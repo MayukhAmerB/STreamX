@@ -1,0 +1,278 @@
+from datetime import timedelta
+from pathlib import Path
+
+import dj_database_url
+
+from config.env import env, env_bool, env_list
+
+# Developer credit: Ibrahim Mohsin Mayukh Bhatt
+BASE_DIR = Path(__file__).resolve().parents[2]
+
+SECRET_KEY = env("DJANGO_SECRET_KEY", "dev-only-secret-key")
+DEBUG = env_bool("DEBUG", False)
+ALLOWED_HOSTS = env_list(
+    "ALLOWED_HOSTS",
+    ["localhost", "127.0.0.1"] if DEBUG else [],
+)
+
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "corsheaders",
+    "rest_framework",
+    "rest_framework.authtoken",
+    "apps.users",
+    "apps.courses",
+    "apps.payments",
+    "apps.realtime",
+]
+
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "config.security.SuspiciousInputFirewallMiddleware",
+    "config.security.APISecurityHeadersMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+ROOT_URLCONF = "config.urls"
+WSGI_APPLICATION = "config.wsgi.application"
+ASGI_APPLICATION = "config.asgi.application"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ]
+        },
+    }
+]
+
+DATABASE_URL = env("DATABASE_URL", "sqlite:///db.sqlite3")
+is_postgres_database = DATABASE_URL.startswith(("postgres://", "postgresql://", "postgis://"))
+DATABASES = {
+    "default": dj_database_url.parse(
+        DATABASE_URL,
+        conn_max_age=int(env("DATABASE_CONN_MAX_AGE", "120")),
+        ssl_require=env_bool("DATABASE_SSL_REQUIRE", not DEBUG) if is_postgres_database else False,
+    )
+}
+_db_engine_name = str(DATABASES["default"].get("ENGINE", "")).lower()
+_db_name = str(DATABASES["default"].get("NAME", "")).strip()
+if "sqlite3" in _db_engine_name and _db_name and not Path(_db_name).is_absolute():
+    DATABASES["default"]["NAME"] = str((BASE_DIR / _db_name).resolve())
+DATABASE_CONN_HEALTH_CHECKS = env_bool("DATABASE_CONN_HEALTH_CHECKS", True)
+DATABASE_STATEMENT_TIMEOUT_MS = int(env("DATABASE_STATEMENT_TIMEOUT_MS", "15000"))
+DATABASE_LOCK_TIMEOUT_MS = int(env("DATABASE_LOCK_TIMEOUT_MS", "10000"))
+DATABASE_IDLE_IN_TX_TIMEOUT_MS = int(env("DATABASE_IDLE_IN_TX_TIMEOUT_MS", "30000"))
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = DATABASE_CONN_HEALTH_CHECKS
+_db_engine = str(DATABASES["default"].get("ENGINE", ""))
+if "postgresql" in _db_engine:
+    db_options = DATABASES["default"].get("OPTIONS", {})
+    existing_option_string = str(db_options.get("options", "")).strip()
+    hardening_options = (
+        f"-c statement_timeout={DATABASE_STATEMENT_TIMEOUT_MS} "
+        f"-c lock_timeout={DATABASE_LOCK_TIMEOUT_MS} "
+        f"-c idle_in_transaction_session_timeout={DATABASE_IDLE_IN_TX_TIMEOUT_MS}"
+    )
+    db_options["options"] = f"{existing_option_string} {hardening_options}".strip()
+    DATABASES["default"]["OPTIONS"] = db_options
+
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": int(env("AUTH_MIN_PASSWORD_LENGTH", "12"))},
+    },
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+]
+try:
+    import argon2  # noqa: F401
+except ImportError:
+    pass
+else:
+    PASSWORD_HASHERS.insert(0, "django.contrib.auth.hashers.Argon2PasswordHasher")
+
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "Asia/Kolkata"
+USE_I18N = True
+USE_TZ = True
+
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_PUBLIC_BASE_URL = env("MEDIA_PUBLIC_BASE_URL", "")
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+AUTH_USER_MODEL = "users.User"
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "config.authentication.CookieJWTAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.AllowAny",
+    ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "50/minute",
+        "user": "200/minute",
+        "login": "10/minute",
+        "login_burst": "5/minute",
+        "contact": "5/hour",
+        "password_reset_request": "5/hour",
+        "password_reset_confirm": "20/hour",
+        "payment_create": "20/hour",
+        "payment_verify": "60/hour",
+        "live_class_enroll": "20/hour",
+        "lecture_playback": "120/minute",
+        "realtime_session_create": "30/hour",
+        "realtime_session_join": "240/hour",
+    },
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": False,
+    "BLACKLIST_AFTER_ROTATION": False,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
+
+JWT_COOKIE_SECURE = env_bool("JWT_COOKIE_SECURE", False)
+JWT_COOKIE_SAMESITE = env("JWT_COOKIE_SAMESITE", "Lax")
+
+SESSION_COOKIE_SECURE = env_bool("SESSION_COOKIE_SECURE", not DEBUG)
+CSRF_COOKIE_SECURE = env_bool("CSRF_COOKIE_SECURE", not DEBUG)
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = env_bool("CSRF_COOKIE_HTTPONLY", False)
+SESSION_COOKIE_SAMESITE = env("SESSION_COOKIE_SAMESITE", "Lax")
+CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", "Lax")
+
+CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", ["http://localhost:5173"])
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", ["http://localhost:5173"])
+
+if DEBUG:
+    dev_frontend_origins = [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
+    ]
+    CORS_ALLOWED_ORIGINS = list(dict.fromkeys([*CORS_ALLOWED_ORIGINS, *dev_frontend_origins]))
+    CSRF_TRUSTED_ORIGINS = list(dict.fromkeys([*CSRF_TRUSTED_ORIGINS, *dev_frontend_origins]))
+
+SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", False)
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = env_bool("USE_X_FORWARDED_HOST", True)
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = env("SECURE_REFERRER_POLICY", "strict-origin-when-cross-origin")
+X_FRAME_OPTIONS = env("X_FRAME_OPTIONS", "DENY")
+SECURE_CROSS_ORIGIN_OPENER_POLICY = env("SECURE_CROSS_ORIGIN_OPENER_POLICY", "same-origin")
+
+SECURE_HSTS_SECONDS = int(env("SECURE_HSTS_SECONDS", "0" if DEBUG else "31536000"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", not DEBUG)
+SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", not DEBUG)
+
+SECURE_REDIRECT_EXEMPT = env_list("SECURE_REDIRECT_EXEMPT", [])
+SECURE_SSL_HOST = env("SECURE_SSL_HOST", None)
+
+AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", "")
+AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", "")
+AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", "")
+AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", "")
+
+RAZORPAY_KEY_ID = env("RAZORPAY_KEY_ID", "")
+RAZORPAY_KEY_SECRET = env("RAZORPAY_KEY_SECRET", "")
+GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", "")
+
+FRONTEND_URL = env("FRONTEND_URL", "http://localhost:5173")
+FRONTEND_PUBLIC_ORIGIN = env("FRONTEND_PUBLIC_ORIGIN", "")
+
+EMAIL_BACKEND = env("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = env("EMAIL_HOST", "")
+EMAIL_PORT = int(env("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "no-reply@alsyedacademy.local")
+CONTACT_RECEIVER_EMAIL = env("CONTACT_RECEIVER_EMAIL", DEFAULT_FROM_EMAIL)
+FFMPEG_BINARY = env("FFMPEG_BINARY", "ffmpeg")
+SECURITY_BLOCK_SUSPICIOUS_INPUT = env_bool("SECURITY_BLOCK_SUSPICIOUS_INPUT", True)
+SECURITY_MAX_INSPECTION_BODY_BYTES = int(env("SECURITY_MAX_INSPECTION_BODY_BYTES", "16384"))
+AUTH_LOGIN_MAX_FAILURES = int(env("AUTH_LOGIN_MAX_FAILURES", "6"))
+AUTH_LOGIN_LOCKOUT_SECONDS = int(env("AUTH_LOGIN_LOCKOUT_SECONDS", "900"))
+COURSE_LIST_CACHE_TTL_SECONDS = int(env("COURSE_LIST_CACHE_TTL_SECONDS", "60"))
+COURSE_DETAIL_CACHE_TTL_SECONDS = int(env("COURSE_DETAIL_CACHE_TTL_SECONDS", "60"))
+LIVE_CLASS_LIST_CACHE_TTL_SECONDS = int(env("LIVE_CLASS_LIST_CACHE_TTL_SECONDS", "30"))
+LIVEKIT_URL = env("LIVEKIT_URL", "")
+LIVEKIT_PUBLIC_URL = env("LIVEKIT_PUBLIC_URL", "")
+LIVEKIT_API_KEY = env("LIVEKIT_API_KEY", "")
+LIVEKIT_API_SECRET = env("LIVEKIT_API_SECRET", "")
+LIVEKIT_MEET_URL = env("LIVEKIT_MEET_URL", "https://meet.livekit.io")
+
+REALTIME_DEFAULT_MEETING_CAPACITY = int(env("REALTIME_DEFAULT_MEETING_CAPACITY", "300"))
+REALTIME_DEFAULT_MAX_AUDIENCE = int(env("REALTIME_DEFAULT_MAX_AUDIENCE", "50000"))
+REALTIME_JOIN_TOKEN_TTL_SECONDS = int(env("REALTIME_JOIN_TOKEN_TTL_SECONDS", "3600"))
+
+OWNCAST_BASE_URL = env("OWNCAST_BASE_URL", "")
+OWNCAST_STREAM_PUBLIC_BASE_URL = env("OWNCAST_STREAM_PUBLIC_BASE_URL", "")
+OWNCAST_CHAT_PUBLIC_BASE_URL = env("OWNCAST_CHAT_PUBLIC_BASE_URL", "")
+OWNCAST_DEFAULT_STREAM_PATH = env("OWNCAST_DEFAULT_STREAM_PATH", "/embed/video")
+OWNCAST_DEFAULT_CHAT_PATH = env("OWNCAST_DEFAULT_CHAT_PATH", "/embed/chat/readwrite")
+OWNCAST_RTMP_TARGET = env("OWNCAST_RTMP_TARGET", "")
+LIVEKIT_EGRESS_LAYOUT = env("LIVEKIT_EGRESS_LAYOUT", "speaker-dark")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
+        }
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+        }
+    },
+    "loggers": {
+        "security.audit": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        }
+    },
+}

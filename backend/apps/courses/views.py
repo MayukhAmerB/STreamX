@@ -1,0 +1,626 @@
+from django.conf import settings
+from django.core.cache import cache
+from django.db.models import Count, Prefetch, Q
+from rest_framework import generics, permissions, status
+from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.views import APIView
+
+from config.audit import log_security_event
+from config.pagination import apply_optional_pagination
+from config.response import api_response
+from config.url_utils import get_media_public_url
+
+from .models import Course, Enrollment, Lecture, LiveClass, LiveClassEnrollment, Section
+from .permissions import IsCourseInstructor, IsEnrolledInCourse, IsInstructor
+from .serializers import (
+    CourseDetailSerializer,
+    CourseListSerializer,
+    CourseWriteSerializer,
+    LectureSerializer,
+    LiveClassEnrollSerializer,
+    LiveClassListSerializer,
+    SectionSerializer,
+)
+from .services import S3VideoError, generate_playback_url, generate_signed_video_url
+
+
+def _course_prefetch_queryset():
+    return Course.objects.select_related("instructor").prefetch_related(
+        Prefetch(
+            "sections",
+            queryset=Section.objects.all().prefetch_related("lectures"),
+        )
+    )
+
+
+class CourseListCreateView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        search = (request.query_params.get("search") or "").strip()
+        cache_key = None
+        if not request.user.is_authenticated:
+            cache_key = (
+                "course-list:"
+                f"search={search.lower()}:"
+                f"paginate={request.query_params.get('paginate','')}:"
+                f"page={request.query_params.get('page','')}:"
+                f"page_size={request.query_params.get('page_size','')}"
+            )
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return api_response(success=True, message="Courses fetched.", data=cached)
+
+        queryset = (
+            Course.objects.filter(is_published=True)
+            .select_related("instructor")
+            .annotate(section_count=Count("sections"))
+        )
+        if search:
+            queryset = queryset.filter(
+                Q(title__icontains=search) | Q(description__icontains=search)
+            )
+        queryset = queryset.order_by("-created_at")
+        paged_queryset, page_meta = apply_optional_pagination(request, queryset)
+        serializer = CourseListSerializer(
+            paged_queryset,
+            many=True,
+            context={"request": request},
+        )
+        payload = (
+            {"results": serializer.data, "pagination": page_meta}
+            if page_meta is not None
+            else serializer.data
+        )
+        if cache_key:
+            cache.set(
+                cache_key,
+                payload,
+                timeout=getattr(settings, "COURSE_LIST_CACHE_TTL_SECONDS", 60),
+            )
+        return api_response(success=True, message="Courses fetched.", data=payload)
+
+    def post(self, request):
+        if not request.user or not request.user.is_authenticated:
+            return api_response(
+                success=False,
+                message="Authentication required.",
+                errors={"detail": "Authentication credentials were not provided."},
+                status_code=status.HTTP_401_UNAUTHORIZED,
+            )
+        if request.user.role != "instructor":
+            return api_response(
+                success=False,
+                message="Instructor role required.",
+                errors={"detail": "Only instructors can create courses."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = CourseWriteSerializer(data=request.data)
+        if not serializer.is_valid():
+            return api_response(
+                success=False,
+                message="Course creation failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        course = serializer.save(instructor=request.user)
+        data = CourseDetailSerializer(course, context={"request": request}).data
+        return api_response(
+            success=True,
+            message="Course created.",
+            data=data,
+            status_code=status.HTTP_201_CREATED,
+        )
+
+
+class CourseDetailView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get_object(self, request, pk):
+        queryset = _course_prefetch_queryset()
+        course = generics.get_object_or_404(queryset, pk=pk)
+        if course.is_published:
+            return course
+        if not request.user.is_authenticated:
+            raise permissions.PermissionDenied("Course is not published.")
+        if request.user.role == "instructor" and request.user.id == course.instructor_id:
+            return course
+        raise permissions.PermissionDenied("Course is not published.")
+
+    def get(self, request, pk):
+        try:
+            course = self.get_object(request, pk)
+        except permissions.PermissionDenied as exc:
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": str(exc)},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        cache_key = None
+        if not request.user.is_authenticated and course.is_published:
+            updated_ts = int(course.updated_at.timestamp()) if course.updated_at else 0
+            cache_key = f"course-detail:{course.pk}:v={updated_ts}"
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return api_response(success=True, message="Course fetched.", data=cached)
+        serializer = CourseDetailSerializer(course, context={"request": request})
+        payload = serializer.data
+        if cache_key:
+            cache.set(
+                cache_key,
+                payload,
+                timeout=getattr(settings, "COURSE_DETAIL_CACHE_TTL_SECONDS", 60),
+            )
+        return api_response(success=True, message="Course fetched.", data=payload)
+
+    def patch(self, request, pk):
+        return self._update(request, pk, partial=True)
+
+    def put(self, request, pk):
+        return self._update(request, pk, partial=False)
+
+    def _update(self, request, pk, partial):
+        course = generics.get_object_or_404(Course, pk=pk)
+        if not request.user.is_authenticated:
+            return api_response(
+                success=False,
+                message="Authentication required.",
+                errors={"detail": "Authentication credentials were not provided."},
+                status_code=status.HTTP_401_UNAUTHORIZED,
+            )
+        if request.user.role != "instructor" or course.instructor_id != request.user.id:
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "Only the course instructor can edit this course."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = CourseWriteSerializer(course, data=request.data, partial=partial)
+        if not serializer.is_valid():
+            return api_response(
+                success=False,
+                message="Course update failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer.save()
+        data = CourseDetailSerializer(course, context={"request": request}).data
+        return api_response(success=True, message="Course updated.", data=data)
+
+    def delete(self, request, pk):
+        course = generics.get_object_or_404(Course, pk=pk)
+        if not request.user.is_authenticated:
+            return api_response(
+                success=False,
+                message="Authentication required.",
+                errors={"detail": "Authentication credentials were not provided."},
+                status_code=status.HTTP_401_UNAUTHORIZED,
+            )
+        if request.user.role != "instructor" or course.instructor_id != request.user.id:
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "Only the course instructor can delete this course."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        course.delete()
+        return api_response(success=True, message="Course deleted.", data=None)
+
+
+class SectionCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsInstructor]
+
+    def post(self, request):
+        serializer = SectionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return api_response(
+                success=False,
+                message="Section creation failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        course = serializer.validated_data["course"]
+        if course.instructor_id != request.user.id:
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "You can only create sections for your own courses."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        section = serializer.save()
+        return api_response(
+            success=True,
+            message="Section created.",
+            data=SectionSerializer(section).data,
+            status_code=status.HTTP_201_CREATED,
+        )
+
+
+class SectionDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsInstructor]
+
+    def put(self, request, pk):
+        section = generics.get_object_or_404(Section.objects.select_related("course"), pk=pk)
+        if section.course.instructor_id != request.user.id:
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "You can only edit sections for your own courses."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = SectionSerializer(section, data=request.data)
+        if not serializer.is_valid():
+            return api_response(
+                success=False,
+                message="Section update failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer.save()
+        return api_response(success=True, message="Section updated.", data=serializer.data)
+
+    def delete(self, request, pk):
+        section = generics.get_object_or_404(Section.objects.select_related("course"), pk=pk)
+        if section.course.instructor_id != request.user.id:
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "You can only delete sections for your own courses."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        section.delete()
+        return api_response(success=True, message="Section deleted.", data=None)
+
+
+class LectureCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsInstructor]
+
+    def post(self, request):
+        serializer = LectureSerializer(data=request.data)
+        if not serializer.is_valid():
+            return api_response(
+                success=False,
+                message="Lecture creation failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        section = serializer.validated_data["section"]
+        if section.course.instructor_id != request.user.id:
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "You can only create lectures for your own courses."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        lecture = serializer.save()
+        return api_response(
+            success=True,
+            message="Lecture created.",
+            data=LectureSerializer(lecture, context={"request": request}).data,
+            status_code=status.HTTP_201_CREATED,
+        )
+
+
+class LectureDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsInstructor]
+
+    def put(self, request, pk):
+        lecture = generics.get_object_or_404(Lecture.objects.select_related("section__course"), pk=pk)
+        if lecture.section.course.instructor_id != request.user.id:
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "You can only edit lectures for your own courses."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = LectureSerializer(lecture, data=request.data)
+        if not serializer.is_valid():
+            return api_response(
+                success=False,
+                message="Lecture update failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer.save()
+        return api_response(
+            success=True,
+            message="Lecture updated.",
+            data=LectureSerializer(lecture, context={"request": request}).data,
+        )
+
+    def delete(self, request, pk):
+        lecture = generics.get_object_or_404(Lecture.objects.select_related("section__course"), pk=pk)
+        if lecture.section.course.instructor_id != request.user.id:
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "You can only delete lectures for your own courses."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        lecture.delete()
+        return api_response(success=True, message="Lecture deleted.", data=None)
+
+
+class LectureVideoView(APIView):
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "lecture_playback"
+
+    def get(self, request, pk):
+        lecture = generics.get_object_or_404(
+            Lecture.objects.select_related("section__course", "section__course__instructor"),
+            pk=pk,
+        )
+        course = lecture.section.course
+        if not lecture.is_preview:
+            if not request.user.is_authenticated:
+                log_security_event("course.lecture_playback_denied_unauthenticated", request=request, lecture_id=lecture.id)
+                return api_response(
+                    success=False,
+                    message="Authentication required.",
+                    errors={"detail": "Authentication credentials were not provided."},
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                )
+            is_instructor_owner = (
+                request.user.role == "instructor" and request.user.id == course.instructor_id
+            )
+            is_enrolled = Enrollment.objects.filter(
+                user=request.user,
+                course=course,
+                payment_status=Enrollment.STATUS_PAID,
+            ).exists()
+            if not (is_instructor_owner or is_enrolled):
+                log_security_event(
+                    "course.lecture_playback_denied_not_enrolled",
+                    request=request,
+                    lecture_id=lecture.id,
+                    course_id=course.id,
+                )
+                return api_response(
+                    success=False,
+                    message="Enrollment required.",
+                    errors={"detail": "You are not enrolled in this course."},
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+
+        if lecture.stream_status == Lecture.STREAM_READY and lecture.stream_manifest_key:
+            try:
+                playback_url, expires_in = generate_playback_url(
+                    request, lecture.stream_manifest_key, expires_in=300, signer=generate_signed_video_url
+                )
+            except S3VideoError as exc:
+                log_security_event(
+                    "course.lecture_playback_hls_url_failed",
+                    request=request,
+                    lecture_id=lecture.id,
+                    course_id=course.id,
+                )
+                return api_response(
+                    success=False,
+                    message="Stream URL generation failed.",
+                    errors={"detail": str(exc)},
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+            log_security_event(
+                "course.lecture_playback_hls_url_issued",
+                request=request,
+                lecture_id=lecture.id,
+                course_id=course.id,
+            )
+            return api_response(
+                success=True,
+                message="Lecture stream URL generated.",
+                data={
+                    "signed_url": playback_url,
+                    "playback_url": playback_url,
+                    "playback_type": "hls",
+                    "stream_status": lecture.stream_status,
+                    "expires_in": expires_in,
+                },
+            )
+
+        if lecture.video_file:
+            media_url = get_media_public_url(lecture.video_file.url, request=request)
+            log_security_event(
+                "course.lecture_playback_file_url_issued",
+                request=request,
+                lecture_id=lecture.id,
+                course_id=course.id,
+            )
+            return api_response(
+                success=True,
+                message="Lecture video URL generated.",
+                data={
+                    "signed_url": media_url,
+                    "playback_url": media_url,
+                    "playback_type": "file",
+                    "stream_status": lecture.stream_status,
+                    "expires_in": None,
+                },
+            )
+
+        if not lecture.video_key:
+            return api_response(
+                success=False,
+                message="Video not configured.",
+                errors={"detail": "No uploaded video file or video key is configured for this lecture."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            signed_url, expires_in = generate_playback_url(
+                request, lecture.video_key, expires_in=300, signer=generate_signed_video_url
+            )
+        except S3VideoError as exc:
+            log_security_event(
+                "course.lecture_playback_signed_url_failed",
+                request=request,
+                lecture_id=lecture.id,
+                course_id=course.id,
+            )
+            return api_response(
+                success=False,
+                message="Video URL generation failed.",
+                errors={"detail": str(exc)},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        log_security_event(
+            "course.lecture_playback_signed_url_issued",
+            request=request,
+            lecture_id=lecture.id,
+            course_id=course.id,
+        )
+        return api_response(
+            success=True,
+            message="Signed video URL generated.",
+            data={
+                "signed_url": signed_url,
+                "playback_url": signed_url,
+                "playback_type": "file",
+                "stream_status": lecture.stream_status,
+                "expires_in": expires_in,
+            },
+        )
+
+
+class MyCoursesView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        enrollments = (
+            Enrollment.objects.filter(user=request.user, payment_status=Enrollment.STATUS_PAID)
+            .select_related("course")
+            .order_by("-enrolled_at")
+        )
+        data = [
+            {
+                "id": enrollment.course.id,
+                "title": enrollment.course.title,
+                "description": enrollment.course.description,
+                "thumbnail": enrollment.course.get_thumbnail_url(request=request),
+                "price": str(enrollment.course.price),
+                "slug": enrollment.course.slug,
+                "enrolled_at": enrollment.enrolled_at,
+            }
+            for enrollment in enrollments
+        ]
+        return api_response(success=True, message="Enrolled courses fetched.", data=data)
+
+
+class InstructorCoursesView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsInstructor]
+
+    def get(self, request):
+        queryset = (
+            Course.objects.filter(instructor=request.user)
+            .select_related("instructor")
+            .annotate(section_count=Count("sections"))
+        )
+        serializer = CourseListSerializer(
+            queryset,
+            many=True,
+            context={"request": request},
+        )
+        return api_response(success=True, message="Instructor courses fetched.", data=serializer.data)
+
+
+class LiveClassListView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        cache_key = None
+        if not request.user.is_authenticated:
+            cache_key = (
+                "live-class-list:"
+                f"paginate={request.query_params.get('paginate','')}:"
+                f"page={request.query_params.get('page','')}:"
+                f"page_size={request.query_params.get('page_size','')}"
+            )
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return api_response(success=True, message="Live classes fetched.", data=cached)
+
+        queryset = (
+            LiveClass.objects.filter(is_active=True)
+            .select_related("linked_course")
+            .annotate(enrollment_count=Count("enrollments"))
+            .order_by("month_number", "id")
+        )
+        paged_queryset, page_meta = apply_optional_pagination(request, queryset, default_page_size=12, max_page_size=50)
+        serializer_context = {"request": request}
+        if request.user.is_authenticated:
+            live_class_ids = [item.id for item in paged_queryset]
+            enrolled_ids = set(
+                LiveClassEnrollment.objects.filter(
+                    user=request.user,
+                    live_class_id__in=live_class_ids,
+                ).values_list("live_class_id", flat=True)
+            )
+            serializer_context["enrolled_live_class_ids"] = enrolled_ids
+        serializer = LiveClassListSerializer(paged_queryset, many=True, context=serializer_context)
+        payload = (
+            {"results": serializer.data, "pagination": page_meta}
+            if page_meta is not None
+            else serializer.data
+        )
+        if cache_key:
+            cache.set(
+                cache_key,
+                payload,
+                timeout=getattr(settings, "LIVE_CLASS_LIST_CACHE_TTL_SECONDS", 30),
+            )
+        return api_response(success=True, message="Live classes fetched.", data=payload)
+
+
+class LiveClassEnrollView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "live_class_enroll"
+
+    def post(self, request):
+        serializer = LiveClassEnrollSerializer(data=request.data)
+        if not serializer.is_valid():
+            log_security_event("live_class.enroll_invalid", request=request, errors=serializer.errors)
+            return api_response(
+                success=False,
+                message="Live class enrollment failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        live_class = (
+            LiveClass.objects.filter(pk=serializer.validated_data["live_class_id"], is_active=True)
+            .select_related("linked_course")
+            .first()
+        )
+        if not live_class:
+            log_security_event("live_class.enroll_not_found_or_inactive", request=request)
+            return api_response(
+                success=False,
+                message="Live class unavailable.",
+                errors={"detail": "Live class not found or inactive."},
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        enrollment, created = LiveClassEnrollment.objects.get_or_create(
+            user=request.user,
+            live_class=live_class,
+        )
+        log_security_event(
+            "live_class.enroll_success" if created else "live_class.enroll_already_exists",
+            request=request,
+            live_class_id=live_class.id,
+        )
+
+        return api_response(
+            success=True,
+            message="Live class enrollment successful." if created else "Already enrolled in live class.",
+            data={
+                "live_class_id": live_class.id,
+                "enrolled": True,
+                "already_enrolled": not created,
+                "email": request.user.email,
+                "full_name": request.user.full_name,
+            },
+        )

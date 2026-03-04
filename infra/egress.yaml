@@ -1,0 +1,7 @@
+api_key: devkey
+api_secret: secret
+ws_url: ws://127.0.0.1:7880
+redis:
+  address: redis:6379
+template_port: 7980
+health_port: 7981

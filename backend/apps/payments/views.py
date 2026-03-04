@@ -1,0 +1,211 @@
+from decimal import Decimal
+
+from django.db import transaction
+from rest_framework import permissions, status
+from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.views import APIView
+
+from apps.courses.models import Course, Enrollment
+from config.audit import log_security_event
+from config.response import api_response
+
+from .models import Payment
+from .serializers import CreateOrderSerializer, VerifyPaymentSerializer
+from .services import RazorpayServiceError, create_razorpay_order, verify_razorpay_signature
+
+
+class CreateOrderView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "payment_create"
+
+    def post(self, request):
+        serializer = CreateOrderSerializer(data=request.data)
+        if not serializer.is_valid():
+            log_security_event("payment.create_order_invalid", request=request, errors=serializer.errors)
+            return api_response(
+                success=False,
+                message="Order creation failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        course = Course.objects.filter(pk=serializer.validated_data["course_id"]).first()
+        if not course or not course.is_published:
+            log_security_event("payment.create_order_course_unavailable", request=request)
+            return api_response(
+                success=False,
+                message="Course unavailable.",
+                errors={"detail": "Course not found or not published."},
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        if request.user.id == course.instructor_id:
+            log_security_event("payment.create_order_instructor_self_purchase_blocked", request=request, course_id=course.id)
+            return api_response(
+                success=False,
+                message="Invalid purchase request.",
+                errors={"detail": "Instructors cannot purchase their own courses."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        existing_enrollment = Enrollment.objects.filter(
+            user=request.user, course=course, payment_status=Enrollment.STATUS_PAID
+        ).exists()
+        if existing_enrollment:
+            log_security_event("payment.create_order_already_enrolled", request=request, course_id=course.id)
+            return api_response(
+                success=True,
+                message="Already enrolled.",
+                data={"already_enrolled": True, "course_id": course.id},
+            )
+
+        amount_paise = int(Decimal(course.price) * 100)
+        try:
+            order = create_razorpay_order(
+                amount_paise=amount_paise,
+                currency="INR",
+                receipt=f"course-{course.id}-user-{request.user.id}",
+            )
+        except RazorpayServiceError as exc:
+            log_security_event("payment.create_order_gateway_error", request=request, course_id=course.id)
+            return api_response(
+                success=False,
+                message="Order creation failed.",
+                errors={"detail": str(exc)},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        payment = Payment.objects.create(
+            user=request.user,
+            course=course,
+            razorpay_order_id=order["id"],
+            amount=course.price,
+            currency=order.get("currency", "INR"),
+            status=Payment.STATUS_CREATED,
+        )
+        log_security_event(
+            "payment.create_order_success",
+            request=request,
+            course_id=course.id,
+            payment_id=payment.id,
+        )
+        return api_response(
+            success=True,
+            message="Razorpay order created.",
+            data={
+                "payment_id": payment.id,
+                "razorpay_order_id": order["id"],
+                "amount": order["amount"],
+                "currency": order.get("currency", "INR"),
+                "key_id": None,
+            },
+            status_code=status.HTTP_201_CREATED,
+        )
+
+
+class VerifyPaymentView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "payment_verify"
+
+    def post(self, request):
+        serializer = VerifyPaymentSerializer(data=request.data)
+        if not serializer.is_valid():
+            log_security_event("payment.verify_invalid", request=request, errors=serializer.errors)
+            return api_response(
+                success=False,
+                message="Payment verification failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        data = serializer.validated_data
+        payment = (
+            Payment.objects.select_related("course", "user")
+            .filter(
+                user=request.user,
+                course_id=data["course_id"],
+                razorpay_order_id=data["razorpay_order_id"],
+            )
+            .first()
+        )
+        if not payment:
+            log_security_event("payment.verify_payment_not_found", request=request, course_id=data.get("course_id"))
+            return api_response(
+                success=False,
+                message="Payment record not found.",
+                errors={"detail": "Payment order not found for this user/course."},
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        if payment.status == Payment.STATUS_PAID and payment.razorpay_payment_id == data["razorpay_payment_id"]:
+            enrollment, _ = Enrollment.objects.get_or_create(
+                user=request.user,
+                course=payment.course,
+                defaults={"payment_status": Enrollment.STATUS_PAID},
+            )
+            if enrollment.payment_status != Enrollment.STATUS_PAID:
+                enrollment.payment_status = Enrollment.STATUS_PAID
+                enrollment.save(update_fields=["payment_status"])
+            log_security_event("payment.verify_already_paid", request=request, course_id=payment.course_id, payment_id=payment.id)
+            return api_response(
+                success=True,
+                message="Payment already verified.",
+                data={"course_id": payment.course_id, "enrolled": True},
+            )
+
+        try:
+            verify_razorpay_signature(
+                razorpay_order_id=data["razorpay_order_id"],
+                razorpay_payment_id=data["razorpay_payment_id"],
+                razorpay_signature=data["razorpay_signature"],
+            )
+        except RazorpayServiceError as exc:
+            payment.status = Payment.STATUS_FAILED
+            payment.razorpay_payment_id = data["razorpay_payment_id"]
+            payment.razorpay_signature = data["razorpay_signature"]
+            payment.save(
+                update_fields=["status", "razorpay_payment_id", "razorpay_signature", "updated_at"]
+            )
+            log_security_event("payment.verify_signature_failed", request=request, course_id=payment.course_id, payment_id=payment.id)
+            return api_response(
+                success=False,
+                message="Payment verification failed.",
+                errors={"detail": str(exc)},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            payment.status = Payment.STATUS_PAID
+            payment.razorpay_payment_id = data["razorpay_payment_id"]
+            payment.razorpay_signature = data["razorpay_signature"]
+            payment.save(
+                update_fields=["status", "razorpay_payment_id", "razorpay_signature", "updated_at"]
+            )
+            enrollment, created = Enrollment.objects.get_or_create(
+                user=request.user,
+                course=payment.course,
+                defaults={"payment_status": Enrollment.STATUS_PAID},
+            )
+            if not created and enrollment.payment_status != Enrollment.STATUS_PAID:
+                enrollment.payment_status = Enrollment.STATUS_PAID
+                enrollment.save(update_fields=["payment_status"])
+        log_security_event("payment.verify_success", request=request, course_id=payment.course_id, payment_id=payment.id)
+
+        return api_response(
+            success=True,
+            message="Payment verified and enrollment created.",
+            data={"course_id": payment.course_id, "enrolled": True},
+        )
+
+
+class PaymentWebhookStubView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        return api_response(
+            success=True,
+            message="Webhook endpoint stub. Add Razorpay webhook signature validation before production use.",
+            data=None,
+        )

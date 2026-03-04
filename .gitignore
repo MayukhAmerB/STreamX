@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.coverage
+
+# Django
+backend/db.sqlite3
+backend/staticfiles/
+backend/media/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Env files
+.env
+backend/.env
+frontend/.env
+
+# OS/editor
+.DS_Store
+Thumbs.db
+infra/livekit.runtime.yaml

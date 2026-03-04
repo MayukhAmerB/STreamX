@@ -1,0 +1,19 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | AlsyedAcademy Enterprise Control{% endblock %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'admin/css/enterprise.css' %}">
+{% endblock %}
+
+{% block branding %}
+  <h1 id="site-name">
+    <a href="{% url 'admin:index' %}">AlsyedAcademy Enterprise Control</a>
+  </h1>
+{% endblock %}
+
+{% block nav-global %}
+  <div class="enterprise-admin-note">Operations, security, and platform governance</div>
+{% endblock %}

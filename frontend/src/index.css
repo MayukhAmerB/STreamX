@@ -1,0 +1,209 @@
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  font-family: "Manrope", system-ui, sans-serif;
+  background: #050705;
+  color: #ffffff;
+  @apply antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Space Grotesk", "Manrope", system-ui, sans-serif;
+}
+
+.font-editorial {
+  font-family: "Cormorant Garamond", Georgia, serif;
+}
+
+.font-reference {
+  font-family: "Sora", "Space Grotesk", "Manrope", system-ui, sans-serif;
+}
+
+.mesh-panel {
+  background:
+    radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.92), rgba(243, 247, 236, 0.86) 45%, rgba(227, 235, 217, 0.78)),
+    linear-gradient(135deg, rgba(246, 249, 240, 0.9), rgba(234, 239, 227, 0.8));
+}
+
+.grid-noise {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sheenSweep {
+  0% {
+    transform: translateX(-150%) skewX(-18deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.45;
+  }
+  55% {
+    opacity: 0.2;
+  }
+  100% {
+    transform: translateX(220%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+@keyframes slowFloat {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.reveal-up {
+  opacity: 0;
+  animation: riseIn 700ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.reveal-delay-1 {
+  animation-delay: 80ms;
+}
+
+.reveal-delay-2 {
+  animation-delay: 160ms;
+}
+
+.reveal-delay-3 {
+  animation-delay: 240ms;
+}
+
+.surface-white {
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(180deg, rgba(252, 253, 249, 0.98), rgba(238, 243, 231, 0.98));
+  border: 1px solid rgba(222, 230, 212, 0.9);
+  box-shadow:
+    0 18px 60px rgba(28, 34, 27, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.surface-white::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 16% 4%, rgba(255, 255, 255, 0.95), transparent 40%),
+    linear-gradient(180deg, rgba(214, 224, 203, 0.2), transparent 28%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.surface-dark {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 80% 0%, rgba(199, 210, 188, 0.16), transparent 42%),
+    linear-gradient(180deg, #121712, #090c09);
+  border: 1px solid rgba(205, 216, 196, 0.14);
+  box-shadow:
+    0 22px 70px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.glossy {
+  position: relative;
+  overflow: hidden;
+}
+
+.glossy::after {
+  content: "";
+  position: absolute;
+  top: -30%;
+  left: 0;
+  width: 42%;
+  height: 180%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.16),
+    rgba(255, 255, 255, 0)
+  );
+  transform: translateX(-180%) skewX(-18deg);
+  pointer-events: none;
+}
+
+.glossy:hover::after {
+  animation: sheenSweep 900ms ease;
+}
+
+.hover-lift {
+  transition:
+    transform 250ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 250ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 250ms ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+}
+
+.floating-soft {
+  animation: slowFloat 6s ease-in-out infinite;
+}
+
+.soft-ring {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.45),
+    0 24px 60px rgba(0, 0, 0, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-up,
+  .floating-soft {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .hover-lift,
+  .hover-lift:hover {
+    transition: none;
+    transform: none;
+  }
+
+  .glossy:hover::after {
+    animation: none;
+  }
+}

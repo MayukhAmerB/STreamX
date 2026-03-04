@@ -1,0 +1,63 @@
+{% extends "admin/base_site.html" %}
+{% load i18n log %}
+
+{% block content %}
+  <div class="enterprise-admin-shell">
+    <section class="enterprise-admin-main">
+      {% if app_list %}
+        {% for app in app_list %}
+          <article id="app-{{ app.app_label }}" class="enterprise-admin-appcard">
+            <header class="enterprise-admin-appcard-header">
+              <h3>{{ app.name }}</h3>
+            </header>
+            <div class="enterprise-admin-model-list">
+              {% for model in app.models %}
+                <div class="enterprise-admin-model-row">
+                  <div class="enterprise-admin-model-name">
+                    {% if model.admin_url %}
+                      <a href="{{ model.admin_url }}">{{ model.name }}</a>
+                    {% else %}
+                      {{ model.name }}
+                    {% endif %}
+                  </div>
+                  <div class="enterprise-admin-model-actions">
+                    {% if model.add_url %}
+                      <a href="{{ model.add_url }}" class="enterprise-admin-action-link">Add</a>
+                    {% endif %}
+                    {% if model.admin_url %}
+                      <a href="{{ model.admin_url }}" class="enterprise-admin-action-link">Manage</a>
+                    {% endif %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </article>
+        {% endfor %}
+      {% else %}
+        <article class="enterprise-admin-appcard">
+          <h3>No Management Permissions</h3>
+          <p class="enterprise-admin-muted">
+            You do not have permission to view or edit admin models.
+          </p>
+        </article>
+      {% endif %}
+    </section>
+  </div>
+
+  <section class="enterprise-admin-activity enterprise-admin-activity--full">
+    <h2>Recent Actions</h2>
+    {% get_admin_log 12 as admin_log for_user user %}
+    {% if admin_log %}
+      <ul class="enterprise-admin-activity-list">
+        {% for entry in admin_log %}
+          <li>
+            <span class="enterprise-admin-activity-object">{{ entry.object_repr }}</span>
+            <span class="enterprise-admin-activity-model">{{ entry.content_type.name|capfirst }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="enterprise-admin-muted">No recent actions.</p>
+    {% endif %}
+  </section>
+{% endblock %}

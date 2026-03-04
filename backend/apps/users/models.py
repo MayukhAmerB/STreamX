@@ -1,0 +1,63 @@
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+
+from config.model_validators import validate_no_active_content
+from config.upload_validators import validate_profile_image_upload
+
+from .managers import UserManager
+
+
+class User(AbstractUser):
+    ROLE_STUDENT = "student"
+    ROLE_INSTRUCTOR = "instructor"
+    ROLE_CHOICES = [
+        (ROLE_STUDENT, "Student"),
+        (ROLE_INSTRUCTOR, "Instructor"),
+    ]
+
+    username = None
+    email = models.EmailField(unique=True)
+    full_name = models.CharField(max_length=255)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_STUDENT)
+    profile_image = models.ImageField(upload_to="profile_images/", blank=True, null=True)
+    two_factor_enabled = models.BooleanField(default=False)
+    two_factor_secret = models.CharField(max_length=64, blank=True, default="")
+    oauth_provider = models.CharField(max_length=50, blank=True, default="")
+    oauth_provider_uid = models.CharField(max_length=255, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = []
+
+    objects = UserManager()
+
+    def clean(self):
+        super().clean()
+        validate_no_active_content(self.full_name, "full_name")
+        validate_profile_image_upload(self.profile_image, "profile_image")
+
+    def __str__(self):
+        return self.email
+
+
+class AuthConfiguration(models.Model):
+    registration_enabled = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Auth Configuration"
+        verbose_name_plural = "Auth Configuration"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1, defaults={"registration_enabled": False})
+        return obj
+
+    def __str__(self):
+        return "Auth Configuration"

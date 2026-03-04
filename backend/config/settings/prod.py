@@ -1,0 +1,7 @@
+from .base import *  # noqa
+
+DEBUG = False
+SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+JWT_COOKIE_SECURE = True

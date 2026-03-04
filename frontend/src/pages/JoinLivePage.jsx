@@ -1,0 +1,362 @@
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import Button from "../components/Button";
+import PageShell from "../components/PageShell";
+import MeetingRoomExperience from "../components/realtime/MeetingRoomExperience";
+import { joinRealtimeSession, listRealtimeSessions } from "../api/realtime";
+import { useAuth } from "../hooks/useAuth";
+import { apiData, apiMessage } from "../utils/api";
+
+const pageBackgroundImage =
+  "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
+
+const modeOptions = [
+  { key: "all", label: "All Sessions" },
+  { key: "meeting", label: "Meetings" },
+  { key: "broadcasting", label: "Broadcasts" },
+];
+
+function statusBadgeClass(status) {
+  if (status === "live") {
+    return "border-emerald-300/30 bg-emerald-300/10 text-emerald-200";
+  }
+  if (status === "scheduled") {
+    return "border-amber-300/30 bg-amber-300/10 text-amber-200";
+  }
+  return "border-[#2f3f31] bg-[#121a13] text-[#c8d2bf]";
+}
+
+function sessionTypeLabel(sessionType) {
+  return sessionType === "broadcasting" ? "Broadcast" : "Meeting";
+}
+
+export default function JoinLivePage() {
+  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [joinState, setJoinState] = useState({ loadingId: null, error: "", info: "" });
+  const [activeSession, setActiveSession] = useState(null);
+  const [query, setQuery] = useState("");
+  const [mode, setMode] = useState("all");
+  const [autoJoinConsumed, setAutoJoinConsumed] = useState(false);
+
+  const highlightedSessionId = useMemo(() => {
+    const raw = searchParams.get("session");
+    const value = Number(raw || 0);
+    return Number.isInteger(value) && value > 0 ? value : null;
+  }, [searchParams]);
+
+  const loadSessions = async () => {
+    try {
+      const response = await listRealtimeSessions({ status: "all" });
+      const data = apiData(response, []);
+      const rows = Array.isArray(data) ? data.filter((item) => item.status !== "ended") : [];
+      setSessions(rows);
+      setError("");
+    } catch (err) {
+      setError(apiMessage(err, "Unable to load live sessions."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSessions();
+  }, []);
+
+  const orderedSessions = useMemo(() => {
+    return [...sessions].sort((a, b) => {
+      const statusWeight = { live: 1, scheduled: 2, ended: 3 };
+      const aWeight = statusWeight[a.status] || 4;
+      const bWeight = statusWeight[b.status] || 4;
+      if (aWeight !== bWeight) return aWeight - bWeight;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }, [sessions]);
+
+  const filteredSessions = useMemo(() => {
+    const trimmed = query.trim().toLowerCase();
+    return orderedSessions.filter((session) => {
+      if (mode !== "all" && session.session_type !== mode) {
+        return false;
+      }
+      if (!trimmed) {
+        return true;
+      }
+      return (
+        (session.title || "").toLowerCase().includes(trimmed) ||
+        (session.description || "").toLowerCase().includes(trimmed) ||
+        (session.host?.full_name || "").toLowerCase().includes(trimmed)
+      );
+    });
+  }, [mode, orderedSessions, query]);
+
+  const stats = useMemo(() => {
+    const liveCount = orderedSessions.filter((session) => session.status === "live").length;
+    const meetingCount = orderedSessions.filter((session) => session.session_type === "meeting").length;
+    const broadcastCount = orderedSessions.filter(
+      (session) => session.session_type === "broadcasting"
+    ).length;
+    return {
+      total: orderedSessions.length,
+      live: liveCount,
+      meeting: meetingCount,
+      broadcasting: broadcastCount,
+    };
+  }, [orderedSessions]);
+
+  const handleJoin = async (sessionId) => {
+    setJoinState({ loadingId: sessionId, error: "", info: "" });
+    try {
+      const response = await joinRealtimeSession(sessionId, {
+        display_name: user?.full_name || "",
+      });
+      const data = apiData(response, null);
+      setActiveSession(data);
+      setJoinState({ loadingId: null, error: "", info: "Joined live session." });
+      await loadSessions();
+    } catch (err) {
+      setJoinState({ loadingId: null, error: apiMessage(err, "Unable to join live session."), info: "" });
+    }
+  };
+
+  useEffect(() => {
+    if (!highlightedSessionId || activeSession || autoJoinConsumed) {
+      return;
+    }
+    setAutoJoinConsumed(true);
+    handleJoin(highlightedSessionId);
+  }, [activeSession, autoJoinConsumed, highlightedSessionId]);
+
+  return (
+    <PageShell
+      title="Join Live"
+      subtitle="Access all active meetings and broadcasts from one premium live operations screen."
+      badge="LIVE ACCESS"
+    >
+      <section className="relative mb-6 overflow-hidden rounded-[30px] border border-[#cfd8c5]/10 bg-[#070907] shadow-[0_26px_70px_rgba(0,0,0,0.35)]">
+        <div className="absolute inset-0">
+          <img
+            src={pageBackgroundImage}
+            alt=""
+            aria-hidden="true"
+            className="h-full w-full object-cover opacity-[0.16]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/88 via-black/78 to-[#0d130f]/94" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_12%,rgba(185,199,171,0.12),transparent_36%)]" />
+          <div className="absolute inset-0 opacity-15 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:26px_26px]" />
+        </div>
+
+        <div className="relative grid gap-5 p-5 sm:p-6 lg:grid-cols-[1.05fr_0.95fr]">
+          <div>
+            <h2 className="font-reference text-3xl font-semibold leading-tight text-white sm:text-4xl">
+              Elegant unified entry for every live experience
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-[#b7c0b0]">
+              Join two-way meeting rooms, switch into stream mode when sessions scale, and keep users
+              in one polished workflow.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-[#243025] bg-[#0f1610]/92 px-3 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-[#8f9989]">Live Now</div>
+                <div className="mt-1 text-2xl font-semibold text-white">{stats.live}</div>
+              </div>
+              <div className="rounded-xl border border-[#243025] bg-[#0f1610]/92 px-3 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-[#8f9989]">Total Active</div>
+                <div className="mt-1 text-2xl font-semibold text-white">{stats.total}</div>
+              </div>
+              <div className="rounded-xl border border-[#243025] bg-[#0f1610]/92 px-3 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-[#8f9989]">Meetings</div>
+                <div className="mt-1 text-2xl font-semibold text-white">{stats.meeting}</div>
+              </div>
+              <div className="rounded-xl border border-[#243025] bg-[#0f1610]/92 px-3 py-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-[#8f9989]">Broadcasts</div>
+                <div className="mt-1 text-2xl font-semibold text-white">{stats.broadcasting}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-[#243025] bg-[#0d120f]/92 p-5 backdrop-blur-sm">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8f9989]">
+              Join Workflow
+            </div>
+            <div className="mt-3 space-y-2">
+              {[
+                "Find a live session or search by title/host.",
+                "Join meeting mode for interactive class participation.",
+                "When overflow triggers, continue in broadcast mode with chat.",
+                "Stay in one page without losing session context.",
+              ].map((item, index) => (
+                <div
+                  key={item}
+                  className="flex items-start gap-3 rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-3 text-sm text-[#c4cdba]"
+                >
+                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-[#334033] bg-[#111811] text-[10px] font-semibold text-[#d5ddcb]">
+                    {index + 1}
+                  </span>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {joinState.error ? (
+        <div className="mb-4 rounded-xl border border-red-300/30 bg-red-200/10 px-4 py-3 text-sm text-red-200">
+          {joinState.error}
+        </div>
+      ) : null}
+
+      {joinState.info ? (
+        <div className="mb-4 rounded-xl border border-[#2f3f31] bg-[#111a12] px-4 py-3 text-sm text-[#d5ddcb]">
+          {joinState.info}
+        </div>
+      ) : null}
+
+      {activeSession?.mode === "meeting" ? (
+        <MeetingRoomExperience
+          payload={activeSession}
+          onLeave={() => setActiveSession(null)}
+          audiencePanel
+        />
+      ) : null}
+
+      {activeSession?.mode === "broadcast" ? (
+        <section className="mb-6 rounded-[26px] border border-[#223023] bg-[#090d09]/72 p-4 sm:p-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.14em] text-[#8f9989]">Now Viewing</div>
+              <span className="text-sm text-[#dbe4d1]">{activeSession.session?.title}</span>
+            </div>
+            <span className="rounded-full border border-[#2f3f31] bg-[#121a13] px-3 py-1 text-xs uppercase tracking-[0.12em] text-[#c8d2bf]">
+              Live Broadcast
+            </span>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
+            <div className="overflow-hidden rounded-2xl border border-[#263328] bg-black">
+              {activeSession.broadcast?.stream_embed_url ? (
+                <iframe
+                  title="Broadcast Stream"
+                  src={activeSession.broadcast.stream_embed_url}
+                  className="h-[460px] w-full"
+                  allow="autoplay; fullscreen"
+                />
+              ) : (
+                <div className="flex h-[460px] items-center justify-center px-6 text-center text-sm text-[#b7c0b0]">
+                  Stream URL not configured for this session.
+                </div>
+              )}
+            </div>
+            <div className="overflow-hidden rounded-2xl border border-[#263328] bg-[#0d140e]">
+              {activeSession.broadcast?.chat_embed_url ? (
+                <iframe
+                  title="Broadcast Chat"
+                  src={activeSession.broadcast.chat_embed_url}
+                  className="h-[460px] w-full"
+                  allow="clipboard-read; clipboard-write"
+                />
+              ) : (
+                <div className="flex h-[460px] items-center justify-center px-6 text-center text-sm text-[#b7c0b0]">
+                  Chat URL not configured for this session.
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="rounded-[26px] border border-[#223023] bg-[#090d09]/72 p-4 sm:p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="font-reference text-xl font-semibold text-white">Available Live Sessions</h3>
+            <p className="mt-1 text-xs text-[#8f9989]">Clean list view with smart filters and one-click join.</p>
+          </div>
+          <span className="text-xs text-[#8f9989]">
+            {loading ? "Loading..." : `${filteredSessions.length} session${filteredSessions.length === 1 ? "" : "s"}`}
+          </span>
+        </div>
+
+        <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto]">
+          <input
+            className="w-full rounded-xl border border-[#2a3a2c] bg-[#0c120d] px-3 py-2.5 text-sm text-white outline-none focus:border-[#8ea284]"
+            placeholder="Search by session title or description"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <div className="flex flex-wrap gap-2">
+            {modeOptions.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setMode(option.key)}
+                className={`rounded-xl border px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition ${
+                  mode === option.key
+                    ? "border-[#d5decb] bg-[#d5decb] text-[#111611]"
+                    : "border-[#2f3f31] bg-[#111a12] text-[#c8d2bf] hover:bg-[#18221a]"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {error ? (
+          <div className="mb-4 rounded-xl border border-amber-300/30 bg-amber-100/10 px-4 py-3 text-sm text-amber-200">
+            {error}
+          </div>
+        ) : null}
+
+        {filteredSessions.length > 0 ? (
+          <div className="space-y-3">
+            {filteredSessions.map((session) => (
+              <article
+                key={session.id}
+                className={`grid gap-4 rounded-2xl border bg-[#101812]/92 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.22)] md:grid-cols-[1fr_auto] md:items-center ${
+                  session.id === highlightedSessionId ? "border-[#d5decb]/40" : "border-[#273527]"
+                }`}
+              >
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full border px-2 py-1 text-[11px] uppercase tracking-[0.12em] ${statusBadgeClass(session.status)}`}
+                    >
+                      {session.status}
+                    </span>
+                    <span className="rounded-full border border-[#2f3f31] bg-[#121a13] px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-[#c8d2bf]">
+                      {sessionTypeLabel(session.session_type)}
+                    </span>
+                    {session.id === highlightedSessionId ? (
+                      <span className="rounded-full border border-[#d5decb]/35 bg-[#d5decb]/10 px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-[#d5decb]">
+                        Shared Link
+                      </span>
+                    ) : null}
+                  </div>
+                  <h4 className="mt-2 font-reference text-xl text-white">{session.title}</h4>
+                  <p className="mt-2 text-sm leading-6 text-[#b7c0b0]">
+                    {session.description || "Live session with classroom or broadcast format."}
+                  </p>
+                </div>
+                <Button
+                  className="w-full md:w-[160px]"
+                  loading={joinState.loadingId === session.id}
+                  onClick={() => handleJoin(session.id)}
+                >
+                  Join Session
+                </Button>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-[#2f3f31] bg-[#111a12] px-4 py-3 text-sm text-[#d5ddcb]">
+            No sessions match this filter right now.
+          </div>
+        )}
+      </section>
+    </PageShell>
+  );
+}

@@ -1,0 +1,85 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: alsyedacademy
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+    working_dir: /app
+    env_file:
+      - ./backend/.env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - livekit
+      - livekit-egress
+      - owncast
+    command: python manage.py runserver 0.0.0.0:8000
+
+  frontend:
+    build:
+      context: ./frontend
+    env_file:
+      - ./frontend/.env
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+  livekit:
+    image: livekit/livekit-server:latest
+    environment:
+      NODE_IP: ${LIVEKIT_NODE_IP}
+      UDP_PORT: ${LIVEKIT_UDP_PORT:-7882}
+    command: --config /etc/livekit.yaml
+    ports:
+      - "7880:7880/tcp"
+      - "7881:7881/tcp"
+      - "${LIVEKIT_UDP_PORT:-7882}:${LIVEKIT_UDP_PORT:-7882}/udp"
+    volumes:
+      - ${LIVEKIT_CONFIG_FILE:-./infra/livekit.yaml}:/etc/livekit.yaml:ro
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  livekit-egress:
+    image: livekit/egress:latest
+    network_mode: "service:livekit"
+    depends_on:
+      - livekit
+      - redis
+    environment:
+      EGRESS_CONFIG_FILE: /out/egress.yaml
+    volumes:
+      - ./infra/egress.yaml:/out/egress.yaml:ro
+
+  owncast:
+    image: gabekangas/owncast:latest
+    command: ["-streamkey", "${OWNCAST_STREAM_KEY:-alsyedacademydevstream}"]
+    ports:
+      - "8080:8080"
+      - "1935:1935"
+    volumes:
+      - owncast_data:/app/data
+
+volumes:
+  postgres_data:
+  owncast_data:

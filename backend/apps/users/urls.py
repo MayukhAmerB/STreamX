@@ -1,0 +1,39 @@
+from django.urls import path
+
+from .views import (
+    AuthConfigView,
+    ChangePasswordView,
+    CsrfTokenView,
+    CurrentUserView,
+    GoogleLoginView,
+    LoginView,
+    LogoutView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
+    ContactMessageView,
+    ProfileView,
+    RefreshTokenView,
+    RegisterView,
+    TwoFactorDisableView,
+    TwoFactorEnableView,
+    TwoFactorSetupView,
+)
+
+urlpatterns = [
+    path("config/", AuthConfigView.as_view(), name="auth-config"),
+    path("csrf/", CsrfTokenView.as_view(), name="auth-csrf"),
+    path("register/", RegisterView.as_view(), name="auth-register"),
+    path("login/", LoginView.as_view(), name="auth-login"),
+    path("logout/", LogoutView.as_view(), name="auth-logout"),
+    path("refresh/", RefreshTokenView.as_view(), name="auth-refresh"),
+    path("user/", CurrentUserView.as_view(), name="auth-user"),
+    path("profile/", ProfileView.as_view(), name="auth-profile"),
+    path("change-password/", ChangePasswordView.as_view(), name="auth-change-password"),
+    path("2fa/setup/", TwoFactorSetupView.as_view(), name="auth-2fa-setup"),
+    path("2fa/enable/", TwoFactorEnableView.as_view(), name="auth-2fa-enable"),
+    path("2fa/disable/", TwoFactorDisableView.as_view(), name="auth-2fa-disable"),
+    path("google/", GoogleLoginView.as_view(), name="auth-google"),
+    path("contact/", ContactMessageView.as_view(), name="auth-contact"),
+    path("password-reset/", PasswordResetRequestView.as_view(), name="auth-password-reset"),
+    path("password-reset-confirm/", PasswordResetConfirmView.as_view(), name="auth-password-reset-confirm"),
+]
