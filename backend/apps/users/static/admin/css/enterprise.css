@@ -362,6 +362,31 @@ a:hover {
   font-size: 12px;
 }
 
+.enterprise-password-generator {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.enterprise-password-generator .enterprise-password-generator-btn,
+.enterprise-password-generator .enterprise-password-generator-copy {
+  min-height: 34px;
+}
+
+.enterprise-password-generator .enterprise-password-generator-output {
+  min-width: 260px;
+  height: 34px;
+}
+
+.enterprise-password-generator .enterprise-password-generator-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 11px;
+  color: var(--admin-text-soft);
+}
+
 @media (max-width: 900px) {
   .enterprise-admin-activity {
     position: static;
@@ -370,5 +395,9 @@ a:hover {
   .enterprise-admin-model-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .enterprise-password-generator {
+    grid-template-columns: 1fr;
   }
 }

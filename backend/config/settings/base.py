@@ -2,6 +2,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 
 from config.env import env, env_bool, env_int, env_list
 
@@ -15,6 +16,16 @@ ALLOWED_HOSTS = env_list(
     "ALLOWED_HOSTS",
     ["localhost", "127.0.0.1"] if DEBUG else [],
 )
+ENABLE_WHITENOISE_STATIC = env_bool("ENABLE_WHITENOISE_STATIC", not DEBUG)
+USE_GCS_MEDIA_STORAGE = env_bool("USE_GCS_MEDIA_STORAGE", False)
+GCS_MEDIA_BUCKET_NAME = env("GCS_MEDIA_BUCKET_NAME", "").strip()
+GCS_MEDIA_LOCATION = env("GCS_MEDIA_LOCATION", "").strip().strip("/")
+GCS_MEDIA_QUERYSTRING_AUTH = env_bool("GCS_MEDIA_QUERYSTRING_AUTH", False)
+GCS_MEDIA_CACHE_CONTROL = env("GCS_MEDIA_CACHE_CONTROL", "public,max-age=3600").strip()
+GCP_PROJECT_ID = env("GCP_PROJECT_ID", "").strip()
+GCS_MEDIA_CUSTOM_DOMAIN = env("GCS_MEDIA_CUSTOM_DOMAIN", "").strip()
+if USE_GCS_MEDIA_STORAGE and not GCS_MEDIA_BUCKET_NAME:
+    raise ImproperlyConfigured("GCS_MEDIA_BUCKET_NAME must be set when USE_GCS_MEDIA_STORAGE=1.")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -31,9 +42,15 @@ INSTALLED_APPS = [
     "apps.payments",
     "apps.realtime",
 ]
+if USE_GCS_MEDIA_STORAGE:
+    INSTALLED_APPS.append("storages")
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+]
+if ENABLE_WHITENOISE_STATIC:
+    MIDDLEWARE.append("whitenoise.middleware.WhiteNoiseMiddleware")
+MIDDLEWARE += [
     "corsheaders.middleware.CorsMiddleware",
     "config.security.SuspiciousInputFirewallMiddleware",
     "config.security.APISecurityHeadersMiddleware",
@@ -147,9 +164,46 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+WHITENOISE_MAX_AGE = env_int("WHITENOISE_MAX_AGE", 0 if DEBUG else 31536000)
+WHITENOISE_ALLOW_ALL_ORIGINS = env_bool("WHITENOISE_ALLOW_ALL_ORIGINS", True)
+WHITENOISE_KEEP_ONLY_HASHED_FILES = env_bool("WHITENOISE_KEEP_ONLY_HASHED_FILES", True)
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 MEDIA_PUBLIC_BASE_URL = env("MEDIA_PUBLIC_BASE_URL", "")
+if USE_GCS_MEDIA_STORAGE and not MEDIA_PUBLIC_BASE_URL:
+    if GCS_MEDIA_CUSTOM_DOMAIN:
+        MEDIA_PUBLIC_BASE_URL = f"https://{GCS_MEDIA_CUSTOM_DOMAIN.rstrip('/')}"
+    else:
+        MEDIA_PUBLIC_BASE_URL = f"https://storage.googleapis.com/{GCS_MEDIA_BUCKET_NAME}"
+if MEDIA_PUBLIC_BASE_URL:
+    MEDIA_PUBLIC_BASE_URL = MEDIA_PUBLIC_BASE_URL.rstrip("/")
+
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
+
+if ENABLE_WHITENOISE_STATIC:
+    STORAGES["staticfiles"] = {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"}
+
+if USE_GCS_MEDIA_STORAGE:
+    gcs_options = {
+        "bucket_name": GCS_MEDIA_BUCKET_NAME,
+        "default_acl": None,
+        "querystring_auth": GCS_MEDIA_QUERYSTRING_AUTH,
+        "file_overwrite": False,
+        "object_parameters": {"cache_control": GCS_MEDIA_CACHE_CONTROL},
+    }
+    if GCS_MEDIA_LOCATION:
+        gcs_options["location"] = GCS_MEDIA_LOCATION
+    if GCS_MEDIA_CUSTOM_DOMAIN:
+        gcs_options["custom_endpoint"] = f"https://{GCS_MEDIA_CUSTOM_DOMAIN.rstrip('/')}"
+    if GCP_PROJECT_ID:
+        gcs_options["project_id"] = GCP_PROJECT_ID
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        "OPTIONS": gcs_options,
+    }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "users.User"
@@ -287,6 +341,7 @@ SECURITY_BLOCK_SUSPICIOUS_INPUT = env_bool("SECURITY_BLOCK_SUSPICIOUS_INPUT", Tr
 SECURITY_MAX_INSPECTION_BODY_BYTES = env_int("SECURITY_MAX_INSPECTION_BODY_BYTES", 16384)
 AUTH_LOGIN_MAX_FAILURES = env_int("AUTH_LOGIN_MAX_FAILURES", 6)
 AUTH_LOGIN_LOCKOUT_SECONDS = env_int("AUTH_LOGIN_LOCKOUT_SECONDS", 900)
+ACCOUNT_SELF_SERVICE_CREDENTIALS_ENABLED = env_bool("ACCOUNT_SELF_SERVICE_CREDENTIALS_ENABLED", False)
 COURSE_LIST_CACHE_TTL_SECONDS = env_int("COURSE_LIST_CACHE_TTL_SECONDS", 60)
 COURSE_DETAIL_CACHE_TTL_SECONDS = env_int("COURSE_DETAIL_CACHE_TTL_SECONDS", 60)
 LIVE_CLASS_LIST_CACHE_TTL_SECONDS = env_int("LIVE_CLASS_LIST_CACHE_TTL_SECONDS", 30)

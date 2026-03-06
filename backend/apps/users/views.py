@@ -45,6 +45,10 @@ def _registration_enabled():
     return bool(AuthConfiguration.get_solo().registration_enabled)
 
 
+def _self_service_credentials_enabled():
+    return bool(getattr(settings, "ACCOUNT_SELF_SERVICE_CREDENTIALS_ENABLED", False))
+
+
 def _issue_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
     return str(refresh.access_token), str(refresh)
@@ -489,6 +493,14 @@ class ChangePasswordView(APIView):
     parser_classes = [JSONParser]
 
     def post(self, request):
+        if not _self_service_credentials_enabled():
+            log_security_event("auth.password_change_disabled", request=request)
+            return api_response(
+                success=False,
+                message="Password change is currently disabled.",
+                errors={"detail": "Password management is handled by admin."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
         serializer = ChangePasswordSerializer(data=request.data)
         if not serializer.is_valid():
             return api_response(
@@ -517,6 +529,14 @@ class TwoFactorSetupView(APIView):
     parser_classes = [JSONParser]
 
     def post(self, request):
+        if not _self_service_credentials_enabled():
+            log_security_event("auth.2fa_setup_disabled", request=request)
+            return api_response(
+                success=False,
+                message="Two-factor setup is currently disabled.",
+                errors={"detail": "Two-factor management is handled by admin."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
         secret = pyotp.random_base32()
         request.user.two_factor_secret = secret
         request.user.two_factor_enabled = False
@@ -545,6 +565,14 @@ class TwoFactorEnableView(APIView):
     parser_classes = [JSONParser]
 
     def post(self, request):
+        if not _self_service_credentials_enabled():
+            log_security_event("auth.2fa_enable_disabled", request=request)
+            return api_response(
+                success=False,
+                message="Two-factor enable is currently disabled.",
+                errors={"detail": "Two-factor management is handled by admin."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
         serializer = TwoFactorCodeSerializer(data=request.data)
         if not serializer.is_valid():
             return api_response(
@@ -584,6 +612,14 @@ class TwoFactorDisableView(APIView):
     parser_classes = [JSONParser]
 
     def post(self, request):
+        if not _self_service_credentials_enabled():
+            log_security_event("auth.2fa_disable_disabled", request=request)
+            return api_response(
+                success=False,
+                message="Two-factor disable is currently disabled.",
+                errors={"detail": "Two-factor management is handled by admin."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
         serializer = TwoFactorDisableSerializer(data=request.data)
         if not serializer.is_valid():
             return api_response(

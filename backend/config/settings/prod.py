@@ -71,6 +71,14 @@ if ENFORCE_PRODUCTION_REQUIREMENTS:
         errors.append("All auth/session cookies must be marked secure in production.")
     if SECURE_HSTS_SECONDS < 31536000:
         errors.append("SECURE_HSTS_SECONDS must be at least 31536000 in production.")
+    if not ENABLE_WHITENOISE_STATIC:
+        errors.append("ENABLE_WHITENOISE_STATIC must be enabled in production.")
+    if not USE_GCS_MEDIA_STORAGE:
+        errors.append("USE_GCS_MEDIA_STORAGE must be enabled in production for durable media storage.")
+    if USE_GCS_MEDIA_STORAGE and not GCS_MEDIA_BUCKET_NAME:
+        errors.append("GCS_MEDIA_BUCKET_NAME must be set when USE_GCS_MEDIA_STORAGE=1.")
+    if MEDIA_PUBLIC_BASE_URL and not _is_secure_origin(MEDIA_PUBLIC_BASE_URL):
+        errors.append("MEDIA_PUBLIC_BASE_URL must use HTTPS in production.")
 
     if errors:
         raise ImproperlyConfigured("Production configuration is not secure:\n- " + "\n- ".join(errors))

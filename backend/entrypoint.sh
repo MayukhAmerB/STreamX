@@ -6,5 +6,7 @@ if [ "${APP_ENV:-}" = "production" ] || [ "${DJANGO_SETTINGS_MODULE:-}" = "confi
 fi
 
 python manage.py migrate --noinput
-python manage.py collectstatic --noinput || true
+if [ "${RUN_COLLECTSTATIC:-1}" = "1" ]; then
+  python manage.py collectstatic --noinput
+fi
 exec "$@"

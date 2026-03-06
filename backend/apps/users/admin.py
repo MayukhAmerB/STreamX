@@ -31,6 +31,9 @@ class UserAdmin(DjangoUserAdmin):
         ),
     )
 
+    class Media:
+        js = ("admin/js/user_password_generator.js",)
+
 
 @admin.register(AuthConfiguration)
 class AuthConfigurationAdmin(admin.ModelAdmin):
