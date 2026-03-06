@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { listCourses } from "../api/courses";
 import Button from "../components/Button";
@@ -21,7 +21,7 @@ const stats = [
 const infoCards = [
   {
     title: "About Us",
-    body: "AlsyedAcademy is a cybersecurity learning platform focused on practical skills, ethical testing, and professional workflows.",
+    body: "Al syed Initiative is a cybersecurity learning platform focused on practical skills, ethical testing, and professional workflows.",
   },
   {
     title: "Courses We Provide",
@@ -148,20 +148,6 @@ function programBulletsForCourse(course) {
   return ["Structured learning path", "Practical workflow-based progression"];
 }
 
-function PlaceholderImage({ label, className = "" }) {
-  return (
-    <div
-      className={`flex items-center justify-center rounded-2xl border-2 border-dashed border-[#2a332d] bg-[#0d120f] text-center ${className}`}
-    >
-      <div className="px-4 py-6">
-        <div className="mx-auto mb-2 h-8 w-8 rounded-lg border border-[#2a332d] bg-[#151b15]" />
-        <p className="text-sm font-semibold text-[#d7e0cc]">{label}</p>
-        <p className="mt-1 text-xs text-[#8f9989]">Image placeholder (you will provide later)</p>
-      </div>
-    </div>
-  );
-}
-
 function IconBadge({ type }) {
   if (type === "target") {
     return (
@@ -273,7 +259,7 @@ export default function LandingPage() {
   }, [catalogCourses]);
 
   return (
-    <div className="bg-black text-[#f5f7f1]">
+    <div className="bg-transparent text-[#f5f7f1]">
       <section className="relative overflow-hidden px-4 pb-8 pt-6 sm:pt-10">
         <div className="absolute inset-0">
           <img
@@ -290,7 +276,7 @@ export default function LandingPage() {
             <div className="reveal-up">
               <div className="inline-flex items-center gap-2 rounded-full border border-[#99aa8e]/30 bg-white/5 px-3 py-1 text-xs font-semibold tracking-wide text-[#d7e0cc]">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#b9c7ab]" />
-                AlsyedAcademy Cybersecurity Platform
+                Al syed Initiative Cybersecurity Platform
               </div>
 
               <h1 className="mt-5 max-w-xl font-reference text-4xl font-semibold leading-[1.02] tracking-tight text-white sm:text-5xl lg:text-6xl">
@@ -418,7 +404,7 @@ export default function LandingPage() {
 
           <SectionCard>
             <SectionTitle
-              title="Why learners choose AlsyedAcademy"
+              title="Why learners choose Al syed Initiative"
               subtitle="Cybersecurity training depth with a modern online learning experience focused on professional execution."
             />
             <div className="mt-6 grid auto-rows-fr gap-4 lg:grid-cols-3">
@@ -523,7 +509,7 @@ export default function LandingPage() {
                         </button>
                       </Link>
                     ) : (
-                      <button className="w-full rounded-full border border-amber-200/20 bg-amber-100/5 px-3 py-2 text-sm font-semibold text-amber-200">
+                      <button className="flex-1 rounded-full border border-amber-200/20 bg-amber-100/5 px-3 py-2 text-sm font-semibold text-amber-200">
                         Coming Soon
                       </button>
                     )}
@@ -560,60 +546,10 @@ export default function LandingPage() {
           </SectionCard>
         </div>
       </div>
-
-      <footer
-        id="contact"
-        className="relative overflow-hidden border-t border-[#d2dcc6]/10 bg-[#060806] text-[#f5f5f5] scroll-mt-24"
-      >
-        <div className="absolute inset-0">
-          <img
-            src={brandBackgroundImage}
-            alt=""
-            aria-hidden="true"
-            className="h-full w-full object-cover opacity-[0.18]"
-          />
-          <div className="absolute inset-0 bg-black/85" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0f1410]/35 via-transparent to-[#b9c7ab]/20" />
-        </div>
-        <div className="relative mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <h3 className="font-reference bg-gradient-to-r from-[#b9c7ab] via-[#99aa8e] to-white bg-clip-text text-2xl font-semibold text-transparent">AlsyedAcademy</h3>
-            <p className="mt-3 text-sm leading-6 text-neutral-400">
-              Personalized cybersecurity learning focused on practical OSINT, recon, and web application testing workflows.
-            </p>
-          </div>
-          <div>
-            <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-neutral-400">Explore</h4>
-            <ul className="mt-3 space-y-2 text-sm text-neutral-300">
-              <li>Home</li>
-              <li>Courses</li>
-              <li>About</li>
-              <li>Contact</li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-neutral-400">Programs</h4>
-            <ul className="mt-3 space-y-2 text-sm text-neutral-300">
-              <li>OSINT Foundations</li>
-              <li>Attack Surface Mapping</li>
-              <li>Web App Pentesting Workflow</li>
-              <li>Reporting and Evidence</li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-neutral-400">Media</h4>
-            <PlaceholderImage label="Footer/Brand Image Placeholder" className="mt-3 h-28" />
-          </div>
-        </div>
-        <div className="relative border-t border-[#d2dcc6]/10">
-          <div className="mx-auto flex max-w-6xl items-center justify-center px-4 py-4 text-xs tracking-[0.12em] text-neutral-400">
-            © Alsyed. All rights reserved.
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
+
 
 
 

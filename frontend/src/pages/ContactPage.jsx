@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { sendContactMessage } from "../api/auth";
 import Button from "../components/Button";
 import FormInput from "../components/FormInput";
@@ -11,14 +11,14 @@ const pageBackgroundImage =
 const contactLinks = [
   {
     name: "Instagram",
-    href: "https://instagram.com/alsyedacademy",
-    handle: "@alsyedacademy",
+    href: "https://instagram.com/alsyedinitiative",
+    handle: "@alsyedinitiative",
     accent: "from-[#f7d5b2] to-[#d89a79]",
   },
   {
     name: "X",
-    href: "https://x.com/alsyedacademy",
-    handle: "@alsyedacademy",
+    href: "https://x.com/alsyedinitiative",
+    handle: "@alsyedinitiative",
     accent: "from-[#dbe6d2] to-[#9fb18f]",
   },
   {
@@ -29,8 +29,8 @@ const contactLinks = [
   },
   {
     name: "Email",
-    href: "mailto:contact@alsyedacademy.com",
-    handle: "contact@alsyedacademy.com",
+    href: "mailto:contact@alsyedinitiative.com",
+    handle: "contact@alsyedinitiative.com",
     accent: "from-[#e8eddc] to-[#c9d5bd]",
   },
 ];
@@ -119,7 +119,7 @@ export default function ContactPage() {
         <div className="relative p-5 sm:p-7">
           <div className="mb-6 rounded-2xl border border-[#243025] bg-[#0d120f]/90 p-5 backdrop-blur-sm">
             <div className="inline-flex items-center rounded-full border border-[#334033] bg-white/5 px-3 py-1 text-xs font-semibold tracking-wide text-[#d7e0cc]">
-              CONTACT ALSYEDACADEMY
+              CONTACT AL SYED INITIATIVE
             </div>
             <h2 className="mt-4 font-reference text-3xl font-semibold leading-tight text-white sm:text-4xl">
               Reach us directly or send a message from the contact form
@@ -221,3 +221,4 @@ export default function ContactPage() {
     </PageShell>
   );
 }
+

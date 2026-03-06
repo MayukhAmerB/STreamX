@@ -17,3 +17,13 @@ def env_list(key, default=None):
     if raw is None:
         return default or []
     return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def env_int(key, default=0):
+    raw = os.getenv(key)
+    if raw is None:
+        return int(default)
+    try:
+        return int(raw.strip())
+    except (TypeError, ValueError):
+        return int(default)

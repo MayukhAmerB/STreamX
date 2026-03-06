@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
-import { getCourse } from "../api/courses";
+import { getCourse, requestCourseEnrollment } from "../api/courses";
 import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
@@ -11,6 +11,26 @@ import { featuredCourse } from "../utils/featuredCourse";
 
 const pageBackgroundImage =
   "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
+const ENABLE_DIRECT_PAYMENTS = String(import.meta.env.VITE_ENABLE_PAYMENTS || "").trim() === "1";
+
+function normalizeEnrollmentStatus(value) {
+  const raw = String(value || "none").toLowerCase();
+  if (raw === "paid" || raw === "approved") return "approved";
+  if (raw === "pending") return "pending";
+  if (raw === "failed" || raw === "rejected" || raw === "cancelled" || raw === "canceled") return "none";
+  return raw || "none";
+}
+
+function withNormalizedEnrollment(courseData) {
+  if (!courseData) return courseData;
+  const enrollmentStatus = normalizeEnrollmentStatus(courseData.enrollment_status);
+  const isEnrolled = Boolean(courseData.is_enrolled) || enrollmentStatus === "approved";
+  return {
+    ...courseData,
+    enrollment_status: enrollmentStatus,
+    is_enrolled: isEnrolled,
+  };
+}
 
 function formatCategory(category) {
   if (category === "web_pentesting") return "Web Pentesting";
@@ -79,17 +99,18 @@ export default function CourseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [previewImageFailed, setPreviewImageFailed] = useState(false);
+  const [enrollmentState, setEnrollmentState] = useState({ loading: false, error: "", success: "" });
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
         const response = await getCourse(id);
-        if (active) setCourse(apiData(response));
+        if (active) setCourse(withNormalizedEnrollment(apiData(response)));
       } catch (err) {
         if (!active) return;
         const fallbackAllowed = String(id) === String(featuredCourse.id);
-        setCourse(fallbackAllowed ? featuredCourse : null);
+        setCourse(fallbackAllowed ? withNormalizedEnrollment(featuredCourse) : null);
         setError(
           fallbackAllowed
             ? "Showing local course preview. Backend is unavailable."
@@ -107,6 +128,47 @@ export default function CourseDetailPage() {
   useEffect(() => {
     setPreviewImageFailed(false);
   }, [id, course?.thumbnail]);
+
+  const normalizedEnrollmentStatus = useMemo(
+    () => normalizeEnrollmentStatus(course?.enrollment_status),
+    [course?.enrollment_status]
+  );
+  const hasApprovedEnrollment = Boolean(course?.is_enrolled) || normalizedEnrollmentStatus === "approved";
+
+  useEffect(() => {
+    if (!isAuthenticated || normalizedEnrollmentStatus !== "pending") return undefined;
+    let active = true;
+
+    const refreshEnrollmentStatus = async () => {
+      try {
+        const response = await getCourse(id);
+        if (!active) return;
+        const latest = withNormalizedEnrollment(apiData(response));
+        setCourse((prev) => (prev ? { ...prev, ...latest } : latest));
+        if (normalizeEnrollmentStatus(latest?.enrollment_status) !== "pending") {
+          setEnrollmentState((prev) => ({ ...prev, success: "" }));
+        }
+      } catch {
+        // Silently ignore status refresh failures; main fetch path already handles errors.
+      }
+    };
+
+    const intervalId = window.setInterval(refreshEnrollmentStatus, 12000);
+    const onFocus = () => {
+      if (document.visibilityState === "visible") {
+        refreshEnrollmentStatus();
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [id, isAuthenticated, normalizedEnrollmentStatus]);
 
   const sections = course?.sections || [];
   const lectureCount = useMemo(
@@ -131,13 +193,47 @@ export default function CourseDetailPage() {
     [course, sections]
   );
 
-  const handleBuy = () => {
+  const handleEnrollNow = async () => {
     if (launchStatus.isComingSoon) return;
     if (!isAuthenticated) {
-      navigate("/login", { state: { from: `/courses/${id}/payment` } });
+      navigate("/login", { state: { from: ENABLE_DIRECT_PAYMENTS ? `/courses/${id}/payment` : `/courses/${id}` } });
       return;
     }
-    navigate(`/courses/${id}/payment`);
+    if (ENABLE_DIRECT_PAYMENTS) {
+      navigate(`/courses/${id}/payment`);
+      return;
+    }
+
+    setEnrollmentState({ loading: true, error: "", success: "" });
+    try {
+      const response = await requestCourseEnrollment({ course_id: Number(id) });
+      const data = apiData(response, {});
+      const enrollmentStatus = normalizeEnrollmentStatus(data?.enrollment_status || "pending");
+      setCourse((prev) =>
+        prev
+          ? {
+              ...prev,
+              is_enrolled: Boolean(data?.is_enrolled) || enrollmentStatus === "approved",
+              enrollment_status: enrollmentStatus,
+            }
+          : prev
+      );
+      setEnrollmentState({
+        loading: false,
+        error: "",
+        success:
+          response?.data?.message ||
+          (enrollmentStatus === "approved"
+            ? "Enrollment approved."
+            : "Enrollment request submitted and pending admin approval."),
+      });
+    } catch (err) {
+      setEnrollmentState({
+        loading: false,
+        error: apiMessage(err, "Unable to submit enrollment request."),
+        success: "",
+      });
+    }
   };
 
   if (loading) {
@@ -320,16 +416,16 @@ export default function CourseDetailPage() {
                   >
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(185,199,171,0.05),transparent_45%)]" />
                     <div className="relative">
-                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="rounded-full border border-[#d6decc]/20 bg-[#161d16] px-3 py-1 text-[11px] font-semibold tracking-wide text-[#d3dcc9]">
+                      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                        <div className="flex min-w-0 items-start gap-2">
+                          <span className="shrink-0 whitespace-nowrap rounded-full border border-[#d6decc]/20 bg-[#161d16] px-3 py-1 text-[11px] font-semibold tracking-wide text-[#d3dcc9]">
                             Module {sectionIndex + 1}
                           </span>
-                          <h3 className="font-reference text-base font-semibold text-white sm:text-lg">
+                          <h3 className="min-w-0 font-reference text-base font-semibold text-white sm:text-lg">
                             {section.title}
                           </h3>
                         </div>
-                        <span className="rounded-full border border-[#2b372b] bg-[#0f1410] px-2.5 py-1 text-[11px] font-semibold text-[#b7c0b0]">
+                        <span className="shrink-0 whitespace-nowrap rounded-full border border-[#2b372b] bg-[#0f1410] px-2.5 py-1 text-[11px] font-semibold text-[#b7c0b0]">
                           {(section.lectures || []).length} lesson{(section.lectures || []).length === 1 ? "" : "s"}
                         </span>
                       </div>
@@ -444,15 +540,31 @@ export default function CourseDetailPage() {
                 >
                   Coming Soon
                 </Button>
-              ) : course.is_enrolled ? (
+              ) : hasApprovedEnrollment ? (
                 <Link to={`/learn/${course.id}`} className="block">
                   <Button className="w-full">Go to Course</Button>
                 </Link>
+              ) : normalizedEnrollmentStatus === "pending" && !ENABLE_DIRECT_PAYMENTS ? (
+                <Button className="w-full" disabled>
+                  Enrollment Pending
+                </Button>
               ) : (
-                <Button className="w-full" onClick={handleBuy}>
-                  {isAuthenticated ? "Buy" : "Login to Buy"}
+                <Button className="w-full" onClick={handleEnrollNow} loading={enrollmentState.loading}>
+                  {ENABLE_DIRECT_PAYMENTS
+                    ? isAuthenticated
+                      ? "Buy"
+                      : "Login to Buy"
+                    : isAuthenticated
+                      ? "Enroll Now"
+                      : "Login to Enroll"}
                 </Button>
               )}
+              {enrollmentState.error ? (
+                <p className="text-xs text-red-300">{enrollmentState.error}</p>
+              ) : null}
+              {enrollmentState.success ? (
+                <p className="text-xs text-green-300">{enrollmentState.success}</p>
+              ) : null}
 
               <Link to="/courses" className="block">
                 <Button variant="secondary" className="w-full">
@@ -464,7 +576,9 @@ export default function CourseDetailPage() {
             <p className="mt-3 text-xs leading-5 text-[#8f9989]">
               {launchStatus.isComingSoon
                 ? "This track is not live yet. We will open enrollment once the curriculum release is ready."
-                : "Payment (Card/UPI) works after backend and Razorpay credentials are configured."}
+                : ENABLE_DIRECT_PAYMENTS
+                  ? "Payment (Card/UPI) works after backend and Razorpay credentials are configured."
+                  : "Enrollment requests are reviewed by admin. Course access is enabled after approval."}
             </p>
           </div>
 

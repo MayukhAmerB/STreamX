@@ -1,4 +1,5 @@
 import os
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -229,6 +230,7 @@ class LiveClass(models.Model):
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True, blank=True)
     description = models.TextField()
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     linked_course = models.ForeignKey(
         Course,
         on_delete=models.SET_NULL,
@@ -275,6 +277,15 @@ class LiveClass(models.Model):
 
 
 class LiveClassEnrollment(models.Model):
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_APPROVED, "Approved"),
+        (STATUS_REJECTED, "Rejected"),
+    ]
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -285,6 +296,7 @@ class LiveClassEnrollment(models.Model):
         on_delete=models.CASCADE,
         related_name="enrollments",
     )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -299,3 +311,34 @@ class LiveClassEnrollment(models.Model):
 
     def __str__(self):
         return f"{self.user.email} -> {self.live_class.title}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self._sync_linked_course_enrollment_status()
+
+    def _sync_linked_course_enrollment_status(self):
+        linked_course_id = getattr(self.live_class, "linked_course_id", None)
+        if not linked_course_id:
+            return
+
+        enrollment = (
+            Enrollment.objects.filter(user=self.user, course_id=linked_course_id)
+            .order_by("-enrolled_at")
+            .first()
+        )
+        if not enrollment:
+            return
+
+        target_status = None
+        if self.status == self.STATUS_APPROVED:
+            target_status = Enrollment.STATUS_PAID
+        elif self.status == self.STATUS_PENDING:
+            target_status = Enrollment.STATUS_PENDING
+        elif self.status == self.STATUS_REJECTED:
+            # Do not downgrade already-approved course access.
+            if enrollment.payment_status != Enrollment.STATUS_PAID:
+                target_status = Enrollment.STATUS_FAILED
+
+        if target_status and enrollment.payment_status != target_status:
+            enrollment.payment_status = target_status
+            enrollment.save(update_fields=["payment_status"])

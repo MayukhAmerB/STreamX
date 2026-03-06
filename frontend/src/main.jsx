@@ -20,3 +20,34 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     </GoogleOAuthProvider>
   </React.StrictMode>
 );
+
+const bootLoader = document.getElementById("boot-loader");
+if (bootLoader && document.body) {
+  const completeTransition = () => {
+    if (bootLoader.isConnected) {
+      bootLoader.remove();
+    }
+  };
+
+  const beginTransition = () => {
+    document.body.classList.add("app-ready");
+    document.body.classList.remove("preload-active");
+    bootLoader.addEventListener(
+      "transitionend",
+      (event) => {
+        if (event.propertyName === "opacity") {
+          completeTransition();
+        }
+      },
+      { once: true }
+    );
+    // Fallback in case transitionend does not fire.
+    window.setTimeout(completeTransition, 1100);
+  };
+
+  window.setTimeout(() => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(beginTransition);
+    });
+  }, 2600);
+}

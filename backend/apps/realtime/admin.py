@@ -1,6 +1,64 @@
+from django import forms
 from django.contrib import admin
+from django.http import HttpResponseRedirect
+from django.urls import reverse
 
 from .models import RealtimeConfiguration, RealtimeSession
+
+
+class RealtimeConfigurationAdminForm(forms.ModelForm):
+    MODE_CURRENT = "current"
+    MODE_HIGH_720P = "high_720p"
+
+    broadcast_quality_mode = forms.ChoiceField(
+        label="Broadcast Quality Preset",
+        required=False,
+        initial=MODE_CURRENT,
+        widget=forms.RadioSelect,
+        choices=(
+            (
+                MODE_CURRENT,
+                "Default profile (keeps your current bitrate/resolution, e.g. existing 480p setup)",
+            ),
+            (MODE_HIGH_720P, "High bitrate profile (1280x720 @ 24fps, 2200 kbps)"),
+        ),
+        help_text=(
+            "Select High bitrate profile to apply 720p defaults automatically. "
+            "Leave on Default profile to use the current manual values."
+        ),
+    )
+
+    class Meta:
+        model = RealtimeConfiguration
+        fields = "__all__"
+
+    @staticmethod
+    def _is_high_profile(instance):
+        return (
+            (instance.broadcast_capture_width or 0) >= 1280
+            and (instance.broadcast_capture_height or 0) >= 720
+            and (instance.broadcast_max_video_bitrate_kbps or 0) >= 1800
+        )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk and self._is_high_profile(self.instance):
+            self.fields["broadcast_quality_mode"].initial = self.MODE_HIGH_720P
+        else:
+            self.fields["broadcast_quality_mode"].initial = self.MODE_CURRENT
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        selected_mode = self.cleaned_data.get("broadcast_quality_mode", self.MODE_CURRENT)
+        if selected_mode == self.MODE_HIGH_720P:
+            instance.broadcast_capture_width = 1280
+            instance.broadcast_capture_height = 720
+            instance.broadcast_capture_fps = 24
+            instance.broadcast_max_video_bitrate_kbps = 2200
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
 
 @admin.register(RealtimeSession)
@@ -31,6 +89,7 @@ class RealtimeSessionAdmin(admin.ModelAdmin):
 
 @admin.register(RealtimeConfiguration)
 class RealtimeConfigurationAdmin(admin.ModelAdmin):
+    form = RealtimeConfigurationAdminForm
     list_display = (
         "broadcast_profile_summary",
         "meeting_camera_profile_summary",
@@ -43,6 +102,7 @@ class RealtimeConfigurationAdmin(admin.ModelAdmin):
             "Broadcast Profile (Host Studio)",
             {
                 "fields": (
+                    "broadcast_quality_mode",
                     "broadcast_capture_width",
                     "broadcast_capture_height",
                     "broadcast_capture_fps",
@@ -87,6 +147,14 @@ class RealtimeConfigurationAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    def changelist_view(self, request, extra_context=None):
+        singleton = RealtimeConfiguration.objects.order_by("pk").first()
+        if singleton:
+            return HttpResponseRedirect(
+                reverse("admin:realtime_realtimeconfiguration_change", args=[singleton.pk])
+            )
+        return super().changelist_view(request, extra_context=extra_context)
 
     @admin.display(description="Broadcast Profile")
     def broadcast_profile_summary(self, obj):

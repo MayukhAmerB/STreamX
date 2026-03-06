@@ -1,4 +1,4 @@
-from django.contrib.auth import get_user_model
+﻿from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings
 from django.core.mail import EmailMessage
@@ -100,6 +100,19 @@ class LoginView(APIView):
     throttle_scope = "login"
 
     def post(self, request):
+        if request.query_params:
+            log_security_event(
+                "auth.login_query_params_blocked",
+                request=request,
+                query_keys=sorted([str(key) for key in request.query_params.keys()])[:20],
+            )
+            return api_response(
+                success=False,
+                message="Login failed.",
+                errors={"detail": "Credentials must not be sent in URL query parameters."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
         email = str(request.data.get("email", "")).strip().lower()
         is_locked, attempts, max_failures = get_lockout_state(email, request)
         if is_locked:
@@ -309,7 +322,7 @@ class PasswordResetRequestView(APIView):
                 or "no-reply@localhost"
             )
             email_message = EmailMessage(
-                subject="Reset your AlsyedAcademy password",
+                subject="Reset your Al syed Initiative password",
                 body=(
                     "We received a password reset request for your account.\n\n"
                     f"Reset link: {reset_url}\n\n"
@@ -509,7 +522,7 @@ class TwoFactorSetupView(APIView):
         request.user.two_factor_enabled = False
         request.user.save(update_fields=["two_factor_secret", "two_factor_enabled", "updated_at"])
 
-        issuer = "AlsyedAcademy"
+        issuer = "Al syed Initiative"
         otp_uri = pyotp.totp.TOTP(secret).provisioning_uri(
             name=request.user.email,
             issuer_name=issuer,
@@ -596,3 +609,4 @@ class TwoFactorDisableView(APIView):
             message="Two-factor authentication disabled.",
             data=_serialize_user(request.user, request=request),
         )
+

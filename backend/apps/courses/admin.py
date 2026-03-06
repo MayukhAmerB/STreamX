@@ -271,9 +271,43 @@ class EnrollmentAdmin(admin.ModelAdmin):
     list_display = ("id", "user", "course", "payment_status", "enrolled_at")
     list_filter = ("payment_status", "course__category", "course__level")
     search_fields = ("user__email", "course__title")
+    list_editable = ("payment_status",)
     raw_id_fields = ("user", "course")
     readonly_fields = ("enrolled_at",)
     list_per_page = 50
+    actions = ("approve_enrollment_requests", "reject_enrollment_requests")
+
+    @admin.action(description="Approve selected enrollment requests")
+    def approve_enrollment_requests(self, request, queryset):
+        updated = queryset.exclude(payment_status=Enrollment.STATUS_PAID).update(
+            payment_status=Enrollment.STATUS_PAID
+        )
+        self.message_user(
+            request,
+            ngettext(
+                "%d enrollment request approved.",
+                "%d enrollment requests approved.",
+                updated,
+            )
+            % updated,
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Reject selected enrollment requests")
+    def reject_enrollment_requests(self, request, queryset):
+        updated = queryset.exclude(payment_status=Enrollment.STATUS_FAILED).update(
+            payment_status=Enrollment.STATUS_FAILED
+        )
+        self.message_user(
+            request,
+            ngettext(
+                "%d enrollment request rejected.",
+                "%d enrollment requests rejected.",
+                updated,
+            )
+            % updated,
+            level=messages.WARNING,
+        )
 
 
 @admin.register(LiveClass)
@@ -281,6 +315,7 @@ class LiveClassAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "title",
+        "price",
         "month_number",
         "level",
         "schedule_days",
@@ -291,11 +326,24 @@ class LiveClassAdmin(admin.ModelAdmin):
     )
     list_filter = ("is_active", "level", "month_number")
     search_fields = ("title", "description", "linked_course__title")
-    list_editable = ("month_number", "is_active")
+    list_editable = ("price", "month_number", "is_active")
     autocomplete_fields = ("linked_course",)
     readonly_fields = ("slug", "enrollment_count_display", "created_at", "updated_at")
     fieldsets = (
-        ("Live Class", {"fields": ("title", "slug", "description", "linked_course", "level", "month_number")}),
+        (
+            "Live Class",
+            {
+                "fields": (
+                    "title",
+                    "slug",
+                    "description",
+                    "price",
+                    "linked_course",
+                    "level",
+                    "month_number",
+                )
+            },
+        ),
         ("Schedule", {"fields": ("schedule_days", "class_duration_minutes", "is_active")}),
         ("Enrollments", {"fields": ("enrollment_count_display",)}),
         ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
@@ -322,15 +370,18 @@ class LiveClassEnrollmentAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "live_class",
+        "status",
         "user",
         "user_full_name",
         "user_email",
         "created_at",
     )
-    list_filter = ("live_class", "live_class__level", "live_class__month_number", "created_at")
+    list_filter = ("status", "live_class", "live_class__level", "live_class__month_number", "created_at")
     search_fields = ("user__email", "user__full_name", "live_class__title")
+    list_editable = ("status",)
     autocomplete_fields = ("user", "live_class")
     readonly_fields = ("created_at",)
+    actions = ("approve_enrollment_requests", "reject_enrollment_requests")
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("user", "live_class")
@@ -343,7 +394,40 @@ class LiveClassEnrollmentAdmin(admin.ModelAdmin):
     def user_email(self, obj):
         return obj.user.email
 
+    @admin.action(description="Approve selected live-class enrollment requests")
+    def approve_enrollment_requests(self, request, queryset):
+        updated = queryset.exclude(status=LiveClassEnrollment.STATUS_APPROVED).update(
+            status=LiveClassEnrollment.STATUS_APPROVED
+        )
+        self.message_user(
+            request,
+            ngettext(
+                "%d live-class enrollment approved.",
+                "%d live-class enrollments approved.",
+                updated,
+            )
+            % updated,
+            level=messages.SUCCESS,
+        )
 
-admin.site.site_header = "Alsyed Academy Admin"
-admin.site.site_title = "Alsyed Academy Admin"
+    @admin.action(description="Reject selected live-class enrollment requests")
+    def reject_enrollment_requests(self, request, queryset):
+        updated = queryset.exclude(status=LiveClassEnrollment.STATUS_REJECTED).update(
+            status=LiveClassEnrollment.STATUS_REJECTED
+        )
+        self.message_user(
+            request,
+            ngettext(
+                "%d live-class enrollment rejected.",
+                "%d live-class enrollments rejected.",
+                updated,
+            )
+            % updated,
+            level=messages.WARNING,
+        )
+
+
+admin.site.site_header = "Al syed Initiative Admin"
+admin.site.site_title = "Al syed Initiative Admin"
 admin.site.index_title = "Course, Modules, and Enrollment Management"
+

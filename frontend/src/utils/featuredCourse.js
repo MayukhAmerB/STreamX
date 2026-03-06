@@ -1,4 +1,4 @@
-export const featuredCourse = {
+﻿export const featuredCourse = {
   id: 1,
   title: "OSINT for Cyber security and Web Application Penetration Testing",
   slug: "osint-for-cyber-security-and-web-application-penetration-testing",
@@ -11,8 +11,8 @@ export const featuredCourse = {
   section_count: 5,
   instructor: {
     id: 1,
-    full_name: "Alsyed Academy",
-    email: "instructor@alsyedacademy.local",
+    full_name: "Al syed Initiative",
+    email: "instructor@alsyedinitiative.local",
   },
   learning_points: [
     "Target discovery and attack surface mapping with OSINT workflows",
@@ -72,3 +72,4 @@ export const featuredCourse = {
 export function getFeaturedCourseFallback() {
   return featuredCourse;
 }
+

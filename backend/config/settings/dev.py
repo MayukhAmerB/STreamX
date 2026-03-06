@@ -3,6 +3,7 @@ import socket
 from urllib.parse import urlparse
 
 DEBUG = True
+APP_ENV = "development"
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0"]
 
 _primary_lan_ip = ""
@@ -37,6 +38,7 @@ SECURE_SSL_REDIRECT = False
 SECURE_HSTS_SECONDS = 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False
+TRUST_X_FORWARDED_FOR = False
 
 # Vite dev ports can shift when one is occupied (5173 -> 5174/5175...).
 _dev_frontend_ports = [5173, 5174, 5175, 5176, 5177, 5178]

@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 import pyotp
 
-from config.request_security import contains_active_content
+from config.request_security import contains_active_content, contains_suspicious_sqli
 from config.upload_validators import validate_profile_image_upload
 from config.url_utils import get_media_public_url
 
@@ -66,10 +66,14 @@ class LoginSerializer(serializers.Serializer):
     otp_code = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     def validate(self, attrs):
+        email = str(attrs.get("email", "")).strip().lower()
+        password = str(attrs.get("password", ""))
+        if contains_suspicious_sqli(email) or contains_suspicious_sqli(password):
+            raise serializers.ValidationError({"detail": "Suspicious input detected."})
         user = authenticate(
             request=self.context.get("request"),
-            email=attrs.get("email"),
-            password=attrs.get("password"),
+            email=email,
+            password=password,
         )
         if not user:
             raise serializers.ValidationError({"detail": "Invalid email or password."})

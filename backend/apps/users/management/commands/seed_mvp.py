@@ -30,7 +30,7 @@ COURSE_CATALOG = [
                 ],
             },
             {
-                "title": "Module 2: Intelligence Lifecycle (Collection → Analysis → Reporting)",
+                "title": "Module 2: Intelligence Lifecycle (Collection -> Analysis -> Reporting)",
                 "description": (
                     "Covers the basic intelligence lifecycle so students understand how to collect information, analyze findings, "
                     "and present information clearly in a simple report."
@@ -206,7 +206,7 @@ COURSE_CATALOG = [
 
 
 class Command(BaseCommand):
-    help = "Seed MVP data: instructor, student, and the AlsyedAcademy catalog courses."
+    help = "Seed MVP data: instructor, student, and the Al syed Initiative catalog courses."
 
     def handle(self, *args, **options):
         instructor, _ = User.objects.get_or_create(
@@ -345,6 +345,7 @@ class Command(BaseCommand):
                 "title": "OSINT Live Class - Month 1 (Beginner)",
                 "level": LiveClass.LEVEL_BEGINNER,
                 "month_number": 1,
+                "price": Decimal("1499.00"),
                 "description": "Month 1 live classes for OSINT Beginner foundation training. Friday, Saturday, Sunday - 1 hour each class.",
             },
             {
@@ -352,6 +353,7 @@ class Command(BaseCommand):
                 "title": "OSINT Live Class - Month 2 (Intermediate)",
                 "level": LiveClass.LEVEL_INTERMEDIATE,
                 "month_number": 2,
+                "price": Decimal("2499.00"),
                 "description": "Month 2 live classes for OSINT Intermediate practical skills. Friday, Saturday, Sunday - 1 hour each class.",
             },
             {
@@ -359,6 +361,7 @@ class Command(BaseCommand):
                 "title": "OSINT Live Class - Month 3 (Advanced)",
                 "level": LiveClass.LEVEL_ADVANCED,
                 "month_number": 3,
+                "price": Decimal("3999.00"),
                 "description": "Month 3 live classes for OSINT Advanced investigations and intelligence. Friday, Saturday, Sunday - 1 hour each class.",
             },
         ]
@@ -371,6 +374,7 @@ class Command(BaseCommand):
                 title=spec["title"],
                 defaults={
                     "description": spec["description"],
+                    "price": spec["price"],
                     "linked_course": linked_course,
                     "level": spec["level"],
                     "month_number": spec["month_number"],
@@ -382,6 +386,7 @@ class Command(BaseCommand):
             changed = False
             for field, value in {
                 "description": spec["description"],
+                "price": spec["price"],
                 "linked_course": linked_course,
                 "level": spec["level"],
                 "month_number": spec["month_number"],
@@ -400,3 +405,4 @@ class Command(BaseCommand):
                 f"Seeded users, {seeded_count} catalog courses, and OSINT live classes."
             )
         )
+

@@ -172,6 +172,7 @@ class CourseDetailSerializer(serializers.ModelSerializer):
     instructor = serializers.SerializerMethodField()
     sections = SectionNestedSerializer(many=True, read_only=True)
     is_enrolled = serializers.SerializerMethodField()
+    enrollment_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -189,6 +190,7 @@ class CourseDetailSerializer(serializers.ModelSerializer):
             "instructor",
             "sections",
             "is_enrolled",
+            "enrollment_status",
             "created_at",
             "updated_at",
         )
@@ -215,6 +217,26 @@ class CourseDetailSerializer(serializers.ModelSerializer):
             course=obj,
             payment_status=Enrollment.STATUS_PAID,
         ).exists()
+
+    def get_enrollment_status(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return "none"
+        if request.user.id == obj.instructor_id:
+            return "approved"
+        enrollment = (
+            Enrollment.objects.filter(user=request.user, course=obj)
+            .order_by("-enrolled_at")
+            .first()
+        )
+        if not enrollment:
+            return "none"
+        if enrollment.payment_status == Enrollment.STATUS_PAID:
+            return "approved"
+        if enrollment.payment_status == Enrollment.STATUS_PENDING:
+            return "pending"
+        # Failed/rejected requests should return to "Enroll Now" state in UI.
+        return "none"
 
 
 class CourseWriteSerializer(serializers.ModelSerializer):
@@ -266,6 +288,7 @@ class LiveClassListSerializer(serializers.ModelSerializer):
     linked_course_id = serializers.IntegerField(read_only=True)
     enrollment_count = serializers.IntegerField(read_only=True)
     is_enrolled = serializers.SerializerMethodField()
+    enrollment_status = serializers.SerializerMethodField()
 
     class Meta:
         model = LiveClass
@@ -274,6 +297,7 @@ class LiveClassListSerializer(serializers.ModelSerializer):
             "title",
             "slug",
             "description",
+            "price",
             "level",
             "month_number",
             "schedule_days",
@@ -283,16 +307,31 @@ class LiveClassListSerializer(serializers.ModelSerializer):
             "linked_course_title",
             "enrollment_count",
             "is_enrolled",
+            "enrollment_status",
         )
 
     def get_is_enrolled(self, obj):
+        return self.get_enrollment_status(obj) == LiveClassEnrollment.STATUS_APPROVED
+
+    def get_enrollment_status(self, obj):
         request = self.context.get("request")
         if not request or not request.user.is_authenticated:
-            return False
-        enrolled_ids = self.context.get("enrolled_live_class_ids")
-        if enrolled_ids is not None:
-            return obj.id in enrolled_ids
-        return LiveClassEnrollment.objects.filter(user=request.user, live_class=obj).exists()
+            return "none"
+        status_map = self.context.get("live_class_enrollment_statuses")
+        if status_map is not None:
+            return status_map.get(obj.id, "none")
+        enrollment = (
+            LiveClassEnrollment.objects.filter(user=request.user, live_class=obj)
+            .order_by("-created_at")
+            .first()
+        )
+        if not enrollment:
+            return "none"
+        return enrollment.status
+
+
+class CourseEnrollSerializer(serializers.Serializer):
+    course_id = serializers.IntegerField(min_value=1)
 
 
 class LiveClassEnrollSerializer(serializers.Serializer):

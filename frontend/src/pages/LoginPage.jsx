@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { requestPasswordReset } from "../api/auth";
@@ -94,7 +94,7 @@ export default function LoginPage() {
             </div>
 
             <h1 className="mt-4 font-reference text-4xl font-semibold leading-tight text-white">
-              Access your Alsyed Academy account
+              Access your Al syed Initiative account
             </h1>
             <p className="mt-3 max-w-md text-sm leading-7 text-[#b7c0b0]">
               Continue your OSINT and web application pentesting learning path with protected access,
@@ -248,4 +248,5 @@ export default function LoginPage() {
     </PageShell>
   );
 }
+
 

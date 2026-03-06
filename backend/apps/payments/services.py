@@ -1,4 +1,4 @@
-from django.conf import settings
+﻿from django.conf import settings
 
 
 class RazorpayServiceError(Exception):
@@ -24,7 +24,7 @@ def create_razorpay_order(*, amount_paise, currency="INR", receipt=""):
             {
                 "amount": amount_paise,
                 "currency": currency,
-                "receipt": receipt or "alsyedacademy-order",
+                "receipt": receipt or "alsyedinitiative-order",
                 "payment_capture": 1,
             }
         )
@@ -44,3 +44,4 @@ def verify_razorpay_signature(*, razorpay_order_id, razorpay_payment_id, razorpa
         return True
     except Exception as exc:
         raise RazorpayServiceError("Razorpay signature verification failed.") from exc
+

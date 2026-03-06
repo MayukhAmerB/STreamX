@@ -1,6 +1,10 @@
 from rest_framework import serializers
 
-from config.request_security import contains_active_content, is_safe_public_http_url
+from config.request_security import (
+    contains_active_content,
+    is_safe_public_http_url,
+    is_safe_public_stream_url,
+)
 
 from .models import RealtimeSession
 from .services import build_session_join_url
@@ -139,9 +143,14 @@ class RealtimeSessionCreateSerializer(serializers.ModelSerializer):
             attrs.setdefault("meeting_capacity", 300)
 
         rtmp_target_url = (attrs.get("rtmp_target_url") or "").strip()
-        if rtmp_target_url and not rtmp_target_url.startswith(("rtmp://", "rtmps://")):
+        if rtmp_target_url and not is_safe_public_stream_url(rtmp_target_url):
             raise serializers.ValidationError(
-                {"rtmp_target_url": "RTMP target must start with rtmp:// or rtmps://"}
+                {
+                    "rtmp_target_url": (
+                        "Only public rtmp/rtmps URLs are allowed. "
+                        "Private/local/internal URLs are blocked."
+                    )
+                }
             )
 
         return attrs

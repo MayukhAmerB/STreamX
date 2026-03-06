@@ -1,4 +1,4 @@
-from decimal import Decimal
+﻿from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth.tokens import default_token_generator
@@ -11,7 +11,7 @@ from django.urls import reverse
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
-from apps.courses.models import Course, Enrollment, Lecture, LiveClass, Section
+from apps.courses.models import Course, Enrollment, Lecture, LiveClass, LiveClassEnrollment, Section
 from apps.courses.serializers import LectureSerializer
 from apps.payments.models import Payment
 from apps.realtime.models import RealtimeSession
@@ -122,6 +122,41 @@ class AuthTests(APITestCase):
         self.assertEqual(response.status_code, 403)
         self.assertFalse(response.data["success"])
 
+    def test_login_rejects_credentials_in_url_query_string(self):
+        user = User.objects.create_user(
+            email="querylogin@test.com",
+            password="StrongPass@123",
+            full_name="Query Login",
+            role=User.ROLE_STUDENT,
+        )
+        response = self.client.post(
+            f"{reverse('auth-login')}?email={user.email}&password=StrongPass@123",
+            {"email": user.email, "password": "StrongPass@123"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.data["success"])
+        self.assertEqual(
+            response.data["errors"]["detail"],
+            "Credentials must not be sent in URL query parameters.",
+        )
+
+    def test_login_rejects_sqli_payload(self):
+        user = User.objects.create_user(
+            email="sqli-login@test.com",
+            password="StrongPass@123",
+            full_name="SQLi Login",
+            role=User.ROLE_STUDENT,
+        )
+        response = self.client.post(
+            reverse("auth-login"),
+            {"email": user.email, "password": "' OR 1=1 --"},
+            format="json",
+        )
+        payload = response.json()
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(payload["success"])
+
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="noreply@test.com",
@@ -164,7 +199,7 @@ class AuthTests(APITestCase):
         self.assertEqual(request_resp.status_code, 200)
         self.assertTrue(request_resp.data["success"])
         self.assertEqual(len(mail.outbox), 1)
-        self.assertIn("Reset your AlsyedAcademy password", mail.outbox[0].subject)
+        self.assertIn("Reset your Al syed Initiative password", mail.outbox[0].subject)
 
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
@@ -274,6 +309,52 @@ class UploadValidationTests(APITestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("profile_image", serializer.errors)
 
+    def test_profile_serializer_rejects_non_image_payload_with_jpg_extension(self):
+        user = User.objects.create_user(
+            email="profile-binary@test.com",
+            password="StrongPass@123",
+            full_name="Profile User Binary",
+            role=User.ROLE_STUDENT,
+        )
+        fake_jpg = SimpleUploadedFile("avatar.jpg", b"<script>alert('x')</script>", content_type="image/jpeg")
+        serializer = ProfileUpdateSerializer(
+            user,
+            data={"full_name": "Profile User Binary", "profile_image": fake_jpg},
+            partial=True,
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("profile_image", serializer.errors)
+
+    def test_lecture_serializer_rejects_non_video_payload_with_mp4_extension(self):
+        instructor = User.objects.create_user(
+            email="vid-binary@test.com",
+            password="StrongPass@123",
+            full_name="Vid Instructor Binary",
+            role=User.ROLE_INSTRUCTOR,
+        )
+        course = Course.objects.create(
+            title="Video Binary Course",
+            description="Course description",
+            price=Decimal("100.00"),
+            instructor=instructor,
+            is_published=True,
+        )
+        section = Section.objects.create(course=course, title="Module 1", order=1)
+        fake_video = SimpleUploadedFile("bad.mp4", b"not-a-real-video-container", content_type="video/mp4")
+
+        serializer = LectureSerializer(
+            data={
+                "section": section.id,
+                "title": "Bad Lecture Binary",
+                "description": "Invalid video binary",
+                "order": 1,
+                "is_preview": False,
+                "video_file": fake_video,
+            }
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("video_file", serializer.errors)
+
 
 class SecurityHeaderTests(APITestCase):
     def test_api_responses_include_security_headers(self):
@@ -285,6 +366,49 @@ class SecurityHeaderTests(APITestCase):
         self.assertIn("default-src 'none'", response["Content-Security-Policy"])
         self.assertEqual(response["Cache-Control"], "no-store")
         self.assertIn("payment=()", response["Permissions-Policy"])
+
+
+class RequestFirewallTests(APITestCase):
+    def test_blocks_sqli_in_query_params(self):
+        response = self.client.get(
+            reverse("course-list-create"),
+            {"search": "' OR 1=1 --"},
+        )
+        payload = response.json()
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(payload["success"])
+        self.assertEqual(payload["message"], "Request blocked by security policy.")
+
+    def test_blocks_url_encoded_sqli_payload(self):
+        response = self.client.get(
+            reverse("course-list-create"),
+            {"search": "%27%20OR%201%3D1%20--"},
+        )
+        payload = response.json()
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(payload["success"])
+        self.assertEqual(payload["message"], "Request blocked by security policy.")
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        CONTACT_RECEIVER_EMAIL="contact@test.com",
+    )
+    def test_blocks_sqli_in_json_body(self):
+        response = self.client.post(
+            reverse("auth-contact"),
+            {
+                "name": "Visitor",
+                "email": "visitor@test.com",
+                "subject": "Need help",
+                "message": "' UNION SELECT password FROM auth_user --",
+            },
+            format="json",
+        )
+        payload = response.json()
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(payload["success"])
+        self.assertEqual(payload["message"], "Request blocked by security policy.")
 
 
 class PaginationTests(APITestCase):
@@ -328,6 +452,18 @@ class PaginationTests(APITestCase):
         self.assertEqual(len(response.data["data"]["results"]), 2)
         self.assertEqual(response.data["data"]["pagination"]["total"], 3)
 
+    def test_course_list_rejects_unknown_query_params(self):
+        response = self.client.get(reverse("course-list-create"), {"unknown_field": "id"})
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.data["success"])
+        self.assertEqual(response.data["errors"]["detail"], "Unsupported query parameters.")
+
+    def test_live_class_list_rejects_unknown_query_params(self):
+        response = self.client.get(reverse("live-class-list"), {"order_by": "created_at"})
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.data["success"])
+        self.assertEqual(response.data["errors"]["detail"], "Unsupported query parameters.")
+
 
 class PermissionTests(BaseAPITestCase):
     def test_student_cannot_create_course_but_instructor_can(self):
@@ -360,6 +496,22 @@ class PermissionTests(BaseAPITestCase):
         )
         self.assertEqual(instructor_resp.status_code, 201)
         self.assertTrue(instructor_resp.data["success"])
+
+    def test_instructor_cannot_create_course_with_private_thumbnail_url(self):
+        self.login(self.instructor.email)
+        response = self.client.post(
+            reverse("course-list-create"),
+            {
+                "title": "Private Thumbnail URL",
+                "description": "Should be blocked",
+                "price": "100.00",
+                "thumbnail": "http://127.0.0.1/internal-image.png",
+                "is_published": False,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("thumbnail", response.data["errors"])
 
 
 class PaymentVerificationTests(BaseAPITestCase):
@@ -395,6 +547,41 @@ class PaymentVerificationTests(BaseAPITestCase):
                 payment_status=Enrollment.STATUS_PAID,
             ).exists()
         )
+
+
+class EnrollmentApprovalFlowTests(BaseAPITestCase):
+    def test_course_enroll_request_creates_pending_enrollment(self):
+        self.login(self.student.email)
+        response = self.client.post(
+            reverse("course-enroll"),
+            {"course_id": self.course.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["enrollment_status"], Enrollment.STATUS_PENDING)
+        self.assertFalse(response.data["data"]["is_enrolled"])
+        enrollment = Enrollment.objects.get(user=self.student, course=self.course)
+        self.assertEqual(enrollment.payment_status, Enrollment.STATUS_PENDING)
+
+    def test_live_class_enroll_request_creates_pending_enrollment(self):
+        live_class = LiveClass.objects.create(
+            title="Approval Live Class",
+            description="Live class approval flow",
+            level=LiveClass.LEVEL_BEGINNER,
+            month_number=1,
+            is_active=True,
+        )
+        self.login(self.student.email)
+        response = self.client.post(
+            reverse("live-class-enroll"),
+            {"live_class_id": live_class.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["enrollment_status"], LiveClassEnrollment.STATUS_PENDING)
+        self.assertFalse(response.data["data"]["enrolled"])
+        enrollment = LiveClassEnrollment.objects.get(user=self.student, live_class=live_class)
+        self.assertEqual(enrollment.status, LiveClassEnrollment.STATUS_PENDING)
 
 
 class LectureVideoAccessTests(BaseAPITestCase):
@@ -440,6 +627,29 @@ class RealtimeSessionTests(APITestCase):
         )
         self.assertEqual(response.status_code, 200)
         return response
+
+    def test_realtime_create_rejects_private_rtmp_target_url(self):
+        self.login(self.host.email)
+        response = self.client.post(
+            reverse("realtime-session-list-create"),
+            {
+                "title": "Unsafe RTMP",
+                "description": "Should be blocked",
+                "session_type": "broadcasting",
+                "meeting_capacity": 100,
+                "max_audience": 1000,
+                "rtmp_target_url": "rtmp://127.0.0.1:1935/live/key",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("rtmp_target_url", response.data["errors"])
+
+    def test_realtime_list_rejects_unknown_query_params(self):
+        response = self.client.get(reverse("realtime-session-list-create"), {"filter": "host"})
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.data["success"])
+        self.assertEqual(response.data["errors"]["detail"], "Unsupported query parameters.")
 
     @override_settings(
         LIVEKIT_URL="ws://livekit.test",
@@ -687,3 +897,4 @@ class RealtimeSessionTests(APITestCase):
             response.data["data"][0]["join_url"],
             f"http://203.0.113.20:5173/join-live?session={session.id}",
         )
+

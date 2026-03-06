@@ -1,4 +1,4 @@
-import PageShell from "../components/PageShell";
+﻿import PageShell from "../components/PageShell";
 
 const pageBackgroundImage =
   "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
@@ -25,7 +25,7 @@ export default function AboutPage() {
   return (
     <PageShell
       title="About Us"
-      subtitle="AlsyedAcademy helps learners build practical cybersecurity skills with structured training."
+      subtitle="Al syed Initiative helps learners build practical cybersecurity skills with structured training."
     >
       <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[28px] border border-[#cfd8c5]/10 bg-[#070907] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">
@@ -43,13 +43,13 @@ export default function AboutPage() {
           <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
             <section className="rounded-2xl border border-[#243025] bg-[#0d120f]/92 p-6 backdrop-blur-sm">
               <div className="inline-flex items-center rounded-full border border-[#334033] bg-white/5 px-3 py-1 text-xs font-semibold tracking-wide text-[#d7e0cc]">
-                ABOUT ALSYEDACADEMY
+                ABOUT AL SYED INITIATIVE
               </div>
               <h2 className="mt-4 font-reference text-3xl font-semibold leading-tight text-white sm:text-4xl">
                 Practical cybersecurity learning built for real execution
               </h2>
               <p className="mt-4 text-sm leading-7 text-[#b7c0b0]">
-                AlsyedAcademy is a cybersecurity learning platform focused on practical training in
+                Al syed Initiative is a cybersecurity learning platform focused on practical training in
                 OSINT, reconnaissance, and web application penetration testing. We design lessons
                 for learners who want a clear path from fundamentals to professional execution.
               </p>
@@ -146,3 +146,4 @@ export default function AboutPage() {
     </PageShell>
   );
 }
+

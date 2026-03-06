@@ -7,6 +7,8 @@ from rest_framework import permissions, status
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from config.audit import log_security_event
+from config.request_security import find_disallowed_query_params
 from config.response import api_response
 
 from .models import RealtimeConfiguration, RealtimeSession
@@ -45,6 +47,24 @@ class RealtimeSessionListCreateView(APIView):
         return []
 
     def get(self, request):
+        disallowed_query_params = find_disallowed_query_params(
+            request,
+            {"session_type", "status"},
+        )
+        if disallowed_query_params:
+            log_security_event(
+                "request.query_params_blocked",
+                request=request,
+                endpoint="realtime_session_list",
+                blocked_keys=disallowed_query_params[:20],
+            )
+            return api_response(
+                success=False,
+                message="Invalid request query.",
+                errors={"detail": "Unsupported query parameters."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
         queryset = RealtimeSession.objects.select_related("host")
 
         session_type = (request.query_params.get("session_type") or "").strip().lower()

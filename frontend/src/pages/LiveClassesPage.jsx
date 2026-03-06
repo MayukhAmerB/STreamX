@@ -5,6 +5,7 @@ import Button from "../components/Button";
 import { enrollInLiveClass, listLiveClasses } from "../api/courses";
 import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
+import { formatINR } from "../utils/currency";
 
 const pageBackgroundImage =
   "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
@@ -24,8 +25,10 @@ const fallbackLiveClasses = [
       "Foundational OSINT training covering introduction, intelligence lifecycle, legal boundaries, search engine intelligence, and SOCMINT basics.",
     schedule_days: "Friday, Saturday, Sunday",
     class_duration_minutes: 60,
+    price: 1499,
     enrollment_count: 0,
     is_enrolled: false,
+    enrollment_status: "none",
     linked_course_id: null,
     linked_course_title: "OSINT Beginner",
   },
@@ -38,8 +41,10 @@ const fallbackLiveClasses = [
       "Practical OSINT workflows for people and identity research, image/video analysis, domain intelligence, tools, and advanced search techniques.",
     schedule_days: "Friday, Saturday, Sunday",
     class_duration_minutes: 60,
+    price: 2499,
     enrollment_count: 0,
     is_enrolled: false,
+    enrollment_status: "none",
     linked_course_id: null,
     linked_course_title: "OSINT Intermediate",
   },
@@ -52,8 +57,10 @@ const fallbackLiveClasses = [
       "Advanced investigation and intelligence workflows including dark web OSINT, profiling, geolocation, archive analysis, and end-to-end investigations.",
     schedule_days: "Friday, Saturday, Sunday",
     class_duration_minutes: 60,
+    price: 3999,
     enrollment_count: 0,
     is_enrolled: false,
+    enrollment_status: "none",
     linked_course_id: null,
     linked_course_title: "OSINT Advanced",
   },
@@ -76,6 +83,12 @@ function isOsintCourse(course) {
 function formatLevel(level) {
   if (!level) return "Program";
   return level.charAt(0).toUpperCase() + level.slice(1);
+}
+
+function formatLiveClassPrice(value) {
+  const amount = Number(value ?? 0);
+  if (!Number.isFinite(amount) || amount <= 0) return "Free";
+  return formatINR(amount);
 }
 
 export default function LiveClassesPage() {
@@ -125,13 +138,18 @@ export default function LiveClassesPage() {
     try {
       const response = await enrollInLiveClass({ live_class_id: liveClassId });
       const data = apiData(response, {});
+      const enrollmentStatus = String(data?.enrollment_status || (data?.enrolled ? "approved" : "pending")).toLowerCase();
       setTracks((prev) =>
         prev.map((item) =>
           item.id === liveClassId
             ? {
                 ...item,
-                is_enrolled: true,
-                enrollment_count: (item.enrollment_count || 0) + (data.already_enrolled ? 0 : 1),
+                is_enrolled: enrollmentStatus === "approved",
+                enrollment_status: enrollmentStatus,
+                enrollment_count:
+                  enrollmentStatus === "approved" && !data.already_enrolled
+                    ? (item.enrollment_count || 0) + 1
+                    : item.enrollment_count || 0,
               }
             : item
         )
@@ -141,7 +159,11 @@ export default function LiveClassesPage() {
         [liveClassId]: {
           loading: false,
           error: "",
-          success: data.already_enrolled ? "Already enrolled." : "Enrolled successfully.",
+          success:
+            response?.data?.message ||
+            (enrollmentStatus === "approved"
+              ? "Already enrolled."
+              : "Enrollment request submitted for admin approval."),
         },
       }));
     } catch (err) {
@@ -183,16 +205,16 @@ export default function LiveClassesPage() {
               as a progressive 3-month path: Beginner, Intermediate, and Advanced.
             </p>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
+            <div className="mt-5 grid gap-3 sm:auto-rows-fr sm:grid-cols-3">
+              <div className="h-full rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
                 <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Class Days</div>
                 <div className="mt-1 text-sm font-semibold text-white">{classSchedule.days.join(", ")}</div>
               </div>
-              <div className="rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
+              <div className="h-full rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
                 <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Duration</div>
                 <div className="mt-1 text-sm font-semibold text-white">{classSchedule.duration}</div>
               </div>
-              <div className="rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
+              <div className="h-full rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
                 <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Track Length</div>
                 <div className="mt-1 text-sm font-semibold text-white">3 Months (OSINT)</div>
               </div>
@@ -243,7 +265,7 @@ export default function LiveClassesPage() {
           </span>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-3">
+        <div className="grid auto-rows-fr gap-5 lg:grid-cols-3">
           {orderedTracks.map((course) => {
             const levelKey = String(course?.level || "").toLowerCase();
             const monthMeta = monthByLevel[levelKey] || {
@@ -254,10 +276,10 @@ export default function LiveClassesPage() {
             return (
               <article
                 key={course.id}
-                className="relative overflow-hidden rounded-2xl border border-[#243025] bg-[#0d120f] p-4 shadow-[0_16px_36px_rgba(0,0,0,0.24)]"
+                className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-[#243025] bg-[#0d120f] p-4 shadow-[0_16px_36px_rgba(0,0,0,0.24)]"
               >
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(185,199,171,0.07),transparent_40%)]" />
-                <div className="relative">
+                <div className="relative flex h-full flex-1 flex-col">
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <span className="rounded-full border border-[#d6decc]/20 bg-[#161d16] px-3 py-1 text-[11px] font-semibold tracking-wide text-[#d3dcc9]">
                       {monthMeta.label}
@@ -267,25 +289,31 @@ export default function LiveClassesPage() {
                     </span>
                   </div>
 
-                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8f9989]">
+                  <div className="mb-2 min-h-[1rem] text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8f9989]">
                     {monthMeta.subtitle}
                   </div>
-                  <h4 className="font-reference text-xl font-semibold leading-tight text-white">
+                  <h4 className="font-reference text-xl font-semibold leading-tight text-white lg:min-h-[5rem]">
                     {course.title}
                   </h4>
-                  <p className="mt-3 text-sm leading-6 text-[#b7c0b0]">
+                  <p className="mt-3 text-sm leading-6 text-[#b7c0b0] lg:min-h-[6rem]">
                     {course.description || "OSINT live class track with guided progression."}
                   </p>
 
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <div className="rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-2">
+                  <div className="mt-4 grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-3">
+                    <div className="h-full rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-2">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-[#7f8b7c]">Schedule</div>
                       <div className="mt-1 text-xs font-semibold text-[#dce4d2]">Fri / Sat / Sun</div>
                     </div>
-                    <div className="rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-2">
+                    <div className="h-full rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-2">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-[#7f8b7c]">Duration</div>
                       <div className="mt-1 text-xs font-semibold text-[#dce4d2]">
                         {course.class_duration_minutes ? `${course.class_duration_minutes} min` : "1 hour"}
+                      </div>
+                    </div>
+                    <div className="h-full rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#7f8b7c]">Price</div>
+                      <div className="mt-1 text-xs font-semibold text-[#dce4d2]">
+                        {formatLiveClassPrice(course.price)}
                       </div>
                     </div>
                   </div>
@@ -308,10 +336,14 @@ export default function LiveClassesPage() {
                     )}
                   </div>
 
-                  <div className="mt-3">
-                    {course.is_enrolled ? (
+                  <div className="mt-auto pt-4">
+                    {course.is_enrolled || String(course.enrollment_status || "").toLowerCase() === "approved" ? (
                       <Button className="w-full" disabled>
                         Enrolled
+                      </Button>
+                    ) : String(course.enrollment_status || "").toLowerCase() === "pending" ? (
+                      <Button className="w-full" disabled>
+                        Pending Approval
                       </Button>
                     ) : isAuthenticated ? (
                       <Button

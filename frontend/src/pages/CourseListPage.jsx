@@ -93,25 +93,25 @@ export default function CourseListPage() {
                 upcoming tracks are marked as coming soon.
               </p>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
+              <div className="mt-5 grid gap-3 sm:auto-rows-fr sm:grid-cols-2 xl:grid-cols-4">
+                <div className="h-full rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
                   <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Live Tracks</div>
                   <div className="mt-1 text-xl font-semibold text-white">{summary.live}</div>
                   <div className="mt-1 text-xs text-[#b7c0b0]">Ready for enrollment</div>
                 </div>
-                <div className="rounded-2xl border border-amber-200/10 bg-amber-100/5 p-3 backdrop-blur-sm">
+                <div className="h-full rounded-2xl border border-amber-200/10 bg-amber-100/5 p-3 backdrop-blur-sm">
                   <div className="text-[10px] uppercase tracking-[0.16em] text-amber-200/80">
                     Coming Soon
                   </div>
                   <div className="mt-1 text-xl font-semibold text-white">{summary.comingSoon}</div>
                   <div className="mt-1 text-xs text-[#b7c0b0]">Upcoming releases</div>
                 </div>
-                <div className="rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
+                <div className="h-full rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
                   <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">OSINT</div>
                   <div className="mt-1 text-xl font-semibold text-white">{summary.osint}</div>
                   <div className="mt-1 text-xs text-[#b7c0b0]">Investigation tracks</div>
                 </div>
-                <div className="rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
+                <div className="h-full rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
                   <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Web Pentesting</div>
                   <div className="mt-1 text-xl font-semibold text-white">{summary.web}</div>
                   <div className="mt-1 text-xs text-[#b7c0b0]">Application security</div>
@@ -136,22 +136,22 @@ export default function CourseListPage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
 
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-2">
+              <div className="grid auto-rows-fr grid-cols-2 gap-2 text-sm">
+                <div className="h-full rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-2">
                   <div className="text-[10px] uppercase tracking-[0.14em] text-[#7f8b7c]">Beginner</div>
                   <div className="mt-1 font-semibold text-white">{levelSummary.beginner}</div>
                 </div>
-                <div className="rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-2">
+                <div className="h-full rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-2">
                   <div className="text-[10px] uppercase tracking-[0.14em] text-[#7f8b7c]">
                     Intermediate
                   </div>
                   <div className="mt-1 font-semibold text-white">{levelSummary.intermediate}</div>
                 </div>
-                <div className="rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-2">
+                <div className="h-full rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-2">
                   <div className="text-[10px] uppercase tracking-[0.14em] text-[#7f8b7c]">Advanced</div>
                   <div className="mt-1 font-semibold text-white">{levelSummary.advanced}</div>
                 </div>
-                <div className="rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-2">
+                <div className="h-full rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-2">
                   <div className="text-[10px] uppercase tracking-[0.14em] text-[#7f8b7c]">Results</div>
                   <div className="mt-1 font-semibold text-white">
                     {loading ? "..." : courses.length}
@@ -189,7 +189,7 @@ export default function CourseListPage() {
 
       <div className="relative rounded-[26px] border border-[#202920] bg-[#090d09]/70 p-4 sm:p-5">
         <div className="absolute inset-0 rounded-[26px] bg-[radial-gradient(circle_at_0%_0%,rgba(185,199,171,0.07),transparent_35%)]" />
-        <div className="relative grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+        <div className="relative grid auto-rows-fr gap-5 lg:grid-cols-2 xl:grid-cols-3">
           {courses.map((course) => (
             <CourseCard key={course.id} course={course} />
           ))}

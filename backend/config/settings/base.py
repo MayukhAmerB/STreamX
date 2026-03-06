@@ -3,13 +3,14 @@ from pathlib import Path
 
 import dj_database_url
 
-from config.env import env, env_bool, env_list
+from config.env import env, env_bool, env_int, env_list
 
 # Developer credit: Ibrahim Mohsin Mayukh Bhatt
 BASE_DIR = Path(__file__).resolve().parents[2]
 
 SECRET_KEY = env("DJANGO_SECRET_KEY", "dev-only-secret-key")
 DEBUG = env_bool("DEBUG", False)
+APP_ENV = env("APP_ENV", "production" if not DEBUG else "development").strip().lower()
 ALLOWED_HOSTS = env_list(
     "ALLOWED_HOSTS",
     ["localhost", "127.0.0.1"] if DEBUG else [],
@@ -68,7 +69,7 @@ is_postgres_database = DATABASE_URL.startswith(("postgres://", "postgresql://", 
 DATABASES = {
     "default": dj_database_url.parse(
         DATABASE_URL,
-        conn_max_age=int(env("DATABASE_CONN_MAX_AGE", "120")),
+        conn_max_age=env_int("DATABASE_CONN_MAX_AGE", 120),
         ssl_require=env_bool("DATABASE_SSL_REQUIRE", not DEBUG) if is_postgres_database else False,
     )
 }
@@ -77,9 +78,10 @@ _db_name = str(DATABASES["default"].get("NAME", "")).strip()
 if "sqlite3" in _db_engine_name and _db_name and not Path(_db_name).is_absolute():
     DATABASES["default"]["NAME"] = str((BASE_DIR / _db_name).resolve())
 DATABASE_CONN_HEALTH_CHECKS = env_bool("DATABASE_CONN_HEALTH_CHECKS", True)
-DATABASE_STATEMENT_TIMEOUT_MS = int(env("DATABASE_STATEMENT_TIMEOUT_MS", "15000"))
-DATABASE_LOCK_TIMEOUT_MS = int(env("DATABASE_LOCK_TIMEOUT_MS", "10000"))
-DATABASE_IDLE_IN_TX_TIMEOUT_MS = int(env("DATABASE_IDLE_IN_TX_TIMEOUT_MS", "30000"))
+DATABASE_STATEMENT_TIMEOUT_MS = env_int("DATABASE_STATEMENT_TIMEOUT_MS", 15000)
+DATABASE_LOCK_TIMEOUT_MS = env_int("DATABASE_LOCK_TIMEOUT_MS", 10000)
+DATABASE_IDLE_IN_TX_TIMEOUT_MS = env_int("DATABASE_IDLE_IN_TX_TIMEOUT_MS", 30000)
+DATABASE_CONNECT_TIMEOUT_SECONDS = env_int("DATABASE_CONNECT_TIMEOUT_SECONDS", 10)
 DATABASES["default"]["CONN_HEALTH_CHECKS"] = DATABASE_CONN_HEALTH_CHECKS
 _db_engine = str(DATABASES["default"].get("ENGINE", ""))
 if "postgresql" in _db_engine:
@@ -90,14 +92,39 @@ if "postgresql" in _db_engine:
         f"-c lock_timeout={DATABASE_LOCK_TIMEOUT_MS} "
         f"-c idle_in_transaction_session_timeout={DATABASE_IDLE_IN_TX_TIMEOUT_MS}"
     )
+    db_options.setdefault("connect_timeout", DATABASE_CONNECT_TIMEOUT_SECONDS)
     db_options["options"] = f"{existing_option_string} {hardening_options}".strip()
     DATABASES["default"]["OPTIONS"] = db_options
+
+CACHE_DEFAULT_TIMEOUT_SECONDS = env_int("CACHE_DEFAULT_TIMEOUT_SECONDS", 300)
+REDIS_URL = env("REDIS_URL", "").strip()
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+            "TIMEOUT": CACHE_DEFAULT_TIMEOUT_SECONDS,
+            "OPTIONS": {
+                "socket_connect_timeout": env_int("REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS", 5),
+                "socket_timeout": env_int("REDIS_SOCKET_TIMEOUT_SECONDS", 5),
+                "retry_on_timeout": True,
+            },
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "al-syed-initiative-cache",
+            "TIMEOUT": CACHE_DEFAULT_TIMEOUT_SECONDS,
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-        "OPTIONS": {"min_length": int(env("AUTH_MIN_PASSWORD_LENGTH", "12"))},
+        "OPTIONS": {"min_length": env_int("AUTH_MIN_PASSWORD_LENGTH", 12)},
     },
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
@@ -149,6 +176,7 @@ REST_FRAMEWORK = {
         "password_reset_confirm": "20/hour",
         "payment_create": "20/hour",
         "payment_verify": "60/hour",
+        "course_enroll": "20/hour",
         "live_class_enroll": "20/hour",
         "lecture_playback": "120/minute",
         "realtime_session_create": "30/hour",
@@ -173,6 +201,16 @@ SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = env_bool("CSRF_COOKIE_HTTPONLY", False)
 SESSION_COOKIE_SAMESITE = env("SESSION_COOKIE_SAMESITE", "Lax")
 CSRF_COOKIE_SAMESITE = env("CSRF_COOKIE_SAMESITE", "Lax")
+SESSION_COOKIE_AGE = env_int("SESSION_COOKIE_AGE", 1209600)
+SESSION_EXPIRE_AT_BROWSER_CLOSE = env_bool("SESSION_EXPIRE_AT_BROWSER_CLOSE", False)
+SESSION_SAVE_EVERY_REQUEST = env_bool("SESSION_SAVE_EVERY_REQUEST", False)
+_session_cookie_domain = env("SESSION_COOKIE_DOMAIN", "").strip()
+_csrf_cookie_domain = env("CSRF_COOKIE_DOMAIN", "").strip()
+SESSION_COOKIE_DOMAIN = _session_cookie_domain or None
+CSRF_COOKIE_DOMAIN = _csrf_cookie_domain or None
+_default_session_engine = "django.contrib.sessions.backends.cached_db" if REDIS_URL else "django.contrib.sessions.backends.db"
+SESSION_ENGINE = env("SESSION_ENGINE", "").strip() or _default_session_engine
+SESSION_CACHE_ALIAS = "default"
 
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", ["http://localhost:5173"])
 CORS_ALLOW_CREDENTIALS = True
@@ -192,15 +230,31 @@ if DEBUG:
     CSRF_TRUSTED_ORIGINS = list(dict.fromkeys([*CSRF_TRUSTED_ORIGINS, *dev_frontend_origins]))
 
 SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", False)
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = env_bool("USE_X_FORWARDED_HOST", True)
+USE_X_FORWARDED_PORT = env_bool("USE_X_FORWARDED_PORT", True)
+if env_bool("USE_SECURE_PROXY_SSL_HEADER", True):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+else:
+    SECURE_PROXY_SSL_HEADER = None
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = env("SECURE_REFERRER_POLICY", "strict-origin-when-cross-origin")
 X_FRAME_OPTIONS = env("X_FRAME_OPTIONS", "DENY")
 SECURE_CROSS_ORIGIN_OPENER_POLICY = env("SECURE_CROSS_ORIGIN_OPENER_POLICY", "same-origin")
+SECURE_CROSS_ORIGIN_RESOURCE_POLICY = env("SECURE_CROSS_ORIGIN_RESOURCE_POLICY", "same-origin")
+SECURE_PERMISSIONS_POLICY = env(
+    "SECURE_PERMISSIONS_POLICY",
+    (
+        "accelerometer=(), autoplay=(), camera=(), clipboard-read=(), clipboard-write=(), "
+        "geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+    ),
+)
+API_SECURITY_CSP = env(
+    "API_SECURITY_CSP",
+    "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+)
 
-SECURE_HSTS_SECONDS = int(env("SECURE_HSTS_SECONDS", "0" if DEBUG else "31536000"))
+SECURE_HSTS_SECONDS = env_int("SECURE_HSTS_SECONDS", 0 if DEBUG else 31536000)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", not DEBUG)
 SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", not DEBUG)
 
@@ -221,30 +275,35 @@ FRONTEND_PUBLIC_ORIGIN = env("FRONTEND_PUBLIC_ORIGIN", "")
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
 EMAIL_HOST = env("EMAIL_HOST", "")
-EMAIL_PORT = int(env("EMAIL_PORT", "587"))
+EMAIL_PORT = env_int("EMAIL_PORT", 587)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
 EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
-DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "no-reply@alsyedacademy.local")
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "no-reply@alsyedinitiative.local")
 CONTACT_RECEIVER_EMAIL = env("CONTACT_RECEIVER_EMAIL", DEFAULT_FROM_EMAIL)
 FFMPEG_BINARY = env("FFMPEG_BINARY", "ffmpeg")
 SECURITY_BLOCK_SUSPICIOUS_INPUT = env_bool("SECURITY_BLOCK_SUSPICIOUS_INPUT", True)
-SECURITY_MAX_INSPECTION_BODY_BYTES = int(env("SECURITY_MAX_INSPECTION_BODY_BYTES", "16384"))
-AUTH_LOGIN_MAX_FAILURES = int(env("AUTH_LOGIN_MAX_FAILURES", "6"))
-AUTH_LOGIN_LOCKOUT_SECONDS = int(env("AUTH_LOGIN_LOCKOUT_SECONDS", "900"))
-COURSE_LIST_CACHE_TTL_SECONDS = int(env("COURSE_LIST_CACHE_TTL_SECONDS", "60"))
-COURSE_DETAIL_CACHE_TTL_SECONDS = int(env("COURSE_DETAIL_CACHE_TTL_SECONDS", "60"))
-LIVE_CLASS_LIST_CACHE_TTL_SECONDS = int(env("LIVE_CLASS_LIST_CACHE_TTL_SECONDS", "30"))
+SECURITY_MAX_INSPECTION_BODY_BYTES = env_int("SECURITY_MAX_INSPECTION_BODY_BYTES", 16384)
+AUTH_LOGIN_MAX_FAILURES = env_int("AUTH_LOGIN_MAX_FAILURES", 6)
+AUTH_LOGIN_LOCKOUT_SECONDS = env_int("AUTH_LOGIN_LOCKOUT_SECONDS", 900)
+COURSE_LIST_CACHE_TTL_SECONDS = env_int("COURSE_LIST_CACHE_TTL_SECONDS", 60)
+COURSE_DETAIL_CACHE_TTL_SECONDS = env_int("COURSE_DETAIL_CACHE_TTL_SECONDS", 60)
+LIVE_CLASS_LIST_CACHE_TTL_SECONDS = env_int("LIVE_CLASS_LIST_CACHE_TTL_SECONDS", 30)
+DATA_UPLOAD_MAX_MEMORY_SIZE = env_int("DATA_UPLOAD_MAX_MEMORY_SIZE", 2621440)
+FILE_UPLOAD_MAX_MEMORY_SIZE = env_int("FILE_UPLOAD_MAX_MEMORY_SIZE", 2621440)
+DATA_UPLOAD_MAX_NUMBER_FIELDS = env_int("DATA_UPLOAD_MAX_NUMBER_FIELDS", 1000)
+TRUST_X_FORWARDED_FOR = env_bool("TRUST_X_FORWARDED_FOR", not DEBUG)
+TRUSTED_PROXY_COUNT = max(1, env_int("TRUSTED_PROXY_COUNT", 1))
 LIVEKIT_URL = env("LIVEKIT_URL", "")
 LIVEKIT_PUBLIC_URL = env("LIVEKIT_PUBLIC_URL", "")
 LIVEKIT_API_KEY = env("LIVEKIT_API_KEY", "")
 LIVEKIT_API_SECRET = env("LIVEKIT_API_SECRET", "")
 LIVEKIT_MEET_URL = env("LIVEKIT_MEET_URL", "https://meet.livekit.io")
 
-REALTIME_DEFAULT_MEETING_CAPACITY = int(env("REALTIME_DEFAULT_MEETING_CAPACITY", "300"))
-REALTIME_DEFAULT_MAX_AUDIENCE = int(env("REALTIME_DEFAULT_MAX_AUDIENCE", "50000"))
-REALTIME_JOIN_TOKEN_TTL_SECONDS = int(env("REALTIME_JOIN_TOKEN_TTL_SECONDS", "3600"))
+REALTIME_DEFAULT_MEETING_CAPACITY = env_int("REALTIME_DEFAULT_MEETING_CAPACITY", 300)
+REALTIME_DEFAULT_MAX_AUDIENCE = env_int("REALTIME_DEFAULT_MAX_AUDIENCE", 50000)
+REALTIME_JOIN_TOKEN_TTL_SECONDS = env_int("REALTIME_JOIN_TOKEN_TTL_SECONDS", 3600)
 
 OWNCAST_BASE_URL = env("OWNCAST_BASE_URL", "")
 OWNCAST_STREAM_PUBLIC_BASE_URL = env("OWNCAST_STREAM_PUBLIC_BASE_URL", "")
@@ -271,8 +330,14 @@ LOGGING = {
     "loggers": {
         "security.audit": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": env("LOG_LEVEL", "INFO"),
             "propagate": False,
-        }
+        },
+        "django.security": {
+            "handlers": ["console"],
+            "level": env("DJANGO_SECURITY_LOG_LEVEL", env("LOG_LEVEL", "INFO")),
+            "propagate": False,
+        },
     },
 }
+

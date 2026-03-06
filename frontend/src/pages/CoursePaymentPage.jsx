@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
@@ -91,7 +91,7 @@ export default function CoursePaymentPage() {
         amount: orderData.amount,
         currency: orderData.currency,
         order_id: orderData.razorpay_order_id,
-        name: "AlsyedAcademy",
+        name: "Al syed Initiative",
         description: course.title,
         theme: { color: "#111111" },
         handler: async (response) => {
@@ -247,3 +247,4 @@ export default function CoursePaymentPage() {
     </PageShell>
   );
 }
+

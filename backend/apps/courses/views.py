@@ -7,12 +7,14 @@ from rest_framework.views import APIView
 
 from config.audit import log_security_event
 from config.pagination import apply_optional_pagination
+from config.request_security import find_disallowed_query_params
 from config.response import api_response
 from config.url_utils import get_media_public_url
 
 from .models import Course, Enrollment, Lecture, LiveClass, LiveClassEnrollment, Section
 from .permissions import IsCourseInstructor, IsEnrolledInCourse, IsInstructor
 from .serializers import (
+    CourseEnrollSerializer,
     CourseDetailSerializer,
     CourseListSerializer,
     CourseWriteSerializer,
@@ -37,6 +39,24 @@ class CourseListCreateView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
+        disallowed_query_params = find_disallowed_query_params(
+            request,
+            {"search", "paginate", "page", "page_size"},
+        )
+        if disallowed_query_params:
+            log_security_event(
+                "request.query_params_blocked",
+                request=request,
+                endpoint="course_list",
+                blocked_keys=disallowed_query_params[:20],
+            )
+            return api_response(
+                success=False,
+                message="Invalid request query.",
+                errors={"detail": "Unsupported query parameters."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
         search = (request.query_params.get("search") or "").strip()
         cache_key = None
         if not request.user.is_authenticated:
@@ -525,10 +545,103 @@ class InstructorCoursesView(APIView):
         return api_response(success=True, message="Instructor courses fetched.", data=serializer.data)
 
 
+class CourseEnrollView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "course_enroll"
+
+    def post(self, request):
+        serializer = CourseEnrollSerializer(data=request.data)
+        if not serializer.is_valid():
+            log_security_event("course.enroll_invalid", request=request, errors=serializer.errors)
+            return api_response(
+                success=False,
+                message="Course enrollment request failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        course = Course.objects.filter(
+            pk=serializer.validated_data["course_id"],
+            is_published=True,
+        ).first()
+        if not course:
+            log_security_event("course.enroll_not_found_or_unpublished", request=request)
+            return api_response(
+                success=False,
+                message="Course unavailable.",
+                errors={"detail": "Course not found or not published."},
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        if request.user.id == course.instructor_id:
+            log_security_event("course.enroll_instructor_self_blocked", request=request, course_id=course.id)
+            return api_response(
+                success=False,
+                message="Enrollment request failed.",
+                errors={"detail": "Instructors cannot enroll in their own courses."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        enrollment, created = Enrollment.objects.get_or_create(
+            user=request.user,
+            course=course,
+            defaults={"payment_status": Enrollment.STATUS_PENDING},
+        )
+
+        if created:
+            message = "Enrollment request submitted for admin approval."
+        elif enrollment.payment_status == Enrollment.STATUS_PAID:
+            message = "You are already enrolled in this course."
+        elif enrollment.payment_status == Enrollment.STATUS_PENDING:
+            message = "Enrollment request already pending admin approval."
+        else:
+            enrollment.payment_status = Enrollment.STATUS_PENDING
+            enrollment.save(update_fields=["payment_status"])
+            message = "Enrollment request re-submitted for admin approval."
+
+        log_security_event(
+            "course.enroll_requested" if enrollment.payment_status == Enrollment.STATUS_PENDING else "course.enroll_already_paid",
+            request=request,
+            course_id=course.id,
+        )
+
+        enrollment_status = (
+            "approved" if enrollment.payment_status == Enrollment.STATUS_PAID else enrollment.payment_status
+        )
+        return api_response(
+            success=True,
+            message=message,
+            data={
+                "course_id": course.id,
+                "enrollment_status": enrollment_status,
+                "is_enrolled": enrollment.payment_status == Enrollment.STATUS_PAID,
+            },
+        )
+
+
 class LiveClassListView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
+        disallowed_query_params = find_disallowed_query_params(
+            request,
+            {"paginate", "page", "page_size"},
+        )
+        if disallowed_query_params:
+            log_security_event(
+                "request.query_params_blocked",
+                request=request,
+                endpoint="live_class_list",
+                blocked_keys=disallowed_query_params[:20],
+            )
+            return api_response(
+                success=False,
+                message="Invalid request query.",
+                errors={"detail": "Unsupported query parameters."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
         cache_key = None
         if not request.user.is_authenticated:
             cache_key = (
@@ -544,20 +657,26 @@ class LiveClassListView(APIView):
         queryset = (
             LiveClass.objects.filter(is_active=True)
             .select_related("linked_course")
-            .annotate(enrollment_count=Count("enrollments"))
+            .annotate(
+                enrollment_count=Count(
+                    "enrollments",
+                    filter=Q(enrollments__status=LiveClassEnrollment.STATUS_APPROVED),
+                )
+            )
             .order_by("month_number", "id")
         )
         paged_queryset, page_meta = apply_optional_pagination(request, queryset, default_page_size=12, max_page_size=50)
         serializer_context = {"request": request}
         if request.user.is_authenticated:
             live_class_ids = [item.id for item in paged_queryset]
-            enrolled_ids = set(
-                LiveClassEnrollment.objects.filter(
+            enrollment_statuses = {
+                live_class_id: status_value
+                for live_class_id, status_value in LiveClassEnrollment.objects.filter(
                     user=request.user,
                     live_class_id__in=live_class_ids,
-                ).values_list("live_class_id", flat=True)
-            )
-            serializer_context["enrolled_live_class_ids"] = enrolled_ids
+                ).values_list("live_class_id", "status")
+            }
+            serializer_context["live_class_enrollment_statuses"] = enrollment_statuses
         serializer = LiveClassListSerializer(paged_queryset, many=True, context=serializer_context)
         payload = (
             {"results": serializer.data, "pagination": page_meta}
@@ -606,20 +725,35 @@ class LiveClassEnrollView(APIView):
         enrollment, created = LiveClassEnrollment.objects.get_or_create(
             user=request.user,
             live_class=live_class,
+            defaults={"status": LiveClassEnrollment.STATUS_PENDING},
         )
+        if created:
+            response_message = "Enrollment request submitted for admin approval."
+        elif enrollment.status == LiveClassEnrollment.STATUS_APPROVED:
+            response_message = "Already enrolled in live class."
+        elif enrollment.status == LiveClassEnrollment.STATUS_PENDING:
+            response_message = "Enrollment request already pending admin approval."
+        else:
+            enrollment.status = LiveClassEnrollment.STATUS_PENDING
+            enrollment.save(update_fields=["status"])
+            response_message = "Enrollment request re-submitted for admin approval."
+
         log_security_event(
-            "live_class.enroll_success" if created else "live_class.enroll_already_exists",
+            "live_class.enroll_requested"
+            if enrollment.status == LiveClassEnrollment.STATUS_PENDING
+            else "live_class.enroll_already_approved",
             request=request,
             live_class_id=live_class.id,
         )
 
         return api_response(
             success=True,
-            message="Live class enrollment successful." if created else "Already enrolled in live class.",
+            message=response_message,
             data={
                 "live_class_id": live_class.id,
-                "enrolled": True,
-                "already_enrolled": not created,
+                "enrolled": enrollment.status == LiveClassEnrollment.STATUS_APPROVED,
+                "enrollment_status": enrollment.status,
+                "already_pending": enrollment.status == LiveClassEnrollment.STATUS_PENDING and not created,
                 "email": request.user.email,
                 "full_name": request.user.full_name,
             },

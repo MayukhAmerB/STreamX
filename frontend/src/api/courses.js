@@ -13,4 +13,5 @@ export const getLectureVideoUrl = (id) => apiClient.get(`/lectures/${id}/video/`
 export const getMyCourses = () => apiClient.get("/my-courses/");
 export const getInstructorCourses = () => apiClient.get("/instructor/courses/");
 export const listLiveClasses = () => apiClient.get("/live-classes/");
+export const requestCourseEnrollment = (payload) => apiClient.post("/courses/enroll/", payload);
 export const enrollInLiveClass = (payload) => apiClient.post("/live-classes/enroll/", payload);

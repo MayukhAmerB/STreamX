@@ -4,7 +4,11 @@ from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
 
-from config.model_validators import validate_no_active_content, validate_safe_public_url
+from config.model_validators import (
+    validate_no_active_content,
+    validate_safe_public_stream_url,
+    validate_safe_public_url,
+)
 
 
 class RealtimeSession(models.Model):
@@ -95,6 +99,7 @@ class RealtimeSession(models.Model):
         validate_no_active_content(self.room_name, "room_name")
         validate_no_active_content(self.livekit_room_name, "livekit_room_name")
         validate_no_active_content(self.rtmp_target_url, "rtmp_target_url")
+        validate_safe_public_stream_url(self.rtmp_target_url, "rtmp_target_url")
         validate_safe_public_url(self.stream_embed_url, "stream_embed_url")
         validate_safe_public_url(self.chat_embed_url, "chat_embed_url")
 
