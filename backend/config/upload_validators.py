@@ -5,7 +5,6 @@ from PIL import Image, UnidentifiedImageError
 
 
 ALLOWED_PROFILE_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
-ALLOWED_PROFILE_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 ALLOWED_PROFILE_IMAGE_FORMATS = {"JPEG", "PNG", "WEBP"}
 
 ALLOWED_VIDEO_EXTENSIONS = {"mp4", "m4v", "mov", "webm"}
@@ -127,7 +126,9 @@ def validate_profile_image_upload(file_obj, field_name="profile_image"):
     if size and size > MAX_PROFILE_IMAGE_BYTES:
         raise ValidationError({field_name: "Profile image must be 5 MB or smaller."})
     content_type = _content_type(file_obj)
-    if content_type and content_type not in ALLOWED_PROFILE_IMAGE_CONTENT_TYPES:
+    # Browsers/clients can send many valid image MIME aliases (e.g., image/pjpeg, image/jfif).
+    # Rely on extension + binary verification, and only reject non-image MIME types.
+    if content_type and not content_type.startswith("image/"):
         raise ValidationError({field_name: "Unsupported profile image type."})
     _validate_profile_image_binary(file_obj, field_name)
 

@@ -2,8 +2,8 @@ import { Link } from "react-router-dom";
 
 export default function BrandLogo({ to = "/", className = "" }) {
   return (
-    <Link to={to} className={`inline-flex items-center gap-2.5 ${className}`}>
-      <span className="relative inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-full">
+    <Link to={to} className={`inline-flex max-w-full items-center gap-2.5 ${className}`}>
+      <span className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full sm:h-11 sm:w-11">
         <img
           src="/logo.jpeg"
           alt="Al syed Initiative logo"
@@ -12,11 +12,11 @@ export default function BrandLogo({ to = "/", className = "" }) {
           decoding="async"
         />
       </span>
-      <span className="leading-tight">
-        <span className="block text-[17px] font-semibold tracking-tight text-white">
+      <span className="min-w-0 leading-tight">
+        <span className="block truncate text-[15px] font-semibold tracking-tight text-white sm:text-[17px]">
           Al syed Initiative
         </span>
-        <span className="block text-[10px] uppercase tracking-[0.18em] text-[#d6dfcb]/70">
+        <span className="hidden text-[10px] uppercase tracking-[0.18em] text-[#d6dfcb]/70 sm:block">
           Cybersecurity Platform
         </span>
       </span>

@@ -1,5 +1,26 @@
+import { Suspense } from "react";
 import AppRoutes from "./routes/AppRoutes";
 
+function RouteLoader() {
+  return (
+    <div className="min-h-screen bg-[#050705] text-[#d5ddcb]">
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+        <div className="h-12 w-52 animate-pulse rounded-xl border border-[#273327] bg-[#101711]" />
+        <div className="mt-6 h-44 animate-pulse rounded-2xl border border-[#273327] bg-[#101711]" />
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="h-40 animate-pulse rounded-2xl border border-[#273327] bg-[#101711]" />
+          <div className="h-40 animate-pulse rounded-2xl border border-[#273327] bg-[#101711]" />
+          <div className="h-40 animate-pulse rounded-2xl border border-[#273327] bg-[#101711]" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
-  return <AppRoutes />;
+  return (
+    <Suspense fallback={<RouteLoader />}>
+      <AppRoutes />
+    </Suspense>
+  );
 }

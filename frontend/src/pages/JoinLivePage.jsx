@@ -30,6 +30,20 @@ function sessionTypeLabel(sessionType) {
   return sessionType === "broadcasting" ? "Broadcast" : "Meeting";
 }
 
+function deriveEmbedUrl(baseUrl, targetPath) {
+  const raw = String(baseUrl || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    parsed.pathname = targetPath;
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return "";
+  }
+}
+
 export default function JoinLivePage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -130,6 +144,20 @@ export default function JoinLivePage() {
     setAutoJoinConsumed(true);
     handleJoin(highlightedSessionId);
   }, [activeSession, autoJoinConsumed, highlightedSessionId]);
+
+  const activeBroadcastStreamUrl = useMemo(() => {
+    if (!activeSession || activeSession.mode !== "broadcast") return "";
+    const direct = String(activeSession.broadcast?.stream_embed_url || "").trim();
+    if (direct) return direct;
+    return deriveEmbedUrl(activeSession.broadcast?.chat_embed_url, "/embed/video");
+  }, [activeSession]);
+
+  const activeBroadcastChatUrl = useMemo(() => {
+    if (!activeSession || activeSession.mode !== "broadcast") return "";
+    const direct = String(activeSession.broadcast?.chat_embed_url || "").trim();
+    if (direct) return direct;
+    return deriveEmbedUrl(activeSession.broadcast?.stream_embed_url, "/embed/chat/readwrite");
+  }, [activeSession]);
 
   return (
     <PageShell
@@ -238,29 +266,29 @@ export default function JoinLivePage() {
           </div>
           <div className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
             <div className="overflow-hidden rounded-2xl border border-[#263328] bg-black">
-              {activeSession.broadcast?.stream_embed_url ? (
+              {activeBroadcastStreamUrl ? (
                 <iframe
                   title="Broadcast Stream"
-                  src={activeSession.broadcast.stream_embed_url}
-                  className="h-[460px] w-full"
+                  src={activeBroadcastStreamUrl}
+                  className="h-[260px] w-full sm:h-[340px] lg:h-[460px]"
                   allow="autoplay; fullscreen"
                 />
               ) : (
-                <div className="flex h-[460px] items-center justify-center px-6 text-center text-sm text-[#b7c0b0]">
+                <div className="flex h-[260px] items-center justify-center px-6 text-center text-sm text-[#b7c0b0] sm:h-[340px] lg:h-[460px]">
                   Stream URL not configured for this session.
                 </div>
               )}
             </div>
             <div className="overflow-hidden rounded-2xl border border-[#263328] bg-[#0d140e]">
-              {activeSession.broadcast?.chat_embed_url ? (
+              {activeBroadcastChatUrl ? (
                 <iframe
                   title="Broadcast Chat"
-                  src={activeSession.broadcast.chat_embed_url}
-                  className="h-[460px] w-full"
+                  src={activeBroadcastChatUrl}
+                  className="h-[260px] w-full sm:h-[340px] lg:h-[460px]"
                   allow="clipboard-read; clipboard-write"
                 />
               ) : (
-                <div className="flex h-[460px] items-center justify-center px-6 text-center text-sm text-[#b7c0b0]">
+                <div className="flex h-[260px] items-center justify-center px-6 text-center text-sm text-[#b7c0b0] sm:h-[340px] lg:h-[460px]">
                   Chat URL not configured for this session.
                 </div>
               )}

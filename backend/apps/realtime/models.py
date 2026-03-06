@@ -11,6 +11,16 @@ from config.model_validators import (
 )
 
 
+class RealtimeSessionQuerySet(models.QuerySet):
+    def with_related(self):
+        return self.select_related(
+            "host",
+            "linked_course",
+            "linked_live_class",
+            "linked_live_class__linked_course",
+        )
+
+
 class RealtimeSession(models.Model):
     TYPE_MEETING = "meeting"
     TYPE_BROADCASTING = "broadcasting"
@@ -60,6 +70,20 @@ class RealtimeSession(models.Model):
         on_delete=models.CASCADE,
         related_name="realtime_sessions",
     )
+    linked_course = models.ForeignKey(
+        "courses.Course",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="realtime_sessions",
+    )
+    linked_live_class = models.ForeignKey(
+        "courses.LiveClass",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="realtime_sessions",
+    )
     room_name = models.CharField(max_length=255, unique=True, blank=True)
     livekit_room_name = models.CharField(max_length=255, blank=True, default="")
 
@@ -90,7 +114,10 @@ class RealtimeSession(models.Model):
             models.Index(fields=["session_type", "status", "created_at"]),
             models.Index(fields=["host", "status"]),
             models.Index(fields=["room_name"]),
+            models.Index(fields=["linked_course", "status"]),
+            models.Index(fields=["linked_live_class", "status"]),
         ]
+    objects = RealtimeSessionQuerySet.as_manager()
 
     def clean(self):
         super().clean()
@@ -113,6 +140,12 @@ class RealtimeSession(models.Model):
             )
         if self.max_audience > 50000:
             raise ValidationError({"max_audience": "Max audience cannot exceed 50000."})
+        if not self.linked_live_class_id:
+            if self.session_type == self.TYPE_MEETING:
+                detail = "Select a linked live class for meeting sessions."
+            else:
+                detail = "Select a linked live class for broadcast sessions."
+            raise ValidationError({"linked_live_class": detail})
         if not isinstance(self.presenter_user_ids, list):
             raise ValidationError({"presenter_user_ids": "Presenter user IDs must be a list."})
         normalized_presenters = self.get_presenter_user_ids()
@@ -140,6 +173,9 @@ class RealtimeSession(models.Model):
 
         if not self.livekit_room_name:
             self.livekit_room_name = self.room_name
+
+        if self.linked_live_class_id and not self.linked_course_id:
+            self.linked_course_id = self.linked_live_class.linked_course_id
 
         if self.status == self.STATUS_LIVE and self.started_at is None:
             self.started_at = timezone.now()

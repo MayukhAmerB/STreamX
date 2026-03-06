@@ -94,3 +94,6 @@ if _lan_ips:
             "http",
             8080,
         )
+
+# Keep MEDIA_PUBLIC_BASE_URL empty in local dev so API returns same-origin /media URLs.
+# Frontend Vite proxies /media -> backend, which avoids LAN-interface mismatches.

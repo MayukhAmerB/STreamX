@@ -1,6 +1,10 @@
+import { memo, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { formatINR } from "../utils/currency";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
+
+const COURSE_FALLBACK_THUMBNAIL =
+  "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
 
 function formatCategory(category) {
   if (category === "web_pentesting") return "Web Pentesting";
@@ -13,23 +17,39 @@ function formatLevel(level) {
   return level.charAt(0).toUpperCase() + level.slice(1);
 }
 
-export default function CourseCard({ course }) {
+function CourseCard({ course }) {
   const status = getCourseLaunchStatus(course);
   const categoryLabel = formatCategory(course?.category);
   const levelLabel = formatLevel(course?.level);
+  const [thumbnailSrc, setThumbnailSrc] = useState(course?.thumbnail || "");
+  const safeTitle = course?.title || "Untitled course";
+  const safeDescription = course?.description || "Cybersecurity course track.";
+
+  useEffect(() => {
+    setThumbnailSrc(course?.thumbnail || "");
+  }, [course?.id, course?.thumbnail]);
 
   return (
-    <article className="hover-lift group relative flex h-full flex-col overflow-hidden rounded-[22px] border border-[#253027] bg-[#0b100d] text-white shadow-[0_20px_48px_rgba(0,0,0,0.28)] transition duration-300 hover:border-[#39453a]">
+    <article className="hover-lift group relative flex h-full min-h-[560px] self-stretch flex-col overflow-hidden rounded-[22px] border border-[#253027] bg-[#0b100d] text-white shadow-[0_20px_48px_rgba(0,0,0,0.28)] transition duration-300 hover:border-[#39453a] sm:min-h-[620px]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(185,199,171,0.12),transparent_42%)]" />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d8e0cf]/30 to-transparent" />
 
-      <div className="relative aspect-[16/10] bg-[#090b09]">
+      <div className="relative h-[200px] bg-[#090b09] sm:h-[230px] lg:h-[260px] xl:h-[280px]">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_15%,rgba(185,199,171,0.12),transparent_42%)]" />
-        {course.thumbnail ? (
+        {thumbnailSrc ? (
           <img
-            src={course.thumbnail}
-            alt={course.title}
-            className="h-full w-full object-cover opacity-[0.72] transition duration-500 group-hover:scale-[1.04]"
+            src={thumbnailSrc}
+            alt={safeTitle}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover object-center opacity-[0.72] transition duration-500 group-hover:scale-[1.04]"
+            onError={() => {
+              if (thumbnailSrc !== COURSE_FALLBACK_THUMBNAIL) {
+                setThumbnailSrc(COURSE_FALLBACK_THUMBNAIL);
+              } else {
+                setThumbnailSrc("");
+              }
+            }}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-neutral-500">
@@ -64,15 +84,15 @@ export default function CourseCard({ course }) {
             <span className="inline-flex h-2 w-2 rounded-full bg-[#b9c7ab]" />
             <span>{course.instructor?.full_name || "Instructor"}</span>
           </div>
-          <h3 className="line-clamp-2 font-reference text-lg font-semibold leading-tight text-white sm:text-[1.15rem]">
-            {course.title}
+          <h3 className="line-clamp-2 min-h-[3.2rem] max-w-full break-words font-reference text-lg font-semibold leading-tight text-white sm:text-[1.15rem]">
+            {safeTitle}
           </h3>
         </div>
       </div>
 
       <div className="relative flex flex-1 flex-col p-5">
-        <p className="line-clamp-3 text-sm leading-6 text-[#adb6a7]">
-          {course.description || "Cybersecurity course track."}
+        <p className="line-clamp-3 min-h-[4.6rem] max-w-full break-words text-sm leading-6 text-[#adb6a7]">
+          {safeDescription}
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-2">
@@ -96,7 +116,7 @@ export default function CourseCard({ course }) {
 
         <div className="mt-4 flex items-center gap-2 text-xs text-[#97a08f]">
           <span className="inline-flex h-1.5 w-1.5 rounded-full bg-[#b9c7ab]" />
-          <span>
+          <span className="line-clamp-2 min-h-[1.2rem]">
             {status.isComingSoon
               ? "Join waitlist updates when the track launches."
               : "Enrollment is open for this track."}
@@ -129,3 +149,5 @@ export default function CourseCard({ course }) {
     </article>
   );
 }
+
+export default memo(CourseCard);

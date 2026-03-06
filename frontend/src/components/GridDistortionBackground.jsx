@@ -22,9 +22,20 @@ export default function GridDistortionBackground() {
     let dpr = 1;
     let cell = 32;
     let reducedMotion = false;
+    let isVisible = true;
+    let lastFrameTime = 0;
+    let frameIntervalMs = 1000 / 30;
+    let glowA = null;
+    let glowB = null;
 
     if (typeof window !== "undefined" && window.matchMedia) {
       reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    }
+    if (typeof document !== "undefined") {
+      isVisible = document.visibilityState !== "hidden";
+    }
+    if (reducedMotion) {
+      frameIntervalMs = 1000 / 12;
     }
 
     const distort = (x, y, t) => {
@@ -40,16 +51,10 @@ export default function GridDistortionBackground() {
       ctx.fillRect(0, 0, width, height);
 
       // Soft ambient glows to avoid a flat grid look.
-      const glowA = ctx.createRadialGradient(width * 0.18, height * 0.12, 0, width * 0.18, height * 0.12, width * 0.6);
-      glowA.addColorStop(0, "rgba(132, 170, 149, 0.18)");
-      glowA.addColorStop(1, "rgba(132, 170, 149, 0)");
-      ctx.fillStyle = glowA;
+      ctx.fillStyle = glowA || "rgba(132, 170, 149, 0.08)";
       ctx.fillRect(0, 0, width, height);
 
-      const glowB = ctx.createRadialGradient(width * 0.82, height * 0.86, 0, width * 0.82, height * 0.86, width * 0.54);
-      glowB.addColorStop(0, "rgba(98, 132, 117, 0.18)");
-      glowB.addColorStop(1, "rgba(98, 132, 117, 0)");
-      ctx.fillStyle = glowB;
+      ctx.fillStyle = glowB || "rgba(98, 132, 117, 0.08)";
       ctx.fillRect(0, 0, width, height);
 
       const sampleStep = Math.max(8, Math.floor(cell * 0.34));
@@ -115,23 +120,48 @@ export default function GridDistortionBackground() {
     };
 
     const resize = () => {
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      dpr = Math.min(window.devicePixelRatio || 1, 1.75);
       width = Math.max(window.innerWidth, 1);
       height = Math.max(window.innerHeight, 1);
       cell = clamp(Math.floor(width / 44), 28, 42);
       canvas.width = Math.floor(width * dpr);
       canvas.height = Math.floor(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      glowA = ctx.createRadialGradient(width * 0.18, height * 0.12, 0, width * 0.18, height * 0.12, width * 0.6);
+      glowA.addColorStop(0, "rgba(132, 170, 149, 0.18)");
+      glowA.addColorStop(1, "rgba(132, 170, 149, 0)");
+      glowB = ctx.createRadialGradient(width * 0.82, height * 0.86, 0, width * 0.82, height * 0.86, width * 0.54);
+      glowB.addColorStop(0, "rgba(98, 132, 117, 0.18)");
+      glowB.addColorStop(1, "rgba(98, 132, 117, 0)");
       drawGrid(0);
     };
 
     const render = (timestamp) => {
+      if (!isVisible) {
+        rafId = window.requestAnimationFrame(render);
+        return;
+      }
+      if (timestamp - lastFrameTime < frameIntervalMs) {
+        rafId = window.requestAnimationFrame(render);
+        return;
+      }
+      lastFrameTime = timestamp;
       drawGrid(timestamp * 0.001);
       rafId = window.requestAnimationFrame(render);
     };
 
+    const handleVisibilityChange = () => {
+      isVisible = document.visibilityState !== "hidden";
+      if (!isVisible) {
+        return;
+      }
+      lastFrameTime = 0;
+      drawGrid(performance.now() * 0.001);
+    };
+
     resize();
     window.addEventListener("resize", resize);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     if (!reducedMotion) {
       rafId = window.requestAnimationFrame(render);
@@ -139,6 +169,7 @@ export default function GridDistortionBackground() {
 
     return () => {
       window.removeEventListener("resize", resize);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (rafId) {
         window.cancelAnimationFrame(rafId);
       }

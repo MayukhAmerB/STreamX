@@ -23,6 +23,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 
 const bootLoader = document.getElementById("boot-loader");
 if (bootLoader && document.body) {
+  const bootstrapStartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+  const MIN_BOOT_LOADER_MS = 900;
+
   const completeTransition = () => {
     if (bootLoader.isConnected) {
       bootLoader.remove();
@@ -45,9 +48,12 @@ if (bootLoader && document.body) {
     window.setTimeout(completeTransition, 1100);
   };
 
+  const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+  const remaining = Math.max(0, MIN_BOOT_LOADER_MS - (now - bootstrapStartedAt));
+
   window.setTimeout(() => {
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(beginTransition);
     });
-  }, 2600);
+  }, remaining);
 }

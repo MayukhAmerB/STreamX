@@ -1,17 +1,93 @@
+from django import forms
 from django.contrib import admin, messages
 from django.db.models import Count
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import ngettext
 
-from .models import Course, Enrollment, Lecture, LiveClass, LiveClassEnrollment, Section
+from .models import (
+    Course,
+    Enrollment,
+    Lecture,
+    LiveClass,
+    LiveClassEnrollment,
+    PublicEnrollmentLead,
+    Section,
+)
+from .cache_utils import bump_course_list_cache_version
 from .services import VideoTranscodeError, transcode_lecture_to_hls
+
+
+class LectureInlineForm(forms.ModelForm):
+    remove_uploaded_video = forms.BooleanField(
+        required=False,
+        label="Remove uploaded video",
+        help_text="Clear the current video file without deleting the lecture row.",
+    )
+
+    class Meta:
+        model = Lecture
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        has_existing_file = bool(getattr(self.instance, "pk", None) and self.instance.video_file)
+        if not has_existing_file:
+            self.fields["remove_uploaded_video"].widget = forms.HiddenInput()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        remove_uploaded_video = cleaned_data.get("remove_uploaded_video", False)
+
+        if remove_uploaded_video:
+            if "video_file" in self.changed_data and cleaned_data.get("video_file"):
+                self.add_error(
+                    "remove_uploaded_video",
+                    "Use either a new upload or remove, not both in the same save.",
+                )
+            # For FileField in ModelForm, False explicitly clears existing file.
+            cleaned_data["video_file"] = False
+
+        return cleaned_data
+
+    def save(self, commit=True):
+        remove_uploaded_video = self.cleaned_data.get("remove_uploaded_video", False)
+        old_video_name = None
+        old_video_storage = None
+
+        if remove_uploaded_video and getattr(self.instance, "video_file", None):
+            old_video_name = self.instance.video_file.name
+            old_video_storage = self.instance.video_file.storage
+
+            # Reset stream artifacts tied to uploaded file so stale stream metadata is not reused.
+            self.instance.stream_manifest_key = ""
+            self.instance.stream_duration_seconds = None
+            self.instance.stream_error = ""
+
+        instance = super().save(commit=commit)
+
+        if commit and old_video_name and old_video_storage:
+            try:
+                old_video_storage.delete(old_video_name)
+            except Exception:
+                pass
+
+        return instance
 
 
 class LectureInline(admin.TabularInline):
     model = Lecture
+    form = LectureInlineForm
     extra = 1
-    fields = ("order", "title", "video_file", "video_key", "is_preview", "stream_status")
+    fields = (
+        "order",
+        "title",
+        "video_file",
+        "remove_uploaded_video",
+        "video_key",
+        "is_preview",
+        "stream_status",
+    )
     readonly_fields = ("stream_status",)
     ordering = ("order", "id")
     show_change_link = True
@@ -32,6 +108,7 @@ class CourseAdmin(admin.ModelAdmin):
         "instructor",
         "section_count",
         "lecture_count",
+        "admin_actions",
         "updated_at",
     )
     list_filter = ("category", "level", "launch_status", "is_published", "created_at", "updated_at")
@@ -99,6 +176,12 @@ class CourseAdmin(admin.ModelAdmin):
             _lecture_count=Count("sections__lectures", distinct=True),
         )
 
+    def get_changeform_initial_data(self, request):
+        initial = super().get_changeform_initial_data(request)
+        initial.setdefault("is_published", True)
+        initial.setdefault("launch_status", Course.STATUS_LIVE)
+        return initial
+
     @admin.display(ordering="_section_count", description="Modules")
     def section_count(self, obj):
         return getattr(obj, "_section_count", None) or obj.sections.count()
@@ -154,21 +237,31 @@ class CourseAdmin(admin.ModelAdmin):
             obj.pk,
         )
 
+    @admin.display(description="Actions")
+    def admin_actions(self, obj):
+        edit_url = reverse("admin:courses_course_change", args=[obj.pk])
+        delete_url = reverse("admin:courses_course_delete", args=[obj.pk])
+        return format_html('<a href="{}">Edit</a> | <a href="{}">Delete</a>', edit_url, delete_url)
+
     @admin.action(description="Mark selected courses as Live")
     def mark_live(self, request, queryset):
         queryset.update(launch_status=Course.STATUS_LIVE)
+        bump_course_list_cache_version()
 
     @admin.action(description="Mark selected courses as Coming Soon")
     def mark_coming_soon(self, request, queryset):
         queryset.update(launch_status=Course.STATUS_COMING_SOON)
+        bump_course_list_cache_version()
 
     @admin.action(description="Publish selected courses")
     def publish_courses(self, request, queryset):
         queryset.update(is_published=True)
+        bump_course_list_cache_version()
 
     @admin.action(description="Unpublish selected courses")
     def unpublish_courses(self, request, queryset):
         queryset.update(is_published=False)
+        bump_course_list_cache_version()
 
 
 @admin.register(Section)
@@ -277,6 +370,10 @@ class EnrollmentAdmin(admin.ModelAdmin):
     list_per_page = 50
     actions = ("approve_enrollment_requests", "reject_enrollment_requests")
 
+    def get_model_perms(self, request):
+        # Managed from Users admin via inlines to keep enrollment control centralized.
+        return {}
+
     @admin.action(description="Approve selected enrollment requests")
     def approve_enrollment_requests(self, request, queryset):
         updated = queryset.exclude(payment_status=Enrollment.STATUS_PAID).update(
@@ -323,6 +420,7 @@ class LiveClassAdmin(admin.ModelAdmin):
         "is_active",
         "linked_course",
         "enrollment_count",
+        "admin_actions",
     )
     list_filter = ("is_active", "level", "month_number")
     search_fields = ("title", "description", "linked_course__title")
@@ -364,6 +462,12 @@ class LiveClassAdmin(admin.ModelAdmin):
             return "Save the live class first to view enrollments."
         return self.enrollment_count(obj)
 
+    @admin.display(description="Actions")
+    def admin_actions(self, obj):
+        edit_url = reverse("admin:courses_liveclass_change", args=[obj.pk])
+        delete_url = reverse("admin:courses_liveclass_delete", args=[obj.pk])
+        return format_html('<a href="{}">Edit</a> | <a href="{}">Delete</a>', edit_url, delete_url)
+
 
 @admin.register(LiveClassEnrollment)
 class LiveClassEnrollmentAdmin(admin.ModelAdmin):
@@ -382,6 +486,10 @@ class LiveClassEnrollmentAdmin(admin.ModelAdmin):
     autocomplete_fields = ("user", "live_class")
     readonly_fields = ("created_at",)
     actions = ("approve_enrollment_requests", "reject_enrollment_requests")
+
+    def get_model_perms(self, request):
+        # Managed from Users admin via inlines to keep enrollment control centralized.
+        return {}
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("user", "live_class")
@@ -425,6 +533,130 @@ class LiveClassEnrollmentAdmin(admin.ModelAdmin):
             % updated,
             level=messages.WARNING,
         )
+
+
+@admin.register(PublicEnrollmentLead)
+class PublicEnrollmentLeadAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "status",
+        "target_type",
+        "target_name",
+        "email",
+        "phone_number",
+        "whatsapp_number",
+        "message_preview",
+        "created_at",
+    )
+    list_display_links = ("id", "target_name", "email")
+    list_editable = ("status",)
+    list_filter = ("status", "created_at")
+    search_fields = (
+        "email",
+        "phone_number",
+        "whatsapp_number",
+        "message",
+        "course__title",
+        "live_class__title",
+    )
+    readonly_fields = (
+        "course",
+        "live_class",
+        "target_name",
+        "email",
+        "phone_number",
+        "whatsapp_number",
+        "message",
+        "source_path",
+        "created_at",
+        "updated_at",
+    )
+    autocomplete_fields = ("course", "live_class")
+    ordering = ("-created_at",)
+    date_hierarchy = "created_at"
+    list_per_page = 100
+    fieldsets = (
+        ("Enrollment Request", {"fields": ("status", "course", "live_class", "target_name")}),
+        ("Contact", {"fields": ("email", "phone_number", "whatsapp_number")}),
+        ("Message", {"fields": ("message", "source_path")}),
+        ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
+    )
+
+    actions = ("mark_reviewed", "mark_contacted", "mark_converted")
+
+    @admin.display(description="Target Type")
+    def target_type(self, obj):
+        if obj.course_id:
+            return "Course"
+        if obj.live_class_id:
+            return "Live Class"
+        return "-"
+
+    @admin.display(description="Target")
+    def target_name(self, obj):
+        if obj.course_id:
+            return obj.course.title
+        if obj.live_class_id:
+            return obj.live_class.title
+        return "Target removed"
+
+    @admin.display(description="Message")
+    def message_preview(self, obj):
+        text = (obj.message or "").strip()
+        if len(text) <= 80:
+            return text
+        return f"{text[:80]}..."
+
+    @admin.action(description="Mark selected leads as Reviewed")
+    def mark_reviewed(self, request, queryset):
+        updated = queryset.exclude(status=PublicEnrollmentLead.STATUS_REVIEWED).update(
+            status=PublicEnrollmentLead.STATUS_REVIEWED
+        )
+        self.message_user(
+            request,
+            ngettext(
+                "%d lead marked as reviewed.",
+                "%d leads marked as reviewed.",
+                updated,
+            )
+            % updated,
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Mark selected leads as Contacted")
+    def mark_contacted(self, request, queryset):
+        updated = queryset.exclude(status=PublicEnrollmentLead.STATUS_CONTACTED).update(
+            status=PublicEnrollmentLead.STATUS_CONTACTED
+        )
+        self.message_user(
+            request,
+            ngettext(
+                "%d lead marked as contacted.",
+                "%d leads marked as contacted.",
+                updated,
+            )
+            % updated,
+            level=messages.SUCCESS,
+        )
+
+    @admin.action(description="Mark selected leads as Converted")
+    def mark_converted(self, request, queryset):
+        updated = queryset.exclude(status=PublicEnrollmentLead.STATUS_CONVERTED).update(
+            status=PublicEnrollmentLead.STATUS_CONVERTED
+        )
+        self.message_user(
+            request,
+            ngettext(
+                "%d lead marked as converted.",
+                "%d leads marked as converted.",
+                updated,
+            )
+            % updated,
+            level=messages.SUCCESS,
+        )
+
+    def has_add_permission(self, request):
+        return False
 
 
 admin.site.site_header = "Al syed Initiative Admin"

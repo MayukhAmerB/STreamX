@@ -1,7 +1,10 @@
 import apiClient from "./client";
+import { dedupedGet } from "./requestDedup";
 
-export const listRealtimeSessions = (params = {}) => apiClient.get("/realtime/sessions/", { params });
-export const getRealtimeSession = (id) => apiClient.get(`/realtime/sessions/${id}/`);
+export const listRealtimeSessions = (params = {}) =>
+  dedupedGet("/realtime/sessions/", params, () => apiClient.get("/realtime/sessions/", { params }));
+export const getRealtimeSession = (id) =>
+  dedupedGet(`/realtime/sessions/${id}/`, {}, () => apiClient.get(`/realtime/sessions/${id}/`));
 export const createRealtimeSession = (payload) => apiClient.post("/realtime/sessions/", payload);
 export const joinRealtimeSession = (id, payload = {}) => apiClient.post(`/realtime/sessions/${id}/join/`, payload);
 export const endRealtimeSession = (id) => apiClient.post(`/realtime/sessions/${id}/end/`);

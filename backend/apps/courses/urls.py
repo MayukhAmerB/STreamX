@@ -11,6 +11,7 @@ from .views import (
     LiveClassEnrollView,
     LiveClassListView,
     MyCoursesView,
+    PublicEnrollmentLeadCreateView,
     SectionCreateView,
     SectionDetailView,
 )
@@ -26,6 +27,7 @@ urlpatterns = [
     path("lectures/<int:pk>/video/", LectureVideoView.as_view(), name="lecture-video"),
     path("live-classes/", LiveClassListView.as_view(), name="live-class-list"),
     path("live-classes/enroll/", LiveClassEnrollView.as_view(), name="live-class-enroll"),
+    path("enrollment-leads/", PublicEnrollmentLeadCreateView.as_view(), name="public-enrollment-lead-create"),
     path("my-courses/", MyCoursesView.as_view(), name="my-courses"),
     path("instructor/courses/", InstructorCoursesView.as_view(), name="instructor-courses"),
 ]

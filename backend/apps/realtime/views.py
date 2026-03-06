@@ -1,7 +1,9 @@
+import logging
 import time
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status
 from rest_framework.throttling import ScopedRateThrottle
@@ -11,6 +13,13 @@ from config.audit import log_security_event
 from config.request_security import find_disallowed_query_params
 from config.response import api_response
 
+from .domain import (
+    build_permission_set,
+    get_access_decision,
+    list_queryset,
+    resolve_participant_state,
+    session_payload_for_create,
+)
 from .models import RealtimeConfiguration, RealtimeSession
 from .serializers import (
     RealtimeSessionCreateSerializer,
@@ -34,10 +43,69 @@ from .services import (
 )
 
 User = get_user_model()
+realtime_ops_logger = logging.getLogger("ops.realtime")
+
+
+def _can_manage_session(user, session):
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    return bool(
+        getattr(user, "id", None) == session.host_id
+        or getattr(user, "is_staff", False)
+        or getattr(user, "is_superuser", False)
+    )
+
+
+def _build_session_list_cache_key(*, user_id, is_admin, session_type, status_filter):
+    normalized_session_type = session_type or "-"
+    normalized_status = status_filter or "-"
+    return (
+        "realtime-session-list:"
+        f"user={user_id}:"
+        f"admin={1 if is_admin else 0}:"
+        f"session_type={normalized_session_type}:"
+        f"status={normalized_status}"
+    )
+
+
+def _emit_realtime_telemetry(
+    *,
+    event,
+    level,
+    request,
+    session,
+    participant_state,
+    **extra,
+):
+    if not bool(getattr(settings, "REALTIME_TELEMETRY_ENABLED", True)):
+        return
+    window_seconds = max(10, int(getattr(settings, "REALTIME_TELEMETRY_LOG_WINDOW_SECONDS", 60)))
+    throttle_key = f"realtime-telemetry:{event}:session={session.id}"
+    if not cache.add(throttle_key, 1, timeout=window_seconds):
+        return
+
+    payload = {
+        "event": event,
+        "request_id": getattr(request, "request_id", None),
+        "session_id": session.id,
+        "session_type": session.session_type,
+        "status": session.status,
+        "meeting_capacity": session.meeting_capacity,
+        "participant_count": participant_state.participant_count,
+        "participant_count_source": participant_state.participant_count_source,
+        "overflow_triggered": participant_state.overflow_triggered,
+        "user_id": getattr(getattr(request, "user", None), "id", None),
+        **extra,
+    }
+
+    if str(level).lower() == "warning":
+        realtime_ops_logger.warning("REALTIME_TELEMETRY %s", payload)
+    else:
+        realtime_ops_logger.info("REALTIME_TELEMETRY %s", payload)
 
 
 class RealtimeSessionListCreateView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "realtime_session_create"
 
@@ -65,26 +133,33 @@ class RealtimeSessionListCreateView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        queryset = RealtimeSession.objects.select_related("host")
-
         session_type = (request.query_params.get("session_type") or "").strip().lower()
-        if session_type in {RealtimeSession.TYPE_MEETING, RealtimeSession.TYPE_BROADCASTING}:
-            queryset = queryset.filter(session_type=session_type)
-
         status_filter = (request.query_params.get("status") or "").strip().lower()
-        if status_filter in {
-            RealtimeSession.STATUS_SCHEDULED,
-            RealtimeSession.STATUS_LIVE,
-            RealtimeSession.STATUS_ENDED,
-        }:
-            queryset = queryset.filter(status=status_filter)
-        elif status_filter != "all":
-            queryset = queryset.filter(
-                status__in=[RealtimeSession.STATUS_SCHEDULED, RealtimeSession.STATUS_LIVE]
-            )
+        is_admin = bool(getattr(request.user, "is_staff", False) or getattr(request.user, "is_superuser", False))
+        cache_ttl = max(0, int(getattr(settings, "REALTIME_SESSION_LIST_CACHE_TTL_SECONDS", 5)))
+        cache_key = _build_session_list_cache_key(
+            user_id=request.user.id,
+            is_admin=is_admin,
+            session_type=session_type,
+            status_filter=status_filter,
+        )
+
+        if cache_ttl > 0:
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return api_response(success=True, message="Realtime sessions fetched.", data=cached)
+
+        queryset = list_queryset(
+            session_type=session_type,
+            status_filter=status_filter,
+            user=request.user,
+        )
 
         serializer = RealtimeSessionListSerializer(queryset, many=True, context={"request": request})
-        return api_response(success=True, message="Realtime sessions fetched.", data=serializer.data)
+        payload = serializer.data
+        if cache_ttl > 0:
+            cache.set(cache_key, payload, timeout=cache_ttl)
+        return api_response(success=True, message="Realtime sessions fetched.", data=payload)
 
     def post(self, request):
         if not request.user or not request.user.is_authenticated:
@@ -111,10 +186,7 @@ class RealtimeSessionListCreateView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        payload = dict(serializer.validated_data)
-        payload.setdefault("meeting_capacity", settings.REALTIME_DEFAULT_MEETING_CAPACITY)
-        payload.setdefault("max_audience", settings.REALTIME_DEFAULT_MAX_AUDIENCE)
-        payload.setdefault("status", RealtimeSession.STATUS_LIVE)
+        payload = session_payload_for_create(serializer.validated_data)
 
         session = RealtimeSession.objects.create(host=request.user, **payload)
         data = RealtimeSessionListSerializer(session, context={"request": request}).data
@@ -127,10 +199,18 @@ class RealtimeSessionListCreateView(APIView):
 
 
 class RealtimeSessionDetailView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, pk):
-        session = get_object_or_404(RealtimeSession.objects.select_related("host"), pk=pk)
+        session = get_object_or_404(RealtimeSession.objects.with_related(), pk=pk)
+        access_decision = get_access_decision(session, request.user)
+        if not access_decision.allowed:
+            return api_response(
+                success=False,
+                message=access_decision.message,
+                errors={"detail": access_decision.detail},
+                status_code=access_decision.status_code,
+            )
         data = RealtimeSessionListSerializer(session, context={"request": request}).data
         return api_response(success=True, message="Realtime session fetched.", data=data)
 
@@ -141,7 +221,7 @@ class RealtimeSessionJoinView(APIView):
     throttle_scope = "realtime_session_join"
 
     def post(self, request, pk):
-        session = get_object_or_404(RealtimeSession.objects.select_related("host"), pk=pk)
+        session = get_object_or_404(RealtimeSession.objects.with_related(), pk=pk)
         if session.status == RealtimeSession.STATUS_ENDED:
             return api_response(
                 success=False,
@@ -163,47 +243,63 @@ class RealtimeSessionJoinView(APIView):
             session.mark_live()
 
         room_name = session.livekit_room_name or session.room_name
-        is_host = request.user.id == session.host_id
-        is_admin = bool(getattr(request.user, "is_staff", False) or getattr(request.user, "is_superuser", False))
-        can_manage_presenters = bool(is_host or is_admin)
-        can_present = session.is_presenter_allowed(request.user)
-        can_speak = session.session_type == RealtimeSession.TYPE_MEETING
-        can_publish = bool(can_present or can_speak)
-        can_publish_sources = None
-        if session.session_type == RealtimeSession.TYPE_MEETING:
-            if can_present:
-                can_publish_sources = ["camera", "microphone", "screen_share", "screen_share_audio"]
-            elif can_speak:
-                can_publish_sources = ["microphone"]
+        access_decision = get_access_decision(session, request.user)
+        if not access_decision.allowed:
+            return api_response(
+                success=False,
+                message=access_decision.message,
+                errors={"detail": access_decision.detail},
+                status_code=access_decision.status_code,
+            )
+
+        permissions_set = build_permission_set(session, request.user, access_decision)
         realtime_config = RealtimeConfiguration.get_solo()
-        participant_count = 0
-        participant_count_source = "fallback"
-
+        participant_state = resolve_participant_state(
+            session,
+            room_name=room_name,
+            is_host=access_decision.is_host,
+            participant_counter=get_room_participant_count,
+        )
         if session.session_type == RealtimeSession.TYPE_MEETING:
-            count = get_room_participant_count(room_name)
-            if count is not None:
-                participant_count = count
-                participant_count_source = "livekit"
+            if bool(getattr(settings, "REALTIME_WARN_PARTICIPANT_FALLBACK_SOURCE", True)) and (
+                participant_state.participant_count_source != "livekit"
+            ):
+                _emit_realtime_telemetry(
+                    event="meeting.participant_count_source_fallback",
+                    level="warning",
+                    request=request,
+                    session=session,
+                    participant_state=participant_state,
+                )
+            capacity_threshold = float(getattr(settings, "REALTIME_CAPACITY_WARNING_RATIO", 0.8))
+            safe_capacity = max(1, int(session.meeting_capacity or 1))
+            capacity_ratio = participant_state.participant_count / safe_capacity
+            if capacity_ratio >= capacity_threshold:
+                _emit_realtime_telemetry(
+                    event="meeting.capacity_threshold_reached",
+                    level="warning",
+                    request=request,
+                    session=session,
+                    participant_state=participant_state,
+                    capacity_ratio=round(capacity_ratio, 3),
+                    capacity_threshold=round(capacity_threshold, 3),
+                )
+            if participant_state.overflow_triggered:
+                _emit_realtime_telemetry(
+                    event="meeting.overflow_to_broadcast",
+                    level="warning",
+                    request=request,
+                    session=session,
+                    participant_state=participant_state,
+                )
 
-        should_use_broadcast = session.session_type == RealtimeSession.TYPE_BROADCASTING
-        overflow_triggered = False
-
-        if (
-            session.session_type == RealtimeSession.TYPE_MEETING
-            and session.allow_overflow_broadcast
-            and participant_count >= session.meeting_capacity
-            and not is_host
-        ):
-            should_use_broadcast = True
-            overflow_triggered = True
-
-        if should_use_broadcast:
+        if participant_state.should_use_broadcast:
             urls = resolve_broadcast_urls(session, request=request)
             data = {
                 "mode": "broadcast",
-                "overflow_triggered": overflow_triggered,
-                "participant_count": participant_count,
-                "participant_count_source": participant_count_source,
+                "overflow_triggered": participant_state.overflow_triggered,
+                "participant_count": participant_state.participant_count,
+                "participant_count_source": participant_state.participant_count_source,
                 "session": RealtimeSessionListSerializer(session, context={"request": request}).data,
                 "broadcast": {
                     "stream_embed_url": urls["stream_embed_url"],
@@ -235,11 +331,11 @@ class RealtimeSessionJoinView(APIView):
                 identity=identity,
                 room_name=room_name,
                 participant_name=display_name,
-                can_publish=can_publish,
+                can_publish=permissions_set.can_publish,
                 can_subscribe=True,
-                room_admin=can_manage_presenters,
+                room_admin=permissions_set.can_manage_presenters,
                 ttl_seconds=settings.REALTIME_JOIN_TOKEN_TTL_SECONDS,
-                can_publish_sources=can_publish_sources,
+                can_publish_sources=permissions_set.can_publish_sources,
             )
         except LiveKitConfigError as exc:
             return api_response(
@@ -253,8 +349,8 @@ class RealtimeSessionJoinView(APIView):
         data = {
             "mode": "meeting",
             "overflow_triggered": False,
-            "participant_count": participant_count,
-            "participant_count_source": participant_count_source,
+            "participant_count": participant_state.participant_count,
+            "participant_count_source": participant_state.participant_count_source,
             "session": RealtimeSessionListSerializer(session, context={"request": request}).data,
             "meeting": {
                 "room_name": room_name,
@@ -266,11 +362,11 @@ class RealtimeSessionJoinView(APIView):
                 "meeting_capacity": session.meeting_capacity,
                 "media_profile": realtime_config.to_meeting_dict(),
                 "permissions": {
-                    "can_present": can_present,
-                    "can_speak": can_speak,
-                    "can_use_camera": can_present,
-                    "can_share_screen": can_present,
-                    "can_manage_presenters": can_manage_presenters,
+                    "can_present": permissions_set.can_present,
+                    "can_speak": permissions_set.can_speak,
+                    "can_use_camera": permissions_set.can_present,
+                    "can_share_screen": permissions_set.can_present,
+                    "can_manage_presenters": permissions_set.can_manage_presenters,
                 },
                 "presenter_user_ids": session.get_presenter_user_ids(),
             },
@@ -283,11 +379,11 @@ class RealtimeSessionEndView(APIView):
 
     def post(self, request, pk):
         session = get_object_or_404(RealtimeSession, pk=pk)
-        if request.user.id != session.host_id:
+        if not _can_manage_session(request.user, session):
             return api_response(
                 success=False,
                 message="Access denied.",
-                errors={"detail": "Only the host can end this session."},
+                errors={"detail": "Only host or admin can end this session."},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
@@ -372,11 +468,11 @@ class RealtimeSessionHostTokenView(APIView):
 
     def post(self, request, pk):
         session = get_object_or_404(RealtimeSession, pk=pk)
-        if request.user.id != session.host_id:
+        if not _can_manage_session(request.user, session):
             return api_response(
                 success=False,
                 message="Access denied.",
-                errors={"detail": "Only the host can start browser publishing."},
+                errors={"detail": "Only host or admin can start browser publishing."},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
         if not is_livekit_configured():
@@ -414,11 +510,11 @@ class RealtimeSessionStreamStartView(APIView):
 
     def post(self, request, pk):
         session = get_object_or_404(RealtimeSession, pk=pk)
-        if request.user.id != session.host_id:
+        if not _can_manage_session(request.user, session):
             return api_response(
                 success=False,
                 message="Access denied.",
-                errors={"detail": "Only the host can start streaming."},
+                errors={"detail": "Only host or admin can start streaming."},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
@@ -445,10 +541,15 @@ class RealtimeSessionStreamStartView(APIView):
 
         session.mark_stream_starting()
         try:
+            participant_identity = (
+                build_host_publisher_identity(session.host_id, session.id)
+                if request.user.id == session.host_id
+                else ""
+            )
             egress_id = start_room_broadcast_egress(
                 room_name=session.livekit_room_name or session.room_name,
                 rtmp_target_url=rtmp_target_url,
-                participant_identity=build_host_publisher_identity(session.host_id, session.id),
+                participant_identity=participant_identity,
             )
             session.mark_stream_live(egress_id)
         except (LiveKitConfigError, LiveKitEgressError) as exc:
@@ -469,11 +570,11 @@ class RealtimeSessionStreamStopView(APIView):
 
     def post(self, request, pk):
         session = get_object_or_404(RealtimeSession, pk=pk)
-        if request.user.id != session.host_id:
+        if not _can_manage_session(request.user, session):
             return api_response(
                 success=False,
                 message="Access denied.",
-                errors={"detail": "Only the host can stop streaming."},
+                errors={"detail": "Only host or admin can stop streaming."},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 

@@ -14,5 +14,7 @@ COPY . .
 RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD python -c "import sys, urllib.request; resp = urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=3); sys.exit(0 if resp.status == 200 else 1)"
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["gunicorn", "--config", "gunicorn.conf.py", "config.wsgi:application"]

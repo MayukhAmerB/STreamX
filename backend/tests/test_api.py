@@ -11,7 +11,15 @@ from django.urls import reverse
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
-from apps.courses.models import Course, Enrollment, Lecture, LiveClass, LiveClassEnrollment, Section
+from apps.courses.models import (
+    Course,
+    Enrollment,
+    Lecture,
+    LiveClass,
+    LiveClassEnrollment,
+    PublicEnrollmentLead,
+    Section,
+)
 from apps.courses.serializers import LectureSerializer
 from apps.payments.models import Payment
 from apps.realtime.models import RealtimeSession
@@ -514,6 +522,37 @@ class PermissionTests(BaseAPITestCase):
         self.assertIn("thumbnail", response.data["errors"])
 
 
+class InstructorDeletionSafetyTests(APITestCase):
+    def test_deleting_instructor_keeps_course_with_null_instructor(self):
+        instructor = User.objects.create_user(
+            email="delete-instructor@test.com",
+            password="StrongPass@123",
+            full_name="Delete Instructor",
+            role=User.ROLE_INSTRUCTOR,
+        )
+        course = Course.objects.create(
+            title="Instructor Deletion Safe Course",
+            description="Course should survive instructor deletion.",
+            price=Decimal("199.00"),
+            instructor=instructor,
+            is_published=True,
+            launch_status=Course.STATUS_COMING_SOON,
+            category=Course.CATEGORY_OSINT,
+            level=Course.LEVEL_BEGINNER,
+        )
+
+        instructor.delete()
+        self.assertTrue(Course.objects.filter(pk=course.pk).exists())
+
+        course.refresh_from_db()
+        self.assertIsNone(course.instructor_id)
+
+        response = self.client.get(reverse("course-list-create"))
+        self.assertEqual(response.status_code, 200)
+        returned_ids = {item["id"] for item in response.data["data"]}
+        self.assertIn(course.id, returned_ids)
+
+
 class PaymentVerificationTests(BaseAPITestCase):
     @patch("apps.payments.views.verify_razorpay_signature")
     def test_verify_payment_creates_enrollment(self, mock_verify):
@@ -584,6 +623,76 @@ class EnrollmentApprovalFlowTests(BaseAPITestCase):
         self.assertEqual(enrollment.status, LiveClassEnrollment.STATUS_PENDING)
 
 
+class PublicEnrollmentLeadTests(BaseAPITestCase):
+    def test_guest_can_submit_course_enrollment_lead(self):
+        response = self.client.post(
+            reverse("public-enrollment-lead-create"),
+            {
+                "course_id": self.course.id,
+                "email": "guest@example.com",
+                "phone_number": "+91 90000 11111",
+                "whatsapp_number": "+91 90000 22222",
+                "message": "I want to join this course to build practical OSINT skills.",
+                "source_path": "/courses/1",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data["success"])
+        self.assertEqual(response.data["data"]["target_type"], "course")
+        self.assertTrue(
+            PublicEnrollmentLead.objects.filter(
+                course=self.course,
+                email="guest@example.com",
+                status=PublicEnrollmentLead.STATUS_NEW,
+            ).exists()
+        )
+
+    def test_guest_can_submit_live_class_enrollment_lead(self):
+        live_class = LiveClass.objects.create(
+            title="Guest Lead Live Class",
+            description="Live class for guest lead test",
+            level=LiveClass.LEVEL_BEGINNER,
+            month_number=1,
+            is_active=True,
+        )
+        response = self.client.post(
+            reverse("public-enrollment-lead-create"),
+            {
+                "live_class_id": live_class.id,
+                "email": "guest.live@example.com",
+                "phone_number": "+91 95555 11111",
+                "whatsapp_number": "+91 95555 22222",
+                "message": "I prefer interactive live classes and want to enroll this month.",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["data"]["target_type"], "live_class")
+        self.assertTrue(
+            PublicEnrollmentLead.objects.filter(
+                live_class=live_class,
+                email="guest.live@example.com",
+            ).exists()
+        )
+
+    def test_guest_enrollment_lead_requires_single_target_and_message(self):
+        response = self.client.post(
+            reverse("public-enrollment-lead-create"),
+            {
+                "course_id": self.course.id,
+                "live_class_id": 1,
+                "email": "invalid@example.com",
+                "phone_number": "+91 90000 11111",
+                "whatsapp_number": "+91 90000 22222",
+                "message": "",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.data["success"])
+        self.assertIn("message", response.data["errors"])
+
 class LectureVideoAccessTests(BaseAPITestCase):
     @patch("apps.courses.views.generate_signed_video_url")
     def test_enrolled_student_can_get_signed_url_and_unenrolled_cannot(self, mock_signed):
@@ -601,6 +710,25 @@ class LectureVideoAccessTests(BaseAPITestCase):
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(allowed.data["data"]["signed_url"], "https://signed.example.com/video")
 
+    def test_live_class_approval_does_not_grant_course_video_access(self):
+        linked_live_class = LiveClass.objects.create(
+            title="Linked Live Class",
+            description="Live access only",
+            level=LiveClass.LEVEL_BEGINNER,
+            month_number=1,
+            is_active=True,
+            linked_course=self.course,
+        )
+        LiveClassEnrollment.objects.create(
+            user=self.student,
+            live_class=linked_live_class,
+            status=LiveClassEnrollment.STATUS_APPROVED,
+        )
+
+        self.login(self.student.email)
+        denied = self.client.get(reverse("lecture-video", kwargs={"pk": self.lecture.id}))
+        self.assertEqual(denied.status_code, 403)
+
 
 class RealtimeSessionTests(APITestCase):
     def setUp(self):
@@ -617,6 +745,26 @@ class RealtimeSessionTests(APITestCase):
             password="StrongPass@123",
             full_name="Viewer User",
             role=User.ROLE_STUDENT,
+        )
+        self.meeting_course = Course.objects.create(
+            title="Realtime Meeting Course",
+            description="Course used to gate realtime meetings in tests.",
+            price=Decimal("999.00"),
+            instructor=self.host,
+            is_published=True,
+        )
+        self.live_class = LiveClass.objects.create(
+            title="Realtime Meeting Live Class",
+            description="Live class linked to realtime meeting tests.",
+            level=LiveClass.LEVEL_BEGINNER,
+            month_number=1,
+            is_active=True,
+            linked_course=self.meeting_course,
+        )
+        LiveClassEnrollment.objects.create(
+            user=self.viewer,
+            live_class=self.live_class,
+            status=LiveClassEnrollment.STATUS_APPROVED,
         )
 
     def login(self, email, password="StrongPass@123"):
@@ -636,6 +784,7 @@ class RealtimeSessionTests(APITestCase):
                 "title": "Unsafe RTMP",
                 "description": "Should be blocked",
                 "session_type": "broadcasting",
+                "linked_live_class_id": self.live_class.id,
                 "meeting_capacity": 100,
                 "max_audience": 1000,
                 "rtmp_target_url": "rtmp://127.0.0.1:1935/live/key",
@@ -645,11 +794,138 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("rtmp_target_url", response.data["errors"])
 
+    def test_broadcast_create_requires_linked_live_class(self):
+        self.login(self.host.email)
+        response = self.client.post(
+            reverse("realtime-session-list-create"),
+            {
+                "title": "Broadcast Without Live Class",
+                "description": "Should be blocked",
+                "session_type": "broadcasting",
+                "meeting_capacity": 100,
+                "max_audience": 1000,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("linked_live_class_id", response.data["errors"])
+
     def test_realtime_list_rejects_unknown_query_params(self):
+        self.login(self.viewer.email)
         response = self.client.get(reverse("realtime-session-list-create"), {"filter": "host"})
         self.assertEqual(response.status_code, 400)
         self.assertFalse(response.data["success"])
         self.assertEqual(response.data["errors"]["detail"], "Unsupported query parameters.")
+
+    def test_realtime_list_requires_authentication(self):
+        response = self.client.get(reverse("realtime-session-list-create"), {"status": "all"})
+        self.assertEqual(response.status_code, 401)
+
+    def test_realtime_list_only_shows_permitted_sessions_for_student(self):
+        permitted_live_class = self.live_class
+        blocked_live_class = LiveClass.objects.create(
+            title="Blocked Live Class",
+            description="Blocked session",
+            level=LiveClass.LEVEL_INTERMEDIATE,
+            month_number=2,
+            is_active=True,
+        )
+        allowed_session = RealtimeSession.objects.create(
+            title="Allowed Session",
+            description="Student should see this",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=permitted_live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+        RealtimeSession.objects.create(
+            title="Blocked Session",
+            description="Student should not see this",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=blocked_live_class,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+        allowed_broadcast = RealtimeSession.objects.create(
+            title="Allowed Broadcast",
+            description="Student should see this broadcast",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=permitted_live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+        blocked_broadcast = RealtimeSession.objects.create(
+            title="Blocked Broadcast",
+            description="Student should not see this broadcast",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=blocked_live_class,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+
+        self.login(self.viewer.email)
+        response = self.client.get(reverse("realtime-session-list-create"), {"status": "all"})
+        self.assertEqual(response.status_code, 200)
+        returned_ids = {item["id"] for item in response.data["data"]}
+        self.assertIn(allowed_session.id, returned_ids)
+        self.assertIn(allowed_broadcast.id, returned_ids)
+        self.assertNotIn(blocked_broadcast.id, returned_ids)
+
+    def test_unapproved_student_cannot_fetch_or_join_broadcast_session(self):
+        blocked_user = User.objects.create_user(
+            email="blocked-broadcast@test.com",
+            password="StrongPass@123",
+            full_name="Blocked Broadcast Viewer",
+            role=User.ROLE_STUDENT,
+        )
+        session = RealtimeSession.objects.create(
+            title="Restricted Broadcast",
+            description="Only approved students allowed",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+        )
+
+        self.login(blocked_user.email)
+        detail_response = self.client.get(reverse("realtime-session-detail", kwargs={"pk": session.id}))
+        self.assertEqual(detail_response.status_code, 403)
+        join_response = self.client.post(
+            reverse("realtime-session-join", kwargs={"pk": session.id}),
+            {"display_name": "Blocked Broadcast Viewer"},
+            format="json",
+        )
+        self.assertEqual(join_response.status_code, 403)
+
+    def test_unapproved_student_cannot_fetch_or_join_session(self):
+        blocked_user = User.objects.create_user(
+            email="blocked-viewer@test.com",
+            password="StrongPass@123",
+            full_name="Blocked Viewer",
+            role=User.ROLE_STUDENT,
+        )
+        session = RealtimeSession.objects.create(
+            title="Restricted Meeting",
+            description="Only approved students allowed",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+        self.login(blocked_user.email)
+        detail_response = self.client.get(reverse("realtime-session-detail", kwargs={"pk": session.id}))
+        self.assertEqual(detail_response.status_code, 403)
+        join_response = self.client.post(
+            reverse("realtime-session-join", kwargs={"pk": session.id}),
+            {"display_name": "Blocked Viewer"},
+            format="json",
+        )
+        self.assertEqual(join_response.status_code, 403)
 
     @override_settings(
         LIVEKIT_URL="ws://livekit.test",
@@ -677,6 +953,7 @@ class RealtimeSessionTests(APITestCase):
                 "title": "Blue Team Session",
                 "description": "Interactive meeting session",
                 "session_type": "meeting",
+                "linked_live_class_id": self.live_class.id,
                 "meeting_capacity": 100,
             },
             format="json",
@@ -709,6 +986,8 @@ class RealtimeSessionTests(APITestCase):
             description="Auto stream fallback",
             host=self.host,
             session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
             meeting_capacity=100,
             max_audience=50000,
@@ -809,6 +1088,8 @@ class RealtimeSessionTests(APITestCase):
             description="Presenter control checks",
             host=self.host,
             session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
             meeting_capacity=300,
             max_audience=50000,
@@ -866,6 +1147,7 @@ class RealtimeSessionTests(APITestCase):
             session_type=RealtimeSession.TYPE_MEETING,
             status=RealtimeSession.STATUS_LIVE,
         )
+        self.login(self.host.email)
         response = self.client.get(
             reverse("realtime-session-list-create"),
             {"status": "all"},
@@ -890,6 +1172,7 @@ class RealtimeSessionTests(APITestCase):
             session_type=RealtimeSession.TYPE_MEETING,
             status=RealtimeSession.STATUS_LIVE,
         )
+        self.login(self.host.email)
         response = self.client.get(reverse("realtime-session-list-create"), {"status": "all"})
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data["data"])

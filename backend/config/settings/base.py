@@ -17,6 +17,11 @@ ALLOWED_HOSTS = env_list(
     ["localhost", "127.0.0.1"] if DEBUG else [],
 )
 ENABLE_WHITENOISE_STATIC = env_bool("ENABLE_WHITENOISE_STATIC", not DEBUG)
+if ENABLE_WHITENOISE_STATIC:
+    try:
+        import whitenoise  # noqa: F401
+    except ImportError:
+        ENABLE_WHITENOISE_STATIC = False
 USE_GCS_MEDIA_STORAGE = env_bool("USE_GCS_MEDIA_STORAGE", False)
 GCS_MEDIA_BUCKET_NAME = env("GCS_MEDIA_BUCKET_NAME", "").strip()
 GCS_MEDIA_LOCATION = env("GCS_MEDIA_LOCATION", "").strip().strip("/")
@@ -46,6 +51,8 @@ if USE_GCS_MEDIA_STORAGE:
     INSTALLED_APPS.append("storages")
 
 MIDDLEWARE = [
+    "config.observability.RequestContextMiddleware",
+    "config.observability.PerformanceBudgetMiddleware",
     "django.middleware.security.SecurityMiddleware",
 ]
 if ENABLE_WHITENOISE_STATIC:
@@ -226,6 +233,7 @@ REST_FRAMEWORK = {
         "login": "10/minute",
         "login_burst": "5/minute",
         "contact": "5/hour",
+        "public_enrollment_lead": "20/hour",
         "password_reset_request": "5/hour",
         "password_reset_confirm": "20/hour",
         "payment_create": "20/hour",
@@ -359,6 +367,54 @@ LIVEKIT_MEET_URL = env("LIVEKIT_MEET_URL", "https://meet.livekit.io")
 REALTIME_DEFAULT_MEETING_CAPACITY = env_int("REALTIME_DEFAULT_MEETING_CAPACITY", 300)
 REALTIME_DEFAULT_MAX_AUDIENCE = env_int("REALTIME_DEFAULT_MAX_AUDIENCE", 50000)
 REALTIME_JOIN_TOKEN_TTL_SECONDS = env_int("REALTIME_JOIN_TOKEN_TTL_SECONDS", 3600)
+REALTIME_SESSION_LIST_CACHE_TTL_SECONDS = env_int("REALTIME_SESSION_LIST_CACHE_TTL_SECONDS", 5)
+REALTIME_TELEMETRY_ENABLED = env_bool("REALTIME_TELEMETRY_ENABLED", True)
+REALTIME_TELEMETRY_LOG_WINDOW_SECONDS = env_int("REALTIME_TELEMETRY_LOG_WINDOW_SECONDS", 60)
+REALTIME_WARN_PARTICIPANT_FALLBACK_SOURCE = env_bool("REALTIME_WARN_PARTICIPANT_FALLBACK_SOURCE", True)
+try:
+    REALTIME_CAPACITY_WARNING_RATIO = float(env("REALTIME_CAPACITY_WARNING_RATIO", "0.8"))
+except (TypeError, ValueError):
+    REALTIME_CAPACITY_WARNING_RATIO = 0.8
+REALTIME_CAPACITY_WARNING_RATIO = max(0.1, min(1.0, REALTIME_CAPACITY_WARNING_RATIO))
+
+PERF_MONITORING_ENABLED = env_bool("PERF_MONITORING_ENABLED", True)
+PERF_DB_QUERY_TRACKING_ENABLED = env_bool("PERF_DB_QUERY_TRACKING_ENABLED", True)
+_default_perf_sample_rate = "1.0" if DEBUG else "0.25"
+try:
+    PERF_DB_QUERY_SAMPLE_RATE = float(env("PERF_DB_QUERY_SAMPLE_RATE", _default_perf_sample_rate))
+except (TypeError, ValueError):
+    PERF_DB_QUERY_SAMPLE_RATE = float(_default_perf_sample_rate)
+PERF_DB_QUERY_SAMPLE_RATE = max(0.0, min(1.0, PERF_DB_QUERY_SAMPLE_RATE))
+PERF_SLOW_QUERY_MS = env_int("PERF_SLOW_QUERY_MS", 120)
+PERF_DEFAULT_ENDPOINT_BUDGET_MS = env_int("PERF_DEFAULT_ENDPOINT_BUDGET_MS", 800)
+PERF_WARN_QUERY_COUNT = env_int("PERF_WARN_QUERY_COUNT", 30)
+PERF_WARN_QUERY_TIME_MS = env_int("PERF_WARN_QUERY_TIME_MS", 300)
+PERF_LOG_ALL_REQUESTS = env_bool("PERF_LOG_ALL_REQUESTS", False)
+PERF_RESPONSE_TIME_HEADER_ENABLED = env_bool("PERF_RESPONSE_TIME_HEADER_ENABLED", DEBUG)
+PERF_PATH_BUDGETS = {}
+for _raw_budget_row in env_list(
+    "PERF_PATH_BUDGETS",
+    [
+        "/api/realtime/sessions/=650",
+        "/api/live-classes/=450",
+        "/api/courses/=550",
+        "/api/lectures/=650",
+        "/api/auth/=500",
+    ],
+):
+    budget_row = str(_raw_budget_row or "").strip()
+    if not budget_row:
+        continue
+    delimiter = "=" if "=" in budget_row else ":" if ":" in budget_row else None
+    if delimiter is None:
+        continue
+    path_prefix, budget_value = [segment.strip() for segment in budget_row.split(delimiter, 1)]
+    if not path_prefix:
+        continue
+    try:
+        PERF_PATH_BUDGETS[path_prefix] = max(50, int(budget_value))
+    except (TypeError, ValueError):
+        continue
 
 OWNCAST_BASE_URL = env("OWNCAST_BASE_URL", "")
 OWNCAST_STREAM_PUBLIC_BASE_URL = env("OWNCAST_STREAM_PUBLIC_BASE_URL", "")
@@ -371,18 +427,29 @@ LIVEKIT_EGRESS_LAYOUT = env("LIVEKIT_EGRESS_LAYOUT", "speaker-dark")
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "request_id": {
+            "()": "config.observability.RequestIDLogFilter",
+        }
+    },
     "formatters": {
         "standard": {
-            "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
+            "format": "%(asctime)s %(levelname)s [%(request_id)s] %(name)s %(message)s",
         }
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "standard",
+            "filters": ["request_id"],
         }
     },
     "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": env("LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
         "security.audit": {
             "handlers": ["console"],
             "level": env("LOG_LEVEL", "INFO"),
@@ -393,6 +460,20 @@ LOGGING = {
             "level": env("DJANGO_SECURITY_LOG_LEVEL", env("LOG_LEVEL", "INFO")),
             "propagate": False,
         },
+        "ops.performance": {
+            "handlers": ["console"],
+            "level": env("PERF_LOG_LEVEL", env("LOG_LEVEL", "INFO")),
+            "propagate": False,
+        },
+        "ops.realtime": {
+            "handlers": ["console"],
+            "level": env("REALTIME_TELEMETRY_LOG_LEVEL", env("LOG_LEVEL", "INFO")),
+            "propagate": False,
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": env("LOG_LEVEL", "INFO"),
     },
 }
 

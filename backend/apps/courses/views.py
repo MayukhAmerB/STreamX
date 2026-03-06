@@ -11,7 +11,8 @@ from config.request_security import find_disallowed_query_params
 from config.response import api_response
 from config.url_utils import get_media_public_url
 
-from .models import Course, Enrollment, Lecture, LiveClass, LiveClassEnrollment, Section
+from .cache_utils import get_course_list_cache_version, get_live_class_list_cache_version
+from .models import Course, Enrollment, Lecture, LiveClass, LiveClassEnrollment, PublicEnrollmentLead, Section
 from .permissions import IsCourseInstructor, IsEnrolledInCourse, IsInstructor
 from .serializers import (
     CourseEnrollSerializer,
@@ -21,6 +22,7 @@ from .serializers import (
     LectureSerializer,
     LiveClassEnrollSerializer,
     LiveClassListSerializer,
+    PublicEnrollmentLeadCreateSerializer,
     SectionSerializer,
 )
 from .services import S3VideoError, generate_playback_url, generate_signed_video_url
@@ -60,8 +62,10 @@ class CourseListCreateView(APIView):
         search = (request.query_params.get("search") or "").strip()
         cache_key = None
         if not request.user.is_authenticated:
+            cache_version = get_course_list_cache_version()
             cache_key = (
                 "course-list:"
+                f"v={cache_version}:"
                 f"search={search.lower()}:"
                 f"paginate={request.query_params.get('paginate','')}:"
                 f"page={request.query_params.get('page','')}:"
@@ -136,6 +140,11 @@ class CourseListCreateView(APIView):
 class CourseDetailView(APIView):
     permission_classes = [permissions.AllowAny]
 
+    @staticmethod
+    def _build_public_cache_key(course_id, updated_at):
+        updated_ts = int(updated_at.timestamp()) if updated_at else 0
+        return f"course-detail:{course_id}:v={updated_ts}"
+
     def get_object(self, request, pk):
         queryset = _course_prefetch_queryset()
         course = generics.get_object_or_404(queryset, pk=pk)
@@ -148,6 +157,22 @@ class CourseDetailView(APIView):
         raise permissions.PermissionDenied("Course is not published.")
 
     def get(self, request, pk):
+        cache_key = None
+        if not request.user.is_authenticated:
+            public_cache_row = (
+                Course.objects.filter(pk=pk, is_published=True)
+                .values("id", "updated_at")
+                .first()
+            )
+            if public_cache_row:
+                cache_key = self._build_public_cache_key(
+                    public_cache_row["id"],
+                    public_cache_row["updated_at"],
+                )
+                cached = cache.get(cache_key)
+                if cached is not None:
+                    return api_response(success=True, message="Course fetched.", data=cached)
+
         try:
             course = self.get_object(request, pk)
         except permissions.PermissionDenied as exc:
@@ -157,13 +182,9 @@ class CourseDetailView(APIView):
                 errors={"detail": str(exc)},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
-        cache_key = None
-        if not request.user.is_authenticated and course.is_published:
-            updated_ts = int(course.updated_at.timestamp()) if course.updated_at else 0
-            cache_key = f"course-detail:{course.pk}:v={updated_ts}"
-            cached = cache.get(cache_key)
-            if cached is not None:
-                return api_response(success=True, message="Course fetched.", data=cached)
+
+        if not cache_key and not request.user.is_authenticated and course.is_published:
+            cache_key = self._build_public_cache_key(course.pk, course.updated_at)
         serializer = CourseDetailSerializer(course, context={"request": request})
         payload = serializer.data
         if cache_key:
@@ -644,8 +665,10 @@ class LiveClassListView(APIView):
 
         cache_key = None
         if not request.user.is_authenticated:
+            cache_version = get_live_class_list_cache_version()
             cache_key = (
                 "live-class-list:"
+                f"v={cache_version}:"
                 f"paginate={request.query_params.get('paginate','')}:"
                 f"page={request.query_params.get('page','')}:"
                 f"page_size={request.query_params.get('page_size','')}"
@@ -757,4 +780,44 @@ class LiveClassEnrollView(APIView):
                 "email": request.user.email,
                 "full_name": request.user.full_name,
             },
+        )
+
+
+class PublicEnrollmentLeadCreateView(APIView):
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "public_enrollment_lead"
+
+    def post(self, request):
+        serializer = PublicEnrollmentLeadCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            log_security_event("public_enrollment_lead.invalid", request=request, errors=serializer.errors)
+            return api_response(
+                success=False,
+                message="Enrollment request submission failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        lead = serializer.save()
+        target_id = lead.course_id or lead.live_class_id
+        target_type = "course" if lead.course_id else "live_class"
+        log_security_event(
+            "public_enrollment_lead.created",
+            request=request,
+            lead_id=lead.id,
+            target_type=target_type,
+            target_id=target_id,
+            email=lead.email,
+        )
+        return api_response(
+            success=True,
+            message="Enrollment request received. Our team will contact you.",
+            data={
+                "lead_id": lead.id,
+                "status": PublicEnrollmentLead.STATUS_NEW,
+                "target_type": target_type,
+                "target_id": target_id,
+            },
+            status_code=status.HTTP_201_CREATED,
         )

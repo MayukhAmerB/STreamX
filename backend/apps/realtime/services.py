@@ -303,6 +303,20 @@ def build_meet_embed_url(token, livekit_url=None):
 
 
 def resolve_broadcast_urls(session, request=None):
+    def _normalized_embed_path(raw_path, fallback):
+        path = str(raw_path or "").strip()
+        if not path:
+            path = fallback
+        if not path.startswith("/"):
+            path = f"/{path}"
+        return path
+
+    def _derive_embed_url(base_embed_url, target_path):
+        parsed = urlparse(str(base_embed_url or "").strip())
+        if not parsed.scheme or not parsed.netloc:
+            return ""
+        return urlunparse((parsed.scheme, parsed.netloc, target_path, "", "", ""))
+
     stream_embed_url = (session.stream_embed_url or "").strip()
     chat_embed_url = (session.chat_embed_url or "").strip()
     configured_stream_base_url = (
@@ -323,9 +337,22 @@ def resolve_broadcast_urls(session, request=None):
     )
 
     if stream_base_url and not stream_embed_url:
-        stream_embed_url = f"{stream_base_url}{settings.OWNCAST_DEFAULT_STREAM_PATH}"
+        stream_embed_url = f"{stream_base_url}{_normalized_embed_path(settings.OWNCAST_DEFAULT_STREAM_PATH, '/embed/video')}"
     if chat_base_url and not chat_embed_url:
-        chat_embed_url = f"{chat_base_url}{settings.OWNCAST_DEFAULT_CHAT_PATH}"
+        chat_embed_url = f"{chat_base_url}{_normalized_embed_path(settings.OWNCAST_DEFAULT_CHAT_PATH, '/embed/chat/readwrite')}"
+
+    # Fallback derivation: if one embed URL is set and the other is missing, build
+    # the missing counterpart from the same host so stream/chat iframes stay usable.
+    if stream_embed_url and not chat_embed_url:
+        chat_embed_url = _derive_embed_url(
+            stream_embed_url,
+            _normalized_embed_path(settings.OWNCAST_DEFAULT_CHAT_PATH, "/embed/chat/readwrite"),
+        )
+    if chat_embed_url and not stream_embed_url:
+        stream_embed_url = _derive_embed_url(
+            chat_embed_url,
+            _normalized_embed_path(settings.OWNCAST_DEFAULT_STREAM_PATH, "/embed/video"),
+        )
 
     return {
         "stream_embed_url": stream_embed_url,

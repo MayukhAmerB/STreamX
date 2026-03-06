@@ -1,4 +1,4 @@
-import { createContext, useEffect, useMemo, useState } from "react";
+import { createContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchAuthConfig,
   fetchCsrfToken,
@@ -16,6 +16,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [registrationEnabled, setRegistrationEnabled] = useState(false);
+  const hasBootstrappedRef = useRef(false);
 
   async function refreshUser() {
     try {
@@ -47,6 +48,10 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
+    if (hasBootstrappedRef.current) {
+      return;
+    }
+    hasBootstrappedRef.current = true;
     refreshCsrf();
     refreshUser();
     refreshAuthConfig();

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 import MeetingRoomExperience from "../components/realtime/MeetingRoomExperience";
+import { listLiveClasses } from "../api/courses";
 import {
   createRealtimeSession,
   endRealtimeSession,
@@ -18,6 +19,7 @@ const pageBackgroundImage =
 const initialForm = {
   title: "",
   description: "",
+  linked_live_class_id: "",
   meeting_capacity: 300,
 };
 
@@ -58,6 +60,7 @@ export default function MeetingPage() {
   const navigate = useNavigate();
 
   const [sessions, setSessions] = useState([]);
+  const [liveClassOptions, setLiveClassOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -83,6 +86,35 @@ export default function MeetingPage() {
 
   useEffect(() => {
     loadSessions();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const response = await listLiveClasses();
+        if (!active) return;
+        const payload = apiData(response, []);
+        const rows = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.results)
+            ? payload.results
+            : [];
+        setLiveClassOptions(
+          [...rows].sort((a, b) => {
+            const monthDelta = Number(a?.month_number || 0) - Number(b?.month_number || 0);
+            if (monthDelta !== 0) return monthDelta;
+            return String(a?.title || "").localeCompare(String(b?.title || ""));
+          })
+        );
+      } catch {
+        if (!active) return;
+        setLiveClassOptions([]);
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const orderedSessions = useMemo(() => {
@@ -114,12 +146,17 @@ export default function MeetingPage() {
 
   const handleCreate = async (event) => {
     event.preventDefault();
+    if (!form.linked_live_class_id) {
+      setCreateState({ loading: false, error: "Select the linked live class for this meeting.", success: "" });
+      return;
+    }
     setCreateState({ loading: true, error: "", success: "" });
 
     try {
       const payload = {
         title: form.title,
         description: form.description,
+        linked_live_class_id: Number(form.linked_live_class_id),
         session_type: "meeting",
         meeting_capacity: Number(form.meeting_capacity || 300),
         allow_overflow_broadcast: true,
@@ -218,6 +255,24 @@ export default function MeetingPage() {
               </div>
               {isAuthenticated ? (
                 <form onSubmit={handleCreate} className="mt-3 space-y-3">
+                  <div>
+                    <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-[#8f9989]">
+                      Linked Live Class
+                    </label>
+                    <select
+                      className="w-full rounded-xl border border-[#2a3a2c] bg-[#0c120d] px-3 py-2 text-sm text-white outline-none focus:border-[#8ea284]"
+                      value={form.linked_live_class_id}
+                      onChange={(e) => setForm((prev) => ({ ...prev, linked_live_class_id: e.target.value }))}
+                      required
+                    >
+                      <option value="">Select live class</option>
+                      {liveClassOptions.map((liveClass) => (
+                        <option key={liveClass.id} value={liveClass.id}>
+                          {`${liveClass.title}${liveClass.linked_course_title ? ` - ${liveClass.linked_course_title}` : ""}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <input
                     className="w-full rounded-xl border border-[#2a3a2c] bg-[#0c120d] px-3 py-2 text-sm text-white outline-none focus:border-[#8ea284]"
                     placeholder="Session title"
@@ -330,6 +385,16 @@ export default function MeetingPage() {
                         <span className="rounded-full border border-[#2f3f31] bg-[#121a13] px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-[#c8d2bf]">
                           {session.status}
                         </span>
+                        {session.linked_live_class?.title ? (
+                          <span className="rounded-full border border-[#2f3f31] bg-[#121a13] px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-[#c8d2bf]">
+                            {session.linked_live_class.title}
+                          </span>
+                        ) : null}
+                        {session.linked_course?.title ? (
+                          <span className="rounded-full border border-[#2f3f31] bg-[#121a13] px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-[#c8d2bf]">
+                            {session.linked_course.title}
+                          </span>
+                        ) : null}
                       </div>
                       <p className="mt-2 text-sm leading-6 text-[#b7c0b0]">
                         {session.description || "Interactive instructor-led meeting session."}

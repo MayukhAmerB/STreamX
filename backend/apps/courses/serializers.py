@@ -1,10 +1,20 @@
+import re
+
 from rest_framework import serializers
 
 from config.request_security import contains_active_content, is_safe_public_http_url
 from config.upload_validators import validate_profile_image_upload, validate_video_upload
 from config.url_utils import get_media_public_url
 
-from .models import Course, Enrollment, Lecture, LiveClass, LiveClassEnrollment, Section
+from .models import (
+    Course,
+    Enrollment,
+    Lecture,
+    LiveClass,
+    LiveClassEnrollment,
+    PublicEnrollmentLead,
+    Section,
+)
 
 
 class LectureSerializer(serializers.ModelSerializer):
@@ -156,6 +166,8 @@ class CourseListSerializer(serializers.ModelSerializer):
         )
 
     def get_instructor(self, obj):
+        if not getattr(obj, "instructor_id", None) or not getattr(obj, "instructor", None):
+            return None
         return {
             "id": obj.instructor_id,
             "full_name": obj.instructor.full_name,
@@ -196,6 +208,8 @@ class CourseDetailSerializer(serializers.ModelSerializer):
         )
 
     def get_instructor(self, obj):
+        if not getattr(obj, "instructor_id", None) or not getattr(obj, "instructor", None):
+            return None
         return {
             "id": obj.instructor_id,
             "full_name": obj.instructor.full_name,
@@ -336,6 +350,76 @@ class CourseEnrollSerializer(serializers.Serializer):
 
 class LiveClassEnrollSerializer(serializers.Serializer):
     live_class_id = serializers.IntegerField()
+
+
+PHONE_PATTERN = re.compile(r"^\+?[0-9][0-9()\-\s]{6,22}$")
+
+
+class PublicEnrollmentLeadCreateSerializer(serializers.Serializer):
+    course_id = serializers.IntegerField(min_value=1, required=False)
+    live_class_id = serializers.IntegerField(min_value=1, required=False)
+    email = serializers.EmailField(max_length=254)
+    whatsapp_number = serializers.CharField(max_length=24)
+    phone_number = serializers.CharField(max_length=24)
+    message = serializers.CharField(max_length=2000, min_length=3, trim_whitespace=True)
+    source_path = serializers.CharField(max_length=255, allow_blank=True, required=False)
+
+    @staticmethod
+    def _normalize_phone_number(value):
+        return re.sub(r"\s+", " ", str(value or "").strip())
+
+    def _validate_phone_number(self, value):
+        normalized = self._normalize_phone_number(value)
+        if not PHONE_PATTERN.fullmatch(normalized):
+            raise serializers.ValidationError(
+                "Enter a valid phone number with digits, spaces, (), -, and optional + prefix."
+            )
+        return normalized
+
+    def validate_phone_number(self, value):
+        return self._validate_phone_number(value)
+
+    def validate_whatsapp_number(self, value):
+        return self._validate_phone_number(value)
+
+    def validate_message(self, value):
+        if contains_active_content(value):
+            raise serializers.ValidationError("Suspicious script or active-content payload detected.")
+        return value.strip()
+
+    def validate_source_path(self, value):
+        text = str(value or "").strip()
+        if contains_active_content(text):
+            raise serializers.ValidationError("Suspicious script or active-content payload detected.")
+        return text
+
+    def validate(self, attrs):
+        course_id = attrs.get("course_id")
+        live_class_id = attrs.get("live_class_id")
+
+        if bool(course_id) == bool(live_class_id):
+            raise serializers.ValidationError(
+                {"detail": "Provide exactly one target: either course_id or live_class_id."}
+            )
+
+        if course_id:
+            course = Course.objects.filter(pk=course_id, is_published=True).first()
+            if not course:
+                raise serializers.ValidationError({"course_id": "Course not found or not published."})
+            attrs["course"] = course
+
+        if live_class_id:
+            live_class = LiveClass.objects.filter(pk=live_class_id, is_active=True).first()
+            if not live_class:
+                raise serializers.ValidationError({"live_class_id": "Live class not found or inactive."})
+            attrs["live_class"] = live_class
+
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop("course_id", None)
+        validated_data.pop("live_class_id", None)
+        return PublicEnrollmentLead.objects.create(**validated_data)
 
 
 class EnrollmentCourseSerializer(serializers.ModelSerializer):

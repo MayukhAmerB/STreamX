@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
+import PublicEnrollmentRequestModal from "../components/PublicEnrollmentRequestModal";
 import { getCourse, requestCourseEnrollment } from "../api/courses";
 import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
@@ -100,6 +101,7 @@ export default function CourseDetailPage() {
   const [error, setError] = useState("");
   const [previewImageFailed, setPreviewImageFailed] = useState(false);
   const [enrollmentState, setEnrollmentState] = useState({ loading: false, error: "", success: "" });
+  const [showPublicLeadModal, setShowPublicLeadModal] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -196,7 +198,7 @@ export default function CourseDetailPage() {
   const handleEnrollNow = async () => {
     if (launchStatus.isComingSoon) return;
     if (!isAuthenticated) {
-      navigate("/login", { state: { from: ENABLE_DIRECT_PAYMENTS ? `/courses/${id}/payment` : `/courses/${id}` } });
+      setShowPublicLeadModal(true);
       return;
     }
     if (ENABLE_DIRECT_PAYMENTS) {
@@ -550,13 +552,7 @@ export default function CourseDetailPage() {
                 </Button>
               ) : (
                 <Button className="w-full" onClick={handleEnrollNow} loading={enrollmentState.loading}>
-                  {ENABLE_DIRECT_PAYMENTS
-                    ? isAuthenticated
-                      ? "Buy"
-                      : "Login to Buy"
-                    : isAuthenticated
-                      ? "Enroll Now"
-                      : "Login to Enroll"}
+                  Buy
                 </Button>
               )}
               {enrollmentState.error ? (
@@ -607,6 +603,15 @@ export default function CourseDetailPage() {
           </div>
         </aside>
       </div>
+      <PublicEnrollmentRequestModal
+        isOpen={showPublicLeadModal}
+        onClose={() => setShowPublicLeadModal(false)}
+        targetType="course"
+        targetId={course?.id}
+        targetName={course?.title}
+        sourcePath={`/courses/${id}`}
+        loginPath={`/login`}
+      />
     </PageShell>
   );
 }

@@ -32,6 +32,7 @@ def log_security_event(event, request=None, **data):
                 "ip": _client_ip(request),
                 "path": getattr(request, "path", ""),
                 "method": getattr(request, "method", ""),
+                "request_id": getattr(request, "request_id", None),
                 "user_id": getattr(user, "id", None) if getattr(user, "is_authenticated", False) else None,
                 "user_email": getattr(user, "email", None)
                 if getattr(user, "is_authenticated", False)

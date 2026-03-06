@@ -3,6 +3,7 @@ import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { Room, createLocalAudioTrack, createLocalVideoTrack } from "livekit-client";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
+import { listLiveClasses } from "../api/courses";
 import {
   createRealtimeSession,
   endRealtimeSession,
@@ -21,6 +22,7 @@ const pageBackgroundImage =
 const initialForm = {
   title: "",
   description: "",
+  linked_live_class_id: "",
   stream_embed_url: "",
   chat_embed_url: "",
   rtmp_target_url: "",
@@ -37,6 +39,27 @@ function clampNumber(value, min, max, fallback) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(max, Math.max(min, Math.round(parsed)));
+}
+
+function deriveEmbedUrl(baseUrl, targetPath) {
+  const raw = String(baseUrl || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    parsed.pathname = targetPath;
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return "";
+  }
+}
+
+function canManageSession(session, user) {
+  if (!session) return false;
+  if (Boolean(session.can_manage)) return true;
+  if (Boolean(session.is_host)) return true;
+  return Boolean(user?.is_admin);
 }
 
 const broadcastMarketingCards = [
@@ -81,6 +104,7 @@ export default function BroadcastingPage() {
   const [searchParams] = useSearchParams();
 
   const [sessions, setSessions] = useState([]);
+  const [liveClassOptions, setLiveClassOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -90,6 +114,11 @@ export default function BroadcastingPage() {
   const [joinState, setJoinState] = useState({ loadingId: null, error: "", info: "" });
   const [activeBroadcast, setActiveBroadcast] = useState(() => location.state?.autoJoinPayload || null);
   const [deleteState, setDeleteState] = useState({ loadingId: null, error: "", info: "" });
+  const [streamControlState, setStreamControlState] = useState({
+    loadingId: null,
+    error: "",
+    info: "",
+  });
   const [shareState, setShareState] = useState({ error: "", info: "" });
 
   const [studioSession, setStudioSession] = useState(null);
@@ -114,11 +143,7 @@ export default function BroadcastingPage() {
       const response = await listRealtimeSessions({ status: "all" });
       const data = apiData(response, []);
       const rows = Array.isArray(data)
-        ? data.filter(
-            (item) =>
-              item.status !== "ended" &&
-              (item.session_type === "broadcasting" || item.allow_overflow_broadcast)
-          )
+        ? data.filter((item) => item.status !== "ended" && item.session_type === "broadcasting")
         : [];
       setSessions(rows);
       setError("");
@@ -131,6 +156,35 @@ export default function BroadcastingPage() {
 
   useEffect(() => {
     loadSessions();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const response = await listLiveClasses();
+        if (!active) return;
+        const payload = apiData(response, []);
+        const rows = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.results)
+            ? payload.results
+            : [];
+        setLiveClassOptions(
+          [...rows].sort((a, b) => {
+            const monthDelta = Number(a?.month_number || 0) - Number(b?.month_number || 0);
+            if (monthDelta !== 0) return monthDelta;
+            return String(a?.title || "").localeCompare(String(b?.title || ""));
+          })
+        );
+      } catch {
+        if (!active) return;
+        setLiveClassOptions([]);
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, []);
 
   const orderedSessions = useMemo(() => {
@@ -184,12 +238,17 @@ export default function BroadcastingPage() {
 
   const handleCreate = async (event) => {
     event.preventDefault();
+    if (!form.linked_live_class_id) {
+      setCreateState({ loading: false, error: "Select the linked live class for this broadcast.", success: "" });
+      return;
+    }
     setCreateState({ loading: true, error: "", success: "" });
 
     try {
       const payload = {
         title: form.title,
         description: form.description,
+        linked_live_class_id: Number(form.linked_live_class_id),
         session_type: "broadcasting",
         meeting_capacity: 300,
         max_audience: 50000,
@@ -313,6 +372,41 @@ export default function BroadcastingPage() {
     }
   };
 
+  const handleStopSessionStream = async (session) => {
+    if (!session?.id) {
+      return;
+    }
+    setStreamControlState({ loadingId: session.id, error: "", info: "" });
+    try {
+      const response = await stopRealtimeStream(session.id);
+      const updated = apiData(response, null);
+      if (updated) {
+        syncSessionRow(updated);
+        if (activeBroadcast?.session?.id === session.id) {
+          setActiveBroadcast((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  session: { ...prev.session, ...updated },
+                  broadcast: {
+                    ...prev.broadcast,
+                    stream_status: updated.stream_status || prev.broadcast?.stream_status,
+                  },
+                }
+              : prev
+          );
+        }
+      }
+      setStreamControlState({ loadingId: null, error: "", info: "Broadcast stream stopped." });
+    } catch (err) {
+      setStreamControlState({
+        loadingId: null,
+        error: apiMessage(err, "Unable to stop broadcast stream."),
+        info: "",
+      });
+    }
+  };
+
   const handleConnectCamera = async () => {
     if (!studioSession) return;
     setStudioState({ connecting: true, connected: false, actionLoading: false, error: "", info: "Connecting camera..." });
@@ -344,19 +438,26 @@ export default function BroadcastingPage() {
         ),
       };
 
-      const room = new Room();
+      const room = new Room({
+        adaptiveStream: false,
+        dynacast: false,
+      });
       await room.connect(tokenData.livekit_url, tokenData.token);
 
       const [videoTrack, audioTrack] = await Promise.all([
         createLocalVideoTrack({
+          facingMode: "user",
           resolution: {
             width: profile.capture_width,
             height: profile.capture_height,
-            frameRate: profile.fps,
           },
+          frameRate: profile.fps,
         }),
         createLocalAudioTrack(),
       ]);
+      if (videoTrack?.mediaStreamTrack && "contentHint" in videoTrack.mediaStreamTrack) {
+        videoTrack.mediaStreamTrack.contentHint = "detail";
+      }
 
       await room.localParticipant.publishTrack(videoTrack, {
         simulcast: false,
@@ -364,6 +465,7 @@ export default function BroadcastingPage() {
           maxBitrate: profile.max_video_bitrate_kbps * 1000,
           maxFramerate: profile.fps,
         },
+        degradationPreference: "maintain-resolution",
       });
       await room.localParticipant.publishTrack(audioTrack);
 
@@ -381,7 +483,7 @@ export default function BroadcastingPage() {
         connected: true,
         actionLoading: false,
         error: "",
-        info: `Camera connected (${profile.capture_width}x${profile.capture_height} @ ${profile.fps}fps, ${profile.max_video_bitrate_kbps}kbps). Click Start Live to begin streaming.`,
+        info: `Camera connected (${profile.capture_width}x${profile.capture_height} @ ${profile.fps}fps, ${profile.max_video_bitrate_kbps}kbps). Click Start Live to begin streaming. If admin changes profile, reconnect camera to apply.`,
       });
     } catch (err) {
       disconnectStudio();
@@ -464,8 +566,16 @@ export default function BroadcastingPage() {
   }, [highlightedSessionId, isAuthenticated]);
 
   const studioStreamUrl = getSessionStreamUrl(studioSession);
-  const activeStreamUrl = (activeBroadcast?.broadcast?.stream_embed_url || "").trim();
-  const activeChatUrl = (activeBroadcast?.broadcast?.chat_embed_url || "").trim();
+  const activeStreamUrl = useMemo(() => {
+    const direct = String(activeBroadcast?.broadcast?.stream_embed_url || "").trim();
+    if (direct) return direct;
+    return deriveEmbedUrl(activeBroadcast?.broadcast?.chat_embed_url, "/embed/video");
+  }, [activeBroadcast]);
+  const activeChatUrl = useMemo(() => {
+    const direct = String(activeBroadcast?.broadcast?.chat_embed_url || "").trim();
+    if (direct) return direct;
+    return deriveEmbedUrl(activeBroadcast?.broadcast?.stream_embed_url, "/embed/chat/readwrite");
+  }, [activeBroadcast]);
 
   return (
     <PageShell title="" subtitle="">
@@ -527,6 +637,24 @@ export default function BroadcastingPage() {
                     value={form.description}
                     onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
                   />
+                  <div>
+                    <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-[#8f9989]">
+                      Linked Live Class
+                    </label>
+                    <select
+                      className="w-full rounded-xl border border-[#2a3a2c] bg-[#0c120d] px-3 py-2 text-sm text-white outline-none focus:border-[#8ea284]"
+                      value={form.linked_live_class_id}
+                      onChange={(e) => setForm((prev) => ({ ...prev, linked_live_class_id: e.target.value }))}
+                      required
+                    >
+                      <option value="">Select live class...</option>
+                      {liveClassOptions.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {`Month ${item.month_number}: ${item.title}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <input
                     className="w-full rounded-xl border border-[#2a3a2c] bg-[#0c120d] px-3 py-2 text-sm text-white outline-none focus:border-[#8ea284]"
                     placeholder="Stream embed URL (optional)"
@@ -629,7 +757,13 @@ export default function BroadcastingPage() {
 
           <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="overflow-hidden rounded-2xl border border-[#263328] bg-black">
-              <video ref={previewVideoRef} autoPlay muted playsInline className="h-[320px] w-full object-cover" />
+              <video
+                ref={previewVideoRef}
+                autoPlay
+                muted
+                playsInline
+                className="h-[220px] w-full object-cover sm:h-[280px] lg:h-[320px]"
+              />
             </div>
             <div className="rounded-2xl border border-[#263328] bg-[#101812]/88 p-4">
               <div className="grid gap-2 sm:grid-cols-2">
@@ -697,6 +831,18 @@ export default function BroadcastingPage() {
         </div>
       ) : null}
 
+      {streamControlState.error ? (
+        <div className="mb-4 rounded-xl border border-red-300/30 bg-red-200/10 px-4 py-3 text-sm text-red-200">
+          {streamControlState.error}
+        </div>
+      ) : null}
+
+      {streamControlState.info ? (
+        <div className="mb-4 rounded-xl border border-[#2f3f31] bg-[#111a12] px-4 py-3 text-sm text-[#d5ddcb]">
+          {streamControlState.info}
+        </div>
+      ) : null}
+
       {shareState.error ? (
         <div className="mb-4 rounded-xl border border-red-300/30 bg-red-200/10 px-4 py-3 text-sm text-red-200">
           {shareState.error}
@@ -741,11 +887,11 @@ export default function BroadcastingPage() {
                 <iframe
                   title="Broadcast Stream"
                   src={activeStreamUrl}
-                  className="h-[440px] w-full"
+                  className="h-[260px] w-full sm:h-[340px] lg:h-[440px]"
                   allow="autoplay; fullscreen"
                 />
               ) : (
-                <div className="flex h-[440px] items-center justify-center px-6 text-center text-sm text-[#b7c0b0]">
+                <div className="flex h-[260px] items-center justify-center px-6 text-center text-sm text-[#b7c0b0] sm:h-[340px] lg:h-[440px]">
                   Stream URL not configured for this session.
                 </div>
               )}
@@ -755,11 +901,11 @@ export default function BroadcastingPage() {
                 <iframe
                   title="Broadcast Chat"
                   src={activeChatUrl}
-                  className="h-[440px] w-full"
+                  className="h-[260px] w-full sm:h-[340px] lg:h-[440px]"
                   allow="clipboard-read; clipboard-write"
                 />
               ) : (
-                <div className="flex h-[440px] items-center justify-center px-6 text-center text-sm text-[#b7c0b0]">
+                <div className="flex h-[260px] items-center justify-center px-6 text-center text-sm text-[#b7c0b0] sm:h-[340px] lg:h-[440px]">
                   Chat URL not configured for this session.
                 </div>
               )}
@@ -803,7 +949,7 @@ export default function BroadcastingPage() {
                       <p className="mt-2 text-sm leading-6 text-[#b7c0b0]">
                         {session.description || "Large-audience broadcast session with moderated chat."}
                       </p>
-                      {session.is_host ? (
+                      {canManageSession(session, user) ? (
                         <div className="mt-3 rounded-lg border border-[#2a352c] bg-[#0c120d]/85 px-3 py-2">
                           <div className="text-[10px] uppercase tracking-[0.12em] text-[#8f9989]">Join URL</div>
                           <code className="mt-1 block truncate text-xs text-[#dbe4d1]">{buildJoinLink(session)}</code>
@@ -818,10 +964,18 @@ export default function BroadcastingPage() {
                       >
                         Join Broadcast
                       </Button>
-                      {session.is_host ? (
+                      {canManageSession(session, user) ? (
                         <>
                           <Button variant="secondary" className="w-full" onClick={() => handleOpenStudio(session)}>
                             Open Host Studio
+                          </Button>
+                          <Button
+                            variant="danger"
+                            className="w-full"
+                            onClick={() => handleStopSessionStream(session)}
+                            loading={streamControlState.loadingId === session.id}
+                          >
+                            Stop Broadcast
                           </Button>
                           <Button
                             variant="danger"

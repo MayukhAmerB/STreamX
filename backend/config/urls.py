@@ -3,10 +3,16 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
+from config.health import liveness_view, readiness_view
+
 admin.site.enable_nav_sidebar = False
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("health/live", liveness_view, name="health-live"),
+    path("health/ready", readiness_view, name="health-ready"),
+    path("healthz", liveness_view, name="healthz"),
+    path("readyz", readiness_view, name="readyz"),
     path("api/auth/", include("apps.users.urls")),
     path("api/realtime/", include("apps.realtime.urls")),
     path("api/", include("apps.courses.urls")),

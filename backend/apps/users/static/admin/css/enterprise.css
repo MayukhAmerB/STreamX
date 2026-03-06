@@ -324,6 +324,96 @@ a:hover {
   padding: 14px;
 }
 
+.enterprise-admin-acceptance {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+  background: var(--admin-surface);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.2);
+}
+
+.enterprise-admin-acceptance h2 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--admin-accent-strong);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.enterprise-admin-acceptance-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.enterprise-admin-acceptance-card {
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: #101710;
+  padding: 12px;
+}
+
+.enterprise-admin-acceptance-card h3 {
+  margin: 0;
+  color: var(--admin-text);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.enterprise-admin-acceptance-card .enterprise-admin-muted {
+  margin: 8px 0 10px;
+}
+
+.enterprise-admin-tablist {
+  margin-top: 12px;
+  display: inline-flex;
+  gap: 8px;
+  border: 1px solid var(--admin-border);
+  border-radius: 999px;
+  background: #0f1510;
+  padding: 4px;
+}
+
+.enterprise-admin-tab {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--admin-text-soft);
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.enterprise-admin-tab:hover {
+  color: var(--admin-accent-strong);
+  border-color: var(--admin-border);
+  background: #131b14;
+}
+
+.enterprise-admin-tab.is-active {
+  color: #0f1611;
+  background: linear-gradient(90deg, #d7e2cc, #b8c8ab);
+  border-color: #d5dfca;
+}
+
+.enterprise-admin-tab-panel {
+  display: none;
+}
+
+.enterprise-admin-tab-panel.is-active {
+  display: block;
+}
+
+.enterprise-admin-tab-footer {
+  margin-top: 12px;
+}
+
 .enterprise-admin-activity--full {
   width: 100%;
 }
@@ -341,6 +431,10 @@ a:hover {
   border-radius: 10px;
   background: #101710;
   padding: 8px 10px;
+}
+
+.enterprise-admin-activity-list li.is-hidden {
+  display: none;
 }
 
 .enterprise-admin-activity-object {
@@ -400,4 +494,80 @@ a:hover {
   .enterprise-password-generator {
     grid-template-columns: 1fr;
   }
+}
+
+/* Spreadsheet-style layout for Public Enrollment Leads in admin. */
+body.app-courses.model-publicenrollmentlead.change-list #changelist {
+  background: linear-gradient(180deg, #eef2f7, #e7edf5) !important;
+  border: 1px solid #c9d3df !important;
+  border-radius: 14px !important;
+  padding: 10px !important;
+}
+
+body.app-courses.model-publicenrollmentlead.change-list #changelist .actions,
+body.app-courses.model-publicenrollmentlead.change-list #changelist .paginator,
+body.app-courses.model-publicenrollmentlead.change-list #changelist #toolbar {
+  background: #f5f8fc !important;
+  border: 1px solid #d4dce7 !important;
+  color: #1e293b !important;
+  border-radius: 10px !important;
+}
+
+body.app-courses.model-publicenrollmentlead.change-list #changelist #changelist-search input,
+body.app-courses.model-publicenrollmentlead.change-list #changelist #changelist-search select,
+body.app-courses.model-publicenrollmentlead.change-list #changelist #changelist-search textarea {
+  background: #ffffff !important;
+  border: 1px solid #c9d5e3 !important;
+  color: #0f172a !important;
+}
+
+body.app-courses.model-publicenrollmentlead.change-list #changelist .results {
+  border: 1px solid #c9d5e3 !important;
+  border-radius: 10px !important;
+  overflow: auto !important;
+  background: #ffffff !important;
+}
+
+body.app-courses.model-publicenrollmentlead.change-list #changelist table#result_list {
+  min-width: 1200px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #ffffff !important;
+}
+
+body.app-courses.model-publicenrollmentlead.change-list #changelist table#result_list thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: linear-gradient(180deg, #f9fbff, #eef3f9) !important;
+  color: #334155 !important;
+  border-bottom: 1px solid #c4cfdb !important;
+  border-right: 1px solid #d8e1ec !important;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+}
+
+body.app-courses.model-publicenrollmentlead.change-list #changelist table#result_list tbody td,
+body.app-courses.model-publicenrollmentlead.change-list #changelist table#result_list tbody th {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  border-right: 1px solid #e2e8f0 !important;
+}
+
+body.app-courses.model-publicenrollmentlead.change-list #changelist table#result_list tbody tr:nth-child(even) td,
+body.app-courses.model-publicenrollmentlead.change-list #changelist table#result_list tbody tr:nth-child(even) th {
+  background: #f8fbff !important;
+}
+
+body.app-courses.model-publicenrollmentlead.change-list #changelist table#result_list tbody td.field-message_preview {
+  max-width: 460px;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+body.app-courses.model-publicenrollmentlead.change-list #changelist table#result_list a {
+  color: #0f3c8a !important;
+  text-decoration: underline;
 }

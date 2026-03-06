@@ -17,10 +17,12 @@ export default function Navbar() {
   const location = useLocation();
   const isHome = location.pathname === "/";
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
     setMenuOpen(false);
+    setMobileMenuOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -29,6 +31,7 @@ export default function Navbar() {
         return;
       }
       setMenuOpen(false);
+      setMobileMenuOpen(false);
     };
 
     document.addEventListener("mousedown", handlePointerDown);
@@ -39,21 +42,22 @@ export default function Navbar() {
 
   const onLogout = async () => {
     setMenuOpen(false);
+    setMobileMenuOpen(false);
     await logout();
     navigate("/login");
   };
 
   return (
-    <header className="sticky top-0 z-20 px-3 pt-3">
+    <header className="sticky top-0 z-20 px-3 pt-3" ref={menuRef}>
       <div
-        className={`mx-auto flex max-w-7xl items-center justify-between gap-4 rounded-2xl px-4 py-4 text-neutral-950 backdrop-blur ${
+        className={`mx-auto flex max-w-7xl items-center justify-between gap-3 rounded-2xl px-3 py-3 text-neutral-950 backdrop-blur sm:gap-4 sm:px-4 sm:py-4 ${
           isHome
             ? "border border-[#c5d0ba]/15 bg-gradient-to-r from-[#090c0a]/96 via-[#101410]/94 to-[#171d17]/92 shadow-[0_12px_40px_rgba(8,10,8,0.35)]"
             : "border border-[#c5d0ba]/12 bg-gradient-to-r from-[#0b0e0b]/94 via-[#121712]/92 to-[#1a211a]/88 shadow-[0_10px_30px_rgba(8,10,8,0.28)]"
         }`}
       >
-        <BrandLogo />
-        <nav className="hidden items-center gap-5 md:flex">
+        <BrandLogo className="min-w-0 flex-1 lg:flex-none" />
+        <nav className="hidden items-center gap-5 lg:flex">
           <NavLink to="/courses" className={navClass}>
             Courses
           </NavLink>
@@ -72,9 +76,9 @@ export default function Navbar() {
             Contact
           </NavLink>
         </nav>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {isAuthenticated ? (
-            <div className="relative" ref={menuRef}>
+            <div className="relative hidden sm:block">
               <button
                 type="button"
                 className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
@@ -156,7 +160,7 @@ export default function Navbar() {
               ) : null}
             </div>
           ) : (
-            <>
+            <div className="hidden items-center gap-2 sm:flex">
               <Link to="/login">
                 <Button variant="indigoSoft" className="border-white/25 bg-white/10 text-white hover:bg-white/15">
                   Login
@@ -172,10 +176,131 @@ export default function Navbar() {
                   </Button>
                 </Link>
               ) : null}
-            </>
+            </div>
           )}
+          <button
+            type="button"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15 lg:hidden"
+            onClick={() => {
+              setMenuOpen(false);
+              setMobileMenuOpen((prev) => !prev);
+            }}
+            aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-expanded={mobileMenuOpen}
+          >
+            <span className="relative inline-flex h-4 w-4 flex-col items-center justify-center">
+              <span
+                className={`absolute h-[1.5px] w-4 rounded-full bg-current transition ${
+                  mobileMenuOpen ? "translate-y-0 rotate-45" : "-translate-y-[5px]"
+                }`}
+              />
+              <span
+                className={`absolute h-[1.5px] w-4 rounded-full bg-current transition ${
+                  mobileMenuOpen ? "opacity-0" : "opacity-100"
+                }`}
+              />
+              <span
+                className={`absolute h-[1.5px] w-4 rounded-full bg-current transition ${
+                  mobileMenuOpen ? "translate-y-0 -rotate-45" : "translate-y-[5px]"
+                }`}
+              />
+            </span>
+          </button>
         </div>
       </div>
+      {mobileMenuOpen ? (
+        <div className="mx-auto mt-2 max-w-7xl overflow-hidden rounded-2xl border border-[#2f3a30] bg-[#0d130f]/96 p-3 shadow-[0_18px_34px_rgba(0,0,0,0.34)] backdrop-blur lg:hidden">
+          <nav className="grid gap-1">
+            <NavLink to="/courses" className="rounded-lg px-3 py-2 text-sm font-medium text-[#dbe4d1] transition hover:bg-[#192219]">
+              Courses
+            </NavLink>
+            <NavLink to="/live-classes" className="rounded-lg px-3 py-2 text-sm font-medium text-[#dbe4d1] transition hover:bg-[#192219]">
+              Live Classes
+            </NavLink>
+            {isAuthenticated ? (
+              <NavLink to="/join-live" className="rounded-lg px-3 py-2 text-sm font-medium text-[#dbe4d1] transition hover:bg-[#192219]">
+                Join Live
+              </NavLink>
+            ) : null}
+            <NavLink to="/about" className="rounded-lg px-3 py-2 text-sm font-medium text-[#dbe4d1] transition hover:bg-[#192219]">
+              About Us
+            </NavLink>
+            <NavLink to="/contact" className="rounded-lg px-3 py-2 text-sm font-medium text-[#dbe4d1] transition hover:bg-[#192219]">
+              Contact
+            </NavLink>
+          </nav>
+
+          <div className="mt-3 border-t border-[#273227] pt-3">
+            {isAuthenticated ? (
+              <div className="space-y-2">
+                <div className="rounded-xl border border-[#2a352b] bg-[#111811] px-3 py-2 text-xs text-[#d7e0cc]">
+                  <div className="truncate font-semibold text-white">{user?.full_name || user?.email}</div>
+                  <div className="mt-0.5 truncate text-[#9eaa97]">{user?.email}</div>
+                </div>
+                <div className="grid gap-1">
+                  <Link to="/my-courses" className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]">
+                    My Courses
+                  </Link>
+                  <Link to="/profile" className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]">
+                    Profile
+                  </Link>
+                  {isInstructor ? (
+                    <Link to="/instructor/dashboard" className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]">
+                      Instructor
+                    </Link>
+                  ) : null}
+                  {isAdmin ? (
+                    <Link to="/control-center" className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]">
+                      Admin Control Center
+                    </Link>
+                  ) : null}
+                  {isAdmin ? (
+                    <Link to="/meeting" className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]">
+                      Meeting Control
+                    </Link>
+                  ) : null}
+                  {isAdmin ? (
+                    <Link to="/broadcasting" className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]">
+                      Broadcast Control
+                    </Link>
+                  ) : null}
+                  {isAdmin ? (
+                    <a
+                      href="/admin/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]"
+                    >
+                      Django Admin
+                    </a>
+                  ) : null}
+                </div>
+                <Button
+                  type="button"
+                  variant="danger"
+                  className="mt-2 w-full"
+                  onClick={onLogout}
+                >
+                  Logout
+                </Button>
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                <Link to="/login" className="block">
+                  <Button className="w-full">Login</Button>
+                </Link>
+                {registrationEnabled ? (
+                  <Link to="/register" className="block">
+                    <Button variant="secondary" className="w-full">
+                      Register
+                    </Button>
+                  </Link>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
     </header>
   );
 }

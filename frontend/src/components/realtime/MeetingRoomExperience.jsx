@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Room, RoomEvent, Track } from "livekit-client";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Room, RoomEvent, Track, VideoQuality } from "livekit-client";
 import Button from "../Button";
 import { grantRealtimePresenter, revokeRealtimePresenter } from "../../api/realtime";
 import { apiData, apiMessage } from "../../utils/api";
@@ -90,31 +90,25 @@ function buildVideoPublishOptions(maxVideoBitrateKbps, maxFramerate) {
       maxBitrate: Math.max(150000, maxVideoBitrateKbps * 1000),
       maxFramerate,
     },
+    degradationPreference: "balanced",
   };
 }
 
 function buildScreenShareCaptureOptions(profile) {
   return {
     audio: false,
-    video: {
-      width: {
-        ideal: profile.screenCaptureWidth,
-        max: profile.screenCaptureWidth,
-      },
-      height: {
-        ideal: profile.screenCaptureHeight,
-        max: profile.screenCaptureHeight,
-      },
-      frameRate: {
-        ideal: profile.screenFps,
-        max: profile.screenFps,
-      },
+    video: { displaySurface: "monitor" },
+    resolution: {
+      width: profile.screenCaptureWidth,
+      height: profile.screenCaptureHeight,
+      frameRate: profile.screenFps,
     },
     selfBrowserSurface: "include",
     monitorTypeSurfaces: "include",
     preferCurrentTab: false,
     surfaceSwitching: "include",
     systemAudio: "include",
+    contentHint: "detail",
   };
 }
 
@@ -125,25 +119,113 @@ function buildScreenShareFallbackOptions(profile) {
     resolution: {
       width: profile.screenCaptureWidth,
       height: profile.screenCaptureHeight,
+      frameRate: profile.screenFps,
     },
-    frameRate: profile.screenFps,
+    contentHint: "detail",
   };
 }
 
-async function enableCameraWithProfile(localParticipant, profile) {
+function buildScreenSharePublishOptions(maxVideoBitrateKbps, maxFramerate) {
+  return {
+    simulcast: false,
+    videoEncoding: {
+      maxBitrate: Math.max(500000, maxVideoBitrateKbps * 1000),
+      maxFramerate,
+    },
+    degradationPreference: "maintain-resolution",
+  };
+}
+
+function hasMediaCaptureApi() {
+  return Boolean(
+    typeof navigator !== "undefined" &&
+      navigator.mediaDevices &&
+      typeof navigator.mediaDevices.getUserMedia === "function"
+  );
+}
+
+function mediaPermissionHelpMessage(feature = "microphone") {
+  return `${feature} access is unavailable on this URL. Open the app over HTTPS (or localhost in dev) and allow browser permission.`;
+}
+
+function resolveControlError(err, fallbackError, feature = "microphone") {
+  const rawMessage = String(err?.message || "");
+  const normalized = rawMessage.toLowerCase();
+  if (normalized.includes("getusermedia") || normalized.includes("mediadevices")) {
+    return mediaPermissionHelpMessage(feature);
+  }
+  if (normalized.includes("notallowederror") || normalized.includes("permission denied")) {
+    return `Browser denied ${feature} permission. Allow it in site settings and retry.`;
+  }
+  if (normalized.includes("notfounderror") || normalized.includes("requested device not found")) {
+    return `No ${feature} device was found on this system.`;
+  }
+  return rawMessage || fallbackError;
+}
+
+function getLocalCameraCaptureSummary(localParticipant) {
   try {
-    await localParticipant.setCameraEnabled(
-      true,
-      buildVideoCaptureOptions(profile.cameraCaptureWidth, profile.cameraCaptureHeight, profile.cameraFps),
-      buildVideoPublishOptions(profile.cameraMaxVideoBitrateKbps, profile.cameraFps)
-    );
+    const cameraPublication = localParticipant?.getTrackPublication?.(Track.Source.Camera);
+    const localVideoTrack = cameraPublication?.videoTrack || cameraPublication?.track;
+    const mediaStreamTrack = localVideoTrack?.mediaStreamTrack;
+    if (!mediaStreamTrack || typeof mediaStreamTrack.getSettings !== "function") {
+      return null;
+    }
+    const settings = mediaStreamTrack.getSettings() || {};
+    const width = Number(settings.width || 0);
+    const height = Number(settings.height || 0);
+    const fps = Number(settings.frameRate || 0);
+    if (!width || !height) {
+      return null;
+    }
+    return {
+      width: Math.round(width),
+      height: Math.round(height),
+      fps: fps > 0 ? Math.round(fps) : null,
+    };
   } catch {
-    await localParticipant.setCameraEnabled(true);
+    return null;
+  }
+}
+
+async function enableCameraWithProfile(localParticipant, profile) {
+  const captureOptions = buildVideoCaptureOptions(
+    profile.cameraCaptureWidth,
+    profile.cameraCaptureHeight,
+    profile.cameraFps
+  );
+  const publishOptions = buildVideoPublishOptions(
+    profile.cameraMaxVideoBitrateKbps,
+    profile.cameraFps
+  );
+
+  // Re-publish camera when turning it on so the latest admin-selected profile is always applied.
+  const existingCameraPublication = localParticipant.getTrackPublication(Track.Source.Camera);
+  if (existingCameraPublication?.track) {
+    try {
+      await localParticipant.unpublishTrack(existingCameraPublication.track, true);
+    } catch {
+      // Fall through and try enabling camera anyway.
+    }
+  }
+
+  try {
+    await localParticipant.setCameraEnabled(true, captureOptions, publishOptions);
+  } catch (primaryError) {
+    try {
+      await localParticipant.setCameraEnabled(true, captureOptions);
+    } catch (secondaryError) {
+      await localParticipant.setCameraEnabled(true);
+      throw secondaryError || primaryError;
+    }
   }
 }
 
 async function enableScreenShareWithProfile(localParticipant, profile) {
-  const publishOptions = buildVideoPublishOptions(profile.screenMaxVideoBitrateKbps, profile.screenFps);
+  const publishOptions = buildScreenSharePublishOptions(
+    profile.screenMaxVideoBitrateKbps,
+    profile.screenFps
+  );
   try {
     await localParticipant.setScreenShareEnabled(true, buildScreenShareCaptureOptions(profile), publishOptions);
   } catch {
@@ -203,9 +285,9 @@ function MeetingTile({ entry, isFeatured = false, isSpeaking = false, isPinned =
   const mediaState = getParticipantMediaState(entry.participant);
   const tileHeightClass = isFeatured
     ? mediaState.hasScreenShare
-      ? "h-[560px]"
-      : "h-[420px]"
-    : "h-[210px]";
+      ? "h-[46vh] min-h-[220px] sm:h-[56vh] lg:h-[560px]"
+      : "h-[40vh] min-h-[200px] sm:h-[46vh] lg:h-[420px]"
+    : "h-[180px] sm:h-[200px] lg:h-[210px]";
   const videoFitClass = mediaState.hasScreenShare ? "object-contain bg-black" : "object-cover";
 
   useEffect(() => {
@@ -283,6 +365,17 @@ function MeetingTile({ entry, isFeatured = false, isSpeaking = false, isPinned =
   );
 }
 
+const MemoMeetingTile = memo(MeetingTile, (prev, next) => {
+  return (
+    prev.entry?.id === next.entry?.id &&
+    prev.entry?.participant === next.entry?.participant &&
+    prev.entry?.isLocal === next.entry?.isLocal &&
+    prev.isFeatured === next.isFeatured &&
+    prev.isSpeaking === next.isSpeaking &&
+    prev.isPinned === next.isPinned
+  );
+});
+
 function buildJoinLink(session) {
   if (session?.join_url) {
     return session.join_url;
@@ -314,6 +407,18 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
   const canManagePresenters = Boolean(meeting?.permissions?.can_manage_presenters);
   const audienceFocusMode = Boolean(audiencePanel && !canManagePresenters);
   const mediaProfile = useMemo(() => normalizeMeetingMediaProfile(meeting?.media_profile || {}), [meeting?.media_profile]);
+  const premiumProfileEnabled = useMemo(
+    () =>
+      mediaProfile.cameraCaptureWidth >= 1920 &&
+      mediaProfile.cameraCaptureHeight >= 1080 &&
+      mediaProfile.cameraFps >= 30 &&
+      mediaProfile.cameraMaxVideoBitrateKbps >= 3000 &&
+      mediaProfile.screenCaptureWidth >= 1920 &&
+      mediaProfile.screenCaptureHeight >= 1080 &&
+      mediaProfile.screenFps >= 30 &&
+      mediaProfile.screenMaxVideoBitrateKbps >= 5000,
+    [mediaProfile]
+  );
 
   const [meetingError, setMeetingError] = useState("");
   const [meetingInfo, setMeetingInfo] = useState("");
@@ -376,6 +481,31 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     });
   }, []);
 
+  const enforceRemotePublicationQuality = useCallback(
+    (publication) => {
+      if (!premiumProfileEnabled || !publication || publication.kind !== Track.Kind.Video) {
+        return;
+      }
+      try {
+        if (typeof publication.setVideoQuality === "function") {
+          publication.setVideoQuality(VideoQuality.HIGH);
+        }
+        if (typeof publication.setVideoFPS === "function") {
+          publication.setVideoFPS(Math.max(24, mediaProfile.screenFps));
+        }
+        if (typeof publication.setVideoDimensions === "function") {
+          publication.setVideoDimensions({
+            width: mediaProfile.screenCaptureWidth,
+            height: mediaProfile.screenCaptureHeight,
+          });
+        }
+      } catch {
+        // best-effort quality hints
+      }
+    },
+    [mediaProfile.screenCaptureHeight, mediaProfile.screenCaptureWidth, mediaProfile.screenFps, premiumProfileEnabled]
+  );
+
   useEffect(() => {
     setPresenterUserIds(Array.isArray(meeting.presenter_user_ids) ? meeting.presenter_user_ids : []);
     setPermissionState({ loadingUserId: null, error: "", info: "" });
@@ -405,7 +535,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
 
     let disposed = false;
     const room = new Room({
-      adaptiveStream: true,
+      adaptiveStream: premiumProfileEnabled ? false : true,
       dynacast: true,
     });
     roomRef.current = room;
@@ -430,7 +560,10 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     room.on(RoomEvent.ParticipantDisconnected, refreshRoomState);
     room.on(RoomEvent.LocalTrackPublished, refreshRoomState);
     room.on(RoomEvent.LocalTrackUnpublished, refreshRoomState);
-    room.on(RoomEvent.TrackSubscribed, refreshRoomState);
+    room.on(RoomEvent.TrackSubscribed, (_track, publication) => {
+      enforceRemotePublicationQuality(publication);
+      refreshRoomState();
+    });
     room.on(RoomEvent.TrackUnsubscribed, refreshRoomState);
     room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
       setActiveSpeakerIds(speakers.map((speaker) => speaker.identity));
@@ -489,6 +622,11 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
       try {
         await room.connect(meeting.livekit_url, meeting.token);
         await room.startAudio();
+        for (const remoteParticipant of room.remoteParticipants.values()) {
+          for (const publication of remoteParticipant.trackPublications.values()) {
+            enforceRemotePublicationQuality(publication);
+          }
+        }
 
         if (canPresent) {
           try {
@@ -502,7 +640,9 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
             setMeetingInfo("Microphone permission not granted.");
           }
         } else if (canSpeak) {
-          setMeetingInfo("Audience mode: you can use microphone and chat. Camera/screen share are presenter-only.");
+          setMeetingInfo(
+            "Audience mode: you can use microphone and chat. Camera/screen share are presenter-only. If admin updates meeting quality profile, rejoin to apply latest capture settings."
+          );
         } else {
           setMeetingInfo("Viewer mode enabled. Only presenter-approved users can publish media.");
         }
@@ -517,7 +657,22 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
         setConnecting(false);
         setConnected(true);
         setConnectionLabel("connected");
-        setMeetingInfo("Connected. Meeting is live.");
+        if (canPresent) {
+          const actualCamera = getLocalCameraCaptureSummary(room.localParticipant);
+          setMeetingInfo(
+            `Connected. Meeting is live. Camera target: ${mediaProfile.cameraCaptureWidth}x${mediaProfile.cameraCaptureHeight} @ ${mediaProfile.cameraFps}fps / ${mediaProfile.cameraMaxVideoBitrateKbps} kbps.${
+              actualCamera
+                ? ` Applied capture: ${actualCamera.width}x${actualCamera.height}${
+                    actualCamera.fps ? ` @ ${actualCamera.fps}fps` : ""
+                  }.`
+                : ""
+            }${premiumProfileEnabled ? " Premium HD receiver mode enabled." : ""}`
+          );
+        } else if (canSpeak) {
+          setMeetingInfo("Connected. Meeting is live. Mic-enabled participant mode.");
+        } else {
+          setMeetingInfo("Connected. Meeting is live.");
+        }
       } catch (err) {
         if (disposed) {
           return;
@@ -541,6 +696,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
   }, [
     canPresent,
     canSpeak,
+    enforceRemotePublicationQuality,
     mediaProfile.cameraCaptureHeight,
     mediaProfile.cameraCaptureWidth,
     mediaProfile.cameraFps,
@@ -548,6 +704,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     meeting.livekit_url,
     meeting.participant_identity,
     meeting.token,
+    premiumProfileEnabled,
     syncLocalControls,
     syncParticipants,
   ]);
@@ -647,7 +804,17 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     }
   };
 
-  const runControlAction = async (operation, fallbackError, permissionRequirement = "present") => {
+  const runControlAction = async (
+    operation,
+    fallbackError,
+    permissionRequirement = "present",
+    options = {}
+  ) => {
+    const {
+      requiresMediaApi = false,
+      featureName = "microphone",
+      shouldValidateMediaApi = null,
+    } = options;
     if (permissionRequirement === "speak" && !canSpeak) {
       setMeetingError("Microphone access is disabled for your role in this meeting.");
       return;
@@ -660,13 +827,22 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     if (!room?.localParticipant) {
       return;
     }
+
+    const shouldCheckMediaApi =
+      requiresMediaApi &&
+      (typeof shouldValidateMediaApi === "function" ? shouldValidateMediaApi() : true);
+    if (shouldCheckMediaApi && !hasMediaCaptureApi()) {
+      setMeetingError(mediaPermissionHelpMessage(featureName));
+      return;
+    }
+
     setControlBusy(true);
     setMeetingError("");
     try {
       await operation(room.localParticipant);
       syncLocalControls();
     } catch (err) {
-      setMeetingError(err?.message || fallbackError);
+      setMeetingError(resolveControlError(err, fallbackError, featureName));
     } finally {
       setControlBusy(false);
     }
@@ -676,19 +852,38 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     runControlAction(
       (localParticipant) => localParticipant.setMicrophoneEnabled(!controls.mic),
       "Unable to update microphone.",
-      "speak"
+      "speak",
+      {
+        requiresMediaApi: true,
+        featureName: "Microphone",
+        shouldValidateMediaApi: () => !controls.mic,
+      }
     );
 
   const toggleCamera = () =>
     runControlAction(
-      (localParticipant) => {
+      async (localParticipant) => {
         if (controls.camera) {
-          return localParticipant.setCameraEnabled(false);
+          await localParticipant.setCameraEnabled(false);
+          return;
         }
-        return enableCameraWithProfile(localParticipant, mediaProfile);
+        await enableCameraWithProfile(localParticipant, mediaProfile);
+        const actualCamera = getLocalCameraCaptureSummary(localParticipant);
+        if (actualCamera) {
+          setMeetingInfo(
+            `Camera updated: ${actualCamera.width}x${actualCamera.height}${
+              actualCamera.fps ? ` @ ${actualCamera.fps}fps` : ""
+            }.`
+          );
+        }
       },
       "Unable to update camera.",
-      "present"
+      "present",
+      {
+        requiresMediaApi: true,
+        featureName: "Camera",
+        shouldValidateMediaApi: () => !controls.camera,
+      }
     );
 
   const toggleScreenShare = () =>
@@ -700,7 +895,12 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
         return enableScreenShareWithProfile(localParticipant, mediaProfile);
       },
       "Unable to update screen sharing.",
-      "present"
+      "present",
+      {
+        requiresMediaApi: true,
+        featureName: "Screen share",
+        shouldValidateMediaApi: () => !controls.screen,
+      }
     );
 
   const handlePresenterPermission = async (userId, grantAccess) => {
@@ -818,20 +1018,24 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
         </div>
       </div>
 
-      <div className={sidePanelOpen ? "grid gap-0 lg:grid-cols-[1fr_320px]" : "grid gap-0"}>
+      <div className={sidePanelOpen ? "grid gap-0 xl:grid-cols-[minmax(0,1fr)_320px]" : "grid gap-0"}>
         <div
           ref={stageRef}
-          className={`${stagePriorityMode ? "min-h-[74vh]" : "min-h-[520px]"} bg-[#060906] p-4 sm:p-5`}
+          className={`${
+            stagePriorityMode
+              ? "min-h-[58vh] sm:min-h-[66vh] lg:min-h-[74vh]"
+              : "min-h-[340px] sm:min-h-[460px] lg:min-h-[520px]"
+          } bg-[#060906] p-4 sm:p-5`}
         >
           {connecting ? (
-            <div className="flex h-[460px] items-center justify-center rounded-2xl border border-[#273226] bg-[#0e140e] text-[#d5ddcb]">
+            <div className="flex h-[220px] items-center justify-center rounded-2xl border border-[#273226] bg-[#0e140e] text-[#d5ddcb] sm:h-[320px] lg:h-[460px]">
               Connecting to meeting...
             </div>
           ) : useFeaturedLayout ? (
             otherParticipants.length > 0 ? (
               stagePriorityMode ? (
                 <div className="space-y-3">
-                  <MeetingTile
+                  <MemoMeetingTile
                     key={featuredParticipant.id}
                     entry={featuredParticipant}
                     isFeatured
@@ -848,7 +1052,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                   <div className="flex gap-3 overflow-x-auto pb-1">
                     {otherParticipants.map((entry) => (
                       <div key={entry.id} className="min-w-[220px] max-w-[260px] flex-none">
-                        <MeetingTile
+                        <MemoMeetingTile
                           entry={entry}
                           isPinned={pinnedIdentity === entry.participant.identity}
                           isSpeaking={activeSpeakerIds.includes(entry.participant.identity)}
@@ -868,7 +1072,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                     featuredHasScreenShare ? "xl:grid-cols-[minmax(0,1fr)_260px]" : "lg:grid-cols-[1fr_220px]"
                   }`}
                 >
-                  <MeetingTile
+                  <MemoMeetingTile
                     key={featuredParticipant.id}
                     entry={featuredParticipant}
                     isFeatured
@@ -882,9 +1086,15 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                       )
                     }
                   />
-                  <div className={`${featuredHasScreenShare ? "max-h-[560px]" : "max-h-[420px]"} space-y-3 overflow-y-auto pr-1`}>
+                  <div
+                    className={`${
+                      featuredHasScreenShare
+                        ? "max-h-[260px] sm:max-h-[360px] lg:max-h-[560px]"
+                        : "max-h-[220px] sm:max-h-[320px] lg:max-h-[420px]"
+                    } space-y-3 overflow-y-auto pr-1`}
+                  >
                     {otherParticipants.map((entry) => (
-                      <MeetingTile
+                      <MemoMeetingTile
                         key={entry.id}
                         entry={entry}
                         isPinned={pinnedIdentity === entry.participant.identity}
@@ -900,7 +1110,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                 </div>
               )
             ) : (
-              <MeetingTile
+              <MemoMeetingTile
                 key={featuredParticipant.id}
                 entry={featuredParticipant}
                 isFeatured
@@ -916,7 +1126,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {participantsOrdered.map((entry) => (
-                <MeetingTile
+                <MemoMeetingTile
                   key={entry.id}
                   entry={entry}
                   isPinned={pinnedIdentity === entry.participant.identity}
@@ -954,7 +1164,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
         </div>
 
         {sidePanelOpen ? (
-          <aside className="border-l border-[#253126] bg-[#0c120d]">
+          <aside className="border-t border-[#253126] bg-[#0c120d] xl:border-l xl:border-t-0">
           <div className="flex border-b border-[#253126]">
             <button
               type="button"
@@ -977,7 +1187,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
           </div>
 
           {panelTab === "people" ? (
-            <div className="h-[520px] overflow-y-auto p-3">
+            <div className="max-h-[320px] overflow-y-auto p-3 sm:max-h-[420px] xl:h-[520px] xl:max-h-none">
               <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[#8f9989]">
                 Participants ({participantCount})
               </div>
@@ -1021,7 +1231,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
               </div>
             </div>
           ) : (
-            <div className="flex h-[520px] flex-col">
+            <div className="flex max-h-[360px] flex-col sm:max-h-[420px] xl:h-[520px] xl:max-h-none">
               <div className="flex-1 space-y-2 overflow-y-auto p-3">
                 {messages.length === 0 ? (
                   <div className="rounded-xl border border-[#273327] bg-[#101711] px-3 py-2 text-xs text-[#9eaa97]">

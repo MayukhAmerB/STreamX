@@ -47,7 +47,7 @@ export default function AppFooter() {
       </div>
 
       <div className="relative mx-auto max-w-7xl px-4 py-10 sm:py-12">
-        <div className="grid gap-4 lg:grid-cols-[1.2fr_0.9fr_0.9fr_1fr]">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1.2fr_0.9fr_0.9fr_1fr]">
           <section className="rounded-2xl border border-[#2a332d] bg-[#0d120f]/90 p-5 shadow-[0_12px_30px_rgba(0,0,0,0.26)]">
             <BrandLogo />
             <p className="mt-4 max-w-md text-sm leading-6 text-[#b7c0b0]">
@@ -98,8 +98,8 @@ export default function AppFooter() {
       </div>
 
       <div className="relative border-t border-[#d2dcc6]/12">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs tracking-[0.12em] text-[#8f9989]">
-          <span>© {year} Al syed Initiative. All rights reserved.</span>
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-2 px-4 py-4 text-center text-xs tracking-[0.12em] text-[#8f9989] sm:justify-between sm:text-left">
+          <span>{"\u00A9"} {year} Al syed Initiative. All rights reserved.</span>
           <span>Secure Learning Infrastructure</span>
         </div>
       </div>

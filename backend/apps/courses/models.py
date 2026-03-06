@@ -1,14 +1,19 @@
 import os
 from decimal import Decimal
+from io import BytesIO
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.db import models
+from django.db.models import Q
 from django.utils.text import slugify
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from config.model_validators import validate_no_active_content, validate_safe_public_url
 from config.upload_validators import validate_profile_image_upload, validate_video_upload
 from config.url_utils import get_media_public_url
+from .cache_utils import bump_course_list_cache_version, bump_live_class_list_cache_version
 
 
 class Course(models.Model):
@@ -48,7 +53,9 @@ class Course(models.Model):
     )
     instructor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="courses",
     )
     is_published = models.BooleanField(default=False)
@@ -75,7 +82,76 @@ class Course(models.Model):
             return get_media_public_url(self.thumbnail_file.url, request=request)
         return self.thumbnail
 
+    def _normalize_thumbnail_file(self):
+        """
+        Normalize uploaded course thumbnails to 16:10 so cards render consistently.
+        Process new uploads and legacy stored files that are not yet normalized.
+        """
+        if not self.thumbnail_file:
+            return
+        current_name = str(self.thumbnail_file.name or "")
+        if not current_name:
+            return
+        filename_no_ext, _ = os.path.splitext(os.path.basename(current_name))
+        if filename_no_ext.endswith("_16x10"):
+            return
+
+        original_name = os.path.basename(current_name or "thumbnail")
+        base_name, ext = os.path.splitext(original_name)
+        ext = ext.lower()
+        output_format = "WEBP" if ext == ".webp" else "JPEG"
+        output_ext = ".webp" if output_format == "WEBP" else ".jpg"
+        safe_base_name = slugify(base_name)[:120] or "thumbnail"
+
+        opened_here = False
+        raw_file = getattr(self.thumbnail_file, "file", None)
+        try:
+            if raw_file is None:
+                self.thumbnail_file.open("rb")
+                raw_file = self.thumbnail_file.file
+                opened_here = True
+            raw_file.seek(0)
+            with Image.open(raw_file) as image:
+                image = ImageOps.exif_transpose(image)
+                if image.mode not in {"RGB", "RGBA"}:
+                    image = image.convert("RGB")
+
+                width, height = image.size
+                if width <= 0 or height <= 0:
+                    return
+
+                target_ratio = 16 / 10
+                current_ratio = width / height
+                if current_ratio > target_ratio:
+                    crop_width = int(height * target_ratio)
+                    left = (width - crop_width) // 2
+                    crop_box = (left, 0, left + crop_width, height)
+                else:
+                    crop_height = int(width / target_ratio)
+                    top = (height - crop_height) // 2
+                    crop_box = (0, top, width, top + crop_height)
+
+                cropped = image.crop(crop_box).convert("RGB")
+                resampling = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
+                normalized = cropped.resize((1600, 1000), resampling)
+
+                output = BytesIO()
+                if output_format == "WEBP":
+                    normalized.save(output, format=output_format, quality=90, method=6)
+                else:
+                    normalized.save(output, format=output_format, quality=88, optimize=True)
+                output.seek(0)
+                processed_name = f"{safe_base_name}_16x10{output_ext}"
+                self.thumbnail_file.save(processed_name, ContentFile(output.read()), save=False)
+        except (UnidentifiedImageError, OSError, ValueError):
+            # Validation already handles bad files; keep original payload if processing fails.
+            return
+        finally:
+            if opened_here:
+                self.thumbnail_file.close()
+
     def save(self, *args, **kwargs):
+        self._normalize_thumbnail_file()
         if not self.slug:
             base_slug = slugify(self.title)[:220] or "course"
             slug = base_slug
@@ -85,6 +161,11 @@ class Course(models.Model):
                 index += 1
             self.slug = slug
         super().save(*args, **kwargs)
+        bump_course_list_cache_version()
+
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
+        bump_course_list_cache_version()
 
     def __str__(self):
         return self.title
@@ -271,6 +352,11 @@ class LiveClass(models.Model):
                 index += 1
             self.slug = slug
         super().save(*args, **kwargs)
+        bump_live_class_list_cache_version()
+
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
+        bump_live_class_list_cache_version()
 
     def __str__(self):
         return self.title
@@ -307,6 +393,8 @@ class LiveClassEnrollment(models.Model):
         indexes = [
             models.Index(fields=["user", "created_at"]),
             models.Index(fields=["live_class", "created_at"]),
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["live_class", "status"]),
         ]
 
     def __str__(self):
@@ -314,31 +402,80 @@ class LiveClassEnrollment(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        self._sync_linked_course_enrollment_status()
 
-    def _sync_linked_course_enrollment_status(self):
-        linked_course_id = getattr(self.live_class, "linked_course_id", None)
-        if not linked_course_id:
-            return
 
-        enrollment = (
-            Enrollment.objects.filter(user=self.user, course_id=linked_course_id)
-            .order_by("-enrolled_at")
-            .first()
-        )
-        if not enrollment:
-            return
+class PublicEnrollmentLead(models.Model):
+    STATUS_NEW = "new"
+    STATUS_REVIEWED = "reviewed"
+    STATUS_CONTACTED = "contacted"
+    STATUS_CONVERTED = "converted"
+    STATUS_CHOICES = [
+        (STATUS_NEW, "New"),
+        (STATUS_REVIEWED, "Reviewed"),
+        (STATUS_CONTACTED, "Contacted"),
+        (STATUS_CONVERTED, "Converted"),
+    ]
 
-        target_status = None
-        if self.status == self.STATUS_APPROVED:
-            target_status = Enrollment.STATUS_PAID
-        elif self.status == self.STATUS_PENDING:
-            target_status = Enrollment.STATUS_PENDING
-        elif self.status == self.STATUS_REJECTED:
-            # Do not downgrade already-approved course access.
-            if enrollment.payment_status != Enrollment.STATUS_PAID:
-                target_status = Enrollment.STATUS_FAILED
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="public_enrollment_leads",
+    )
+    live_class = models.ForeignKey(
+        LiveClass,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="public_enrollment_leads",
+    )
+    email = models.EmailField(max_length=254)
+    phone_number = models.CharField(max_length=24)
+    whatsapp_number = models.CharField(max_length=24)
+    message = models.TextField()
+    source_path = models.CharField(max_length=255, blank=True, default="")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_NEW)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
-        if target_status and enrollment.payment_status != target_status:
-            enrollment.payment_status = target_status
-            enrollment.save(update_fields=["payment_status"])
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Public Enrollment Lead"
+        verbose_name_plural = "Public Enrollment Leads"
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    (Q(course__isnull=False) & Q(live_class__isnull=True))
+                    | (Q(course__isnull=True) & Q(live_class__isnull=False))
+                    | (Q(course__isnull=True) & Q(live_class__isnull=True))
+                ),
+                name="courses_publicenrollmentlead_zero_or_one_target",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["email", "created_at"]),
+            models.Index(fields=["course", "created_at"]),
+            models.Index(fields=["live_class", "created_at"]),
+        ]
+
+    def clean(self):
+        super().clean()
+        validate_no_active_content(self.message, "message")
+        validate_no_active_content(self.source_path, "source_path")
+        has_course = bool(self.course_id)
+        has_live_class = bool(self.live_class_id)
+        if has_course and has_live_class:
+            raise ValidationError(
+                {"detail": "Select only one target: either a course or a live class."}
+            )
+
+    def __str__(self):
+        if self.course_id:
+            target = self.course.title
+        elif self.live_class_id:
+            target = self.live_class.title
+        else:
+            target = "Unknown target"
+        return f"{self.email} -> {target}"

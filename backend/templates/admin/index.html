@@ -44,20 +44,133 @@
     </section>
   </div>
 
-  <section class="enterprise-admin-activity enterprise-admin-activity--full">
-    <h2>Recent Actions</h2>
-    {% get_admin_log 12 as admin_log for_user user %}
-    {% if admin_log %}
-      <ul class="enterprise-admin-activity-list">
-        {% for entry in admin_log %}
-          <li>
-            <span class="enterprise-admin-activity-object">{{ entry.object_repr }}</span>
-            <span class="enterprise-admin-activity-model">{{ entry.content_type.name|capfirst }}</span>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p class="enterprise-admin-muted">No recent actions.</p>
-    {% endif %}
+  <section class="enterprise-admin-acceptance enterprise-admin-acceptance--full">
+    <h2>Acceptance Queue</h2>
+    <div class="enterprise-admin-acceptance-grid">
+      <article class="enterprise-admin-acceptance-card">
+        <h3>Course Acceptance (Buy Requests)</h3>
+        <p class="enterprise-admin-muted">
+          Review and approve pending course buy requests.
+        </p>
+        <div class="enterprise-admin-model-actions">
+          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_enrollment_changelist' %}?payment_status__exact=pending">
+            Pending Course Requests
+          </a>
+          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_enrollment_changelist' %}">
+            All Course Requests
+          </a>
+        </div>
+      </article>
+      <article class="enterprise-admin-acceptance-card">
+        <h3>Live Class Acceptance (Enroll Requests)</h3>
+        <p class="enterprise-admin-muted">
+          Review and approve pending live-class enrollment requests.
+        </p>
+        <div class="enterprise-admin-model-actions">
+          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_liveclassenrollment_changelist' %}?status__exact=pending">
+            Pending Live Class Requests
+          </a>
+          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_liveclassenrollment_changelist' %}">
+            All Live Class Requests
+          </a>
+        </div>
+      </article>
+    </div>
   </section>
+
+  <section class="enterprise-admin-activity enterprise-admin-activity--full">
+    <h2>Recent Activities</h2>
+    {% get_admin_log 30 as admin_log for_user user %}
+    <div class="enterprise-admin-tablist" role="tablist" aria-label="Activity tabs">
+      <button
+        class="enterprise-admin-tab is-active"
+        type="button"
+        role="tab"
+        aria-selected="true"
+        aria-controls="tab-recent-actions"
+        id="tab-trigger-recent-actions"
+        data-tab-target="tab-recent-actions"
+      >
+        Recent Actions
+      </button>
+      <button
+        class="enterprise-admin-tab"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="tab-enrollment-inbox"
+        id="tab-trigger-enrollment-inbox"
+        data-tab-target="tab-enrollment-inbox"
+      >
+        Enrollment Inbox
+      </button>
+    </div>
+
+    <div class="enterprise-admin-tab-panel is-active" id="tab-recent-actions" role="tabpanel" aria-labelledby="tab-trigger-recent-actions">
+      {% if admin_log %}
+        <ul class="enterprise-admin-activity-list">
+          {% for entry in admin_log|slice:":12" %}
+            <li>
+              <span class="enterprise-admin-activity-object">{{ entry.object_repr }}</span>
+              <span class="enterprise-admin-activity-model">{{ entry.content_type.name|capfirst }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="enterprise-admin-muted">No recent actions.</p>
+      {% endif %}
+    </div>
+
+    <div class="enterprise-admin-tab-panel" id="tab-enrollment-inbox" role="tabpanel" aria-labelledby="tab-trigger-enrollment-inbox">
+      {% if admin_log %}
+        <ul class="enterprise-admin-activity-list">
+          {% for entry in admin_log %}
+            <li
+              class="{% if entry.content_type.model != 'publicenrollmentlead' and entry.content_type.model != 'enrollment' and entry.content_type.model != 'liveclassenrollment' %}is-hidden{% endif %}"
+            >
+              <span class="enterprise-admin-activity-object">
+                {{ entry.object_repr }}
+              </span>
+              <span class="enterprise-admin-activity-model">
+                {{ entry.content_type.name|capfirst }}
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+        <div class="enterprise-admin-tab-footer">
+          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_publicenrollmentlead_changelist' %}">
+            Open Full Enrollment Sheet
+          </a>
+        </div>
+      {% else %}
+        <p class="enterprise-admin-muted">No enrollment activity yet.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      var tabs = Array.prototype.slice.call(document.querySelectorAll(".enterprise-admin-tab"));
+      var panels = Array.prototype.slice.call(document.querySelectorAll(".enterprise-admin-tab-panel"));
+      if (!tabs.length || !panels.length) return;
+
+      function activateTab(targetId) {
+        tabs.forEach(function (tab) {
+          var isActive = tab.getAttribute("data-tab-target") === targetId;
+          tab.classList.toggle("is-active", isActive);
+          tab.setAttribute("aria-selected", isActive ? "true" : "false");
+        });
+        panels.forEach(function (panel) {
+          var isActive = panel.id === targetId;
+          panel.classList.toggle("is-active", isActive);
+        });
+      }
+
+      tabs.forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          activateTab(tab.getAttribute("data-tab-target"));
+        });
+      });
+    })();
+  </script>
 {% endblock %}

@@ -1,25 +1,27 @@
+import { lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "../components/ProtectedRoute";
 import AppLayout from "../layouts/AppLayout";
-import AdminControlCenterPage from "../pages/AdminControlCenterPage";
-import AboutPage from "../pages/AboutPage";
-import BroadcastingPage from "../pages/BroadcastingPage";
-import ContactPage from "../pages/ContactPage";
-import CourseDetailPage from "../pages/CourseDetailPage";
-import CourseListPage from "../pages/CourseListPage";
-import CoursePlayerPage from "../pages/CoursePlayerPage";
-import CoursePaymentPage from "../pages/CoursePaymentPage";
-import CreateCoursePage from "../pages/CreateCoursePage";
-import EditCoursePage from "../pages/EditCoursePage";
-import InstructorDashboardPage from "../pages/InstructorDashboardPage";
-import JoinLivePage from "../pages/JoinLivePage";
-import LandingPage from "../pages/LandingPage";
-import LiveClassesPage from "../pages/LiveClassesPage";
-import LoginPage from "../pages/LoginPage";
-import MeetingPage from "../pages/MeetingPage";
-import MyCoursesPage from "../pages/MyCoursesPage";
-import ProfilePage from "../pages/ProfilePage";
-import RegisterPage from "../pages/RegisterPage";
+
+const AdminControlCenterPage = lazy(() => import("../pages/AdminControlCenterPage"));
+const AboutPage = lazy(() => import("../pages/AboutPage"));
+const BroadcastingPage = lazy(() => import("../pages/BroadcastingPage"));
+const ContactPage = lazy(() => import("../pages/ContactPage"));
+const CourseDetailPage = lazy(() => import("../pages/CourseDetailPage"));
+const CourseListPage = lazy(() => import("../pages/CourseListPage"));
+const CoursePlayerPage = lazy(() => import("../pages/CoursePlayerPage"));
+const CoursePaymentPage = lazy(() => import("../pages/CoursePaymentPage"));
+const CreateCoursePage = lazy(() => import("../pages/CreateCoursePage"));
+const EditCoursePage = lazy(() => import("../pages/EditCoursePage"));
+const InstructorDashboardPage = lazy(() => import("../pages/InstructorDashboardPage"));
+const JoinLivePage = lazy(() => import("../pages/JoinLivePage"));
+const LandingPage = lazy(() => import("../pages/LandingPage"));
+const LiveClassesPage = lazy(() => import("../pages/LiveClassesPage"));
+const LoginPage = lazy(() => import("../pages/LoginPage"));
+const MeetingPage = lazy(() => import("../pages/MeetingPage"));
+const MyCoursesPage = lazy(() => import("../pages/MyCoursesPage"));
+const ProfilePage = lazy(() => import("../pages/ProfilePage"));
+const RegisterPage = lazy(() => import("../pages/RegisterPage"));
 
 export default function AppRoutes() {
   return (

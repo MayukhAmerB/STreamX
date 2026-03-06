@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import PageShell from "../components/PageShell";
 import Button from "../components/Button";
+import PublicEnrollmentRequestModal from "../components/PublicEnrollmentRequestModal";
 import { enrollInLiveClass, listLiveClasses } from "../api/courses";
 import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
@@ -91,12 +92,19 @@ function formatLiveClassPrice(value) {
   return formatINR(amount);
 }
 
+function toValidLiveClassId(value) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
 export default function LiveClassesPage() {
   const { isAuthenticated } = useAuth();
   const [tracks, setTracks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionState, setActionState] = useState({});
+  const [publicLeadTarget, setPublicLeadTarget] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -131,12 +139,24 @@ export default function LiveClassesPage() {
   }, [tracks]);
 
   const handleEnroll = async (liveClassId) => {
+    const targetId = toValidLiveClassId(liveClassId);
+    if (!targetId) {
+      setActionState((prev) => ({
+        ...prev,
+        [liveClassId]: {
+          loading: false,
+          error: "Enrollment is unavailable in preview mode.",
+          success: "",
+        },
+      }));
+      return;
+    }
     setActionState((prev) => ({
       ...prev,
       [liveClassId]: { loading: true, error: "", success: "" },
     }));
     try {
-      const response = await enrollInLiveClass({ live_class_id: liveClassId });
+      const response = await enrollInLiveClass({ live_class_id: targetId });
       const data = apiData(response, {});
       const enrollmentStatus = String(data?.enrollment_status || (data?.enrolled ? "approved" : "pending")).toLowerCase();
       setTracks((prev) =>
@@ -354,9 +374,29 @@ export default function LiveClassesPage() {
                         Enroll
                       </Button>
                     ) : (
-                      <Link to="/login" state={{ from: "/live-classes" }} className="block">
-                        <Button className="w-full">Login to Enroll</Button>
-                      </Link>
+                      <Button
+                        className="w-full"
+                        onClick={() => {
+                          const targetId = toValidLiveClassId(course.id);
+                          if (!targetId) {
+                            setActionState((prev) => ({
+                              ...prev,
+                              [course.id]: {
+                                loading: false,
+                                error: "Enrollment is unavailable in preview mode.",
+                                success: "",
+                              },
+                            }));
+                            return;
+                          }
+                          setPublicLeadTarget({
+                            id: targetId,
+                            title: course.title,
+                          });
+                        }}
+                      >
+                        Enroll
+                      </Button>
                     )}
                     {actionState[course.id]?.error ? (
                       <p className="mt-2 text-xs text-red-300">{actionState[course.id].error}</p>
@@ -371,6 +411,16 @@ export default function LiveClassesPage() {
           })}
         </div>
       </section>
+
+      <PublicEnrollmentRequestModal
+        isOpen={Boolean(publicLeadTarget)}
+        onClose={() => setPublicLeadTarget(null)}
+        targetType="live_class"
+        targetId={publicLeadTarget?.id}
+        targetName={publicLeadTarget?.title}
+        sourcePath="/live-classes"
+        loginPath="/login"
+      />
     </PageShell>
   );
 }
