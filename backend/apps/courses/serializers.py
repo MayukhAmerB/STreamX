@@ -432,3 +432,46 @@ class EnrollmentCourseSerializer(serializers.ModelSerializer):
     def get_thumbnail(self, obj):
         request = self.context.get("request")
         return obj.get_thumbnail_url(request=request)
+
+
+class MyCourseLibrarySerializer(serializers.ModelSerializer):
+    thumbnail = serializers.SerializerMethodField()
+    instructor = serializers.SerializerMethodField()
+    section_count = serializers.IntegerField(read_only=True)
+    lecture_count = serializers.IntegerField(read_only=True)
+    enrolled_at = serializers.DateTimeField(read_only=True)
+    access_source = serializers.CharField(read_only=True)
+    access_label = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = Course
+        fields = (
+            "id",
+            "title",
+            "slug",
+            "description",
+            "thumbnail",
+            "price",
+            "category",
+            "level",
+            "launch_status",
+            "section_count",
+            "lecture_count",
+            "instructor",
+            "enrolled_at",
+            "access_source",
+            "access_label",
+        )
+
+    def get_instructor(self, obj):
+        if not getattr(obj, "instructor_id", None) or not getattr(obj, "instructor", None):
+            return None
+        return {
+            "id": obj.instructor_id,
+            "full_name": obj.instructor.full_name,
+            "email": obj.instructor.email,
+        }
+
+    def get_thumbnail(self, obj):
+        request = self.context.get("request")
+        return obj.get_thumbnail_url(request=request)

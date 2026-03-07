@@ -657,6 +657,71 @@ class PaymentVerificationTests(BaseAPITestCase):
         )
 
 
+class MyCoursesViewTests(BaseAPITestCase):
+    def test_my_courses_returns_purchased_and_granted_courses_for_current_user(self):
+        granted_course = Course.objects.create(
+            title="Granted Course",
+            description="Approved directly by admin.",
+            price=Decimal("299.00"),
+            instructor=self.instructor,
+            is_published=True,
+        )
+
+        Enrollment.objects.create(
+            user=self.student,
+            course=self.course,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        Payment.objects.create(
+            user=self.student,
+            course=self.course,
+            razorpay_order_id="order_paid_library",
+            razorpay_payment_id="pay_paid_library",
+            razorpay_signature="sig_paid_library",
+            amount=self.course.price,
+            currency="INR",
+            status=Payment.STATUS_PAID,
+        )
+        Enrollment.objects.create(
+            user=self.student,
+            course=granted_course,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        Enrollment.objects.create(
+            user=self.instructor,
+            course=granted_course,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+
+        self.login(self.student.email)
+        response = self.client.get(reverse("my-courses"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["data"]), 2)
+
+        returned = {item["id"]: item for item in response.data["data"]}
+        self.assertEqual(returned[self.course.id]["access_source"], "purchased")
+        self.assertEqual(returned[self.course.id]["access_label"], "Purchased")
+        self.assertEqual(returned[self.course.id]["section_count"], 1)
+        self.assertEqual(returned[self.course.id]["lecture_count"], 1)
+
+        self.assertEqual(returned[granted_course.id]["access_source"], "granted")
+        self.assertEqual(returned[granted_course.id]["access_label"], "Granted Access")
+
+    def test_my_courses_excludes_pending_enrollments(self):
+        Enrollment.objects.create(
+            user=self.student,
+            course=self.course,
+            payment_status=Enrollment.STATUS_PENDING,
+        )
+
+        self.login(self.student.email)
+        response = self.client.get(reverse("my-courses"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"], [])
+
+
 class EnrollmentApprovalFlowTests(BaseAPITestCase):
     def test_course_enroll_request_creates_pending_enrollment(self):
         self.login(self.student.email)

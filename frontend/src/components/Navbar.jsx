@@ -93,7 +93,7 @@ export default function Navbar() {
                     to="/my-courses"
                     className="block px-4 py-2.5 text-sm text-[#dbe4d1] transition hover:bg-[#1b241c]"
                   >
-                    My Courses
+                      Your Courses
                   </Link>
                   <Link
                     to="/profile"
@@ -238,8 +238,8 @@ export default function Navbar() {
                   <div className="mt-0.5 truncate text-[#9eaa97]">{user?.email}</div>
                 </div>
                 <div className="grid gap-1">
-                  <Link to="/my-courses" className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]">
-                    My Courses
+                    <Link to="/my-courses" className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]">
+                      Your Courses
                   </Link>
                   <Link to="/profile" className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]">
                     Profile

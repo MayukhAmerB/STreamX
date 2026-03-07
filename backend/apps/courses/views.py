@@ -11,6 +11,8 @@ from config.request_security import find_disallowed_query_params
 from config.response import api_response
 from config.url_utils import get_media_public_url
 
+from apps.payments.models import Payment
+
 from .cache_utils import get_course_list_cache_version, get_live_class_list_cache_version
 from .models import Course, Enrollment, Lecture, LiveClass, LiveClassEnrollment, PublicEnrollmentLead, Section
 from .permissions import IsCourseInstructor, IsEnrolledInCourse, IsInstructor
@@ -22,6 +24,7 @@ from .serializers import (
     LectureSerializer,
     LiveClassEnrollSerializer,
     LiveClassListSerializer,
+    MyCourseLibrarySerializer,
     PublicEnrollmentLeadCreateSerializer,
     SectionSerializer,
 )
@@ -529,24 +532,44 @@ class MyCoursesView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        enrollments = (
+        enrollments = list(
             Enrollment.objects.filter(user=request.user, payment_status=Enrollment.STATUS_PAID)
-            .select_related("course")
             .order_by("-enrolled_at")
+            .values("course_id", "enrolled_at")
         )
-        data = [
-            {
-                "id": enrollment.course.id,
-                "title": enrollment.course.title,
-                "description": enrollment.course.description,
-                "thumbnail": enrollment.course.get_thumbnail_url(request=request),
-                "price": str(enrollment.course.price),
-                "slug": enrollment.course.slug,
-                "enrolled_at": enrollment.enrolled_at,
-            }
-            for enrollment in enrollments
-        ]
-        return api_response(success=True, message="Enrolled courses fetched.", data=data)
+        if not enrollments:
+            return api_response(success=True, message="Your courses fetched.", data=[])
+
+        course_ids = [row["course_id"] for row in enrollments]
+        purchased_course_ids = set(
+            Payment.objects.filter(
+                user=request.user,
+                course_id__in=course_ids,
+                status=Payment.STATUS_PAID,
+            ).values_list("course_id", flat=True)
+        )
+        course_map = {
+            course.id: course
+            for course in Course.objects.filter(id__in=course_ids)
+            .select_related("instructor")
+            .annotate(
+                section_count=Count("sections", distinct=True),
+                lecture_count=Count("sections__lectures", distinct=True),
+            )
+        }
+
+        courses = []
+        for row in enrollments:
+            course = course_map.get(row["course_id"])
+            if course is None:
+                continue
+            course.enrolled_at = row["enrolled_at"]
+            course.access_source = "purchased" if course.id in purchased_course_ids else "granted"
+            course.access_label = "Purchased" if course.id in purchased_course_ids else "Granted Access"
+            courses.append(course)
+
+        serializer = MyCourseLibrarySerializer(courses, many=True, context={"request": request})
+        return api_response(success=True, message="Your courses fetched.", data=serializer.data)
 
 
 class InstructorCoursesView(APIView):
