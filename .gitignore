@@ -31,3 +31,4 @@ Thumbs.db
 infra/livekit.runtime.yaml
 infra/recordings/*
 !infra/recordings/.gitkeep
+.hostinger-backups/

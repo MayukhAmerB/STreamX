@@ -1,3 +1,5 @@
+name: streamx
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -52,7 +54,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import sys,urllib.request;req=urllib.request.Request('http://127.0.0.1:8000/health/live',headers={'Host':'api.alsyedinitiative.com','X-Forwarded-Proto':'https'});resp=urllib.request.urlopen(req,timeout=3);sys.exit(0 if resp.status==200 else 1)",
+          "import sys,urllib.request;req=urllib.request.Request('http://127.0.0.1:8000/health/live',headers={'Host':'${API_HOSTNAME:-api.alsyedinitiative.com}','X-Forwarded-Proto':'https'});resp=urllib.request.urlopen(req,timeout=3);sys.exit(0 if resp.status==200 else 1)",
         ]
       interval: 30s
       timeout: 5s
@@ -68,13 +70,28 @@ services:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
         VITE_ENABLE_PAYMENTS: ${VITE_ENABLE_PAYMENTS:-0}
         VITE_RAZORPAY_KEY_ID: ${VITE_RAZORPAY_KEY_ID:-}
-        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
     restart: always
     depends_on:
       backend:
         condition: service_healthy
     ports:
       - "127.0.0.1:3000:8080"
+    networks:
+      - appnet
+
+  media:
+    image: nginx:1.27-alpine
+    restart: always
+    volumes:
+      - backend_media:/media:ro
+      - ./infra/hostinger/nginx/media.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "127.0.0.1:8090:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
     networks:
       - appnet
 
@@ -136,6 +153,8 @@ services:
         condition: service_healthy
       frontend:
         condition: service_started
+      media:
+        condition: service_started
       livekit:
         condition: service_started
       owncast:
@@ -143,17 +162,23 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./infra/hostinger/nginx/alsyedinitiative.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infra/hostinger/nginx/compose-edge.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - appnet
 
 volumes:
   postgres_data:
+    name: streamx_postgres_data
   redis_data:
+    name: streamx_redis_data
   owncast_data:
+    name: streamx_owncast_data
   backend_media:
+    name: streamx_backend_media
   recordings_data:
+    name: streamx_recordings_data
 
 networks:
   appnet:
     driver: bridge
+    name: streamx_appnet

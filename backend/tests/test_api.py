@@ -1,6 +1,7 @@
 import os
 import tempfile
 from decimal import Decimal
+from io import BytesIO
 from unittest.mock import patch
 
 from django.conf import settings
@@ -13,6 +14,7 @@ from django.utils.http import urlsafe_base64_encode
 from django.urls import reverse
 from django.test import override_settings
 from rest_framework.test import APITestCase
+from PIL import Image
 
 from apps.courses.models import (
     Course,
@@ -526,6 +528,59 @@ class PermissionTests(BaseAPITestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("thumbnail", response.data["errors"])
+
+
+class HostingerMediaUploadTests(BaseAPITestCase):
+    @staticmethod
+    def _build_thumbnail_file():
+        image_buffer = BytesIO()
+        Image.new("RGB", (64, 64), color="#2b8a3e").save(image_buffer, format="JPEG")
+        image_buffer.seek(0)
+        return SimpleUploadedFile("thumbnail.jpg", image_buffer.read(), content_type="image/jpeg")
+
+    def test_instructor_can_create_course_with_uploaded_thumbnail(self):
+        self.login(self.instructor.email)
+        thumbnail = self._build_thumbnail_file()
+        response = self.client.post(
+            reverse("course-list-create"),
+            {
+                "title": "Uploaded Thumbnail Course",
+                "description": "Course with local thumbnail upload",
+                "price": "149.00",
+                "thumbnail": "",
+                "thumbnail_file": thumbnail,
+                "is_published": False,
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+        created_course = Course.objects.get(title="Uploaded Thumbnail Course")
+        self.assertTrue(bool(created_course.thumbnail_file))
+
+    def test_instructor_can_create_lecture_with_uploaded_video_file(self):
+        self.login(self.instructor.email)
+        video_file = SimpleUploadedFile(
+            "lesson.mp4",
+            b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom",
+            content_type="video/mp4",
+        )
+        response = self.client.post(
+            reverse("lecture-create"),
+            {
+                "section": self.section.id,
+                "title": "Uploaded Lecture",
+                "description": "Lecture with local file upload",
+                "video_key": "",
+                "video_file": video_file,
+                "order": 2,
+                "is_preview": False,
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+        lecture = Lecture.objects.get(title="Uploaded Lecture")
+        self.assertTrue(bool(lecture.video_file))
+        self.assertEqual(lecture.video_key, "")
 
 
 class InstructorDeletionSafetyTests(APITestCase):

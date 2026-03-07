@@ -1,0 +1,10 @@
+[Unit]
+Description=StreamX Hostinger backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/alsyed/StreamX
+Environment=HOSTINGER_BACKUP_ROOT=/opt/alsyed/StreamX/.hostinger-backups
+ExecStart=/opt/alsyed/StreamX/infra/hostinger/backup-data.sh

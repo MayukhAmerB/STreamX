@@ -12,8 +12,22 @@ const initialForm = {
   description: "",
   price: "",
   thumbnail: "",
+  thumbnail_file: null,
   is_published: false,
 };
+
+export function buildCoursePayload(form) {
+  const payload = new FormData();
+  payload.append("title", form.title || "");
+  payload.append("description", form.description || "");
+  payload.append("price", String(form.price ?? ""));
+  payload.append("thumbnail", form.thumbnail || "");
+  payload.append("is_published", form.is_published ? "true" : "false");
+  if (form.thumbnail_file) {
+    payload.append("thumbnail_file", form.thumbnail_file);
+  }
+  return payload;
+}
 
 export function CourseForm({ form, setForm, onSubmit, error, loading }) {
   return (
@@ -47,12 +61,35 @@ export function CourseForm({ form, setForm, onSubmit, error, loading }) {
         />
         <FormInput
           label="Thumbnail URL"
-          hint="Public image URL used in catalog and details page."
+          hint="Optional public image URL. Leave blank if you upload a local thumbnail file."
           value={form.thumbnail}
           onChange={(e) => setForm((p) => ({ ...p, thumbnail: e.target.value }))}
           placeholder="https://example.com/image.jpg"
         />
       </div>
+      <label className="block">
+        <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#aeb8a3]">
+          Thumbnail Upload
+        </span>
+        <input
+          key={form.thumbnail_file?.name || "thumbnail-file-empty"}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="w-full rounded-xl border border-[#2a332d] bg-[#0f1310] px-3.5 py-2.5 text-sm text-white file:mr-3 file:rounded-lg file:border-0 file:bg-[#b9c7ab] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[#0d120f] focus:border-[#b9c7ab] focus:outline-none focus:ring-2 focus:ring-[#b9c7ab]/20"
+          onChange={(e) =>
+            setForm((p) => ({
+              ...p,
+              thumbnail_file: e.target.files?.[0] || null,
+            }))
+          }
+        />
+        <span className="mt-1.5 block text-xs text-[#8e9987]">
+          Hostinger-friendly option. Uploaded files are stored on the app media volume and override the URL above.
+        </span>
+        {form.thumbnail_file ? (
+          <span className="mt-1.5 block text-xs text-[#d4dbc8]">Selected: {form.thumbnail_file.name}</span>
+        ) : null}
+      </label>
       <label className="flex items-center gap-2 rounded-xl border border-[#2a332d] bg-[#0a0d0a] px-3 py-2 text-sm text-[#d4dbc8]">
         <input
           type="checkbox"
@@ -80,10 +117,7 @@ export default function CreateCoursePage() {
     setLoading(true);
     setError("");
     try {
-      const response = await createCourse({
-        ...form,
-        price: Number(form.price),
-      });
+      const response = await createCourse(buildCoursePayload(form));
       const course = apiData(response);
       navigate(`/instructor/courses/${course.id}/edit`);
     } catch (err) {
@@ -109,7 +143,7 @@ export default function CreateCoursePage() {
           },
           {
             title: "Author",
-            description: "After creating, open edit view and add modules + lectures with valid media keys.",
+            description: "After creating, open edit view and add modules + lectures using uploads or remote media keys.",
           },
           {
             title: "Release",

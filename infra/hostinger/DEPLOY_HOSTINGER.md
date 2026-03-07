@@ -36,8 +36,7 @@ Set all placeholder values before first boot:
 
 Important:
 
-- Production settings currently enforce object storage via `USE_GCS_MEDIA_STORAGE=1`.
-- Configure valid GCS values in `backend/.env.hostinger.production` or app boot will fail (secure-by-default).
+- Hostinger deployment uses the local Docker media volume plus `/media/` reverse proxying. No GCP or GCS values are required.
 - Keep LiveKit keys in sync in all three files:
   - `backend/.env.hostinger.production`
   - `infra/hostinger/livekit.yaml`
@@ -48,10 +47,15 @@ Important:
 Always include `--env-file backend/.env.hostinger.production`:
 
 ```bash
-docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml build
-docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml up -d
-docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml ps
+./infra/hostinger/deploy-safe.sh
 ```
+
+What this changes:
+
+- takes a timestamped backup before rebuild
+- keeps fixed Docker volume names across deployments
+- starts only the VPS-nginx-friendly app stack
+- never requires Docker `edge-nginx`
 
 ## 5) Django bootstrap
 
@@ -59,11 +63,12 @@ docker compose --env-file backend/.env.hostinger.production -f docker-compose.ho
 docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml exec backend python manage.py migrate
 docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml exec backend python manage.py collectstatic --noinput
 docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml exec backend python manage.py createsuperuser
+docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml exec backend python manage.py check --deploy
 ```
 
 ## 6) Nginx reverse proxy + TLS
 
-Copy provided config:
+Copy provided host-nginx config. It proxies host loopback ports exposed by Docker (`127.0.0.1:3000`, `8000`, `8080`, `8090`, `7880`):
 
 ```bash
 cp infra/hostinger/nginx/alsyedinitiative.conf /etc/nginx/sites-available/alsyedinitiative
@@ -96,13 +101,46 @@ Logs:
 docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml logs -f backend
 docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml logs -f livekit
 docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml logs -f owncast
+docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml logs -f media
+```
+
+Optional lecture streaming optimization after direct uploads:
+
+```bash
+docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml exec backend python manage.py transcode_lecture_streams --all-uploaded
 ```
 
 Deploy updates:
 
 ```bash
 git pull
-docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml build
-docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml up -d
-docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml exec backend python manage.py migrate
+./infra/hostinger/deploy-safe.sh
 ```
+
+Backups:
+
+```bash
+./infra/hostinger/backup-data.sh
+ls -la .hostinger-backups
+```
+
+Restore the latest backup if needed:
+
+```bash
+HOSTINGER_RESTORE_CONFIRM=1 ./infra/hostinger/restore-data.sh latest
+```
+
+Systemd timer for automatic daily backups:
+
+```bash
+cp infra/hostinger/systemd/hostinger-backup.service /etc/systemd/system/
+cp infra/hostinger/systemd/hostinger-backup.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now hostinger-backup.timer
+systemctl list-timers hostinger-backup.timer
+```
+
+Important:
+
+- `docker compose down` is safe
+- `docker compose down -v` deletes persistent volumes and must not be used

@@ -14,7 +14,31 @@ import WorkflowGuidePanel from "../components/admin/WorkflowGuidePanel";
 import FormInput from "../components/FormInput";
 import PageShell from "../components/PageShell";
 import { apiData, apiMessage } from "../utils/api";
-import { CourseForm } from "./CreateCoursePage";
+import { buildCoursePayload, CourseForm } from "./CreateCoursePage";
+
+function isManagedMediaUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return false;
+  try {
+    return new URL(raw).pathname.includes("/media/");
+  } catch {
+    return raw.includes("/media/");
+  }
+}
+
+function buildLecturePayload(section, lectureForm) {
+  const payload = new FormData();
+  payload.append("section", String(section.id));
+  payload.append("title", lectureForm.title || "");
+  payload.append("description", lectureForm.description || "");
+  payload.append("video_key", lectureForm.video_key || "");
+  payload.append("order", String((section.lectures?.length || 0) + 1));
+  payload.append("is_preview", lectureForm.is_preview ? "true" : "false");
+  if (lectureForm.video_file) {
+    payload.append("video_file", lectureForm.video_file);
+  }
+  return payload;
+}
 
 export default function EditCoursePage() {
   const { id } = useParams();
@@ -36,7 +60,8 @@ export default function EditCoursePage() {
       title: data.title || "",
       description: data.description || "",
       price: data.price || "",
-      thumbnail: data.thumbnail || "",
+      thumbnail: isManagedMediaUrl(data.thumbnail) ? "" : data.thumbnail || "",
+      thumbnail_file: null,
       is_published: Boolean(data.is_published),
     });
     setSectionEdits((prev) => {
@@ -71,7 +96,7 @@ export default function EditCoursePage() {
     setError("");
     setMessage("");
     try {
-      await updateCourse(id, { ...courseForm, price: Number(courseForm.price) });
+      await updateCourse(id, buildCoursePayload(courseForm));
       await loadCourse();
       setMessage("Course updated.");
     } catch (err) {
@@ -128,19 +153,12 @@ export default function EditCoursePage() {
 
   const handleAddLecture = async (section) => {
     const currentForm = lectureForms[section.id];
-    if (!currentForm?.title || !currentForm?.video_key) return;
+    if (!currentForm?.title || (!currentForm?.video_key && !currentForm?.video_file)) return;
     try {
-      await createLecture({
-        section: section.id,
-        title: currentForm.title,
-        description: currentForm.description || "",
-        video_key: currentForm.video_key,
-        order: (section.lectures?.length || 0) + 1,
-        is_preview: Boolean(currentForm.is_preview),
-      });
+      await createLecture(buildLecturePayload(section, currentForm));
       setLectureForms((prev) => ({
         ...prev,
-        [section.id]: { title: "", description: "", video_key: "", is_preview: false },
+        [section.id]: { title: "", description: "", video_key: "", video_file: null, is_preview: false },
       }));
       await loadCourse();
     } catch (err) {
@@ -185,7 +203,7 @@ export default function EditCoursePage() {
           },
           {
             title: "Modules",
-            description: "Create logical sections with clear scope before inserting lecture media keys.",
+            description: "Create logical sections with clear scope before inserting lecture uploads or remote media keys.",
           },
           {
             title: "Govern",
@@ -234,6 +252,7 @@ export default function EditCoursePage() {
                 title: "",
                 description: "",
                 video_key: "",
+                video_file: null,
                 is_preview: false,
               };
 
@@ -318,7 +337,7 @@ export default function EditCoursePage() {
                       }
                     />
                     <FormInput
-                      label="Video S3 Key"
+                      label="Storage Key / Remote URL"
                       value={lectureForm.video_key}
                       onChange={(e) =>
                         setLectureForms((prev) => ({
@@ -327,6 +346,31 @@ export default function EditCoursePage() {
                         }))
                       }
                     />
+                    <label className="block">
+                      <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#aeb8a3]">
+                        Lecture Video Upload
+                      </span>
+                      <input
+                        key={`lecture-video-file-${section.id}-${lectureForm.video_file?.name || "empty"}`}
+                        type="file"
+                        accept="video/mp4,video/webm,video/quicktime,video/x-matroska"
+                        className="w-full rounded-xl border border-[#2a332d] bg-[#0f1310] px-3.5 py-2.5 text-sm text-white file:mr-3 file:rounded-lg file:border-0 file:bg-[#b9c7ab] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[#0d120f] focus:border-[#b9c7ab] focus:outline-none focus:ring-2 focus:ring-[#b9c7ab]/20"
+                        onChange={(e) =>
+                          setLectureForms((prev) => ({
+                            ...prev,
+                            [section.id]: { ...lectureForm, video_file: e.target.files?.[0] || null },
+                          }))
+                        }
+                      />
+                      <span className="mt-1.5 block text-xs text-[#8e9987]">
+                        Hostinger-native option. Use this for direct uploads to the local media volume.
+                      </span>
+                      {lectureForm.video_file ? (
+                        <span className="mt-1.5 block text-xs text-[#d4dbc8]">
+                          Selected: {lectureForm.video_file.name}
+                        </span>
+                      ) : null}
+                    </label>
                     <FormInput
                       label="Description"
                       as="textarea"
@@ -352,6 +396,10 @@ export default function EditCoursePage() {
                       />
                       Preview lecture
                     </label>
+                    <p className="text-xs text-[#8f9989]">
+                      Add either a direct video upload or a remote storage key/URL. Uploaded files play immediately and
+                      can be transcoded to HLS later for smoother delivery.
+                    </p>
                     <Button onClick={() => handleAddLecture(section)}>Add Lecture</Button>
                   </div>
                 </div>

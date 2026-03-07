@@ -64,14 +64,11 @@ def readiness_view(request):
     else:
         checks["cache"] = "skipped"
 
-    if getattr(settings, "USE_GCS_MEDIA_STORAGE", False):
-        try:
-            _check_storage()
-            checks["storage"] = "ok"
-        except Exception as exc:  # noqa: BLE001
-            failures["storage"] = str(exc)
-    else:
-        checks["storage"] = "skipped"
+    try:
+        _check_storage()
+        checks["storage"] = "ok"
+    except Exception as exc:  # noqa: BLE001
+        failures["storage"] = str(exc)
 
     elapsed_ms = int((time.monotonic() - started_at) * 1000)
     status_code = 200 if not failures else 503
