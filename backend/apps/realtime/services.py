@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
@@ -8,6 +9,7 @@ from urllib.error import HTTPError, URLError
 import jwt
 from django.conf import settings
 from django.core.exceptions import DisallowedHost
+from django.utils import timezone
 
 
 logger = logging.getLogger(__name__)
@@ -445,3 +447,164 @@ def stop_room_broadcast_egress(*, egress_id):
     if not egress_id:
         return
     _twirp_post("livekit.Egress/StopEgress", {"egress_id": egress_id})
+
+
+def build_recording_filepath(*, room_name, session_type):
+    prefix = str(getattr(settings, "LIVEKIT_RECORDING_FILEPATH_PREFIX", "/recordings") or "").strip()
+    if not prefix:
+        prefix = "/recordings"
+    if prefix != "/":
+        prefix = prefix.rstrip("/")
+    normalized_room = "".join(
+        char if (char.isalnum() or char in {"-", "_"}) else "-"
+        for char in str(room_name or "").strip().lower()
+    ).strip("-")
+    if not normalized_room:
+        normalized_room = "room"
+    normalized_type = "meeting" if str(session_type or "").strip() == "meeting" else "broadcasting"
+    timestamp = timezone.now().strftime("%Y%m%d-%H%M%S")
+    file_name = f"{normalized_room}-{timestamp}.mp4"
+    return f"{prefix}/{normalized_type}/{file_name}"
+
+
+def resolve_recording_local_path(output_file_path):
+    raw_path = str(output_file_path or "").strip()
+    if not raw_path:
+        return None
+
+    root = Path(
+        str(getattr(settings, "LIVEKIT_RECORDING_LOCAL_OUTPUT_ROOT", "/recordings") or "/recordings")
+    ).expanduser()
+    if not root.is_absolute():
+        root = (Path.cwd() / root).resolve()
+    else:
+        root = root.resolve()
+
+    normalized = raw_path.replace("\\", "/")
+    prefix = str(getattr(settings, "LIVEKIT_RECORDING_FILEPATH_PREFIX", "/recordings") or "/recordings").strip()
+    if not prefix:
+        prefix = "/recordings"
+    prefix = prefix.replace("\\", "/")
+    if not prefix.startswith("/"):
+        prefix = f"/{prefix}"
+    if prefix != "/":
+        prefix = prefix.rstrip("/")
+
+    relative = None
+    if prefix == normalized:
+        relative = ""
+    elif prefix != "/" and normalized.startswith(f"{prefix}/"):
+        relative = normalized[len(prefix) + 1 :]
+
+    if relative is None:
+        candidate_path = Path(normalized)
+        if candidate_path.is_absolute():
+            candidate = candidate_path.resolve()
+        else:
+            relative = normalized.lstrip("./")
+            if relative.startswith("recordings/"):
+                relative = relative[len("recordings/") :]
+            candidate = (root / relative).resolve()
+    else:
+        candidate = (root / relative).resolve()
+
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return None
+    return candidate
+
+
+def delete_recording_assets(recording):
+    """Best-effort deletion for storage assets linked to a recording row."""
+    if not recording:
+        return {"video_file_deleted": False, "local_file_deleted": False}
+
+    result = {"video_file_deleted": False, "local_file_deleted": False}
+
+    video_field = getattr(recording, "video_file", None)
+    video_name = str(getattr(video_field, "name", "") or "").strip()
+    if video_name:
+        try:
+            video_field.delete(save=False)
+            result["video_file_deleted"] = True
+        except Exception as exc:
+            logger.warning(
+                "Realtime recording video_file cleanup failed. recording_id=%s file=%s error=%s",
+                getattr(recording, "id", None),
+                video_name,
+                str(exc),
+            )
+
+    output_file_path = str(getattr(recording, "output_file_path", "") or "").strip()
+    if output_file_path:
+        local_file = resolve_recording_local_path(output_file_path)
+        if local_file and local_file.exists() and local_file.is_file():
+            try:
+                local_file.unlink()
+                result["local_file_deleted"] = True
+            except Exception as exc:
+                logger.warning(
+                    "Realtime recording local file cleanup failed. recording_id=%s path=%s error=%s",
+                    getattr(recording, "id", None),
+                    str(local_file),
+                    str(exc),
+                )
+
+    return result
+
+
+def start_room_recording_egress(*, room_name, output_file_path, layout=""):
+    payload = {
+        "room_name": room_name,
+        "layout": (layout or settings.LIVEKIT_EGRESS_LAYOUT or "speaker-dark"),
+        "file_outputs": [{"filepath": output_file_path}],
+    }
+    data = _twirp_post("livekit.Egress/StartRoomCompositeEgress", payload)
+    egress_id = data.get("egress_id") or data.get("egressId") or ""
+    if not egress_id:
+        raise LiveKitEgressError("Recording egress started but no egress_id was returned by LiveKit.")
+    return {
+        "egress_id": egress_id,
+        "output_file_path": output_file_path,
+        "response": data,
+    }
+
+
+def stop_room_recording_egress(*, egress_id):
+    if not egress_id:
+        raise LiveKitEgressError("Missing recording egress id.")
+    return _twirp_post("livekit.Egress/StopEgress", {"egress_id": egress_id})
+
+
+def extract_recording_output(*, stop_payload, fallback_file_path=""):
+    file_path = str(fallback_file_path or "").strip()
+    download_url = ""
+    payload = stop_payload if isinstance(stop_payload, dict) else {}
+
+    file_results = payload.get("file_results") or payload.get("fileResults") or []
+    if isinstance(file_results, list) and file_results:
+        first_result = file_results[0] if isinstance(file_results[0], dict) else {}
+    else:
+        first_result = {}
+
+    if isinstance(first_result, dict):
+        file_path = (
+            str(
+                first_result.get("filename")
+                or first_result.get("filepath")
+                or first_result.get("file_path")
+                or file_path
+            ).strip()
+        )
+        download_url = str(first_result.get("location") or first_result.get("url") or "").strip()
+
+    if not download_url and file_path:
+        base_public_url = str(getattr(settings, "LIVEKIT_RECORDING_OUTPUT_PUBLIC_BASE_URL", "") or "").strip().rstrip("/")
+        if base_public_url:
+            download_url = f"{base_public_url}/{file_path.lstrip('/')}"
+
+    return {
+        "file_path": file_path,
+        "download_url": download_url,
+    }

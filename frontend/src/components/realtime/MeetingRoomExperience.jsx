@@ -1,7 +1,16 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Room, RoomEvent, Track, VideoQuality } from "livekit-client";
 import Button from "../Button";
-import { grantRealtimePresenter, revokeRealtimePresenter } from "../../api/realtime";
+import {
+  deleteRealtimeRecording,
+  grantRealtimePresenter,
+  listRealtimeRecordings,
+  revokeRealtimePresenter,
+  startRealtimeRecording,
+  stopRealtimeRecording,
+  uploadRealtimeBrowserRecording,
+} from "../../api/realtime";
+import { ScreenityFallbackRecorder } from "../../services/recording/ScreenityFallbackRecorder";
 import { apiData, apiMessage } from "../../utils/api";
 
 const textEncoder = new TextEncoder();
@@ -399,6 +408,21 @@ function parseUserIdFromIdentity(identity) {
   return Number.isInteger(userId) && userId > 0 ? userId : null;
 }
 
+function resolveRecordingMode(recording) {
+  const source = String(recording?.source || "").trim().toLowerCase();
+  if (source === "browser_fallback") {
+    return "screenity-fallback";
+  }
+  if (recording?.is_active) {
+    return "livekit-egress";
+  }
+  return "";
+}
+
+function resolveRecordingPlaybackUrl(recording) {
+  return String(recording?.playback_url || recording?.output_download_url || "").trim();
+}
+
 export default function MeetingRoomExperience({ payload, onLeave, audiencePanel = false }) {
   const session = payload?.session || {};
   const meeting = payload?.meeting || {};
@@ -443,10 +467,19 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     error: "",
     info: "",
   });
+  const [recordingState, setRecordingState] = useState({
+    loading: false,
+    error: "",
+    info: "",
+    active: null,
+    latestCompleted: null,
+    mode: "",
+  });
 
   const roomRef = useRef(null);
   const connectedAtRef = useRef(null);
   const stageRef = useRef(null);
+  const fallbackRecorderRef = useRef(null);
   const [isStageFullscreen, setIsStageFullscreen] = useState(false);
 
   const syncParticipants = useCallback(() => {
@@ -516,12 +549,63 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
   }, [audienceFocusMode, session.id]);
 
   useEffect(() => {
+    let active = true;
+    if (!session.id) {
+      setRecordingState({
+        loading: false,
+        error: "",
+        info: "",
+        active: null,
+        latestCompleted: null,
+        mode: "",
+      });
+      return undefined;
+    }
+    (async () => {
+      try {
+        const response = await listRealtimeRecordings(session.id);
+        if (!active) return;
+        const payload = apiData(response, []);
+        const rows = Array.isArray(payload) ? payload : [];
+        const activeRecording = rows.find((item) => item?.is_active) || null;
+        const latestCompleted = rows.find((item) => item?.status === "completed") || null;
+        setRecordingState((prev) => ({
+          ...prev,
+          loading: false,
+          error: "",
+          active: activeRecording,
+          latestCompleted,
+          mode: resolveRecordingMode(activeRecording),
+        }));
+      } catch {
+        if (!active) return;
+        setRecordingState((prev) => ({ ...prev, loading: false }));
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [session.id]);
+
+  useEffect(() => {
     const onFullscreenChange = () => {
       setIsStageFullscreen(Boolean(document.fullscreenElement));
     };
     document.addEventListener("fullscreenchange", onFullscreenChange);
     return () => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      const recorder = fallbackRecorderRef.current;
+      if (recorder?.isRecording) {
+        recorder.stop().catch(() => {
+          // best-effort cleanup
+        });
+      }
+      fallbackRecorderRef.current = null;
     };
   }, []);
 
@@ -929,7 +1013,177 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     }
   };
 
+  const handleStartRecording = async () => {
+    if (!session.id || !canManagePresenters) {
+      return;
+    }
+    setRecordingState((prev) => ({ ...prev, loading: true, error: "", info: "" }));
+    try {
+      const response = await startRealtimeRecording(session.id);
+      const recording = apiData(response, null);
+      setRecordingState((prev) => ({
+        ...prev,
+        loading: false,
+        error: "",
+        info: "Recording started.",
+        active: recording,
+        mode: resolveRecordingMode(recording) || "livekit-egress",
+      }));
+    } catch (livekitErr) {
+      try {
+        const fallbackRecorder =
+          fallbackRecorderRef.current || new ScreenityFallbackRecorder({ withMicrophone: true });
+        fallbackRecorderRef.current = fallbackRecorder;
+        if (!fallbackRecorder.isRecording) {
+          await fallbackRecorder.start();
+        }
+        setRecordingState((prev) => ({
+          ...prev,
+          loading: false,
+          error: "",
+          info: "LiveKit recorder unavailable. Browser fallback recording started.",
+          active: {
+            id: "browser-fallback",
+            status: "recording",
+            is_active: true,
+            source: "browser_fallback",
+          },
+          mode: "screenity-fallback",
+        }));
+      } catch (fallbackErr) {
+        fallbackRecorderRef.current = null;
+        const primaryError = apiMessage(livekitErr, "Unable to start recording.");
+        const fallbackError = resolveControlError(
+          fallbackErr,
+          "Browser fallback recording failed.",
+          "Screen recording"
+        );
+        setRecordingState((prev) => ({
+          ...prev,
+          loading: false,
+          error: `${primaryError} ${fallbackError}`,
+          info: "",
+          mode: "",
+        }));
+      }
+    }
+  };
+
+  const handleStopRecording = async () => {
+    if (!session.id || !canManagePresenters) {
+      return;
+    }
+    setRecordingState((prev) => ({ ...prev, loading: true, error: "", info: "" }));
+    if (recordingState.mode === "screenity-fallback") {
+      const fallbackRecorder = fallbackRecorderRef.current;
+      if (!fallbackRecorder || !fallbackRecorder.isRecording) {
+        setRecordingState((prev) => ({
+          ...prev,
+          loading: false,
+          error: "No active fallback recording found.",
+          info: "",
+          active: null,
+          mode: "",
+        }));
+        return;
+      }
+      try {
+        const localRecording = await fallbackRecorder.stop();
+        fallbackRecorderRef.current = null;
+
+        const formData = new FormData();
+        formData.append("video_file", localRecording.file, localRecording.file_name);
+        if (localRecording.started_at) {
+          formData.append("started_at", localRecording.started_at);
+        }
+        if (localRecording.ended_at) {
+          formData.append("ended_at", localRecording.ended_at);
+        }
+
+        const uploadResponse = await uploadRealtimeBrowserRecording(session.id, formData);
+        const storedRecording = apiData(uploadResponse, null);
+        setRecordingState((prev) => ({
+          ...prev,
+          loading: false,
+          error: "",
+          info: "Fallback recording uploaded and stored.",
+          active: null,
+          latestCompleted: storedRecording || prev.latestCompleted,
+          mode: "",
+        }));
+      } catch (err) {
+        setRecordingState((prev) => ({
+          ...prev,
+          loading: false,
+          error: resolveControlError(err, "Unable to stop/upload fallback recording.", "Screen recording"),
+          info: "",
+        }));
+      }
+      return;
+    }
+
+    try {
+      const response = await stopRealtimeRecording(session.id);
+      const recording = apiData(response, null);
+      setRecordingState((prev) => ({
+        ...prev,
+        loading: false,
+        error: "",
+        info: "Recording stopped and stored.",
+        active: recording?.is_active ? recording : null,
+        latestCompleted: recording?.status === "completed" ? recording : prev.latestCompleted,
+        mode: recording?.is_active ? resolveRecordingMode(recording) : "",
+      }));
+    } catch (err) {
+      setRecordingState((prev) => ({
+        ...prev,
+        loading: false,
+        error: apiMessage(err, "Unable to stop recording."),
+        info: "",
+      }));
+    }
+  };
+
+  const handleDeleteLatestRecording = async () => {
+    if (!session.id || !canManagePresenters) {
+      return;
+    }
+    const latest = recordingState.latestCompleted;
+    if (!latest?.id) {
+      return;
+    }
+    if (!window.confirm("Delete the latest recording permanently? This cannot be undone.")) {
+      return;
+    }
+    setRecordingState((prev) => ({ ...prev, loading: true, error: "", info: "" }));
+    try {
+      await deleteRealtimeRecording(latest.id);
+      setRecordingState((prev) => ({
+        ...prev,
+        loading: false,
+        error: "",
+        info: "Latest recording deleted.",
+        active: prev.active?.id === latest.id ? null : prev.active,
+        latestCompleted: prev.latestCompleted?.id === latest.id ? null : prev.latestCompleted,
+      }));
+    } catch (err) {
+      setRecordingState((prev) => ({
+        ...prev,
+        loading: false,
+        error: apiMessage(err, "Unable to delete recording."),
+        info: "",
+      }));
+    }
+  };
+
   const handleLeaveMeeting = () => {
+    const fallbackRecorder = fallbackRecorderRef.current;
+    if (fallbackRecorder?.isRecording) {
+      fallbackRecorder.stop().catch(() => {
+        // best-effort cleanup on leave
+      });
+    }
+    fallbackRecorderRef.current = null;
     const room = roomRef.current;
     if (room) {
       room.disconnect();
@@ -1016,6 +1270,60 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
             </>
           ) : null}
         </div>
+        {canManagePresenters ? (
+          <div className="mt-3 rounded-lg border border-[#2f3f31] bg-[#111a12] px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-[#d5ddcb]">
+                Recording: {recordingState.active?.status || "idle"}
+                {recordingState.active
+                  ? ` (${recordingState.mode === "screenity-fallback" ? "browser fallback" : "livekit"})`
+                  : ""}
+              </span>
+              <Button
+                className="px-3 py-1.5 text-xs"
+                onClick={handleStartRecording}
+                loading={recordingState.loading}
+                disabled={Boolean(recordingState.active)}
+              >
+                Start Recording
+              </Button>
+              <Button
+                variant="danger"
+                className="px-3 py-1.5 text-xs"
+                onClick={handleStopRecording}
+                loading={recordingState.loading}
+                disabled={!recordingState.active}
+              >
+                Stop Recording
+              </Button>
+              {resolveRecordingPlaybackUrl(recordingState.latestCompleted) ? (
+                <a
+                  href={resolveRecordingPlaybackUrl(recordingState.latestCompleted)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-full border border-[#3d4c3f] bg-[#151f16] px-3 py-1.5 text-xs text-[#dbe4d1] hover:bg-[#1d2a1f]"
+                >
+                  Open Last Recording
+                </a>
+              ) : null}
+              <Button
+                variant="danger"
+                className="px-3 py-1.5 text-xs"
+                onClick={handleDeleteLatestRecording}
+                loading={recordingState.loading}
+                disabled={!recordingState.latestCompleted?.id || Boolean(recordingState.active)}
+              >
+                Delete Last Recording
+              </Button>
+            </div>
+            {recordingState.error ? (
+              <p className="mt-2 text-xs text-red-300">{recordingState.error}</p>
+            ) : null}
+            {recordingState.info ? (
+              <p className="mt-2 text-xs text-green-300">{recordingState.info}</p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className={sidePanelOpen ? "grid gap-0 xl:grid-cols-[minmax(0,1fr)_320px]" : "grid gap-0"}>

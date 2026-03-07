@@ -97,3 +97,8 @@ if _lan_ips:
 
 # Keep MEDIA_PUBLIC_BASE_URL empty in local dev so API returns same-origin /media URLs.
 # Frontend Vite proxies /media -> backend, which avoids LAN-interface mismatches.
+
+# Local backend runs outside Docker in `npm run dev`, while egress writes to `infra/recordings`.
+# Default to that local folder unless explicitly overridden.
+if str(LIVEKIT_RECORDING_LOCAL_OUTPUT_ROOT or "").strip() in {"", "/recordings"}:
+    LIVEKIT_RECORDING_LOCAL_OUTPUT_ROOT = str((BASE_DIR.parent / "infra" / "recordings").resolve())

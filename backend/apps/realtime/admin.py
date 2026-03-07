@@ -2,8 +2,12 @@ from django import forms
 from django.contrib import admin
 from django.http import HttpResponseRedirect
 from django.urls import reverse
+from django.utils.html import format_html
 
-from .models import RealtimeConfiguration, RealtimeSession
+from config.url_utils import get_media_public_url
+
+from .models import RealtimeConfiguration, RealtimeSession, RealtimeSessionRecording
+from .services import delete_recording_assets
 
 
 class RealtimeConfigurationAdminForm(forms.ModelForm):
@@ -291,4 +295,86 @@ class RealtimeConfigurationAdmin(admin.ModelAdmin):
         return (
             f"{obj.meeting_screen_capture_width}x{obj.meeting_screen_capture_height} @ "
             f"{obj.meeting_screen_capture_fps}fps / {obj.meeting_screen_max_video_bitrate_kbps} kbps"
+        )
+
+
+@admin.register(RealtimeSessionRecording)
+class RealtimeSessionRecordingAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "session",
+        "recording_type",
+        "status",
+        "started_by",
+        "livekit_egress_id",
+        "recording_player",
+        "started_at",
+        "ended_at",
+        "created_at",
+    )
+    list_filter = ("recording_type", "status", "created_at", "started_at", "ended_at")
+    list_display_links = ("id", "session")
+    search_fields = (
+        "session__title",
+        "session__room_name",
+        "session__livekit_room_name",
+        "livekit_egress_id",
+        "started_by__email",
+        "video_file",
+        "output_file_path",
+        "output_download_url",
+    )
+    readonly_fields = (
+        "session",
+        "recording_type",
+        "status",
+        "started_by",
+        "livekit_egress_id",
+        "output_file_path",
+        "output_download_url",
+        "video_file",
+        "recording_player",
+        "error",
+        "livekit_payload",
+        "started_at",
+        "ended_at",
+        "created_at",
+        "updated_at",
+    )
+    autocomplete_fields = ("session", "started_by")
+
+    def has_add_permission(self, request):
+        return False
+
+    def delete_model(self, request, obj):
+        delete_recording_assets(obj)
+        super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        for recording in queryset.iterator():
+            delete_recording_assets(recording)
+        super().delete_queryset(request, queryset)
+
+    class Media:
+        js = ("admin/js/recordings_changelist_row_click.js",)
+
+    @admin.display(description="Playback")
+    def recording_player(self, obj):
+        playback_url = ""
+        if obj.output_download_url:
+            playback_url = obj.output_download_url
+        elif getattr(obj, "video_file", None):
+            playback_url = get_media_public_url(obj.video_file.url)
+        elif obj.output_file_path and obj.pk:
+            playback_url = reverse(
+                "realtime-session-recording-download",
+                kwargs={"recording_id": obj.pk},
+            )
+        if not playback_url:
+            return "-"
+        return format_html(
+            '<video controls preload="metadata" src="{}" style="max-width: 420px; width: 100%; border-radius: 8px;"></video><br>'
+            '<a href="{}" target="_blank" rel="noopener">Open recording</a>',
+            playback_url,
+            playback_url,
         )

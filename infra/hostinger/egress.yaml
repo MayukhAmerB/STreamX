@@ -1,5 +1,5 @@
-api_key: replace-livekit-key
-api_secret: replace-livekit-secret
+api_key: lk_4QBORTR5B1Y0F190FLPB
+api_secret: ITxAoIvZl8qKW00zrAZs2kJ7YYG3Jn0QdJrNs2mzSQj6kgFn
 ws_url: ws://127.0.0.1:7880
 
 redis:

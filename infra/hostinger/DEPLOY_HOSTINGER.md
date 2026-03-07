@@ -21,9 +21,9 @@ git clone https://github.com/YOUR_REPO.git .
 
 ## 3) Prepare production env
 
-```bash
-cp backend/.env.hostinger.example backend/.env.hostinger
-```
+Use:
+
+- `backend/.env.hostinger.production`
 
 Set all placeholder values before first boot:
 
@@ -37,28 +37,28 @@ Set all placeholder values before first boot:
 Important:
 
 - Production settings currently enforce object storage via `USE_GCS_MEDIA_STORAGE=1`.
-- Configure valid GCS values in `backend/.env.hostinger` or app boot will fail (secure-by-default).
+- Configure valid GCS values in `backend/.env.hostinger.production` or app boot will fail (secure-by-default).
 - Keep LiveKit keys in sync in all three files:
-  - `backend/.env.hostinger`
+  - `backend/.env.hostinger.production`
   - `infra/hostinger/livekit.yaml`
   - `infra/hostinger/egress.yaml`
 
 ## 4) Build and start stack
 
-Always include `--env-file backend/.env.hostinger`:
+Always include `--env-file backend/.env.hostinger.production`:
 
 ```bash
-docker compose --env-file backend/.env.hostinger -f docker-compose.hostinger.yml build
-docker compose --env-file backend/.env.hostinger -f docker-compose.hostinger.yml up -d
-docker compose --env-file backend/.env.hostinger -f docker-compose.hostinger.yml ps
+docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml build
+docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml up -d
+docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml ps
 ```
 
 ## 5) Django bootstrap
 
 ```bash
-docker compose --env-file backend/.env.hostinger -f docker-compose.hostinger.yml exec backend python manage.py migrate
-docker compose --env-file backend/.env.hostinger -f docker-compose.hostinger.yml exec backend python manage.py collectstatic --noinput
-docker compose --env-file backend/.env.hostinger -f docker-compose.hostinger.yml exec backend python manage.py createsuperuser
+docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml exec backend python manage.py migrate
+docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml exec backend python manage.py collectstatic --noinput
+docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml exec backend python manage.py createsuperuser
 ```
 
 ## 6) Nginx reverse proxy + TLS
@@ -93,16 +93,16 @@ Allow inbound:
 Logs:
 
 ```bash
-docker compose --env-file backend/.env.hostinger -f docker-compose.hostinger.yml logs -f backend
-docker compose --env-file backend/.env.hostinger -f docker-compose.hostinger.yml logs -f livekit
-docker compose --env-file backend/.env.hostinger -f docker-compose.hostinger.yml logs -f owncast
+docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml logs -f backend
+docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml logs -f livekit
+docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml logs -f owncast
 ```
 
 Deploy updates:
 
 ```bash
 git pull
-docker compose --env-file backend/.env.hostinger -f docker-compose.hostinger.yml build
-docker compose --env-file backend/.env.hostinger -f docker-compose.hostinger.yml up -d
-docker compose --env-file backend/.env.hostinger -f docker-compose.hostinger.yml exec backend python manage.py migrate
+docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml build
+docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml up -d
+docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml exec backend python manage.py migrate
 ```

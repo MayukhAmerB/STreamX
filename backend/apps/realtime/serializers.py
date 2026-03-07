@@ -1,3 +1,5 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.urls import reverse
 from rest_framework import serializers
 
 from config.request_security import (
@@ -5,10 +7,12 @@ from config.request_security import (
     is_safe_public_http_url,
     is_safe_public_stream_url,
 )
+from config.upload_validators import validate_video_upload
+from config.url_utils import get_media_public_url
 
 from apps.courses.models import LiveClass
 
-from .models import RealtimeSession
+from .models import RealtimeSession, RealtimeSessionRecording
 from .services import build_session_join_url
 
 
@@ -225,3 +229,83 @@ class RealtimeSessionJoinSerializer(serializers.Serializer):
 
 class RealtimePresenterPermissionSerializer(serializers.Serializer):
     user_id = serializers.IntegerField(min_value=1)
+
+
+class RealtimeSessionRecordingSerializer(serializers.ModelSerializer):
+    started_by = serializers.SerializerMethodField()
+    is_active = serializers.SerializerMethodField()
+    playback_url = serializers.SerializerMethodField()
+    source = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RealtimeSessionRecording
+        fields = (
+            "id",
+            "session",
+            "recording_type",
+            "status",
+            "is_active",
+            "started_by",
+            "livekit_egress_id",
+            "output_file_path",
+            "output_download_url",
+            "playback_url",
+            "source",
+            "error",
+            "started_at",
+            "ended_at",
+            "created_at",
+            "updated_at",
+        )
+
+    def get_started_by(self, obj):
+        if not obj.started_by_id:
+            return None
+        return {
+            "id": obj.started_by_id,
+            "email": obj.started_by.email,
+            "full_name": obj.started_by.full_name,
+        }
+
+    def get_is_active(self, obj):
+        return obj.status in RealtimeSessionRecording.ACTIVE_STATUSES
+
+    def get_playback_url(self, obj):
+        request = self.context.get("request")
+        if obj.output_download_url:
+            return obj.output_download_url
+        if getattr(obj, "video_file", None):
+            return get_media_public_url(obj.video_file.url, request=request)
+        if obj.output_file_path and obj.pk:
+            url = reverse("realtime-session-recording-download", kwargs={"recording_id": obj.pk})
+            if request:
+                return request.build_absolute_uri(url)
+            return url
+        return ""
+
+    def get_source(self, obj):
+        payload = obj.livekit_payload if isinstance(obj.livekit_payload, dict) else {}
+        source = str(payload.get("source") or "").strip().lower()
+        if source:
+            return source
+        if getattr(obj, "video_file", None):
+            return "browser_fallback"
+        return "livekit_egress"
+
+
+class RealtimeSessionBrowserRecordingUploadSerializer(serializers.Serializer):
+    video_file = serializers.FileField(required=True)
+    started_at = serializers.DateTimeField(required=False, allow_null=True)
+    ended_at = serializers.DateTimeField(required=False, allow_null=True)
+
+    def validate_video_file(self, value):
+        try:
+            validate_video_upload(value, "video_file")
+        except DjangoValidationError as exc:
+            detail = getattr(exc, "message_dict", {}).get("video_file")
+            if isinstance(detail, list) and detail:
+                raise serializers.ValidationError(detail[0])
+            if isinstance(detail, str):
+                raise serializers.ValidationError(detail)
+            raise serializers.ValidationError("Invalid recording video file.")
+        return value

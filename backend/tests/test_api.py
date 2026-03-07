@@ -1,3 +1,5 @@
+import os
+import tempfile
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -23,7 +25,7 @@ from apps.courses.models import (
 )
 from apps.courses.serializers import LectureSerializer
 from apps.payments.models import Payment
-from apps.realtime.models import RealtimeSession
+from apps.realtime.models import RealtimeSession, RealtimeSessionRecording
 from apps.users.models import AuthConfiguration, User
 from apps.users.serializers import ProfileUpdateSerializer
 
@@ -1067,6 +1069,270 @@ class RealtimeSessionTests(APITestCase):
         session.refresh_from_db()
         self.assertEqual(session.stream_status, RealtimeSession.STREAM_LIVE)
         self.assertEqual(session.livekit_egress_id, "EG_test_123")
+
+    @override_settings(
+        LIVEKIT_URL="ws://livekit.test",
+        LIVEKIT_API_KEY="devkey",
+        LIVEKIT_API_SECRET="secret",
+        LIVEKIT_RECORDING_ENABLED=True,
+    )
+    @patch("apps.realtime.views.start_room_recording_egress")
+    def test_start_recording_creates_recording_entry(self, mock_start_recording):
+        mock_start_recording.return_value = {
+            "egress_id": "EG_recording_123",
+            "output_file_path": "recordings/meeting/session-123.mp4",
+            "response": {"egress_id": "EG_recording_123"},
+        }
+        session = RealtimeSession.objects.create(
+            title="Meeting Recording Session",
+            description="Recording flow",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+
+        self.login(self.host.email)
+        response = self.client.post(
+            reverse("realtime-session-recording-start", kwargs={"pk": session.id}),
+            {},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(RealtimeSessionRecording.objects.filter(session=session).count(), 1)
+
+        recording = RealtimeSessionRecording.objects.get(session=session)
+        self.assertEqual(recording.status, RealtimeSessionRecording.STATUS_RECORDING)
+        self.assertEqual(recording.livekit_egress_id, "EG_recording_123")
+
+    @override_settings(
+        LIVEKIT_URL="ws://livekit.test",
+        LIVEKIT_API_KEY="devkey",
+        LIVEKIT_API_SECRET="secret",
+        LIVEKIT_RECORDING_ENABLED=True,
+    )
+    @patch("apps.realtime.views.stop_room_recording_egress")
+    def test_stop_recording_marks_recording_completed(self, mock_stop_recording):
+        mock_stop_recording.return_value = {
+            "egress_id": "EG_recording_999",
+            "file_results": [
+                {
+                    "filename": "recordings/meeting/session-999.mp4",
+                    "location": "https://media.example.com/recordings/meeting/session-999.mp4",
+                }
+            ],
+        }
+        session = RealtimeSession.objects.create(
+            title="Meeting Recording Stop Session",
+            description="Recording stop flow",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+        recording = RealtimeSessionRecording.objects.create(
+            session=session,
+            recording_type=RealtimeSession.TYPE_MEETING,
+            started_by=self.host,
+            status=RealtimeSessionRecording.STATUS_RECORDING,
+            livekit_egress_id="EG_recording_999",
+            output_file_path="recordings/meeting/session-999.mp4",
+        )
+
+        self.login(self.host.email)
+        response = self.client.post(
+            reverse("realtime-session-recording-stop", kwargs={"pk": session.id}),
+            {},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        recording.refresh_from_db()
+        self.assertEqual(recording.status, RealtimeSessionRecording.STATUS_COMPLETED)
+        self.assertEqual(
+            recording.output_download_url,
+            "https://media.example.com/recordings/meeting/session-999.mp4",
+        )
+
+    def test_browser_fallback_upload_creates_completed_recording(self):
+        session = RealtimeSession.objects.create(
+            title="Browser Fallback Recording Session",
+            description="Fallback upload flow",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+        fallback_file = SimpleUploadedFile(
+            "fallback-recording.webm",
+            b"\x1a\x45\xdf\xa3\x9fB\x86\x81\x01",
+            content_type="video/webm",
+        )
+
+        self.login(self.host.email)
+        response = self.client.post(
+            reverse("realtime-session-recording-browser-upload", kwargs={"pk": session.id}),
+            {"video_file": fallback_file},
+        )
+        self.assertEqual(response.status_code, 201)
+        recording = RealtimeSessionRecording.objects.get(session=session)
+        self.assertEqual(recording.status, RealtimeSessionRecording.STATUS_COMPLETED)
+        self.assertTrue(bool(recording.video_file))
+
+    def test_recording_download_serves_local_egress_output(self):
+        with tempfile.TemporaryDirectory() as recordings_root:
+            meeting_dir = os.path.join(recordings_root, "meeting")
+            os.makedirs(meeting_dir, exist_ok=True)
+            file_name = "local-egress-recording.mp4"
+            absolute_file_path = os.path.join(meeting_dir, file_name)
+            file_bytes = b"\x00\x00\x00\x18ftypmp42test-recording-data"
+            with open(absolute_file_path, "wb") as recording_file:
+                recording_file.write(file_bytes)
+
+            session = RealtimeSession.objects.create(
+                title="Local Recording Download Session",
+                description="Download endpoint should stream egress file",
+                host=self.host,
+                session_type=RealtimeSession.TYPE_MEETING,
+                linked_live_class=self.live_class,
+                linked_course=self.meeting_course,
+                status=RealtimeSession.STATUS_LIVE,
+            )
+            recording = RealtimeSessionRecording.objects.create(
+                session=session,
+                recording_type=RealtimeSession.TYPE_MEETING,
+                started_by=self.host,
+                status=RealtimeSessionRecording.STATUS_COMPLETED,
+                output_file_path=f"recordings/meeting/{file_name}",
+            )
+
+            self.login(self.host.email)
+            with override_settings(LIVEKIT_RECORDING_LOCAL_OUTPUT_ROOT=recordings_root):
+                response = self.client.get(
+                    reverse(
+                        "realtime-session-recording-download",
+                        kwargs={"recording_id": recording.id},
+                    )
+                )
+            self.assertEqual(response.status_code, 200)
+            streamed_content = b"".join(response.streaming_content)
+            self.assertEqual(streamed_content, file_bytes)
+
+    def test_recording_download_resolves_prefixed_absolute_output_path(self):
+        with tempfile.TemporaryDirectory() as recordings_root:
+            meeting_dir = os.path.join(recordings_root, "meeting")
+            os.makedirs(meeting_dir, exist_ok=True)
+            file_name = "prefixed-absolute-egress-recording.mp4"
+            absolute_file_path = os.path.join(meeting_dir, file_name)
+            file_bytes = b"\x00\x00\x00\x18ftypmp42prefixed-absolute-data"
+            with open(absolute_file_path, "wb") as recording_file:
+                recording_file.write(file_bytes)
+
+            session = RealtimeSession.objects.create(
+                title="Prefixed Absolute Recording Session",
+                description="Download endpoint should resolve /recordings prefix to local root",
+                host=self.host,
+                session_type=RealtimeSession.TYPE_MEETING,
+                linked_live_class=self.live_class,
+                linked_course=self.meeting_course,
+                status=RealtimeSession.STATUS_LIVE,
+            )
+            recording = RealtimeSessionRecording.objects.create(
+                session=session,
+                recording_type=RealtimeSession.TYPE_MEETING,
+                started_by=self.host,
+                status=RealtimeSessionRecording.STATUS_COMPLETED,
+                output_file_path=f"/recordings/meeting/{file_name}",
+            )
+
+            self.login(self.host.email)
+            with override_settings(
+                LIVEKIT_RECORDING_LOCAL_OUTPUT_ROOT=recordings_root,
+                LIVEKIT_RECORDING_FILEPATH_PREFIX="/recordings",
+            ):
+                response = self.client.get(
+                    reverse(
+                        "realtime-session-recording-download",
+                        kwargs={"recording_id": recording.id},
+                    )
+                )
+            self.assertEqual(response.status_code, 200)
+            streamed_content = b"".join(response.streaming_content)
+            self.assertEqual(streamed_content, file_bytes)
+
+    def test_recording_delete_removes_db_row_and_local_file(self):
+        with tempfile.TemporaryDirectory() as recordings_root:
+            meeting_dir = os.path.join(recordings_root, "meeting")
+            os.makedirs(meeting_dir, exist_ok=True)
+            file_name = "delete-me-recording.mp4"
+            absolute_file_path = os.path.join(meeting_dir, file_name)
+            with open(absolute_file_path, "wb") as recording_file:
+                recording_file.write(b"delete-me")
+
+            session = RealtimeSession.objects.create(
+                title="Delete Recording Session",
+                description="Delete flow",
+                host=self.host,
+                session_type=RealtimeSession.TYPE_MEETING,
+                linked_live_class=self.live_class,
+                linked_course=self.meeting_course,
+                status=RealtimeSession.STATUS_LIVE,
+            )
+            recording = RealtimeSessionRecording.objects.create(
+                session=session,
+                recording_type=RealtimeSession.TYPE_MEETING,
+                started_by=self.host,
+                status=RealtimeSessionRecording.STATUS_COMPLETED,
+                output_file_path=f"/recordings/meeting/{file_name}",
+            )
+
+            self.login(self.host.email)
+            with override_settings(
+                LIVEKIT_RECORDING_LOCAL_OUTPUT_ROOT=recordings_root,
+                LIVEKIT_RECORDING_FILEPATH_PREFIX="/recordings",
+            ):
+                response = self.client.delete(
+                    reverse(
+                        "realtime-session-recording-delete",
+                        kwargs={"recording_id": recording.id},
+                    )
+                )
+
+            self.assertEqual(response.status_code, 200)
+            self.assertFalse(
+                RealtimeSessionRecording.objects.filter(id=recording.id).exists()
+            )
+            self.assertFalse(os.path.exists(absolute_file_path))
+
+    def test_recording_delete_rejects_active_recording(self):
+        session = RealtimeSession.objects.create(
+            title="Active Recording Delete Session",
+            description="Delete guard",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+        recording = RealtimeSessionRecording.objects.create(
+            session=session,
+            recording_type=RealtimeSession.TYPE_MEETING,
+            started_by=self.host,
+            status=RealtimeSessionRecording.STATUS_RECORDING,
+            livekit_egress_id="EG_active_test",
+        )
+
+        self.login(self.host.email)
+        response = self.client.delete(
+            reverse(
+                "realtime-session-recording-delete",
+                kwargs={"recording_id": recording.id},
+            )
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(RealtimeSessionRecording.objects.filter(id=recording.id).exists())
 
     @override_settings(
         LIVEKIT_URL="ws://livekit.test",

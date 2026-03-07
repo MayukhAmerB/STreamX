@@ -1,10 +1,13 @@
 import logging
+import mimetypes
 import time
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
@@ -20,25 +23,33 @@ from .domain import (
     resolve_participant_state,
     session_payload_for_create,
 )
-from .models import RealtimeConfiguration, RealtimeSession
+from .models import RealtimeConfiguration, RealtimeSession, RealtimeSessionRecording
 from .serializers import (
+    RealtimeSessionBrowserRecordingUploadSerializer,
     RealtimeSessionCreateSerializer,
     RealtimeSessionJoinSerializer,
     RealtimeSessionListSerializer,
+    RealtimeSessionRecordingSerializer,
     RealtimePresenterPermissionSerializer,
 )
 from .services import (
+    delete_recording_assets,
     LiveKitEgressError,
     LiveKitConfigError,
+    build_recording_filepath,
     build_host_publisher_identity,
     build_host_publisher_token,
     build_meet_embed_url,
     build_participant_token,
+    extract_recording_output,
     get_room_participant_count,
     is_livekit_configured,
+    resolve_recording_local_path,
     resolve_livekit_client_url,
     resolve_broadcast_urls,
+    start_room_recording_egress,
     start_room_broadcast_egress,
+    stop_room_recording_egress,
     stop_room_broadcast_egress,
 )
 
@@ -102,6 +113,18 @@ def _emit_realtime_telemetry(
         realtime_ops_logger.warning("REALTIME_TELEMETRY %s", payload)
     else:
         realtime_ops_logger.info("REALTIME_TELEMETRY %s", payload)
+
+
+def _get_active_session_recording(session):
+    return (
+        RealtimeSessionRecording.objects.filter(
+            session=session,
+            status__in=RealtimeSessionRecording.ACTIVE_STATUSES,
+        )
+        .select_related("started_by")
+        .order_by("-created_at")
+        .first()
+    )
 
 
 class RealtimeSessionListCreateView(APIView):
@@ -592,3 +615,281 @@ class RealtimeSessionStreamStopView(APIView):
 
         data = RealtimeSessionListSerializer(session, context={"request": request}).data
         return api_response(success=True, message="Live stream stopped.", data=data)
+
+
+class RealtimeSessionRecordingListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        session = get_object_or_404(RealtimeSession.objects.with_related(), pk=pk)
+        access_decision = get_access_decision(session, request.user)
+        if not access_decision.allowed:
+            return api_response(
+                success=False,
+                message=access_decision.message,
+                errors={"detail": access_decision.detail},
+                status_code=access_decision.status_code,
+            )
+
+        recordings = (
+            RealtimeSessionRecording.objects.filter(session=session)
+            .select_related("started_by")
+            .order_by("-created_at")
+        )
+        data = RealtimeSessionRecordingSerializer(recordings, many=True, context={"request": request}).data
+        return api_response(success=True, message="Session recordings fetched.", data=data)
+
+
+class RealtimeSessionRecordingDownloadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, recording_id):
+        recording = get_object_or_404(
+            RealtimeSessionRecording.objects.select_related("session", "started_by"),
+            pk=recording_id,
+        )
+        access_decision = get_access_decision(recording.session, request.user)
+        if not access_decision.allowed:
+            return api_response(
+                success=False,
+                message=access_decision.message,
+                errors={"detail": access_decision.detail},
+                status_code=access_decision.status_code,
+            )
+
+        stream = None
+        filename = f"recording-{recording.id}.mp4"
+
+        if recording.video_file:
+            try:
+                stream = recording.video_file.open("rb")
+                filename = str(recording.video_file.name or filename).replace("\\", "/").split("/")[-1]
+            except Exception:
+                stream = None
+
+        if stream is None:
+            resolved_path = resolve_recording_local_path(recording.output_file_path)
+            if not resolved_path or not resolved_path.exists() or not resolved_path.is_file():
+                return api_response(
+                    success=False,
+                    message="Recording file not found.",
+                    errors={"detail": "Recording asset is not available on storage."},
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+            stream = resolved_path.open("rb")
+            filename = resolved_path.name or filename
+
+        content_type, _ = mimetypes.guess_type(filename)
+        response = FileResponse(stream, content_type=content_type or "application/octet-stream")
+        response["Content-Disposition"] = f'inline; filename="{filename}"'
+        return response
+
+
+class RealtimeSessionRecordingDeleteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, recording_id):
+        recording = get_object_or_404(
+            RealtimeSessionRecording.objects.select_related("session", "started_by"),
+            pk=recording_id,
+        )
+        if not _can_manage_session(request.user, recording.session):
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "Only host or admin can delete recordings."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        if recording.status in RealtimeSessionRecording.ACTIVE_STATUSES:
+            return api_response(
+                success=False,
+                message="Recording is active.",
+                errors={"detail": "Stop the recording before deleting it."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        recording_id_value = recording.id
+        delete_recording_assets(recording)
+        recording.delete()
+        return api_response(
+            success=True,
+            message="Recording deleted.",
+            data={"id": recording_id_value},
+        )
+
+
+class RealtimeSessionRecordingStartView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        session = get_object_or_404(RealtimeSession, pk=pk)
+        if not _can_manage_session(request.user, session):
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "Only host or admin can start recording."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        if not bool(getattr(settings, "LIVEKIT_RECORDING_ENABLED", True)):
+            return api_response(
+                success=False,
+                message="Recording is disabled.",
+                errors={"detail": "LIVEKIT_RECORDING_ENABLED is disabled in backend environment."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        if not is_livekit_configured():
+            return api_response(
+                success=False,
+                message="Recording service unavailable.",
+                errors={
+                    "detail": (
+                        "LiveKit is not configured. Set LIVEKIT_URL, LIVEKIT_API_KEY, "
+                        "and LIVEKIT_API_SECRET in backend environment variables."
+                    )
+                },
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        active_recording = _get_active_session_recording(session)
+        if active_recording:
+            data = RealtimeSessionRecordingSerializer(active_recording, context={"request": request}).data
+            return api_response(
+                success=True,
+                message="Recording already in progress.",
+                data=data,
+            )
+
+        output_file_path = build_recording_filepath(
+            room_name=session.livekit_room_name or session.room_name,
+            session_type=session.session_type,
+        )
+        recording = RealtimeSessionRecording.objects.create(
+            session=session,
+            recording_type=session.session_type,
+            started_by=request.user,
+            status=RealtimeSessionRecording.STATUS_STARTING,
+            output_file_path=output_file_path,
+            started_at=timezone.now(),
+        )
+
+        try:
+            result = start_room_recording_egress(
+                room_name=session.livekit_room_name or session.room_name,
+                output_file_path=output_file_path,
+                layout=settings.LIVEKIT_EGRESS_LAYOUT,
+            )
+            recording.mark_recording(
+                egress_id=result.get("egress_id", ""),
+                payload={"start_response": result.get("response", {})},
+            )
+        except (LiveKitConfigError, LiveKitEgressError) as exc:
+            recording.mark_failed(str(exc), payload={"start_error": str(exc)})
+            return api_response(
+                success=False,
+                message="Unable to start recording.",
+                errors={"detail": str(exc)},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        data = RealtimeSessionRecordingSerializer(recording, context={"request": request}).data
+        return api_response(success=True, message="Recording started.", data=data)
+
+
+class RealtimeSessionRecordingStopView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        session = get_object_or_404(RealtimeSession, pk=pk)
+        if not _can_manage_session(request.user, session):
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "Only host or admin can stop recording."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        recording = _get_active_session_recording(session)
+        if not recording:
+            return api_response(
+                success=False,
+                message="No active recording.",
+                errors={"detail": "There is no active recording for this session."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        if not recording.livekit_egress_id:
+            recording.mark_failed("Missing LiveKit recording egress id.")
+            return api_response(
+                success=False,
+                message="Unable to stop recording.",
+                errors={"detail": "Recording egress id is missing."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        recording.mark_stopping()
+        try:
+            stop_payload = stop_room_recording_egress(egress_id=recording.livekit_egress_id)
+            resolved_output = extract_recording_output(
+                stop_payload=stop_payload,
+                fallback_file_path=recording.output_file_path,
+            )
+            recording.mark_completed(
+                file_path=resolved_output.get("file_path", ""),
+                file_url=resolved_output.get("download_url", ""),
+                payload={"stop_response": stop_payload},
+            )
+        except (LiveKitConfigError, LiveKitEgressError) as exc:
+            recording.mark_failed(str(exc), payload={"stop_error": str(exc)})
+            return api_response(
+                success=False,
+                message="Unable to stop recording cleanly.",
+                errors={"detail": str(exc)},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        data = RealtimeSessionRecordingSerializer(recording, context={"request": request}).data
+        return api_response(success=True, message="Recording stopped.", data=data)
+
+
+class RealtimeSessionBrowserRecordingUploadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        session = get_object_or_404(RealtimeSession, pk=pk)
+        if not _can_manage_session(request.user, session):
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "Only host or admin can upload fallback recording."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = RealtimeSessionBrowserRecordingUploadSerializer(data=request.data)
+        if not serializer.is_valid():
+            return api_response(
+                success=False,
+                message="Fallback recording upload failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        started_at = serializer.validated_data.get("started_at")
+        ended_at = serializer.validated_data.get("ended_at")
+        video_file = serializer.validated_data["video_file"]
+
+        recording = RealtimeSessionRecording.objects.create(
+            session=session,
+            recording_type=session.session_type,
+            started_by=request.user,
+            status=RealtimeSessionRecording.STATUS_COMPLETED,
+            started_at=started_at or timezone.now(),
+            ended_at=ended_at or timezone.now(),
+            video_file=video_file,
+            livekit_payload={"source": "browser_fallback"},
+        )
+        data = RealtimeSessionRecordingSerializer(recording, context={"request": request}).data
+        return api_response(
+            success=True,
+            message="Fallback recording uploaded.",
+            data=data,
+            status_code=status.HTTP_201_CREATED,
+        )

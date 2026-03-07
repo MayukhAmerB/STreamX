@@ -21,9 +21,13 @@ frontend/dist/
 .env
 backend/.env
 backend/.env.hostinger
+backend/.env.hostinger.production
+backend/.env.production.final
 frontend/.env
 
 # OS/editor
 .DS_Store
 Thumbs.db
 infra/livekit.runtime.yaml
+infra/recordings/*
+!infra/recordings/.gitkeep

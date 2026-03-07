@@ -6,14 +6,20 @@ import PageShell from "../components/PageShell";
 import { listLiveClasses } from "../api/courses";
 import {
   createRealtimeSession,
+  deleteRealtimeRecording,
   endRealtimeSession,
   getRealtimeHostToken,
   joinRealtimeSession,
+  listRealtimeRecordings,
   listRealtimeSessions,
+  startRealtimeRecording,
   startRealtimeStream,
+  stopRealtimeRecording,
   stopRealtimeStream,
+  uploadRealtimeBrowserRecording,
 } from "../api/realtime";
 import { useAuth } from "../hooks/useAuth";
+import { ScreenityFallbackRecorder } from "../services/recording/ScreenityFallbackRecorder";
 import { apiData, apiMessage } from "../utils/api";
 
 const pageBackgroundImage =
@@ -60,6 +66,21 @@ function canManageSession(session, user) {
   if (Boolean(session.can_manage)) return true;
   if (Boolean(session.is_host)) return true;
   return Boolean(user?.is_admin);
+}
+
+function resolveRecordingMode(recording) {
+  const source = String(recording?.source || "").trim().toLowerCase();
+  if (source === "browser_fallback") {
+    return "screenity-fallback";
+  }
+  if (recording?.is_active) {
+    return "livekit-egress";
+  }
+  return "";
+}
+
+function resolveRecordingPlaybackUrl(recording) {
+  return String(recording?.playback_url || recording?.output_download_url || "").trim();
 }
 
 const broadcastMarketingCards = [
@@ -130,11 +151,20 @@ export default function BroadcastingPage() {
     error: "",
     info: "",
   });
+  const [studioRecordingState, setStudioRecordingState] = useState({
+    loading: false,
+    error: "",
+    info: "",
+    active: null,
+    latestCompleted: null,
+    mode: "",
+  });
 
   const roomRef = useRef(null);
   const localVideoTrackRef = useRef(null);
   const localAudioTrackRef = useRef(null);
   const previewVideoRef = useRef(null);
+  const fallbackRecorderRef = useRef(null);
 
   const highlightedSessionId = searchParams.get("session");
 
@@ -187,6 +217,45 @@ export default function BroadcastingPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    if (!studioSession?.id) {
+      setStudioRecordingState({
+        loading: false,
+        error: "",
+        info: "",
+        active: null,
+        latestCompleted: null,
+        mode: "",
+      });
+      return undefined;
+    }
+    (async () => {
+      try {
+        const response = await listRealtimeRecordings(studioSession.id);
+        if (!active) return;
+        const payload = apiData(response, []);
+        const rows = Array.isArray(payload) ? payload : [];
+        const activeRecording = rows.find((item) => item?.is_active) || null;
+        const latestCompleted = rows.find((item) => item?.status === "completed") || null;
+        setStudioRecordingState((prev) => ({
+          ...prev,
+          loading: false,
+          error: "",
+          active: activeRecording,
+          latestCompleted,
+          mode: resolveRecordingMode(activeRecording),
+        }));
+      } catch {
+        if (!active) return;
+        setStudioRecordingState((prev) => ({ ...prev, loading: false }));
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [studioSession?.id]);
+
   const orderedSessions = useMemo(() => {
     return [...sessions].sort((a, b) => {
       const statusWeight = { live: 1, scheduled: 2, ended: 3 };
@@ -217,7 +286,18 @@ export default function BroadcastingPage() {
     }
   };
 
+  const stopFallbackRecorder = () => {
+    const recorder = fallbackRecorderRef.current;
+    if (recorder?.isRecording) {
+      recorder.stop().catch(() => {
+        // best-effort cleanup on session switch/unmount
+      });
+    }
+    fallbackRecorderRef.current = null;
+  };
+
   const disconnectStudio = () => {
+    stopFallbackRecorder();
     stopLocalMedia();
     if (roomRef.current) {
       roomRef.current.disconnect();
@@ -554,6 +634,157 @@ export default function BroadcastingPage() {
     }
   };
 
+  const handleStartRecording = async () => {
+    if (!studioSession?.id) return;
+    setStudioRecordingState((prev) => ({ ...prev, loading: true, error: "", info: "" }));
+    try {
+      const response = await startRealtimeRecording(studioSession.id);
+      const recording = apiData(response, null);
+      setStudioRecordingState((prev) => ({
+        ...prev,
+        loading: false,
+        error: "",
+        info: "Broadcast recording started.",
+        active: recording,
+        mode: resolveRecordingMode(recording) || "livekit-egress",
+      }));
+    } catch (livekitErr) {
+      try {
+        const fallbackRecorder =
+          fallbackRecorderRef.current || new ScreenityFallbackRecorder({ withMicrophone: true });
+        fallbackRecorderRef.current = fallbackRecorder;
+        if (!fallbackRecorder.isRecording) {
+          await fallbackRecorder.start();
+        }
+        setStudioRecordingState((prev) => ({
+          ...prev,
+          loading: false,
+          error: "",
+          info: "LiveKit recorder unavailable. Browser fallback recording started.",
+          active: {
+            id: "browser-fallback",
+            status: "recording",
+            is_active: true,
+            source: "browser_fallback",
+          },
+          mode: "screenity-fallback",
+        }));
+      } catch (fallbackErr) {
+        fallbackRecorderRef.current = null;
+        setStudioRecordingState((prev) => ({
+          ...prev,
+          loading: false,
+          error: `${apiMessage(livekitErr, "Unable to start broadcast recording.")} ${apiMessage(
+            fallbackErr,
+            "Fallback recording failed."
+          )}`,
+          info: "",
+          mode: "",
+        }));
+      }
+    }
+  };
+
+  const handleStopRecording = async () => {
+    if (!studioSession?.id) return;
+    setStudioRecordingState((prev) => ({ ...prev, loading: true, error: "", info: "" }));
+    if (studioRecordingState.mode === "screenity-fallback") {
+      const fallbackRecorder = fallbackRecorderRef.current;
+      if (!fallbackRecorder || !fallbackRecorder.isRecording) {
+        setStudioRecordingState((prev) => ({
+          ...prev,
+          loading: false,
+          error: "No active fallback recording found.",
+          info: "",
+          active: null,
+          mode: "",
+        }));
+        return;
+      }
+      try {
+        const localRecording = await fallbackRecorder.stop();
+        fallbackRecorderRef.current = null;
+
+        const formData = new FormData();
+        formData.append("video_file", localRecording.file, localRecording.file_name);
+        if (localRecording.started_at) {
+          formData.append("started_at", localRecording.started_at);
+        }
+        if (localRecording.ended_at) {
+          formData.append("ended_at", localRecording.ended_at);
+        }
+
+        const uploadResponse = await uploadRealtimeBrowserRecording(studioSession.id, formData);
+        const storedRecording = apiData(uploadResponse, null);
+        setStudioRecordingState((prev) => ({
+          ...prev,
+          loading: false,
+          error: "",
+          info: "Fallback recording uploaded and stored.",
+          active: null,
+          latestCompleted: storedRecording || prev.latestCompleted,
+          mode: "",
+        }));
+      } catch (err) {
+        setStudioRecordingState((prev) => ({
+          ...prev,
+          loading: false,
+          error: apiMessage(err, "Unable to stop/upload fallback broadcast recording."),
+          info: "",
+        }));
+      }
+      return;
+    }
+
+    try {
+      const response = await stopRealtimeRecording(studioSession.id);
+      const recording = apiData(response, null);
+      setStudioRecordingState((prev) => ({
+        ...prev,
+        loading: false,
+        error: "",
+        info: "Broadcast recording stopped and stored.",
+        active: recording?.is_active ? recording : null,
+        latestCompleted: recording?.status === "completed" ? recording : prev.latestCompleted,
+        mode: recording?.is_active ? resolveRecordingMode(recording) : "",
+      }));
+    } catch (err) {
+      setStudioRecordingState((prev) => ({
+        ...prev,
+        loading: false,
+        error: apiMessage(err, "Unable to stop broadcast recording."),
+        info: "",
+      }));
+    }
+  };
+
+  const handleDeleteLatestRecording = async () => {
+    const latest = studioRecordingState.latestCompleted;
+    if (!studioSession?.id || !latest?.id) return;
+    if (!window.confirm("Delete the latest broadcast recording permanently? This cannot be undone.")) {
+      return;
+    }
+    setStudioRecordingState((prev) => ({ ...prev, loading: true, error: "", info: "" }));
+    try {
+      await deleteRealtimeRecording(latest.id);
+      setStudioRecordingState((prev) => ({
+        ...prev,
+        loading: false,
+        error: "",
+        info: "Latest broadcast recording deleted.",
+        active: prev.active?.id === latest.id ? null : prev.active,
+        latestCompleted: prev.latestCompleted?.id === latest.id ? null : prev.latestCompleted,
+      }));
+    } catch (err) {
+      setStudioRecordingState((prev) => ({
+        ...prev,
+        loading: false,
+        error: apiMessage(err, "Unable to delete broadcast recording."),
+        info: "",
+      }));
+    }
+  };
+
   useEffect(() => {
     if (!highlightedSessionId || !isAuthenticated || activeBroadcast) {
       return;
@@ -792,13 +1023,59 @@ export default function BroadcastingPage() {
                   Stop Live
                 </Button>
               </div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <Button
+                  variant="secondary"
+                  onClick={handleStartRecording}
+                  loading={studioRecordingState.loading}
+                  disabled={Boolean(studioRecordingState.active)}
+                >
+                  Start Recording
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={handleStopRecording}
+                  loading={studioRecordingState.loading}
+                  disabled={!studioRecordingState.active}
+                >
+                  Stop Recording
+                </Button>
+              </div>
 
               {studioState.error ? <p className="mt-3 text-xs text-red-300">{studioState.error}</p> : null}
               {studioState.info ? <p className="mt-3 text-xs text-green-300">{studioState.info}</p> : null}
+              {studioRecordingState.error ? <p className="mt-2 text-xs text-red-300">{studioRecordingState.error}</p> : null}
+              {studioRecordingState.info ? <p className="mt-2 text-xs text-green-300">{studioRecordingState.info}</p> : null}
               <p className="mt-2 text-[11px] text-[#9cab95]">
                 Active profile: {studioProfile.capture_width}x{studioProfile.capture_height} at{" "}
                 {studioProfile.fps}fps, max {studioProfile.max_video_bitrate_kbps} kbps.
               </p>
+              <p className="mt-1 text-[11px] text-[#9cab95]">
+                Recording status: {studioRecordingState.active?.status || "idle"}
+                {studioRecordingState.active
+                  ? ` (${studioRecordingState.mode === "screenity-fallback" ? "browser fallback" : "livekit"})`
+                  : ""}
+                .
+              </p>
+              {resolveRecordingPlaybackUrl(studioRecordingState.latestCompleted) ? (
+                <a
+                  href={resolveRecordingPlaybackUrl(studioRecordingState.latestCompleted)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex rounded-full border border-[#3d4c3f] bg-[#151f16] px-3 py-1.5 text-xs text-[#dbe4d1] hover:bg-[#1d2a1f]"
+                >
+                  Open Last Recording
+                </a>
+              ) : null}
+              <Button
+                variant="danger"
+                className="mt-2 inline-flex px-3 py-1.5 text-xs"
+                onClick={handleDeleteLatestRecording}
+                loading={studioRecordingState.loading}
+                disabled={!studioRecordingState.latestCompleted?.id || Boolean(studioRecordingState.active)}
+              >
+                Delete Last Recording
+              </Button>
               {studioSession.livekit_egress_error ? (
                 <p className="mt-2 text-xs text-amber-300">Egress: {studioSession.livekit_egress_error}</p>
               ) : null}

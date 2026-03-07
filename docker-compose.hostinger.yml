@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-alsyedacademy}
       POSTGRES_USER: ${POSTGRES_USER:-alsyed_app}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-2p3Dxy7Cop4YJLwvR92z6XSp2I%U}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -35,7 +35,7 @@ services:
       context: ./backend
     restart: always
     env_file:
-      - ./backend/.env.hostinger
+      - ./backend/.env.hostinger.production
     depends_on:
       postgres:
         condition: service_healthy
@@ -45,6 +45,7 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - backend_media:/app/media
+      - recordings_data:/recordings:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import sys,urllib.request;resp=urllib.request.urlopen('http://127.0.0.1:8000/health/live',timeout=3);sys.exit(0 if resp.status==200 else 1)"]
       interval: 30s
@@ -100,11 +101,12 @@ services:
       EGRESS_CONFIG_FILE: /out/egress.yaml
     volumes:
       - ./infra/hostinger/egress.yaml:/out/egress.yaml:ro
+      - recordings_data:/recordings
 
   owncast:
     image: gabekangas/owncast:latest
     restart: always
-    command: ["-streamkey", "${OWNCAST_STREAM_KEY:-replace-with-owncast-stream-key}"]
+    command: ["-streamkey", "${OWNCAST_STREAM_KEY:-MN5hfI6rnjCUPO6e4P3PrrNGSV1eK9KX}"]
     volumes:
       - owncast_data:/app/data
     ports:
@@ -144,6 +146,7 @@ volumes:
   redis_data:
   owncast_data:
   backend_media:
+  recordings_data:
 
 networks:
   appnet:

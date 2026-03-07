@@ -13,7 +13,7 @@ redis:
   address: redis:6379
 
 # IMPORTANT:
-# Keep these values in sync with backend/.env.hostinger:
+# Keep these values in sync with backend/.env.hostinger.production:
 # LIVEKIT_API_KEY and LIVEKIT_API_SECRET.
 keys:
-  replace-livekit-key: replace-livekit-secret
+  lk_4QBORTR5B1Y0F190FLPB: ITxAoIvZl8qKW00zrAZs2kJ7YYG3Jn0QdJrNs2mzSQj6kgFn

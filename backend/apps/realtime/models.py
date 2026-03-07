@@ -1,3 +1,5 @@
+import os
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -270,6 +272,144 @@ class RealtimeSession(models.Model):
 
     def __str__(self):
         return self.title
+
+
+def realtime_recording_upload_path(instance, filename):
+    original_name = str(filename or "").strip() or "recording.webm"
+    base_name, ext = os.path.splitext(original_name)
+    safe_ext = ext.lower() if ext else ".webm"
+    session_slug = slugify(getattr(instance.session, "slug", "") or getattr(instance.session, "title", "session"))
+    if not session_slug:
+        session_slug = "session"
+    timestamp = timezone.now().strftime("%Y%m%d-%H%M%S")
+    return f"realtime_recordings/{session_slug}/{timestamp}-{slugify(base_name)[:80] or 'recording'}{safe_ext}"
+
+
+class RealtimeSessionRecording(models.Model):
+    STATUS_STARTING = "starting"
+    STATUS_RECORDING = "recording"
+    STATUS_STOPPING = "stopping"
+    STATUS_COMPLETED = "completed"
+    STATUS_FAILED = "failed"
+    STATUS_CHOICES = [
+        (STATUS_STARTING, "Starting"),
+        (STATUS_RECORDING, "Recording"),
+        (STATUS_STOPPING, "Stopping"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_FAILED, "Failed"),
+    ]
+    ACTIVE_STATUSES = {STATUS_STARTING, STATUS_RECORDING, STATUS_STOPPING}
+
+    session = models.ForeignKey(
+        RealtimeSession,
+        on_delete=models.CASCADE,
+        related_name="recordings",
+    )
+    recording_type = models.CharField(
+        max_length=20,
+        choices=RealtimeSession.SESSION_TYPE_CHOICES,
+        default=RealtimeSession.TYPE_MEETING,
+    )
+    started_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="realtime_recordings_started",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_STARTING,
+    )
+    livekit_egress_id = models.CharField(max_length=255, blank=True, default="")
+    output_file_path = models.CharField(max_length=1024, blank=True, default="")
+    output_download_url = models.URLField(blank=True, default="")
+    video_file = models.FileField(upload_to=realtime_recording_upload_path, blank=True, null=True)
+    livekit_payload = models.JSONField(default=dict, blank=True)
+    error = models.TextField(blank=True, default="")
+    started_at = models.DateTimeField(null=True, blank=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Recording"
+        verbose_name_plural = "Recordings"
+        indexes = [
+            models.Index(fields=["session", "status", "created_at"]),
+            models.Index(fields=["livekit_egress_id"]),
+        ]
+
+    def _merge_payload(self, payload):
+        merged = {}
+        if isinstance(self.livekit_payload, dict):
+            merged.update(self.livekit_payload)
+        if isinstance(payload, dict):
+            merged.update(payload)
+        self.livekit_payload = merged
+
+    def mark_recording(self, *, egress_id="", payload=None):
+        self.status = self.STATUS_RECORDING
+        if egress_id:
+            self.livekit_egress_id = str(egress_id)
+        self.error = ""
+        self.started_at = self.started_at or timezone.now()
+        self._merge_payload(payload)
+        self.save(
+            update_fields=[
+                "status",
+                "livekit_egress_id",
+                "error",
+                "started_at",
+                "livekit_payload",
+                "updated_at",
+            ]
+        )
+
+    def mark_stopping(self):
+        self.status = self.STATUS_STOPPING
+        self.save(update_fields=["status", "updated_at"])
+
+    def mark_completed(self, *, file_path="", file_url="", payload=None):
+        self.status = self.STATUS_COMPLETED
+        if file_path:
+            self.output_file_path = str(file_path)[:1024]
+        if file_url:
+            self.output_download_url = str(file_url)
+        self.error = ""
+        self.ended_at = timezone.now()
+        self._merge_payload(payload)
+        self.save(
+            update_fields=[
+                "status",
+                "output_file_path",
+                "output_download_url",
+                "error",
+                "ended_at",
+                "livekit_payload",
+                "updated_at",
+            ]
+        )
+
+    def mark_failed(self, message, *, payload=None):
+        self.status = self.STATUS_FAILED
+        self.error = str(message or "")[:2000]
+        self.ended_at = self.ended_at or timezone.now()
+        self._merge_payload(payload)
+        self.save(
+            update_fields=[
+                "status",
+                "error",
+                "ended_at",
+                "livekit_payload",
+                "updated_at",
+            ]
+        )
+
+    def __str__(self):
+        return f"{self.session.title} recording #{self.pk}"
 
 
 class RealtimeConfiguration(models.Model):
