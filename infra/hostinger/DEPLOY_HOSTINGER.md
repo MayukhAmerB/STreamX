@@ -55,7 +55,7 @@ What this changes:
 - takes a timestamped backup before rebuild
 - keeps fixed Docker volume names across deployments
 - starts only the VPS-nginx-friendly app stack
-- never requires Docker `edge-nginx`
+- removes orphaned old services during deploys
 
 ## 5) Django bootstrap
 
@@ -115,6 +115,12 @@ Deploy updates:
 ```bash
 git pull
 ./infra/hostinger/deploy-safe.sh
+```
+
+Destructive fresh rebuild of the whole Docker stack:
+
+```bash
+HOSTINGER_RESET_CONFIRM=1 ./infra/hostinger/reset-fresh.sh
 ```
 
 Backups:

@@ -12,7 +12,7 @@ compose() {
 }
 
 log() {
-  printf '[hostinger-deploy] %s\n' "$*"
+  printf '[hostinger-reset] %s\n' "$*"
 }
 
 wait_for_backend_health() {
@@ -34,19 +34,41 @@ wait_for_backend_health() {
   done
 }
 
+if [ "${HOSTINGER_RESET_CONFIRM:-0}" != "1" ]; then
+  printf '[hostinger-reset] Refusing destructive reset without HOSTINGER_RESET_CONFIRM=1\n' >&2
+  exit 1
+fi
+
 if [ -x "$BACKUP_SCRIPT" ]; then
+  log "Creating safety backup before destructive reset."
   "$BACKUP_SCRIPT"
 else
   log "Backup script is missing or not executable: $BACKUP_SCRIPT"
   exit 1
 fi
 
-log "Rebuilding and starting persistent application services."
-compose up -d --build --remove-orphans
+log "Stopping and deleting the full Docker stack and all named volumes."
+compose down --remove-orphans -v
+
+log "Removing project images so the rebuild is fully fresh."
+mapfile -t project_images < <(compose config --images | sort -u)
+if [ "${#project_images[@]}" -gt 0 ]; then
+  docker image rm -f "${project_images[@]}" >/dev/null 2>&1 || true
+fi
+
+log "Pulling the latest repository changes."
+git -C "$REPO_ROOT" pull --ff-only
+
+log "Pulling upstream service images and rebuilding local images without cache."
+compose pull
+compose build --pull --no-cache
+
+log "Starting a fresh Hostinger stack."
+compose up -d --force-recreate --remove-orphans
 wait_for_backend_health
 
 log "Running Django production checks."
 compose exec -T backend python manage.py check --deploy
 
-log "Deployment complete."
+log "Fresh reset complete."
 compose ps
