@@ -3,6 +3,7 @@ from django.contrib.admin.sites import NotRegistered
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import Group
 from django.db.models import Count, Q
+from django.utils.html import format_html
 from rest_framework.authtoken.models import Token
 
 from apps.courses.models import Enrollment, LiveClassEnrollment
@@ -18,24 +19,49 @@ for model in (Group, Token):
         pass
 
 
-class CourseEnrollmentInline(admin.TabularInline):
+def highlighted_identity(value, color="#e8f1df", border="#3b4a3d", background="#111912"):
+    text = str(value or "Not provided").strip() or "Not provided"
+    return format_html(
+        '<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid {};background:{};color:{};font-weight:600;">{}</span>',
+        border,
+        background,
+        color,
+        text,
+    )
+
+
+class EnrollmentRequesterInlineMixin:
+    @admin.display(description="Username")
+    def requester_username(self, obj):
+        return highlighted_identity(getattr(obj.user, "full_name", None) or getattr(obj.user, "email", None))
+
+    @admin.display(description="Email")
+    def requester_email(self, obj):
+        return highlighted_identity(getattr(obj.user, "email", None))
+
+    @admin.display(description="Phone")
+    def requester_phone(self, obj):
+        return highlighted_identity(getattr(obj.user, "phone_number", None), color="#f0f6e8")
+
+
+class CourseEnrollmentInline(EnrollmentRequesterInlineMixin, admin.TabularInline):
     model = Enrollment
     fk_name = "user"
     extra = 0
-    fields = ("course", "payment_status", "enrolled_at")
-    readonly_fields = ("enrolled_at",)
+    fields = ("requester_username", "requester_email", "requester_phone", "course", "payment_status", "enrolled_at")
+    readonly_fields = ("requester_username", "requester_email", "requester_phone", "enrolled_at")
     ordering = ("-enrolled_at",)
     show_change_link = True
     verbose_name = "Course Buy Request"
     verbose_name_plural = "Course Acceptance (Buy Requests)"
 
 
-class LiveClassEnrollmentInline(admin.TabularInline):
+class LiveClassEnrollmentInline(EnrollmentRequesterInlineMixin, admin.TabularInline):
     model = LiveClassEnrollment
     fk_name = "user"
     extra = 0
-    fields = ("live_class", "status", "created_at")
-    readonly_fields = ("created_at",)
+    fields = ("requester_username", "requester_email", "requester_phone", "live_class", "status", "created_at")
+    readonly_fields = ("requester_username", "requester_email", "requester_phone", "created_at")
     ordering = ("-created_at",)
     show_change_link = True
     verbose_name = "Live Class Enroll Request"
@@ -48,6 +74,7 @@ class UserAdmin(DjangoUserAdmin):
     list_display = (
         "email",
         "full_name",
+        "phone_number",
         "role",
         "pending_course_requests",
         "pending_live_class_requests",
@@ -56,7 +83,7 @@ class UserAdmin(DjangoUserAdmin):
     )
     list_filter = ("role", "two_factor_enabled", "is_staff", "is_active")
     ordering = ("-created_at",)
-    search_fields = ("email", "full_name")
+    search_fields = ("email", "full_name", "phone_number")
     inlines = (CourseEnrollmentInline, LiveClassEnrollmentInline)
 
     def get_queryset(self, request):
@@ -83,7 +110,7 @@ class UserAdmin(DjangoUserAdmin):
 
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        ("Personal info", {"fields": ("full_name", "profile_image", "role")}),
+        ("Personal info", {"fields": ("full_name", "phone_number", "profile_image", "role")}),
         ("Security", {"fields": ("two_factor_enabled", "two_factor_secret")}),
         ("OAuth", {"fields": ("oauth_provider", "oauth_provider_uid")}),
         ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser")}),
@@ -95,7 +122,7 @@ class UserAdmin(DjangoUserAdmin):
             None,
             {
                 "classes": ("wide",),
-                "fields": ("email", "full_name", "role", "password1", "password2"),
+                "fields": ("email", "full_name", "phone_number", "role", "password1", "password2"),
             },
         ),
     )

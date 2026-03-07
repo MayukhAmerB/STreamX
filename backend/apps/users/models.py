@@ -18,6 +18,7 @@ class User(AbstractUser):
     username = None
     email = models.EmailField(unique=True)
     full_name = models.CharField(max_length=255)
+    phone_number = models.CharField(max_length=24, blank=True, default="")
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_STUDENT)
     profile_image = models.ImageField(upload_to="profile_images/", blank=True, null=True)
     two_factor_enabled = models.BooleanField(default=False)

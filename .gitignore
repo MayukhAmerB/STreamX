@@ -20,6 +20,7 @@ frontend/dist/
 # Env files
 .env
 backend/.env
+backend/.env.hostinger
 frontend/.env
 
 # OS/editor

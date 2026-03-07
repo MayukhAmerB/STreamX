@@ -1,3 +1,5 @@
+import re
+
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -10,6 +12,21 @@ from config.url_utils import get_media_public_url
 
 from .models import User
 
+PHONE_PATTERN = re.compile(r"^\+?[0-9][0-9()\-\s]{6,22}$")
+
+
+def normalize_phone_number(value):
+    return re.sub(r"\s+", " ", str(value or "").strip())
+
+
+def validate_phone_number_value(value):
+    normalized = normalize_phone_number(value)
+    if normalized and not PHONE_PATTERN.fullmatch(normalized):
+        raise serializers.ValidationError(
+            "Enter a valid phone number with digits, spaces, (), -, and optional + prefix."
+        )
+    return normalized
+
 
 class UserSerializer(serializers.ModelSerializer):
     profile_image_url = serializers.SerializerMethodField()
@@ -21,6 +38,7 @@ class UserSerializer(serializers.ModelSerializer):
             "id",
             "email",
             "full_name",
+            "phone_number",
             "role",
             "is_admin",
             "profile_image_url",
@@ -44,7 +62,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("email", "full_name", "password", "role")
+        fields = ("email", "full_name", "phone_number", "password", "role")
 
     def validate_password(self, value):
         validate_password(value)
@@ -54,6 +72,9 @@ class RegisterSerializer(serializers.ModelSerializer):
         if contains_active_content(value):
             raise serializers.ValidationError("Suspicious script or active-content payload detected.")
         return value
+
+    def validate_phone_number(self, value):
+        return validate_phone_number_value(value)
 
     def create(self, validated_data):
         password = validated_data.pop("password")
@@ -137,12 +158,15 @@ class ContactMessageSerializer(serializers.Serializer):
 class ProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("full_name", "profile_image")
+        fields = ("full_name", "phone_number", "profile_image")
 
     def validate_full_name(self, value):
         if contains_active_content(value):
             raise serializers.ValidationError("Suspicious script or active-content payload detected.")
         return value
+
+    def validate_phone_number(self, value):
+        return validate_phone_number_value(value)
 
     def validate_profile_image(self, value):
         if value in (None, ""):

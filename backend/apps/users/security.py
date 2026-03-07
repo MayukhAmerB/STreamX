@@ -22,7 +22,7 @@ def _key_ip(ip):
 
 
 def get_lockout_state(email, request):
-    max_failures = int(getattr(settings, "AUTH_LOGIN_MAX_FAILURES", 6))
+    max_failures = int(getattr(settings, "AUTH_LOGIN_MAX_FAILURES", 3))
     email_count = int(cache.get(_key_email(email), 0) or 0)
     ip_count = int(cache.get(_key_ip(_client_ip(request)), 0) or 0)
     attempts = max(email_count, ip_count)
@@ -30,7 +30,7 @@ def get_lockout_state(email, request):
 
 
 def register_failed_login(email, request):
-    ttl_seconds = int(getattr(settings, "AUTH_LOGIN_LOCKOUT_SECONDS", 900))
+    ttl_seconds = int(getattr(settings, "AUTH_LOGIN_LOCKOUT_SECONDS", 3600))
     email_key = _key_email(email)
     ip_key = _key_ip(_client_ip(request))
     email_count = int(cache.get(email_key, 0) or 0) + 1

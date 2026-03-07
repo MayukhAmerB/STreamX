@@ -1,6 +1,7 @@
-﻿from decimal import Decimal
+from decimal import Decimal
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
 from django.core import mail
@@ -29,6 +30,8 @@ from apps.users.serializers import ProfileUpdateSerializer
 
 class BaseAPITestCase(APITestCase):
     def setUp(self):
+        # Reset throttling/cache state per test to avoid cross-test bleed.
+        cache.clear()
         self.instructor = User.objects.create_user(
             email="instructor@test.com",
             password="StrongPass@123",
@@ -242,15 +245,16 @@ class RateLimitTests(APITestCase):
 
     def test_login_endpoint_is_throttled(self):
         status_codes = []
-        for _ in range(6):
+        max_failures = int(getattr(settings, 'AUTH_LOGIN_MAX_FAILURES', 3))
+        for _ in range(max_failures + 1):
             response = self.client.post(
                 reverse("auth-login"),
                 {"email": self.user.email, "password": "WrongPass@123"},
                 format="json",
             )
             status_codes.append(response.status_code)
-        self.assertEqual(status_codes[:5], [400, 400, 400, 400, 400])
-        self.assertEqual(status_codes[5], 429)
+        self.assertEqual(status_codes[:max_failures], [400] * max_failures)
+        self.assertEqual(status_codes[max_failures], 429)
 
     @override_settings(AUTH_LOGIN_MAX_FAILURES=1, AUTH_LOGIN_LOCKOUT_SECONDS=120)
     def test_login_is_temporarily_locked_after_repeated_failures(self):

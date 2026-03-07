@@ -27,6 +27,7 @@ function StatusText({ error, success }) {
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
   const [profileName, setProfileName] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
   const [profileImageFile, setProfileImageFile] = useState(null);
   const [profilePreview, setProfilePreview] = useState("");
   const [profileLoading, setProfileLoading] = useState(false);
@@ -34,8 +35,9 @@ export default function ProfilePage() {
 
   useEffect(() => {
     setProfileName(user?.full_name || "");
+    setProfilePhone(user?.phone_number || "");
     setProfilePreview(user?.profile_image_url || "");
-  }, [user?.full_name, user?.profile_image_url]);
+  }, [user?.full_name, user?.phone_number, user?.profile_image_url]);
 
   const effectivePreview = useMemo(() => {
     if (profileImageFile) {
@@ -97,6 +99,7 @@ export default function ProfilePage() {
     try {
       const formData = new FormData();
       formData.append("full_name", profileName);
+      formData.append("phone_number", profilePhone);
       if (profileImageFile) {
         formData.append("profile_image", profileImageFile);
       }
@@ -213,6 +216,14 @@ export default function ProfilePage() {
                 label="Username (Display Name)"
                 value={profileName}
                 onChange={(e) => setProfileName(e.target.value)}
+                required
+              />
+
+              <FormInput
+                label="Phone Number"
+                value={profilePhone}
+                onChange={(e) => setProfilePhone(e.target.value)}
+                placeholder="+91 98765 43210"
                 required
               />
 

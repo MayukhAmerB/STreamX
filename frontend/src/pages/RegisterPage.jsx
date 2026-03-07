@@ -12,6 +12,7 @@ export default function RegisterPage() {
   const [form, setForm] = useState({
     full_name: "",
     email: "",
+    phone_number: "",
     password: "",
     role: "student",
   });
@@ -49,6 +50,13 @@ export default function RegisterPage() {
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                required
+              />
+              <FormInput
+                label="Phone Number"
+                value={form.phone_number}
+                onChange={(e) => setForm((prev) => ({ ...prev, phone_number: e.target.value }))}
+                placeholder="+91 98765 43210"
                 required
               />
               <FormInput

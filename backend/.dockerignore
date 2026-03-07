@@ -1,0 +1,22 @@
+.git
+.gitignore
+.venv
+__pycache__/
+*.py[cod]
+*.sqlite3
+db.sqlite3
+media/
+staticfiles/
+.pytest_cache/
+.mypy_cache/
+
+# Never bake local environment or credentials into images.
+.env
+.env.*
+!.env.example
+!.env.gcp.example
+
+# Local/test artifacts
+coverage.xml
+htmlcov/
+*.log

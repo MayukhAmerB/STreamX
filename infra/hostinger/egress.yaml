@@ -1,0 +1,9 @@
+api_key: replace-livekit-key
+api_secret: replace-livekit-secret
+ws_url: ws://127.0.0.1:7880
+
+redis:
+  address: redis:6379
+
+template_port: 7980
+health_port: 7981

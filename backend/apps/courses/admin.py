@@ -361,14 +361,50 @@ class ModuleAdmin(admin.ModelAdmin):
 
 @admin.register(Enrollment)
 class EnrollmentAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "course", "payment_status", "enrolled_at")
+    list_display = (
+        "id",
+        "requester_username",
+        "requester_email",
+        "requester_phone",
+        "course",
+        "payment_status",
+        "enrolled_at",
+    )
     list_filter = ("payment_status", "course__category", "course__level")
-    search_fields = ("user__email", "course__title")
+    search_fields = ("user__email", "user__full_name", "user__phone_number", "course__title")
     list_editable = ("payment_status",)
     raw_id_fields = ("user", "course")
-    readonly_fields = ("enrolled_at",)
+    readonly_fields = ("requester_username", "requester_email", "requester_phone", "enrolled_at")
     list_per_page = 50
     actions = ("approve_enrollment_requests", "reject_enrollment_requests")
+
+    fields = ("requester_username", "requester_email", "requester_phone", "user", "course", "payment_status", "enrolled_at")
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("user", "course")
+
+    @admin.display(description="Username")
+    def requester_username(self, obj):
+        value = obj.user.full_name or obj.user.email
+        return format_html(
+            '<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid #3b4a3d;background:#111912;color:#e8f1df;font-weight:600;">{}</span>',
+            value,
+        )
+
+    @admin.display(description="Email")
+    def requester_email(self, obj):
+        return format_html(
+            '<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid #3b4a3d;background:#111912;color:#e8f1df;font-weight:600;">{}</span>',
+            obj.user.email,
+        )
+
+    @admin.display(description="Phone")
+    def requester_phone(self, obj):
+        phone = obj.user.phone_number or "Not provided"
+        return format_html(
+            '<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid #3b4a3d;background:#111912;color:#f0f6e8;font-weight:600;">{}</span>',
+            phone,
+        )
 
     def get_model_perms(self, request):
         # Managed from Users admin via inlines to keep enrollment control centralized.
@@ -475,17 +511,18 @@ class LiveClassEnrollmentAdmin(admin.ModelAdmin):
         "id",
         "live_class",
         "status",
-        "user",
         "user_full_name",
         "user_email",
+        "user_phone",
         "created_at",
     )
     list_filter = ("status", "live_class", "live_class__level", "live_class__month_number", "created_at")
-    search_fields = ("user__email", "user__full_name", "live_class__title")
+    search_fields = ("user__email", "user__full_name", "user__phone_number", "live_class__title")
     list_editable = ("status",)
     autocomplete_fields = ("user", "live_class")
-    readonly_fields = ("created_at",)
+    readonly_fields = ("user_full_name", "user_email", "user_phone", "created_at")
     actions = ("approve_enrollment_requests", "reject_enrollment_requests")
+    fields = ("user_full_name", "user_email", "user_phone", "user", "live_class", "status", "created_at")
 
     def get_model_perms(self, request):
         # Managed from Users admin via inlines to keep enrollment control centralized.
@@ -496,11 +533,26 @@ class LiveClassEnrollmentAdmin(admin.ModelAdmin):
 
     @admin.display(description="User Name")
     def user_full_name(self, obj):
-        return obj.user.full_name
+        value = obj.user.full_name or obj.user.email
+        return format_html(
+            '<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid #3b4a3d;background:#111912;color:#e8f1df;font-weight:600;">{}</span>',
+            value,
+        )
 
     @admin.display(description="User Email")
     def user_email(self, obj):
-        return obj.user.email
+        return format_html(
+            '<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid #3b4a3d;background:#111912;color:#e8f1df;font-weight:600;">{}</span>',
+            obj.user.email,
+        )
+
+    @admin.display(description="User Phone")
+    def user_phone(self, obj):
+        phone = obj.user.phone_number or "Not provided"
+        return format_html(
+            '<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid #3b4a3d;background:#111912;color:#f0f6e8;font-weight:600;">{}</span>',
+            phone,
+        )
 
     @admin.action(description="Approve selected live-class enrollment requests")
     def approve_enrollment_requests(self, request, queryset):

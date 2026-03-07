@@ -1,0 +1,150 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-alsyedacademy}
+      POSTGRES_USER: ${POSTGRES_USER:-alsyed_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-alsyed_app} -d ${POSTGRES_DB:-alsyedacademy}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - appnet
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - appnet
+
+  backend:
+    build:
+      context: ./backend
+    restart: always
+    env_file:
+      - ./backend/.env.hostinger
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - backend_media:/app/media
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request;resp=urllib.request.urlopen('http://127.0.0.1:8000/health/live',timeout=3);sys.exit(0 if resp.status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks:
+      - appnet
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+        VITE_ENABLE_PAYMENTS: ${VITE_ENABLE_PAYMENTS:-0}
+        VITE_RAZORPAY_KEY_ID: ${VITE_RAZORPAY_KEY_ID:-}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:8080"
+    networks:
+      - appnet
+
+  livekit:
+    image: livekit/livekit-server:latest
+    restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: ["--config", "/etc/livekit.yaml"]
+    volumes:
+      - ./infra/hostinger/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7880:7880/tcp"
+      - "7881:7881/tcp"
+      - "${LIVEKIT_UDP_PORT:-7882}:${LIVEKIT_UDP_PORT:-7882}/udp"
+    networks:
+      - appnet
+
+  livekit-egress:
+    image: livekit/egress:latest
+    restart: always
+    depends_on:
+      livekit:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    network_mode: "service:livekit"
+    environment:
+      EGRESS_CONFIG_FILE: /out/egress.yaml
+    volumes:
+      - ./infra/hostinger/egress.yaml:/out/egress.yaml:ro
+
+  owncast:
+    image: gabekangas/owncast:latest
+    restart: always
+    command: ["-streamkey", "${OWNCAST_STREAM_KEY:-replace-with-owncast-stream-key}"]
+    volumes:
+      - owncast_data:/app/data
+    ports:
+      - "127.0.0.1:8080:8080"
+    expose:
+      - "1935"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    networks:
+      - appnet
+
+  edge-nginx:
+    image: nginx:1.27-alpine
+    restart: always
+    profiles: ["edge"]
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+      livekit:
+        condition: service_started
+      owncast:
+        condition: service_started
+    ports:
+      - "80:80"
+    volumes:
+      - ./infra/hostinger/nginx/alsyedinitiative.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - appnet
+
+volumes:
+  postgres_data:
+  redis_data:
+  owncast_data:
+  backend_media:
+
+networks:
+  appnet:
+    driver: bridge
