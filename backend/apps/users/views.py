@@ -58,11 +58,18 @@ def _serialize_user(user, request=None):
     return UserSerializer(user, context={"request": request} if request else {}).data
 
 
+def _attach_csrf_token(response, request):
+    if request is None:
+        return response
+    token = get_token(request)
+    if isinstance(getattr(response, "data", None), dict):
+        response.data["csrf_token"] = token
+    response["X-CSRFToken"] = token
+    return response
+
+
 def _auth_success_response(user, message, request=None):
     access, refresh = _issue_tokens_for_user(user)
-    if request is not None:
-        # Ensure a CSRF cookie is issued alongside auth cookies for subsequent unsafe requests.
-        get_token(request)
     response = api_response(
         success=True,
         message=message,
@@ -70,7 +77,7 @@ def _auth_success_response(user, message, request=None):
         status_code=status.HTTP_200_OK,
     )
     set_auth_cookies(response, access, refresh)
-    return response
+    return _attach_csrf_token(response, request)
 
 
 class RegisterView(APIView):
@@ -192,7 +199,7 @@ class RefreshTokenView(APIView):
             )
         response = api_response(success=True, message="Token refreshed.", data=None)
         set_auth_cookies(response, str(refresh.access_token), str(refresh))
-        return response
+        return _attach_csrf_token(response, request)
 
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
@@ -201,18 +208,20 @@ class CurrentUserView(APIView):
 
     def get(self, request):
         if not request.user or not request.user.is_authenticated:
-            return api_response(
+            response = api_response(
                 success=False,
                 message="Not authenticated.",
                 data=None,
                 errors={"detail": "Authentication credentials were not provided."},
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
-        return api_response(
+            return _attach_csrf_token(response, request)
+        response = api_response(
             success=True,
             message="Current user fetched.",
             data=_serialize_user(request.user, request=request),
         )
+        return _attach_csrf_token(response, request)
 
 
 class GoogleLoginView(APIView):
@@ -295,11 +304,12 @@ class CsrfTokenView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        return api_response(
+        response = api_response(
             success=True,
             message="CSRF cookie set.",
             data=None,
         )
+        return _attach_csrf_token(response, request)
 
 
 class PasswordResetRequestView(APIView):

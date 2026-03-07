@@ -9,10 +9,12 @@ from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from config.audit import log_security_event
+from config.authentication import CookieJWTAuthentication
 from config.request_security import find_disallowed_query_params
 from config.response import api_response
 
@@ -641,6 +643,7 @@ class RealtimeSessionRecordingListView(APIView):
 
 
 class RealtimeSessionRecordingDownloadView(APIView):
+    authentication_classes = [SessionAuthentication, CookieJWTAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, recording_id):

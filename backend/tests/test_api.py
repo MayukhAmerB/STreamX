@@ -76,10 +76,18 @@ class BaseAPITestCase(APITestCase):
 
 
 class AuthTests(APITestCase):
+    def test_csrf_endpoint_returns_token_payload_and_cookie(self):
+        response = self.client.get(reverse("auth-csrf"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("csrftoken", response.cookies)
+        self.assertTrue(response.data["csrf_token"])
+        self.assertEqual(response.headers.get("X-CSRFToken"), response.data["csrf_token"])
+
     def test_current_user_endpoint_unauthenticated_returns_401(self):
         response = self.client.get(reverse("auth-user"))
         self.assertEqual(response.status_code, 401)
         self.assertFalse(response.data["success"])
+        self.assertTrue(response.data["csrf_token"])
 
     def test_auth_config_endpoint_reflects_registration_toggle(self):
         config = AuthConfiguration.get_solo()
@@ -1274,6 +1282,47 @@ class RealtimeSessionTests(APITestCase):
             self.assertEqual(response.status_code, 200)
             streamed_content = b"".join(response.streaming_content)
             self.assertEqual(streamed_content, file_bytes)
+
+    def test_recording_download_allows_admin_session_authentication(self):
+        recording_file = SimpleUploadedFile(
+            "admin-session-recording.webm",
+            b"\x1a\x45\xdf\xa3session-download-test",
+            content_type="video/webm",
+        )
+        session = RealtimeSession.objects.create(
+            title="Admin Session Recording Download",
+            description="Admin should preview/download recordings from changelist",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+        recording = RealtimeSessionRecording.objects.create(
+            session=session,
+            recording_type=RealtimeSession.TYPE_MEETING,
+            started_by=self.host,
+            status=RealtimeSessionRecording.STATUS_COMPLETED,
+            video_file=recording_file,
+        )
+
+        admin_user = User.objects.create_superuser(
+            email="admin-recordings@test.com",
+            password="StrongPass@123",
+            full_name="Admin Recordings",
+        )
+        self.client.force_login(admin_user)
+        response = self.client.get(
+            reverse(
+                "realtime-session-recording-download",
+                kwargs={"recording_id": recording.id},
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.headers.get("Content-Disposition"),
+            f'inline; filename="{recording.video_file.name.split("/")[-1]}"',
+        )
 
     def test_recording_download_resolves_prefixed_absolute_output_path(self):
         with tempfile.TemporaryDirectory() as recordings_root:
