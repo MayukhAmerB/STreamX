@@ -16,6 +16,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [registrationEnabled, setRegistrationEnabled] = useState(false);
+  const [googleLoginEnabled, setGoogleLoginEnabled] = useState(false);
   const hasBootstrappedRef = useRef(false);
 
   async function refreshUser() {
@@ -34,8 +35,10 @@ export function AuthProvider({ children }) {
       const response = await fetchAuthConfig();
       const data = apiData(response, {});
       setRegistrationEnabled(Boolean(data?.registration_enabled));
+      setGoogleLoginEnabled(Boolean(data?.google_login_enabled));
     } catch {
       setRegistrationEnabled(false);
+      setGoogleLoginEnabled(false);
     }
   }
 
@@ -94,6 +97,7 @@ export function AuthProvider({ children }) {
       isInstructor: user?.role === "instructor",
       isAdmin: Boolean(user?.is_admin),
       registrationEnabled,
+      googleLoginEnabled,
       login,
       register,
       googleLogin,
@@ -102,7 +106,7 @@ export function AuthProvider({ children }) {
       refreshAuthConfig,
       apiMessage,
     }),
-    [user, loading, registrationEnabled]
+    [user, loading, registrationEnabled, googleLoginEnabled]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

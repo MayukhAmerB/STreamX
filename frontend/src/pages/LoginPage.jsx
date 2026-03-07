@@ -12,7 +12,7 @@ const authBackgroundImage =
   "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
 
 export default function LoginPage() {
-  const { login, googleLogin, registrationEnabled } = useAuth();
+  const { login, googleLogin, registrationEnabled, googleLoginEnabled } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTo = location.state?.from || "/";
@@ -21,6 +21,10 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [needs2FA, setNeeds2FA] = useState(false);
+  const frontendGoogleOAuthEnabled = Boolean(
+    import.meta.env.VITE_GOOGLE_CLIENT_ID && String(import.meta.env.VITE_GOOGLE_CLIENT_ID).trim().toLowerCase() !== "disabled"
+  );
+  const showGoogleLogin = Boolean(googleLoginEnabled && frontendGoogleOAuthEnabled);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -207,20 +211,28 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <div className="my-5 flex items-center gap-3 text-xs text-[#889486]">
-              <div className="h-px flex-1 bg-[#2a332d]" />
-              <span>OR CONTINUE WITH</span>
-              <div className="h-px flex-1 bg-[#2a332d]" />
-            </div>
+            {showGoogleLogin ? (
+              <>
+                <div className="my-5 flex items-center gap-3 text-xs text-[#889486]">
+                  <div className="h-px flex-1 bg-[#2a332d]" />
+                  <span>OR CONTINUE WITH</span>
+                  <div className="h-px flex-1 bg-[#2a332d]" />
+                </div>
 
-            <div className="rounded-xl border border-[#232c24] bg-[#101510] p-3">
-              <div className="flex justify-center">
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={() => setError("Google login failed.")}
-                />
+                <div className="rounded-xl border border-[#232c24] bg-[#101510] p-3">
+                  <div className="flex justify-center">
+                    <GoogleLogin
+                      onSuccess={handleGoogleSuccess}
+                      onError={() => setError("Google login failed.")}
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="my-5 rounded-xl border border-[#232c24] bg-[#101510] px-4 py-3 text-xs text-[#8f9989]">
+                Google sign-in is currently disabled.
               </div>
-            </div>
+            )}
 
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#232c24] bg-[#101510] px-4 py-3">
               {registrationEnabled ? (

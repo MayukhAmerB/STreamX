@@ -283,7 +283,10 @@ class AuthConfigView(APIView):
         return api_response(
             success=True,
             message="Auth configuration fetched.",
-            data={"registration_enabled": _registration_enabled()},
+            data={
+                "registration_enabled": _registration_enabled(),
+                "google_login_enabled": bool(getattr(settings, "GOOGLE_CLIENT_ID", "").strip()),
+            },
         )
 
 

@@ -8,16 +8,24 @@ import "./index.css";
 
 // Developer credit: Ibrahim Mohsin Mayukh Bhatt
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+const googleOAuthEnabled =
+  Boolean(googleClientId) && String(googleClientId).trim().toLowerCase() !== "disabled";
+
+const appTree = (
+  <BrowserRouter>
+    <AuthProvider>
+      <App />
+    </AuthProvider>
+  </BrowserRouter>
+);
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <GoogleOAuthProvider clientId={googleClientId}>
-      <BrowserRouter>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </BrowserRouter>
-    </GoogleOAuthProvider>
+    {googleOAuthEnabled ? (
+      <GoogleOAuthProvider clientId={googleClientId}>{appTree}</GoogleOAuthProvider>
+    ) : (
+      appTree
+    )}
   </React.StrictMode>
 );
 
