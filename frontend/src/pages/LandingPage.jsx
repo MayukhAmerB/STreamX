@@ -340,7 +340,7 @@ export default function LandingPage() {
 
             <div className="reveal-up reveal-delay-1 relative">
               <div className="rounded-[28px] border border-[#273127] bg-[#0c110d] p-3 shadow-[0_24px_60px_rgba(0,0,0,0.36)]">
-                <div className="relative h-[360px] overflow-hidden rounded-[24px] border border-[#1e261f] bg-black sm:h-[420px]">
+                <div className="relative h-[570px] overflow-hidden rounded-[24px] border border-[#1e261f] bg-black sm:h-[570px]">
                   <img
                     src={heroCardImage}
                     alt="Cybersecurity training visual"
