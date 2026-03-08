@@ -32,3 +32,4 @@ infra/livekit.runtime.yaml
 infra/recordings/*
 !infra/recordings/.gitkeep
 .hostinger-backups/
+hostinger-data.json
