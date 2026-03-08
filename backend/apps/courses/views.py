@@ -1,6 +1,10 @@
+import mimetypes
+from pathlib import Path
+
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Count, Prefetch, Q
+from django.http import FileResponse, HttpResponse, HttpResponseNotFound
 from rest_framework import generics, permissions, status
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
@@ -9,12 +13,11 @@ from config.audit import log_security_event
 from config.pagination import apply_optional_pagination
 from config.request_security import find_disallowed_query_params
 from config.response import api_response
-from config.url_utils import get_media_public_url
 
 from apps.payments.models import Payment
 
 from .cache_utils import get_course_list_cache_version, get_live_class_list_cache_version
-from .models import Course, Enrollment, Lecture, LiveClass, LiveClassEnrollment, PublicEnrollmentLead, Section
+from .models import Course, Enrollment, Lecture, LectureProgress, LiveClass, LiveClassEnrollment, PublicEnrollmentLead, Section
 from .permissions import IsCourseInstructor, IsEnrolledInCourse, IsInstructor
 from .serializers import (
     CourseEnrollSerializer,
@@ -22,13 +25,63 @@ from .serializers import (
     CourseListSerializer,
     CourseWriteSerializer,
     LectureSerializer,
+    LectureProgressStateSerializer,
+    LectureProgressUpdateSerializer,
     LiveClassEnrollSerializer,
     LiveClassListSerializer,
     MyCourseLibrarySerializer,
     PublicEnrollmentLeadCreateSerializer,
     SectionSerializer,
 )
-from .services import S3VideoError, generate_playback_url, generate_signed_video_url
+from .services import (
+    ProtectedMediaError,
+    S3VideoError,
+    build_protected_lecture_playback_url,
+    generate_playback_url,
+    generate_signed_video_url,
+    normalize_storage_key,
+    resolve_lecture_playback_expires_in,
+    validate_protected_lecture_playback_request,
+)
+
+
+def _local_media_path_exists(storage_key):
+    try:
+        normalized_key = normalize_storage_key(storage_key)
+    except ProtectedMediaError:
+        return False
+    return (Path(settings.MEDIA_ROOT) / normalized_key).exists()
+
+
+def _protected_media_content_type(asset_path):
+    lowered_path = str(asset_path or "").lower()
+    if lowered_path.endswith(".m3u8"):
+        return "application/vnd.apple.mpegurl"
+    if lowered_path.endswith(".ts"):
+        return "video/mp2t"
+    guessed_type, _ = mimetypes.guess_type(lowered_path)
+    return guessed_type or "application/octet-stream"
+
+
+def _build_protected_media_response(asset_path):
+    normalized_path = normalize_storage_key(asset_path)
+    media_path = Path(settings.MEDIA_ROOT) / normalized_path
+    if not media_path.exists() or not media_path.is_file():
+        return HttpResponseNotFound("Protected lecture asset not found.")
+
+    if bool(getattr(settings, "COURSE_PROTECTED_MEDIA_USE_ACCEL_REDIRECT", not settings.DEBUG)):
+        response = HttpResponse()
+        response["X-Accel-Redirect"] = f"/_protected_media/{normalized_path}"
+    else:
+        response = FileResponse(
+            media_path.open("rb"),
+            content_type=_protected_media_content_type(normalized_path),
+        )
+        response["Content-Length"] = str(media_path.stat().st_size)
+
+    response["Cache-Control"] = "private, max-age=300"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 def _course_prefetch_queryset():
@@ -38,6 +91,40 @@ def _course_prefetch_queryset():
             queryset=Section.objects.all().prefetch_related("lectures"),
         )
     )
+
+
+def _get_lecture_access_context(lecture, user):
+    course = lecture.section.course
+    is_authenticated = bool(user and getattr(user, "is_authenticated", False))
+    is_instructor_owner = bool(
+        is_authenticated and user.role == "instructor" and getattr(user, "id", None) == course.instructor_id
+    )
+    is_enrolled = bool(
+        is_authenticated
+        and Enrollment.objects.filter(
+            user=user,
+            course=course,
+            payment_status=Enrollment.STATUS_PAID,
+        ).exists()
+    )
+    can_access = bool(lecture.is_preview and is_authenticated) or is_instructor_owner or is_enrolled
+    return {
+        "course": course,
+        "is_authenticated": is_authenticated,
+        "is_instructor_owner": is_instructor_owner,
+        "is_enrolled": is_enrolled,
+        "can_access": can_access,
+    }
+
+
+def _build_lecture_progress_map(*, course, user):
+    if not user or not getattr(user, "is_authenticated", False):
+        return {}
+    queryset = LectureProgress.objects.filter(
+        user=user,
+        lecture__section__course=course,
+    ).select_related("lecture")
+    return {item.lecture_id: item for item in queryset}
 
 
 class CourseListCreateView(APIView):
@@ -188,7 +275,23 @@ class CourseDetailView(APIView):
 
         if not cache_key and not request.user.is_authenticated and course.is_published:
             cache_key = self._build_public_cache_key(course.pk, course.updated_at)
-        serializer = CourseDetailSerializer(course, context={"request": request})
+        serializer_context = {"request": request}
+        if request.user.is_authenticated:
+            can_view_progress = bool(
+                request.user.id == course.instructor_id
+                or Enrollment.objects.filter(
+                    user=request.user,
+                    course=course,
+                    payment_status=Enrollment.STATUS_PAID,
+                ).exists()
+            )
+            if can_view_progress:
+                serializer_context["lecture_progress_map"] = _build_lecture_progress_map(
+                    course=course,
+                    user=request.user,
+                )
+
+        serializer = CourseDetailSerializer(course, context=serializer_context)
         payload = serializer.data
         if cache_key:
             cache.set(
@@ -396,9 +499,11 @@ class LectureVideoView(APIView):
             Lecture.objects.select_related("section__course", "section__course__instructor"),
             pk=pk,
         )
-        course = lecture.section.course
+        access_context = _get_lecture_access_context(lecture, request.user)
+        course = access_context["course"]
+        expires_in = resolve_lecture_playback_expires_in(lecture)
         if not lecture.is_preview:
-            if not request.user.is_authenticated:
+            if not access_context["is_authenticated"]:
                 log_security_event("course.lecture_playback_denied_unauthenticated", request=request, lecture_id=lecture.id)
                 return api_response(
                     success=False,
@@ -406,15 +511,7 @@ class LectureVideoView(APIView):
                     errors={"detail": "Authentication credentials were not provided."},
                     status_code=status.HTTP_401_UNAUTHORIZED,
                 )
-            is_instructor_owner = (
-                request.user.role == "instructor" and request.user.id == course.instructor_id
-            )
-            is_enrolled = Enrollment.objects.filter(
-                user=request.user,
-                course=course,
-                payment_status=Enrollment.STATUS_PAID,
-            ).exists()
-            if not (is_instructor_owner or is_enrolled):
+            if not access_context["can_access"]:
                 log_security_event(
                     "course.lecture_playback_denied_not_enrolled",
                     request=request,
@@ -430,9 +527,21 @@ class LectureVideoView(APIView):
 
         if lecture.stream_status == Lecture.STREAM_READY and lecture.stream_manifest_key:
             try:
-                playback_url, expires_in = generate_playback_url(
-                    request, lecture.stream_manifest_key, expires_in=300, signer=generate_signed_video_url
-                )
+                if _local_media_path_exists(lecture.stream_manifest_key):
+                    playback_url, expires_in = build_protected_lecture_playback_url(
+                        request,
+                        lecture,
+                        lecture.stream_manifest_key,
+                        expires_in=expires_in,
+                        asset_type="hls",
+                    )
+                else:
+                    playback_url, expires_in = generate_playback_url(
+                        request,
+                        lecture.stream_manifest_key,
+                        expires_in=expires_in,
+                        signer=generate_signed_video_url,
+                    )
             except S3VideoError as exc:
                 log_security_event(
                     "course.lecture_playback_hls_url_failed",
@@ -440,6 +549,13 @@ class LectureVideoView(APIView):
                     lecture_id=lecture.id,
                     course_id=course.id,
                 )
+                return api_response(
+                    success=False,
+                    message="Stream URL generation failed.",
+                    errors={"detail": str(exc)},
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+            except ProtectedMediaError as exc:
                 return api_response(
                     success=False,
                     message="Stream URL generation failed.",
@@ -465,7 +581,21 @@ class LectureVideoView(APIView):
             )
 
         if lecture.video_file:
-            media_url = get_media_public_url(lecture.video_file.url, request=request)
+            try:
+                media_url, expires_in = build_protected_lecture_playback_url(
+                    request,
+                    lecture,
+                    lecture.video_file.name,
+                    expires_in=expires_in,
+                    asset_type="file",
+                )
+            except ProtectedMediaError as exc:
+                return api_response(
+                    success=False,
+                    message="Video URL generation failed.",
+                    errors={"detail": str(exc)},
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
             log_security_event(
                 "course.lecture_playback_file_url_issued",
                 request=request,
@@ -480,7 +610,7 @@ class LectureVideoView(APIView):
                     "playback_url": media_url,
                     "playback_type": "file",
                     "stream_status": lecture.stream_status,
-                    "expires_in": None,
+                    "expires_in": expires_in,
                 },
             )
 
@@ -494,7 +624,7 @@ class LectureVideoView(APIView):
 
         try:
             signed_url, expires_in = generate_playback_url(
-                request, lecture.video_key, expires_in=300, signer=generate_signed_video_url
+                request, lecture.video_key, expires_in=expires_in, signer=generate_signed_video_url
             )
         except S3VideoError as exc:
             log_security_event(
@@ -525,6 +655,91 @@ class LectureVideoView(APIView):
                 "stream_status": lecture.stream_status,
                 "expires_in": expires_in,
             },
+        )
+
+
+class LectureProtectedMediaView(APIView):
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "lecture_playback"
+
+    def get(self, request, pk, token, asset_path):
+        try:
+            normalized_path = validate_protected_lecture_playback_request(
+                token,
+                pk,
+                asset_path,
+                max_age=resolve_lecture_playback_expires_in(None),
+            )
+        except ProtectedMediaError:
+            return HttpResponseNotFound("Protected lecture asset not found.")
+        return _build_protected_media_response(normalized_path)
+
+
+class LectureProgressView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        lecture = generics.get_object_or_404(
+            Lecture.objects.select_related("section__course", "section__course__instructor"),
+            pk=pk,
+        )
+        access_context = _get_lecture_access_context(lecture, request.user)
+        if not access_context["can_access"]:
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "You do not have access to this lecture."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        progress = LectureProgress.objects.filter(user=request.user, lecture=lecture).first()
+        return api_response(
+            success=True,
+            message="Lecture progress fetched.",
+            data=LectureProgressStateSerializer(progress).data if progress else None,
+        )
+
+    def put(self, request, pk):
+        return self._save(request, pk)
+
+    def patch(self, request, pk):
+        return self._save(request, pk)
+
+    def _save(self, request, pk):
+        lecture = generics.get_object_or_404(
+            Lecture.objects.select_related("section__course", "section__course__instructor"),
+            pk=pk,
+        )
+        access_context = _get_lecture_access_context(lecture, request.user)
+        if not access_context["can_access"]:
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "You do not have access to this lecture."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = LectureProgressUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return api_response(
+                success=False,
+                message="Lecture progress update failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        progress, _ = LectureProgress.objects.get_or_create(user=request.user, lecture=lecture)
+        progress.mark_progress(
+            position_seconds=serializer.validated_data["position_seconds"],
+            duration_seconds=serializer.validated_data.get("duration_seconds") or lecture.stream_duration_seconds,
+            completed=serializer.validated_data.get("completed"),
+        )
+        progress.save()
+        return api_response(
+            success=True,
+            message="Lecture progress updated.",
+            data=LectureProgressStateSerializer(progress).data,
         )
 
 

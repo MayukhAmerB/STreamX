@@ -1,7 +1,10 @@
+import json
 import os
 import tempfile
 from decimal import Decimal
 from io import BytesIO
+from types import SimpleNamespace
+from urllib.parse import urlparse
 from unittest.mock import patch
 
 from django.conf import settings
@@ -20,12 +23,14 @@ from apps.courses.models import (
     Course,
     Enrollment,
     Lecture,
+    LectureProgress,
     LiveClass,
     LiveClassEnrollment,
     PublicEnrollmentLead,
     Section,
 )
 from apps.courses.serializers import LectureSerializer
+from apps.courses.services import transcode_lecture_to_hls
 from apps.payments.models import Payment
 from apps.realtime.models import RealtimeSession, RealtimeSessionRecording
 from apps.users.models import AuthConfiguration, User
@@ -844,6 +849,100 @@ class LectureVideoAccessTests(BaseAPITestCase):
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(allowed.data["data"]["signed_url"], "https://signed.example.com/video")
 
+    def test_local_uploaded_lecture_returns_protected_playback_url(self):
+        with tempfile.TemporaryDirectory() as temp_dir, override_settings(
+            MEDIA_ROOT=temp_dir,
+            COURSE_PROTECTED_MEDIA_USE_ACCEL_REDIRECT=True,
+        ):
+            lecture = Lecture.objects.create(
+                section=self.section,
+                title="Uploaded Lecture",
+                description="Protected local video",
+                video_file=SimpleUploadedFile("lesson.mp4", b"fake video payload", content_type="video/mp4"),
+                order=2,
+                is_preview=False,
+            )
+            Enrollment.objects.create(
+                user=self.student,
+                course=self.course,
+                payment_status=Enrollment.STATUS_PAID,
+            )
+
+            self.login(self.student.email)
+            response = self.client.get(reverse("lecture-video", kwargs={"pk": lecture.id}))
+            self.assertEqual(response.status_code, 200)
+            playback_url = response.data["data"]["playback_url"]
+            self.assertIn(f"/api/lectures/{lecture.id}/playback/", playback_url)
+            self.assertNotIn("/media/", playback_url)
+
+            protected_response = self.client.get(urlparse(playback_url).path)
+            self.assertEqual(protected_response.status_code, 200)
+            self.assertEqual(
+                protected_response.headers.get("X-Accel-Redirect"),
+                f"/_protected_media/{lecture.video_file.name}",
+            )
+
+    def test_local_hls_manifest_returns_protected_playback_url(self):
+        with tempfile.TemporaryDirectory() as temp_dir, override_settings(
+            MEDIA_ROOT=temp_dir,
+            COURSE_PROTECTED_MEDIA_USE_ACCEL_REDIRECT=True,
+        ):
+            manifest_path = os.path.join("streams", "test-course", "lecture_99", "master.m3u8")
+            segment_path = os.path.join("streams", "test-course", "lecture_99", "segment_000.ts")
+            os.makedirs(os.path.dirname(os.path.join(temp_dir, manifest_path)), exist_ok=True)
+            with open(os.path.join(temp_dir, manifest_path), "w", encoding="utf-8") as handle:
+                handle.write("#EXTM3U\n#EXTINF:6.0,\nsegment_000.ts\n")
+            with open(os.path.join(temp_dir, segment_path), "wb") as handle:
+                handle.write(b"segment-bytes")
+
+            lecture = Lecture.objects.create(
+                section=self.section,
+                title="HLS Lecture",
+                description="Protected local HLS",
+                video_key="videos/source.mp4",
+                stream_status=Lecture.STREAM_READY,
+                stream_manifest_key=manifest_path.replace("\\", "/"),
+                order=3,
+                is_preview=False,
+            )
+            Enrollment.objects.create(
+                user=self.student,
+                course=self.course,
+                payment_status=Enrollment.STATUS_PAID,
+            )
+
+            self.login(self.student.email)
+            response = self.client.get(reverse("lecture-video", kwargs={"pk": lecture.id}))
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.data["data"]["playback_type"], "hls")
+            playback_url = response.data["data"]["playback_url"]
+            self.assertIn(f"/api/lectures/{lecture.id}/playback/", playback_url)
+
+            protected_response = self.client.get(urlparse(playback_url).path)
+            self.assertEqual(protected_response.status_code, 200)
+            self.assertEqual(
+                protected_response.headers.get("X-Accel-Redirect"),
+                f"/_protected_media/{lecture.stream_manifest_key}",
+            )
+
+    def test_course_detail_hides_uploaded_video_paths(self):
+        with tempfile.TemporaryDirectory() as temp_dir, override_settings(MEDIA_ROOT=temp_dir):
+            lecture = Lecture.objects.create(
+                section=self.section,
+                title="Uploaded Lecture",
+                description="Should not leak file paths",
+                video_file=SimpleUploadedFile("hidden.mp4", b"video", content_type="video/mp4"),
+                order=2,
+                is_preview=False,
+            )
+
+            response = self.client.get(reverse("course-detail", kwargs={"pk": self.course.id}))
+            self.assertEqual(response.status_code, 200)
+            lectures = response.data["data"]["sections"][0]["lectures"]
+            payload = next(item for item in lectures if item["id"] == lecture.id)
+            self.assertNotIn("video_file", payload)
+            self.assertNotIn("video_file_url", payload)
+
     def test_live_class_approval_does_not_grant_course_video_access(self):
         linked_live_class = LiveClass.objects.create(
             title="Linked Live Class",
@@ -862,6 +961,120 @@ class LectureVideoAccessTests(BaseAPITestCase):
         self.login(self.student.email)
         denied = self.client.get(reverse("lecture-video", kwargs={"pk": self.lecture.id}))
         self.assertEqual(denied.status_code, 403)
+
+
+class LectureProgressTests(BaseAPITestCase):
+    def test_enrolled_student_can_save_and_fetch_lecture_progress(self):
+        Enrollment.objects.create(
+            user=self.student,
+            course=self.course,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        self.login(self.student.email)
+
+        update_response = self.client.put(
+            reverse("lecture-progress", kwargs={"pk": self.lecture.id}),
+            {
+                "position_seconds": 147,
+                "duration_seconds": 600,
+            },
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(update_response.data["data"]["last_position_seconds"], 147)
+        self.assertEqual(update_response.data["data"]["percent_complete"], 24)
+        self.assertFalse(update_response.data["data"]["completed"])
+
+        detail_response = self.client.get(reverse("course-detail", kwargs={"pk": self.course.id}))
+        self.assertEqual(detail_response.status_code, 200)
+        lecture_payload = detail_response.data["data"]["sections"][0]["lectures"][0]
+        self.assertEqual(lecture_payload["progress"]["last_position_seconds"], 147)
+        self.assertEqual(lecture_payload["progress"]["resume_position_seconds"], 147)
+
+        fetch_response = self.client.get(reverse("lecture-progress", kwargs={"pk": self.lecture.id}))
+        self.assertEqual(fetch_response.status_code, 200)
+        self.assertEqual(fetch_response.data["data"]["last_position_seconds"], 147)
+
+    def test_progress_update_marks_completion_and_blocks_unenrolled_student(self):
+        self.login(self.student.email)
+        denied = self.client.put(
+            reverse("lecture-progress", kwargs={"pk": self.lecture.id}),
+            {"position_seconds": 40, "duration_seconds": 120},
+            format="json",
+        )
+        self.assertEqual(denied.status_code, 403)
+
+        Enrollment.objects.create(
+            user=self.student,
+            course=self.course,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        completed = self.client.put(
+            reverse("lecture-progress", kwargs={"pk": self.lecture.id}),
+            {"position_seconds": 118, "duration_seconds": 120},
+            format="json",
+        )
+        self.assertEqual(completed.status_code, 200)
+        self.assertTrue(completed.data["data"]["completed"])
+
+        progress = LectureProgress.objects.get(user=self.student, lecture=self.lecture)
+        self.assertTrue(progress.completed)
+        self.assertEqual(progress.resume_position_seconds(), 0)
+
+
+class AdaptiveHLSTranscodeTests(BaseAPITestCase):
+    @patch("apps.courses.services.subprocess.run")
+    def test_transcode_lecture_to_hls_generates_master_playlist_and_duration(self, mock_run):
+        with tempfile.TemporaryDirectory() as temp_dir, override_settings(MEDIA_ROOT=temp_dir):
+            lecture = Lecture.objects.create(
+                section=self.section,
+                title="Adaptive Lecture",
+                description="Adaptive stream generation",
+                video_file=SimpleUploadedFile("adaptive.mp4", b"source-bytes", content_type="video/mp4"),
+                order=2,
+            )
+
+            def fake_run(cmd, check=False, capture_output=False, text=False):
+                executable = os.path.basename(str(cmd[0]))
+                if executable == "ffprobe":
+                    return SimpleNamespace(
+                        returncode=0,
+                        stdout=json.dumps(
+                            {
+                                "streams": [
+                                    {"codec_type": "video", "width": 1280, "height": 720},
+                                    {"codec_type": "audio"},
+                                ],
+                                "format": {"duration": "612.4"},
+                            }
+                        ),
+                        stderr="",
+                    )
+
+                output_path = cmd[-1]
+                segment_pattern = cmd[cmd.index("-hls_segment_filename") + 1]
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                with open(output_path, "w", encoding="utf-8") as handle:
+                    handle.write("#EXTM3U\n#EXTINF:6.0,\nsegment_000.ts\n")
+                with open(segment_pattern.replace("%03d", "000"), "wb") as handle:
+                    handle.write(b"segment")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+            mock_run.side_effect = fake_run
+            transcode_lecture_to_hls(lecture)
+            lecture.refresh_from_db()
+
+            self.assertEqual(lecture.stream_status, Lecture.STREAM_READY)
+            self.assertEqual(lecture.stream_duration_seconds, 612)
+            self.assertTrue(lecture.stream_manifest_key.endswith("master.m3u8"))
+
+            master_playlist_path = os.path.join(temp_dir, lecture.stream_manifest_key)
+            self.assertTrue(os.path.exists(master_playlist_path))
+            with open(master_playlist_path, "r", encoding="utf-8") as handle:
+                master_playlist = handle.read()
+            self.assertIn("360p/index.m3u8", master_playlist)
+            self.assertIn("540p/index.m3u8", master_playlist)
+            self.assertIn("720p/index.m3u8", master_playlist)
 
 
 class RealtimeSessionTests(APITestCase):
@@ -1105,11 +1318,15 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(join_response.status_code, 200)
         self.assertEqual(join_response.data["data"]["mode"], "meeting")
         self.assertEqual(join_response.data["data"]["meeting"]["token"], "lk.token")
-        self.assertTrue(join_response.data["data"]["meeting"]["permissions"]["can_speak"])
+        self.assertFalse(join_response.data["data"]["meeting"]["permissions"]["can_speak"])
         self.assertFalse(join_response.data["data"]["meeting"]["permissions"]["can_present"])
         self.assertEqual(mock_build_token.call_count, 1)
-        self.assertTrue(mock_build_token.call_args.kwargs["can_publish"])
-        self.assertEqual(mock_build_token.call_args.kwargs["can_publish_sources"], ["microphone"])
+        self.assertFalse(mock_build_token.call_args.kwargs["can_publish"])
+        self.assertIsNone(mock_build_token.call_args.kwargs["can_publish_sources"])
+        self.assertEqual(mock_build_token.call_args.kwargs["participant_metadata"]["user_id"], self.viewer.id)
+        self.assertEqual(mock_build_token.call_args.kwargs["participant_metadata"]["role"], User.ROLE_STUDENT)
+        self.assertFalse(mock_build_token.call_args.kwargs["participant_metadata"]["is_admin"])
+        self.assertEqual(join_response.data["data"]["meeting"]["participant_profile_image_url"], "")
 
     @patch("apps.realtime.views.get_room_participant_count")
     def test_join_switches_to_broadcast_when_meeting_capacity_reached(self, mock_participant_count):
@@ -1431,6 +1648,80 @@ class RealtimeSessionTests(APITestCase):
             streamed_content = b"".join(response.streaming_content)
             self.assertEqual(streamed_content, file_bytes)
 
+    def test_recording_download_resolves_host_absolute_output_path_containing_recordings_segment(self):
+        with tempfile.TemporaryDirectory() as recordings_root:
+            meeting_dir = os.path.join(recordings_root, "meeting")
+            os.makedirs(meeting_dir, exist_ok=True)
+            file_name = "host-absolute-egress-recording.mp4"
+            absolute_file_path = os.path.join(meeting_dir, file_name)
+            file_bytes = b"\x00\x00\x00\x18ftypmp42host-absolute-data"
+            with open(absolute_file_path, "wb") as recording_file:
+                recording_file.write(file_bytes)
+
+            session = RealtimeSession.objects.create(
+                title="Host Absolute Recording Session",
+                description="Download endpoint should recover recordings segment from host paths",
+                host=self.host,
+                session_type=RealtimeSession.TYPE_MEETING,
+                linked_live_class=self.live_class,
+                linked_course=self.meeting_course,
+                status=RealtimeSession.STATUS_LIVE,
+            )
+            recording = RealtimeSessionRecording.objects.create(
+                session=session,
+                recording_type=RealtimeSession.TYPE_MEETING,
+                started_by=self.host,
+                status=RealtimeSessionRecording.STATUS_COMPLETED,
+                output_file_path=f"/opt/alsyed/StreamX/recordings/meeting/{file_name}",
+            )
+
+            self.login(self.host.email)
+            with override_settings(
+                LIVEKIT_RECORDING_LOCAL_OUTPUT_ROOT=recordings_root,
+                LIVEKIT_RECORDING_FILEPATH_PREFIX="/recordings",
+            ):
+                response = self.client.get(
+                    reverse(
+                        "realtime-session-recording-download",
+                        kwargs={"recording_id": recording.id},
+                    )
+                )
+            self.assertEqual(response.status_code, 200)
+            streamed_content = b"".join(response.streaming_content)
+            self.assertEqual(streamed_content, file_bytes)
+
+    def test_recording_download_redirects_to_public_output_url_when_local_file_is_missing(self):
+        session = RealtimeSession.objects.create(
+            title="Remote Recording Download Session",
+            description="Redirect to public URL when local asset is unavailable",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+        recording = RealtimeSessionRecording.objects.create(
+            session=session,
+            recording_type=RealtimeSession.TYPE_MEETING,
+            started_by=self.host,
+            status=RealtimeSessionRecording.STATUS_COMPLETED,
+            output_file_path="/recordings/meeting/missing-file.mp4",
+            output_download_url="https://media.example.com/recordings/meeting/missing-file.mp4",
+        )
+
+        self.login(self.host.email)
+        response = self.client.get(
+            reverse(
+                "realtime-session-recording-download",
+                kwargs={"recording_id": recording.id},
+            )
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.headers.get("Location"),
+            "https://media.example.com/recordings/meeting/missing-file.mp4",
+        )
+
     def test_recording_delete_removes_db_row_and_local_file(self):
         with tempfile.TemporaryDirectory() as recordings_root:
             meeting_dir = os.path.join(recordings_root, "meeting")
@@ -1512,7 +1803,7 @@ class RealtimeSessionTests(APITestCase):
     @patch("apps.realtime.views.build_meet_embed_url")
     @patch("apps.realtime.views.build_participant_token")
     @patch("apps.realtime.views.get_room_participant_count")
-    def test_student_joins_meeting_in_viewer_mode_until_presenter_granted(
+    def test_student_cannot_receive_stage_access_and_stays_in_viewer_mode(
         self,
         mock_participant_count,
         mock_build_token,
@@ -1542,7 +1833,7 @@ class RealtimeSessionTests(APITestCase):
         )
         self.assertEqual(before_grant.status_code, 200)
         self.assertFalse(before_grant.data["data"]["meeting"]["permissions"]["can_present"])
-        self.assertTrue(before_grant.data["data"]["meeting"]["permissions"]["can_speak"])
+        self.assertFalse(before_grant.data["data"]["meeting"]["permissions"]["can_speak"])
 
         self.client.post(reverse("auth-logout"))
         self.login(self.host.email)
@@ -1554,8 +1845,11 @@ class RealtimeSessionTests(APITestCase):
             {"user_id": self.viewer.id},
             format="json",
         )
-        self.assertEqual(grant_response.status_code, 200)
-        self.assertIn(self.viewer.id, grant_response.data["data"]["presenter_user_ids"])
+        self.assertEqual(grant_response.status_code, 400)
+        self.assertEqual(
+            grant_response.data["errors"]["detail"],
+            "Only admin or the assigned instructor can use camera and screen share.",
+        )
 
         self.client.post(reverse("auth-logout"))
         self.login(self.viewer.email)
@@ -1565,17 +1859,136 @@ class RealtimeSessionTests(APITestCase):
             format="json",
         )
         self.assertEqual(after_grant.status_code, 200)
-        self.assertTrue(after_grant.data["data"]["meeting"]["permissions"]["can_present"])
-        self.assertTrue(after_grant.data["data"]["meeting"]["permissions"]["can_speak"])
+        self.assertFalse(after_grant.data["data"]["meeting"]["permissions"]["can_present"])
+        self.assertFalse(after_grant.data["data"]["meeting"]["permissions"]["can_speak"])
         self.assertEqual(mock_build_token.call_count, 2)
         self.assertEqual(
             mock_build_token.call_args_list[0].kwargs["can_publish_sources"],
-            ["microphone"],
+            None,
         )
         self.assertEqual(
             mock_build_token.call_args_list[1].kwargs["can_publish_sources"],
-            ["camera", "microphone", "screen_share", "screen_share_audio"],
+            None,
         )
+
+    @override_settings(
+        LIVEKIT_URL="ws://livekit.test",
+        LIVEKIT_API_KEY="devkey",
+        LIVEKIT_API_SECRET="secret",
+        LIVEKIT_MEET_URL="https://meet.livekit.io",
+    )
+    @patch("apps.realtime.views.build_meet_embed_url")
+    @patch("apps.realtime.views.build_participant_token")
+    @patch("apps.realtime.views.get_room_participant_count")
+    def test_student_joins_meeting_with_microphone_only_after_speaker_granted(
+        self,
+        mock_participant_count,
+        mock_build_token,
+        mock_build_meet_url,
+    ):
+        mock_participant_count.return_value = 1
+        mock_build_token.return_value = "lk.token"
+        mock_build_meet_url.return_value = "https://meet.livekit.io/?token=lk.token"
+
+        session = RealtimeSession.objects.create(
+            title="Speaker Permission Session",
+            description="Speaker control checks",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            meeting_capacity=300,
+            max_audience=50000,
+        )
+
+        self.login(self.host.email)
+        grant_response = self.client.post(
+            reverse(
+                "realtime-session-speaker-permission",
+                kwargs={"pk": session.id, "permission_action": "grant"},
+            ),
+            {"user_id": self.viewer.id},
+            format="json",
+        )
+        self.assertEqual(grant_response.status_code, 200)
+        self.assertIn(self.viewer.id, grant_response.data["data"]["speaker_user_ids"])
+        self.assertNotIn(self.viewer.id, grant_response.data["data"]["presenter_user_ids"])
+
+        self.client.post(reverse("auth-logout"))
+        self.login(self.viewer.email)
+        join_response = self.client.post(
+            reverse("realtime-session-join", kwargs={"pk": session.id}),
+            {"display_name": "Viewer User"},
+            format="json",
+        )
+        self.assertEqual(join_response.status_code, 200)
+        self.assertFalse(join_response.data["data"]["meeting"]["permissions"]["can_present"])
+        self.assertTrue(join_response.data["data"]["meeting"]["permissions"]["can_speak"])
+        self.assertEqual(mock_build_token.call_count, 1)
+        self.assertTrue(mock_build_token.call_args.kwargs["can_publish"])
+        self.assertEqual(mock_build_token.call_args.kwargs["can_publish_sources"], ["microphone"])
+
+    @override_settings(
+        LIVEKIT_URL="ws://livekit.test",
+        LIVEKIT_API_KEY="devkey",
+        LIVEKIT_API_SECRET="secret",
+        LIVEKIT_MEET_URL="https://meet.livekit.io",
+    )
+    @patch("apps.realtime.views.build_participant_token")
+    @patch("apps.realtime.views.get_room_participant_count")
+    def test_assigned_instructor_can_join_and_manage_permissions_without_being_host(
+        self,
+        mock_participant_count,
+        mock_build_token,
+    ):
+        mock_participant_count.return_value = 1
+        mock_build_token.return_value = "lk.token"
+
+        admin_host = User.objects.create_user(
+            email="adminhost@test.com",
+            password="StrongPass@123",
+            full_name="Admin Host",
+            role=User.ROLE_INSTRUCTOR,
+            is_staff=True,
+        )
+        session = RealtimeSession.objects.create(
+            title="Instructor Managed Session",
+            description="Assigned instructor can moderate",
+            host=admin_host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            meeting_capacity=300,
+            max_audience=50000,
+        )
+
+        self.login(self.host.email)
+        detail_response = self.client.get(reverse("realtime-session-detail", kwargs={"pk": session.id}))
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertTrue(detail_response.data["data"]["can_manage"])
+
+        join_response = self.client.post(
+            reverse("realtime-session-join", kwargs={"pk": session.id}),
+            {"display_name": "Assigned Instructor"},
+            format="json",
+        )
+        self.assertEqual(join_response.status_code, 200)
+        self.assertTrue(join_response.data["data"]["meeting"]["permissions"]["can_present"])
+        self.assertTrue(join_response.data["data"]["meeting"]["permissions"]["can_speak"])
+        self.assertTrue(join_response.data["data"]["meeting"]["permissions"]["can_manage_participants"])
+
+        grant_response = self.client.post(
+            reverse(
+                "realtime-session-speaker-permission",
+                kwargs={"pk": session.id, "permission_action": "grant"},
+            ),
+            {"user_id": self.viewer.id},
+            format="json",
+        )
+        self.assertEqual(grant_response.status_code, 200)
+        self.assertIn(self.viewer.id, grant_response.data["data"]["speaker_user_ids"])
 
     @override_settings(FRONTEND_PUBLIC_ORIGIN="https://academy.example.com")
     def test_session_join_url_prefers_frontend_public_origin(self):

@@ -6,10 +6,12 @@ from config.request_security import contains_active_content, is_safe_public_http
 from config.upload_validators import validate_profile_image_upload, validate_video_upload
 from config.url_utils import get_media_public_url
 
+from .services import ProtectedMediaError, build_protected_lecture_playback_url, resolve_lecture_playback_expires_in
 from .models import (
     Course,
     Enrollment,
     Lecture,
+    LectureProgress,
     LiveClass,
     LiveClassEnrollment,
     PublicEnrollmentLead,
@@ -88,11 +90,21 @@ class LectureSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if not getattr(obj, "video_file", None):
             return None
-        return get_media_public_url(obj.video_file.url, request=request)
+        try:
+            url, _ = build_protected_lecture_playback_url(
+                request,
+                obj,
+                obj.video_file.name,
+                expires_in=resolve_lecture_playback_expires_in(obj),
+                asset_type="file",
+            )
+            return url
+        except ProtectedMediaError:
+            return None
 
 
 class LectureNestedSerializer(serializers.ModelSerializer):
-    video_file_url = serializers.SerializerMethodField(read_only=True)
+    progress = serializers.SerializerMethodField()
 
     class Meta:
         model = Lecture
@@ -102,19 +114,43 @@ class LectureNestedSerializer(serializers.ModelSerializer):
             "description",
             "order",
             "is_preview",
-            "video_file",
-            "video_file_url",
             "stream_status",
             "stream_duration_seconds",
+            "progress",
             "created_at",
             "updated_at",
         )
 
-    def get_video_file_url(self, obj):
-        request = self.context.get("request")
-        if not getattr(obj, "video_file", None):
+    def get_progress(self, obj):
+        progress_map = self.context.get("lecture_progress_map") or {}
+        progress = progress_map.get(obj.id)
+        if not progress:
             return None
-        return get_media_public_url(obj.video_file.url, request=request)
+        return LectureProgressStateSerializer(progress).data
+
+
+class LectureProgressStateSerializer(serializers.ModelSerializer):
+    percent_complete = serializers.SerializerMethodField()
+    resume_position_seconds = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LectureProgress
+        fields = (
+            "last_position_seconds",
+            "max_position_seconds",
+            "duration_seconds",
+            "completed",
+            "completed_at",
+            "percent_complete",
+            "resume_position_seconds",
+            "updated_at",
+        )
+
+    def get_percent_complete(self, obj):
+        return obj.completion_percent()
+
+    def get_resume_position_seconds(self, obj):
+        return obj.resume_position_seconds()
 
 
 class SectionSerializer(serializers.ModelSerializer):
@@ -346,6 +382,12 @@ class LiveClassListSerializer(serializers.ModelSerializer):
 
 class CourseEnrollSerializer(serializers.Serializer):
     course_id = serializers.IntegerField(min_value=1)
+
+
+class LectureProgressUpdateSerializer(serializers.Serializer):
+    position_seconds = serializers.IntegerField(min_value=0)
+    duration_seconds = serializers.IntegerField(min_value=1, required=False)
+    completed = serializers.BooleanField(required=False)
 
 
 class LiveClassEnrollSerializer(serializers.Serializer):

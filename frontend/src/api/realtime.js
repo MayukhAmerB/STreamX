@@ -23,3 +23,7 @@ export const grantRealtimePresenter = (id, userId) =>
   apiClient.post(`/realtime/sessions/${id}/presenters/grant/`, { user_id: userId });
 export const revokeRealtimePresenter = (id, userId) =>
   apiClient.post(`/realtime/sessions/${id}/presenters/revoke/`, { user_id: userId });
+export const grantRealtimeSpeaker = (id, userId) =>
+  apiClient.post(`/realtime/sessions/${id}/speakers/grant/`, { user_id: userId });
+export const revokeRealtimeSpeaker = (id, userId) =>
+  apiClient.post(`/realtime/sessions/${id}/speakers/revoke/`, { user_id: userId });

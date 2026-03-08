@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.text import slugify
 from PIL import Image, ImageOps, UnidentifiedImageError
 
@@ -250,6 +251,28 @@ class Lecture(models.Model):
             validate_safe_public_url(self.video_key, "video_key")
 
     def save(self, *args, **kwargs):
+        source_changed = False
+        if self.pk:
+            previous = (
+                Lecture.objects.filter(pk=self.pk)
+                .values("video_key", "video_file", "stream_manifest_key")
+                .first()
+            )
+            if previous:
+                previous_video_key = str(previous.get("video_key") or "")
+                previous_video_file = str(previous.get("video_file") or "")
+                current_video_key = str(self.video_key or "")
+                current_video_file = str(getattr(self.video_file, "name", "") or "")
+                source_changed = (
+                    previous_video_key != current_video_key
+                    or previous_video_file != current_video_file
+                )
+
+        if source_changed:
+            self.stream_manifest_key = ""
+            self.stream_duration_seconds = None
+            self.stream_error = ""
+
         has_source = bool(self.video_file or self.video_key)
         has_manifest = bool(self.stream_manifest_key)
 
@@ -268,6 +291,87 @@ class Lecture(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class LectureProgress(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="lecture_progress_entries",
+    )
+    lecture = models.ForeignKey(
+        Lecture,
+        on_delete=models.CASCADE,
+        related_name="progress_entries",
+    )
+    last_position_seconds = models.PositiveIntegerField(default=0)
+    max_position_seconds = models.PositiveIntegerField(default=0)
+    duration_seconds = models.PositiveIntegerField(blank=True, null=True)
+    completed = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "lecture"], name="courses_lectureprogress_unique_user_lecture"),
+        ]
+        indexes = [
+            models.Index(fields=["user", "updated_at"]),
+            models.Index(fields=["lecture", "updated_at"]),
+            models.Index(fields=["user", "completed"]),
+        ]
+
+    def mark_progress(self, *, position_seconds, duration_seconds=None, completed=None):
+        normalized_position = max(0, int(position_seconds or 0))
+        normalized_duration = None
+        if duration_seconds is not None:
+            try:
+                normalized_duration = max(0, int(duration_seconds))
+            except (TypeError, ValueError):
+                normalized_duration = None
+        if normalized_duration:
+            normalized_position = min(normalized_position, normalized_duration)
+
+        self.last_position_seconds = normalized_position
+        self.max_position_seconds = max(self.max_position_seconds or 0, normalized_position)
+        if normalized_duration:
+            self.duration_seconds = normalized_duration
+
+        should_complete = bool(completed)
+        if not should_complete and self.duration_seconds:
+            completion_threshold_seconds = max(15, int(self.duration_seconds * 0.9))
+            should_complete = (self.max_position_seconds or 0) >= completion_threshold_seconds
+
+        if should_complete:
+            self.completed = True
+            self.completed_at = self.completed_at or timezone.now()
+        elif completed is False:
+            self.completed = False
+            self.completed_at = None
+
+    def completion_percent(self):
+        duration = int(self.duration_seconds or 0)
+        if duration <= 0:
+            return 0
+        watched = min(duration, max(self.max_position_seconds or 0, self.last_position_seconds or 0))
+        return int(round((watched / duration) * 100))
+
+    def resume_position_seconds(self):
+        if self.completed:
+            return 0
+        return int(self.last_position_seconds or 0)
+
+    def save(self, *args, **kwargs):
+        if self.completed and not self.completed_at:
+            self.completed_at = timezone.now()
+        if not self.completed and self.completed_at:
+            self.completed_at = None
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.user.email} -> {self.lecture.title}"
 
 
 class Enrollment(models.Model):

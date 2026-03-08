@@ -1,11 +1,14 @@
+import json
 import subprocess
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
+from django.core import signing
+from django.urls import reverse
 
-from config.url_utils import get_media_public_url
+from config.url_utils import build_public_url, get_media_public_url
 
 
 class S3VideoError(Exception):
@@ -14,6 +17,131 @@ class S3VideoError(Exception):
 
 class VideoTranscodeError(Exception):
     pass
+
+
+class ProtectedMediaError(Exception):
+    pass
+
+
+PROTECTED_LECTURE_MEDIA_SIGNING_SALT = "courses.protected-lecture-media"
+ADAPTIVE_HLS_PROFILES = [
+    {
+        "name": "360p",
+        "width": 640,
+        "height": 360,
+        "video_bitrate": "800k",
+        "maxrate": "856k",
+        "bufsize": "1200k",
+        "audio_bitrate": "96k",
+    },
+    {
+        "name": "540p",
+        "width": 960,
+        "height": 540,
+        "video_bitrate": "1600k",
+        "maxrate": "1712k",
+        "bufsize": "2400k",
+        "audio_bitrate": "128k",
+    },
+    {
+        "name": "720p",
+        "width": 1280,
+        "height": 720,
+        "video_bitrate": "2800k",
+        "maxrate": "2996k",
+        "bufsize": "4200k",
+        "audio_bitrate": "128k",
+    },
+]
+
+
+def normalize_storage_key(storage_key):
+    text = str(storage_key or "").strip().replace("\\", "/")
+    if not text:
+        raise ProtectedMediaError("Storage key is missing.")
+
+    media_url = str(getattr(settings, "MEDIA_URL", "/media/") or "/media/")
+    if media_url and text.startswith(media_url):
+        text = text[len(media_url) :]
+
+    text = text.lstrip("/")
+    parts = []
+    for part in PurePosixPath(text).parts:
+        if part in {"", "."}:
+            continue
+        if part == "..":
+            raise ProtectedMediaError("Invalid protected media path.")
+        parts.append(part)
+
+    if not parts:
+        raise ProtectedMediaError("Protected media path is empty.")
+    return "/".join(parts)
+
+
+def resolve_lecture_playback_expires_in(lecture):
+    return max(1800, int(getattr(settings, "COURSE_PLAYBACK_URL_TTL_SECONDS", 21600)))
+
+
+def build_protected_lecture_playback_url(request, lecture, storage_key, *, expires_in, asset_type):
+    normalized_path = normalize_storage_key(storage_key)
+    asset_type = str(asset_type or "").strip().lower()
+    if asset_type not in {"file", "hls"}:
+        raise ProtectedMediaError("Unsupported protected media asset type.")
+
+    if asset_type == "hls":
+        root_prefix = PurePosixPath(normalized_path).parent.as_posix()
+        if root_prefix in {"", "."}:
+            raise ProtectedMediaError("Invalid HLS protected media root.")
+    else:
+        root_prefix = normalized_path
+
+    token = signing.dumps(
+        {
+            "lecture_id": int(lecture.id),
+            "asset_type": asset_type,
+            "root_prefix": root_prefix,
+        },
+        salt=PROTECTED_LECTURE_MEDIA_SIGNING_SALT,
+        compress=True,
+    )
+    playback_path = reverse(
+        "lecture-playback-asset",
+        kwargs={
+            "pk": lecture.id,
+            "token": token,
+            "asset_path": normalized_path,
+        },
+    )
+    return build_public_url(playback_path, request=request), expires_in
+
+
+def validate_protected_lecture_playback_request(token, lecture_id, asset_path, *, max_age):
+    try:
+        payload = signing.loads(
+            token,
+            max_age=max_age,
+            salt=PROTECTED_LECTURE_MEDIA_SIGNING_SALT,
+        )
+    except signing.BadSignature as exc:
+        raise ProtectedMediaError("Invalid or expired protected media token.") from exc
+
+    if int(payload.get("lecture_id", 0) or 0) != int(lecture_id):
+        raise ProtectedMediaError("Protected media token does not match the lecture.")
+
+    normalized_path = normalize_storage_key(asset_path)
+    asset_type = str(payload.get("asset_type", "")).strip().lower()
+    root_prefix = normalize_storage_key(payload.get("root_prefix"))
+
+    if asset_type == "hls":
+        if normalized_path != root_prefix and not normalized_path.startswith(f"{root_prefix}/"):
+            raise ProtectedMediaError("Protected media path is outside the HLS asset root.")
+    elif asset_type == "file":
+        if normalized_path != root_prefix:
+            raise ProtectedMediaError("Protected media token does not allow this file.")
+    else:
+        raise ProtectedMediaError("Unsupported protected media asset type.")
+
+    return normalized_path
 
 
 def generate_signed_video_url(video_key, expires_in=300):
@@ -59,6 +187,167 @@ def generate_playback_url(request, storage_key, expires_in=300, signer=None):
     return signer(storage_key, expires_in=expires_in), expires_in
 
 
+def _probe_media_metadata(source_path):
+    ffprobe_binary = getattr(settings, "FFPROBE_BINARY", "ffprobe")
+    cmd = [
+        ffprobe_binary,
+        "-v",
+        "error",
+        "-print_format",
+        "json",
+        "-show_entries",
+        "stream=index,codec_type,width,height:format=duration",
+        str(source_path),
+    ]
+    result = subprocess.run(
+        cmd,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise VideoTranscodeError("FFprobe metadata inspection failed.")
+
+    try:
+        payload = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError as exc:
+        raise VideoTranscodeError("FFprobe returned invalid metadata output.") from exc
+
+    streams = payload.get("streams") or []
+    video_stream = next((row for row in streams if row.get("codec_type") == "video"), {})
+    audio_stream = next((row for row in streams if row.get("codec_type") == "audio"), None)
+    try:
+        width = int(video_stream.get("width") or 0)
+        height = int(video_stream.get("height") or 0)
+    except (TypeError, ValueError):
+        width = 0
+        height = 0
+
+    duration_seconds = None
+    try:
+        raw_duration = float((payload.get("format") or {}).get("duration") or 0)
+    except (TypeError, ValueError):
+        raw_duration = 0
+    if raw_duration > 0:
+        duration_seconds = int(round(raw_duration))
+
+    return {
+        "width": width,
+        "height": height,
+        "duration_seconds": duration_seconds,
+        "has_audio": bool(audio_stream),
+    }
+
+
+def _select_hls_profiles(source_width, source_height):
+    selected = [
+        profile.copy()
+        for profile in ADAPTIVE_HLS_PROFILES
+        if source_height <= 0 or profile["height"] <= source_height
+    ]
+    if not selected:
+        fallback = ADAPTIVE_HLS_PROFILES[0].copy()
+        if source_width > 0:
+            fallback["width"] = min(fallback["width"], source_width)
+        if source_height > 0:
+            fallback["height"] = min(fallback["height"], source_height)
+        fallback["name"] = "source"
+        selected = [fallback]
+    return selected
+
+
+def _bandwidth_value(video_bitrate, audio_bitrate):
+    def _parse(value):
+        text = str(value or "").strip().lower()
+        if text.endswith("k"):
+            return int(float(text[:-1]) * 1000)
+        if text.endswith("m"):
+            return int(float(text[:-1]) * 1000000)
+        return int(float(text or 0))
+
+    return _parse(video_bitrate) + _parse(audio_bitrate)
+
+
+def _write_master_playlist(output_abs_dir, profiles):
+    lines = ["#EXTM3U", "#EXT-X-VERSION:3"]
+    for profile in profiles:
+        bandwidth = _bandwidth_value(profile["video_bitrate"], profile["audio_bitrate"])
+        lines.append(
+            (
+                "#EXT-X-STREAM-INF:"
+                f"BANDWIDTH={bandwidth},"
+                f"AVERAGE-BANDWIDTH={bandwidth},"
+                f"RESOLUTION={profile['width']}x{profile['height']}"
+            )
+        )
+        lines.append(f"{profile['name']}/index.m3u8")
+    (output_abs_dir / "master.m3u8").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _build_profile_transcode_command(
+    *,
+    ffmpeg_binary,
+    source_path,
+    profile,
+    profile_dir,
+    has_audio,
+):
+    scale_filter = (
+        f"scale={profile['width']}:{profile['height']}:"
+        "force_original_aspect_ratio=decrease:force_divisible_by=2,"
+        f"pad={profile['width']}:{profile['height']}:(ow-iw)/2:(oh-ih)/2:color=black"
+    )
+    cmd = [
+        ffmpeg_binary,
+        "-y",
+        "-i",
+        str(source_path),
+        "-vf",
+        scale_filter,
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-profile:v",
+        "main",
+        "-crf",
+        "21",
+        "-sc_threshold",
+        "0",
+        "-g",
+        "48",
+        "-keyint_min",
+        "48",
+        "-b:v",
+        profile["video_bitrate"],
+        "-maxrate",
+        profile["maxrate"],
+        "-bufsize",
+        profile["bufsize"],
+        "-hls_time",
+        "6",
+        "-hls_playlist_type",
+        "vod",
+        "-hls_flags",
+        "independent_segments",
+        "-hls_segment_filename",
+        str(profile_dir / "segment_%03d.ts"),
+    ]
+    if has_audio:
+        cmd += [
+            "-c:a",
+            "aac",
+            "-ar",
+            "48000",
+            "-b:a",
+            profile["audio_bitrate"],
+        ]
+    else:
+        cmd.append("-an")
+    cmd.append(str(profile_dir / "index.m3u8"))
+    return cmd
+
+
 def transcode_lecture_to_hls(lecture):
     """
     Phase 2 local transcoding path.
@@ -82,64 +371,71 @@ def transcode_lecture_to_hls(lecture):
         if artifact.is_file() and artifact.suffix.lower() in {".m3u8", ".ts", ".m4s", ".mp4"}:
             artifact.unlink(missing_ok=True)
 
-    playlist_name = "master.m3u8"
-    playlist_abs_path = output_abs_dir / playlist_name
-    segment_pattern = str(output_abs_dir / "segment_%03d.ts")
-
     lecture.stream_status = getattr(lecture, "STREAM_PROCESSING", "processing")
     lecture.stream_error = ""
     lecture.save(update_fields=["stream_status", "stream_error", "updated_at"])
 
-    cmd = [
-        ffmpeg_binary,
-        "-y",
-        "-i",
-        str(source_path),
-        "-c:v",
-        "libx264",
-        "-preset",
-        "veryfast",
-        "-crf",
-        "23",
-        "-c:a",
-        "aac",
-        "-ar",
-        "48000",
-        "-b:a",
-        "128k",
-        "-movflags",
-        "+faststart",
-        "-hls_time",
-        "6",
-        "-hls_playlist_type",
-        "vod",
-        "-hls_segment_filename",
-        segment_pattern,
-        str(playlist_abs_path),
-    ]
+    try:
+        metadata = _probe_media_metadata(source_path)
+    except FileNotFoundError as exc:
+        lecture.stream_status = getattr(lecture, "STREAM_FAILED", "failed")
+        lecture.stream_error = "FFmpeg/FFprobe is not installed or not found in PATH."
+        lecture.save(update_fields=["stream_status", "stream_error", "updated_at"])
+        raise VideoTranscodeError("FFmpeg/FFprobe is not installed or not found in PATH.") from exc
+    except VideoTranscodeError as exc:
+        lecture.stream_status = getattr(lecture, "STREAM_FAILED", "failed")
+        lecture.stream_error = str(exc)[:4000]
+        lecture.save(update_fields=["stream_status", "stream_error", "updated_at"])
+        raise
+
+    profiles = _select_hls_profiles(metadata["width"], metadata["height"])
 
     try:
-        result = subprocess.run(
-            cmd,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+        for profile in profiles:
+            profile_dir = output_abs_dir / profile["name"]
+            profile_dir.mkdir(parents=True, exist_ok=True)
+            for artifact in profile_dir.iterdir():
+                if artifact.is_file() and artifact.suffix.lower() in {".m3u8", ".ts", ".m4s", ".mp4"}:
+                    artifact.unlink(missing_ok=True)
+            cmd = _build_profile_transcode_command(
+                ffmpeg_binary=ffmpeg_binary,
+                source_path=source_path,
+                profile=profile,
+                profile_dir=profile_dir,
+                has_audio=metadata["has_audio"],
+            )
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0 or not (profile_dir / "index.m3u8").exists():
+                error_text = (result.stderr or result.stdout or "FFmpeg transcoding failed.").strip()
+                raise VideoTranscodeError(error_text[:4000] or "FFmpeg transcoding failed.")
+        _write_master_playlist(output_abs_dir, profiles)
     except FileNotFoundError as exc:
         lecture.stream_status = getattr(lecture, "STREAM_FAILED", "failed")
         lecture.stream_error = "FFmpeg is not installed or not found in PATH."
         lecture.save(update_fields=["stream_status", "stream_error", "updated_at"])
         raise VideoTranscodeError("FFmpeg is not installed or not found in PATH.") from exc
-
-    if result.returncode != 0 or not playlist_abs_path.exists():
-        error_text = (result.stderr or result.stdout or "FFmpeg transcoding failed.").strip()
+    except VideoTranscodeError as exc:
         lecture.stream_status = getattr(lecture, "STREAM_FAILED", "failed")
-        lecture.stream_error = error_text[:4000]
+        lecture.stream_error = str(exc)[:4000]
         lecture.save(update_fields=["stream_status", "stream_error", "updated_at"])
-        raise VideoTranscodeError("FFmpeg transcoding failed.")
+        raise
 
-    lecture.stream_manifest_key = str((output_rel_dir / playlist_name).as_posix())
+    lecture.stream_manifest_key = str((output_rel_dir / "master.m3u8").as_posix())
+    lecture.stream_duration_seconds = metadata["duration_seconds"]
     lecture.stream_status = getattr(lecture, "STREAM_READY", "ready")
     lecture.stream_error = ""
-    lecture.save(update_fields=["stream_manifest_key", "stream_status", "stream_error", "updated_at"])
+    lecture.save(
+        update_fields=[
+            "stream_manifest_key",
+            "stream_duration_seconds",
+            "stream_status",
+            "stream_error",
+            "updated_at",
+        ]
+    )
     return lecture

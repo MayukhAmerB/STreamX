@@ -44,6 +44,7 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
             "max_audience",
             "allow_overflow_broadcast",
             "presenter_user_ids",
+            "speaker_user_ids",
             "join_url",
             "stream_embed_url",
             "chat_embed_url",
@@ -72,11 +73,7 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if not request or not request.user.is_authenticated:
             return False
-        return bool(
-            request.user.id == obj.host_id
-            or getattr(request.user, "is_staff", False)
-            or getattr(request.user, "is_superuser", False)
-        )
+        return obj.is_moderator_allowed(request.user)
 
     def get_join_url(self, obj):
         request = self.context.get("request")
@@ -110,6 +107,7 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
             "slug": course.slug,
             "category": course.category,
             "level": course.level,
+            "instructor_id": course.instructor_id,
         }
 
 

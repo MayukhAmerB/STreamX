@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "concurrently -k -n BACKEND,FRONTEND -c green,blue \"npm run dev:backend\" \"npm run dev:frontend:wait\"",
-    "dev:backend": "cd backend && python manage.py runserver 0.0.0.0:8000",
+    "dev:backend": "cd backend && python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:frontend:wait": "node infra/wait-for-http.mjs http://127.0.0.1:8000/api/auth/config/ 90000 && npm run dev:frontend",
     "infra:up": "node infra/start-infra.mjs",

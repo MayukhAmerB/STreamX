@@ -95,6 +95,35 @@ services:
     networks:
       - appnet
 
+  transcoder:
+    build:
+      context: ./backend
+    restart: always
+    env_file:
+      - ./backend/.env.hostinger.production
+    environment:
+      RUN_MIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command:
+      [
+        "python",
+        "manage.py",
+        "transcode_lecture_streams",
+        "--pending",
+        "--watch",
+        "--poll-seconds",
+        "20",
+      ]
+    volumes:
+      - backend_media:/app/media
+    networks:
+      - appnet
+
   livekit:
     image: livekit/livekit-server:latest
     restart: always

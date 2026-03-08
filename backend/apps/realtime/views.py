@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.http import FileResponse
+from django.http.response import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status
@@ -35,6 +36,8 @@ from .serializers import (
     RealtimePresenterPermissionSerializer,
 )
 from .services import (
+    build_participant_metadata,
+    cache_room_participant_count,
     delete_recording_assets,
     LiveKitEgressError,
     LiveKitConfigError,
@@ -60,13 +63,7 @@ realtime_ops_logger = logging.getLogger("ops.realtime")
 
 
 def _can_manage_session(user, session):
-    if not user or not getattr(user, "is_authenticated", False):
-        return False
-    return bool(
-        getattr(user, "id", None) == session.host_id
-        or getattr(user, "is_staff", False)
-        or getattr(user, "is_superuser", False)
-    )
+    return bool(getattr(session, "is_moderator_allowed", None) and session.is_moderator_allowed(user))
 
 
 def _build_session_list_cache_key(*, user_id, is_admin, session_type, status_filter):
@@ -287,7 +284,7 @@ class RealtimeSessionJoinView(APIView):
         )
         if session.session_type == RealtimeSession.TYPE_MEETING:
             if bool(getattr(settings, "REALTIME_WARN_PARTICIPANT_FALLBACK_SOURCE", True)) and (
-                participant_state.participant_count_source != "livekit"
+                participant_state.participant_count_source == "fallback"
             ):
                 _emit_realtime_telemetry(
                     event="meeting.participant_count_source_fallback",
@@ -350,6 +347,7 @@ class RealtimeSessionJoinView(APIView):
 
         display_name = serializer.validated_data.get("display_name") or request.user.full_name or request.user.email
         identity = f"user-{request.user.id}-{int(time.time())}"
+        participant_metadata = build_participant_metadata(user=request.user, request=request)
 
         try:
             token = build_participant_token(
@@ -361,6 +359,7 @@ class RealtimeSessionJoinView(APIView):
                 room_admin=permissions_set.can_manage_presenters,
                 ttl_seconds=settings.REALTIME_JOIN_TOKEN_TTL_SECONDS,
                 can_publish_sources=permissions_set.can_publish_sources,
+                participant_metadata=participant_metadata,
             )
         except LiveKitConfigError as exc:
             return api_response(
@@ -382,6 +381,7 @@ class RealtimeSessionJoinView(APIView):
                 "livekit_url": livekit_client_url,
                 "participant_identity": identity,
                 "participant_name": display_name,
+                "participant_profile_image_url": participant_metadata.get("profile_image_url") or "",
                 "token": token,
                 "meet_embed_url": build_meet_embed_url(token, livekit_client_url),
                 "meeting_capacity": session.meeting_capacity,
@@ -389,13 +389,17 @@ class RealtimeSessionJoinView(APIView):
                 "permissions": {
                     "can_present": permissions_set.can_present,
                     "can_speak": permissions_set.can_speak,
+                    "can_use_microphone": permissions_set.can_speak,
                     "can_use_camera": permissions_set.can_present,
                     "can_share_screen": permissions_set.can_present,
                     "can_manage_presenters": permissions_set.can_manage_presenters,
+                    "can_manage_participants": permissions_set.can_manage_presenters,
                 },
                 "presenter_user_ids": session.get_presenter_user_ids(),
+                "speaker_user_ids": session.get_speaker_user_ids(),
             },
         }
+        cache_room_participant_count(room_name, participant_state.participant_count + 1)
         return api_response(success=True, message="Meeting join payload created.", data=data)
 
 
@@ -408,7 +412,7 @@ class RealtimeSessionEndView(APIView):
             return api_response(
                 success=False,
                 message="Access denied.",
-                errors={"detail": "Only host or admin can end this session."},
+                errors={"detail": "Only host, assigned instructor, or admin can end this session."},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
@@ -423,69 +427,101 @@ class RealtimeSessionPresenterPermissionView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk, permission_action):
-        session = get_object_or_404(RealtimeSession, pk=pk)
-        is_host = request.user.id == session.host_id
-        is_admin = bool(getattr(request.user, "is_staff", False) or getattr(request.user, "is_superuser", False))
-        if not (is_host or is_admin):
-            return api_response(
-                success=False,
-                message="Access denied.",
-                errors={"detail": "Only host or admin can manage presenter permissions."},
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
-        if session.session_type != RealtimeSession.TYPE_MEETING:
-            return api_response(
-                success=False,
-                message="Presenter control unavailable.",
-                errors={"detail": "Presenter permissions are supported for meeting sessions only."},
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-        if permission_action not in {"grant", "revoke"}:
-            return api_response(
-                success=False,
-                message="Invalid presenter action.",
-                errors={"detail": "Action must be grant or revoke."},
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
+        return _update_participant_permission(
+            request=request,
+            pk=pk,
+            permission_action=permission_action,
+            permission_kind="presenter",
+        )
 
-        serializer = RealtimePresenterPermissionSerializer(data=request.data)
-        if not serializer.is_valid():
-            return api_response(
-                success=False,
-                message="Presenter permission update failed.",
-                errors=serializer.errors,
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
 
-        target_user_id = serializer.validated_data["user_id"]
-        target_user = User.objects.filter(pk=target_user_id, is_active=True).first()
-        if not target_user:
-            return api_response(
-                success=False,
-                message="Presenter permission update failed.",
-                errors={"detail": "Target user not found or inactive."},
-                status_code=status.HTTP_404_NOT_FOUND,
-            )
+class RealtimeSessionSpeakerPermissionView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
 
-        if permission_action == "grant":
-            presenter_ids = session.grant_presenter(target_user_id)
-            message = "Presenter access granted."
-        else:
-            presenter_ids = session.revoke_presenter(target_user_id)
-            message = "Presenter access revoked."
+    def post(self, request, pk, permission_action):
+        return _update_participant_permission(
+            request=request,
+            pk=pk,
+            permission_action=permission_action,
+            permission_kind="speaker",
+        )
 
-        data = {
-            "session": RealtimeSessionListSerializer(session, context={"request": request}).data,
-            "presenter_user_ids": presenter_ids,
-            "updated_user": {
-                "id": target_user.id,
-                "email": target_user.email,
-                "full_name": target_user.full_name,
-                "role": target_user.role,
-            },
-            "note": "Permission updates apply on participant rejoin.",
-        }
-        return api_response(success=True, message=message, data=data)
+
+def _update_participant_permission(*, request, pk, permission_action, permission_kind):
+    session = get_object_or_404(RealtimeSession, pk=pk)
+    if not _can_manage_session(request.user, session):
+        return api_response(
+            success=False,
+            message="Access denied.",
+            errors={"detail": "Only host, assigned instructor, or admin can manage participant permissions."},
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+    if session.session_type != RealtimeSession.TYPE_MEETING:
+        return api_response(
+            success=False,
+            message="Participant control unavailable.",
+            errors={"detail": "Participant permissions are supported for meeting sessions only."},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    if permission_action not in {"grant", "revoke"}:
+        return api_response(
+            success=False,
+            message="Invalid participant permission action.",
+            errors={"detail": "Action must be grant or revoke."},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    serializer = RealtimePresenterPermissionSerializer(data=request.data)
+    if not serializer.is_valid():
+        return api_response(
+            success=False,
+            message="Participant permission update failed.",
+            errors=serializer.errors,
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    target_user_id = serializer.validated_data["user_id"]
+    target_user = User.objects.filter(pk=target_user_id, is_active=True).first()
+    if not target_user:
+        return api_response(
+            success=False,
+            message="Participant permission update failed.",
+            errors={"detail": "Target user not found or inactive."},
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+    target_label = "Presenter" if permission_kind == "presenter" else "Mic"
+    if permission_kind == "presenter":
+        return api_response(
+            success=False,
+            message="Stage access is restricted.",
+            errors={"detail": "Only admin or the assigned instructor can use camera and screen share."},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    else:
+        actor = session.grant_speaker if permission_action == "grant" else session.revoke_speaker
+        speaker_ids = actor(target_user_id)
+        presenter_ids = session.get_presenter_user_ids()
+
+    if permission_action == "grant":
+        message = f"{target_label} access granted."
+    else:
+        message = f"{target_label} access revoked."
+
+    data = {
+        "session": RealtimeSessionListSerializer(session, context={"request": request}).data,
+        "presenter_user_ids": presenter_ids,
+        "speaker_user_ids": speaker_ids,
+        "updated_user": {
+            "id": target_user.id,
+            "email": target_user.email,
+            "full_name": target_user.full_name,
+            "role": target_user.role,
+        },
+        "updated_permission": permission_kind,
+        "note": "Permission updates apply on participant rejoin.",
+    }
+    return api_response(success=True, message=message, data=data)
 
 
 class RealtimeSessionHostTokenView(APIView):
@@ -497,7 +533,7 @@ class RealtimeSessionHostTokenView(APIView):
             return api_response(
                 success=False,
                 message="Access denied.",
-                errors={"detail": "Only host or admin can start browser publishing."},
+                errors={"detail": "Only host, assigned instructor, or admin can start browser publishing."},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
         if not is_livekit_configured():
@@ -539,7 +575,7 @@ class RealtimeSessionStreamStartView(APIView):
             return api_response(
                 success=False,
                 message="Access denied.",
-                errors={"detail": "Only host or admin can start streaming."},
+                errors={"detail": "Only host, assigned instructor, or admin can start streaming."},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
@@ -599,7 +635,7 @@ class RealtimeSessionStreamStopView(APIView):
             return api_response(
                 success=False,
                 message="Access denied.",
-                errors={"detail": "Only host or admin can stop streaming."},
+                errors={"detail": "Only host, assigned instructor, or admin can stop streaming."},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
@@ -673,6 +709,8 @@ class RealtimeSessionRecordingDownloadView(APIView):
         if stream is None:
             resolved_path = resolve_recording_local_path(recording.output_file_path)
             if not resolved_path or not resolved_path.exists() or not resolved_path.is_file():
+                if recording.output_download_url:
+                    return HttpResponseRedirect(recording.output_download_url)
                 return api_response(
                     success=False,
                     message="Recording file not found.",
@@ -700,7 +738,7 @@ class RealtimeSessionRecordingDeleteView(APIView):
             return api_response(
                 success=False,
                 message="Access denied.",
-                errors={"detail": "Only host or admin can delete recordings."},
+                errors={"detail": "Only host, assigned instructor, or admin can delete recordings."},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
         if recording.status in RealtimeSessionRecording.ACTIVE_STATUSES:
@@ -730,7 +768,7 @@ class RealtimeSessionRecordingStartView(APIView):
             return api_response(
                 success=False,
                 message="Access denied.",
-                errors={"detail": "Only host or admin can start recording."},
+                errors={"detail": "Only host, assigned instructor, or admin can start recording."},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
         if not bool(getattr(settings, "LIVEKIT_RECORDING_ENABLED", True)):
@@ -807,7 +845,7 @@ class RealtimeSessionRecordingStopView(APIView):
             return api_response(
                 success=False,
                 message="Access denied.",
-                errors={"detail": "Only host or admin can stop recording."},
+                errors={"detail": "Only host, assigned instructor, or admin can stop recording."},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
@@ -862,7 +900,7 @@ class RealtimeSessionBrowserRecordingUploadView(APIView):
             return api_response(
                 success=False,
                 message="Access denied.",
-                errors={"detail": "Only host or admin can upload fallback recording."},
+                errors={"detail": "Only host, assigned instructor, or admin can upload fallback recording."},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 

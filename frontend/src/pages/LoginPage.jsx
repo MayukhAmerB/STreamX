@@ -3,6 +3,7 @@ import { GoogleLogin } from "@react-oauth/google";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { requestPasswordReset } from "../api/auth";
 import Button from "../components/Button";
+import BrandLogo from "../components/BrandLogo";
 import FormInput from "../components/FormInput";
 import PageShell from "../components/PageShell";
 import { useAuth } from "../hooks/useAuth";
@@ -92,24 +93,46 @@ export default function LoginPage() {
         </div>
 
         <div className="relative grid gap-6 p-4 sm:p-6 lg:grid-cols-[1.03fr_0.97fr] lg:gap-8">
-          <div className="hidden rounded-2xl border border-[#243025] bg-[#0d120f]/72 p-6 backdrop-blur-sm lg:block">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#334033] bg-white/5 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#d7e0cc]">
+          <div className="hidden rounded-[26px] border border-[#243025] bg-[#0d120f]/76 p-6 backdrop-blur-sm lg:block">
+            <div className="rounded-[22px] border border-[#2c352d] bg-[#0d120f]/92 p-4 shadow-[0_16px_44px_rgba(0,0,0,0.24)]">
+              <div className="flex items-start justify-between gap-4">
+                <BrandLogo className="max-w-[260px]" />
+                <div className="rounded-2xl border border-[#2f3a30] bg-[#101611] px-4 py-3 text-right">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8f9989]">
+                    AUTH STATE
+                  </div>
+                  <div className="mt-2 text-sm font-semibold text-[#dce5d2]">SECURE GATEWAY</div>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {["EMAIL", "PASSWORD", "2FA", "ENROLLED ACCESS"].map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-[#314032] bg-[#121712] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#d7e0cc]"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#334033] bg-white/5 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#d7e0cc]">
               SECURE LOGIN
             </div>
 
             <h1 className="mt-4 font-reference text-4xl font-semibold leading-tight text-white">
-              Access your Al syed Initiative account
+              Access the training platform through a controlled login path
             </h1>
             <p className="mt-3 max-w-md text-sm leading-7 text-[#b7c0b0]">
-              Continue your OSINT and web application pentesting learning path with protected access,
-              course purchases, and live class enrollment.
+              Continue your OSINT and web application pentesting workflow with protected course access,
+              instructor-led live sessions, and optional authenticator-based verification.
             </p>
 
             <div className="mt-6 grid gap-3">
               {[
-                "Course access for enrolled students only",
-                "Live classes enrollment linked to your account",
-                "Optional 2FA with authenticator app support",
+                "Course access is issued to enrolled students only",
+                "Live class permissions stay linked to your account",
+                "Authenticator-based 2FA can harden the session",
               ].map((item) => (
                 <div
                   key={item}
@@ -128,7 +151,7 @@ export default function LoginPage() {
               <div className="mt-3 grid grid-cols-3 gap-2">
                 {["Email", "Password", "2FA (Optional)"].map((step, idx) => (
                   <div key={step} className="rounded-xl border border-[#1f2820] bg-[#111612] p-3">
-                    <div className="text-xs font-semibold text-[#dce4d2]">{`0${idx + 1}`}</div>
+                    <div className="font-mono text-xs font-semibold text-[#dce4d2]">{`0${idx + 1}`}</div>
                     <div className="mt-1 text-xs text-[#aab4a3]">{step}</div>
                   </div>
                 ))}

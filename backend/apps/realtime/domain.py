@@ -17,6 +17,7 @@ class JoinAccessDecision:
     detail: str
     is_host: bool
     is_admin: bool
+    is_instructor_owner: bool
 
 
 @dataclass(frozen=True)
@@ -66,7 +67,9 @@ def list_queryset(*, session_type: str, status_filter: str, user):
         live_class__is_active=True,
     ).values_list("live_class_id", flat=True)
     return queryset.filter(
-        Q(host_id=user.id) | Q(linked_live_class_id__in=approved_live_class_ids)
+        Q(host_id=user.id)
+        | Q(linked_course__instructor_id=user.id)
+        | Q(linked_live_class_id__in=approved_live_class_ids)
     )
 
 
@@ -84,8 +87,9 @@ def session_payload_for_create(validated_data):
 def get_access_decision(session: RealtimeSession, user) -> JoinAccessDecision:
     is_host = bool(getattr(user, "id", None) == session.host_id)
     is_admin = bool(getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))
+    is_instructor_owner = session.is_instructor_owner(user)
 
-    if not (is_host or is_admin):
+    if not (is_host or is_admin or is_instructor_owner):
         if not session.linked_live_class_id:
             return JoinAccessDecision(
                 allowed=False,
@@ -94,6 +98,7 @@ def get_access_decision(session: RealtimeSession, user) -> JoinAccessDecision:
                 detail="This live session is not linked to a permitted live class.",
                 is_host=is_host,
                 is_admin=is_admin,
+                is_instructor_owner=is_instructor_owner,
             )
         is_enrolled = LiveClassEnrollment.objects.filter(
             user_id=user.id,
@@ -109,6 +114,7 @@ def get_access_decision(session: RealtimeSession, user) -> JoinAccessDecision:
                 detail="You are not approved for the live class linked to this session.",
                 is_host=is_host,
                 is_admin=is_admin,
+                is_instructor_owner=is_instructor_owner,
             )
 
     return JoinAccessDecision(
@@ -118,13 +124,14 @@ def get_access_decision(session: RealtimeSession, user) -> JoinAccessDecision:
         detail="",
         is_host=is_host,
         is_admin=is_admin,
+        is_instructor_owner=is_instructor_owner,
     )
 
 
 def build_permission_set(session: RealtimeSession, user, decision: JoinAccessDecision) -> JoinPermissionSet:
-    can_manage_presenters = bool(decision.is_host or decision.is_admin)
+    can_manage_presenters = session.is_moderator_allowed(user)
     can_present = session.is_presenter_allowed(user)
-    can_speak = session.session_type == RealtimeSession.TYPE_MEETING
+    can_speak = session.session_type == RealtimeSession.TYPE_MEETING and session.is_speaker_allowed(user)
     can_publish = bool(can_present or can_speak)
 
     can_publish_sources = None
@@ -154,10 +161,12 @@ def resolve_participant_state(
     participant_count_source = "fallback"
 
     if session.session_type == RealtimeSession.TYPE_MEETING:
-        count = participant_counter(room_name)
+        count_result = participant_counter(room_name)
+        count = getattr(count_result, "count", count_result)
+        source = getattr(count_result, "source", "livekit" if count is not None else "fallback")
         if count is not None:
-            participant_count = count
-            participant_count_source = "livekit"
+            participant_count = max(0, int(count))
+            participant_count_source = source or "livekit"
 
     should_use_broadcast = session.session_type == RealtimeSession.TYPE_BROADCASTING
     overflow_triggered = False

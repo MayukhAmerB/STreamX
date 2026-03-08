@@ -8,8 +8,11 @@ from urllib.error import HTTPError, URLError
 
 import jwt
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import DisallowedHost
 from django.utils import timezone
+
+from config.url_utils import get_media_public_url
 
 
 logger = logging.getLogger(__name__)
@@ -22,6 +25,12 @@ class LiveKitConfigError(Exception):
 
 class LiveKitEgressError(Exception):
     """Raised when starting/stopping egress fails."""
+
+
+class ParticipantCountSnapshot:
+    def __init__(self, count=None, source="fallback"):
+        self.count = count
+        self.source = source
 
 
 def is_livekit_configured():
@@ -201,7 +210,7 @@ def build_session_join_url(session_id, request=None):
     return f"/join-live?session={session_id}"
 
 
-def _build_server_token(*, identity, grants, ttl_seconds=3600, participant_name=""):
+def _build_server_token(*, identity, grants, ttl_seconds=3600, participant_name="", participant_metadata=None):
     if not is_livekit_configured():
         raise LiveKitConfigError("LiveKit is not configured. Set LIVEKIT_URL, LIVEKIT_API_KEY and LIVEKIT_API_SECRET.")
 
@@ -215,6 +224,8 @@ def _build_server_token(*, identity, grants, ttl_seconds=3600, participant_name=
     }
     if participant_name:
         payload["name"] = participant_name
+    if participant_metadata:
+        payload["metadata"] = json.dumps(participant_metadata)
     token = jwt.encode(payload, settings.LIVEKIT_API_SECRET, algorithm="HS256")
     if isinstance(token, bytes):
         return token.decode("utf-8")
@@ -231,6 +242,7 @@ def build_participant_token(
     room_admin,
     ttl_seconds,
     can_publish_sources=None,
+    participant_metadata=None,
 ):
     grants = {
         "roomJoin": True,
@@ -247,12 +259,49 @@ def build_participant_token(
         grants=grants,
         ttl_seconds=ttl_seconds,
         participant_name=participant_name,
+        participant_metadata=participant_metadata,
     )
 
 
-def get_room_participant_count(room_name):
+def build_participant_metadata(*, user, request=None):
+    if not user:
+        return {}
+    profile_image_url = ""
+    if getattr(user, "profile_image", None):
+        try:
+            profile_image_url = get_media_public_url(user.profile_image.url, request=request)
+        except Exception:
+            profile_image_url = ""
+    return {
+        "user_id": getattr(user, "id", None),
+        "full_name": getattr(user, "full_name", "") or getattr(user, "email", "") or "",
+        "role": getattr(user, "role", ""),
+        "is_admin": bool(getattr(user, "is_staff", False) or getattr(user, "is_superuser", False)),
+        "profile_image_url": profile_image_url,
+    }
+
+
+def _room_participant_count_cache_key(room_name):
+    return f"realtime-room-participants:{str(room_name or '').strip().lower()}"
+
+
+def cache_room_participant_count(room_name, count):
+    cache_ttl = max(0, int(getattr(settings, "REALTIME_PARTICIPANT_COUNT_CACHE_TTL_SECONDS", 5)))
+    if cache_ttl <= 0 or not room_name or count is None:
+        return
+    cache.set(_room_participant_count_cache_key(room_name), max(0, int(count)), timeout=cache_ttl)
+
+
+def get_room_participant_count(room_name, *, refresh=False):
     if not is_livekit_configured():
-        return None
+        return ParticipantCountSnapshot(count=None, source="fallback")
+
+    cache_ttl = max(0, int(getattr(settings, "REALTIME_PARTICIPANT_COUNT_CACHE_TTL_SECONDS", 5)))
+    cache_key = _room_participant_count_cache_key(room_name)
+    if not refresh and cache_ttl > 0:
+        cached_count = cache.get(cache_key)
+        if cached_count is not None:
+            return ParticipantCountSnapshot(count=max(0, int(cached_count)), source="cache")
 
     admin_token = _build_server_token(
         identity="server-room-admin",
@@ -275,18 +324,21 @@ def get_room_participant_count(room_name):
         with urlopen(request, timeout=4) as response:
             body = json.loads(response.read().decode("utf-8") or "{}")
             participants = body.get("participants") or []
-            return len(participants)
+            count = len(participants)
+            cache_room_participant_count(room_name, count)
+            return ParticipantCountSnapshot(count=count, source="livekit")
     except HTTPError as exc:
         if exc.code in {400, 404}:
-            return 0
+            cache_room_participant_count(room_name, 0)
+            return ParticipantCountSnapshot(count=0, source="livekit")
         logger.warning("LiveKit participant count HTTP error: %s", exc)
-        return None
+        return ParticipantCountSnapshot(count=None, source="fallback")
     except URLError as exc:
         logger.warning("LiveKit participant count network error: %s", exc)
-        return None
+        return ParticipantCountSnapshot(count=None, source="fallback")
     except Exception as exc:  # defensive fallback
         logger.warning("LiveKit participant count unknown error: %s", exc)
-        return None
+        return ParticipantCountSnapshot(count=None, source="fallback")
 
 
 def build_meet_embed_url(token, livekit_url=None):
@@ -376,6 +428,7 @@ def build_host_publisher_token(*, session, user):
         can_subscribe=True,
         room_admin=True,
         ttl_seconds=settings.REALTIME_JOIN_TOKEN_TTL_SECONDS,
+        participant_metadata=build_participant_metadata(user=user),
     )
     return {
         "identity": identity,
@@ -490,29 +543,54 @@ def resolve_recording_local_path(output_file_path):
     if prefix != "/":
         prefix = prefix.rstrip("/")
 
-    relative = None
-    if prefix == normalized:
-        relative = ""
-    elif prefix != "/" and normalized.startswith(f"{prefix}/"):
-        relative = normalized[len(prefix) + 1 :]
+    candidate_values = []
 
-    if relative is None:
-        candidate_path = Path(normalized)
+    def add_candidate(value):
+        normalized_value = str(value or "").strip()
+        if normalized_value and normalized_value not in candidate_values:
+            candidate_values.append(normalized_value)
+
+    if prefix == normalized:
+        add_candidate("")
+    elif prefix != "/" and normalized.startswith(f"{prefix}/"):
+        add_candidate(normalized[len(prefix) + 1 :])
+
+    if prefix != "/" and f"{prefix}/" in normalized:
+        add_candidate(normalized.split(f"{prefix}/", 1)[1])
+
+    add_candidate(normalized)
+    add_candidate(normalized.lstrip("./"))
+    if normalized.startswith("recordings/"):
+        add_candidate(normalized[len("recordings/") :])
+
+    file_name = Path(normalized).name.strip()
+
+    for candidate_value in candidate_values:
+        candidate_path = Path(candidate_value)
         if candidate_path.is_absolute():
             candidate = candidate_path.resolve()
         else:
-            relative = normalized.lstrip("./")
-            if relative.startswith("recordings/"):
-                relative = relative[len("recordings/") :]
+            relative = str(candidate_value).replace("\\", "/").lstrip("/")
             candidate = (root / relative).resolve()
-    else:
-        candidate = (root / relative).resolve()
 
-    try:
-        candidate.relative_to(root)
-    except ValueError:
-        return None
-    return candidate
+        if candidate.exists() and candidate.is_file():
+            try:
+                candidate.relative_to(root)
+            except ValueError:
+                continue
+            return candidate
+
+    if file_name:
+        for matched_file in root.rglob(file_name):
+            resolved_match = matched_file.resolve()
+            try:
+                resolved_match.relative_to(root)
+            except ValueError:
+                continue
+            if resolved_match.is_file():
+                return resolved_match
+
+    return None
 
 
 def delete_recording_assets(recording):

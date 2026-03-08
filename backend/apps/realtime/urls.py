@@ -13,6 +13,7 @@ from .views import (
     RealtimeSessionRecordingStartView,
     RealtimeSessionRecordingStopView,
     RealtimeSessionPresenterPermissionView,
+    RealtimeSessionSpeakerPermissionView,
     RealtimeSessionStreamStartView,
     RealtimeSessionStreamStopView,
 )
@@ -59,5 +60,10 @@ urlpatterns = [
         "sessions/<int:pk>/presenters/<str:permission_action>/",
         RealtimeSessionPresenterPermissionView.as_view(),
         name="realtime-session-presenter-permission",
+    ),
+    path(
+        "sessions/<int:pk>/speakers/<str:permission_action>/",
+        RealtimeSessionSpeakerPermissionView.as_view(),
+        name="realtime-session-speaker-permission",
     ),
 ]

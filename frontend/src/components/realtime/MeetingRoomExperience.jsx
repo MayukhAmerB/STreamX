@@ -1,15 +1,17 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Room, RoomEvent, Track, VideoQuality } from "livekit-client";
 import Button from "../Button";
+import meetingAdminLogo from "../../assets/logo.jpeg";
 import {
   deleteRealtimeRecording,
-  grantRealtimePresenter,
+  grantRealtimeSpeaker,
   listRealtimeRecordings,
-  revokeRealtimePresenter,
+  revokeRealtimeSpeaker,
   startRealtimeRecording,
   stopRealtimeRecording,
   uploadRealtimeBrowserRecording,
 } from "../../api/realtime";
+import { useAuth } from "../../hooks/useAuth";
 import { ScreenityFallbackRecorder } from "../../services/recording/ScreenityFallbackRecorder";
 import { apiData, apiMessage } from "../../utils/api";
 
@@ -26,6 +28,9 @@ const DEFAULT_MEETING_MEDIA_PROFILE = {
   screen_fps: 15,
   screen_max_video_bitrate_kbps: 2500,
 };
+
+const meetingShellBackgroundImage =
+  "https://i.pinimg.com/736x/e7/18/de/e718de74d25e0e9a2cf62cd126b3abb5.jpg";
 
 function clampWholeNumber(value, min, max, fallback) {
   const numeric = Number(value);
@@ -247,6 +252,36 @@ function participantLabel(entry) {
   return entry.isLocal ? `${name} (You)` : name;
 }
 
+function publicationHasActiveTrack(publication) {
+  if (!publication?.track) {
+    return false;
+  }
+  if (publication.isMuted === true || publication.isEnabled === false) {
+    return false;
+  }
+  if (publication.track?.isMuted === true || publication.track?.isEnabled === false) {
+    return false;
+  }
+  return true;
+}
+
+function buildParticipantMediaStateKey(participant) {
+  const publications = Array.from(participant?.trackPublications?.values?.() || [])
+    .map((publication) => {
+      const source = String(publication?.source || publication?.kind || "unknown");
+      const trackSid = String(publication?.trackSid || publication?.track?.sid || "");
+      const hasTrack = publication?.track ? "1" : "0";
+      const publicationMuted = publication?.isMuted === true ? "1" : "0";
+      const publicationEnabled = publication?.isEnabled === false ? "0" : "1";
+      const trackMuted = publication?.track?.isMuted === true ? "1" : "0";
+      const trackEnabled = publication?.track?.isEnabled === false ? "0" : "1";
+      return `${source}:${trackSid}:${hasTrack}:${publicationMuted}:${publicationEnabled}:${trackMuted}:${trackEnabled}`;
+    })
+    .sort();
+
+  return publications.join("|");
+}
+
 function getParticipantMediaState(participant) {
   const publications = Array.from(participant.trackPublications.values());
 
@@ -254,23 +289,23 @@ function getParticipantMediaState(participant) {
     (publication) =>
       publication.source === Track.Source.ScreenShare &&
       publication.kind === Track.Kind.Video &&
-      publication.track
+      publicationHasActiveTrack(publication)
   );
   const cameraVideoPublication = publications.find(
     (publication) =>
       publication.source === Track.Source.Camera &&
       publication.kind === Track.Kind.Video &&
-      publication.track
+      publicationHasActiveTrack(publication)
   );
   const audioPublication =
     publications.find(
       (publication) =>
         publication.source === Track.Source.Microphone &&
         publication.kind === Track.Kind.Audio &&
-        publication.track
+        publicationHasActiveTrack(publication)
     ) ||
     publications.find(
-      (publication) => publication.kind === Track.Kind.Audio && publication.track
+      (publication) => publication.kind === Track.Kind.Audio && publicationHasActiveTrack(publication)
     );
 
   const hasScreenShare = Boolean(screenVideoPublication);
@@ -286,12 +321,53 @@ function getParticipantMediaState(participant) {
   };
 }
 
+function participantInitials(label) {
+  const normalized = String(label || "")
+    .replace(/\(You\)/g, "")
+    .trim();
+  const parts = normalized.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return "P";
+  }
+  if (parts.length === 1) {
+    return parts[0].slice(0, 1).toUpperCase();
+  }
+  return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
+}
+
+function humanizeConnectionLabel(label) {
+  const normalized = String(label || "connecting")
+    .replace(/[_-]+/g, " ")
+    .trim();
+  if (!normalized) {
+    return "Connecting";
+  }
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function parseParticipantMetadata(participant) {
+  const rawMetadata = String(participant?.metadata || "").trim();
+  if (!rawMetadata) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(rawMetadata);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 function MeetingTile({ entry, isFeatured = false, isSpeaking = false, isPinned = false, onPin }) {
   const videoRef = useRef(null);
   const audioRef = useRef(null);
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   // Re-evaluate media state on each render so track switches (camera <-> screen) apply immediately.
   const mediaState = getParticipantMediaState(entry.participant);
+  const displayName = participantLabel(entry);
+  const initials = participantInitials(displayName);
+  const profileImageUrl = String(entry?.profileImageUrl || "").trim();
   const tileHeightClass = isFeatured
     ? mediaState.hasScreenShare
       ? "h-[46vh] min-h-[220px] sm:h-[56vh] lg:h-[560px]"
@@ -326,46 +402,100 @@ function MeetingTile({ entry, isFeatured = false, isSpeaking = false, isPinned =
     };
   }, [entry.isLocal, mediaState.audioTrack]);
 
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [profileImageUrl]);
+
   return (
     <article
-      className={`relative overflow-hidden rounded-2xl border ${
+      className={`group relative overflow-hidden rounded-[24px] border ${
         isSpeaking
-          ? "border-[#d8e4cd]/70 shadow-[0_0_0_1px_rgba(216,228,205,0.4),0_18px_34px_rgba(0,0,0,0.33)]"
-          : "border-[#2a3529]"
-      } bg-black`}
+          ? "border-[#b9c7ab]/70 shadow-[0_0_0_1px_rgba(185,199,171,0.28),0_24px_36px_rgba(0,0,0,0.28)]"
+          : "border-[#2b372d] shadow-[0_16px_32px_rgba(0,0,0,0.22)]"
+      } bg-[#0c110d]/95`}
     >
-      <div className={`${tileHeightClass} w-full bg-[#040604]`}>
+      <div className={`${tileHeightClass} relative w-full bg-[#0d120f]`}>
         {mediaState.videoTrack ? (
-          <video ref={videoRef} autoPlay playsInline muted={entry.isLocal} className={`h-full w-full ${videoFitClass}`} />
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted={entry.isLocal}
+            className={`h-full w-full ${videoFitClass}`}
+          />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#101712] to-[#0a0f0a]">
-            <span className="rounded-full border border-[#364337] bg-[#141c15] px-4 py-2 text-sm text-[#cfd7c8]">
-              Camera Off
-            </span>
+          <div className="flex h-full w-full flex-col items-center justify-center bg-[radial-gradient(circle_at_top,rgba(185,199,171,0.14),transparent_38%),linear-gradient(180deg,#131914_0%,#0b0f0c_100%)] px-6 text-center">
+            {profileImageUrl && !avatarFailed ? (
+              <img
+                src={profileImageUrl}
+                alt={displayName}
+                className="h-24 w-24 rounded-full border border-[#2b372d] object-cover shadow-[0_10px_22px_rgba(0,0,0,0.28)]"
+                onError={() => setAvatarFailed(true)}
+              />
+            ) : (
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#202820] text-2xl font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                {initials}
+              </div>
+            )}
+            <div className="mt-4 text-sm font-medium text-white">{displayName}</div>
+            <div className="mt-1 text-xs text-[#b7c0b0]">
+              {mediaState.hasAudio ? "Audio connected" : "Camera off"}
+            </div>
           </div>
         )}
+
+        <div className="absolute inset-0 bg-gradient-to-t from-black/72 via-transparent to-black/10" />
+
+        <div className="absolute left-3 top-3 flex flex-wrap items-center gap-2">
+          {entry.isLocal ? (
+            <span className="rounded-full border border-[#2b372d] bg-[#121812]/88 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#dfe4d6]">
+              You
+            </span>
+          ) : null}
+          {isSpeaking ? (
+            <span className="rounded-full border border-[#b9c7ab]/40 bg-[#b9c7ab]/16 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#eef4e7]">
+              Speaking
+            </span>
+          ) : null}
+          {mediaState.hasScreenShare ? (
+            <span className="rounded-full border border-[#2b372d] bg-[#121812]/88 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#dfe4d6]">
+              Presenting
+            </span>
+          ) : null}
+        </div>
+
+        <button
+          type="button"
+          onClick={onPin}
+          className="absolute right-3 top-3 rounded-full border border-[#2b372d] bg-[#121812]/88 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#dfe4d6] transition hover:bg-[#182018]"
+        >
+          {isPinned ? "Unpin" : "Pin"}
+        </button>
       </div>
 
-      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/80 via-black/45 to-transparent px-3 py-2">
-        <div className="truncate text-xs font-semibold text-white">{participantLabel(entry)}</div>
-        <div className="flex items-center gap-2">
-          {mediaState.hasScreenShare ? (
-            <span className="rounded-full border border-[#425144] bg-[#172019] px-2 py-0.5 text-[10px] text-[#d9e3cf]">
-              Screen
-            </span>
-          ) : null}
-          {isPinned ? (
-            <span className="rounded-full border border-[#425144] bg-[#172019] px-2 py-0.5 text-[10px] text-[#d9e3cf]">
-              Pinned
-            </span>
-          ) : null}
-          <button
-            type="button"
-            onClick={onPin}
-            className="rounded-full border border-[#3b473b] bg-[#141b14] px-2 py-0.5 text-[10px] text-[#d9e3cf] hover:bg-[#1b251c]"
-          >
-            {isPinned ? "Unpin" : "Pin"}
-          </button>
+      <div className="absolute inset-x-0 bottom-0 px-3 py-3">
+        <div className="flex items-end justify-between gap-3 rounded-2xl border border-[#2b372d] bg-[#121812]/82 px-3 py-2.5 backdrop-blur">
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-white">{displayName}</div>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              <span className="rounded-full border border-[#2b372d] bg-black/20 px-2 py-0.5 text-[10px] text-[#dfe4d6]">
+                {mediaState.hasAudio ? "Mic live" : "Muted"}
+              </span>
+              <span className="rounded-full border border-[#2b372d] bg-black/20 px-2 py-0.5 text-[10px] text-[#dfe4d6]">
+                {mediaState.hasCamera ? "Camera on" : "Camera off"}
+              </span>
+              {isPinned ? (
+                <span className="rounded-full border border-[#2b372d] bg-black/20 px-2 py-0.5 text-[10px] text-[#dfe4d6]">
+                  Pinned
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <div
+            className={`h-2.5 w-2.5 flex-none rounded-full ${
+              mediaState.hasAudio ? "bg-[#34a853]" : "bg-[#5f6368]"
+            }`}
+          />
         </div>
       </div>
 
@@ -379,6 +509,8 @@ const MemoMeetingTile = memo(MeetingTile, (prev, next) => {
     prev.entry?.id === next.entry?.id &&
     prev.entry?.participant === next.entry?.participant &&
     prev.entry?.isLocal === next.entry?.isLocal &&
+    prev.entry?.profileImageUrl === next.entry?.profileImageUrl &&
+    prev.entry?.mediaStateKey === next.entry?.mediaStateKey &&
     prev.isFeatured === next.isFeatured &&
     prev.isSpeaking === next.isSpeaking &&
     prev.isPinned === next.isPinned
@@ -423,13 +555,25 @@ function resolveRecordingPlaybackUrl(recording) {
   return String(recording?.playback_url || recording?.output_download_url || "").trim();
 }
 
+function normalizeUserIdList(values) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+  return [...new Set(values.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0))].sort(
+    (a, b) => a - b
+  );
+}
+
 export default function MeetingRoomExperience({ payload, onLeave, audiencePanel = false }) {
+  const { user } = useAuth();
   const session = payload?.session || {};
   const meeting = payload?.meeting || {};
   const canPresent = Boolean(meeting?.permissions?.can_present);
   const canSpeak = Boolean(meeting?.permissions?.can_speak || canPresent);
-  const canManagePresenters = Boolean(meeting?.permissions?.can_manage_presenters);
-  const audienceFocusMode = Boolean(audiencePanel && !canManagePresenters);
+  const canManageParticipants = Boolean(
+    meeting?.permissions?.can_manage_participants ?? meeting?.permissions?.can_manage_presenters
+  );
+  const audienceFocusMode = Boolean(audiencePanel && !canManageParticipants);
   const mediaProfile = useMemo(() => normalizeMeetingMediaProfile(meeting?.media_profile || {}), [meeting?.media_profile]);
   const premiumProfileEnabled = useMemo(
     () =>
@@ -459,11 +603,9 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
   const [chatInput, setChatInput] = useState("");
   const [panelTab, setPanelTab] = useState("people");
   const [sidePanelOpen, setSidePanelOpen] = useState(!audienceFocusMode);
-  const [presenterUserIds, setPresenterUserIds] = useState(() =>
-    Array.isArray(meeting.presenter_user_ids) ? meeting.presenter_user_ids : []
-  );
+  const [speakerUserIds, setSpeakerUserIds] = useState(() => normalizeUserIdList(meeting.speaker_user_ids));
   const [permissionState, setPermissionState] = useState({
-    loadingUserId: null,
+    loadingKey: "",
     error: "",
     info: "",
   });
@@ -481,6 +623,14 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
   const stageRef = useRef(null);
   const fallbackRecorderRef = useRef(null);
   const [isStageFullscreen, setIsStageFullscreen] = useState(false);
+  const defaultModeratorUserIds = useMemo(
+    () =>
+      normalizeUserIdList([
+        session?.host?.id,
+        session?.linked_course?.instructor_id,
+      ]),
+    [session?.host?.id, session?.linked_course?.instructor_id]
+  );
 
   const syncParticipants = useCallback(() => {
     const room = roomRef.current;
@@ -489,17 +639,39 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
       return;
     }
 
+    const buildParticipantEntry = (participant, isLocal) => {
+      const participantMetadata = parseParticipantMetadata(participant);
+      const authUserProfileImageUrl = isLocal ? String(user?.profile_image_url || "").trim() : "";
+      const shouldUseAdminLogo =
+        Boolean(participantMetadata?.is_admin) || Boolean(isLocal && user?.is_admin);
+      const profileImageUrl = String(
+        (isLocal ? meeting?.participant_profile_image_url : "") ||
+          participantMetadata.profile_image_url ||
+          participantMetadata.profileImageUrl ||
+          authUserProfileImageUrl ||
+          (shouldUseAdminLogo ? meetingAdminLogo : "") ||
+          ""
+      ).trim();
+
+      return {
+        id: participant.identity || participant.sid,
+        participant,
+        isLocal,
+        participantMetadata,
+        profileImageUrl,
+        mediaStateKey: buildParticipantMediaStateKey(participant),
+      };
+    };
+
     const localEntry = room.localParticipant
-      ? [{ id: room.localParticipant.identity || room.localParticipant.sid, participant: room.localParticipant, isLocal: true }]
+      ? [buildParticipantEntry(room.localParticipant, true)]
       : [];
-    const remoteEntries = Array.from(room.remoteParticipants.values()).map((participant) => ({
-      id: participant.identity || participant.sid,
-      participant,
-      isLocal: false,
-    }));
+    const remoteEntries = Array.from(room.remoteParticipants.values()).map((participant) =>
+      buildParticipantEntry(participant, false)
+    );
 
     setParticipants([...localEntry, ...remoteEntries]);
-  }, []);
+  }, [meeting?.participant_profile_image_url, user?.is_admin, user?.profile_image_url]);
 
   const syncLocalControls = useCallback(() => {
     const room = roomRef.current;
@@ -540,9 +712,9 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
   );
 
   useEffect(() => {
-    setPresenterUserIds(Array.isArray(meeting.presenter_user_ids) ? meeting.presenter_user_ids : []);
-    setPermissionState({ loadingUserId: null, error: "", info: "" });
-  }, [meeting.presenter_user_ids, session.id]);
+    setSpeakerUserIds(normalizeUserIdList(meeting.speaker_user_ids));
+    setPermissionState({ loadingKey: "", error: "", info: "" });
+  }, [meeting.speaker_user_ids, session.id]);
 
   useEffect(() => {
     setSidePanelOpen(!audienceFocusMode);
@@ -642,8 +814,14 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
 
     room.on(RoomEvent.ParticipantConnected, refreshRoomState);
     room.on(RoomEvent.ParticipantDisconnected, refreshRoomState);
+    room.on(RoomEvent.TrackPublished, refreshRoomState);
+    room.on(RoomEvent.TrackUnpublished, refreshRoomState);
     room.on(RoomEvent.LocalTrackPublished, refreshRoomState);
     room.on(RoomEvent.LocalTrackUnpublished, refreshRoomState);
+    room.on(RoomEvent.TrackMuted, refreshRoomState);
+    room.on(RoomEvent.TrackUnmuted, refreshRoomState);
+    room.on(RoomEvent.ParticipantMetadataChanged, refreshRoomState);
+    room.on(RoomEvent.ParticipantNameChanged, refreshRoomState);
     room.on(RoomEvent.TrackSubscribed, (_track, publication) => {
       enforceRemotePublicationQuality(publication);
       refreshRoomState();
@@ -725,10 +903,10 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
           }
         } else if (canSpeak) {
           setMeetingInfo(
-            "Audience mode: you can use microphone and chat. Camera/screen share are presenter-only. If admin updates meeting quality profile, rejoin to apply latest capture settings."
+            "Discussion access enabled. You can use microphone and chat, but camera and screen sharing stay locked unless stage access is granted. Rejoin after moderation updates to apply new permissions."
           );
         } else {
-          setMeetingInfo("Viewer mode enabled. Only presenter-approved users can publish media.");
+          setMeetingInfo("Listener mode enabled. Microphone, camera, and screen sharing are locked until an instructor or admin grants access.");
         }
 
         if (disposed) {
@@ -753,9 +931,9 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
             }${premiumProfileEnabled ? " Premium HD receiver mode enabled." : ""}`
           );
         } else if (canSpeak) {
-          setMeetingInfo("Connected. Meeting is live. Mic-enabled participant mode.");
+          setMeetingInfo("Connected. Meeting is live. Your microphone is enabled by moderator approval.");
         } else {
-          setMeetingInfo("Connected. Meeting is live.");
+          setMeetingInfo("Connected. Meeting is live. You are in listener mode.");
         }
       } catch (err) {
         if (disposed) {
@@ -859,6 +1037,41 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
   const useFeaturedLayout = Boolean(featuredParticipant) && (otherParticipants.length > 0 || featuredHasScreenShare);
   const stagePriorityMode = audienceFocusMode && !sidePanelOpen;
   const shareableJoinLink = buildJoinLink(session);
+  const isModeratorByDefault = useCallback(
+    (userId) => Boolean(userId && defaultModeratorUserIds.includes(userId)),
+    [defaultModeratorUserIds]
+  );
+  const elevatedParticipantUserIds = useMemo(
+    () =>
+      normalizeUserIdList(
+        participants
+          .filter((entry) => {
+            const metadata = entry?.participantMetadata || {};
+            return Boolean(metadata?.is_admin || metadata?.role === "instructor");
+          })
+          .map((entry) => parseUserIdFromIdentity(entry?.participant?.identity))
+      ),
+    [participants]
+  );
+  const hasPresenterAccess = useCallback(
+    (userId) => Boolean(userId && (isModeratorByDefault(userId) || elevatedParticipantUserIds.includes(userId))),
+    [elevatedParticipantUserIds, isModeratorByDefault]
+  );
+  const hasSpeakerAccess = useCallback(
+    (userId) =>
+      Boolean(
+        userId &&
+          (hasPresenterAccess(userId) || speakerUserIds.includes(userId))
+      ),
+    [hasPresenterAccess, speakerUserIds]
+  );
+  const moderationSummary = useMemo(
+    () => ({
+      micGrants: speakerUserIds.filter((userId) => !hasPresenterAccess(userId)).length,
+      stageModerators: defaultModeratorUserIds.length,
+    }),
+    [defaultModeratorUserIds.length, hasPresenterAccess, speakerUserIds]
+  );
 
   const toggleStageFullscreen = async () => {
     const element = stageRef.current;
@@ -987,34 +1200,33 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
       }
     );
 
-  const handlePresenterPermission = async (userId, grantAccess) => {
-    if (!canManagePresenters || !session.id || !userId) {
+  const handleSpeakerPermission = async (userId, grantAccess) => {
+    if (!canManageParticipants || !session.id || !userId) {
       return;
     }
-    setPermissionState({ loadingUserId: userId, error: "", info: "" });
+    setPermissionState({ loadingKey: `speaker:${userId}`, error: "", info: "" });
     try {
       const response = grantAccess
-        ? await grantRealtimePresenter(session.id, userId)
-        : await revokeRealtimePresenter(session.id, userId);
+        ? await grantRealtimeSpeaker(session.id, userId)
+        : await revokeRealtimeSpeaker(session.id, userId);
       const data = apiData(response, {});
-      const nextPresenterIds = Array.isArray(data.presenter_user_ids) ? data.presenter_user_ids : [];
-      setPresenterUserIds(nextPresenterIds);
+      setSpeakerUserIds(normalizeUserIdList(data.speaker_user_ids));
       setPermissionState({
-        loadingUserId: null,
+        loadingKey: "",
         error: "",
-        info: `${grantAccess ? "Presenter access granted" : "Presenter access revoked"} for user ${userId}. Rejoin required to apply.`,
+        info: `${grantAccess ? "Mic access granted" : "Mic access revoked"} for user ${userId}. Rejoin required to apply.`,
       });
     } catch (err) {
       setPermissionState({
-        loadingUserId: null,
-        error: apiMessage(err, "Unable to update presenter permission."),
+        loadingKey: "",
+        error: apiMessage(err, "Unable to update microphone permission."),
         info: "",
       });
     }
   };
 
   const handleStartRecording = async () => {
-    if (!session.id || !canManagePresenters) {
+    if (!session.id || !canManageParticipants) {
       return;
     }
     setRecordingState((prev) => ({ ...prev, loading: true, error: "", info: "" }));
@@ -1070,7 +1282,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
   };
 
   const handleStopRecording = async () => {
-    if (!session.id || !canManagePresenters) {
+    if (!session.id || !canManageParticipants) {
       return;
     }
     setRecordingState((prev) => ({ ...prev, loading: true, error: "", info: "" }));
@@ -1145,7 +1357,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
   };
 
   const handleDeleteLatestRecording = async () => {
-    if (!session.id || !canManagePresenters) {
+    if (!session.id || !canManageParticipants) {
       return;
     }
     const latest = recordingState.latestCompleted;
@@ -1232,111 +1444,232 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     }
   };
 
+  const connectionStatusLabel = humanizeConnectionLabel(connectionLabel);
+  const connectionStatusToneClass = (() => {
+    const normalized = String(connectionLabel || "").toLowerCase();
+    if (normalized.includes("reconnect")) {
+      return "border-amber-200/20 bg-amber-100/8 text-amber-100";
+    }
+    if (normalized.includes("connect")) {
+      return "border-[#b9c7ab]/30 bg-[#b9c7ab]/14 text-[#eef4e7]";
+    }
+    if (normalized.includes("fail") || normalized.includes("left") || normalized.includes("disconnect")) {
+      return "border-red-300/25 bg-red-300/10 text-red-100";
+    }
+    return "border-[#2b372d] bg-[#121812]/80 text-[#dfe4d6]";
+  })();
+  const viewerRoleLabel = canManageParticipants
+    ? "Moderator"
+    : canPresent
+      ? "Presenter"
+      : canSpeak
+        ? "Speaker"
+        : "Listener";
+  const latestRecordingPlaybackUrl = resolveRecordingPlaybackUrl(recordingState.latestCompleted);
+
   return (
-    <section className="mb-6 overflow-hidden rounded-[28px] border border-[#263326] bg-[#070b07]/94 shadow-[0_24px_55px_rgba(0,0,0,0.35)]">
-      <div className="border-b border-[#253126] px-4 py-3 sm:px-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="font-reference text-xl font-semibold text-white">{session.title || "Meeting Room"}</h3>
-            <p className="mt-1 text-xs text-[#8f9989]">
-              Room: {meeting.room_name || "-"} | Status: {connectionLabel}
+    <section
+      className="relative mb-6 overflow-hidden rounded-[32px] border border-[#2b372d] bg-[#0b0f0b] shadow-[0_32px_80px_rgba(0,0,0,0.36)]"
+    >
+      <div className="absolute inset-0">
+        <img
+          src={meetingShellBackgroundImage}
+          alt=""
+          aria-hidden="true"
+          className="h-full w-full object-cover opacity-[0.12] blur-[1px] grayscale"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/66 via-black/78 to-black/88" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_14%,rgba(185,199,171,0.12),transparent_34%)]" />
+        <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(207,216,197,0.24)_1px,transparent_1px),linear-gradient(90deg,rgba(207,216,197,0.2)_1px,transparent_1px)] [background-size:28px_28px]" />
+      </div>
+
+      <div className="relative border-b border-[#263126] bg-[linear-gradient(180deg,rgba(10,14,11,0.84),rgba(13,18,14,0.78))] px-4 py-4 backdrop-blur-[2px] sm:px-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em]">
+              <span className="rounded-full border border-[#2b372d] bg-[#111611]/82 px-3 py-1 text-[#dfe4d6]">
+                Meeting room
+              </span>
+              <span className={`rounded-full border px-3 py-1 ${connectionStatusToneClass}`}>
+                {connectionStatusLabel}
+              </span>
+              <span className="rounded-full border border-[#2b372d] bg-[#111611]/82 px-3 py-1 text-[#dfe4d6]">
+                {viewerRoleLabel}
+              </span>
+            </div>
+            <h3 className="mt-3 font-reference text-2xl font-semibold tracking-tight text-white">
+              {session.title || "Meeting Room"}
+            </h3>
+            <p className="mt-1 text-sm text-[#b7c0b0]">
+              Room {meeting.room_name || "-"} with live stage, audience controls, and in-session chat.
             </p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-[#2b372d] bg-[#111611]/86 px-3 py-1.5 text-xs text-[#dfe4d6]">
+                {participantCount} participant{participantCount === 1 ? "" : "s"}
+              </span>
+              <span className="rounded-full border border-[#2b372d] bg-[#111611]/86 px-3 py-1.5 text-xs text-[#dfe4d6]">
+                {liveDurationLabel || "--:--"}
+              </span>
+              <span className="rounded-full border border-[#2b372d] bg-[#111611]/86 px-3 py-1.5 text-xs text-[#dfe4d6]">
+                {sidePanelOpen ? `${panelTab === "people" ? "People" : "Chat"} panel open` : "Stage focus"}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-[#344235] bg-[#121912] px-3 py-1 text-xs text-[#d5ddcb]">
-              {participantCount} participant{participantCount === 1 ? "" : "s"}
-            </span>
-            <span className="rounded-full border border-[#344235] bg-[#121912] px-3 py-1 text-xs text-[#d5ddcb]">
-              {liveDurationLabel || "--:--"}
-            </span>
+
+          <div className="grid gap-3 sm:min-w-[340px] sm:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="rounded-[22px] border border-[#2b372d] bg-[#111611]/88 px-4 py-3 backdrop-blur-sm">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">
+                Share link
+              </div>
+              <code className="mt-2 block truncate rounded-xl bg-[#0d120f] px-3 py-2 text-xs text-[#dfe4d6]">
+                {shareableJoinLink || "Join link unavailable"}
+              </code>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="secondary"
+                className="rounded-full border-[#2f3a30] bg-[#111612]/92 px-4 py-2 text-[#d7e0cc] shadow-none hover:bg-[#171d17]"
+                onClick={handleCopyJoinLink}
+              >
+                Copy link
+              </Button>
+              <Button
+                variant="secondary"
+                className="rounded-full border-[#2f3a30] bg-[#111612]/92 px-4 py-2 text-[#d7e0cc] shadow-none hover:bg-[#171d17]"
+                onClick={() => setSidePanelOpen((prev) => !prev)}
+              >
+                {sidePanelOpen ? "Hide panel" : "Open panel"}
+              </Button>
+              <Button
+                variant="secondary"
+                className="rounded-full border-[#2f3a30] bg-[#111612]/92 px-4 py-2 text-[#d7e0cc] shadow-none hover:bg-[#171d17]"
+                onClick={toggleStageFullscreen}
+              >
+                {isStageFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              </Button>
+            </div>
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <code className="max-w-full truncate rounded-md border border-[#2d382f] bg-[#111811] px-2 py-1 text-xs text-[#dbe4d1]">
-            {shareableJoinLink || "Join link unavailable"}
-          </code>
-          <Button variant="secondary" className="px-3 py-1.5 text-xs" onClick={handleCopyJoinLink}>
-            Copy Link
-          </Button>
-          {audienceFocusMode ? (
-            <>
-              <Button variant="secondary" className="px-3 py-1.5 text-xs" onClick={() => setSidePanelOpen((prev) => !prev)}>
-                {sidePanelOpen ? "Hide Chat Panel" : "Open Chat Panel"}
-              </Button>
-              <Button variant="secondary" className="px-3 py-1.5 text-xs" onClick={toggleStageFullscreen}>
-                {isStageFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-              </Button>
-            </>
-          ) : null}
-        </div>
-        {canManagePresenters ? (
-          <div className="mt-3 rounded-lg border border-[#2f3f31] bg-[#111a12] px-3 py-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-[#d5ddcb]">
+        {canManageParticipants ? (
+          <div className="mt-4 rounded-[26px] border border-[#2b372d] bg-[#111611]/88 p-4 backdrop-blur-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-2xl">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8f9989]">
+                  Seminar control
+                </div>
+                <div className="mt-2 text-base font-semibold text-white">
+                  Students stay in listener mode until you grant microphone access.
+                </div>
+                <p className="mt-1 text-sm text-[#b7c0b0]">
+                  Camera, screen share, and presentation stay reserved for instructors and admins while students keep the cleaner stage view.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-[20px] border border-[#2b372d] bg-[#0d120f] px-4 py-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">
+                    Stage reserved
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold text-white">{defaultModeratorUserIds.length}</div>
+                </div>
+                <div className="rounded-[20px] border border-[#2b372d] bg-[#0d120f] px-4 py-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">
+                    Mic grants
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold text-white">{moderationSummary.micGrants}</div>
+                </div>
+                <div className="rounded-[20px] border border-[#2b372d] bg-[#0d120f] px-4 py-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">
+                    Instructor stage
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold text-white">{moderationSummary.stageModerators}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-[#2b372d] bg-[#0d120f] px-3 py-1.5 text-xs text-[#dfe4d6]">
                 Recording: {recordingState.active?.status || "idle"}
                 {recordingState.active
                   ? ` (${recordingState.mode === "screenity-fallback" ? "browser fallback" : "livekit"})`
                   : ""}
               </span>
               <Button
-                className="px-3 py-1.5 text-xs"
+                className="rounded-full border border-[#d2dcc7] bg-gradient-to-r from-[#d6dfcb] to-[#a6b899] px-4 py-2 text-[#101410] shadow-none hover:from-[#e2e8db] hover:to-[#b8c7ad]"
                 onClick={handleStartRecording}
                 loading={recordingState.loading}
                 disabled={Boolean(recordingState.active)}
               >
-                Start Recording
+                Start recording
               </Button>
               <Button
                 variant="danger"
-                className="px-3 py-1.5 text-xs"
+                className="rounded-full border-[#f28b82] bg-[#ea4335] px-4 py-2 text-white shadow-none hover:bg-[#d93025]"
                 onClick={handleStopRecording}
                 loading={recordingState.loading}
                 disabled={!recordingState.active}
               >
-                Stop Recording
+                Stop recording
               </Button>
-              {resolveRecordingPlaybackUrl(recordingState.latestCompleted) ? (
+              {latestRecordingPlaybackUrl ? (
                 <a
-                  href={resolveRecordingPlaybackUrl(recordingState.latestCompleted)}
+                  href={latestRecordingPlaybackUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-full border border-[#3d4c3f] bg-[#151f16] px-3 py-1.5 text-xs text-[#dbe4d1] hover:bg-[#1d2a1f]"
+                  className="rounded-full border border-[#2f3a30] bg-[#111612]/92 px-4 py-2 text-sm font-semibold text-[#d7e0cc] transition hover:bg-[#171d17]"
                 >
-                  Open Last Recording
+                  Open last recording
                 </a>
               ) : null}
               <Button
                 variant="danger"
-                className="px-3 py-1.5 text-xs"
+                className="rounded-full border-red-400/40 bg-red-600 px-4 py-2 text-white shadow-none hover:bg-red-500"
                 onClick={handleDeleteLatestRecording}
                 loading={recordingState.loading}
                 disabled={!recordingState.latestCompleted?.id || Boolean(recordingState.active)}
               >
-                Delete Last Recording
+                Delete last recording
               </Button>
             </div>
-            {recordingState.error ? (
-              <p className="mt-2 text-xs text-red-300">{recordingState.error}</p>
-            ) : null}
-            {recordingState.info ? (
-              <p className="mt-2 text-xs text-green-300">{recordingState.info}</p>
-            ) : null}
+            {recordingState.error ? <p className="mt-3 text-xs text-[#f28b82]">{recordingState.error}</p> : null}
+            {recordingState.info ? <p className="mt-3 text-xs text-[#a8dab5]">{recordingState.info}</p> : null}
           </div>
         ) : null}
       </div>
 
-      <div className={sidePanelOpen ? "grid gap-0 xl:grid-cols-[minmax(0,1fr)_320px]" : "grid gap-0"}>
+      <div className={sidePanelOpen ? "grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]" : "grid gap-0"}>
         <div
           ref={stageRef}
           className={`${
             stagePriorityMode
               ? "min-h-[58vh] sm:min-h-[66vh] lg:min-h-[74vh]"
               : "min-h-[340px] sm:min-h-[460px] lg:min-h-[520px]"
-          } bg-[#060906] p-4 sm:p-5`}
+          } bg-[linear-gradient(180deg,rgba(8,12,9,0.26),rgba(8,12,9,0.12))] p-4 sm:p-5`}
         >
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">Stage</div>
+              <div className="mt-1 text-sm text-[#dfe4d6]">
+                {featuredParticipant
+                  ? `${participantLabel(featuredParticipant)} is currently featured.`
+                  : "Waiting for participants to join the stage."}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {pinnedIdentity ? (
+                <span className="rounded-full border border-[#2b372d] bg-[#111611]/86 px-3 py-1.5 text-xs text-[#dfe4d6]">
+                  Pinned view active
+                </span>
+              ) : null}
+              {audienceFocusMode ? (
+                <span className="rounded-full border border-[#2b372d] bg-[#111611]/86 px-3 py-1.5 text-xs text-[#dfe4d6]">
+                  Audience focus mode
+                </span>
+              ) : null}
+            </div>
+          </div>
           {connecting ? (
-            <div className="flex h-[220px] items-center justify-center rounded-2xl border border-[#273226] bg-[#0e140e] text-[#d5ddcb] sm:h-[320px] lg:h-[460px]">
+            <div className="flex h-[220px] items-center justify-center rounded-[28px] border border-[#2b372d] bg-[#111611]/88 text-[#dfe4d6] sm:h-[320px] lg:h-[460px]">
               Connecting to meeting...
             </div>
           ) : useFeaturedLayout ? (
@@ -1377,7 +1710,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
               ) : (
                 <div
                   className={`grid gap-3 ${
-                    featuredHasScreenShare ? "xl:grid-cols-[minmax(0,1fr)_260px]" : "lg:grid-cols-[1fr_220px]"
+                    featuredHasScreenShare ? "xl:grid-cols-[minmax(0,1fr)_280px]" : "lg:grid-cols-[1fr_240px]"
                   }`}
                 >
                   <MemoMeetingTile
@@ -1450,89 +1783,161 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
           )}
 
           {meetingError ? (
-            <div className="mt-3 rounded-lg border border-red-300/30 bg-red-300/10 px-3 py-2 text-xs text-red-200">
+            <div className="mt-4 rounded-2xl border border-[#ea4335]/35 bg-[#ea4335]/10 px-4 py-3 text-sm text-[#ffd9d6]">
               {meetingError}
             </div>
           ) : null}
           {meetingInfo ? (
-            <div className="mt-3 rounded-lg border border-[#2f3f31] bg-[#111a12] px-3 py-2 text-xs text-[#d5ddcb]">
+            <div className="mt-4 rounded-2xl border border-[#2b372d] bg-[#111611]/88 px-4 py-3 text-sm text-[#dfe4d6]">
               {meetingInfo}
             </div>
           ) : null}
           {permissionState.error ? (
-            <div className="mt-3 rounded-lg border border-red-300/30 bg-red-300/10 px-3 py-2 text-xs text-red-200">
+            <div className="mt-4 rounded-2xl border border-[#ea4335]/35 bg-[#ea4335]/10 px-4 py-3 text-sm text-[#ffd9d6]">
               {permissionState.error}
             </div>
           ) : null}
           {permissionState.info ? (
-            <div className="mt-3 rounded-lg border border-[#2f3f31] bg-[#111a12] px-3 py-2 text-xs text-[#d5ddcb]">
+            <div className="mt-4 rounded-2xl border border-[#2b372d] bg-[#111611]/88 px-4 py-3 text-sm text-[#dfe4d6]">
               {permissionState.info}
             </div>
           ) : null}
         </div>
 
         {sidePanelOpen ? (
-          <aside className="border-t border-[#253126] bg-[#0c120d] xl:border-l xl:border-t-0">
-          <div className="flex border-b border-[#253126]">
-            <button
-              type="button"
-              className={`flex-1 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] ${
-                panelTab === "people" ? "bg-[#131c14] text-white" : "text-[#8f9989]"
-              }`}
-              onClick={() => setPanelTab("people")}
-            >
-              People
-            </button>
-            <button
-              type="button"
-              className={`flex-1 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] ${
-                panelTab === "chat" ? "bg-[#131c14] text-white" : "text-[#8f9989]"
-              }`}
-              onClick={() => setPanelTab("chat")}
-            >
-              Chat
-            </button>
-          </div>
+          <aside className="border-t border-[#263126] bg-[#0f1510]/84 backdrop-blur-sm xl:border-l xl:border-t-0">
+            <div className="border-b border-[#263126] px-4 py-3">
+              <div className="rounded-full bg-[#111611]/88 p-1">
+                <div className="grid grid-cols-2 gap-1">
+                  <button
+                    type="button"
+                    className={`rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition ${
+                      panelTab === "people"
+                        ? "bg-gradient-to-r from-[#d6dfcb] to-[#a6b899] text-[#101410]"
+                        : "text-[#8f9989] hover:bg-[#171d17]"
+                    }`}
+                    onClick={() => setPanelTab("people")}
+                  >
+                    {canManageParticipants ? "People + control" : "People"}
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition ${
+                      panelTab === "chat"
+                        ? "bg-gradient-to-r from-[#d6dfcb] to-[#a6b899] text-[#101410]"
+                        : "text-[#8f9989] hover:bg-[#171d17]"
+                    }`}
+                    onClick={() => setPanelTab("chat")}
+                  >
+                    Chat
+                  </button>
+                </div>
+              </div>
+            </div>
 
           {panelTab === "people" ? (
-            <div className="max-h-[320px] overflow-y-auto p-3 sm:max-h-[420px] xl:h-[520px] xl:max-h-none">
-              <div className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[#8f9989]">
-                Participants ({participantCount})
+            <div className="max-h-[320px] overflow-y-auto p-4 sm:max-h-[420px] xl:h-[520px] xl:max-h-none">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">
+                  Participants
+                </div>
+                <span className="rounded-full border border-[#2b372d] bg-[#111611]/86 px-2.5 py-1 text-[11px] text-[#dfe4d6]">
+                  {participantCount}
+                </span>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {participantsOrdered.map((entry) => {
                   const media = getParticipantMediaState(entry.participant);
                   const participantUserId = parseUserIdFromIdentity(entry.participant.identity);
-                  const presenterOverrideEnabled =
-                    participantUserId && presenterUserIds.includes(participantUserId);
+                  const presenterAccessEnabled = hasPresenterAccess(participantUserId);
+                  const speakerAccessEnabled = hasSpeakerAccess(participantUserId);
+                  const loadingSpeaker = permissionState.loadingKey === `speaker:${participantUserId}`;
+                  const participantAvatarUrl = String(entry?.profileImageUrl || "").trim();
+                  const roleBadges = [
+                    isModeratorByDefault(participantUserId) ? "Host / Instructor" : "",
+                    presenterAccessEnabled ? "Stage" : "",
+                    speakerAccessEnabled && !presenterAccessEnabled ? "Mic" : "",
+                    !speakerAccessEnabled ? "Listener" : "",
+                  ].filter(Boolean);
                   return (
                     <div
                       key={entry.id}
-                      className="rounded-xl border border-[#273327] bg-[#101711] px-3 py-2 text-xs text-[#d6decf]"
+                      className="rounded-[24px] border border-[#2b372d] bg-[#111611]/88 px-4 py-4 text-sm text-[#dfe4d6]"
                     >
-                      <div className="truncate font-semibold text-white">{participantLabel(entry)}</div>
-                      <div className="mt-1 text-[#9eaa97]">
-                        {media.hasCamera ? "Camera On" : "Camera Off"} |{" "}
-                        {media.hasAudio ? "Mic On" : "Mic Off"}
-                        {media.hasScreenShare ? " | Sharing screen" : ""}
-                      </div>
-                      <div className="mt-1 text-[#9eaa97]">
-                        {presenterOverrideEnabled ? "Presenter permission: Granted" : "Presenter permission: Default"}
-                      </div>
-                      {canManagePresenters && participantUserId && !entry.isLocal ? (
-                        <div className="mt-2">
+                      <div className="flex items-start gap-3">
+                        {participantAvatarUrl ? (
+                          <img
+                            src={participantAvatarUrl}
+                            alt={participantLabel(entry)}
+                            className="h-11 w-11 flex-none rounded-full border border-[#2b372d] object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-[#202820] text-sm font-semibold text-white">
+                            {participantInitials(participantLabel(entry))}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="truncate font-semibold text-white">{participantLabel(entry)}</div>
+                              <div className="mt-1 text-xs text-[#b7c0b0]">
+                                {media.hasCamera ? "Camera on" : "Camera off"} | {media.hasAudio ? "Mic on" : "Mic off"}
+                                {media.hasScreenShare ? " | Presenting" : ""}
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap justify-end gap-1.5">
+                              {roleBadges.map((badge) => (
+                                <span
+                                  key={`${entry.id}-${badge}`}
+                                  className="rounded-full border border-[#2b372d] bg-[#0d120f] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#dfe4d6]"
+                                >
+                                  {badge}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                            <div className="rounded-2xl border border-[#2b372d] bg-[#0d120f] px-3 py-2.5">
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8f9989]">
+                                Microphone
+                              </div>
+                              <div className="mt-1 text-sm font-medium text-white">
+                                {speakerAccessEnabled ? "Allowed" : "Locked"}
+                              </div>
+                            </div>
+                            <div className="rounded-2xl border border-[#2b372d] bg-[#0d120f] px-3 py-2.5">
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8f9989]">
+                                Camera / screen
+                              </div>
+                              <div className="mt-1 text-sm font-medium text-white">
+                                {presenterAccessEnabled ? "Allowed" : "Locked"}
+                              </div>
+                            </div>
+                          </div>
+                      {canManageParticipants && participantUserId && !entry.isLocal && !presenterAccessEnabled ? (
+                        <div className="mt-3">
                           <Button
-                            variant={presenterOverrideEnabled ? "danger" : "secondary"}
-                            className="w-full px-2 py-1 text-xs"
-                            loading={permissionState.loadingUserId === participantUserId}
-                            onClick={() =>
-                              handlePresenterPermission(participantUserId, !presenterOverrideEnabled)
-                            }
+                            variant={speakerAccessEnabled ? "danger" : "secondary"}
+                            className={`w-full rounded-full px-3 py-2 text-xs shadow-none sm:max-w-[180px] ${
+                              speakerAccessEnabled
+                                ? "border-[#f28b82] bg-[#ea4335] text-white hover:bg-[#d93025]"
+                                : "border-[#2f3a30] bg-[#111612]/92 text-[#d7e0cc] hover:bg-[#171d17]"
+                            }`}
+                            loading={loadingSpeaker}
+                            onClick={() => handleSpeakerPermission(participantUserId, !speakerAccessEnabled)}
                           >
-                            {presenterOverrideEnabled ? "Revoke Presenter Access" : "Grant Presenter Access"}
+                            {speakerAccessEnabled ? "Revoke mic" : "Allow mic"}
                           </Button>
                         </div>
                       ) : null}
+                      {isModeratorByDefault(participantUserId) ? (
+                        <div className="mt-3 rounded-2xl border border-[#2b372d] bg-[#0d120f] px-3 py-2.5 text-xs text-[#b7c0b0]">
+                          Core moderation access comes from the session host or assigned instructor role.
+                        </div>
+                      ) : null}
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
@@ -1540,19 +1945,19 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
             </div>
           ) : (
             <div className="flex max-h-[360px] flex-col sm:max-h-[420px] xl:h-[520px] xl:max-h-none">
-              <div className="flex-1 space-y-2 overflow-y-auto p-3">
+              <div className="flex-1 space-y-3 overflow-y-auto p-4">
                 {messages.length === 0 ? (
-                  <div className="rounded-xl border border-[#273327] bg-[#101711] px-3 py-2 text-xs text-[#9eaa97]">
+                  <div className="rounded-[22px] border border-[#2b372d] bg-[#111611]/88 px-4 py-3 text-sm text-[#b7c0b0]">
                     No messages yet.
                   </div>
                 ) : (
                   messages.map((message) => (
                     <div
                       key={message.id}
-                      className={`rounded-xl border px-3 py-2 text-xs ${
+                      className={`rounded-[22px] border px-4 py-3 text-sm ${
                         message.isSelf
-                          ? "border-[#41513f] bg-[#192419] text-[#e5ede0]"
-                          : "border-[#273327] bg-[#101711] text-[#d6decf]"
+                          ? "ml-6 border-[#d2dcc7]/20 bg-[#1b251c] text-[#eef4e7]"
+                          : "mr-6 border-[#2b372d] bg-[#111611]/88 text-[#dfe4d6]"
                       }`}
                     >
                       <div className="font-semibold text-white">{message.sender}</div>
@@ -1561,14 +1966,17 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                   ))
                 )}
               </div>
-              <form onSubmit={sendMessage} className="border-t border-[#253126] p-3">
+              <form onSubmit={sendMessage} className="border-t border-[#263126] p-4">
                 <input
-                  className="w-full rounded-xl border border-[#2a3a2c] bg-[#0c120d] px-3 py-2 text-sm text-white outline-none focus:border-[#8ea284]"
+                  className="w-full rounded-full border border-[#2f3a30] bg-[#111612]/92 px-4 py-3 text-sm text-white outline-none placeholder:text-[#8f9989] focus:border-[#b9c7ab]"
                   placeholder="Send a message"
                   value={chatInput}
                   onChange={(event) => setChatInput(event.target.value)}
                 />
-                <Button type="submit" className="mt-2 w-full">
+                <Button
+                  type="submit"
+                  className="mt-3 w-full rounded-full border border-[#d2dcc7] bg-gradient-to-r from-[#d6dfcb] to-[#a6b899] py-3 text-[#101410] shadow-none hover:from-[#e2e8db] hover:to-[#b8c7ad]"
+                >
                   Send
                 </Button>
               </form>
@@ -1578,12 +1986,17 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-2 border-t border-[#253126] bg-[#090f09] px-3 py-3">
-        {(canPresent || canSpeak) ? (
+      <div className="relative border-t border-[#263126] bg-[#0f1510]/84 px-4 py-4 backdrop-blur-sm">
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {canPresent || canSpeak ? (
           <>
             <Button
               variant={controls.mic ? "secondary" : "danger"}
-              className="min-w-[110px]"
+              className={`min-w-[126px] rounded-full px-5 py-3 shadow-none ${
+                controls.mic
+                  ? "border-[#2f3a30] bg-[#111612]/92 text-[#d7e0cc] hover:bg-[#171d17]"
+                  : "border-[#f28b82] bg-[#ea4335] text-white hover:bg-[#d93025]"
+              }`}
               onClick={toggleMicrophone}
               loading={controlBusy}
             >
@@ -1593,38 +2006,51 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
               <>
                 <Button
                   variant={controls.camera ? "secondary" : "danger"}
-                  className="min-w-[110px]"
+                  className={`min-w-[126px] rounded-full px-5 py-3 shadow-none ${
+                    controls.camera
+                      ? "border-[#2f3a30] bg-[#111612]/92 text-[#d7e0cc] hover:bg-[#171d17]"
+                      : "border-[#f28b82] bg-[#ea4335] text-white hover:bg-[#d93025]"
+                  }`}
                   onClick={toggleCamera}
                   loading={controlBusy}
                 >
-                  {controls.camera ? "Camera Off" : "Camera On"}
+                  {controls.camera ? "Camera off" : "Camera on"}
                 </Button>
                 <Button
                   variant={controls.screen ? "primary" : "secondary"}
-                  className="min-w-[130px]"
+                  className={`min-w-[148px] rounded-full px-5 py-3 shadow-none ${
+                    controls.screen
+                      ? "border border-[#d2dcc7] bg-gradient-to-r from-[#d6dfcb] to-[#a6b899] text-[#101410] hover:from-[#e2e8db] hover:to-[#b8c7ad]"
+                      : "border-[#2f3a30] bg-[#111612]/92 text-[#d7e0cc] hover:bg-[#171d17]"
+                  }`}
                   onClick={toggleScreenShare}
                   loading={controlBusy}
                 >
-                  {controls.screen ? "Stop Share" : "Present Now"}
+                  {controls.screen ? "Stop presenting" : "Present now"}
                 </Button>
               </>
             ) : (
-              <span className="rounded-full border border-[#344235] bg-[#121912] px-3 py-1 text-xs text-[#d5ddcb]">
+              <span className="rounded-full border border-[#2b372d] bg-[#111611]/86 px-4 py-3 text-sm text-[#dfe4d6]">
                 Presenter-only: camera and screen share
               </span>
             )}
           </>
         ) : (
-          <span className="rounded-full border border-[#344235] bg-[#121912] px-3 py-1 text-xs text-[#d5ddcb]">
+          <span className="rounded-full border border-[#2b372d] bg-[#111611]/86 px-4 py-3 text-sm text-[#dfe4d6]">
             Viewer mode: media publishing is disabled for this account.
           </span>
         )}
-        <Button variant="danger" className="min-w-[110px]" onClick={handleLeaveMeeting}>
-          Leave
-        </Button>
+          <Button
+            variant="danger"
+            className="min-w-[126px] rounded-full border-[#f28b82] bg-[#ea4335] px-5 py-3 text-white shadow-none hover:bg-[#d93025]"
+            onClick={handleLeaveMeeting}
+          >
+            Leave
+          </Button>
+        </div>
       </div>
-      <div className="border-t border-[#1f291f] bg-[#070d07] px-3 py-2 text-[11px] text-[#8f9c89]">
-        For full desktop presentation, choose <span className="text-[#d5ddcb]">Entire Screen</span> in the browser share picker.
+      <div className="relative border-t border-[#263126] bg-[#0d120f]/88 px-4 py-3 text-xs text-[#8f9989] backdrop-blur-sm">
+        For full desktop presentation, choose <span className="text-[#dfe4d6]">Entire Screen</span> in the browser share picker.
       </div>
     </section>
   );

@@ -93,6 +93,7 @@ class RealtimeSession(models.Model):
     max_audience = models.PositiveIntegerField(default=50000)
     allow_overflow_broadcast = models.BooleanField(default=True)
     presenter_user_ids = models.JSONField(default=list, blank=True)
+    speaker_user_ids = models.JSONField(default=list, blank=True)
 
     stream_embed_url = models.URLField(blank=True, default="")
     chat_embed_url = models.URLField(blank=True, default="")
@@ -153,6 +154,11 @@ class RealtimeSession(models.Model):
         normalized_presenters = self.get_presenter_user_ids()
         if len(normalized_presenters) > 1000:
             raise ValidationError({"presenter_user_ids": "Too many presenter overrides for one session."})
+        if not isinstance(self.speaker_user_ids, list):
+            raise ValidationError({"speaker_user_ids": "Speaker user IDs must be a list."})
+        normalized_speakers = self.get_speaker_user_ids()
+        if len(normalized_speakers) > 1000:
+            raise ValidationError({"speaker_user_ids": "Too many speaker overrides for one session."})
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -234,9 +240,16 @@ class RealtimeSession(models.Model):
         self.save(update_fields=["stream_status", "livekit_egress_error", "updated_at"])
 
     def get_presenter_user_ids(self):
+        # Stage access is reserved for moderators (host, assigned instructor, admin).
+        return []
+
+    def get_speaker_user_ids(self):
+        return self._normalize_user_id_list(self.speaker_user_ids)
+
+    def _normalize_user_id_list(self, raw_values):
         normalized = []
         seen = set()
-        for value in self.presenter_user_ids or []:
+        for value in raw_values or []:
             try:
                 user_id = int(value)
             except (TypeError, ValueError):
@@ -247,28 +260,56 @@ class RealtimeSession(models.Model):
             seen.add(user_id)
         return sorted(normalized)
 
-    def is_presenter_allowed(self, user):
+    def get_instructor_user_id(self):
+        if self.linked_course_id and getattr(self.linked_course, "instructor_id", None):
+            return self.linked_course.instructor_id
+        if self.linked_live_class_id and getattr(getattr(self.linked_live_class, "linked_course", None), "instructor_id", None):
+            return self.linked_live_class.linked_course.instructor_id
+        return None
+
+    def is_instructor_owner(self, user):
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+        instructor_user_id = self.get_instructor_user_id()
+        return bool(instructor_user_id and getattr(user, "id", None) == instructor_user_id)
+
+    def is_moderator_allowed(self, user):
         if not user or not getattr(user, "is_authenticated", False):
             return False
         is_admin = bool(getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))
-        is_instructor = getattr(user, "role", "") == "instructor"
-        if is_admin or is_instructor or user.id == self.host_id:
+        return bool(is_admin or user.id == self.host_id or self.is_instructor_owner(user))
+
+    def is_presenter_allowed(self, user):
+        return self.is_moderator_allowed(user)
+
+    def is_speaker_allowed(self, user):
+        if self.is_presenter_allowed(user):
             return True
-        return user.id in self.get_presenter_user_ids()
+        return bool(user and getattr(user, "is_authenticated", False) and user.id in self.get_speaker_user_ids())
 
     def grant_presenter(self, user_id):
-        presenter_ids = self.get_presenter_user_ids()
-        if user_id not in presenter_ids:
-            presenter_ids.append(int(user_id))
-        self.presenter_user_ids = sorted(set(presenter_ids))
+        self.presenter_user_ids = []
         self.save(update_fields=["presenter_user_ids", "updated_at"])
         return self.presenter_user_ids
 
     def revoke_presenter(self, user_id):
-        presenter_ids = [row for row in self.get_presenter_user_ids() if row != int(user_id)]
-        self.presenter_user_ids = presenter_ids
+        self.presenter_user_ids = []
         self.save(update_fields=["presenter_user_ids", "updated_at"])
         return self.presenter_user_ids
+
+    def grant_speaker(self, user_id):
+        speaker_ids = self.get_speaker_user_ids()
+        if user_id not in speaker_ids:
+            speaker_ids.append(int(user_id))
+        self.speaker_user_ids = sorted(set(speaker_ids))
+        self.save(update_fields=["speaker_user_ids", "updated_at"])
+        return self.speaker_user_ids
+
+    def revoke_speaker(self, user_id):
+        speaker_ids = [row for row in self.get_speaker_user_ids() if row != int(user_id)]
+        self.speaker_user_ids = speaker_ids
+        self.save(update_fields=["speaker_user_ids", "updated_at"])
+        return self.speaker_user_ids
 
     def __str__(self):
         return self.title

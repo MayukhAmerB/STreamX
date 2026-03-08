@@ -266,13 +266,15 @@ export default function LandingPage() {
             src={brandBackgroundImage}
             alt=""
             aria-hidden="true"
-            className="h-full w-full object-cover opacity-[0.18] blur-[2px] grayscale"
+            className="h-full w-full object-cover opacity-[0.14] blur-[2px] grayscale"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/78 to-black/92" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(185,199,171,0.18),transparent_40%)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/72 via-black/82 to-black/94" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_14%,rgba(185,199,171,0.16),transparent_34%)]" />
+          <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(207,216,197,0.32)_1px,transparent_1px),linear-gradient(90deg,rgba(207,216,197,0.28)_1px,transparent_1px)] [background-size:32px_32px]" />
         </div>
-        <div className="relative mx-auto max-w-6xl rounded-[28px] border border-[#d5deca]/10 bg-gradient-to-b from-[#080a08]/98 via-[#090b09]/96 to-[#050605]/98 p-5 shadow-[0_18px_40px_rgba(6,8,6,0.38)] backdrop-blur-[2px] sm:p-7">
-          <div className="grid items-center gap-8 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[30px] border border-[#d5deca]/10 bg-[linear-gradient(135deg,rgba(6,9,7,0.98),rgba(11,15,11,0.96),rgba(5,6,5,0.99))] shadow-[0_28px_80px_rgba(0,0,0,0.42)]">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#dbe4d0]/40 to-transparent" />
+          <div className="grid items-center gap-8 p-5 sm:p-7 lg:grid-cols-[1.03fr_0.97fr]">
             <div className="reveal-up">
               <div className="inline-flex items-center gap-2 rounded-full border border-[#99aa8e]/30 bg-white/5 px-3 py-1 text-xs font-semibold tracking-wide text-[#d7e0cc]">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#b9c7ab]" />
@@ -296,38 +298,30 @@ export default function LandingPage() {
                 </Link>
                 <Link to="/courses">
                   <Button
-                    variant="indigoSoft"
-                    className="rounded-full border-[#d8e1cf] bg-white px-5 hover:bg-[#f3f5ee]"
+                    variant="secondary"
+                    className="rounded-full border border-[#d8e1cf]/28 bg-[#101611]/96 px-5 text-[#f4f7ef] shadow-[0_12px_24px_rgba(0,0,0,0.18)] hover:bg-[#171d18]"
                   >
                     Explore Programs
                   </Button>
                 </Link>
               </div>
 
-              <div className="mt-5 rounded-2xl border border-[#2a332d] bg-[#0f1310] p-4">
+              <div className="mt-5 rounded-2xl border border-[#243025] bg-[#0d120f]/92 p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)]">
                 <div className="grid gap-2 text-sm text-[#b7c0b0] sm:grid-cols-2">
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex h-4 w-4 items-center justify-center" aria-hidden="true">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#d7e0cc]" />
-                    </span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#d7e0cc]" />
                     OSINT and attack surface mapping
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex h-4 w-4 items-center justify-center" aria-hidden="true">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#d7e0cc]" />
-                    </span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#d7e0cc]" />
                     Web application pentesting workflow
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex h-4 w-4 items-center justify-center" aria-hidden="true">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#d7e0cc]" />
-                    </span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#d7e0cc]" />
                     Practical lessons and structured modules
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex h-4 w-4 items-center justify-center" aria-hidden="true">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#d7e0cc]" />
-                    </span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#d7e0cc]" />
                     Ethical and professional methodology
                   </div>
                 </div>
@@ -335,7 +329,7 @@ export default function LandingPage() {
                   {["OSINT", "Web App Pentesting", "Recon Workflow"].map((tag) => (
                     <span
                       key={tag}
-                      className="rounded-full border border-[#d8e1cf] bg-[#f3f5ee] px-3 py-1 text-xs font-semibold text-[#62755a]"
+                      className="rounded-full border border-[#2d382e] bg-[#111612] px-3 py-1 text-xs font-semibold text-[#d7e0cc]"
                     >
                       {tag}
                     </span>
@@ -345,25 +339,36 @@ export default function LandingPage() {
             </div>
 
             <div className="reveal-up reveal-delay-1 relative">
-              <div className="rounded-3xl border border-[#d5deca]/12 bg-[#0e120f] p-3 shadow-[0_20px_40px_rgba(0,0,0,0.42)]">
-                <div className="relative h-[360px] w-full overflow-hidden rounded-2xl border border-[#d5deca]/10 sm:h-[420px]">
+              <div className="rounded-[28px] border border-[#273127] bg-[#0c110d] p-3 shadow-[0_24px_60px_rgba(0,0,0,0.36)]">
+                <div className="relative h-[360px] overflow-hidden rounded-[24px] border border-[#1e261f] bg-black sm:h-[420px]">
                   <img
                     src={heroCardImage}
                     alt="Cybersecurity training visual"
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover opacity-[0.9]"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-white/5" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/78 via-black/30 to-black/12" />
+                  <div className="absolute inset-0 opacity-[0.14] [background-image:linear-gradient(rgba(207,216,197,0.16)_1px,transparent_1px),linear-gradient(90deg,rgba(207,216,197,0.12)_1px,transparent_1px)] [background-size:24px_24px]" />
+                  <div className="absolute left-4 top-4 rounded-2xl border border-[#dbe4d0]/12 bg-[#0d120f]/86 px-4 py-3 backdrop-blur-sm">
+                    <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8f9989]">
+                      LIVE TRAINING
+                    </div>
+                    <div className="mt-2 text-lg font-semibold text-white">Structured cybersecurity learning</div>
+                    <div className="mt-1 max-w-[220px] text-xs leading-5 text-[#b7c0b0]">
+                      Guided modules, professional instruction, and practical workflow-based training.
+                    </div>
+                  </div>
+
+                  <div className="absolute inset-x-4 bottom-4 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-[#dbe4d0]/12 bg-[#0d120f]/88 p-3 backdrop-blur-sm">
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-[#8f9989]">1000+ Students</div>
+                      <div className="mt-2 text-sm font-semibold text-[#e2e9d8]">Active cybersecurity learners</div>
+                    </div>
+                    <div className="rounded-2xl border border-[#dbe4d0]/12 bg-[#0d120f]/88 p-3 backdrop-blur-sm">
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-[#8f9989]">Top-Rated Training</div>
+                      <div className="mt-2 text-sm font-semibold text-[#e2e9d8]">Workflow-first progression</div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              <div className="absolute -left-2 top-10 rounded-2xl border border-[#d5deca]/15 bg-[#0f1410]/96 px-4 py-3 shadow-[0_10px_24px_rgba(0,0,0,0.25)] sm:-left-6">
-                <div className="text-sm font-semibold text-white">1000+ students</div>
-                <div className="text-xs text-[#9ca697]">active cybersecurity learners</div>
-              </div>
-
-              <div className="absolute -bottom-2 right-0 rounded-2xl border border-[#d5deca]/15 bg-[#0f1410]/96 px-4 py-3 shadow-[0_10px_24px_rgba(0,0,0,0.25)] sm:-right-4">
-                <div className="text-sm font-semibold text-white">Top-rated training</div>
-                <div className="text-xs text-[#9ca697]">workflow-first progression</div>
               </div>
             </div>
           </div>
