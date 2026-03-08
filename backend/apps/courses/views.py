@@ -40,17 +40,16 @@ from .services import (
     generate_playback_url,
     generate_signed_video_url,
     normalize_storage_key,
+    resolve_local_media_storage_key,
+    resolve_lecture_local_video_storage_key,
     resolve_lecture_playback_expires_in,
     validate_protected_lecture_playback_request,
 )
 
 
 def _local_media_path_exists(storage_key):
-    try:
-        normalized_key = normalize_storage_key(storage_key)
-    except ProtectedMediaError:
-        return False
-    return (Path(settings.MEDIA_ROOT) / normalized_key).exists()
+    normalized_key = resolve_local_media_storage_key(storage_key)
+    return bool(normalized_key and (Path(settings.MEDIA_ROOT) / normalized_key).exists())
 
 
 def _protected_media_content_type(asset_path):
@@ -580,12 +579,13 @@ class LectureVideoView(APIView):
                 },
             )
 
-        if lecture.video_file:
+        local_video_storage_key = resolve_lecture_local_video_storage_key(lecture)
+        if local_video_storage_key:
             try:
                 media_url, expires_in = build_protected_lecture_playback_url(
                     request,
                     lecture,
-                    lecture.video_file.name,
+                    local_video_storage_key,
                     expires_in=expires_in,
                     asset_type="file",
                 )

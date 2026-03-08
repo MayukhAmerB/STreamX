@@ -1,6 +1,8 @@
 import json
 import subprocess
+from os.path import basename
 from pathlib import Path, PurePosixPath
+from urllib.parse import urlparse
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
@@ -76,6 +78,85 @@ def normalize_storage_key(storage_key):
     if not parts:
         raise ProtectedMediaError("Protected media path is empty.")
     return "/".join(parts)
+
+
+def resolve_local_media_storage_key(storage_key):
+    text = str(storage_key or "").strip()
+    if not text:
+        return ""
+
+    media_url = str(getattr(settings, "MEDIA_URL", "/media/") or "/media/")
+    parsed_path = ""
+    if text.startswith(("http://", "https://")):
+        try:
+            parsed_path = urlparse(text).path or ""
+        except Exception:
+            parsed_path = ""
+
+    candidates = []
+
+    def add_candidate(value):
+        normalized_value = str(value or "").strip()
+        if normalized_value and normalized_value not in candidates:
+            candidates.append(normalized_value)
+
+    add_candidate(text)
+    add_candidate(parsed_path)
+    if media_url:
+        if text.startswith(media_url):
+            add_candidate(text[len(media_url) :])
+        if parsed_path.startswith(media_url):
+            add_candidate(parsed_path[len(media_url) :])
+        if media_url in text:
+            add_candidate(text.split(media_url, 1)[1])
+        if parsed_path and media_url in parsed_path:
+            add_candidate(parsed_path.split(media_url, 1)[1])
+
+    for candidate in candidates:
+        try:
+            normalized_key = normalize_storage_key(candidate)
+        except ProtectedMediaError:
+            continue
+        local_path = Path(settings.MEDIA_ROOT) / normalized_key
+        if local_path.exists() and local_path.is_file():
+            return normalized_key
+
+    return ""
+
+
+def resolve_lecture_local_video_storage_key(lecture):
+    if not lecture:
+        return ""
+
+    direct_storage_key = resolve_local_media_storage_key(getattr(lecture, "video_file", None) and lecture.video_file.name)
+    if direct_storage_key:
+        return direct_storage_key
+
+    direct_storage_key = resolve_local_media_storage_key(getattr(lecture, "video_key", ""))
+    if direct_storage_key:
+        return direct_storage_key
+
+    course_slug = getattr(getattr(getattr(lecture, "section", None), "course", None), "slug", "") or "course"
+    section_id = getattr(lecture, "section_id", None) or "module"
+    expected_dir = Path(settings.MEDIA_ROOT) / "lecture_videos" / course_slug / f"module_{section_id}"
+    if not expected_dir.exists() or not expected_dir.is_dir():
+        return ""
+
+    expected_files = sorted(path for path in expected_dir.iterdir() if path.is_file())
+    if not expected_files:
+        return ""
+
+    raw_video_key = str(getattr(lecture, "video_key", "") or "").strip()
+    file_hint = basename(raw_video_key)
+    if file_hint:
+        matching_files = [path for path in expected_files if path.name == file_hint]
+        if len(matching_files) == 1:
+            return str(matching_files[0].relative_to(Path(settings.MEDIA_ROOT))).replace("\\", "/")
+
+    if len(expected_files) == 1:
+        return str(expected_files[0].relative_to(Path(settings.MEDIA_ROOT))).replace("\\", "/")
+
+    return ""
 
 
 def resolve_lecture_playback_expires_in(lecture):
@@ -178,9 +259,9 @@ def generate_playback_url(request, storage_key, expires_in=300, signer=None):
     if str(storage_key).startswith(("http://", "https://")):
         return str(storage_key), None
 
-    local_path = Path(settings.MEDIA_ROOT) / str(storage_key)
-    if local_path.exists():
-        media_url = f"{settings.MEDIA_URL.rstrip('/')}/{str(storage_key).lstrip('/')}"
+    local_storage_key = resolve_local_media_storage_key(storage_key)
+    if local_storage_key:
+        media_url = f"{settings.MEDIA_URL.rstrip('/')}/{local_storage_key.lstrip('/')}"
         return get_media_public_url(media_url, request=request), None
 
     signer = signer or generate_signed_video_url

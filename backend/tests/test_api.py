@@ -882,6 +882,49 @@ class LectureVideoAccessTests(BaseAPITestCase):
                 f"/_protected_media/{lecture.video_file.name}",
             )
 
+    def test_legacy_local_video_key_uses_expected_upload_directory(self):
+        with tempfile.TemporaryDirectory() as temp_dir, override_settings(
+            MEDIA_ROOT=temp_dir,
+            COURSE_PROTECTED_MEDIA_USE_ACCEL_REDIRECT=True,
+        ):
+            expected_rel_path = os.path.join(
+                "lecture_videos",
+                self.course.slug,
+                f"module_{self.section.id}",
+                "legacy-lesson.mp4",
+            )
+            expected_abs_path = os.path.join(temp_dir, expected_rel_path)
+            os.makedirs(os.path.dirname(expected_abs_path), exist_ok=True)
+            with open(expected_abs_path, "wb") as handle:
+                handle.write(b"legacy-video")
+
+            lecture = Lecture.objects.create(
+                section=self.section,
+                title="Legacy Uploaded Lecture",
+                description="Legacy key points to local upload directory",
+                video_key="qwerty",
+                order=2,
+                is_preview=False,
+            )
+            Enrollment.objects.create(
+                user=self.student,
+                course=self.course,
+                payment_status=Enrollment.STATUS_PAID,
+            )
+
+            self.login(self.student.email)
+            response = self.client.get(reverse("lecture-video", kwargs={"pk": lecture.id}))
+            self.assertEqual(response.status_code, 200)
+            playback_url = response.data["data"]["playback_url"]
+            self.assertIn(f"/api/lectures/{lecture.id}/playback/", playback_url)
+
+            protected_response = self.client.get(urlparse(playback_url).path)
+            self.assertEqual(protected_response.status_code, 200)
+            self.assertEqual(
+                protected_response.headers.get("X-Accel-Redirect"),
+                f"/_protected_media/{expected_rel_path.replace(os.sep, '/')}",
+            )
+
     def test_local_hls_manifest_returns_protected_playback_url(self):
         with tempfile.TemporaryDirectory() as temp_dir, override_settings(
             MEDIA_ROOT=temp_dir,

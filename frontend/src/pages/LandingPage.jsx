@@ -299,7 +299,7 @@ export default function LandingPage() {
                 <Link to="/courses">
                   <Button
                     variant="secondary"
-                    className="rounded-full border border-[#d8e1cf]/28 bg-[#101611]/96 px-5 text-[#f4f7ef] shadow-[0_12px_24px_rgba(0,0,0,0.18)] hover:bg-[#171d18]"
+                    className="rounded-full border border-[#f4f7ef]/70 bg-[#f4f7ef] px-5 text-[#101410] shadow-[0_12px_24px_rgba(0,0,0,0.18)] hover:bg-[#ffffff]"
                   >
                     Explore Programs
                   </Button>
