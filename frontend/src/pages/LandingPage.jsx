@@ -298,8 +298,8 @@ export default function LandingPage() {
                 </Link>
                 <Link to="/courses">
                   <Button
-                    variant="secondary"
-                    className="rounded-full border border-[#f4f7ef]/70 bg-[#f4f7ef] px-5 text-[#101410] shadow-[0_12px_24px_rgba(0,0,0,0.18)] hover:bg-[#ffffff]"
+                    variant="indigoSoft"
+                    className="glossy rounded-full !border-[#fff4d4] !bg-[linear-gradient(135deg,#fffef9_0%,#fff7e5_52%,#f3e2b6_100%)] px-5 !text-[#101410] shadow-[0_14px_28px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.95)] hover:!bg-[linear-gradient(135deg,#ffffff_0%,#fff9eb_52%,#f5e6c0_100%)]"
                   >
                     Explore Programs
                   </Button>
