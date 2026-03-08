@@ -1,4 +1,6 @@
 import json
+import hashlib
+import hmac
 import os
 import tempfile
 from decimal import Decimal
@@ -289,6 +291,26 @@ class RateLimitTests(APITestCase):
         )
         self.assertEqual(second.status_code, 429)
         self.assertEqual(second.data["errors"]["code"], "login_temporarily_locked")
+
+    @override_settings(
+        AUTH_LOGIN_MAX_FAILURES=100,
+        AUTH_LOGIN_LOCKOUT_SECONDS=3600,
+        TRUST_X_FORWARDED_FOR=False,
+    )
+    def test_login_throttle_ignores_untrusted_x_forwarded_for_header(self):
+        status_codes = []
+        for idx in range(6):
+            response = self.client.post(
+                reverse("auth-login"),
+                {"email": self.user.email, "password": "WrongPass@123"},
+                format="json",
+                REMOTE_ADDR="198.51.100.77",
+                HTTP_X_FORWARDED_FOR=f"203.0.113.{idx}, 198.51.100.10",
+            )
+            status_codes.append(response.status_code)
+
+        self.assertEqual(status_codes[:5], [400] * 5)
+        self.assertEqual(status_codes[5], 429)
 
 
 class UploadValidationTests(APITestCase):
@@ -654,6 +676,95 @@ class PaymentVerificationTests(BaseAPITestCase):
         payment.refresh_from_db()
         self.assertEqual(payment.status, Payment.STATUS_PAID)
         self.assertTrue(
+            Enrollment.objects.filter(
+                user=self.student,
+                course=self.course,
+                payment_status=Enrollment.STATUS_PAID,
+            ).exists()
+        )
+
+    @override_settings(RAZORPAY_WEBHOOK_SECRET="whsec_test")
+    def test_payment_webhook_marks_payment_paid_and_creates_enrollment(self):
+        payment = Payment.objects.create(
+            user=self.student,
+            course=self.course,
+            razorpay_order_id="order_webhook_123",
+            amount=self.course.price,
+            currency="INR",
+            status=Payment.STATUS_CREATED,
+        )
+        payload = {
+            "event": "payment.captured",
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "id": "pay_webhook_123",
+                        "order_id": payment.razorpay_order_id,
+                        "status": "captured",
+                        "amount": int(Decimal(self.course.price) * 100),
+                    }
+                }
+            },
+        }
+        body = json.dumps(payload).encode("utf-8")
+        signature = hmac.new(b"whsec_test", body, hashlib.sha256).hexdigest()
+
+        response = self.client.post(
+            reverse("payment-webhook"),
+            data=body,
+            content_type="application/json",
+            HTTP_X_RAZORPAY_SIGNATURE=signature,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["data"]["processed"])
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, Payment.STATUS_PAID)
+        self.assertEqual(payment.razorpay_payment_id, "pay_webhook_123")
+        self.assertTrue(
+            Enrollment.objects.filter(
+                user=self.student,
+                course=self.course,
+                payment_status=Enrollment.STATUS_PAID,
+            ).exists()
+        )
+
+    @override_settings(RAZORPAY_WEBHOOK_SECRET="whsec_test")
+    def test_payment_webhook_rejects_invalid_signature(self):
+        payment = Payment.objects.create(
+            user=self.student,
+            course=self.course,
+            razorpay_order_id="order_webhook_bad_sig",
+            amount=self.course.price,
+            currency="INR",
+            status=Payment.STATUS_CREATED,
+        )
+        payload = {
+            "event": "payment.captured",
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "id": "pay_webhook_bad_sig",
+                        "order_id": payment.razorpay_order_id,
+                        "status": "captured",
+                        "amount": int(Decimal(self.course.price) * 100),
+                    }
+                }
+            },
+        }
+        body = json.dumps(payload).encode("utf-8")
+
+        response = self.client.post(
+            reverse("payment-webhook"),
+            data=body,
+            content_type="application/json",
+            HTTP_X_RAZORPAY_SIGNATURE="invalid-signature",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, Payment.STATUS_CREATED)
+        self.assertFalse(
             Enrollment.objects.filter(
                 user=self.student,
                 course=self.course,
@@ -1316,6 +1427,33 @@ class RealtimeSessionTests(APITestCase):
             format="json",
         )
         self.assertEqual(join_response.status_code, 403)
+
+    def test_blocked_user_join_does_not_mark_scheduled_session_live(self):
+        blocked_user = User.objects.create_user(
+            email="blocked-scheduled@test.com",
+            password="StrongPass@123",
+            full_name="Blocked Scheduled User",
+            role=User.ROLE_STUDENT,
+        )
+        session = RealtimeSession.objects.create(
+            title="Scheduled Restricted Meeting",
+            description="Unauthorized join must not transition status",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_SCHEDULED,
+        )
+
+        self.login(blocked_user.email)
+        join_response = self.client.post(
+            reverse("realtime-session-join", kwargs={"pk": session.id}),
+            {"display_name": "Blocked Scheduled User"},
+            format="json",
+        )
+        self.assertEqual(join_response.status_code, 403)
+        session.refresh_from_db()
+        self.assertEqual(session.status, RealtimeSession.STATUS_SCHEDULED)
 
     @override_settings(
         LIVEKIT_URL="ws://livekit.test",

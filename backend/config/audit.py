@@ -1,26 +1,9 @@
 import logging
 
-from django.conf import settings
+from config.client_ip import resolve_client_ip
 
 
 audit_logger = logging.getLogger("security.audit")
-
-
-def _client_ip(request):
-    if getattr(settings, "TRUST_X_FORWARDED_FOR", False):
-        forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "")
-        if forwarded_for:
-            ips = [item.strip() for item in forwarded_for.split(",") if item.strip()]
-            if ips:
-                # When trusted proxies are configured, pick the closest untrusted client.
-                try:
-                    trusted_proxy_count = max(1, int(getattr(settings, "TRUSTED_PROXY_COUNT", 1)))
-                except (TypeError, ValueError):
-                    trusted_proxy_count = 1
-                if len(ips) > trusted_proxy_count:
-                    return ips[-(trusted_proxy_count + 1)]
-                return ips[0]
-    return request.META.get("REMOTE_ADDR", "") or "unknown"
 
 
 def log_security_event(event, request=None, **data):
@@ -29,7 +12,7 @@ def log_security_event(event, request=None, **data):
         user = getattr(request, "user", None)
         payload.update(
             {
-                "ip": _client_ip(request),
+                "ip": resolve_client_ip(request),
                 "path": getattr(request, "path", ""),
                 "method": getattr(request, "method", ""),
                 "request_id": getattr(request, "request_id", None),

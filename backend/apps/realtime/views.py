@@ -261,10 +261,6 @@ class RealtimeSessionJoinView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        if session.status == RealtimeSession.STATUS_SCHEDULED:
-            session.mark_live()
-
-        room_name = session.livekit_room_name or session.room_name
         access_decision = get_access_decision(session, request.user)
         if not access_decision.allowed:
             return api_response(
@@ -273,6 +269,9 @@ class RealtimeSessionJoinView(APIView):
                 errors={"detail": access_decision.detail},
                 status_code=access_decision.status_code,
             )
+        if session.status == RealtimeSession.STATUS_SCHEDULED:
+            session.mark_live()
+        room_name = session.livekit_room_name or session.room_name
 
         permissions_set = build_permission_set(session, request.user, access_decision)
         realtime_config = RealtimeConfiguration.get_solo()

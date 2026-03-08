@@ -1,16 +1,11 @@
 from django.conf import settings
 from django.core.cache import cache
 
+from config.client_ip import resolve_client_ip
+
 
 def _normalize_email(email):
     return str(email or "").strip().lower()
-
-
-def _client_ip(request):
-    forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR", "") or "unknown"
 
 
 def _key_email(email):
@@ -24,7 +19,7 @@ def _key_ip(ip):
 def get_lockout_state(email, request):
     max_failures = int(getattr(settings, "AUTH_LOGIN_MAX_FAILURES", 3))
     email_count = int(cache.get(_key_email(email), 0) or 0)
-    ip_count = int(cache.get(_key_ip(_client_ip(request)), 0) or 0)
+    ip_count = int(cache.get(_key_ip(resolve_client_ip(request)), 0) or 0)
     attempts = max(email_count, ip_count)
     return attempts >= max_failures, attempts, max_failures
 
@@ -32,7 +27,7 @@ def get_lockout_state(email, request):
 def register_failed_login(email, request):
     ttl_seconds = int(getattr(settings, "AUTH_LOGIN_LOCKOUT_SECONDS", 3600))
     email_key = _key_email(email)
-    ip_key = _key_ip(_client_ip(request))
+    ip_key = _key_ip(resolve_client_ip(request))
     email_count = int(cache.get(email_key, 0) or 0) + 1
     ip_count = int(cache.get(ip_key, 0) or 0) + 1
     cache.set(email_key, email_count, timeout=ttl_seconds)
@@ -41,4 +36,4 @@ def register_failed_login(email, request):
 
 
 def clear_failed_login(email, request):
-    cache.delete_many([_key_email(email), _key_ip(_client_ip(request))])
+    cache.delete_many([_key_email(email), _key_ip(resolve_client_ip(request))])

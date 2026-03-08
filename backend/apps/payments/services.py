@@ -1,4 +1,7 @@
-﻿from django.conf import settings
+import hashlib
+import hmac
+
+from django.conf import settings
 
 
 class RazorpayServiceError(Exception):
@@ -45,3 +48,25 @@ def verify_razorpay_signature(*, razorpay_order_id, razorpay_payment_id, razorpa
     except Exception as exc:
         raise RazorpayServiceError("Razorpay signature verification failed.") from exc
 
+
+def verify_razorpay_webhook_signature(*, payload_body, razorpay_signature):
+    webhook_secret = str(getattr(settings, "RAZORPAY_WEBHOOK_SECRET", "") or "").strip()
+    if not webhook_secret:
+        raise RazorpayServiceError("Razorpay webhook secret is not configured.")
+
+    signature = str(razorpay_signature or "").strip()
+    if not signature:
+        raise RazorpayServiceError("Missing Razorpay webhook signature header.")
+
+    body = payload_body.encode("utf-8") if isinstance(payload_body, str) else bytes(payload_body or b"")
+    if not body:
+        raise RazorpayServiceError("Webhook payload is empty.")
+
+    expected_signature = hmac.new(
+        key=webhook_secret.encode("utf-8"),
+        msg=body,
+        digestmod=hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(expected_signature, signature):
+        raise RazorpayServiceError("Razorpay webhook signature verification failed.")
+    return True
