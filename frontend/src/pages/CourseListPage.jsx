@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import CourseCard from "../components/CourseCard";
-import FormInput from "../components/FormInput";
 import PageShell from "../components/PageShell";
 import { listCourses } from "../api/courses";
 import { apiData } from "../utils/api";
@@ -77,7 +76,6 @@ export default function CourseListPage() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_18%,rgba(192,192,192,0.14),transparent_38%)]" />
         </div>
 
-        <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:28px_28px]" />
 
         <div className="relative p-5 sm:p-6">
           <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
@@ -94,65 +92,71 @@ export default function CourseListPage() {
               </p>
 
               <div className="mt-5 grid gap-3 sm:auto-rows-fr sm:grid-cols-2 xl:grid-cols-4">
-                <div className="h-full rounded-2xl border border-black panel-gradient p-3 backdrop-blur-sm">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Live Tracks</div>
-                  <div className="mt-1 text-xl font-semibold text-white">{summary.live}</div>
-                  <div className="mt-1 text-xs text-[#BBBBBB]">Ready for enrollment</div>
+                <div className="h-full rounded-2xl border border-black bg-[linear-gradient(135deg,#FFFFFF_0%,#F4F4F4_58%,#E1E1E1_100%)] p-3">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-[#444444]">Live Tracks</div>
+                  <div className="mt-1 text-xl font-semibold text-[#111111]">{summary.live}</div>
+                  <div className="mt-1 text-xs text-[#2E2E2E]">Ready for enrollment</div>
                 </div>
-                <div className="h-full rounded-2xl border border-black bg-[#D9D9D9]/16 p-3 backdrop-blur-sm">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-[#CECECE]">
+                <div className="h-full rounded-2xl border border-black bg-[linear-gradient(135deg,#FFFFFF_0%,#F4F4F4_58%,#E1E1E1_100%)] p-3">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-[#444444]">
                     Coming Soon
                   </div>
-                  <div className="mt-1 text-xl font-semibold text-white">{summary.comingSoon}</div>
-                  <div className="mt-1 text-xs text-[#BBBBBB]">Upcoming releases</div>
+                  <div className="mt-1 text-xl font-semibold text-[#111111]">{summary.comingSoon}</div>
+                  <div className="mt-1 text-xs text-[#2E2E2E]">Upcoming releases</div>
                 </div>
-                <div className="h-full rounded-2xl border border-black panel-gradient p-3 backdrop-blur-sm">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">OSINT</div>
-                  <div className="mt-1 text-xl font-semibold text-white">{summary.osint}</div>
-                  <div className="mt-1 text-xs text-[#BBBBBB]">Investigation tracks</div>
+                <div className="h-full rounded-2xl border border-black bg-[linear-gradient(135deg,#FFFFFF_0%,#F4F4F4_58%,#E1E1E1_100%)] p-3">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-[#444444]">OSINT</div>
+                  <div className="mt-1 text-xl font-semibold text-[#111111]">{summary.osint}</div>
+                  <div className="mt-1 text-xs text-[#2E2E2E]">Investigation tracks</div>
                 </div>
-                <div className="h-full rounded-2xl border border-black panel-gradient p-3 backdrop-blur-sm">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Web Pentesting</div>
-                  <div className="mt-1 text-xl font-semibold text-white">{summary.web}</div>
-                  <div className="mt-1 text-xs text-[#BBBBBB]">Application security</div>
+                <div className="h-full rounded-2xl border border-black bg-[linear-gradient(135deg,#FFFFFF_0%,#F4F4F4_58%,#E1E1E1_100%)] p-3">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-[#444444]">Web Pentesting</div>
+                  <div className="mt-1 text-xl font-semibold text-[#111111]">{summary.web}</div>
+                  <div className="mt-1 text-xs text-[#2E2E2E]">Application security</div>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-4 rounded-2xl border border-black panel-gradient p-4 backdrop-blur-sm">
+            <div className="space-y-4 rounded-2xl border border-black bg-[linear-gradient(90deg,#050505_0%,#0E0E0E_52%,#1A1A1A_100%)] p-4 text-white shadow-[0_10px_30px_rgba(0,0,0,0.22)]">
               <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#E6E6E6]">
                   Search & Filter
                 </div>
-                <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
+                <p className="mt-2 text-sm leading-6 text-[#F1F1F1]">
                   Search by title or description keywords. Course status and category badges update
                   automatically from backend data.
                 </p>
               </div>
-              <FormInput
-                label="Search"
-                placeholder="Search courses..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+              <label className="block">
+                <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#F0F0F0]">
+                  Search
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search courses..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-xl border border-white/65 bg-white/92 px-3.5 py-2.5 text-sm text-[#111111] placeholder:text-[#626262] shadow-[inset_0_1px_0_rgba(255,255,255,0.96)] focus:border-white focus:outline-none focus:ring-2 focus:ring-white/25"
+                />
+              </label>
 
               <div className="grid auto-rows-fr grid-cols-2 gap-2 text-sm">
-                <div className="h-full rounded-xl border border-black panel-gradient px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Beginner</div>
+                <div className="h-full rounded-xl border border-white/40 bg-black/25 px-3 py-2 backdrop-blur-sm">
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-[#E1E1E1]">Beginner</div>
                   <div className="mt-1 font-semibold text-white">{levelSummary.beginner}</div>
                 </div>
-                <div className="h-full rounded-xl border border-black panel-gradient px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">
+                <div className="h-full rounded-xl border border-white/40 bg-black/25 px-3 py-2 backdrop-blur-sm">
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-[#E1E1E1]">
                     Intermediate
                   </div>
                   <div className="mt-1 font-semibold text-white">{levelSummary.intermediate}</div>
                 </div>
-                <div className="h-full rounded-xl border border-black panel-gradient px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Advanced</div>
+                <div className="h-full rounded-xl border border-white/40 bg-black/25 px-3 py-2 backdrop-blur-sm">
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-[#E1E1E1]">Advanced</div>
                   <div className="mt-1 font-semibold text-white">{levelSummary.advanced}</div>
                 </div>
-                <div className="h-full rounded-xl border border-black panel-gradient px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Results</div>
+                <div className="h-full rounded-xl border border-white/40 bg-black/25 px-3 py-2 backdrop-blur-sm">
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-[#E1E1E1]">Results</div>
                   <div className="mt-1 font-semibold text-white">
                     {loading ? "..." : courses.length}
                   </div>
@@ -182,7 +186,7 @@ export default function CourseListPage() {
         </div>
       ) : null}
       {!loading && !error && courses.length === 0 ? (
-        <div className="rounded-2xl border border-black panel-gradient p-6 text-sm text-[#BBBBBB]">
+        <div className="rounded-2xl border border-black bg-[linear-gradient(135deg,#FFFFFF_0%,#F4F4F4_58%,#E1E1E1_100%)] p-6 text-sm text-[#1D1D1D]">
           No courses found.
         </div>
       ) : null}

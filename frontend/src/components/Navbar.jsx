@@ -56,15 +56,15 @@ export default function Navbar() {
         aria-hidden="true"
         className={`pointer-events-none absolute inset-0 z-0 ${
           isHome
-            ? "bg-[radial-gradient(120%_220%_at_100%_0%,rgba(255,255,255,0.22)_0%,rgba(255,255,255,0.10)_20%,rgba(255,255,255,0.03)_42%,rgba(255,255,255,0)_70%)]"
-            : "bg-[radial-gradient(120%_220%_at_100%_0%,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.08)_20%,rgba(255,255,255,0.025)_42%,rgba(255,255,255,0)_70%)]"
+            ? "hidden md:block md:bg-[radial-gradient(120%_220%_at_100%_0%,rgba(255,255,255,0.22)_0%,rgba(255,255,255,0.10)_20%,rgba(255,255,255,0.03)_42%,rgba(255,255,255,0)_70%)]"
+            : "hidden md:block md:bg-[radial-gradient(120%_220%_at_100%_0%,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.08)_20%,rgba(255,255,255,0.025)_42%,rgba(255,255,255,0)_70%)]"
         }`}
       />
       <div
         className={`relative z-10 mx-auto flex max-w-7xl items-center justify-between gap-3 rounded-2xl px-3 py-3 text-neutral-950 backdrop-blur sm:gap-4 sm:px-4 sm:py-4 ${
           isHome
-            ? "border border-black bg-[radial-gradient(100%_220%_at_100%_0%,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.08)_22%,rgba(255,255,255,0.03)_40%,rgba(255,255,255,0)_68%),linear-gradient(90deg,#000000_0%,#000000_62%,#0E0E0E_100%)] shadow-[0_12px_40px_rgba(0,0,0,0.4)]"
-            : "border border-black bg-[radial-gradient(100%_220%_at_100%_0%,rgba(255,255,255,0.15)_0%,rgba(255,255,255,0.065)_22%,rgba(255,255,255,0.025)_40%,rgba(255,255,255,0)_68%),linear-gradient(90deg,#000000_0%,#000000_62%,#0D0D0D_100%)] shadow-[0_10px_30px_rgba(0,0,0,0.34)]"
+            ? "border border-black bg-black md:bg-[radial-gradient(100%_220%_at_100%_0%,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.08)_22%,rgba(255,255,255,0.03)_40%,rgba(255,255,255,0)_68%),linear-gradient(90deg,#000000_0%,#000000_62%,#0E0E0E_100%)] shadow-[0_12px_40px_rgba(0,0,0,0.4)]"
+            : "border border-black bg-black md:bg-[radial-gradient(100%_220%_at_100%_0%,rgba(255,255,255,0.15)_0%,rgba(255,255,255,0.065)_22%,rgba(255,255,255,0.025)_40%,rgba(255,255,255,0)_68%),linear-gradient(90deg,#000000_0%,#000000_62%,#0D0D0D_100%)] shadow-[0_10px_30px_rgba(0,0,0,0.34)]"
         }`}
       >
         <BrandLogo className="min-w-0 flex-1 lg:flex-none" />

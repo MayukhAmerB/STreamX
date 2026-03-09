@@ -74,7 +74,106 @@ h6 {
   background:
     radial-gradient(circle at 100% 0%, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.028) 24%, rgba(255,255,255,0) 52%),
     linear-gradient(130deg, #000000 76%, #101010 100%);
+  border-color: rgba(150,150,150,0.38) !important;
+}
+
+.border-black {
+  border-color: rgba(150,150,150,0.38) !important;
+}
+
+.landing-hero .border-black,
+.landing-hero .panel-gradient {
   border-color: #000000 !important;
+}
+
+.hero-glitch-overlay {
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.34;
+}
+
+.hero-glitch-line {
+  position: absolute;
+  left: -42%;
+  width: 220%;
+  margin: 0;
+  white-space: nowrap;
+  font-family: "Courier New", "Consolas", monospace;
+  font-size: clamp(10px, 0.9vw, 13px);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.18);
+  text-shadow:
+    -1px 0 rgba(255,255,255,0.08),
+    1px 0 rgba(255,255,255,0.08);
+  mix-blend-mode: screen;
+}
+
+.hero-glitch-line-a {
+  top: 16%;
+  animation:
+    heroGlitchSlideA 16s linear infinite,
+    heroGlitchFlicker 2.6s steps(2, end) infinite;
+}
+
+.hero-glitch-line-b {
+  top: 42%;
+  animation:
+    heroGlitchSlideB 14s linear infinite,
+    heroGlitchFlicker 2.2s steps(3, end) infinite;
+}
+
+.hero-glitch-line-c {
+  top: 68%;
+  animation:
+    heroGlitchSlideC 18s linear infinite,
+    heroGlitchFlicker 2.9s steps(2, end) infinite;
+}
+
+@keyframes heroGlitchSlideA {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-18%);
+  }
+}
+
+@keyframes heroGlitchSlideB {
+  0% {
+    transform: translateX(-4%);
+  }
+  100% {
+    transform: translateX(10%);
+  }
+}
+
+@keyframes heroGlitchSlideC {
+  0% {
+    transform: translateX(6%);
+  }
+  100% {
+    transform: translateX(-12%);
+  }
+}
+
+@keyframes heroGlitchFlicker {
+  0%,
+  100% {
+    opacity: 0.34;
+  }
+  18% {
+    opacity: 0.16;
+  }
+  36% {
+    opacity: 0.42;
+  }
+  59% {
+    opacity: 0.22;
+  }
+  81% {
+    opacity: 0.4;
+  }
 }
 
 @keyframes riseIn {

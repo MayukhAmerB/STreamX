@@ -268,7 +268,6 @@ export default function CourseDetailPage() {
           />
           <div className="absolute inset-0 bg-gradient-to-br from-black/90 via-black/76 to-[#111111]/95" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(192,192,192,0.12),transparent_40%)]" />
-          <div className="absolute inset-0 opacity-15 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:26px_26px]" />
         </div>
 
         <div className="relative grid gap-5 p-5 sm:p-6 lg:grid-cols-[1.15fr_0.85fr]">
@@ -356,7 +355,6 @@ export default function CourseDetailPage() {
                       }}
                     />
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_10%,rgba(192,192,192,0.12),transparent_42%)]" />
-                    <div className="absolute inset-0 opacity-15 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:22px_22px]" />
                   </div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/10" />

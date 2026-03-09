@@ -8,6 +8,9 @@ import { featuredCourse } from "../utils/featuredCourse";
 
 const heroCardImage =
   "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
+const heroGlitchBase =
+  "AL SYED INITIATIVE // CYBERSECURITY // OSINT // WEB PENTESTING // LIVE TRAINING // ";
+const heroGlitchLine = `${heroGlitchBase}${heroGlitchBase}${heroGlitchBase}${heroGlitchBase}`;
 
 const stats = [
   { value: "1000+", label: "Students trained" },
@@ -192,10 +195,6 @@ function SectionCard({ children, className = "" }) {
     <section
       className={`relative mx-auto max-w-6xl overflow-hidden rounded-[24px] border border-black ${cornerGlowPanelBg} p-4 shadow-[0_12px_30px_rgba(0,0,0,0.22)] sm:p-6 ${className}`}
     >
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-[0.14] [background-image:linear-gradient(rgba(255,255,255,0.10)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:30px_30px]"
-      />
       <div className="relative z-10">{children}</div>
     </section>
   );
@@ -273,15 +272,19 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(0,0,0,0)_58%,rgba(255,255,255,0.02)_76%,rgba(255,255,255,0.07)_100%)]" />
       </div>
 
-      <section className="relative z-10 overflow-hidden px-4 pb-8 pt-6 sm:pt-10">
+      <section className="landing-hero relative z-10 overflow-hidden px-4 pb-8 pt-6 sm:pt-10">
         <div className="absolute inset-0">
           <div className="absolute inset-0 bg-black" />
+          <div aria-hidden="true" className="hero-glitch-overlay absolute inset-0 overflow-hidden">
+            <p className="hero-glitch-line hero-glitch-line-a">{heroGlitchLine}</p>
+            <p className="hero-glitch-line hero-glitch-line-b">{heroGlitchLine}</p>
+            <p className="hero-glitch-line hero-glitch-line-c">{heroGlitchLine}</p>
+          </div>
           <div className="absolute inset-0 bg-[radial-gradient(88%_78%_at_100%_0%,rgba(255,255,255,0.26)_0%,rgba(255,255,255,0.12)_24%,rgba(255,255,255,0.05)_42%,rgba(255,255,255,0)_68%)]" />
           <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(0,0,0,0)_58%,rgba(255,255,255,0.025)_76%,rgba(255,255,255,0.08)_100%)]" />
         </div>
         <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[30px] border border-black bg-black shadow-[0_28px_80px_rgba(0,0,0,0.42)]">
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[1]">
-            <div className="absolute inset-0 [background-image:linear-gradient(rgba(255,255,255,0.20)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.16)_1px,transparent_1px)] [background-size:34px_34px] opacity-[0.34]" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_22%,rgba(255,255,255,0.10),transparent_44%)]" />
           </div>
           <div className="relative z-10 grid items-center gap-8 p-5 sm:p-7 lg:grid-cols-[1.03fr_0.97fr]">
@@ -357,7 +360,6 @@ export default function LandingPage() {
                     className="h-full w-full object-cover opacity-[0.9]"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/78 via-black/30 to-black/12" />
-                  <div className="absolute inset-0 opacity-[0.14] [background-image:linear-gradient(rgba(211,211,211,0.16)_1px,transparent_1px),linear-gradient(90deg,rgba(211,211,211,0.12)_1px,transparent_1px)] [background-size:24px_24px]" />
                   <div className="absolute left-4 top-4 rounded-2xl border border-black bg-black/86 px-4 py-3 backdrop-blur-sm">
                     <div className="font-reference text-[10px] tracking-[0.22em] text-[#949494]">
                       LIVE TRAINING
@@ -393,10 +395,10 @@ export default function LandingPage() {
                 key={item.label}
                 className={`reveal-up ${
                   idx === 0 ? "reveal-delay-1" : idx === 1 ? "reveal-delay-2" : "reveal-delay-3"
-                } flex h-full flex-col items-center justify-center rounded-2xl border border-black ${cornerGlowCardBg} px-4 py-4 text-center shadow-[0_10px_20px_rgba(0,0,0,0.22)]`}
+                } flex h-full flex-col items-center justify-center rounded-2xl border border-black bg-[linear-gradient(135deg,#FFFFFF_0%,#F4F4F4_58%,#E1E1E1_100%)] px-4 py-4 text-center shadow-[0_10px_20px_rgba(0,0,0,0.22)]`}
               >
-                <div className="font-reference text-3xl font-semibold text-[#D3D3D3]">{item.value}</div>
-                <div className="mt-1 text-xs font-medium uppercase tracking-wide text-[#A6A6A6]">
+                <div className="font-reference text-3xl font-semibold text-[#111111]">{item.value}</div>
+                <div className="mt-1 text-xs font-medium uppercase tracking-wide text-[#2A2A2A]">
                   {item.label}
                 </div>
               </div>
@@ -429,15 +431,15 @@ export default function LandingPage() {
                   key={item.title}
                   className={`hover-lift reveal-up ${
                     idx === 0 ? "reveal-delay-1" : idx === 1 ? "reveal-delay-2" : "reveal-delay-3"
-                  } flex h-full flex-col rounded-2xl border border-black ${cornerGlowCardBg} p-4 shadow-[0_10px_20px_rgba(0,0,0,0.22)]`}
+                  } flex h-full flex-col rounded-2xl border border-black bg-[linear-gradient(135deg,#FFFFFF_0%,#F4F4F4_58%,#E1E1E1_100%)] p-4 shadow-[0_10px_20px_rgba(0,0,0,0.22)]`}
                 >
                   <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-[#CDCDCD] bg-[#F0F0F0] text-[#2A2A2A] shadow-[0_2px_10px_rgba(0,0,0,0.18)]">
                     <IconBadge type={item.icon} />
                   </div>
-                  <h3 className="font-reference text-xl font-semibold leading-tight text-white">
+                  <h3 className="font-reference text-xl font-semibold leading-tight text-[#111111]">
                     {item.title}
                   </h3>
-                  <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">{item.body}</p>
+                  <p className="mt-2 text-sm leading-6 text-[#2E2E2E]">{item.body}</p>
                 </div>
               ))}
             </div>
@@ -485,10 +487,10 @@ export default function LandingPage() {
                   } flex h-full flex-col rounded-2xl border border-black ${cornerGlowCardBg} p-4 shadow-[0_10px_24px_rgba(0,0,0,0.25)]`}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="rounded-full border border-black bg-[#0F0F0F] px-2.5 py-1 text-[11px] font-semibold text-[#D6D6D6]">
+                    <span className="rounded-full border border-black bg-[#111111] px-2.5 py-1 text-[11px] font-semibold text-[#D6D6D6]">
                       Course {idx + 1}
                     </span>
-                    <span className="rounded-full border border-black bg-[#0F0F0F] px-2.5 py-1 text-[11px] font-semibold text-[#D6D6D6]">
+                    <span className="rounded-full border border-black bg-[#111111] px-2.5 py-1 text-[11px] font-semibold text-[#D6D6D6]">
                       {program.section_count ?? program.lessons ?? 0} sections
                     </span>
                   </div>
@@ -520,12 +522,12 @@ export default function LandingPage() {
                     </Link>
                     {status.isLive ? (
                       <Link to={detailsLink} className="flex-1">
-                        <button className="w-full rounded-full border border-black bg-[#111111] px-3 py-2 text-sm font-semibold text-[#E2E2E2] shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition hover:bg-[#1A1A1A]">
+                        <button className="w-full rounded-full border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-3 py-2 text-sm font-semibold text-[#1A1A1A] shadow-[0_10px_24px_rgba(0,0,0,0.2)] transition hover:bg-[linear-gradient(135deg,#FFFDF2_0%,#F9EFD1_55%,#EEDFB4_100%)]">
                           Live
                         </button>
                       </Link>
                     ) : (
-                      <button className="flex-1 rounded-full border border-black bg-[#111111] px-3 py-2 text-sm font-semibold text-[#E2E2E2] shadow-[0_8px_18px_rgba(0,0,0,0.18)] transition hover:bg-[#1A1A1A]">
+                      <button className="flex-1 rounded-full border border-[#B7B7B7] bg-gradient-to-r from-[#CFCFCF] to-[#989898] px-3 py-2 text-sm font-semibold text-[#121212] shadow-[0_8px_18px_rgba(0,0,0,0.2)] transition hover:from-[#DBDBDB] hover:to-[#A6A6A6]">
                         Coming Soon
                       </button>
                     )}

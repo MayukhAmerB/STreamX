@@ -209,7 +209,6 @@ export default function LiveClassesPage() {
           />
           <div className="absolute inset-0 bg-gradient-to-br from-black/88 via-black/78 to-[#111111]/94" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_12%,rgba(192,192,192,0.12),transparent_36%)]" />
-          <div className="absolute inset-0 opacity-15 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:26px_26px]" />
         </div>
 
         <div className="relative grid gap-5 p-5 sm:p-6 lg:grid-cols-[1.05fr_0.95fr]">
@@ -304,7 +303,7 @@ export default function LiveClassesPage() {
                     <span className="rounded-full border border-[#DADADA]/20 bg-[#1A1A1A] px-3 py-1 text-[11px] font-semibold tracking-wide text-[#D7D7D7]">
                       {monthMeta.label}
                     </span>
-                    <span className="rounded-full border border-[#DEDEDE] bg-[#F0F0F0] px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-[#272727]">
+                    <span className="rounded-full border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-[#1A1A1A]">
                       Live
                     </span>
                   </div>

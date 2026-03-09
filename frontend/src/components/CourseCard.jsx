@@ -42,7 +42,7 @@ function CourseCard({ course }) {
             alt={safeTitle}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover object-center opacity-[0.72] transition duration-500 group-hover:scale-[1.04]"
+            className="h-full w-full object-cover object-center opacity-[0.9] transition duration-500 group-hover:scale-[1.04]"
             onError={() => {
               if (thumbnailSrc !== COURSE_FALLBACK_THUMBNAIL) {
                 setThumbnailSrc(COURSE_FALLBACK_THUMBNAIL);
@@ -56,15 +56,15 @@ function CourseCard({ course }) {
             No Thumbnail
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#060606] via-black/30 to-black/10" />
-        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#060606]/95 via-black/25 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/72 to-transparent" />
 
         <div className="absolute left-4 top-4 right-4 flex items-start justify-between gap-2">
           <div className="flex flex-wrap gap-2">
-            <span className="rounded-full border border-white/70 bg-white/90 px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-neutral-900 shadow-sm">
+            <span className="rounded-full border border-black bg-white px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-neutral-900 shadow-sm">
               {categoryLabel}
             </span>
-            <span className="rounded-full border border-[#DBDBDB]/20 bg-[#121212]/85 px-3 py-1 text-[10px] font-semibold tracking-wide text-[#DBDBDB]">
+            <span className="rounded-full border border-black bg-[#F1F1F1] px-3 py-1 text-[10px] font-semibold tracking-wide text-[#202020]">
               {levelLabel}
             </span>
           </div>
@@ -96,17 +96,17 @@ function CourseCard({ course }) {
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-2">
-          <div className="rounded-xl border border-black bg-[#121212] px-3 py-2">
-            <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Modules</div>
-            <div className="mt-1 text-sm font-semibold text-[#E0E0E0]">
+          <div className="rounded-xl border border-black bg-[#F4F4F4] px-3 py-2">
+            <div className="text-[10px] uppercase tracking-[0.14em] text-[#5A5A5A]">Modules</div>
+            <div className="mt-1 text-sm font-semibold text-[#111111]">
               {course.section_count ?? 0}
             </div>
           </div>
-          <div className="rounded-xl border border-black bg-[#121212] px-3 py-2">
-            <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Access</div>
+          <div className="rounded-xl border border-black bg-[#F4F4F4] px-3 py-2">
+            <div className="text-[10px] uppercase tracking-[0.14em] text-[#5A5A5A]">Access</div>
             <div
               className={`mt-1 text-sm font-semibold ${
-                status.isComingSoon ? "text-[#D3D3D3]" : "text-[#E0E0E0]"
+                status.isComingSoon ? "text-[#2A2A2A]" : "text-[#111111]"
               }`}
             >
               {status.isComingSoon ? "Coming Soon" : formatINR(course.price)}
@@ -134,12 +134,12 @@ function CourseCard({ course }) {
             {status.isLive ? (
               <Link
                 to={`/courses/${course.id}`}
-                className="glossy inline-flex items-center justify-center rounded-full border border-[#E7E7E7]/80 bg-[linear-gradient(135deg,#FEFEFE_0%,#F3F3F3_55%,#CFCFCF_100%)] px-3 py-2.5 text-sm font-semibold text-[#141414] shadow-[0_10px_22px_rgba(0,0,0,0.22)] transition hover:bg-[linear-gradient(135deg,#FFFFFF_0%,#F7F7F7_55%,#DADADA_100%)]"
+                className="glossy inline-flex items-center justify-center rounded-full border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-3 py-2.5 text-sm font-semibold text-[#1A1A1A] shadow-[0_8px_18px_rgba(0,0,0,0.14)] transition hover:bg-[linear-gradient(135deg,#FFFDF2_0%,#F9EFD1_55%,#EEDFB4_100%)]"
               >
                 Live
               </Link>
             ) : (
-              <span className="inline-flex items-center justify-center rounded-full border border-[#D1D1D1]/70 bg-[linear-gradient(90deg,#DBDBDB_0%,#C4C4C4_55%,#A1A1A1_100%)] px-3 py-2.5 text-sm font-semibold text-[#141414] shadow-[0_8px_18px_rgba(0,0,0,0.18)]">
+              <span className="inline-flex items-center justify-center rounded-full border border-[#B7B7B7] bg-gradient-to-r from-[#CFCFCF] to-[#989898] px-3 py-2.5 text-sm font-semibold text-[#121212] shadow-[0_8px_18px_rgba(0,0,0,0.2)]">
                 Coming Soon
               </span>
             )}

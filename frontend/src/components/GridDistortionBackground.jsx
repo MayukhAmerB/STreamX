@@ -21,6 +21,7 @@ export default function GridDistortionBackground() {
     let height = 0;
     let dpr = 1;
     let cell = 32;
+    let glyphNodes = [];
     let reducedMotion = false;
     let isVisible = true;
     let lastFrameTime = 0;
@@ -36,11 +37,19 @@ export default function GridDistortionBackground() {
       frameIntervalMs = 1000 / 12;
     }
 
-    const distort = (x, y, t) => {
-      const waveX = Math.sin(x * 0.012 + t * 0.9) * 4.2;
-      const waveY = Math.cos(y * 0.014 - t * 0.8) * 3.8;
-      const swirl = Math.sin((x + y) * 0.008 - t * 0.55) * 2.8;
-      return [x + waveX + swirl, y + waveY - swirl * 0.45];
+    const createGlyphNodes = () => {
+      const area = width * height;
+      const count = clamp(Math.floor(area / 22000), 40, 180);
+      glyphNodes = Array.from({ length: count }, () => ({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        driftX: (Math.random() * 2 - 1) * 18,
+        driftY: (Math.random() * 2 - 1) * 14,
+        speed: 0.2 + Math.random() * 0.6,
+        phase: Math.random() * Math.PI * 2,
+        glyphIndex: Math.floor(Math.random() * GLYPHS.length),
+        size: Math.max(10, Math.floor(cell * (0.26 + Math.random() * 0.2))),
+      }));
     };
 
     const drawGrid = (t) => {
@@ -48,64 +57,34 @@ export default function GridDistortionBackground() {
       ctx.fillStyle = "#000000";
       ctx.fillRect(0, 0, width, height);
 
-      const sampleStep = Math.max(8, Math.floor(cell * 0.34));
-      const maxX = width + cell * 2;
-      const maxY = height + cell * 2;
-
-      for (let y = -cell; y <= maxY; y += cell) {
-        ctx.beginPath();
-        let first = true;
-        for (let x = -cell; x <= maxX; x += sampleStep) {
-          const [dx, dy] = distort(x, y, t);
-          if (first) {
-            ctx.moveTo(dx, dy);
-            first = false;
-          } else {
-            ctx.lineTo(dx, dy);
-          }
-        }
-        const rowIndex = Math.round((y + cell) / cell);
-        ctx.strokeStyle =
-          rowIndex % 4 === 0 ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.18)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-
-      for (let x = -cell; x <= maxX; x += cell) {
-        ctx.beginPath();
-        let first = true;
-        for (let y = -cell; y <= maxY; y += sampleStep) {
-          const [dx, dy] = distort(x, y, t);
-          if (first) {
-            ctx.moveTo(dx, dy);
-            first = false;
-          } else {
-            ctx.lineTo(dx, dy);
-          }
-        }
-        const colIndex = Math.round((x + cell) / cell);
-        ctx.strokeStyle =
-          colIndex % 5 === 0 ? "rgba(255,255,255,0.24)" : "rgba(255,255,255,0.16)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-
-      ctx.font = `${Math.max(9, Math.floor(cell * 0.34))}px Inter, "Segoe UI", Arial, sans-serif`;
       ctx.textBaseline = "middle";
 
-      for (let gy = -cell; gy <= maxY; gy += cell * 2) {
-        for (let gx = -cell; gx <= maxX; gx += cell * 2) {
-          const signal = Math.sin(gx * 0.018 + gy * 0.016 + t * 1.1);
-          if (signal < 0.38) continue;
-          const [dx, dy] = distort(gx, gy, t);
-          const idx = Math.abs(Math.floor((gx * 7 + gy * 11 + t * 28))) % GLYPHS.length;
-          const glyph = GLYPHS[idx];
-          ctx.fillStyle = signal > 0.88 ? "rgba(255,255,255,0.62)" : "rgba(255,255,255,0.44)";
-          ctx.fillText(glyph, dx, dy);
-          if (signal > 0.7) {
-            ctx.fillStyle = "rgba(255,255,255,0.28)";
-            ctx.fillText(GLYPHS[(idx + 17) % GLYPHS.length], dx + cell * 0.32, dy + cell * 0.26);
-          }
+      for (const node of glyphNodes) {
+        const wobbleX = Math.sin(t * node.speed + node.phase) * node.driftX;
+        const wobbleY = Math.cos(t * (node.speed * 1.18) + node.phase * 0.8) * node.driftY;
+        let x = node.x + wobbleX;
+        let y = node.y + wobbleY;
+        if (x < -24) x += width + 48;
+        if (x > width + 24) x -= width + 48;
+        if (y < -24) y += height + 48;
+        if (y > height + 24) y -= height + 48;
+
+        const flicker = Math.sin(t * 2.2 + node.phase * 1.3) * 0.5 + 0.5;
+        const alpha = 0.14 + flicker * 0.38;
+        const glyphStep = Math.floor(t * 10 * node.speed);
+        const glyph = GLYPHS[(node.glyphIndex + glyphStep) % GLYPHS.length];
+
+        ctx.font = `${node.size}px Inter, "Segoe UI", Arial, sans-serif`;
+        ctx.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
+        ctx.fillText(glyph, x, y);
+
+        if (flicker > 0.84) {
+          ctx.fillStyle = "rgba(255,255,255,0.18)";
+          ctx.fillText(
+            GLYPHS[(node.glyphIndex + glyphStep + 13) % GLYPHS.length],
+            x + node.size * 0.46,
+            y + node.size * 0.24
+          );
         }
       }
     };
@@ -115,6 +94,7 @@ export default function GridDistortionBackground() {
       width = Math.max(window.innerWidth, 1);
       height = Math.max(window.innerHeight, 1);
       cell = clamp(Math.floor(width / 44), 28, 42);
+      createGlyphNodes();
       canvas.width = Math.floor(width * dpr);
       canvas.height = Math.floor(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

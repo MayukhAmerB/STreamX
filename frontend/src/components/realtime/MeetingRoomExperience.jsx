@@ -1480,7 +1480,6 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/66 via-black/78 to-black/88" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_14%,rgba(192,192,192,0.12),transparent_34%)]" />
-        <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(211,211,211,0.24)_1px,transparent_1px),linear-gradient(90deg,rgba(211,211,211,0.2)_1px,transparent_1px)] [background-size:28px_28px]" />
       </div>
 
       <div className="relative border-b border-black bg-[linear-gradient(180deg,rgba(12,12,12,0.84),rgba(16,16,16,0.78))] px-4 py-4 backdrop-blur-[2px] sm:px-5">
