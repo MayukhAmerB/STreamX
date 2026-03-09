@@ -32,24 +32,6 @@ body {
   @apply antialiased;
 }
 
-/* Desktop/laptop default visual scale equivalent to 75% browser zoom. */
-@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
-  html {
-    zoom: 0.75;
-  }
-}
-
-/* Fallback for engines that do not support CSS zoom. */
-@supports not (zoom: 1) {
-  @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
-    #root {
-      width: calc(100% / 0.75);
-      transform: scale(0.75);
-      transform-origin: top left;
-    }
-  }
-}
-
 a {
   color: inherit;
 }

@@ -220,7 +220,7 @@ export default function CoursePaymentPage() {
             <div className="mt-4 space-y-2">
               {launchStatus.isComingSoon ? (
                 <Button
-                  className="w-full border border-[#c8cdd5] bg-[#d6dae0] text-[#111319] hover:bg-[#d6dae0]"
+                  className="w-full border border-[#cbd8c1]/70 bg-[linear-gradient(90deg,#d7e0cc_0%,#bccbb2_55%,#96ab89_100%)] text-[#11170f] shadow-[0_8px_18px_rgba(0,0,0,0.18)] hover:bg-[linear-gradient(90deg,#dde6d3_0%,#c4d2ba_55%,#a0b593_100%)]"
                   disabled
                 >
                   Coming Soon

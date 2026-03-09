@@ -139,7 +139,7 @@ function CourseCard({ course }) {
                 Live
               </Link>
             ) : (
-              <span className="inline-flex items-center justify-center rounded-full border border-[#c8cdd5] bg-[#d6dae0] px-3 py-2.5 text-sm font-semibold text-[#111319]">
+              <span className="inline-flex items-center justify-center rounded-full border border-[#cbd8c1]/70 bg-[linear-gradient(90deg,#d7e0cc_0%,#bccbb2_55%,#96ab89_100%)] px-3 py-2.5 text-sm font-semibold text-[#11170f] shadow-[0_8px_18px_rgba(0,0,0,0.18)]">
                 Coming Soon
               </span>
             )}

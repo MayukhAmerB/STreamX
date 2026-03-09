@@ -517,7 +517,7 @@ export default function LandingPage() {
                         </button>
                       </Link>
                     ) : (
-                      <button className="flex-1 rounded-full border border-[#c8cdd5] bg-[#d6d9df] px-3 py-2 text-sm font-semibold text-[#12151c]">
+                      <button className="flex-1 rounded-full border border-[#cbd8c1]/70 bg-[linear-gradient(90deg,#d7e0cc_0%,#bccbb2_55%,#96ab89_100%)] px-3 py-2 text-sm font-semibold text-[#11170f] shadow-[0_8px_18px_rgba(0,0,0,0.18)] transition hover:bg-[linear-gradient(90deg,#dde6d3_0%,#c4d2ba_55%,#a0b593_100%)]">
                         Coming Soon
                       </button>
                     )}
@@ -527,24 +527,24 @@ export default function LandingPage() {
               })}
             </div>
 
-            <div className="mt-6 rounded-2xl border border-[#b5bcc6]/30 bg-gradient-to-r from-[#12161c] via-[#4f5661] to-[#b7bcc4] p-5 text-white shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
+            <div className="mt-6 rounded-2xl border border-[#c4d2b8]/45 bg-[linear-gradient(90deg,#13170f_0%,#5f6d52_52%,#b8c8aa_100%)] p-5 text-white shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h3 className="font-reference text-2xl font-semibold">
                     Ready to start your cybersecurity journey?
                   </h3>
-                  <p className="mt-2 text-sm text-[#e3ead9]">
+                  <p className="mt-2 text-sm text-[#e7eddd]">
                     Join our flagship course and learn OSINT plus web application pentesting with a structured workflow.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Link to="/courses">
-                    <button className="rounded-full border border-white/60 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">
+                    <button className="rounded-full border border-[#2f3a30]/45 px-4 py-2 text-sm font-semibold text-[#1a2318] hover:bg-black/5">
                       Explore
                     </button>
                   </Link>
                   <Link to={`/courses/${featuredLiveCourse.id}`}>
-                    <button className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#363c46] hover:bg-[#eef1f5]">
+                    <button className="rounded-full bg-[#f6f8f1] px-4 py-2 text-sm font-semibold text-[#1c2418] hover:bg-white">
                       Join Now
                     </button>
                   </Link>
