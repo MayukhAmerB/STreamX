@@ -50,12 +50,21 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-20 px-3 pt-3" ref={menuRef}>
+    <header className="relative isolate sticky top-0 z-20 px-3 pt-3" ref={menuRef}>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 bg-black" />
       <div
-        className={`mx-auto flex max-w-7xl items-center justify-between gap-3 rounded-2xl px-3 py-3 text-neutral-950 backdrop-blur sm:gap-4 sm:px-4 sm:py-4 ${
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-0 z-0 ${
           isHome
-            ? "border border-[#CACACA]/15 bg-gradient-to-r from-[#0B0B0B]/96 via-[#121212]/94 to-[#1B1B1B]/92 shadow-[0_12px_40px_rgba(9,9,9,0.35)]"
-            : "border border-[#CACACA]/12 bg-gradient-to-r from-[#0D0D0D]/94 via-[#151515]/92 to-[#1E1E1E]/88 shadow-[0_10px_30px_rgba(9,9,9,0.28)]"
+            ? "bg-[radial-gradient(120%_220%_at_100%_0%,rgba(255,255,255,0.22)_0%,rgba(255,255,255,0.10)_20%,rgba(255,255,255,0.03)_42%,rgba(255,255,255,0)_70%)]"
+            : "bg-[radial-gradient(120%_220%_at_100%_0%,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.08)_20%,rgba(255,255,255,0.025)_42%,rgba(255,255,255,0)_70%)]"
+        }`}
+      />
+      <div
+        className={`relative z-10 mx-auto flex max-w-7xl items-center justify-between gap-3 rounded-2xl px-3 py-3 text-neutral-950 backdrop-blur sm:gap-4 sm:px-4 sm:py-4 ${
+          isHome
+            ? "border border-black bg-[radial-gradient(100%_220%_at_100%_0%,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0.08)_22%,rgba(255,255,255,0.03)_40%,rgba(255,255,255,0)_68%),linear-gradient(90deg,#000000_0%,#000000_62%,#0E0E0E_100%)] shadow-[0_12px_40px_rgba(0,0,0,0.4)]"
+            : "border border-black bg-[radial-gradient(100%_220%_at_100%_0%,rgba(255,255,255,0.15)_0%,rgba(255,255,255,0.065)_22%,rgba(255,255,255,0.025)_40%,rgba(255,255,255,0)_68%),linear-gradient(90deg,#000000_0%,#000000_62%,#0D0D0D_100%)] shadow-[0_10px_30px_rgba(0,0,0,0.34)]"
         }`}
       >
         <BrandLogo className="min-w-0 flex-1 lg:flex-none" />

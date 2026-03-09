@@ -1,5 +1,6 @@
 import os
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from PIL import Image, UnidentifiedImageError
 
@@ -14,7 +15,16 @@ MAX_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_PROFILE_IMAGE_WIDTH = 4096
 MAX_PROFILE_IMAGE_HEIGHT = 4096
 MAX_PROFILE_IMAGE_PIXELS = 16_000_000
-MAX_VIDEO_UPLOAD_BYTES = 1024 * 1024 * 1024  # 1 GB local/admin safety cap
+DEFAULT_MAX_VIDEO_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024  # 2 GB
+
+
+def _max_video_upload_bytes():
+    configured = getattr(settings, "MAX_VIDEO_UPLOAD_BYTES", DEFAULT_MAX_VIDEO_UPLOAD_BYTES)
+    try:
+        value = int(configured)
+    except (TypeError, ValueError):
+        return DEFAULT_MAX_VIDEO_UPLOAD_BYTES
+    return max(1, value)
 
 
 def _extension(file_obj):
@@ -141,8 +151,10 @@ def validate_video_upload(file_obj, field_name="video_file"):
     if ext not in ALLOWED_VIDEO_EXTENSIONS:
         raise ValidationError({field_name: "Only MP4, M4V, MOV, or WEBM video files are allowed."})
     size = getattr(file_obj, "size", None)
-    if size and size > MAX_VIDEO_UPLOAD_BYTES:
-        raise ValidationError({field_name: "Video file is too large. Max allowed size is 1 GB."})
+    max_video_upload_bytes = _max_video_upload_bytes()
+    if size and size > max_video_upload_bytes:
+        limit_gb = max_video_upload_bytes / float(1024 * 1024 * 1024)
+        raise ValidationError({field_name: f"Video file is too large. Max allowed size is {limit_gb:.0f} GB."})
     content_type = _content_type(file_obj)
     if content_type and content_type not in ALLOWED_VIDEO_CONTENT_TYPES:
         raise ValidationError({field_name: "Unsupported video content type."})
