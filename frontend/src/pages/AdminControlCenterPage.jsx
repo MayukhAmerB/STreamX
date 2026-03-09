@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 import WorkflowGuidePanel from "../components/admin/WorkflowGuidePanel";
+import { resolveDjangoAdminUrl } from "../utils/backendUrl";
 
 const operationsCards = [
   {
@@ -45,6 +46,8 @@ const securityChecklist = [
 ];
 
 export default function AdminControlCenterPage() {
+  const djangoAdminUrl = resolveDjangoAdminUrl();
+
   return (
     <PageShell
       title="Admin Control Center"
@@ -61,7 +64,11 @@ export default function AdminControlCenterPage() {
             <p className="mt-2 text-sm leading-7 text-[#b7c0b0]">{card.detail}</p>
             <div className="mt-4">
               {card.action.external ? (
-                <a href={card.action.href} target="_blank" rel="noreferrer">
+                <a
+                  href={card.action.href === "/admin/" ? djangoAdminUrl : card.action.href}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   <Button className="w-full">{card.action.label}</Button>
                 </a>
               ) : (

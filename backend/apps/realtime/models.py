@@ -454,6 +454,45 @@ class RealtimeSessionRecording(models.Model):
 
 
 class RealtimeConfiguration(models.Model):
+    MEETING_QUALITY_MODE_LOW = "low"
+    MEETING_QUALITY_MODE_PREMIUM_HD = "premium_hd"
+    MEETING_QUALITY_MODE_ADAPTIVE = "adaptive"
+    MEETING_QUALITY_MODE_CHOICES = [
+        (MEETING_QUALITY_MODE_LOW, "Low"),
+        (MEETING_QUALITY_MODE_PREMIUM_HD, "Premium HD"),
+        (MEETING_QUALITY_MODE_ADAPTIVE, "Adaptive"),
+    ]
+    MEETING_LOW_PROFILE = {
+        "camera_capture_width": 854,
+        "camera_capture_height": 480,
+        "camera_fps": 20,
+        "camera_max_video_bitrate_kbps": 850,
+        "screen_capture_width": 854,
+        "screen_capture_height": 480,
+        "screen_fps": 12,
+        "screen_max_video_bitrate_kbps": 1400,
+    }
+    MEETING_PREMIUM_PROFILE = {
+        "camera_capture_width": 1920,
+        "camera_capture_height": 1080,
+        "camera_fps": 30,
+        "camera_max_video_bitrate_kbps": 3500,
+        "screen_capture_width": 1920,
+        "screen_capture_height": 1080,
+        "screen_fps": 30,
+        "screen_max_video_bitrate_kbps": 6000,
+    }
+    MEETING_ADAPTIVE_BASE_PROFILE = {
+        "camera_capture_width": 1280,
+        "camera_capture_height": 720,
+        "camera_fps": 24,
+        "camera_max_video_bitrate_kbps": 1200,
+        "screen_capture_width": 1280,
+        "screen_capture_height": 720,
+        "screen_fps": 15,
+        "screen_max_video_bitrate_kbps": 2500,
+    }
+
     broadcast_capture_width = models.PositiveIntegerField(default=640)
     broadcast_capture_height = models.PositiveIntegerField(default=360)
     broadcast_capture_fps = models.PositiveIntegerField(default=20)
@@ -466,6 +505,11 @@ class RealtimeConfiguration(models.Model):
     meeting_screen_capture_height = models.PositiveIntegerField(default=1080)
     meeting_screen_capture_fps = models.PositiveIntegerField(default=15)
     meeting_screen_max_video_bitrate_kbps = models.PositiveIntegerField(default=2500)
+    meeting_quality_mode = models.CharField(
+        max_length=20,
+        choices=MEETING_QUALITY_MODE_CHOICES,
+        default=MEETING_QUALITY_MODE_LOW,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -537,6 +581,65 @@ class RealtimeConfiguration(models.Model):
         super().save(*args, **kwargs)
 
     @classmethod
+    def low_meeting_profile(cls):
+        return dict(cls.MEETING_LOW_PROFILE)
+
+    @classmethod
+    def premium_meeting_profile(cls):
+        return dict(cls.MEETING_PREMIUM_PROFILE)
+
+    @classmethod
+    def constrained_meeting_profile(cls):
+        return dict(cls.MEETING_LOW_PROFILE)
+
+    @classmethod
+    def adaptive_base_meeting_profile(cls):
+        return dict(cls.MEETING_ADAPTIVE_BASE_PROFILE)
+
+    def apply_meeting_profile(self, profile):
+        profile = profile or {}
+        self.meeting_camera_capture_width = int(
+            profile.get("camera_capture_width", self.meeting_camera_capture_width)
+        )
+        self.meeting_camera_capture_height = int(
+            profile.get("camera_capture_height", self.meeting_camera_capture_height)
+        )
+        self.meeting_camera_capture_fps = int(profile.get("camera_fps", self.meeting_camera_capture_fps))
+        self.meeting_camera_max_video_bitrate_kbps = int(
+            profile.get("camera_max_video_bitrate_kbps", self.meeting_camera_max_video_bitrate_kbps)
+        )
+        self.meeting_screen_capture_width = int(
+            profile.get("screen_capture_width", self.meeting_screen_capture_width)
+        )
+        self.meeting_screen_capture_height = int(
+            profile.get("screen_capture_height", self.meeting_screen_capture_height)
+        )
+        self.meeting_screen_capture_fps = int(profile.get("screen_fps", self.meeting_screen_capture_fps))
+        self.meeting_screen_max_video_bitrate_kbps = int(
+            profile.get("screen_max_video_bitrate_kbps", self.meeting_screen_max_video_bitrate_kbps)
+        )
+
+    def _resolve_adaptive_meeting_profile(self, *, participant_count=0, meeting_capacity=None):
+        safe_default_capacity = max(1, int(getattr(settings, "REALTIME_DEFAULT_MEETING_CAPACITY", 300)))
+        try:
+            normalized_count = max(0, int(participant_count or 0))
+        except (TypeError, ValueError):
+            normalized_count = 0
+        try:
+            normalized_capacity = int(meeting_capacity or 0)
+        except (TypeError, ValueError):
+            normalized_capacity = 0
+        safe_capacity = max(1, normalized_capacity or safe_default_capacity)
+        load_ratio = normalized_count / safe_capacity
+
+        # Adaptive tiers:
+        # - Start at 720p for normal classroom load.
+        # - Drop to 480p when participant load increases.
+        if load_ratio <= 0.60 and normalized_count <= 180:
+            return self.adaptive_base_meeting_profile()
+        return self.constrained_meeting_profile()
+
+    @classmethod
     def get_solo(cls):
         obj, _ = cls.objects.get_or_create(
             pk=1,
@@ -545,14 +648,15 @@ class RealtimeConfiguration(models.Model):
                 "broadcast_capture_height": 360,
                 "broadcast_capture_fps": 20,
                 "broadcast_max_video_bitrate_kbps": 650,
-                "meeting_camera_capture_width": 1280,
-                "meeting_camera_capture_height": 720,
-                "meeting_camera_capture_fps": 24,
-                "meeting_camera_max_video_bitrate_kbps": 1200,
-                "meeting_screen_capture_width": 1920,
-                "meeting_screen_capture_height": 1080,
-                "meeting_screen_capture_fps": 15,
-                "meeting_screen_max_video_bitrate_kbps": 2500,
+                "meeting_camera_capture_width": 854,
+                "meeting_camera_capture_height": 480,
+                "meeting_camera_capture_fps": 20,
+                "meeting_camera_max_video_bitrate_kbps": 850,
+                "meeting_screen_capture_width": 854,
+                "meeting_screen_capture_height": 480,
+                "meeting_screen_capture_fps": 12,
+                "meeting_screen_max_video_bitrate_kbps": 1400,
+                "meeting_quality_mode": cls.MEETING_QUALITY_MODE_LOW,
             },
         )
         return obj
@@ -565,17 +669,16 @@ class RealtimeConfiguration(models.Model):
             "max_video_bitrate_kbps": self.broadcast_max_video_bitrate_kbps,
         }
 
-    def to_meeting_dict(self):
-        return {
-            "camera_capture_width": self.meeting_camera_capture_width,
-            "camera_capture_height": self.meeting_camera_capture_height,
-            "camera_fps": self.meeting_camera_capture_fps,
-            "camera_max_video_bitrate_kbps": self.meeting_camera_max_video_bitrate_kbps,
-            "screen_capture_width": self.meeting_screen_capture_width,
-            "screen_capture_height": self.meeting_screen_capture_height,
-            "screen_fps": self.meeting_screen_capture_fps,
-            "screen_max_video_bitrate_kbps": self.meeting_screen_max_video_bitrate_kbps,
-        }
+    def to_meeting_dict(self, *, participant_count=0, meeting_capacity=None):
+        mode = str(self.meeting_quality_mode or self.MEETING_QUALITY_MODE_LOW).strip().lower()
+        if mode == self.MEETING_QUALITY_MODE_PREMIUM_HD:
+            return self.premium_meeting_profile()
+        if mode == self.MEETING_QUALITY_MODE_ADAPTIVE:
+            return self._resolve_adaptive_meeting_profile(
+                participant_count=participant_count,
+                meeting_capacity=meeting_capacity,
+            )
+        return self.low_meeting_profile()
 
     def to_dict(self):
         # Backwards-compatible alias used by broadcast host-token payloads.

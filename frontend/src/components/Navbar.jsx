@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { resolveDjangoAdminUrl } from "../utils/backendUrl";
 import Button from "./Button";
 import BrandLogo from "./BrandLogo";
 
@@ -19,6 +20,7 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef(null);
+  const djangoAdminUrl = resolveDjangoAdminUrl();
 
   useEffect(() => {
     setMenuOpen(false);
@@ -141,7 +143,7 @@ export default function Navbar() {
                   ) : null}
                   {isAdmin ? (
                     <a
-                      href="/admin/"
+                      href={djangoAdminUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="block px-4 py-2.5 text-sm text-[#dbe4d1] transition hover:bg-[#1b241c]"
@@ -266,7 +268,7 @@ export default function Navbar() {
                   ) : null}
                   {isAdmin ? (
                     <a
-                      href="/admin/"
+                      href={djangoAdminUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]"

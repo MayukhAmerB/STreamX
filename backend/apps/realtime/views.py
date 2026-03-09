@@ -384,7 +384,10 @@ class RealtimeSessionJoinView(APIView):
                 "token": token,
                 "meet_embed_url": build_meet_embed_url(token, livekit_client_url),
                 "meeting_capacity": session.meeting_capacity,
-                "media_profile": realtime_config.to_meeting_dict(),
+                "media_profile": realtime_config.to_meeting_dict(
+                    participant_count=participant_state.participant_count,
+                    meeting_capacity=session.meeting_capacity,
+                ),
                 "permissions": {
                     "can_present": permissions_set.can_present,
                     "can_speak": permissions_set.can_speak,

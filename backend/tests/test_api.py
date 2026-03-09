@@ -34,7 +34,7 @@ from apps.courses.models import (
 from apps.courses.serializers import LectureSerializer
 from apps.courses.services import transcode_lecture_to_hls
 from apps.payments.models import Payment
-from apps.realtime.models import RealtimeSession, RealtimeSessionRecording
+from apps.realtime.models import RealtimeConfiguration, RealtimeSession, RealtimeSessionRecording
 from apps.users.models import AuthConfiguration, User
 from apps.users.serializers import ProfileUpdateSerializer
 
@@ -1508,6 +1508,148 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(mock_build_token.call_args.kwargs["participant_metadata"]["role"], User.ROLE_STUDENT)
         self.assertFalse(mock_build_token.call_args.kwargs["participant_metadata"]["is_admin"])
         self.assertEqual(join_response.data["data"]["meeting"]["participant_profile_image_url"], "")
+
+    @override_settings(
+        LIVEKIT_URL="ws://livekit.test",
+        LIVEKIT_API_KEY="devkey",
+        LIVEKIT_API_SECRET="secret",
+        LIVEKIT_MEET_URL="https://meet.livekit.io",
+    )
+    @patch("apps.realtime.views.build_meet_embed_url")
+    @patch("apps.realtime.views.build_participant_token")
+    @patch("apps.realtime.views.get_room_participant_count")
+    def test_join_meeting_low_quality_mode_returns_low_profile(
+        self,
+        mock_participant_count,
+        mock_build_token,
+        mock_build_meet_url,
+    ):
+        mock_participant_count.return_value = 10
+        mock_build_token.return_value = "lk.token"
+        mock_build_meet_url.return_value = "https://meet.livekit.io/?token=lk.token"
+
+        config = RealtimeConfiguration.get_solo()
+        config.meeting_quality_mode = RealtimeConfiguration.MEETING_QUALITY_MODE_LOW
+        # Even if stale high values exist in DB, low mode must emit low profile.
+        config.meeting_camera_capture_width = 1920
+        config.meeting_camera_capture_height = 1080
+        config.meeting_camera_capture_fps = 30
+        config.meeting_camera_max_video_bitrate_kbps = 3500
+        config.meeting_screen_capture_width = 1920
+        config.meeting_screen_capture_height = 1080
+        config.meeting_screen_capture_fps = 30
+        config.meeting_screen_max_video_bitrate_kbps = 6000
+        config.save(
+            update_fields=[
+                "meeting_quality_mode",
+                "meeting_camera_capture_width",
+                "meeting_camera_capture_height",
+                "meeting_camera_capture_fps",
+                "meeting_camera_max_video_bitrate_kbps",
+                "meeting_screen_capture_width",
+                "meeting_screen_capture_height",
+                "meeting_screen_capture_fps",
+                "meeting_screen_max_video_bitrate_kbps",
+                "updated_at",
+            ]
+        )
+
+        session = RealtimeSession.objects.create(
+            title="Low Quality Meeting Session",
+            description="Low mode should apply deterministic low profile",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            meeting_capacity=300,
+            max_audience=50000,
+        )
+
+        self.login(self.viewer.email)
+        join_response = self.client.post(
+            reverse("realtime-session-join", kwargs={"pk": session.id}),
+            {"display_name": "Viewer User"},
+            format="json",
+        )
+        self.assertEqual(join_response.status_code, 200)
+        media_profile = join_response.data["data"]["meeting"]["media_profile"]
+        self.assertEqual(media_profile["camera_capture_width"], 854)
+        self.assertEqual(media_profile["camera_capture_height"], 480)
+        self.assertEqual(media_profile["camera_fps"], 20)
+        self.assertEqual(media_profile["camera_max_video_bitrate_kbps"], 850)
+        self.assertEqual(media_profile["screen_capture_width"], 854)
+        self.assertEqual(media_profile["screen_capture_height"], 480)
+        self.assertEqual(media_profile["screen_fps"], 12)
+        self.assertEqual(media_profile["screen_max_video_bitrate_kbps"], 1400)
+
+    @override_settings(
+        LIVEKIT_URL="ws://livekit.test",
+        LIVEKIT_API_KEY="devkey",
+        LIVEKIT_API_SECRET="secret",
+        LIVEKIT_MEET_URL="https://meet.livekit.io",
+    )
+    @patch("apps.realtime.views.build_meet_embed_url")
+    @patch("apps.realtime.views.build_participant_token")
+    @patch("apps.realtime.views.get_room_participant_count")
+    def test_join_meeting_adaptive_quality_mode_scales_profile_by_participant_load(
+        self,
+        mock_participant_count,
+        mock_build_token,
+        mock_build_meet_url,
+    ):
+        mock_participant_count.side_effect = [20, 220]
+        mock_build_token.return_value = "lk.token"
+        mock_build_meet_url.return_value = "https://meet.livekit.io/?token=lk.token"
+
+        config = RealtimeConfiguration.get_solo()
+        config.meeting_quality_mode = RealtimeConfiguration.MEETING_QUALITY_MODE_ADAPTIVE
+        config.save(update_fields=["meeting_quality_mode", "updated_at"])
+
+        session = RealtimeSession.objects.create(
+            title="Adaptive Quality Meeting Session",
+            description="Adaptive mode should tune profile by participant load",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            meeting_capacity=300,
+            max_audience=50000,
+        )
+
+        self.login(self.viewer.email)
+        low_load_join = self.client.post(
+            reverse("realtime-session-join", kwargs={"pk": session.id}),
+            {"display_name": "Viewer User"},
+            format="json",
+        )
+        self.assertEqual(low_load_join.status_code, 200)
+        low_load_profile = low_load_join.data["data"]["meeting"]["media_profile"]
+        self.assertEqual(low_load_profile["camera_capture_width"], 1280)
+        self.assertEqual(low_load_profile["camera_capture_height"], 720)
+        self.assertEqual(low_load_profile["camera_fps"], 24)
+        self.assertEqual(low_load_profile["camera_max_video_bitrate_kbps"], 1200)
+        self.assertEqual(low_load_profile["screen_capture_width"], 1280)
+        self.assertEqual(low_load_profile["screen_capture_height"], 720)
+        self.assertEqual(low_load_profile["screen_fps"], 15)
+        self.assertEqual(low_load_profile["screen_max_video_bitrate_kbps"], 2500)
+
+        high_load_join = self.client.post(
+            reverse("realtime-session-join", kwargs={"pk": session.id}),
+            {"display_name": "Viewer User"},
+            format="json",
+        )
+        self.assertEqual(high_load_join.status_code, 200)
+        high_load_profile = high_load_join.data["data"]["meeting"]["media_profile"]
+        self.assertEqual(high_load_profile["camera_capture_width"], 854)
+        self.assertEqual(high_load_profile["camera_capture_height"], 480)
+        self.assertEqual(high_load_profile["camera_fps"], 20)
+        self.assertEqual(high_load_profile["camera_max_video_bitrate_kbps"], 850)
+        self.assertEqual(high_load_profile["screen_capture_width"], 854)
+        self.assertEqual(high_load_profile["screen_capture_height"], 480)
+        self.assertEqual(high_load_profile["screen_fps"], 12)
+        self.assertEqual(high_load_profile["screen_max_video_bitrate_kbps"], 1400)
 
     @patch("apps.realtime.views.get_room_participant_count")
     def test_join_switches_to_broadcast_when_meeting_capacity_reached(self, mock_participant_count):

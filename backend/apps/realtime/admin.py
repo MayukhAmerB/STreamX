@@ -3,6 +3,7 @@ from django.contrib import admin
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils.html import format_html
+from urllib.parse import urlparse
 
 from config.url_utils import get_media_public_url
 
@@ -13,8 +14,9 @@ from .services import delete_recording_assets
 class RealtimeConfigurationAdminForm(forms.ModelForm):
     BROADCAST_MODE_CURRENT = "broadcast_current"
     BROADCAST_MODE_PREMIUM_HD = "broadcast_premium_hd"
-    MEETING_MODE_CURRENT = "meeting_current"
-    MEETING_MODE_PREMIUM_HD = "meeting_premium_hd"
+    MEETING_MODE_LOW = RealtimeConfiguration.MEETING_QUALITY_MODE_LOW
+    MEETING_MODE_PREMIUM_HD = RealtimeConfiguration.MEETING_QUALITY_MODE_PREMIUM_HD
+    MEETING_MODE_ADAPTIVE = RealtimeConfiguration.MEETING_QUALITY_MODE_ADAPTIVE
 
     broadcast_quality_mode = forms.ChoiceField(
         label="Broadcast Quality Preset",
@@ -36,24 +38,28 @@ class RealtimeConfigurationAdminForm(forms.ModelForm):
             "Leave on Default profile to use the current manual values."
         ),
     )
-    meeting_camera_quality_mode = forms.ChoiceField(
-        label="Meeting Camera Quality Preset",
+    meeting_quality_mode = forms.ChoiceField(
+        label="Meeting Quality Preset",
         required=False,
-        initial=MEETING_MODE_CURRENT,
+        initial=MEETING_MODE_LOW,
         widget=forms.RadioSelect,
         choices=(
             (
-                MEETING_MODE_CURRENT,
-                "Default meeting profile (use current meeting camera values)",
+                MEETING_MODE_LOW,
+                "Low profile (camera 854x480 @ 20fps, 850 kbps + screen share 854x480 @ 12fps, 1400 kbps)",
             ),
             (
                 MEETING_MODE_PREMIUM_HD,
                 "Premium meeting profile (Google Meet-like HD: camera 1920x1080 @ 30fps, 3500 kbps + screen share 1920x1080 @ 30fps, 6000 kbps)",
             ),
+            (
+                MEETING_MODE_ADAPTIVE,
+                "Adaptive profile (starts at 1280x720; automatically drops to 854x480 as participant load increases)",
+            ),
         ),
         help_text=(
             "This preset controls both camera and screen-share quality for meetings. "
-            "If broadcast profile is still on default low values, premium mode also upgrades broadcast host quality. "
+            "If broadcast profile is still on default low values, premium mode can also upgrade broadcast host quality. "
             "For active participants, toggle camera/screen-share off/on or rejoin to apply."
         ),
     )
@@ -90,10 +96,22 @@ class RealtimeConfigurationAdminForm(forms.ModelForm):
             self.fields["broadcast_quality_mode"].initial = self.BROADCAST_MODE_PREMIUM_HD
         else:
             self.fields["broadcast_quality_mode"].initial = self.BROADCAST_MODE_CURRENT
-        if self.instance and self.instance.pk and self._is_high_meeting_profile(self.instance):
-            self.fields["meeting_camera_quality_mode"].initial = self.MEETING_MODE_PREMIUM_HD
+        if self.instance and self.instance.pk:
+            current_meeting_mode = str(
+                getattr(self.instance, "meeting_quality_mode", "") or ""
+            ).strip().lower()
+            if current_meeting_mode in {
+                self.MEETING_MODE_LOW,
+                self.MEETING_MODE_PREMIUM_HD,
+                self.MEETING_MODE_ADAPTIVE,
+            }:
+                self.fields["meeting_quality_mode"].initial = current_meeting_mode
+            elif self._is_high_meeting_profile(self.instance):
+                self.fields["meeting_quality_mode"].initial = self.MEETING_MODE_PREMIUM_HD
+            else:
+                self.fields["meeting_quality_mode"].initial = self.MEETING_MODE_LOW
         else:
-            self.fields["meeting_camera_quality_mode"].initial = self.MEETING_MODE_CURRENT
+            self.fields["meeting_quality_mode"].initial = self.MEETING_MODE_LOW
         self.fields["broadcast_quality_mode"].help_text = (
             "Select Premium broadcast profile to apply 1080p defaults automatically. "
             "This affects only Broadcast Host Studio sessions. "
@@ -135,19 +153,16 @@ class RealtimeConfigurationAdminForm(forms.ModelForm):
             instance.broadcast_capture_height = 1080
             instance.broadcast_capture_fps = 30
             instance.broadcast_max_video_bitrate_kbps = 3800
-        selected_meeting_mode = self.cleaned_data.get(
-            "meeting_camera_quality_mode",
-            self.MEETING_MODE_CURRENT,
-        )
+        selected_meeting_mode = self.cleaned_data.get("meeting_quality_mode", self.MEETING_MODE_LOW)
+        if selected_meeting_mode not in {
+            self.MEETING_MODE_LOW,
+            self.MEETING_MODE_PREMIUM_HD,
+            self.MEETING_MODE_ADAPTIVE,
+        }:
+            selected_meeting_mode = self.MEETING_MODE_LOW
+        instance.meeting_quality_mode = selected_meeting_mode
         if selected_meeting_mode == self.MEETING_MODE_PREMIUM_HD:
-            instance.meeting_camera_capture_width = 1920
-            instance.meeting_camera_capture_height = 1080
-            instance.meeting_camera_capture_fps = 30
-            instance.meeting_camera_max_video_bitrate_kbps = 3500
-            instance.meeting_screen_capture_width = 1920
-            instance.meeting_screen_capture_height = 1080
-            instance.meeting_screen_capture_fps = 30
-            instance.meeting_screen_max_video_bitrate_kbps = 6000
+            instance.apply_meeting_profile(RealtimeConfiguration.premium_meeting_profile())
             # Keep broadcast quality aligned with premium meeting profile unless
             # admin has explicitly selected a custom broadcast mode.
             if (
@@ -158,6 +173,11 @@ class RealtimeConfigurationAdminForm(forms.ModelForm):
                 instance.broadcast_capture_height = 1080
                 instance.broadcast_capture_fps = 30
                 instance.broadcast_max_video_bitrate_kbps = 3800
+        elif selected_meeting_mode == self.MEETING_MODE_ADAPTIVE:
+            # Save adaptive baseline; final profile is resolved per join from participant load.
+            instance.apply_meeting_profile(RealtimeConfiguration.adaptive_base_meeting_profile())
+        else:
+            instance.apply_meeting_profile(RealtimeConfiguration.low_meeting_profile())
         if commit:
             instance.save()
             self.save_m2m()
@@ -215,7 +235,7 @@ class RealtimeConfigurationAdmin(admin.ModelAdmin):
             "Meeting Camera Profile (Primary)",
             {
                 "fields": (
-                    "meeting_camera_quality_mode",
+                    "meeting_quality_mode",
                     "meeting_camera_capture_width",
                     "meeting_camera_capture_height",
                     "meeting_camera_capture_fps",
@@ -358,23 +378,34 @@ class RealtimeSessionRecordingAdmin(admin.ModelAdmin):
     class Media:
         js = ("admin/js/recordings_changelist_row_click.js",)
 
-    @admin.display(description="Playback")
+    @admin.display(description="Recording File")
     def recording_player(self, obj):
-        playback_url = ""
+        download_url = ""
         if obj.output_download_url:
-            playback_url = obj.output_download_url
+            download_url = obj.output_download_url
         elif getattr(obj, "video_file", None):
-            playback_url = get_media_public_url(obj.video_file.url)
+            download_url = get_media_public_url(obj.video_file.url)
         elif obj.output_file_path and obj.pk:
-            playback_url = reverse(
+            download_url = reverse(
                 "realtime-session-recording-download",
                 kwargs={"recording_id": obj.pk},
             )
-        if not playback_url:
+        if not download_url:
             return "-"
+
+        filename = ""
+        if getattr(obj, "video_file", None) and getattr(obj.video_file, "name", ""):
+            filename = str(obj.video_file.name).replace("\\", "/").split("/")[-1]
+        if not filename and obj.output_file_path:
+            filename = str(obj.output_file_path).replace("\\", "/").split("/")[-1]
+        if not filename and obj.output_download_url:
+            parsed_path = urlparse(obj.output_download_url).path
+            filename = parsed_path.rstrip("/").split("/")[-1]
+        if not filename:
+            filename = f"recording-{obj.pk or 'file'}.webm"
+
         return format_html(
-            '<video controls preload="metadata" src="{}" style="max-width: 420px; width: 100%; border-radius: 8px;"></video><br>'
-            '<a href="{}" target="_blank" rel="noopener">Open recording</a>',
-            playback_url,
-            playback_url,
+            '<a href="{}" target="_blank" rel="noopener" download>{}</a>',
+            download_url,
+            filename,
         )
