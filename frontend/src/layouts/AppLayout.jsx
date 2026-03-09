@@ -5,7 +5,7 @@ import Navbar from "../components/Navbar";
 
 export default function AppLayout() {
   return (
-    <div className="relative min-h-screen bg-[#050705] text-white">
+    <div className="relative min-h-screen bg-black text-white">
       <GridDistortionBackground />
       <div className="relative z-10">
         <Navbar />

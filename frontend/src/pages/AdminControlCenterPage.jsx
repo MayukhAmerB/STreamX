@@ -58,10 +58,10 @@ export default function AdminControlCenterPage() {
         {operationsCards.map((card) => (
           <article
             key={card.title}
-            className="rounded-2xl border border-[#273527] bg-[#101812]/88 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.24)]"
+            className="rounded-2xl border border-black panel-gradient p-4 shadow-[0_14px_34px_rgba(0,0,0,0.24)]"
           >
             <h3 className="font-reference text-lg text-white">{card.title}</h3>
-            <p className="mt-2 text-sm leading-7 text-[#b7c0b0]">{card.detail}</p>
+            <p className="mt-2 text-sm leading-7 text-[#BBBBBB]">{card.detail}</p>
             <div className="mt-4">
               {card.action.external ? (
                 <a
@@ -89,13 +89,13 @@ export default function AdminControlCenterPage() {
         />
       </div>
 
-      <section className="mt-5 rounded-2xl border border-[#253126] bg-[#0b110b]/90 p-4 shadow-[0_16px_34px_rgba(0,0,0,0.26)] sm:p-5">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">
+      <section className="mt-5 rounded-2xl border border-black panel-gradient p-4 shadow-[0_16px_34px_rgba(0,0,0,0.26)] sm:p-5">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
           Security Runbook
         </div>
-        <ul className="mt-3 space-y-2 text-sm text-[#c7d0bf]">
+        <ul className="mt-3 space-y-2 text-sm text-[#CBCBCB]">
           {securityChecklist.map((item) => (
-            <li key={item} className="rounded-lg border border-[#263227] bg-[#101710]/88 px-3 py-2">
+            <li key={item} className="rounded-lg border border-black panel-gradient px-3 py-2">
               {item}
             </li>
           ))}

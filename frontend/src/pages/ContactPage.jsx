@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { sendContactMessage } from "../api/auth";
 import Button from "../components/Button";
 import FormInput from "../components/FormInput";
@@ -13,25 +13,25 @@ const contactLinks = [
     name: "Instagram",
     href: "https://instagram.com/alsyedinitiative",
     handle: "@alsyedinitiative",
-    accent: "from-[#f7d5b2] to-[#d89a79]",
+    accent: "from-[#DBDBDB] to-[#A9A9A9]",
   },
   {
     name: "X",
     href: "https://x.com/alsyedinitiative",
     handle: "@alsyedinitiative",
-    accent: "from-[#dbe6d2] to-[#9fb18f]",
+    accent: "from-[#E0E0E0] to-[#A8A8A8]",
   },
   {
     name: "WhatsApp",
     href: "https://wa.me/0000000000",
     handle: "+00 0000 000000",
-    accent: "from-[#cde4c6] to-[#78a56f]",
+    accent: "from-[#DADADA] to-[#919191]",
   },
   {
     name: "Email",
     href: "mailto:contact@alsyedinitiative.com",
     handle: "contact@alsyedinitiative.com",
-    accent: "from-[#e8eddc] to-[#c9d5bd]",
+    accent: "from-[#EAEAEA] to-[#CFCFCF]",
   },
 ];
 
@@ -104,7 +104,7 @@ export default function ContactPage() {
       title="Contact"
       subtitle="Reach us on social platforms or send a message directly from the form below."
     >
-      <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[28px] border border-[#cfd8c5]/10 bg-[#070907] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
+      <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[28px] border border-black bg-[#080808] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">
           <img
             src={pageBackgroundImage}
@@ -112,19 +112,19 @@ export default function ContactPage() {
             aria-hidden="true"
             className="h-full w-full object-cover opacity-[0.16]"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-black/86 via-black/80 to-[#0d130f]/94" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_83%_12%,rgba(185,199,171,0.12),transparent_36%)]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/86 via-black/80 to-[#111111]/94" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_83%_12%,rgba(192,192,192,0.12),transparent_36%)]" />
         </div>
 
         <div className="relative p-5 sm:p-7">
-          <div className="mb-6 rounded-2xl border border-[#243025] bg-[#0d120f]/90 p-5 backdrop-blur-sm">
-            <div className="inline-flex items-center rounded-full border border-[#334033] bg-white/5 px-3 py-1 text-xs font-semibold tracking-wide text-[#d7e0cc]">
+          <div className="mb-6 rounded-2xl border border-black panel-gradient p-5 backdrop-blur-sm">
+            <div className="inline-flex items-center rounded-full border border-black bg-white/5 px-3 py-1 text-xs font-semibold tracking-wide text-[#DBDBDB]">
               CONTACT AL SYED INITIATIVE
             </div>
             <h2 className="mt-4 font-reference text-3xl font-semibold leading-tight text-white sm:text-4xl">
               Reach us directly or send a message from the contact form
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-[#b7c0b0]">
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[#BBBBBB]">
               We support contact through Instagram, X, WhatsApp, and email. The form below is wired
               to the Django backend email endpoint and can use Django's built-in SMTP email backend
               when configured.
@@ -132,9 +132,9 @@ export default function ContactPage() {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-            <section className="rounded-2xl border border-[#243025] bg-[#0d120f]/90 p-6 backdrop-blur-sm">
+            <section className="rounded-2xl border border-black panel-gradient p-6 backdrop-blur-sm">
               <h2 className="font-reference text-2xl font-semibold text-white">Connect With Us</h2>
-              <p className="mt-3 text-sm leading-6 text-[#b7c0b0]">
+              <p className="mt-3 text-sm leading-6 text-[#BBBBBB]">
                 Choose your preferred channel. Replace the placeholder handles with your real brand
                 links any time.
               </p>
@@ -146,18 +146,18 @@ export default function ContactPage() {
                     href={item.href}
                     target={item.href.startsWith("mailto:") ? undefined : "_blank"}
                     rel={item.href.startsWith("mailto:") ? undefined : "noreferrer"}
-                    className="group flex items-center justify-between rounded-xl border border-[#1f2820] bg-[#101610] p-4 transition hover:border-[#344236] hover:bg-[#141b14]"
+                    className="group flex items-center justify-between rounded-xl border border-black panel-gradient p-4 transition hover:border-[#3C3C3C] hover:bg-[#181818]"
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${item.accent} text-[#111611] shadow-[0_4px_12px_rgba(0,0,0,0.22)]`}>
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${item.accent} text-[#141414] shadow-[0_4px_12px_rgba(0,0,0,0.22)]`}>
                         <ContactChannelIcon name={item.name} />
                       </div>
                       <div>
                         <div className="text-sm font-semibold text-white">{item.name}</div>
-                        <div className="mt-1 text-sm text-[#b7c0b0]">{item.handle}</div>
+                        <div className="mt-1 text-sm text-[#BBBBBB]">{item.handle}</div>
                       </div>
                     </div>
-                    <div className="text-xs font-semibold tracking-wide text-[#a4af9d] transition group-hover:text-[#d7e0cc]">
+                    <div className="text-xs font-semibold tracking-wide text-[#AAAAAA] transition group-hover:text-[#DBDBDB]">
                       OPEN
                     </div>
                   </a>
@@ -165,9 +165,9 @@ export default function ContactPage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-[#243025] bg-[#0d120f]/92 p-6 backdrop-blur-sm">
+            <section className="rounded-2xl border border-black panel-gradient p-6 backdrop-blur-sm">
               <h2 className="font-reference text-2xl font-semibold text-white">Send a Message</h2>
-              <p className="mt-3 text-sm leading-6 text-[#b7c0b0]">
+              <p className="mt-3 text-sm leading-6 text-[#BBBBBB]">
                 This form sends email through the backend endpoint. Configure SMTP in Django to
                 deliver messages from your real mailbox.
               </p>
@@ -205,7 +205,7 @@ export default function ContactPage() {
                   </div>
                 ) : null}
                 {success ? (
-                  <div className="rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-300">
+                  <div className="rounded-xl border border-zinc-500/20 bg-zinc-500/10 px-4 py-3 text-sm text-zinc-300">
                     {success}
                   </div>
                 ) : null}

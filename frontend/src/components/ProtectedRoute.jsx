@@ -6,7 +6,7 @@ export default function ProtectedRoute({ requireInstructor = false, requireAdmin
   const location = useLocation();
 
   if (loading) {
-    return <div className="p-6 text-sm text-[#b7c0b0]">Checking session...</div>;
+    return <div className="p-6 text-sm text-[#BBBBBB]">Checking session...</div>;
   }
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;

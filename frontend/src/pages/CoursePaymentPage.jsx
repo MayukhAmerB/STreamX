@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
@@ -135,7 +135,7 @@ export default function CoursePaymentPage() {
 
   return (
     <PageShell title="Payment" subtitle="Secure checkout powered by Razorpay">
-      <section className="relative overflow-hidden rounded-[28px] border border-[#cfd8c5]/10 bg-[#070907] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
+      <section className="relative overflow-hidden rounded-[28px] border border-black bg-[#080808] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">
           <img
             src={course.thumbnail || pageBackgroundImage}
@@ -143,8 +143,8 @@ export default function CoursePaymentPage() {
             aria-hidden="true"
             className="h-full w-full object-cover opacity-[0.14]"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-black/90 via-black/80 to-[#0d130f]/95" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(187,192,202,0.1),transparent_36%)]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/90 via-black/80 to-[#111111]/95" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(192,192,192,0.1),transparent_36%)]" />
         </div>
 
         <div className="relative grid gap-6 p-5 sm:p-6 lg:grid-cols-[1.1fr_0.9fr]">
@@ -153,14 +153,14 @@ export default function CoursePaymentPage() {
               <span className="rounded-full border border-white/70 bg-white/90 px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-neutral-900">
                 {formatCategory(course.category)}
               </span>
-              <span className="rounded-full border border-[#d7e0cc]/20 bg-[#0f1410]/85 px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-[#d7e0cc]">
+              <span className="rounded-full border border-[#DBDBDB]/20 bg-[#121212]/85 px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-[#DBDBDB]">
                 {formatLevel(course.level)}
               </span>
               <span
                 className={`rounded-full px-3 py-1 text-[10px] font-semibold tracking-[0.14em] ${
                   launchStatus.isLive
-                    ? "border border-[#f4e6b9]/80 bg-[linear-gradient(135deg,#fffef8_0%,#fff5d8_55%,#ebd594_100%)] text-[#2a2412]"
-                    : "border border-[#c8cdd5] bg-[#d6dae0] text-[#111319]"
+                    ? "border border-[#E5E5E5]/80 bg-[linear-gradient(135deg,#FEFEFE_0%,#F5F5F5_55%,#D4D4D4_100%)] text-[#242424]"
+                    : "border border-[#CCCCCC] bg-[#D9D9D9] text-[#131313]"
                 }`}
               >
                 {launchStatus.label}
@@ -170,43 +170,43 @@ export default function CoursePaymentPage() {
             <h2 className="mt-4 font-reference text-2xl font-semibold leading-tight text-white sm:text-3xl">
               {course.title}
             </h2>
-            <p className="mt-3 text-sm leading-7 text-[#b7c0b0]">
+            <p className="mt-3 text-sm leading-7 text-[#BBBBBB]">
               Review your course details and continue to secure payment. Enrollment is activated
               after successful Razorpay verification.
             </p>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-[#243025] bg-[#0d120f]/90 p-3">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Price</div>
+              <div className="rounded-2xl border border-black panel-gradient p-3">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Price</div>
                 <div className="mt-1 text-lg font-semibold text-white">{formatINR(course.price)}</div>
               </div>
-              <div className="rounded-2xl border border-[#243025] bg-[#0d120f]/90 p-3">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Modules</div>
+              <div className="rounded-2xl border border-black panel-gradient p-3">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Modules</div>
                 <div className="mt-1 text-lg font-semibold text-white">{course.sections?.length || 0}</div>
               </div>
-              <div className="rounded-2xl border border-[#243025] bg-[#0d120f]/90 p-3">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Lectures</div>
+              <div className="rounded-2xl border border-black panel-gradient p-3">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Lectures</div>
                 <div className="mt-1 text-lg font-semibold text-white">{lectureCount}</div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#243025] bg-[#0d120f]/92 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8f9989]">
+          <div className="rounded-2xl border border-black panel-gradient p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
               Checkout
             </div>
             <div className="mt-2 font-reference text-3xl font-semibold text-white">
               {launchStatus.isComingSoon ? "Coming Soon" : formatINR(course.price)}
             </div>
-            <p className="mt-2 text-sm leading-6 text-[#b7c0b0]">
+            <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
               Razorpay secure checkout for Card, UPI, and supported payment methods.
             </p>
 
             <div className="mt-4 space-y-2">
-              <div className="rounded-lg border border-[#1f2820] bg-[#101610] px-3 py-2 text-sm text-[#c4cdba]">
+              <div className="rounded-lg border border-black panel-gradient px-3 py-2 text-sm text-[#C8C8C8]">
                 Course: {course.title}
               </div>
-              <div className="rounded-lg border border-[#1f2820] bg-[#101610] px-3 py-2 text-sm text-[#c4cdba]">
+              <div className="rounded-lg border border-black panel-gradient px-3 py-2 text-sm text-[#C8C8C8]">
                 Access: {launchStatus.label}
               </div>
             </div>
@@ -220,7 +220,7 @@ export default function CoursePaymentPage() {
             <div className="mt-4 space-y-2">
               {launchStatus.isComingSoon ? (
                 <Button
-                  className="w-full border border-[#cbd8c1]/70 bg-[linear-gradient(90deg,#d7e0cc_0%,#bccbb2_55%,#96ab89_100%)] text-[#11170f] shadow-[0_8px_18px_rgba(0,0,0,0.18)] hover:bg-[linear-gradient(90deg,#dde6d3_0%,#c4d2ba_55%,#a0b593_100%)]"
+                  className="w-full border border-[#D1D1D1]/70 bg-[linear-gradient(90deg,#DBDBDB_0%,#C4C4C4_55%,#A1A1A1_100%)] text-[#141414] shadow-[0_8px_18px_rgba(0,0,0,0.18)] hover:bg-[linear-gradient(90deg,#E1E1E1_0%,#CBCBCB_55%,#ABABAB_100%)]"
                   disabled
                 >
                   Coming Soon

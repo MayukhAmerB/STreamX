@@ -25,8 +25,6 @@ export default function GridDistortionBackground() {
     let isVisible = true;
     let lastFrameTime = 0;
     let frameIntervalMs = 1000 / 30;
-    let glowA = null;
-    let glowB = null;
 
     if (typeof window !== "undefined" && window.matchMedia) {
       reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -47,14 +45,7 @@ export default function GridDistortionBackground() {
 
     const drawGrid = (t) => {
       ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = "#030506";
-      ctx.fillRect(0, 0, width, height);
-
-      // Soft ambient glows to avoid a flat grid look.
-      ctx.fillStyle = glowA || "rgba(132, 170, 149, 0.08)";
-      ctx.fillRect(0, 0, width, height);
-
-      ctx.fillStyle = glowB || "rgba(98, 132, 117, 0.08)";
+      ctx.fillStyle = "#000000";
       ctx.fillRect(0, 0, width, height);
 
       const sampleStep = Math.max(8, Math.floor(cell * 0.34));
@@ -75,7 +66,7 @@ export default function GridDistortionBackground() {
         }
         const rowIndex = Math.round((y + cell) / cell);
         ctx.strokeStyle =
-          rowIndex % 4 === 0 ? "rgba(182, 215, 194, 0.24)" : "rgba(123, 155, 136, 0.16)";
+          rowIndex % 4 === 0 ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.18)";
         ctx.lineWidth = 1;
         ctx.stroke();
       }
@@ -94,12 +85,12 @@ export default function GridDistortionBackground() {
         }
         const colIndex = Math.round((x + cell) / cell);
         ctx.strokeStyle =
-          colIndex % 5 === 0 ? "rgba(175, 209, 188, 0.22)" : "rgba(113, 148, 128, 0.15)";
+          colIndex % 5 === 0 ? "rgba(255,255,255,0.24)" : "rgba(255,255,255,0.16)";
         ctx.lineWidth = 1;
         ctx.stroke();
       }
 
-      ctx.font = `${Math.max(9, Math.floor(cell * 0.34))}px Consolas, "Courier New", monospace`;
+      ctx.font = `${Math.max(9, Math.floor(cell * 0.34))}px Inter, "Segoe UI", Arial, sans-serif`;
       ctx.textBaseline = "middle";
 
       for (let gy = -cell; gy <= maxY; gy += cell * 2) {
@@ -109,10 +100,10 @@ export default function GridDistortionBackground() {
           const [dx, dy] = distort(gx, gy, t);
           const idx = Math.abs(Math.floor((gx * 7 + gy * 11 + t * 28))) % GLYPHS.length;
           const glyph = GLYPHS[idx];
-          ctx.fillStyle = signal > 0.88 ? "rgba(190, 235, 214, 0.48)" : "rgba(132, 193, 170, 0.38)";
+          ctx.fillStyle = signal > 0.88 ? "rgba(255,255,255,0.62)" : "rgba(255,255,255,0.44)";
           ctx.fillText(glyph, dx, dy);
           if (signal > 0.7) {
-            ctx.fillStyle = "rgba(106, 168, 146, 0.26)";
+            ctx.fillStyle = "rgba(255,255,255,0.28)";
             ctx.fillText(GLYPHS[(idx + 17) % GLYPHS.length], dx + cell * 0.32, dy + cell * 0.26);
           }
         }
@@ -127,12 +118,6 @@ export default function GridDistortionBackground() {
       canvas.width = Math.floor(width * dpr);
       canvas.height = Math.floor(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      glowA = ctx.createRadialGradient(width * 0.18, height * 0.12, 0, width * 0.18, height * 0.12, width * 0.6);
-      glowA.addColorStop(0, "rgba(132, 170, 149, 0.18)");
-      glowA.addColorStop(1, "rgba(132, 170, 149, 0)");
-      glowB = ctx.createRadialGradient(width * 0.82, height * 0.86, 0, width * 0.82, height * 0.86, width * 0.54);
-      glowB.addColorStop(0, "rgba(98, 132, 117, 0.18)");
-      glowB.addColorStop(1, "rgba(98, 132, 117, 0)");
       drawGrid(0);
     };
 
@@ -179,8 +164,6 @@ export default function GridDistortionBackground() {
   return (
     <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
       <canvas ref={canvasRef} className="h-full w-full" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_4%,rgba(186,208,183,0.22),transparent_42%)]" />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,4,2,0.20),rgba(1,2,1,0.40)_62%,rgba(0,1,0,0.62))]" />
     </div>
   );
 }

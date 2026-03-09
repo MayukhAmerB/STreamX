@@ -210,7 +210,7 @@ export default function MeetingPage() {
 
   return (
     <PageShell title="" subtitle="">
-      <section className="relative mb-6 overflow-hidden rounded-[30px] border border-[#cfd8c5]/10 bg-[#070907] shadow-[0_26px_70px_rgba(0,0,0,0.35)]">
+      <section className="relative mb-6 overflow-hidden rounded-[30px] border border-black bg-[#080808] shadow-[0_26px_70px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">
           <img
             src={pageBackgroundImage}
@@ -218,21 +218,21 @@ export default function MeetingPage() {
             aria-hidden="true"
             className="h-full w-full object-cover opacity-[0.16]"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-black/88 via-black/78 to-[#0d130f]/94" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_12%,rgba(185,199,171,0.12),transparent_36%)]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/88 via-black/78 to-[#111111]/94" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_12%,rgba(192,192,192,0.12),transparent_36%)]" />
           <div className="absolute inset-0 opacity-15 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:26px_26px]" />
         </div>
 
         <div className="relative space-y-6 p-5 sm:p-6">
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
             <div>
-              <div className="inline-flex items-center rounded-full border border-[#334033] bg-white/5 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#d7e0cc]">
+              <div className="inline-flex items-center rounded-full border border-black bg-white/5 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#DBDBDB]">
                 MEETING MODE
               </div>
               <h1 className="mt-4 max-w-3xl font-reference text-3xl font-semibold leading-tight text-white sm:text-4xl">
                 Focused rooms for live teaching and real-time collaboration
               </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-[#b7c0b0]">
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-[#BBBBBB]">
                 Keep sessions interactive with camera and microphone for up to 300 active
                 participants. Additional attendees are routed to broadcast mode automatically.
               </p>
@@ -241,7 +241,7 @@ export default function MeetingPage() {
                 {meetingHeroHighlights.map((item) => (
                   <span
                     key={item}
-                    className="rounded-full border border-[#2b372d] bg-[#0f1510]/88 px-3 py-1 text-xs text-[#d6decf]"
+                    className="rounded-full border border-black bg-[#131313]/88 px-3 py-1 text-xs text-[#DADADA]"
                   >
                     {item}
                   </span>
@@ -249,18 +249,18 @@ export default function MeetingPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-[#263227] bg-[#0d130f]/90 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur-sm sm:p-5">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#91a08f]">
+            <div className="rounded-2xl border border-black panel-gradient p-4 shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur-sm sm:p-5">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9A9A9A]">
                 Start A Meeting
               </div>
               {isAuthenticated ? (
                 <form onSubmit={handleCreate} className="mt-3 space-y-3">
                   <div>
-                    <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-[#8f9989]">
+                    <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-[#949494]">
                       Linked Live Class
                     </label>
                     <select
-                      className="w-full rounded-xl border border-[#2a3a2c] bg-[#0c120d] px-3 py-2 text-sm text-white outline-none focus:border-[#8ea284]"
+                      className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
                       value={form.linked_live_class_id}
                       onChange={(e) => setForm((prev) => ({ ...prev, linked_live_class_id: e.target.value }))}
                       required
@@ -274,27 +274,27 @@ export default function MeetingPage() {
                     </select>
                   </div>
                   <input
-                    className="w-full rounded-xl border border-[#2a3a2c] bg-[#0c120d] px-3 py-2 text-sm text-white outline-none focus:border-[#8ea284]"
+                    className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
                     placeholder="Session title"
                     value={form.title}
                     onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
                     required
                   />
                   <textarea
-                    className="min-h-[96px] w-full rounded-xl border border-[#2a3a2c] bg-[#0c120d] px-3 py-2 text-sm text-white outline-none focus:border-[#8ea284]"
+                    className="min-h-[96px] w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
                     placeholder="Session description"
                     value={form.description}
                     onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
                   />
                   <div>
-                    <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-[#8f9989]">
+                    <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-[#949494]">
                       Interactive Capacity
                     </label>
                     <input
                       type="number"
                       min={2}
                       max={300}
-                      className="w-full rounded-xl border border-[#2a3a2c] bg-[#0c120d] px-3 py-2 text-sm text-white outline-none focus:border-[#8ea284]"
+                      className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
                       value={form.meeting_capacity}
                       onChange={(e) => setForm((prev) => ({ ...prev, meeting_capacity: e.target.value }))}
                     />
@@ -303,11 +303,11 @@ export default function MeetingPage() {
                     Create Meeting
                   </Button>
                   {createState.error ? <p className="text-xs text-red-300">{createState.error}</p> : null}
-                  {createState.success ? <p className="text-xs text-green-300">{createState.success}</p> : null}
+                  {createState.success ? <p className="text-xs text-zinc-300">{createState.success}</p> : null}
                 </form>
               ) : (
                 <div className="mt-4 space-y-3">
-                  <p className="text-sm text-[#c7d0bf]">Login to create or join meeting rooms.</p>
+                  <p className="text-sm text-[#CBCBCB]">Login to create or join meeting rooms.</p>
                   <Link to="/login" state={{ from: "/meeting" }} className="inline-block">
                     <Button>Login</Button>
                   </Link>
@@ -316,15 +316,15 @@ export default function MeetingPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#253126] bg-[#0d130f]/84 p-4 sm:p-5">
-            <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">
+          <div className="rounded-2xl border border-black panel-gradient p-4 sm:p-5">
+            <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
               Meeting Workflow
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               {meetingWorkflow.map((item, index) => (
-                <article key={item.step} className="rounded-xl border border-[#1f2820] bg-[#101710] p-3">
-                  <div className="text-xs font-semibold text-[#d8e1cf]">{`0${index + 1}  ${item.step}`}</div>
-                  <p className="mt-2 text-xs leading-6 text-[#b4bead]">{item.detail}</p>
+                <article key={item.step} className="rounded-xl border border-black panel-gradient p-3">
+                  <div className="text-xs font-semibold text-[#DCDCDC]">{`0${index + 1}  ${item.step}`}</div>
+                  <p className="mt-2 text-xs leading-6 text-[#B9B9B9]">{item.detail}</p>
                 </article>
               ))}
             </div>
@@ -345,7 +345,7 @@ export default function MeetingPage() {
       ) : null}
 
       {deleteState.info ? (
-        <div className="mb-4 rounded-xl border border-[#2f3f31] bg-[#111a12] px-4 py-3 text-sm text-[#d5ddcb]">
+        <div className="mb-4 rounded-xl border border-black bg-[#161616] px-4 py-3 text-sm text-[#D9D9D9]">
           {deleteState.info}
         </div>
       ) : null}
@@ -354,13 +354,13 @@ export default function MeetingPage() {
         <MeetingRoomExperience payload={activeMeeting} onLeave={() => setActiveMeeting(null)} />
       ) : null}
 
-      <section className="rounded-[26px] border border-[#223023] bg-[#090d09]/72 p-4 sm:p-5">
+      <section className="rounded-[26px] border border-black panel-gradient p-4 sm:p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h3 className="font-reference text-xl font-semibold text-white">Meeting Rooms</h3>
-            <p className="mt-1 text-xs text-[#8f9989]">Join active rooms or schedule a new instructor session.</p>
+            <p className="mt-1 text-xs text-[#949494]">Join active rooms or schedule a new instructor session.</p>
           </div>
-          <span className="text-xs text-[#8f9989]">
+          <span className="text-xs text-[#949494]">
             {loading ? "Loading..." : `${orderedSessions.length} room${orderedSessions.length === 1 ? "" : "s"}`}
           </span>
         </div>
@@ -377,26 +377,26 @@ export default function MeetingPage() {
                 {orderedSessions.map((session) => (
                   <article
                     key={session.id}
-                    className="grid gap-3 rounded-2xl border border-[#273527] bg-[#101812]/88 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.22)] md:grid-cols-[1fr_auto] md:items-center"
+                    className="grid gap-3 rounded-2xl border border-black panel-gradient p-4 shadow-[0_14px_34px_rgba(0,0,0,0.22)] md:grid-cols-[1fr_auto] md:items-center"
                   >
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <h4 className="font-reference text-lg text-white">{session.title}</h4>
-                        <span className="rounded-full border border-[#2f3f31] bg-[#121a13] px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-[#c8d2bf]">
+                        <span className="rounded-full border border-black bg-[#171717] px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-[#CDCDCD]">
                           {session.status}
                         </span>
                         {session.linked_live_class?.title ? (
-                          <span className="rounded-full border border-[#2f3f31] bg-[#121a13] px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-[#c8d2bf]">
+                          <span className="rounded-full border border-black bg-[#171717] px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-[#CDCDCD]">
                             {session.linked_live_class.title}
                           </span>
                         ) : null}
                         {session.linked_course?.title ? (
-                          <span className="rounded-full border border-[#2f3f31] bg-[#121a13] px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-[#c8d2bf]">
+                          <span className="rounded-full border border-black bg-[#171717] px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-[#CDCDCD]">
                             {session.linked_course.title}
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-2 text-sm leading-6 text-[#b7c0b0]">
+                      <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
                         {session.description || "Interactive instructor-led meeting session."}
                       </p>
                     </div>
@@ -423,7 +423,7 @@ export default function MeetingPage() {
                 ))}
               </div>
             ) : (
-              <div className="rounded-xl border border-[#2f3f31] bg-[#111a12] px-4 py-3 text-sm text-[#d5ddcb]">
+              <div className="rounded-xl border border-black bg-[#161616] px-4 py-3 text-sm text-[#D9D9D9]">
                 No meeting rooms are available yet. Create one from the panel above.
               </div>
             )}
@@ -434,14 +434,14 @@ export default function MeetingPage() {
               {meetingMarketingCards.map((card) => (
                 <article
                   key={card.title}
-                  className="rounded-2xl border border-[#273527] bg-[#101812]/88 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.22)]"
+                  className="rounded-2xl border border-black panel-gradient p-4 shadow-[0_14px_34px_rgba(0,0,0,0.22)]"
                 >
                   <h4 className="font-reference text-lg text-white">{card.title}</h4>
-                  <p className="mt-2 text-sm text-[#b7c0b0]">{card.description}</p>
+                  <p className="mt-2 text-sm text-[#BBBBBB]">{card.description}</p>
                 </article>
               ))}
             </div>
-            <div className="mt-4 rounded-xl border border-[#2f3f31] bg-[#111a12] px-4 py-3 text-sm text-[#d5ddcb]">
+            <div className="mt-4 rounded-xl border border-black bg-[#161616] px-4 py-3 text-sm text-[#D9D9D9]">
               {loading
                 ? "Preparing meeting schedule..."
                 : "Sign in to access interactive rooms. Public view intentionally shows a marketing overview."}

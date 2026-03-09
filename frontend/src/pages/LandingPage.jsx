@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { listCourses } from "../api/courses";
 import Button from "../components/Button";
@@ -6,8 +6,6 @@ import { getCourseLaunchStatus } from "../utils/courseStatus";
 import { apiData } from "../utils/api";
 import { featuredCourse } from "../utils/featuredCourse";
 
-const brandBackgroundImage =
-  "https://i.pinimg.com/736x/e7/18/de/e718de74d25e0e9a2cf62cd126b3abb5.jpg";
 const heroCardImage =
   "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
 
@@ -110,6 +108,10 @@ const popularPrograms = [
 
 const levelOrder = { beginner: 1, intermediate: 2, advanced: 3 };
 const categoryOrder = { osint: 1, web_pentesting: 2 };
+const cornerGlowPanelBg =
+  "bg-[radial-gradient(circle_at_100%_0%,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0.035)_24%,rgba(255,255,255,0)_52%),linear-gradient(130deg,#000000_74%,#111111_100%)]";
+const cornerGlowCardBg =
+  "bg-[radial-gradient(circle_at_100%_0%,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.028)_24%,rgba(255,255,255,0)_52%),linear-gradient(130deg,#000000_76%,#101010_100%)]";
 
 function sortCatalogCourses(courses) {
   return [...courses].sort((a, b) => {
@@ -188,9 +190,13 @@ function IconBadge({ type }) {
 function SectionCard({ children, className = "" }) {
   return (
     <section
-      className={`mx-auto max-w-6xl rounded-[24px] border border-[#b9c7ab]/16 bg-gradient-to-br from-[#0c100d] via-[#121813] to-[#090b09] p-4 shadow-[0_12px_30px_rgba(0,0,0,0.22)] sm:p-6 ${className}`}
+      className={`relative mx-auto max-w-6xl overflow-hidden rounded-[24px] border border-black ${cornerGlowPanelBg} p-4 shadow-[0_12px_30px_rgba(0,0,0,0.22)] sm:p-6 ${className}`}
     >
-      {children}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 opacity-[0.14] [background-image:linear-gradient(rgba(255,255,255,0.10)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:30px_30px]"
+      />
+      <div className="relative z-10">{children}</div>
     </section>
   );
 }
@@ -204,7 +210,7 @@ function SectionTitle({ title, subtitle, titleClassName = "" }) {
         {title}
       </h2>
       {subtitle ? (
-        <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-[#cfd7c9] sm:text-base">
+        <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-[#D3D3D3] sm:text-base">
           {subtitle}
         </p>
       ) : null}
@@ -261,25 +267,27 @@ export default function LandingPage() {
   }, [catalogCourses]);
 
   return (
-    <div className="bg-transparent text-[#f5f7f1]">
-      <section className="relative overflow-hidden px-4 pb-8 pt-6 sm:pt-10">
+    <div className="relative bg-transparent text-[#F6F6F6]">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0">
+        <div className="absolute inset-0 bg-[radial-gradient(92%_82%_at_100%_0%,rgba(255,255,255,0.24)_0%,rgba(255,255,255,0.11)_24%,rgba(255,255,255,0.045)_42%,rgba(255,255,255,0)_68%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(0,0,0,0)_58%,rgba(255,255,255,0.02)_76%,rgba(255,255,255,0.07)_100%)]" />
+      </div>
+
+      <section className="relative z-10 overflow-hidden px-4 pb-8 pt-6 sm:pt-10">
         <div className="absolute inset-0">
-          <img
-            src={brandBackgroundImage}
-            alt=""
-            aria-hidden="true"
-            className="h-full w-full object-cover opacity-[0.14] blur-[2px] grayscale"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/72 via-black/82 to-black/94" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_14%,rgba(185,199,171,0.16),transparent_34%)]" />
-          <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(207,216,197,0.32)_1px,transparent_1px),linear-gradient(90deg,rgba(207,216,197,0.28)_1px,transparent_1px)] [background-size:32px_32px]" />
+          <div className="absolute inset-0 bg-black" />
+          <div className="absolute inset-0 bg-[radial-gradient(88%_78%_at_100%_0%,rgba(255,255,255,0.26)_0%,rgba(255,255,255,0.12)_24%,rgba(255,255,255,0.05)_42%,rgba(255,255,255,0)_68%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(0,0,0,0)_58%,rgba(255,255,255,0.025)_76%,rgba(255,255,255,0.08)_100%)]" />
         </div>
-        <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[30px] border border-[#d5deca]/10 bg-[linear-gradient(135deg,rgba(6,9,7,0.98),rgba(11,15,11,0.96),rgba(5,6,5,0.99))] shadow-[0_28px_80px_rgba(0,0,0,0.42)]">
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#dbe4d0]/40 to-transparent" />
-          <div className="grid items-center gap-8 p-5 sm:p-7 lg:grid-cols-[1.03fr_0.97fr]">
+        <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[30px] border border-black bg-black shadow-[0_28px_80px_rgba(0,0,0,0.42)]">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[1]">
+            <div className="absolute inset-0 [background-image:linear-gradient(rgba(255,255,255,0.20)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.16)_1px,transparent_1px)] [background-size:34px_34px] opacity-[0.34]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_22%,rgba(255,255,255,0.10),transparent_44%)]" />
+          </div>
+          <div className="relative z-10 grid items-center gap-8 p-5 sm:p-7 lg:grid-cols-[1.03fr_0.97fr]">
             <div className="reveal-up">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#99aa8e]/30 bg-white/5 px-3 py-1 text-xs font-semibold tracking-wide text-[#d7e0cc]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#b9c7ab]" />
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#A2A2A2]/30 bg-white/5 px-3 py-1 text-xs font-semibold tracking-wide text-[#DBDBDB]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#C0C0C0]" />
                 Al syed Initiative Cybersecurity Platform
               </div>
 
@@ -287,43 +295,43 @@ export default function LandingPage() {
                 Learn Cyber Security with Expert-Led Practical Training
               </h1>
 
-              <p className="mt-5 max-w-xl text-sm leading-7 text-[#b7c0b0] sm:text-base">
+              <p className="mt-5 max-w-xl text-sm leading-7 text-[#BBBBBB] sm:text-base">
                 We teach cybersecurity through structured OSINT, reconnaissance, and web application
                 penetration testing workflows. Trusted by over 1000 students building practical skills.
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link to={`/courses/${featuredLiveCourse.id}`}>
-                  <Button className="rounded-full bg-gradient-to-r from-[#c9d5bd] to-[#8fa184] px-5 text-[#101410] hover:from-[#d7e0cc] hover:to-[#9daf93]">
+                  <Button className="rounded-full bg-gradient-to-r from-[#CFCFCF] to-[#989898] px-5 text-[#121212] hover:from-[#DBDBDB] hover:to-[#A6A6A6]">
                     View Flagship Course
                   </Button>
                 </Link>
                 <Link to="/courses">
                   <Button
                     variant="indigoSoft"
-                    className="glossy rounded-full !border-[#fff4d4] !bg-[linear-gradient(135deg,#fffef9_0%,#fff7e5_52%,#f3e2b6_100%)] px-5 !text-[#101410] shadow-[0_14px_28px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.95)] hover:!bg-[linear-gradient(135deg,#ffffff_0%,#fff9eb_52%,#f5e6c0_100%)]"
+                    className="glossy rounded-full !border-[#F4F4F4] !bg-[linear-gradient(135deg,#FEFEFE_0%,#F7F7F7_52%,#E2E2E2_100%)] px-5 !text-[#121212] shadow-[0_14px_28px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.95)] hover:!bg-[linear-gradient(135deg,#FFFFFF_0%,#F9F9F9_52%,#E6E6E6_100%)]"
                   >
                     Explore Programs
                   </Button>
                 </Link>
               </div>
 
-              <div className="mt-5 rounded-2xl border border-[#243025] bg-[#0d120f]/92 p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)]">
-                <div className="grid gap-2 text-sm text-[#b7c0b0] sm:grid-cols-2">
+              <div className="mt-5 rounded-2xl border border-black bg-black/92 p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)]">
+                <div className="grid gap-2 text-sm text-[#BBBBBB] sm:grid-cols-2">
                   <div className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#d7e0cc]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#DBDBDB]" />
                     OSINT and attack surface mapping
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#d7e0cc]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#DBDBDB]" />
                     Web application pentesting workflow
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#d7e0cc]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#DBDBDB]" />
                     Practical lessons and structured modules
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#d7e0cc]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#DBDBDB]" />
                     Ethical and professional methodology
                   </div>
                 </div>
@@ -331,7 +339,7 @@ export default function LandingPage() {
                   {["OSINT", "Web App Pentesting", "Recon Workflow"].map((tag) => (
                     <span
                       key={tag}
-                      className="rounded-full border border-[#2d382e] bg-[#111612] px-3 py-1 text-xs font-semibold text-[#d7e0cc]"
+                      className="rounded-full border border-black bg-[#141414] px-3 py-1 text-xs font-semibold text-[#DBDBDB]"
                     >
                       {tag}
                     </span>
@@ -341,33 +349,33 @@ export default function LandingPage() {
             </div>
 
             <div className="reveal-up reveal-delay-1 relative">
-              <div className="rounded-[28px] border border-[#273127] bg-[#0c110d] p-3 shadow-[0_24px_60px_rgba(0,0,0,0.36)]">
-                <div className="relative h-[570px] overflow-hidden rounded-[24px] border border-[#1e261f] bg-black sm:h-[570px]">
+              <div className="rounded-[28px] border border-black bg-black/92 p-3 shadow-[0_24px_60px_rgba(0,0,0,0.36)]">
+                <div className="relative h-[570px] overflow-hidden rounded-[24px] border border-black bg-black sm:h-[570px]">
                   <img
                     src={heroCardImage}
                     alt="Cybersecurity training visual"
                     className="h-full w-full object-cover opacity-[0.9]"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/78 via-black/30 to-black/12" />
-                  <div className="absolute inset-0 opacity-[0.14] [background-image:linear-gradient(rgba(207,216,197,0.16)_1px,transparent_1px),linear-gradient(90deg,rgba(207,216,197,0.12)_1px,transparent_1px)] [background-size:24px_24px]" />
-                  <div className="absolute left-4 top-4 rounded-2xl border border-[#dbe4d0]/12 bg-[#0d120f]/86 px-4 py-3 backdrop-blur-sm">
-                    <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-[#8f9989]">
+                  <div className="absolute inset-0 opacity-[0.14] [background-image:linear-gradient(rgba(211,211,211,0.16)_1px,transparent_1px),linear-gradient(90deg,rgba(211,211,211,0.12)_1px,transparent_1px)] [background-size:24px_24px]" />
+                  <div className="absolute left-4 top-4 rounded-2xl border border-black bg-black/86 px-4 py-3 backdrop-blur-sm">
+                    <div className="font-reference text-[10px] tracking-[0.22em] text-[#949494]">
                       LIVE TRAINING
                     </div>
                     <div className="mt-2 text-lg font-semibold text-white">Structured cybersecurity learning</div>
-                    <div className="mt-1 max-w-[220px] text-xs leading-5 text-[#b7c0b0]">
+                    <div className="mt-1 max-w-[220px] text-xs leading-5 text-[#BBBBBB]">
                       Guided modules, professional instruction, and practical workflow-based training.
                     </div>
                   </div>
 
                   <div className="absolute inset-x-4 bottom-4 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl border border-[#dbe4d0]/12 bg-[#0d120f]/88 p-3 backdrop-blur-sm">
-                      <div className="text-[10px] uppercase tracking-[0.18em] text-[#8f9989]">1000+ Students</div>
-                      <div className="mt-2 text-sm font-semibold text-[#e2e9d8]">Active cybersecurity learners</div>
+                    <div className="rounded-2xl border border-black bg-black/88 p-3 backdrop-blur-sm">
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-[#949494]">1000+ Students</div>
+                      <div className="mt-2 text-sm font-semibold text-[#E5E5E5]">Active cybersecurity learners</div>
                     </div>
-                    <div className="rounded-2xl border border-[#dbe4d0]/12 bg-[#0d120f]/88 p-3 backdrop-blur-sm">
-                      <div className="text-[10px] uppercase tracking-[0.18em] text-[#8f9989]">Top-Rated Training</div>
-                      <div className="mt-2 text-sm font-semibold text-[#e2e9d8]">Workflow-first progression</div>
+                    <div className="rounded-2xl border border-black bg-black/88 p-3 backdrop-blur-sm">
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-[#949494]">Top-Rated Training</div>
+                      <div className="mt-2 text-sm font-semibold text-[#E5E5E5]">Workflow-first progression</div>
                     </div>
                   </div>
                 </div>
@@ -377,7 +385,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <div className="px-4 pb-16">
+      <div className="relative z-10 px-4 pb-16">
         <div className="mx-auto max-w-6xl space-y-7">
           <div className="grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {stats.map((item, idx) => (
@@ -385,10 +393,10 @@ export default function LandingPage() {
                 key={item.label}
                 className={`reveal-up ${
                   idx === 0 ? "reveal-delay-1" : idx === 1 ? "reveal-delay-2" : "reveal-delay-3"
-                } flex h-full flex-col items-center justify-center rounded-2xl border border-[#243025] bg-[#0d120f] px-4 py-4 text-center shadow-[0_10px_20px_rgba(0,0,0,0.22)]`}
+                } flex h-full flex-col items-center justify-center rounded-2xl border border-black ${cornerGlowCardBg} px-4 py-4 text-center shadow-[0_10px_20px_rgba(0,0,0,0.22)]`}
               >
-                <div className="font-reference text-3xl font-semibold text-[#cfd8c5]">{item.value}</div>
-                <div className="mt-1 text-xs font-medium uppercase tracking-wide text-[#a0ab99]">
+                <div className="font-reference text-3xl font-semibold text-[#D3D3D3]">{item.value}</div>
+                <div className="mt-1 text-xs font-medium uppercase tracking-wide text-[#A6A6A6]">
                   {item.label}
                 </div>
               </div>
@@ -401,10 +409,10 @@ export default function LandingPage() {
                 key={card.title}
                 className={`reveal-up ${
                   idx === 0 ? "reveal-delay-1" : idx === 1 ? "reveal-delay-2" : "reveal-delay-3"
-                } flex h-full flex-col rounded-2xl border border-[#243025] bg-[#0d120f] p-4 shadow-[0_10px_20px_rgba(0,0,0,0.22)]`}
+                } flex h-full flex-col rounded-2xl border border-black ${cornerGlowCardBg} p-4 shadow-[0_10px_20px_rgba(0,0,0,0.22)]`}
               >
                 <h3 className="font-reference text-xl font-semibold text-white">{card.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-[#b7c0b0]">{card.body}</p>
+                <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">{card.body}</p>
               </div>
             ))}
           </div>
@@ -421,15 +429,15 @@ export default function LandingPage() {
                   key={item.title}
                   className={`hover-lift reveal-up ${
                     idx === 0 ? "reveal-delay-1" : idx === 1 ? "reveal-delay-2" : "reveal-delay-3"
-                  } flex h-full flex-col rounded-2xl border border-[#243025] bg-[#0d120f] p-4 shadow-[0_10px_20px_rgba(0,0,0,0.22)]`}
+                  } flex h-full flex-col rounded-2xl border border-black ${cornerGlowCardBg} p-4 shadow-[0_10px_20px_rgba(0,0,0,0.22)]`}
                 >
-                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-[#c8d2bf] bg-[#eef2e9] text-[#203023] shadow-[0_2px_10px_rgba(0,0,0,0.18)]">
+                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-[#CDCDCD] bg-[#F0F0F0] text-[#2A2A2A] shadow-[0_2px_10px_rgba(0,0,0,0.18)]">
                     <IconBadge type={item.icon} />
                   </div>
                   <h3 className="font-reference text-xl font-semibold leading-tight text-white">
                     {item.title}
                   </h3>
-                  <p className="mt-2 text-sm leading-6 text-[#b7c0b0]">{item.body}</p>
+                  <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">{item.body}</p>
                 </div>
               ))}
             </div>
@@ -446,13 +454,13 @@ export default function LandingPage() {
                   key={step.no}
                   className={`hover-lift reveal-up ${
                     idx === 0 ? "reveal-delay-1" : idx === 1 ? "reveal-delay-2" : "reveal-delay-3"
-                  } flex h-full flex-col rounded-2xl border border-[#243025] bg-[#0d120f] p-4 shadow-[0_10px_20px_rgba(0,0,0,0.22)]`}
+                  } flex h-full flex-col rounded-2xl border border-black ${cornerGlowCardBg} p-4 shadow-[0_10px_20px_rgba(0,0,0,0.22)]`}
                 >
-                  <div className="mb-4 flex h-7 w-7 items-center justify-center rounded-full bg-[#99aa8e] text-xs font-bold text-white">
+                  <div className="mb-4 flex h-7 w-7 items-center justify-center rounded-full bg-[#A2A2A2] text-xs font-bold text-white">
                     {step.no}
                   </div>
                   <h3 className="font-reference text-base font-semibold tracking-tight text-white">{step.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-[#b7c0b0]">{step.body}</p>
+                  <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">{step.body}</p>
                 </div>
               ))}
             </div>
@@ -474,13 +482,13 @@ export default function LandingPage() {
                   key={program.id}
                   className={`hover-lift reveal-up ${
                     idx % 3 === 0 ? "reveal-delay-1" : idx % 3 === 1 ? "reveal-delay-2" : "reveal-delay-3"
-                  } flex h-full flex-col rounded-2xl border border-[#243025] bg-[#0d120f] p-4 shadow-[0_10px_24px_rgba(0,0,0,0.25)]`}
+                  } flex h-full flex-col rounded-2xl border border-black ${cornerGlowCardBg} p-4 shadow-[0_10px_24px_rgba(0,0,0,0.25)]`}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="rounded-full border border-[#d2d7df] bg-[#f3f5f8] px-2.5 py-1 text-[11px] font-semibold text-[#5c6470]">
+                    <span className="rounded-full border border-black bg-[#0F0F0F] px-2.5 py-1 text-[11px] font-semibold text-[#D6D6D6]">
                       Course {idx + 1}
                     </span>
-                    <span className="rounded-full border border-[#d2d7df] bg-[#f3f5f8] px-2.5 py-1 text-[11px] font-semibold text-[#5c6470]">
+                    <span className="rounded-full border border-black bg-[#0F0F0F] px-2.5 py-1 text-[11px] font-semibold text-[#D6D6D6]">
                       {program.section_count ?? program.lessons ?? 0} sections
                     </span>
                   </div>
@@ -489,15 +497,15 @@ export default function LandingPage() {
                     {program.title}
                   </h3>
 
-                  <p className="mt-2 text-sm leading-6 text-[#b7c0b0]">
+                  <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
                     Structured lessons focused on practical workflow and real application in security assessments.
                   </p>
 
-                  <ul className="mt-4 space-y-2 text-sm text-[#b7c0b0]">
+                  <ul className="mt-4 space-y-2 text-sm text-[#BBBBBB]">
                     {bullets.map((bullet) => (
                       <li key={bullet} className="flex items-start gap-2">
                         <span className="mt-1 inline-flex h-4 w-4 items-center justify-center" aria-hidden="true">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#d7e0cc]" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#DBDBDB]" />
                         </span>
                         <span>{bullet}</span>
                       </li>
@@ -506,18 +514,18 @@ export default function LandingPage() {
 
                   <div className="mt-auto flex gap-2 pt-4">
                     <Link to={detailsLink} className="flex-1">
-                      <button className="w-full rounded-full border border-[#2f3a30] bg-[#111612] px-3 py-2 text-sm font-semibold text-[#d7e0cc] transition hover:bg-[#171d17]">
+                      <button className="w-full rounded-full border border-black bg-[#141414] px-3 py-2 text-sm font-semibold text-[#DBDBDB] transition hover:bg-[#1B1B1B]">
                         View Details
                       </button>
                     </Link>
                     {status.isLive ? (
                       <Link to={detailsLink} className="flex-1">
-                        <button className="glossy w-full rounded-full border border-[#f3e7bf]/80 bg-[linear-gradient(135deg,#fffef8_0%,#fff4d0_55%,#e9d08a_100%)] px-3 py-2 text-sm font-semibold text-[#17140a] shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition hover:bg-[linear-gradient(135deg,#ffffff_0%,#fff7de_55%,#edd89a_100%)]">
+                        <button className="w-full rounded-full border border-black bg-[#111111] px-3 py-2 text-sm font-semibold text-[#E2E2E2] shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition hover:bg-[#1A1A1A]">
                           Live
                         </button>
                       </Link>
                     ) : (
-                      <button className="flex-1 rounded-full border border-[#cbd8c1]/70 bg-[linear-gradient(90deg,#d7e0cc_0%,#bccbb2_55%,#96ab89_100%)] px-3 py-2 text-sm font-semibold text-[#11170f] shadow-[0_8px_18px_rgba(0,0,0,0.18)] transition hover:bg-[linear-gradient(90deg,#dde6d3_0%,#c4d2ba_55%,#a0b593_100%)]">
+                      <button className="flex-1 rounded-full border border-black bg-[#111111] px-3 py-2 text-sm font-semibold text-[#E2E2E2] shadow-[0_8px_18px_rgba(0,0,0,0.18)] transition hover:bg-[#1A1A1A]">
                         Coming Soon
                       </button>
                     )}
@@ -527,13 +535,13 @@ export default function LandingPage() {
               })}
             </div>
 
-            <div className="mt-6 rounded-2xl border border-[#c7c7c7]/40 bg-[linear-gradient(90deg,#121212_0%,#5f5f5f_52%,#d8d8d8_100%)] p-5 text-white shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
+            <div className="mt-6 rounded-2xl border border-black bg-[linear-gradient(90deg,#121212_0%,#5F5F5F_52%,#D8D8D8_100%)] p-5 text-white shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h3 className="font-reference text-2xl font-semibold">
                     Ready to start your cybersecurity journey?
                   </h3>
-                  <p className="mt-2 text-sm text-[#f1f1f1]">
+                  <p className="mt-2 text-sm text-[#F1F1F1]">
                     Join our flagship course and learn OSINT plus web application pentesting with a structured workflow.
                   </p>
                 </div>
@@ -544,7 +552,7 @@ export default function LandingPage() {
                     </button>
                   </Link>
                   <Link to={`/courses/${featuredLiveCourse.id}`}>
-                    <button className="rounded-full bg-[#f2f4f8] px-4 py-2 text-sm font-semibold text-[#202835] hover:bg-white">
+                    <button className="rounded-full bg-[#F4F4F4] px-4 py-2 text-sm font-semibold text-[#272727] hover:bg-white">
                       Join Now
                     </button>
                   </Link>

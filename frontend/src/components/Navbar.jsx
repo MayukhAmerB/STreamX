@@ -54,8 +54,8 @@ export default function Navbar() {
       <div
         className={`mx-auto flex max-w-7xl items-center justify-between gap-3 rounded-2xl px-3 py-3 text-neutral-950 backdrop-blur sm:gap-4 sm:px-4 sm:py-4 ${
           isHome
-            ? "border border-[#c5d0ba]/15 bg-gradient-to-r from-[#090c0a]/96 via-[#101410]/94 to-[#171d17]/92 shadow-[0_12px_40px_rgba(8,10,8,0.35)]"
-            : "border border-[#c5d0ba]/12 bg-gradient-to-r from-[#0b0e0b]/94 via-[#121712]/92 to-[#1a211a]/88 shadow-[0_10px_30px_rgba(8,10,8,0.28)]"
+            ? "border border-[#CACACA]/15 bg-gradient-to-r from-[#0B0B0B]/96 via-[#121212]/94 to-[#1B1B1B]/92 shadow-[0_12px_40px_rgba(9,9,9,0.35)]"
+            : "border border-[#CACACA]/12 bg-gradient-to-r from-[#0D0D0D]/94 via-[#151515]/92 to-[#1E1E1E]/88 shadow-[0_10px_30px_rgba(9,9,9,0.28)]"
         }`}
       >
         <BrandLogo className="min-w-0 flex-1 lg:flex-none" />
@@ -90,29 +90,29 @@ export default function Navbar() {
                 <span className={`text-xs transition ${menuOpen ? "rotate-180" : ""}`}>v</span>
               </button>
               {menuOpen ? (
-                <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-[#2e3a2f] bg-[#111712] shadow-[0_16px_35px_rgba(0,0,0,0.36)]">
+                <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-black panel-gradient shadow-[0_16px_35px_rgba(0,0,0,0.36)]">
                   <Link
                     to="/my-courses"
-                    className="block px-4 py-2.5 text-sm text-[#dbe4d1] transition hover:bg-[#1b241c]"
+                    className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
                   >
                       Your Courses
                   </Link>
                   <Link
                     to="/profile"
-                    className="block px-4 py-2.5 text-sm text-[#dbe4d1] transition hover:bg-[#1b241c]"
+                    className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
                   >
                     Profile
                   </Link>
                   <Link
                     to="/join-live"
-                    className="block px-4 py-2.5 text-sm text-[#dbe4d1] transition hover:bg-[#1b241c]"
+                    className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
                   >
                     Join Live
                   </Link>
                   {isInstructor ? (
                     <Link
                       to="/instructor/dashboard"
-                      className="block px-4 py-2.5 text-sm text-[#dbe4d1] transition hover:bg-[#1b241c]"
+                      className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
                     >
                       Instructor
                     </Link>
@@ -120,7 +120,7 @@ export default function Navbar() {
                   {isAdmin ? (
                     <Link
                       to="/control-center"
-                      className="block px-4 py-2.5 text-sm text-[#dbe4d1] transition hover:bg-[#1b241c]"
+                      className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
                     >
                       Admin Control Center
                     </Link>
@@ -128,7 +128,7 @@ export default function Navbar() {
                   {isAdmin ? (
                     <Link
                       to="/meeting"
-                      className="block px-4 py-2.5 text-sm text-[#dbe4d1] transition hover:bg-[#1b241c]"
+                      className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
                     >
                       Meeting Control
                     </Link>
@@ -136,7 +136,7 @@ export default function Navbar() {
                   {isAdmin ? (
                     <Link
                       to="/broadcasting"
-                      className="block px-4 py-2.5 text-sm text-[#dbe4d1] transition hover:bg-[#1b241c]"
+                      className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
                     >
                       Broadcast Control
                     </Link>
@@ -146,14 +146,14 @@ export default function Navbar() {
                       href={djangoAdminUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="block px-4 py-2.5 text-sm text-[#dbe4d1] transition hover:bg-[#1b241c]"
+                      className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
                     >
                       Django Admin
                     </a>
                   ) : null}
                   <button
                     type="button"
-                    className="block w-full border-t border-[#273227] px-4 py-2.5 text-left text-sm text-red-300 transition hover:bg-[#1b241c]"
+                    className="block w-full border-t border-black px-4 py-2.5 text-left text-sm text-red-300 transition hover:bg-[#202020]"
                     onClick={onLogout}
                   >
                     Logout
@@ -172,7 +172,7 @@ export default function Navbar() {
                 <Link to="/register" className="hidden sm:block">
                   <Button
                     variant="indigo"
-                    className="border border-[#d5ddca] bg-[#eef1e6] text-[#0f1410] shadow-none hover:bg-white"
+                    className="border border-[#D8D8D8] bg-[#EFEFEF] text-[#121212] shadow-none hover:bg-white"
                   >
                     Register
                   </Button>
@@ -211,58 +211,58 @@ export default function Navbar() {
         </div>
       </div>
       {mobileMenuOpen ? (
-        <div className="mx-auto mt-2 max-w-7xl overflow-hidden rounded-2xl border border-[#2f3a30] bg-[#0d130f]/96 p-3 shadow-[0_18px_34px_rgba(0,0,0,0.34)] backdrop-blur lg:hidden">
+        <div className="mx-auto mt-2 max-w-7xl overflow-hidden rounded-2xl border border-black panel-gradient p-3 shadow-[0_18px_34px_rgba(0,0,0,0.34)] backdrop-blur lg:hidden">
           <nav className="grid gap-1">
-            <NavLink to="/courses" className="rounded-lg px-3 py-2 text-sm font-medium text-[#dbe4d1] transition hover:bg-[#192219]">
+            <NavLink to="/courses" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
               Courses
             </NavLink>
-            <NavLink to="/live-classes" className="rounded-lg px-3 py-2 text-sm font-medium text-[#dbe4d1] transition hover:bg-[#192219]">
+            <NavLink to="/live-classes" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
               Live Classes
             </NavLink>
             {isAuthenticated ? (
-              <NavLink to="/join-live" className="rounded-lg px-3 py-2 text-sm font-medium text-[#dbe4d1] transition hover:bg-[#192219]">
+              <NavLink to="/join-live" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                 Join Live
               </NavLink>
             ) : null}
-            <NavLink to="/about" className="rounded-lg px-3 py-2 text-sm font-medium text-[#dbe4d1] transition hover:bg-[#192219]">
+            <NavLink to="/about" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
               About Us
             </NavLink>
-            <NavLink to="/contact" className="rounded-lg px-3 py-2 text-sm font-medium text-[#dbe4d1] transition hover:bg-[#192219]">
+            <NavLink to="/contact" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
               Contact
             </NavLink>
           </nav>
 
-          <div className="mt-3 border-t border-[#273227] pt-3">
+          <div className="mt-3 border-t border-black pt-3">
             {isAuthenticated ? (
               <div className="space-y-2">
-                <div className="rounded-xl border border-[#2a352b] bg-[#111811] px-3 py-2 text-xs text-[#d7e0cc]">
+                <div className="rounded-xl border border-black panel-gradient px-3 py-2 text-xs text-[#DBDBDB]">
                   <div className="truncate font-semibold text-white">{user?.full_name || user?.email}</div>
-                  <div className="mt-0.5 truncate text-[#9eaa97]">{user?.email}</div>
+                  <div className="mt-0.5 truncate text-[#A4A4A4]">{user?.email}</div>
                 </div>
                 <div className="grid gap-1">
-                    <Link to="/my-courses" className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]">
+                    <Link to="/my-courses" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                       Your Courses
                   </Link>
-                  <Link to="/profile" className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]">
+                  <Link to="/profile" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                     Profile
                   </Link>
                   {isInstructor ? (
-                    <Link to="/instructor/dashboard" className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]">
+                    <Link to="/instructor/dashboard" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                       Instructor
                     </Link>
                   ) : null}
                   {isAdmin ? (
-                    <Link to="/control-center" className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]">
+                    <Link to="/control-center" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                       Admin Control Center
                     </Link>
                   ) : null}
                   {isAdmin ? (
-                    <Link to="/meeting" className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]">
+                    <Link to="/meeting" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                       Meeting Control
                     </Link>
                   ) : null}
                   {isAdmin ? (
-                    <Link to="/broadcasting" className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]">
+                    <Link to="/broadcasting" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                       Broadcast Control
                     </Link>
                   ) : null}
@@ -271,7 +271,7 @@ export default function Navbar() {
                       href={djangoAdminUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-lg px-3 py-2 text-sm text-[#dbe4d1] transition hover:bg-[#192219]"
+                      className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]"
                     >
                       Django Admin
                     </a>

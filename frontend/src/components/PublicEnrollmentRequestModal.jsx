@@ -102,22 +102,22 @@ export default function PublicEnrollmentRequestModal({
       role="presentation"
     >
       <div
-        className="w-full max-w-2xl rounded-2xl border border-[#2a342c] bg-[#0b110c] p-5 shadow-[0_28px_80px_rgba(0,0,0,0.55)]"
+        className="w-full max-w-2xl rounded-2xl border border-black panel-gradient p-5 shadow-[0_28px_80px_rgba(0,0,0,0.55)]"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
               Guest Enrollment
             </div>
             <h3 className="mt-1 font-reference text-2xl font-semibold text-white">{heading}</h3>
-            <p className="mt-2 text-sm text-[#b7c0b0]">
+            <p className="mt-2 text-sm text-[#BBBBBB]">
               {targetName ? `Target: ${targetName}` : "Share your details and we will contact you for enrollment."}
             </p>
           </div>
           <button
             type="button"
-            className="rounded-lg border border-[#2f3a30] bg-[#121812] px-3 py-1.5 text-xs font-semibold text-[#d7e0cc] hover:bg-[#171f17]"
+            className="rounded-lg border border-black bg-[#161616] px-3 py-1.5 text-xs font-semibold text-[#DBDBDB] hover:bg-[#1C1C1C]"
             onClick={onClose}
           >
             Close
@@ -169,7 +169,7 @@ export default function PublicEnrollmentRequestModal({
           />
 
           {state.error ? <p className="text-xs text-red-300">{state.error}</p> : null}
-          {state.success ? <p className="text-xs text-green-300">{state.success}</p> : null}
+          {state.success ? <p className="text-xs text-zinc-300">{state.success}</p> : null}
 
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <Button type="submit" loading={state.loading}>

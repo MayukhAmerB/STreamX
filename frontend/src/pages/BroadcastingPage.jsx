@@ -810,7 +810,7 @@ export default function BroadcastingPage() {
 
   return (
     <PageShell title="" subtitle="">
-      <section className="relative mb-6 overflow-hidden rounded-[30px] border border-[#cfd8c5]/10 bg-[#070907] shadow-[0_26px_70px_rgba(0,0,0,0.35)]">
+      <section className="relative mb-6 overflow-hidden rounded-[30px] border border-black bg-[#080808] shadow-[0_26px_70px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">
           <img
             src={pageBackgroundImage}
@@ -818,21 +818,21 @@ export default function BroadcastingPage() {
             aria-hidden="true"
             className="h-full w-full object-cover opacity-[0.16]"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-black/88 via-black/78 to-[#0d130f]/94" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_12%,rgba(185,199,171,0.12),transparent_36%)]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/88 via-black/78 to-[#111111]/94" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_12%,rgba(192,192,192,0.12),transparent_36%)]" />
           <div className="absolute inset-0 opacity-15 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:26px_26px]" />
         </div>
 
         <div className="relative space-y-6 p-5 sm:p-6">
           <div className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
             <div>
-              <div className="inline-flex items-center rounded-full border border-[#334033] bg-white/5 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#d7e0cc]">
+              <div className="inline-flex items-center rounded-full border border-black bg-white/5 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#DBDBDB]">
                 BROADCAST MODE
               </div>
               <h1 className="mt-4 max-w-3xl font-reference text-3xl font-semibold leading-tight text-white sm:text-4xl">
                 One-to-many live streams with built-in viewer chat
               </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-[#b7c0b0]">
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-[#BBBBBB]">
                 Hosts publish directly from browser camera and microphone. Live delivery is managed
                 through LiveKit + Owncast while viewers engage in chat-only mode.
               </p>
@@ -841,7 +841,7 @@ export default function BroadcastingPage() {
                 {broadcastHeroHighlights.map((item) => (
                   <span
                     key={item}
-                    className="rounded-full border border-[#2b372d] bg-[#0f1510]/88 px-3 py-1 text-xs text-[#d6decf]"
+                    className="rounded-full border border-black bg-[#131313]/88 px-3 py-1 text-xs text-[#DADADA]"
                   >
                     {item}
                   </span>
@@ -849,31 +849,31 @@ export default function BroadcastingPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-[#263227] bg-[#0d130f]/90 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur-sm sm:p-5">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#91a08f]">
+            <div className="rounded-2xl border border-black panel-gradient p-4 shadow-[0_16px_40px_rgba(0,0,0,0.28)] backdrop-blur-sm sm:p-5">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9A9A9A]">
                 Start A Broadcast
               </div>
               {isAuthenticated ? (
                 <form onSubmit={handleCreate} className="mt-3 space-y-3">
                   <input
-                    className="w-full rounded-xl border border-[#2a3a2c] bg-[#0c120d] px-3 py-2 text-sm text-white outline-none focus:border-[#8ea284]"
+                    className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
                     placeholder="Broadcast title"
                     value={form.title}
                     onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
                     required
                   />
                   <textarea
-                    className="min-h-[86px] w-full rounded-xl border border-[#2a3a2c] bg-[#0c120d] px-3 py-2 text-sm text-white outline-none focus:border-[#8ea284]"
+                    className="min-h-[86px] w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
                     placeholder="Broadcast context"
                     value={form.description}
                     onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
                   />
                   <div>
-                    <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-[#8f9989]">
+                    <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-[#949494]">
                       Linked Live Class
                     </label>
                     <select
-                      className="w-full rounded-xl border border-[#2a3a2c] bg-[#0c120d] px-3 py-2 text-sm text-white outline-none focus:border-[#8ea284]"
+                      className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
                       value={form.linked_live_class_id}
                       onChange={(e) => setForm((prev) => ({ ...prev, linked_live_class_id: e.target.value }))}
                       required
@@ -887,19 +887,19 @@ export default function BroadcastingPage() {
                     </select>
                   </div>
                   <input
-                    className="w-full rounded-xl border border-[#2a3a2c] bg-[#0c120d] px-3 py-2 text-sm text-white outline-none focus:border-[#8ea284]"
+                    className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
                     placeholder="Stream embed URL (optional)"
                     value={form.stream_embed_url}
                     onChange={(e) => setForm((prev) => ({ ...prev, stream_embed_url: e.target.value }))}
                   />
                   <input
-                    className="w-full rounded-xl border border-[#2a3a2c] bg-[#0c120d] px-3 py-2 text-sm text-white outline-none focus:border-[#8ea284]"
+                    className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
                     placeholder="Chat embed URL (optional)"
                     value={form.chat_embed_url}
                     onChange={(e) => setForm((prev) => ({ ...prev, chat_embed_url: e.target.value }))}
                   />
                   <input
-                    className="w-full rounded-xl border border-[#2a3a2c] bg-[#0c120d] px-3 py-2 text-sm text-white outline-none focus:border-[#8ea284]"
+                    className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
                     placeholder="RTMP target URL (optional)"
                     value={form.rtmp_target_url}
                     onChange={(e) => setForm((prev) => ({ ...prev, rtmp_target_url: e.target.value }))}
@@ -908,11 +908,11 @@ export default function BroadcastingPage() {
                     Create Broadcast
                   </Button>
                   {createState.error ? <p className="text-xs text-red-300">{createState.error}</p> : null}
-                  {createState.success ? <p className="text-xs text-green-300">{createState.success}</p> : null}
+                  {createState.success ? <p className="text-xs text-zinc-300">{createState.success}</p> : null}
                 </form>
               ) : (
                 <div className="mt-4 space-y-3">
-                  <p className="text-sm text-[#c7d0bf]">Login to start or join broadcast sessions.</p>
+                  <p className="text-sm text-[#CBCBCB]">Login to start or join broadcast sessions.</p>
                   <Link to="/login" state={{ from: "/broadcasting" }} className="inline-block">
                     <Button>Login</Button>
                   </Link>
@@ -921,15 +921,15 @@ export default function BroadcastingPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#253126] bg-[#0d130f]/84 p-4 sm:p-5">
-            <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">
+          <div className="rounded-2xl border border-black panel-gradient p-4 sm:p-5">
+            <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
               Broadcast Workflow
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               {broadcastWorkflow.map((item, index) => (
-                <article key={item.step} className="rounded-xl border border-[#1f2820] bg-[#101710] p-3">
-                  <div className="text-xs font-semibold text-[#d8e1cf]">{`0${index + 1}  ${item.step}`}</div>
-                  <p className="mt-2 text-xs leading-6 text-[#b4bead]">{item.detail}</p>
+                <article key={item.step} className="rounded-xl border border-black panel-gradient p-3">
+                  <div className="text-xs font-semibold text-[#DCDCDC]">{`0${index + 1}  ${item.step}`}</div>
+                  <p className="mt-2 text-xs leading-6 text-[#B9B9B9]">{item.detail}</p>
                 </article>
               ))}
             </div>
@@ -938,24 +938,24 @@ export default function BroadcastingPage() {
       </section>
 
       {studioSession?.is_host ? (
-        <section className="mb-6 rounded-[26px] border border-[#223023] bg-[#090d09]/72 p-4 sm:p-5">
+        <section className="mb-6 rounded-[26px] border border-black panel-gradient p-4 sm:p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="font-reference text-xl font-semibold text-white">Host Studio</h3>
-              <p className="mt-1 text-xs text-[#8f9989]">Session: {studioSession.title}</p>
+              <p className="mt-1 text-xs text-[#949494]">Session: {studioSession.title}</p>
             </div>
-            <span className="rounded-full border border-[#2f3f31] bg-[#121a13] px-3 py-1 text-xs uppercase tracking-[0.12em] text-[#c8d2bf]">
+            <span className="rounded-full border border-black bg-[#171717] px-3 py-1 text-xs uppercase tracking-[0.12em] text-[#CDCDCD]">
               {studioSession.stream_status || "idle"}
             </span>
           </div>
 
-          <div className="mb-4 rounded-xl border border-[#273527] bg-[#101812]/88 px-4 py-3">
-            <div className="text-[11px] uppercase tracking-[0.12em] text-[#8f9989]">Share Links</div>
+          <div className="mb-4 rounded-xl border border-black panel-gradient px-4 py-3">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-[#949494]">Share Links</div>
             <div className="mt-2 space-y-3">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.12em] text-[#8f9989]">Join URL</div>
+                <div className="text-[10px] uppercase tracking-[0.12em] text-[#949494]">Join URL</div>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <code className="max-w-full truncate rounded-md bg-[#0b100c] px-2 py-1 text-xs text-[#dbe4d1]">
+                  <code className="max-w-full truncate rounded-md bg-[#0E0E0E] px-2 py-1 text-xs text-[#DFDFDF]">
                     {buildJoinLink(studioSession)}
                   </code>
                   <Button
@@ -968,9 +968,9 @@ export default function BroadcastingPage() {
                 </div>
               </div>
               <div>
-                <div className="text-[10px] uppercase tracking-[0.12em] text-[#8f9989]">Stream URL</div>
+                <div className="text-[10px] uppercase tracking-[0.12em] text-[#949494]">Stream URL</div>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <code className="max-w-full truncate rounded-md bg-[#0b100c] px-2 py-1 text-xs text-[#dbe4d1]">
+                  <code className="max-w-full truncate rounded-md bg-[#0E0E0E] px-2 py-1 text-xs text-[#DFDFDF]">
                     {studioStreamUrl || "Stream URL becomes available after joining the broadcast or setting custom URL."}
                   </code>
                   <Button
@@ -987,7 +987,7 @@ export default function BroadcastingPage() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="overflow-hidden rounded-2xl border border-[#263328] bg-black">
+            <div className="overflow-hidden rounded-2xl border border-black bg-black">
               <video
                 ref={previewVideoRef}
                 autoPlay
@@ -996,7 +996,7 @@ export default function BroadcastingPage() {
                 className="h-[220px] w-full object-cover sm:h-[280px] lg:h-[320px]"
               />
             </div>
-            <div className="rounded-2xl border border-[#263328] bg-[#101812]/88 p-4">
+            <div className="rounded-2xl border border-black panel-gradient p-4">
               <div className="grid gap-2 sm:grid-cols-2">
                 <Button onClick={handleConnectCamera} loading={studioState.connecting || studioState.actionLoading}>
                   {studioState.connected ? "Reconnect Camera" : "Connect Camera"}
@@ -1043,14 +1043,14 @@ export default function BroadcastingPage() {
               </div>
 
               {studioState.error ? <p className="mt-3 text-xs text-red-300">{studioState.error}</p> : null}
-              {studioState.info ? <p className="mt-3 text-xs text-green-300">{studioState.info}</p> : null}
+              {studioState.info ? <p className="mt-3 text-xs text-zinc-300">{studioState.info}</p> : null}
               {studioRecordingState.error ? <p className="mt-2 text-xs text-red-300">{studioRecordingState.error}</p> : null}
-              {studioRecordingState.info ? <p className="mt-2 text-xs text-green-300">{studioRecordingState.info}</p> : null}
-              <p className="mt-2 text-[11px] text-[#9cab95]">
+              {studioRecordingState.info ? <p className="mt-2 text-xs text-zinc-300">{studioRecordingState.info}</p> : null}
+              <p className="mt-2 text-[11px] text-[#A4A4A4]">
                 Active profile: {studioProfile.capture_width}x{studioProfile.capture_height} at{" "}
                 {studioProfile.fps}fps, max {studioProfile.max_video_bitrate_kbps} kbps.
               </p>
-              <p className="mt-1 text-[11px] text-[#9cab95]">
+              <p className="mt-1 text-[11px] text-[#A4A4A4]">
                 Recording status: {studioRecordingState.active?.status || "idle"}
                 {studioRecordingState.active
                   ? ` (${studioRecordingState.mode === "screenity-fallback" ? "browser fallback" : "livekit"})`
@@ -1062,7 +1062,7 @@ export default function BroadcastingPage() {
                   href={resolveRecordingPlaybackUrl(studioRecordingState.latestCompleted)}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-2 inline-flex rounded-full border border-[#3d4c3f] bg-[#151f16] px-3 py-1.5 text-xs text-[#dbe4d1] hover:bg-[#1d2a1f]"
+                  className="mt-2 inline-flex rounded-full border border-black bg-[#1B1B1B] px-3 py-1.5 text-xs text-[#DFDFDF] hover:bg-[#252525]"
                 >
                   Open Last Recording
                 </a>
@@ -1091,7 +1091,7 @@ export default function BroadcastingPage() {
       ) : null}
 
       {joinState.info ? (
-        <div className="mb-4 rounded-xl border border-[#2f3f31] bg-[#111a12] px-4 py-3 text-sm text-[#d5ddcb]">
+        <div className="mb-4 rounded-xl border border-black bg-[#161616] px-4 py-3 text-sm text-[#D9D9D9]">
           {joinState.info}
         </div>
       ) : null}
@@ -1103,7 +1103,7 @@ export default function BroadcastingPage() {
       ) : null}
 
       {deleteState.info ? (
-        <div className="mb-4 rounded-xl border border-[#2f3f31] bg-[#111a12] px-4 py-3 text-sm text-[#d5ddcb]">
+        <div className="mb-4 rounded-xl border border-black bg-[#161616] px-4 py-3 text-sm text-[#D9D9D9]">
           {deleteState.info}
         </div>
       ) : null}
@@ -1115,7 +1115,7 @@ export default function BroadcastingPage() {
       ) : null}
 
       {streamControlState.info ? (
-        <div className="mb-4 rounded-xl border border-[#2f3f31] bg-[#111a12] px-4 py-3 text-sm text-[#d5ddcb]">
+        <div className="mb-4 rounded-xl border border-black bg-[#161616] px-4 py-3 text-sm text-[#D9D9D9]">
           {streamControlState.info}
         </div>
       ) : null}
@@ -1127,24 +1127,24 @@ export default function BroadcastingPage() {
       ) : null}
 
       {shareState.info ? (
-        <div className="mb-4 rounded-xl border border-[#2f3f31] bg-[#111a12] px-4 py-3 text-sm text-[#d5ddcb]">
+        <div className="mb-4 rounded-xl border border-black bg-[#161616] px-4 py-3 text-sm text-[#D9D9D9]">
           {shareState.info}
         </div>
       ) : null}
 
       {activeBroadcast ? (
-        <section className="mb-6 rounded-[26px] border border-[#223023] bg-[#090d09]/72 p-4 sm:p-5">
+        <section className="mb-6 rounded-[26px] border border-black panel-gradient p-4 sm:p-5">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <span className="text-sm text-[#dbe4d1]">Viewing: {activeBroadcast.session?.title}</span>
-            <span className="rounded-full border border-[#2f3f31] bg-[#121a13] px-3 py-1 text-xs uppercase tracking-[0.12em] text-[#c8d2bf]">
+            <span className="text-sm text-[#DFDFDF]">Viewing: {activeBroadcast.session?.title}</span>
+            <span className="rounded-full border border-black bg-[#171717] px-3 py-1 text-xs uppercase tracking-[0.12em] text-[#CDCDCD]">
               Live Broadcast
             </span>
           </div>
 
-          <div className="mb-4 rounded-xl border border-[#273527] bg-[#101812]/88 px-4 py-3">
-            <div className="text-[11px] uppercase tracking-[0.12em] text-[#8f9989]">Stream URL</div>
+          <div className="mb-4 rounded-xl border border-black panel-gradient px-4 py-3">
+            <div className="text-[11px] uppercase tracking-[0.12em] text-[#949494]">Stream URL</div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <code className="max-w-full truncate rounded-md bg-[#0b100c] px-2 py-1 text-xs text-[#dbe4d1]">
+              <code className="max-w-full truncate rounded-md bg-[#0E0E0E] px-2 py-1 text-xs text-[#DFDFDF]">
                 {activeStreamUrl || "Stream URL not configured for this session."}
               </code>
               <Button
@@ -1159,7 +1159,7 @@ export default function BroadcastingPage() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
-            <div className="overflow-hidden rounded-2xl border border-[#263328] bg-black">
+            <div className="overflow-hidden rounded-2xl border border-black bg-black">
               {activeStreamUrl ? (
                 <iframe
                   title="Broadcast Stream"
@@ -1168,12 +1168,12 @@ export default function BroadcastingPage() {
                   allow="autoplay; fullscreen"
                 />
               ) : (
-                <div className="flex h-[260px] items-center justify-center px-6 text-center text-sm text-[#b7c0b0] sm:h-[340px] lg:h-[440px]">
+                <div className="flex h-[260px] items-center justify-center px-6 text-center text-sm text-[#BBBBBB] sm:h-[340px] lg:h-[440px]">
                   Stream URL not configured for this session.
                 </div>
               )}
             </div>
-            <div className="overflow-hidden rounded-2xl border border-[#263328] bg-[#0d140e]">
+            <div className="overflow-hidden rounded-2xl border border-black panel-gradient">
               {activeChatUrl ? (
                 <iframe
                   title="Broadcast Chat"
@@ -1182,7 +1182,7 @@ export default function BroadcastingPage() {
                   allow="clipboard-read; clipboard-write"
                 />
               ) : (
-                <div className="flex h-[260px] items-center justify-center px-6 text-center text-sm text-[#b7c0b0] sm:h-[340px] lg:h-[440px]">
+                <div className="flex h-[260px] items-center justify-center px-6 text-center text-sm text-[#BBBBBB] sm:h-[340px] lg:h-[440px]">
                   Chat URL not configured for this session.
                 </div>
               )}
@@ -1191,13 +1191,13 @@ export default function BroadcastingPage() {
         </section>
       ) : null}
 
-      <section className="rounded-[26px] border border-[#223023] bg-[#090d09]/72 p-4 sm:p-5">
+      <section className="rounded-[26px] border border-black panel-gradient p-4 sm:p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h3 className="font-reference text-xl font-semibold text-white">Broadcast Sessions</h3>
-            <p className="mt-1 text-xs text-[#8f9989]">Create events, publish live, and manage audience access.</p>
+            <p className="mt-1 text-xs text-[#949494]">Create events, publish live, and manage audience access.</p>
           </div>
-          <span className="text-xs text-[#8f9989]">
+          <span className="text-xs text-[#949494]">
             {loading ? "Loading..." : `${orderedSessions.length} session${orderedSessions.length === 1 ? "" : "s"}`}
           </span>
         </div>
@@ -1214,22 +1214,22 @@ export default function BroadcastingPage() {
                 {orderedSessions.map((session) => (
                   <article
                     key={session.id}
-                    className="grid gap-3 rounded-2xl border border-[#273527] bg-[#101812]/88 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.22)] md:grid-cols-[1fr_auto] md:items-center"
+                    className="grid gap-3 rounded-2xl border border-black panel-gradient p-4 shadow-[0_14px_34px_rgba(0,0,0,0.22)] md:grid-cols-[1fr_auto] md:items-center"
                   >
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <h4 className="font-reference text-lg text-white">{session.title}</h4>
-                        <span className="rounded-full border border-[#2f3f31] bg-[#121a13] px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-[#c8d2bf]">
+                        <span className="rounded-full border border-black bg-[#171717] px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-[#CDCDCD]">
                           {session.stream_status === "live" ? "Live" : "Ready"}
                         </span>
                       </div>
-                      <p className="mt-2 text-sm leading-6 text-[#b7c0b0]">
+                      <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
                         {session.description || "Large-audience broadcast session with moderated chat."}
                       </p>
                       {canManageSession(session, user) ? (
-                        <div className="mt-3 rounded-lg border border-[#2a352c] bg-[#0c120d]/85 px-3 py-2">
-                          <div className="text-[10px] uppercase tracking-[0.12em] text-[#8f9989]">Join URL</div>
-                          <code className="mt-1 block truncate text-xs text-[#dbe4d1]">{buildJoinLink(session)}</code>
+                        <div className="mt-3 rounded-lg border border-black panel-gradient px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.12em] text-[#949494]">Join URL</div>
+                          <code className="mt-1 block truncate text-xs text-[#DFDFDF]">{buildJoinLink(session)}</code>
                         </div>
                       ) : null}
                     </div>
@@ -1276,7 +1276,7 @@ export default function BroadcastingPage() {
                 ))}
               </div>
             ) : (
-              <div className="rounded-xl border border-[#2f3f31] bg-[#111a12] px-4 py-3 text-sm text-[#d5ddcb]">
+              <div className="rounded-xl border border-black bg-[#161616] px-4 py-3 text-sm text-[#D9D9D9]">
                 No broadcast sessions available yet. Create one from the panel above.
               </div>
             )}
@@ -1287,14 +1287,14 @@ export default function BroadcastingPage() {
               {broadcastMarketingCards.map((card) => (
                 <article
                   key={card.title}
-                  className="rounded-2xl border border-[#273527] bg-[#101812]/88 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.22)]"
+                  className="rounded-2xl border border-black panel-gradient p-4 shadow-[0_14px_34px_rgba(0,0,0,0.22)]"
                 >
                   <h4 className="font-reference text-lg text-white">{card.title}</h4>
-                  <p className="mt-2 text-sm text-[#b7c0b0]">{card.description}</p>
+                  <p className="mt-2 text-sm text-[#BBBBBB]">{card.description}</p>
                 </article>
               ))}
             </div>
-            <div className="mt-4 rounded-xl border border-[#2f3f31] bg-[#111a12] px-4 py-3 text-sm text-[#d5ddcb]">
+            <div className="mt-4 rounded-xl border border-black bg-[#161616] px-4 py-3 text-sm text-[#D9D9D9]">
               {loading
                 ? "Preparing live event details..."
                 : "Sign in to access broadcast sessions. Public view intentionally shows a marketing overview."}

@@ -35,7 +35,7 @@ export default function RegisterPage() {
 
   return (
     <PageShell title="Register" subtitle="Create a new account.">
-      <div className="mx-auto max-w-md rounded-2xl border border-[#2a332d] bg-[#0f1310] p-6 shadow-[0_16px_40px_rgba(0,0,0,0.28)]">
+      <div className="mx-auto max-w-md rounded-2xl border border-black panel-gradient p-6 shadow-[0_16px_40px_rgba(0,0,0,0.28)]">
         {registrationEnabled ? (
           <>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -68,9 +68,9 @@ export default function RegisterPage() {
                 required
               />
               <label className="block">
-                <span className="mb-2 block text-sm text-[#d4dbc8]">Role</span>
+                <span className="mb-2 block text-sm text-[#D7D7D7]">Role</span>
                 <select
-                  className="w-full rounded-lg border border-[#2a332d] bg-[#0f1310] px-3 py-2 text-sm text-white focus:border-[#b9c7ab] focus:outline-none"
+                  className="w-full rounded-lg border border-black bg-[#111111] px-3 py-2 text-sm text-white focus:border-[#C0C0C0] focus:outline-none"
                   value={form.role}
                   onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))}
                 >
@@ -83,7 +83,7 @@ export default function RegisterPage() {
                 Create Account
               </Button>
             </form>
-            <p className="mt-5 text-sm text-[#b7c0b0]">
+            <p className="mt-5 text-sm text-[#BBBBBB]">
               Already have an account?{" "}
               <Link to="/login" className="text-white hover:underline">
                 Login

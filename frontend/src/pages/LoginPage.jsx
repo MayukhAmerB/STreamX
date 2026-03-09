@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { requestPasswordReset } from "../api/auth";
@@ -8,9 +8,6 @@ import FormInput from "../components/FormInput";
 import PageShell from "../components/PageShell";
 import { useAuth } from "../hooks/useAuth";
 import { apiMessage } from "../utils/api";
-
-const authBackgroundImage =
-  "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
 
 export default function LoginPage() {
   const { login, googleLogin, registrationEnabled, googleLoginEnabled } = useAuth();
@@ -79,36 +76,31 @@ export default function LoginPage() {
 
   return (
     <PageShell title="" subtitle="">
-      <section className="relative mx-auto max-w-6xl overflow-hidden rounded-[28px] border border-[#d5deca]/10 bg-[#070907] shadow-[0_28px_70px_rgba(0,0,0,0.45)]">
+      <section className="relative mx-auto max-w-6xl overflow-hidden rounded-[28px] border border-black bg-[#080808] shadow-[0_28px_70px_rgba(0,0,0,0.45)]">
         <div className="absolute inset-0">
-          <img
-            src={authBackgroundImage}
-            alt=""
-            aria-hidden="true"
-            className="h-full w-full object-cover opacity-[0.18] grayscale"
-          />
-          <div className="absolute inset-0 bg-gradient-to-br from-black/92 via-black/85 to-[#0a0f0b]/94" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_18%,rgba(185,199,171,0.12),transparent_40%)]" />
+          <div className="absolute inset-0 bg-black" />
+          <div className="absolute inset-0 bg-[radial-gradient(88%_78%_at_100%_0%,rgba(255,255,255,0.24)_0%,rgba(255,255,255,0.11)_24%,rgba(255,255,255,0.045)_42%,rgba(255,255,255,0)_68%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(0,0,0,0)_58%,rgba(255,255,255,0.025)_76%,rgba(255,255,255,0.08)_100%)]" />
           <div className="absolute inset-0 opacity-10 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:24px_24px]" />
         </div>
 
         <div className="relative grid gap-6 p-4 sm:p-6 lg:grid-cols-[1.03fr_0.97fr] lg:gap-8">
-          <div className="hidden rounded-[26px] border border-[#243025] bg-[#0d120f]/76 p-6 backdrop-blur-sm lg:block">
-            <div className="rounded-[22px] border border-[#2c352d] bg-[#0d120f]/92 p-4 shadow-[0_16px_44px_rgba(0,0,0,0.24)]">
+          <div className="hidden rounded-[26px] border border-black panel-gradient p-6 backdrop-blur-sm lg:block">
+            <div className="rounded-[22px] border border-black panel-gradient p-4 shadow-[0_16px_44px_rgba(0,0,0,0.24)]">
               <div className="flex items-start justify-between gap-4">
                 <BrandLogo className="max-w-[260px]" />
-                <div className="rounded-2xl border border-[#2f3a30] bg-[#101611] px-4 py-3 text-right">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8f9989]">
+                <div className="rounded-2xl border border-black panel-gradient px-4 py-3 text-right">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#949494]">
                     AUTH STATE
                   </div>
-                  <div className="mt-2 text-sm font-semibold text-[#dce5d2]">SECURE GATEWAY</div>
+                  <div className="mt-2 text-sm font-semibold text-[#E0E0E0]">SECURE GATEWAY</div>
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {["EMAIL", "PASSWORD", "2FA", "ENROLLED ACCESS"].map((item) => (
                   <span
                     key={item}
-                    className="rounded-full border border-[#314032] bg-[#121712] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#d7e0cc]"
+                    className="rounded-full border border-black bg-[#151515] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#DBDBDB]"
                   >
                     {item}
                   </span>
@@ -116,14 +108,14 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#334033] bg-white/5 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#d7e0cc]">
+            <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-black bg-white/5 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#DBDBDB]">
               SECURE LOGIN
             </div>
 
             <h1 className="mt-4 font-reference text-4xl font-semibold leading-tight text-white">
               Access the training platform through a controlled login path
             </h1>
-            <p className="mt-3 max-w-md text-sm leading-7 text-[#b7c0b0]">
+            <p className="mt-3 max-w-md text-sm leading-7 text-[#BBBBBB]">
               Continue your OSINT and web application pentesting workflow with protected course access,
               instructor-led live sessions, and optional authenticator-based verification.
             </p>
@@ -136,38 +128,38 @@ export default function LoginPage() {
               ].map((item) => (
                 <div
                   key={item}
-                  className="flex items-start gap-3 rounded-xl border border-[#202920] bg-[#101610]/90 px-3 py-3 text-sm text-[#c5ceb9]"
+                  className="flex items-start gap-3 rounded-xl border border-black panel-gradient px-3 py-3 text-sm text-[#C9C9C9]"
                 >
-                  <span className="mt-1 h-2.5 w-2.5 rounded-full bg-[#b9c7ab]" />
+                  <span className="mt-1 h-2.5 w-2.5 rounded-full bg-[#C0C0C0]" />
                   <span>{item}</span>
                 </div>
               ))}
             </div>
 
-            <div className="mt-6 rounded-2xl border border-[#2a332d] bg-[#0f1410]/95 p-4">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">
+            <div className="mt-6 rounded-2xl border border-black bg-[#121212]/95 p-4">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
                 Authentication Flow
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 {["Email", "Password", "2FA (Optional)"].map((step, idx) => (
-                  <div key={step} className="rounded-xl border border-[#1f2820] bg-[#111612] p-3">
-                    <div className="font-mono text-xs font-semibold text-[#dce4d2]">{`0${idx + 1}`}</div>
-                    <div className="mt-1 text-xs text-[#aab4a3]">{step}</div>
+                  <div key={step} className="rounded-xl border border-black panel-gradient p-3">
+                    <div className="text-xs font-semibold text-[#E0E0E0]">{`0${idx + 1}`}</div>
+                    <div className="mt-1 text-xs text-[#AFAFAF]">{step}</div>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#d5deca]/12 bg-[#0d120f]/92 p-5 shadow-[0_16px_44px_rgba(0,0,0,0.32)] backdrop-blur-sm sm:p-6">
+          <div className="rounded-2xl border border-black panel-gradient p-5 shadow-[0_16px_44px_rgba(0,0,0,0.32)] backdrop-blur-sm sm:p-6">
             <div className="mb-5">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#2c362d] bg-[#111612] px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#d8e1cf]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-black bg-[#141414] px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#DCDCDC]">
                 {needs2FA ? "2FA REQUIRED" : "LOGIN"}
               </div>
               <h2 className="mt-3 font-reference text-2xl font-semibold text-white sm:text-3xl">
                 {needs2FA ? "Enter your authenticator code" : "Welcome back"}
               </h2>
-              <p className="mt-2 text-sm leading-6 text-[#b7c0b0]">
+              <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
                 {needs2FA
                   ? "Your password was accepted. Complete login using the 6-digit code from your authenticator app."
                   : "Access your student or instructor dashboard securely."}
@@ -211,7 +203,7 @@ export default function LoginPage() {
                 </div>
               ) : null}
               {info ? (
-                <div className="rounded-xl border border-green-300/20 bg-green-500/10 px-3 py-2 text-sm text-green-200">
+                <div className="rounded-xl border border-zinc-400/20 bg-zinc-500/10 px-3 py-2 text-sm text-zinc-200">
                   {info}
                 </div>
               ) : null}
@@ -220,11 +212,11 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={handleResetRequest}
-                  className="text-xs font-medium text-[#b7c0b0] transition hover:text-white"
+                  className="text-xs font-medium text-[#BBBBBB] transition hover:text-white"
                 >
                   Forgot password?
                 </button>
-                <span className="text-[11px] uppercase tracking-[0.12em] text-[#879284]">
+                <span className="text-[11px] uppercase tracking-[0.12em] text-[#8D8D8D]">
                   Secure session
                 </span>
               </div>
@@ -236,13 +228,13 @@ export default function LoginPage() {
 
             {showGoogleLogin ? (
               <>
-                <div className="my-5 flex items-center gap-3 text-xs text-[#889486]">
-                  <div className="h-px flex-1 bg-[#2a332d]" />
+                <div className="my-5 flex items-center gap-3 text-xs text-[#8F8F8F]">
+                  <div className="h-px flex-1 bg-[#303030]" />
                   <span>OR CONTINUE WITH</span>
-                  <div className="h-px flex-1 bg-[#2a332d]" />
+                  <div className="h-px flex-1 bg-[#303030]" />
                 </div>
 
-                <div className="rounded-xl border border-[#232c24] bg-[#101510] p-3">
+                <div className="rounded-xl border border-black bg-[#131313] p-3">
                   <div className="flex justify-center">
                     <GoogleLogin
                       onSuccess={handleGoogleSuccess}
@@ -252,27 +244,27 @@ export default function LoginPage() {
                 </div>
               </>
             ) : (
-              <div className="my-5 rounded-xl border border-[#232c24] bg-[#101510] px-4 py-3 text-xs text-[#8f9989]">
+              <div className="my-5 rounded-xl border border-black bg-[#131313] px-4 py-3 text-xs text-[#949494]">
                 Google sign-in is currently disabled.
               </div>
             )}
 
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#232c24] bg-[#101510] px-4 py-3">
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-black bg-[#131313] px-4 py-3">
               {registrationEnabled ? (
-                <p className="text-sm text-[#b7c0b0]">
+                <p className="text-sm text-[#BBBBBB]">
                   New here?{" "}
                   <Link to="/register" className="font-semibold text-white hover:underline">
                     Create account
                   </Link>
                 </p>
               ) : (
-                <p className="text-sm text-[#b7c0b0]">
+                <p className="text-sm text-[#BBBBBB]">
                   Account creation is managed by admin. Use provided credentials.
                 </p>
               )}
               <Link
                 to="/courses"
-                className="text-xs font-semibold uppercase tracking-[0.12em] text-[#d7e0cc] hover:text-white"
+                className="text-xs font-semibold uppercase tracking-[0.12em] text-[#DBDBDB] hover:text-white"
               >
                 Browse Courses
               </Link>

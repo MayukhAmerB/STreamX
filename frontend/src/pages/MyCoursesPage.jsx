@@ -27,9 +27,9 @@ function formatAccessDate(value) {
 
 function getAccessBadgeClasses(source) {
   if (String(source || "").toLowerCase() === "purchased") {
-    return "border border-[#d7e4ce] bg-[#eef3e8] text-[#1f2d21]";
+    return "border border-[#DEDEDE] bg-[#F0F0F0] text-[#272727]";
   }
-  return "border border-[#c7d2bc]/20 bg-white/5 text-[#d7e0cc]";
+  return "border border-[#CCCCCC]/20 bg-white/5 text-[#DBDBDB]";
 }
 
 export default function MyCoursesPage() {
@@ -77,7 +77,7 @@ export default function MyCoursesPage() {
       }
     >
       {loading ? (
-        <p className="text-sm text-[#b7c0b0]">Loading your course library...</p>
+        <p className="text-sm text-[#BBBBBB]">Loading your course library...</p>
       ) : null}
 
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
@@ -85,27 +85,27 @@ export default function MyCoursesPage() {
       {!loading && !error ? (
         <>
           <section className="mb-6 grid gap-4 md:grid-cols-3">
-            <div className="rounded-[24px] border border-[#243025] bg-[#0d120f] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
-              <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Courses Ready</div>
+            <div className="rounded-[24px] border border-black panel-gradient p-5 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Courses Ready</div>
               <div className="mt-2 text-3xl font-semibold text-white">{libraryStats.total}</div>
-              <p className="mt-2 text-sm text-[#b7c0b0]">Courses currently unlocked for this account.</p>
+              <p className="mt-2 text-sm text-[#BBBBBB]">Courses currently unlocked for this account.</p>
             </div>
-            <div className="rounded-[24px] border border-[#243025] bg-[#0d120f] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
-              <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Purchased</div>
+            <div className="rounded-[24px] border border-black panel-gradient p-5 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Purchased</div>
               <div className="mt-2 text-3xl font-semibold text-white">{libraryStats.purchased}</div>
-              <p className="mt-2 text-sm text-[#b7c0b0]">Courses unlocked through payment verification.</p>
+              <p className="mt-2 text-sm text-[#BBBBBB]">Courses unlocked through payment verification.</p>
             </div>
-            <div className="rounded-[24px] border border-[#243025] bg-[#0d120f] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
-              <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Granted</div>
+            <div className="rounded-[24px] border border-black panel-gradient p-5 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Granted</div>
               <div className="mt-2 text-3xl font-semibold text-white">{libraryStats.granted}</div>
-              <p className="mt-2 text-sm text-[#b7c0b0]">Courses approved for access by your admin team.</p>
+              <p className="mt-2 text-sm text-[#BBBBBB]">Courses approved for access by your admin team.</p>
             </div>
           </section>
 
           {courses.length === 0 ? (
-            <div className="rounded-[28px] border border-[#243025] bg-[#0d120f] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
+            <div className="rounded-[28px] border border-black panel-gradient p-6 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
               <h2 className="font-reference text-xl font-semibold text-white">No courses unlocked yet</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-7 text-[#b7c0b0]">
+              <p className="mt-2 max-w-2xl text-sm leading-7 text-[#BBBBBB]">
                 Once you purchase a course or an admin approves your enrollment request, it will appear here automatically.
               </p>
               <Link to="/courses" className="mt-4 inline-flex">
@@ -117,7 +117,7 @@ export default function MyCoursesPage() {
               {courses.map((course) => (
                 <article
                   key={course.id}
-                  className="relative overflow-hidden rounded-[28px] border border-[#243025] bg-[#0d120f] shadow-[0_20px_60px_rgba(0,0,0,0.24)]"
+                  className="relative overflow-hidden rounded-[28px] border border-black panel-gradient shadow-[0_20px_60px_rgba(0,0,0,0.24)]"
                 >
                   <div className="absolute inset-0">
                     <img
@@ -126,8 +126,8 @@ export default function MyCoursesPage() {
                       aria-hidden="true"
                       className="h-full w-full object-cover opacity-[0.16]"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-br from-black/88 via-[#081008]/88 to-[#101710]/95" />
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_10%,rgba(185,199,171,0.12),transparent_38%)]" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-black/88 via-[#0D0D0D]/88 to-[#141414]/95" />
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_10%,rgba(192,192,192,0.12),transparent_38%)]" />
                   </div>
 
                   <div className="relative flex h-full flex-col p-5 sm:p-6">
@@ -139,40 +139,40 @@ export default function MyCoursesPage() {
                       >
                         {course.access_label || "Unlocked"}
                       </span>
-                      <span className="rounded-full border border-[#cfd8c5]/20 bg-white/5 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#d7e0cc]">
+                      <span className="rounded-full border border-black bg-white/5 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#DBDBDB]">
                         {formatLevel(course.level)}
                       </span>
-                      <span className="rounded-full border border-[#2e382f] bg-[#101610] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#b7c0b0]">
+                      <span className="rounded-full border border-black bg-[#141414] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#BBBBBB]">
                         {course.section_count || 0} modules
                       </span>
                     </div>
 
                     <h2 className="mt-4 font-reference text-2xl font-semibold text-white">{course.title}</h2>
-                    <p className="mt-2 line-clamp-3 text-sm leading-7 text-[#b7c0b0]">
+                    <p className="mt-2 line-clamp-3 text-sm leading-7 text-[#BBBBBB]">
                       {course.description || "Your course description will appear here once the curriculum is published."}
                     </p>
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-2xl border border-[#202920] bg-[#101610]/90 p-3">
-                        <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Lessons</div>
+                      <div className="rounded-2xl border border-black panel-gradient p-3">
+                        <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Lessons</div>
                         <div className="mt-1 text-lg font-semibold text-white">{course.lecture_count || 0}</div>
                       </div>
-                      <div className="rounded-2xl border border-[#202920] bg-[#101610]/90 p-3">
-                        <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Instructor</div>
+                      <div className="rounded-2xl border border-black panel-gradient p-3">
+                        <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Instructor</div>
                         <div className="mt-1 truncate text-sm font-semibold text-white">
                           {course.instructor?.full_name || "Instructor"}
                         </div>
                       </div>
-                      <div className="rounded-2xl border border-[#202920] bg-[#101610]/90 p-3">
-                        <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Price</div>
+                      <div className="rounded-2xl border border-black panel-gradient p-3">
+                        <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Price</div>
                         <div className="mt-1 text-sm font-semibold text-white">{formatINR(course.price)}</div>
                       </div>
                     </div>
 
-                    <div className="mt-4 rounded-2xl border border-[#202920] bg-[#101610]/90 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#aab4a3]">
+                    <div className="mt-4 rounded-2xl border border-black panel-gradient p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#AFAFAF]">
                         <span>
-                          Access added on <span className="font-semibold text-[#dfe6d6]">{formatAccessDate(course.enrolled_at)}</span>
+                          Access added on <span className="font-semibold text-[#E2E2E2]">{formatAccessDate(course.enrolled_at)}</span>
                         </span>
                         <span>{course.category === "web_pentesting" ? "Web Pentesting" : "OSINT"}</span>
                       </div>

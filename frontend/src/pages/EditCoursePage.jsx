@@ -213,7 +213,7 @@ export default function EditCoursePage() {
       />
 
       <div className="mt-5 grid gap-6 lg:grid-cols-[1.15fr_1fr]">
-        <div className="rounded-2xl border border-[#2a332d] bg-[#0f1310]/92 p-6 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
+        <div className="rounded-2xl border border-black panel-gradient p-6 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
           <CourseForm
             form={courseForm}
             setForm={setCourseForm}
@@ -221,12 +221,12 @@ export default function EditCoursePage() {
             error={error}
             loading={saving}
           />
-          {message ? <p className="mt-3 text-sm text-green-400">{message}</p> : null}
+          {message ? <p className="mt-3 text-sm text-zinc-300">{message}</p> : null}
         </div>
 
-        <div className="rounded-2xl border border-[#2a332d] bg-[#0f1310]/92 p-6 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
+        <div className="rounded-2xl border border-black panel-gradient p-6 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
           <h2 className="text-lg font-semibold">Sections & Lectures</h2>
-          <div className="mt-4 space-y-2 rounded-xl border border-[#202820] bg-[#0a0d0a]/90 p-3">
+          <div className="mt-4 space-y-2 rounded-xl border border-black bg-[#0C0C0C]/90 p-3">
             <FormInput
               label="New Module Title"
               placeholder="Module title"
@@ -257,7 +257,7 @@ export default function EditCoursePage() {
               };
 
               return (
-                <div key={section.id} className="rounded-xl border border-[#202820] bg-[#0a0d0a]/90 p-4">
+                <div key={section.id} className="rounded-xl border border-black bg-[#0C0C0C]/90 p-4">
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div className="flex-1 space-y-2">
                       <FormInput
@@ -311,7 +311,7 @@ export default function EditCoursePage() {
                     {(section.lectures || []).map((lecture) => (
                       <div
                         key={lecture.id}
-                        className="flex items-center justify-between rounded-md border border-[#202820] bg-[#111612] px-3 py-2 text-sm"
+                        className="flex items-center justify-between rounded-md border border-black panel-gradient px-3 py-2 text-sm"
                       >
                         <span>{lecture.title}</span>
                         <Button
@@ -325,7 +325,7 @@ export default function EditCoursePage() {
                     ))}
                   </div>
 
-                  <div className="mt-4 space-y-2 rounded-lg border border-[#202820] bg-[#111612] p-3">
+                  <div className="mt-4 space-y-2 rounded-lg border border-black panel-gradient p-3">
                     <FormInput
                       label="Lecture Title"
                       value={lectureForm.title}
@@ -347,14 +347,14 @@ export default function EditCoursePage() {
                       }
                     />
                     <label className="block">
-                      <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#aeb8a3]">
+                      <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#B3B3B3]">
                         Lecture Video Upload
                       </span>
                       <input
                         key={`lecture-video-file-${section.id}-${lectureForm.video_file?.name || "empty"}`}
                         type="file"
                         accept="video/mp4,video/webm,video/quicktime,video/x-matroska"
-                        className="w-full rounded-xl border border-[#2a332d] bg-[#0f1310] px-3.5 py-2.5 text-sm text-white file:mr-3 file:rounded-lg file:border-0 file:bg-[#b9c7ab] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[#0d120f] focus:border-[#b9c7ab] focus:outline-none focus:ring-2 focus:ring-[#b9c7ab]/20"
+                        className="w-full rounded-xl border border-black bg-[#111111] px-3.5 py-2.5 text-sm text-white file:mr-3 file:rounded-lg file:border-0 file:bg-[#C0C0C0] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[#101010] focus:border-[#C0C0C0] focus:outline-none focus:ring-2 focus:ring-[#C0C0C0]/20"
                         onChange={(e) =>
                           setLectureForms((prev) => ({
                             ...prev,
@@ -362,11 +362,11 @@ export default function EditCoursePage() {
                           }))
                         }
                       />
-                      <span className="mt-1.5 block text-xs text-[#8e9987]">
+                      <span className="mt-1.5 block text-xs text-[#949494]">
                         Hostinger-native option. Use this for direct uploads to the local media volume.
                       </span>
                       {lectureForm.video_file ? (
-                        <span className="mt-1.5 block text-xs text-[#d4dbc8]">
+                        <span className="mt-1.5 block text-xs text-[#D7D7D7]">
                           Selected: {lectureForm.video_file.name}
                         </span>
                       ) : null}
@@ -383,7 +383,7 @@ export default function EditCoursePage() {
                         }))
                       }
                     />
-                    <label className="flex items-center gap-2 text-sm text-[#d4dbc8]">
+                    <label className="flex items-center gap-2 text-sm text-[#D7D7D7]">
                       <input
                         type="checkbox"
                         checked={lectureForm.is_preview}
@@ -396,7 +396,7 @@ export default function EditCoursePage() {
                       />
                       Preview lecture
                     </label>
-                    <p className="text-xs text-[#8f9989]">
+                    <p className="text-xs text-[#949494]">
                       Add either a direct video upload or a remote storage key/URL. Uploaded files play immediately and
                       can be transcoded to HLS later for smoother delivery.
                     </p>
@@ -406,7 +406,7 @@ export default function EditCoursePage() {
               );
             })}
             {(course?.sections || []).length === 0 && (
-              <p className="text-sm text-[#b7c0b0]">Add a section to start adding lectures.</p>
+              <p className="text-sm text-[#BBBBBB]">Add a section to start adding lectures.</p>
             )}
           </div>
         </div>

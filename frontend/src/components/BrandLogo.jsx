@@ -16,7 +16,7 @@ export default function BrandLogo({ to = "/", className = "" }) {
         <span className="block truncate text-[15px] font-semibold tracking-tight text-white sm:text-[17px]">
           Al syed Initiative
         </span>
-        <span className="hidden text-[10px] uppercase tracking-[0.18em] text-[#d6dfcb]/70 sm:block">
+        <span className="hidden text-[10px] uppercase tracking-[0.18em] text-[#DADADA]/70 sm:block">
           Cybersecurity Platform
         </span>
       </span>

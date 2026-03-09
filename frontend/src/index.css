@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -26,9 +26,9 @@ body,
 }
 
 body {
-  font-family: "Manrope", system-ui, sans-serif;
-  background: #050705;
-  color: #ffffff;
+  font-family: "Inter", "Segoe UI", Arial, system-ui, sans-serif;
+  background: #000000;
+  color: #FFFFFF;
   @apply antialiased;
 }
 
@@ -42,31 +42,39 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: "Calibri", "Segoe UI", Arial, "Manrope", system-ui, sans-serif;
-  font-weight: 700;
+  font-family: "Inter", "Segoe UI", Arial, system-ui, sans-serif;
+  font-weight: 800;
   text-transform: uppercase;
 }
 
 .font-editorial {
-  font-family: "Cormorant Garamond", Georgia, serif;
+  font-family: "Inter", "Segoe UI", Arial, system-ui, sans-serif;
+  font-weight: 700;
 }
 
 .font-reference {
-  font-family: "Calibri", "Segoe UI", Arial, "Manrope", system-ui, sans-serif;
-  font-weight: 700;
+  font-family: "Inter", "Segoe UI", Arial, system-ui, sans-serif;
+  font-weight: 800;
 }
 
 .mesh-panel {
   background:
-    radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.92), rgba(243, 247, 236, 0.86) 45%, rgba(227, 235, 217, 0.78)),
-    linear-gradient(135deg, rgba(246, 249, 240, 0.9), rgba(234, 239, 227, 0.8));
+    radial-gradient(circle at 20% 15%, rgba(255,255,255,0.92), rgba(245,245,245,0.86) 45%, rgba(231,231,231,0.78)),
+    linear-gradient(135deg, rgba(247,247,247,0.9), rgba(236,236,236,0.8));
 }
 
 .grid-noise {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+    linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);
   background-size: 22px 22px;
+}
+
+.panel-gradient {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.028) 24%, rgba(255,255,255,0) 52%),
+    linear-gradient(130deg, #000000 76%, #101010 100%);
+  border-color: #000000 !important;
 }
 
 @keyframes riseIn {
@@ -128,11 +136,11 @@ h6 {
   position: relative;
   isolation: isolate;
   background:
-    linear-gradient(180deg, rgba(252, 253, 249, 0.98), rgba(238, 243, 231, 0.98));
-  border: 1px solid rgba(222, 230, 212, 0.9);
+    linear-gradient(180deg, rgba(252,252,252,0.98), rgba(240,240,240,0.98));
+  border: 1px solid rgba(226,226,226,0.9);
   box-shadow:
-    0 18px 60px rgba(28, 34, 27, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    0 18px 60px rgba(31,31,31,0.08),
+    inset 0 1px 0 rgba(255,255,255,0.9);
 }
 
 .surface-white::before {
@@ -141,8 +149,8 @@ h6 {
   inset: 0;
   border-radius: inherit;
   background:
-    radial-gradient(circle at 16% 4%, rgba(255, 255, 255, 0.95), transparent 40%),
-    linear-gradient(180deg, rgba(214, 224, 203, 0.2), transparent 28%);
+    radial-gradient(circle at 16% 4%, rgba(255,255,255,0.95), transparent 40%),
+    linear-gradient(180deg, rgba(219,219,219,0.2), transparent 28%);
   pointer-events: none;
   z-index: -1;
 }
@@ -151,12 +159,12 @@ h6 {
   position: relative;
   isolation: isolate;
   background:
-    radial-gradient(circle at 80% 0%, rgba(199, 210, 188, 0.16), transparent 42%),
-    linear-gradient(180deg, #121712, #090c09);
-  border: 1px solid rgba(205, 216, 196, 0.14);
+    radial-gradient(circle at 80% 0%, rgba(204,204,204,0.16), transparent 42%),
+    linear-gradient(180deg, #151515, #0B0B0B);
+  border: 1px solid rgba(210,210,210,0.14);
   box-shadow:
-    0 22px 70px rgba(0, 0, 0, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 22px 70px rgba(0,0,0,0.28),
+    inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
 .glossy {
@@ -173,9 +181,9 @@ h6 {
   height: 180%;
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0),
-    rgba(255, 255, 255, 0.16),
-    rgba(255, 255, 255, 0)
+    rgba(255,255,255,0),
+    rgba(255,255,255,0.16),
+    rgba(255,255,255,0)
   );
   transform: translateX(-180%) skewX(-18deg);
   pointer-events: none;
@@ -202,8 +210,8 @@ h6 {
 
 .soft-ring {
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.45),
-    0 24px 60px rgba(0, 0, 0, 0.12);
+    0 0 0 1px rgba(255,255,255,0.45),
+    0 24px 60px rgba(0,0,0,0.12);
 }
 
 @media (prefers-reduced-motion: reduce) {

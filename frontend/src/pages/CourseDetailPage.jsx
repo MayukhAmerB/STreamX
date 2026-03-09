@@ -258,7 +258,7 @@ export default function CourseDetailPage() {
         </div>
       ) : null}
 
-      <section className="relative mb-6 overflow-hidden rounded-[30px] border border-[#cfd8c5]/10 bg-[#070907] shadow-[0_26px_70px_rgba(0,0,0,0.36)]">
+      <section className="relative mb-6 overflow-hidden rounded-[30px] border border-black bg-[#080808] shadow-[0_26px_70px_rgba(0,0,0,0.36)]">
         <div className="absolute inset-0">
           <img
             src={course.thumbnail || pageBackgroundImage}
@@ -266,8 +266,8 @@ export default function CourseDetailPage() {
             aria-hidden="true"
             className="h-full w-full object-cover opacity-[0.2]"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-black/90 via-black/76 to-[#0d130f]/95" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(187,192,202,0.12),transparent_40%)]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/90 via-black/76 to-[#111111]/95" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(192,192,192,0.12),transparent_40%)]" />
           <div className="absolute inset-0 opacity-15 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:26px_26px]" />
         </div>
 
@@ -277,14 +277,14 @@ export default function CourseDetailPage() {
               <span className="rounded-full border border-white/70 bg-white/90 px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-neutral-900">
                 {formatCategory(course.category)}
               </span>
-              <span className="rounded-full border border-[#cfd8c5]/20 bg-white/5 px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-[#d7e0cc]">
+              <span className="rounded-full border border-black bg-white/5 px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-[#DBDBDB]">
                 {formatLevel(course.level)}
               </span>
               <span
                 className={`rounded-full px-3 py-1 text-[10px] font-semibold tracking-[0.14em] ${
                   launchStatus.isLive
-                    ? "border border-[#f4e6b9]/80 bg-[linear-gradient(135deg,#fffef8_0%,#fff5d8_55%,#ebd594_100%)] text-[#2a2412]"
-                    : "border border-[#c8cdd5] bg-[#d6dae0] text-[#111319]"
+                    ? "border border-[#E5E5E5]/80 bg-[linear-gradient(135deg,#FEFEFE_0%,#F5F5F5_55%,#D4D4D4_100%)] text-[#242424]"
+                    : "border border-[#CCCCCC] bg-[#D9D9D9] text-[#131313]"
                 }`}
               >
                 {launchStatus.label}
@@ -294,39 +294,39 @@ export default function CourseDetailPage() {
             <h2 className="mt-4 max-w-3xl font-reference text-2xl font-semibold leading-tight text-white sm:text-3xl lg:text-[2.35rem]">
               {course.title}
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-[#b7c0b0]">
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[#BBBBBB]">
               {course.description || "Structured cybersecurity training with practical modules and guided progression."}
             </p>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Modules</div>
+              <div className="rounded-2xl border border-black panel-gradient p-3 backdrop-blur-sm">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Modules</div>
                 <div className="mt-1 text-2xl font-semibold text-white">{sections.length}</div>
-                <div className="mt-1 text-xs text-[#b7c0b0]">Curriculum sections</div>
+                <div className="mt-1 text-xs text-[#BBBBBB]">Curriculum sections</div>
               </div>
-              <div className="rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Lessons</div>
+              <div className="rounded-2xl border border-black panel-gradient p-3 backdrop-blur-sm">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Lessons</div>
                 <div className="mt-1 text-2xl font-semibold text-white">{lectureCount}</div>
-                <div className="mt-1 text-xs text-[#b7c0b0]">Lecture entries</div>
+                <div className="mt-1 text-xs text-[#BBBBBB]">Lecture entries</div>
               </div>
-              <div className="rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Access</div>
+              <div className="rounded-2xl border border-black panel-gradient p-3 backdrop-blur-sm">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Access</div>
                 <div className="mt-1 text-lg font-semibold text-white">
                   {launchStatus.isComingSoon ? "Coming Soon" : formatINR(course.price)}
                 </div>
-                <div className="mt-1 text-xs text-[#b7c0b0]">
+                <div className="mt-1 text-xs text-[#BBBBBB]">
                   {launchStatus.isComingSoon ? "Waitlist release" : "One-time enrollment"}
                 </div>
               </div>
             </div>
 
-            <div className="mt-4 rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-4 backdrop-blur-sm">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8f9989]">
+            <div className="mt-4 rounded-2xl border border-black panel-gradient p-4 backdrop-blur-sm">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
                 About This Course
               </div>
               <div className="mt-3 space-y-2">
                 {extendedCourseDescription.map((paragraph, index) => (
-                  <p key={`${index}-${paragraph.slice(0, 24)}`} className="text-sm leading-7 text-[#c6cfbd]">
+                  <p key={`${index}-${paragraph.slice(0, 24)}`} className="text-sm leading-7 text-[#CACACA]">
                     {paragraph}
                   </p>
                 ))}
@@ -335,8 +335,8 @@ export default function CourseDetailPage() {
           </div>
 
           <div className="space-y-4">
-            <div className="relative overflow-hidden rounded-2xl border border-[#243025] bg-[#0d120f]/92 p-3 shadow-[0_20px_60px_rgba(0,0,0,0.25)] backdrop-blur-sm">
-              <div className="relative aspect-[16/10] overflow-hidden rounded-xl border border-[#1f2820] bg-[#090c09]">
+            <div className="relative overflow-hidden rounded-2xl border border-black panel-gradient p-3 shadow-[0_20px_60px_rgba(0,0,0,0.25)] backdrop-blur-sm">
+              <div className="relative aspect-[16/10] overflow-hidden rounded-xl border border-black panel-gradient">
                 {course.thumbnail && !previewImageFailed ? (
                   <img
                     src={course.thumbnail}
@@ -355,35 +355,35 @@ export default function CourseDetailPage() {
                         e.currentTarget.style.display = "none";
                       }}
                     />
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_10%,rgba(187,192,202,0.12),transparent_42%)]" />
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_10%,rgba(192,192,192,0.12),transparent_42%)]" />
                     <div className="absolute inset-0 opacity-15 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:22px_22px]" />
                   </div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/10" />
                 <div className="absolute inset-x-0 bottom-0 p-4">
-                  <div className="rounded-xl border border-[#d6decc]/10 bg-[#0f1410]/88 p-3 backdrop-blur-sm">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">
+                  <div className="rounded-xl border border-[#DADADA]/10 bg-[#121212]/88 p-3 backdrop-blur-sm">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
                       Course Overview
                     </div>
-                    <p className="mt-2 line-clamp-4 text-sm leading-6 text-[#d4ddca]">
+                    <p className="mt-2 line-clamp-4 text-sm leading-6 text-[#D8D8D8]">
                       {course.description ||
                         "Structured cybersecurity training with practical modules and guided progression."}
                     </p>
                   </div>
                 </div>
               </div>
-              <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_100%_0%,rgba(185,199,171,0.08),transparent_40%)]" />
+              <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_100%_0%,rgba(192,192,192,0.08),transparent_40%)]" />
             </div>
 
-            <div className="rounded-2xl border border-[#243025] bg-[#0d120f]/92 p-4 backdrop-blur-sm">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8f9989]">
+            <div className="rounded-2xl border border-black panel-gradient p-4 backdrop-blur-sm">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
                 What You Will Cover
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {highlights.map((item, index) => (
                   <span
                     key={`${item}-${index}`}
-                    className="rounded-full border border-[#2d382d] bg-[#111612] px-3 py-1 text-xs font-medium text-[#cbd4c1]"
+                    className="rounded-full border border-black bg-[#141414] px-3 py-1 text-xs font-medium text-[#CFCFCF]"
                   >
                     {item}
                   </span>
@@ -396,15 +396,15 @@ export default function CourseDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1.55fr_1fr]">
         <div className="space-y-6">
-          <section className="rounded-[24px] border border-[#243025] bg-[#0d120f] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
+          <section className="rounded-[24px] border border-black panel-gradient p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="font-reference text-lg font-semibold text-white">Course Roadmap</h2>
-                <p className="mt-1 text-xs leading-5 text-[#8f9989]">
+                <p className="mt-1 text-xs leading-5 text-[#949494]">
                   Module-by-module breakdown with lecture previews and section descriptions.
                 </p>
               </div>
-              <span className="rounded-full border border-[#2f3a30] bg-[#111612] px-3 py-1 text-xs font-semibold text-[#c6cfbd]">
+              <span className="rounded-full border border-black bg-[#141414] px-3 py-1 text-xs font-semibold text-[#CACACA]">
                 {sections.length} modules / {lectureCount} lessons
               </span>
             </div>
@@ -414,52 +414,52 @@ export default function CourseDetailPage() {
                 {sections.map((section, sectionIndex) => (
                   <div
                     key={section.id}
-                    className="relative overflow-hidden rounded-2xl border border-[#202a21] bg-[#101610] p-4"
+                    className="relative overflow-hidden rounded-2xl border border-black panel-gradient p-4"
                   >
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(185,199,171,0.05),transparent_45%)]" />
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(192,192,192,0.05),transparent_45%)]" />
                     <div className="relative">
                       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                         <div className="flex min-w-0 items-start gap-2">
-                          <span className="shrink-0 whitespace-nowrap rounded-full border border-[#d6decc]/20 bg-[#161d16] px-3 py-1 text-[11px] font-semibold tracking-wide text-[#d3dcc9]">
+                          <span className="shrink-0 whitespace-nowrap rounded-full border border-[#DADADA]/20 bg-[#1A1A1A] px-3 py-1 text-[11px] font-semibold tracking-wide text-[#D7D7D7]">
                             Module {sectionIndex + 1}
                           </span>
                           <h3 className="min-w-0 font-reference text-base font-semibold text-white sm:text-lg">
                             {section.title}
                           </h3>
                         </div>
-                        <span className="shrink-0 whitespace-nowrap rounded-full border border-[#2b372b] bg-[#0f1410] px-2.5 py-1 text-[11px] font-semibold text-[#b7c0b0]">
+                        <span className="shrink-0 whitespace-nowrap rounded-full border border-black bg-[#121212] px-2.5 py-1 text-[11px] font-semibold text-[#BBBBBB]">
                           {(section.lectures || []).length} lesson{(section.lectures || []).length === 1 ? "" : "s"}
                         </span>
                       </div>
 
                       {section.description ? (
-                        <p className="text-sm leading-6 text-[#adb6a7]">{section.description}</p>
+                        <p className="text-sm leading-6 text-[#B2B2B2]">{section.description}</p>
                       ) : null}
 
                       <ul className="mt-4 space-y-2">
                         {(section.lectures || []).map((lecture, lectureIndex) => (
                           <li
                             key={lecture.id}
-                            className="rounded-xl border border-[#1c241d] bg-[#0c110d] px-3 py-3"
+                            className="rounded-xl border border-black panel-gradient px-3 py-3"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex min-w-0 items-start gap-3">
-                                <span className="mt-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-[#2c372d] bg-[#131913] px-1 text-[10px] font-semibold text-[#cfd8c5]">
+                                <span className="mt-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-black bg-[#171717] px-1 text-[10px] font-semibold text-[#D3D3D3]">
                                   {lectureIndex + 1}
                                 </span>
                                 <div className="min-w-0">
-                                  <div className="truncate text-sm font-medium text-[#dfe6d6]">
+                                  <div className="truncate text-sm font-medium text-[#E2E2E2]">
                                     {lecture.title}
                                   </div>
                                   {lecture.description ? (
-                                    <p className="mt-1 text-xs leading-5 text-[#8f9989]">
+                                    <p className="mt-1 text-xs leading-5 text-[#949494]">
                                       {lecture.description}
                                     </p>
                                   ) : null}
                                 </div>
                               </div>
                               {lecture.is_preview ? (
-                                <span className="shrink-0 rounded-full border border-[#cfd8c5]/20 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#d7e0cc]">
+                                <span className="shrink-0 rounded-full border border-black bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#DBDBDB]">
                                   Preview
                                 </span>
                               ) : null}
@@ -472,16 +472,16 @@ export default function CourseDetailPage() {
                 ))}
               </div>
             ) : (
-              <div className="rounded-2xl border border-[#202a21] bg-[#101610] p-4 text-sm text-[#b7c0b0]">
+              <div className="rounded-2xl border border-black panel-gradient p-4 text-sm text-[#BBBBBB]">
                 Curriculum modules will appear here once sections are added in the backend.
               </div>
             )}
           </section>
 
-          <section className="rounded-[24px] border border-[#243025] bg-[#0d120f] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
+          <section className="rounded-[24px] border border-black panel-gradient p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
             <div className="mb-4">
               <h2 className="font-reference text-lg font-semibold text-white">Expected Outcomes</h2>
-              <p className="mt-1 text-xs leading-5 text-[#8f9989]">
+              <p className="mt-1 text-xs leading-5 text-[#949494]">
                 Practical goals learners should be able to achieve after completing this track.
               </p>
             </div>
@@ -489,9 +489,9 @@ export default function CourseDetailPage() {
               {outcomes.map((item, index) => (
                 <div
                   key={`${item}-${index}`}
-                  className="flex items-start gap-3 rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-3 text-sm text-[#c4cdba]"
+                  className="flex items-start gap-3 rounded-xl border border-black panel-gradient px-3 py-3 text-sm text-[#C8C8C8]"
                 >
-                  <span className="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-[#b9c7ab]" />
+                  <span className="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-[#C0C0C0]" />
                   <span>{item}</span>
                 </div>
               ))}
@@ -500,16 +500,16 @@ export default function CourseDetailPage() {
         </div>
 
         <aside className="space-y-5 lg:sticky lg:top-24 lg:h-fit">
-          <div className="rounded-[24px] border border-[#243025] bg-[#0d120f] p-5 text-white shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
+          <div className="rounded-[24px] border border-black panel-gradient p-5 text-white shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
             <div className="flex items-center justify-between gap-2">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8f9989]">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
                 Enrollment
               </div>
               <span
                 className={`rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.14em] ${
                   launchStatus.isLive
-                    ? "border border-[#f4e6b9]/80 bg-[linear-gradient(135deg,#fffef8_0%,#fff5d8_55%,#ebd594_100%)] text-[#2a2412]"
-                    : "border border-[#c8cdd5] bg-[#d6dae0] text-[#111319]"
+                    ? "border border-[#E5E5E5]/80 bg-[linear-gradient(135deg,#FEFEFE_0%,#F5F5F5_55%,#D4D4D4_100%)] text-[#242424]"
+                    : "border border-[#CCCCCC] bg-[#D9D9D9] text-[#131313]"
                 }`}
               >
                 {launchStatus.label}
@@ -519,7 +519,7 @@ export default function CourseDetailPage() {
             <div className="mt-2 font-reference text-3xl font-semibold tracking-tight text-white">
               {launchStatus.isComingSoon ? "Coming Soon" : formatINR(course.price)}
             </div>
-            <p className="mt-2 text-sm leading-6 text-[#b7c0b0]">
+            <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
               {sections.length} modules / {lectureCount} lessons / {formatLevel(course.level)} level
             </p>
 
@@ -527,7 +527,7 @@ export default function CourseDetailPage() {
               {highlights.slice(0, 4).map((point, index) => (
                 <div
                   key={`${point}-${index}`}
-                  className="rounded-lg border border-[#1f2820] bg-[#101610] px-3 py-2 text-sm text-[#c4cdba]"
+                  className="rounded-lg border border-black panel-gradient px-3 py-2 text-sm text-[#C8C8C8]"
                 >
                   {point}
                 </div>
@@ -537,7 +537,7 @@ export default function CourseDetailPage() {
             <div className="mt-4 space-y-2">
               {launchStatus.isComingSoon ? (
                 <Button
-                  className="w-full border border-[#cbd8c1]/70 bg-[linear-gradient(90deg,#d7e0cc_0%,#bccbb2_55%,#96ab89_100%)] text-[#11170f] shadow-[0_8px_18px_rgba(0,0,0,0.18)] hover:bg-[linear-gradient(90deg,#dde6d3_0%,#c4d2ba_55%,#a0b593_100%)]"
+                  className="w-full border border-[#D1D1D1]/70 bg-[linear-gradient(90deg,#DBDBDB_0%,#C4C4C4_55%,#A1A1A1_100%)] text-[#141414] shadow-[0_8px_18px_rgba(0,0,0,0.18)] hover:bg-[linear-gradient(90deg,#E1E1E1_0%,#CBCBCB_55%,#ABABAB_100%)]"
                   disabled
                 >
                   Coming Soon
@@ -559,7 +559,7 @@ export default function CourseDetailPage() {
                 <p className="text-xs text-red-300">{enrollmentState.error}</p>
               ) : null}
               {enrollmentState.success ? (
-                <p className="text-xs text-green-300">{enrollmentState.success}</p>
+                <p className="text-xs text-zinc-300">{enrollmentState.success}</p>
               ) : null}
 
               <Link to="/courses" className="block">
@@ -569,7 +569,7 @@ export default function CourseDetailPage() {
               </Link>
             </div>
 
-            <p className="mt-3 text-xs leading-5 text-[#8f9989]">
+            <p className="mt-3 text-xs leading-5 text-[#949494]">
               {launchStatus.isComingSoon
                 ? "This track is not live yet. We will open enrollment once the curriculum release is ready."
                 : ENABLE_DIRECT_PAYMENTS
@@ -578,24 +578,24 @@ export default function CourseDetailPage() {
             </p>
           </div>
 
-          <div className="rounded-[24px] border border-[#243025] bg-[#0d120f] p-5 text-white shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8f9989]">
+          <div className="rounded-[24px] border border-black panel-gradient p-5 text-white shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
               Course Snapshot
             </div>
             <div className="mt-3 grid gap-2">
-              <div className="rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-3">
-                <div className="text-[10px] uppercase tracking-[0.14em] text-[#7f8b7c]">Category</div>
-                <div className="mt-1 text-sm font-semibold text-[#e0e6d8]">
+              <div className="rounded-xl border border-black panel-gradient px-3 py-3">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Category</div>
+                <div className="mt-1 text-sm font-semibold text-[#E3E3E3]">
                   {formatCategory(course.category)}
                 </div>
               </div>
-              <div className="rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-3">
-                <div className="text-[10px] uppercase tracking-[0.14em] text-[#7f8b7c]">Level</div>
-                <div className="mt-1 text-sm font-semibold text-[#e0e6d8]">{formatLevel(course.level)}</div>
+              <div className="rounded-xl border border-black panel-gradient px-3 py-3">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Level</div>
+                <div className="mt-1 text-sm font-semibold text-[#E3E3E3]">{formatLevel(course.level)}</div>
               </div>
-              <div className="rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-3">
-                <div className="text-[10px] uppercase tracking-[0.14em] text-[#7f8b7c]">Instructor</div>
-                <div className="mt-1 text-sm font-semibold text-[#e0e6d8]">
+              <div className="rounded-xl border border-black panel-gradient px-3 py-3">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Instructor</div>
+                <div className="mt-1 text-sm font-semibold text-[#E3E3E3]">
                   {course.instructor?.full_name || "Instructor"}
                 </div>
               </div>

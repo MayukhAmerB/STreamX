@@ -345,22 +345,22 @@ export default function CoursePlayerPage() {
       subtitle={`${course?.sections?.length || 0} sections - ${lectureCount} lectures`}
     >
       <div className="grid gap-5 xl:grid-cols-[340px_1fr]">
-        <aside className="overflow-hidden rounded-[28px] border border-[#273128] bg-[#0b0f0c] shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
-          <div className="border-b border-[#1d251e] bg-[radial-gradient(circle_at_top,rgba(185,199,171,0.12),transparent_48%)] p-5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8f9989]">
+        <aside className="overflow-hidden rounded-[28px] border border-black panel-gradient shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
+          <div className="border-b border-[#222222] bg-[radial-gradient(circle_at_top,rgba(192,192,192,0.12),transparent_48%)] p-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#949494]">
               Your Progress
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-              <div className="rounded-2xl border border-[#253026] bg-[#101611] p-3">
-                <div className="text-[11px] uppercase tracking-[0.16em] text-[#8f9989]">Completed</div>
+              <div className="rounded-2xl border border-black panel-gradient p-3">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">Completed</div>
                 <div className="mt-1 text-2xl font-semibold text-white">{lectureStats.completedCount}</div>
               </div>
-              <div className="rounded-2xl border border-[#253026] bg-[#101611] p-3">
-                <div className="text-[11px] uppercase tracking-[0.16em] text-[#8f9989]">In Progress</div>
+              <div className="rounded-2xl border border-black panel-gradient p-3">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">In Progress</div>
                 <div className="mt-1 text-2xl font-semibold text-white">{lectureStats.startedCount}</div>
               </div>
-              <div className="rounded-2xl border border-[#253026] bg-[#101611] p-3">
-                <div className="text-[11px] uppercase tracking-[0.16em] text-[#8f9989]">Lessons</div>
+              <div className="rounded-2xl border border-black panel-gradient p-3">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">Lessons</div>
                 <div className="mt-1 text-2xl font-semibold text-white">{lectureStats.total}</div>
               </div>
             </div>
@@ -368,10 +368,10 @@ export default function CoursePlayerPage() {
 
           <div className="max-h-[72vh] space-y-4 overflow-auto p-4">
             {(course?.sections || []).map((section) => (
-              <div key={section.id} className="rounded-2xl border border-[#202820] bg-[#0f1410] p-3">
+              <div key={section.id} className="rounded-2xl border border-black bg-[#121212] p-3">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-sm font-semibold text-white">{section.title}</h2>
-                  <span className="rounded-full border border-[#2c352d] bg-[#131a14] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#b7c0b0]">
+                  <span className="rounded-full border border-black bg-[#171717] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#BBBBBB]">
                     {(section.lectures || []).length} lessons
                   </span>
                 </div>
@@ -387,8 +387,8 @@ export default function CoursePlayerPage() {
                         onClick={() => handleSelectLecture(lecture, section.title)}
                         className={`w-full rounded-2xl border px-3 py-3 text-left transition ${
                           isActive
-                            ? "border-[#b9c7ab] bg-[#dbe4d0] text-[#182119]"
-                            : "border-[#1f2820] bg-[#0a0d0a] text-[#d5ddd0] hover:border-[#334033] hover:bg-[#111612]"
+                            ? "border-[#C0C0C0] bg-[#DFDFDF] text-[#1D1D1D]"
+                            : "border-black bg-[#0C0C0C] text-[#D9D9D9] hover:border-black hover:bg-[#141414]"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -396,7 +396,7 @@ export default function CoursePlayerPage() {
                             <div className="truncate text-sm font-semibold">{lecture.title}</div>
                             <div
                               className={`mt-1 text-xs ${
-                                isActive ? "text-[#314131]" : "text-[#8f9989]"
+                                isActive ? "text-[#3A3A3A]" : "text-[#949494]"
                               }`}
                             >
                               {lectureProgress?.completed
@@ -413,10 +413,10 @@ export default function CoursePlayerPage() {
                           <span
                             className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
                               lectureProgress?.completed
-                                ? "border border-emerald-200/80 bg-emerald-50 text-emerald-900"
+                                ? "border border-zinc-300/80 bg-zinc-100 text-zinc-900"
                                 : percentComplete > 0
-                                  ? "border border-[#d6dfcc]/20 bg-white/10 text-[#e4eadc]"
-                                  : "border border-[#2c352d] bg-[#141915] text-[#9ca697]"
+                                  ? "border border-[#DADADA]/20 bg-white/10 text-[#E7E7E7]"
+                                  : "border border-black bg-[#171717] text-[#A1A1A1]"
                             }`}
                           >
                             {lectureProgress?.completed ? "Done" : `${percentComplete}%`}
@@ -425,7 +425,7 @@ export default function CoursePlayerPage() {
                         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-black/25">
                           <div
                             className={`h-full rounded-full ${
-                              lectureProgress?.completed ? "bg-emerald-300" : "bg-[#b9c7ab]"
+                              lectureProgress?.completed ? "bg-zinc-300" : "bg-[#C0C0C0]"
                             }`}
                             style={{ width: `${Math.max(0, Math.min(100, percentComplete))}%` }}
                           />
@@ -439,33 +439,33 @@ export default function CoursePlayerPage() {
           </div>
         </aside>
 
-        <section className="overflow-hidden rounded-[28px] border border-[#273128] bg-[#0b0f0c] shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
-          <div className="border-b border-[#1d251e] bg-[radial-gradient(circle_at_top_right,rgba(185,199,171,0.15),transparent_36%)] p-5">
+        <section className="overflow-hidden rounded-[28px] border border-black panel-gradient shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
+          <div className="border-b border-[#222222] bg-[radial-gradient(circle_at_top_right,rgba(192,192,192,0.15),transparent_36%)] p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8f9989]">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#949494]">
                   Lesson Workspace
                 </div>
                 <h2 className="mt-2 text-2xl font-semibold text-white">
                   {selectedLecture?.title || "Select a lecture"}
                 </h2>
                 {selectedLecture?.section_title ? (
-                  <p className="mt-1 text-sm text-[#b7c0b0]">{selectedLecture.section_title}</p>
+                  <p className="mt-1 text-sm text-[#BBBBBB]">{selectedLecture.section_title}</p>
                 ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
                 {activeProgress?.completed ? (
-                  <span className="rounded-full border border-emerald-200/80 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-900">
+                  <span className="rounded-full border border-zinc-300/80 bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-900">
                     Completed
                   </span>
                 ) : null}
                 {activeProgress?.resume_position_seconds ? (
-                  <span className="rounded-full border border-[#d6dfcc]/15 bg-white/5 px-3 py-1 text-xs font-semibold text-[#dce4d4]">
+                  <span className="rounded-full border border-[#DADADA]/15 bg-white/5 px-3 py-1 text-xs font-semibold text-[#E0E0E0]">
                     Resume {formatSeconds(activeProgress.resume_position_seconds)}
                   </span>
                 ) : null}
                 {progressState.saving ? (
-                  <span className="rounded-full border border-[#d6dfcc]/15 bg-white/5 px-3 py-1 text-xs font-semibold text-[#dce4d4]">
+                  <span className="rounded-full border border-[#DADADA]/15 bg-white/5 px-3 py-1 text-xs font-semibold text-[#E0E0E0]">
                     Saving...
                   </span>
                 ) : null}
@@ -474,7 +474,7 @@ export default function CoursePlayerPage() {
           </div>
 
           <div className="p-5">
-            <div className="overflow-hidden rounded-[24px] border border-[#1f2820] bg-black">
+            <div className="overflow-hidden rounded-[24px] border border-black bg-black">
               <div className="aspect-video">
                 {videoUrl ? (
                   <video
@@ -485,7 +485,7 @@ export default function CoursePlayerPage() {
                     onError={handleVideoError}
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-sm text-[#889486]">
+                  <div className="flex h-full items-center justify-center text-sm text-[#8F8F8F]">
                     Select a lecture to play.
                   </div>
                 )}
@@ -493,11 +493,11 @@ export default function CoursePlayerPage() {
             </div>
 
             <div className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-2xl border border-[#202820] bg-[#101611] p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8f9989]">
+              <div className="rounded-2xl border border-black panel-gradient p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
                   Lesson Notes
                 </div>
-                <p className="mt-3 text-sm leading-7 text-[#d4dbc8]">
+                <p className="mt-3 text-sm leading-7 text-[#D7D7D7]">
                   {selectedLecture?.description || "Lecture description will appear here."}
                 </p>
                 {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
@@ -506,25 +506,25 @@ export default function CoursePlayerPage() {
                 ) : null}
               </div>
 
-              <div className="rounded-2xl border border-[#202820] bg-[#101611] p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8f9989]">
+              <div className="rounded-2xl border border-black panel-gradient p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
                   Progress Snapshot
                 </div>
                 <div className="mt-4 space-y-3">
-                  <div className="rounded-2xl border border-[#273128] bg-[#0c110d] p-3">
-                    <div className="text-[11px] uppercase tracking-[0.16em] text-[#8f9989]">Completion</div>
+                  <div className="rounded-2xl border border-black panel-gradient p-3">
+                    <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">Completion</div>
                     <div className="mt-1 text-2xl font-semibold text-white">
                       {activeProgress?.percent_complete || 0}%
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-[#273128] bg-[#0c110d] p-3">
-                    <div className="text-[11px] uppercase tracking-[0.16em] text-[#8f9989]">Last Position</div>
+                  <div className="rounded-2xl border border-black panel-gradient p-3">
+                    <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">Last Position</div>
                     <div className="mt-1 text-lg font-semibold text-white">
                       {formatSeconds(activeProgress?.last_position_seconds || 0)}
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-[#273128] bg-[#0c110d] p-3">
-                    <div className="text-[11px] uppercase tracking-[0.16em] text-[#8f9989]">Duration</div>
+                  <div className="rounded-2xl border border-black panel-gradient p-3">
+                    <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">Duration</div>
                     <div className="mt-1 text-lg font-semibold text-white">
                       {formatSeconds(
                         activeProgress?.duration_seconds || selectedLecture?.stream_duration_seconds || 0

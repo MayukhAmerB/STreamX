@@ -199,7 +199,7 @@ export default function LiveClassesPage() {
       title="Live Classes"
       subtitle="Weekend live OSINT classes with a structured month-by-month progression."
     >
-      <section className="relative mb-6 overflow-hidden rounded-[30px] border border-[#cfd8c5]/10 bg-[#070907] shadow-[0_26px_70px_rgba(0,0,0,0.35)]">
+      <section className="relative mb-6 overflow-hidden rounded-[30px] border border-black bg-[#080808] shadow-[0_26px_70px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">
           <img
             src={pageBackgroundImage}
@@ -207,42 +207,42 @@ export default function LiveClassesPage() {
             aria-hidden="true"
             className="h-full w-full object-cover opacity-[0.16]"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-black/88 via-black/78 to-[#0d130f]/94" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_12%,rgba(185,199,171,0.12),transparent_36%)]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/88 via-black/78 to-[#111111]/94" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_12%,rgba(192,192,192,0.12),transparent_36%)]" />
           <div className="absolute inset-0 opacity-15 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:26px_26px]" />
         </div>
 
         <div className="relative grid gap-5 p-5 sm:p-6 lg:grid-cols-[1.05fr_0.95fr]">
           <div>
-            <div className="inline-flex items-center rounded-full border border-[#334033] bg-white/5 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#d7e0cc]">
+            <div className="inline-flex items-center rounded-full border border-black bg-white/5 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#DBDBDB]">
               WEEKEND LIVE CLASSES
             </div>
             <h2 className="mt-4 max-w-3xl font-reference text-2xl font-semibold leading-tight text-white sm:text-3xl lg:text-[2.2rem]">
               OSINT Live Program (Month 1 to Month 3)
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-[#b7c0b0]">
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[#BBBBBB]">
               These are live classes, not self-paced course sessions. The OSINT track is delivered
               as a progressive 3-month path: Beginner, Intermediate, and Advanced.
             </p>
 
             <div className="mt-5 grid gap-3 sm:auto-rows-fr sm:grid-cols-3">
-              <div className="h-full rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Class Days</div>
+              <div className="h-full rounded-2xl border border-black panel-gradient p-3 backdrop-blur-sm">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Class Days</div>
                 <div className="mt-1 text-sm font-semibold text-white">{classSchedule.days.join(", ")}</div>
               </div>
-              <div className="h-full rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Duration</div>
+              <div className="h-full rounded-2xl border border-black panel-gradient p-3 backdrop-blur-sm">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Duration</div>
                 <div className="mt-1 text-sm font-semibold text-white">{classSchedule.duration}</div>
               </div>
-              <div className="h-full rounded-2xl border border-[#243025] bg-[#0d120f]/88 p-3 backdrop-blur-sm">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#8f9989]">Track Length</div>
+              <div className="h-full rounded-2xl border border-black panel-gradient p-3 backdrop-blur-sm">
+                <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Track Length</div>
                 <div className="mt-1 text-sm font-semibold text-white">3 Months (OSINT)</div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#243025] bg-[#0d120f]/92 p-5 backdrop-blur-sm">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8f9989]">
+          <div className="rounded-2xl border border-black panel-gradient p-5 backdrop-blur-sm">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
               Live Class Format
             </div>
             <div className="mt-3 space-y-2">
@@ -255,9 +255,9 @@ export default function LiveClassesPage() {
               ].map((item) => (
                 <div
                   key={item}
-                  className="flex items-start gap-3 rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-3 text-sm text-[#c4cdba]"
+                  className="flex items-start gap-3 rounded-xl border border-black panel-gradient px-3 py-3 text-sm text-[#C8C8C8]"
                 >
-                  <span className="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-[#b9c7ab]" />
+                  <span className="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-[#C0C0C0]" />
                   <span>{item}</span>
                 </div>
               ))}
@@ -272,15 +272,15 @@ export default function LiveClassesPage() {
         </div>
       ) : null}
 
-      <section className="rounded-[26px] border border-[#202920] bg-[#090d09]/70 p-4 sm:p-5">
+      <section className="rounded-[26px] border border-black panel-gradient p-4 sm:p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h3 className="font-reference text-lg font-semibold text-white">OSINT Month-Wise Live Classes</h3>
-            <p className="mt-1 text-xs text-[#8f9989]">
+            <p className="mt-1 text-xs text-[#949494]">
               Month 1 (Beginner), Month 2 (Intermediate), Month 3 (Advanced)
             </p>
           </div>
-          <span className="text-xs text-[#8f9989]">
+          <span className="text-xs text-[#949494]">
             {loading ? "Loading..." : `${orderedTracks.length} live track${orderedTracks.length === 1 ? "" : "s"}`}
           </span>
         </div>
@@ -296,61 +296,61 @@ export default function LiveClassesPage() {
             return (
               <article
                 key={course.id}
-                className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-[#243025] bg-[#0d120f] p-4 shadow-[0_16px_36px_rgba(0,0,0,0.24)]"
+                className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-black panel-gradient p-4 shadow-[0_16px_36px_rgba(0,0,0,0.24)]"
               >
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(185,199,171,0.07),transparent_40%)]" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(192,192,192,0.07),transparent_40%)]" />
                 <div className="relative flex h-full flex-1 flex-col">
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <span className="rounded-full border border-[#d6decc]/20 bg-[#161d16] px-3 py-1 text-[11px] font-semibold tracking-wide text-[#d3dcc9]">
+                    <span className="rounded-full border border-[#DADADA]/20 bg-[#1A1A1A] px-3 py-1 text-[11px] font-semibold tracking-wide text-[#D7D7D7]">
                       {monthMeta.label}
                     </span>
-                    <span className="rounded-full border border-[#d7e4ce] bg-[#eef3e8] px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-[#1f2d21]">
+                    <span className="rounded-full border border-[#DEDEDE] bg-[#F0F0F0] px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-[#272727]">
                       Live
                     </span>
                   </div>
 
-                  <div className="mb-2 min-h-[1rem] text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8f9989]">
+                  <div className="mb-2 min-h-[1rem] text-[11px] font-semibold uppercase tracking-[0.14em] text-[#949494]">
                     {monthMeta.subtitle}
                   </div>
                   <h4 className="font-reference text-xl font-semibold leading-tight text-white lg:min-h-[5rem]">
                     {course.title}
                   </h4>
-                  <p className="mt-3 text-sm leading-6 text-[#b7c0b0] lg:min-h-[6rem]">
+                  <p className="mt-3 text-sm leading-6 text-[#BBBBBB] lg:min-h-[6rem]">
                     {course.description || "OSINT live class track with guided progression."}
                   </p>
 
                   <div className="mt-4 grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-3">
-                    <div className="h-full rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#7f8b7c]">Schedule</div>
-                      <div className="mt-1 text-xs font-semibold text-[#dce4d2]">Fri / Sat / Sun</div>
+                    <div className="h-full rounded-xl border border-black panel-gradient px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Schedule</div>
+                      <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">Fri / Sat / Sun</div>
                     </div>
-                    <div className="h-full rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#7f8b7c]">Duration</div>
-                      <div className="mt-1 text-xs font-semibold text-[#dce4d2]">
+                    <div className="h-full rounded-xl border border-black panel-gradient px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Duration</div>
+                      <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
                         {course.class_duration_minutes ? `${course.class_duration_minutes} min` : "1 hour"}
                       </div>
                     </div>
-                    <div className="h-full rounded-xl border border-[#1f2820] bg-[#101610] px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#7f8b7c]">Price</div>
-                      <div className="mt-1 text-xs font-semibold text-[#dce4d2]">
+                    <div className="h-full rounded-xl border border-black panel-gradient px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Price</div>
+                      <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
                         {formatLiveClassPrice(course.price)}
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                    <span className="rounded-full border border-[#2f3a30] bg-[#111612] px-3 py-1 text-xs font-semibold text-[#c6cfbd]">
+                    <span className="rounded-full border border-black bg-[#141414] px-3 py-1 text-xs font-semibold text-[#CACACA]">
                       {(course.enrollment_count ?? 0)} enrolled
                     </span>
                     {course.linked_course_id ? (
                       <Link
                         to={`/courses/${course.linked_course_id}`}
-                        className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#c9d5bd] to-[#8fa184] px-4 py-2 text-sm font-semibold text-[#101410] transition hover:from-[#d7e0cc] hover:to-[#9daf93]"
+                        className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#CFCFCF] to-[#989898] px-4 py-2 text-sm font-semibold text-[#121212] transition hover:from-[#DBDBDB] hover:to-[#A6A6A6]"
                       >
                         View Course
                       </Link>
                     ) : (
-                      <span className="inline-flex items-center justify-center rounded-full border border-[#2f3a30] bg-[#111612] px-4 py-2 text-sm font-semibold text-[#d7e0cc]">
+                      <span className="inline-flex items-center justify-center rounded-full border border-black bg-[#141414] px-4 py-2 text-sm font-semibold text-[#DBDBDB]">
                         Preview
                       </span>
                     )}
@@ -402,7 +402,7 @@ export default function LiveClassesPage() {
                       <p className="mt-2 text-xs text-red-300">{actionState[course.id].error}</p>
                     ) : null}
                     {actionState[course.id]?.success ? (
-                      <p className="mt-2 text-xs text-green-300">{actionState[course.id].success}</p>
+                      <p className="mt-2 text-xs text-zinc-300">{actionState[course.id].success}</p>
                     ) : null}
                   </div>
                 </div>

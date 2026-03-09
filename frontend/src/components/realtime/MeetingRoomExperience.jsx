@@ -410,11 +410,11 @@ function MeetingTile({ entry, isFeatured = false, isSpeaking = false, isPinned =
     <article
       className={`group relative overflow-hidden rounded-[24px] border ${
         isSpeaking
-          ? "border-[#b9c7ab]/70 shadow-[0_0_0_1px_rgba(185,199,171,0.28),0_24px_36px_rgba(0,0,0,0.28)]"
-          : "border-[#2b372d] shadow-[0_16px_32px_rgba(0,0,0,0.22)]"
-      } bg-[#0c110d]/95`}
+          ? "border-[#C0C0C0]/70 shadow-[0_0_0_1px_rgba(192,192,192,0.28),0_24px_36px_rgba(0,0,0,0.28)]"
+          : "border-black shadow-[0_16px_32px_rgba(0,0,0,0.22)]"
+      } bg-[#0F0F0F]/95`}
     >
-      <div className={`${tileHeightClass} relative w-full bg-[#0d120f]`}>
+      <div className={`${tileHeightClass} relative w-full bg-[#101010]`}>
         {mediaState.videoTrack ? (
           <video
             ref={videoRef}
@@ -424,21 +424,21 @@ function MeetingTile({ entry, isFeatured = false, isSpeaking = false, isPinned =
             className={`h-full w-full ${videoFitClass}`}
           />
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center bg-[radial-gradient(circle_at_top,rgba(185,199,171,0.14),transparent_38%),linear-gradient(180deg,#131914_0%,#0b0f0c_100%)] px-6 text-center">
+          <div className="flex h-full w-full flex-col items-center justify-center bg-[radial-gradient(circle_at_top,rgba(192,192,192,0.14),transparent_38%),linear-gradient(180deg,#171717_0%,#0D0D0D_100%)] px-6 text-center">
             {profileImageUrl && !avatarFailed ? (
               <img
                 src={profileImageUrl}
                 alt={displayName}
-                className="h-24 w-24 rounded-full border border-[#2b372d] object-cover shadow-[0_10px_22px_rgba(0,0,0,0.28)]"
+                className="h-24 w-24 rounded-full border border-black object-cover shadow-[0_10px_22px_rgba(0,0,0,0.28)]"
                 onError={() => setAvatarFailed(true)}
               />
             ) : (
-              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#202820] text-2xl font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#252525] text-2xl font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 {initials}
               </div>
             )}
             <div className="mt-4 text-sm font-medium text-white">{displayName}</div>
-            <div className="mt-1 text-xs text-[#b7c0b0]">
+            <div className="mt-1 text-xs text-[#BBBBBB]">
               {mediaState.hasAudio ? "Audio connected" : "Camera off"}
             </div>
           </div>
@@ -448,17 +448,17 @@ function MeetingTile({ entry, isFeatured = false, isSpeaking = false, isPinned =
 
         <div className="absolute left-3 top-3 flex flex-wrap items-center gap-2">
           {entry.isLocal ? (
-            <span className="rounded-full border border-[#2b372d] bg-[#121812]/88 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#dfe4d6]">
+            <span className="rounded-full border border-black bg-[#161616]/88 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#E1E1E1]">
               You
             </span>
           ) : null}
           {isSpeaking ? (
-            <span className="rounded-full border border-[#b9c7ab]/40 bg-[#b9c7ab]/16 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#eef4e7]">
+            <span className="rounded-full border border-[#C0C0C0]/40 bg-[#C0C0C0]/16 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#F1F1F1]">
               Speaking
             </span>
           ) : null}
           {mediaState.hasScreenShare ? (
-            <span className="rounded-full border border-[#2b372d] bg-[#121812]/88 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#dfe4d6]">
+            <span className="rounded-full border border-black bg-[#161616]/88 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#E1E1E1]">
               Presenting
             </span>
           ) : null}
@@ -467,25 +467,25 @@ function MeetingTile({ entry, isFeatured = false, isSpeaking = false, isPinned =
         <button
           type="button"
           onClick={onPin}
-          className="absolute right-3 top-3 rounded-full border border-[#2b372d] bg-[#121812]/88 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#dfe4d6] transition hover:bg-[#182018]"
+          className="absolute right-3 top-3 rounded-full border border-black bg-[#161616]/88 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#E1E1E1] transition hover:bg-[#1D1D1D]"
         >
           {isPinned ? "Unpin" : "Pin"}
         </button>
       </div>
 
       <div className="absolute inset-x-0 bottom-0 px-3 py-3">
-        <div className="flex items-end justify-between gap-3 rounded-2xl border border-[#2b372d] bg-[#121812]/82 px-3 py-2.5 backdrop-blur">
+        <div className="flex items-end justify-between gap-3 rounded-2xl border border-black bg-[#161616]/82 px-3 py-2.5 backdrop-blur">
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-white">{displayName}</div>
             <div className="mt-1 flex flex-wrap gap-1.5">
-              <span className="rounded-full border border-[#2b372d] bg-black/20 px-2 py-0.5 text-[10px] text-[#dfe4d6]">
+              <span className="rounded-full border border-black bg-black/20 px-2 py-0.5 text-[10px] text-[#E1E1E1]">
                 {mediaState.hasAudio ? "Mic live" : "Muted"}
               </span>
-              <span className="rounded-full border border-[#2b372d] bg-black/20 px-2 py-0.5 text-[10px] text-[#dfe4d6]">
+              <span className="rounded-full border border-black bg-black/20 px-2 py-0.5 text-[10px] text-[#E1E1E1]">
                 {mediaState.hasCamera ? "Camera on" : "Camera off"}
               </span>
               {isPinned ? (
-                <span className="rounded-full border border-[#2b372d] bg-black/20 px-2 py-0.5 text-[10px] text-[#dfe4d6]">
+                <span className="rounded-full border border-black bg-black/20 px-2 py-0.5 text-[10px] text-[#E1E1E1]">
                   Pinned
                 </span>
               ) : null}
@@ -493,7 +493,7 @@ function MeetingTile({ entry, isFeatured = false, isSpeaking = false, isPinned =
           </div>
           <div
             className={`h-2.5 w-2.5 flex-none rounded-full ${
-              mediaState.hasAudio ? "bg-[#34a853]" : "bg-[#5f6368]"
+              mediaState.hasAudio ? "bg-[#7C7C7C]" : "bg-[#626262]"
             }`}
           />
         </div>
@@ -1451,12 +1451,12 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
       return "border-amber-200/20 bg-amber-100/8 text-amber-100";
     }
     if (normalized.includes("connect")) {
-      return "border-[#b9c7ab]/30 bg-[#b9c7ab]/14 text-[#eef4e7]";
+      return "border-[#C0C0C0]/30 bg-[#C0C0C0]/14 text-[#F1F1F1]";
     }
     if (normalized.includes("fail") || normalized.includes("left") || normalized.includes("disconnect")) {
       return "border-red-300/25 bg-red-300/10 text-red-100";
     }
-    return "border-[#2b372d] bg-[#121812]/80 text-[#dfe4d6]";
+    return "border-black bg-[#161616]/80 text-[#E1E1E1]";
   })();
   const viewerRoleLabel = canManageParticipants
     ? "Moderator"
@@ -1469,7 +1469,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
 
   return (
     <section
-      className="relative mb-6 overflow-hidden rounded-[32px] border border-[#2b372d] bg-[#0b0f0b] shadow-[0_32px_80px_rgba(0,0,0,0.36)]"
+      className="relative mb-6 overflow-hidden rounded-[32px] border border-black panel-gradient shadow-[0_32px_80px_rgba(0,0,0,0.36)]"
     >
       <div className="absolute inset-0">
         <img
@@ -1479,70 +1479,70 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
           className="h-full w-full object-cover opacity-[0.12] blur-[1px] grayscale"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/66 via-black/78 to-black/88" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_14%,rgba(185,199,171,0.12),transparent_34%)]" />
-        <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(207,216,197,0.24)_1px,transparent_1px),linear-gradient(90deg,rgba(207,216,197,0.2)_1px,transparent_1px)] [background-size:28px_28px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_14%,rgba(192,192,192,0.12),transparent_34%)]" />
+        <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(211,211,211,0.24)_1px,transparent_1px),linear-gradient(90deg,rgba(211,211,211,0.2)_1px,transparent_1px)] [background-size:28px_28px]" />
       </div>
 
-      <div className="relative border-b border-[#263126] bg-[linear-gradient(180deg,rgba(10,14,11,0.84),rgba(13,18,14,0.78))] px-4 py-4 backdrop-blur-[2px] sm:px-5">
+      <div className="relative border-b border-black bg-[linear-gradient(180deg,rgba(12,12,12,0.84),rgba(16,16,16,0.78))] px-4 py-4 backdrop-blur-[2px] sm:px-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em]">
-              <span className="rounded-full border border-[#2b372d] bg-[#111611]/82 px-3 py-1 text-[#dfe4d6]">
+              <span className="rounded-full border border-black bg-[#141414]/82 px-3 py-1 text-[#E1E1E1]">
                 Meeting room
               </span>
               <span className={`rounded-full border px-3 py-1 ${connectionStatusToneClass}`}>
                 {connectionStatusLabel}
               </span>
-              <span className="rounded-full border border-[#2b372d] bg-[#111611]/82 px-3 py-1 text-[#dfe4d6]">
+              <span className="rounded-full border border-black bg-[#141414]/82 px-3 py-1 text-[#E1E1E1]">
                 {viewerRoleLabel}
               </span>
             </div>
             <h3 className="mt-3 font-reference text-2xl font-semibold tracking-tight text-white">
               {session.title || "Meeting Room"}
             </h3>
-            <p className="mt-1 text-sm text-[#b7c0b0]">
+            <p className="mt-1 text-sm text-[#BBBBBB]">
               Room {meeting.room_name || "-"} with live stage, audience controls, and in-session chat.
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-[#2b372d] bg-[#111611]/86 px-3 py-1.5 text-xs text-[#dfe4d6]">
+              <span className="rounded-full border border-black bg-[#141414]/86 px-3 py-1.5 text-xs text-[#E1E1E1]">
                 {participantCount} participant{participantCount === 1 ? "" : "s"}
               </span>
-              <span className="rounded-full border border-[#2b372d] bg-[#111611]/86 px-3 py-1.5 text-xs text-[#dfe4d6]">
+              <span className="rounded-full border border-black bg-[#141414]/86 px-3 py-1.5 text-xs text-[#E1E1E1]">
                 {liveDurationLabel || "--:--"}
               </span>
-              <span className="rounded-full border border-[#2b372d] bg-[#111611]/86 px-3 py-1.5 text-xs text-[#dfe4d6]">
+              <span className="rounded-full border border-black bg-[#141414]/86 px-3 py-1.5 text-xs text-[#E1E1E1]">
                 {sidePanelOpen ? `${panelTab === "people" ? "People" : "Chat"} panel open` : "Stage focus"}
               </span>
             </div>
           </div>
 
           <div className="grid gap-3 sm:min-w-[340px] sm:grid-cols-[minmax(0,1fr)_auto]">
-            <div className="rounded-[22px] border border-[#2b372d] bg-[#111611]/88 px-4 py-3 backdrop-blur-sm">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">
+            <div className="rounded-[22px] border border-black panel-gradient px-4 py-3 backdrop-blur-sm">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
                 Share link
               </div>
-              <code className="mt-2 block truncate rounded-xl bg-[#0d120f] px-3 py-2 text-xs text-[#dfe4d6]">
+              <code className="mt-2 block truncate rounded-xl bg-[#101010] px-3 py-2 text-xs text-[#E1E1E1]">
                 {shareableJoinLink || "Join link unavailable"}
               </code>
             </div>
             <div className="flex flex-col gap-2">
               <Button
                 variant="secondary"
-                className="rounded-full border-[#2f3a30] bg-[#111612]/92 px-4 py-2 text-[#d7e0cc] shadow-none hover:bg-[#171d17]"
+                className="rounded-full border-black bg-[#141414]/92 px-4 py-2 text-[#DBDBDB] shadow-none hover:bg-[#1B1B1B]"
                 onClick={handleCopyJoinLink}
               >
                 Copy link
               </Button>
               <Button
                 variant="secondary"
-                className="rounded-full border-[#2f3a30] bg-[#111612]/92 px-4 py-2 text-[#d7e0cc] shadow-none hover:bg-[#171d17]"
+                className="rounded-full border-black bg-[#141414]/92 px-4 py-2 text-[#DBDBDB] shadow-none hover:bg-[#1B1B1B]"
                 onClick={() => setSidePanelOpen((prev) => !prev)}
               >
                 {sidePanelOpen ? "Hide panel" : "Open panel"}
               </Button>
               <Button
                 variant="secondary"
-                className="rounded-full border-[#2f3a30] bg-[#111612]/92 px-4 py-2 text-[#d7e0cc] shadow-none hover:bg-[#171d17]"
+                className="rounded-full border-black bg-[#141414]/92 px-4 py-2 text-[#DBDBDB] shadow-none hover:bg-[#1B1B1B]"
                 onClick={toggleStageFullscreen}
               >
                 {isStageFullscreen ? "Exit fullscreen" : "Fullscreen"}
@@ -1552,34 +1552,34 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
         </div>
 
         {canManageParticipants ? (
-          <div className="mt-4 rounded-[26px] border border-[#2b372d] bg-[#111611]/88 p-4 backdrop-blur-sm">
+          <div className="mt-4 rounded-[26px] border border-black panel-gradient p-4 backdrop-blur-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="max-w-2xl">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8f9989]">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
                   Seminar control
                 </div>
                 <div className="mt-2 text-base font-semibold text-white">
                   Students stay in listener mode until you grant microphone access.
                 </div>
-                <p className="mt-1 text-sm text-[#b7c0b0]">
+                <p className="mt-1 text-sm text-[#BBBBBB]">
                   Camera, screen share, and presentation stay reserved for instructors and admins while students keep the cleaner stage view.
                 </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-[20px] border border-[#2b372d] bg-[#0d120f] px-4 py-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">
+                <div className="rounded-[20px] border border-black panel-gradient px-4 py-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
                     Stage reserved
                   </div>
                   <div className="mt-2 text-2xl font-semibold text-white">{defaultModeratorUserIds.length}</div>
                 </div>
-                <div className="rounded-[20px] border border-[#2b372d] bg-[#0d120f] px-4 py-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">
+                <div className="rounded-[20px] border border-black panel-gradient px-4 py-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
                     Mic grants
                   </div>
                   <div className="mt-2 text-2xl font-semibold text-white">{moderationSummary.micGrants}</div>
                 </div>
-                <div className="rounded-[20px] border border-[#2b372d] bg-[#0d120f] px-4 py-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">
+                <div className="rounded-[20px] border border-black panel-gradient px-4 py-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
                     Instructor stage
                   </div>
                   <div className="mt-2 text-2xl font-semibold text-white">{moderationSummary.stageModerators}</div>
@@ -1588,14 +1588,14 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-[#2b372d] bg-[#0d120f] px-3 py-1.5 text-xs text-[#dfe4d6]">
+              <span className="rounded-full border border-black bg-[#101010] px-3 py-1.5 text-xs text-[#E1E1E1]">
                 Recording: {recordingState.active?.status || "idle"}
                 {recordingState.active
                   ? ` (${recordingState.mode === "screenity-fallback" ? "browser fallback" : "livekit"})`
                   : ""}
               </span>
               <Button
-                className="rounded-full border border-[#d2dcc7] bg-gradient-to-r from-[#d6dfcb] to-[#a6b899] px-4 py-2 text-[#101410] shadow-none hover:from-[#e2e8db] hover:to-[#b8c7ad]"
+                className="rounded-full border border-[#D7D7D7] bg-gradient-to-r from-[#DADADA] to-[#AFAFAF] px-4 py-2 text-[#121212] shadow-none hover:from-[#E5E5E5] hover:to-[#C0C0C0]"
                 onClick={handleStartRecording}
                 loading={recordingState.loading}
                 disabled={Boolean(recordingState.active)}
@@ -1604,7 +1604,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
               </Button>
               <Button
                 variant="danger"
-                className="rounded-full border-[#f28b82] bg-[#ea4335] px-4 py-2 text-white shadow-none hover:bg-[#d93025]"
+                className="rounded-full border-[#A9A9A9] bg-[#737373] px-4 py-2 text-white shadow-none hover:bg-[#616161]"
                 onClick={handleStopRecording}
                 loading={recordingState.loading}
                 disabled={!recordingState.active}
@@ -1616,7 +1616,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                   href={latestRecordingPlaybackUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-full border border-[#2f3a30] bg-[#111612]/92 px-4 py-2 text-sm font-semibold text-[#d7e0cc] transition hover:bg-[#171d17]"
+                  className="rounded-full border border-black bg-[#141414]/92 px-4 py-2 text-sm font-semibold text-[#DBDBDB] transition hover:bg-[#1B1B1B]"
                 >
                   Open last recording
                 </a>
@@ -1631,8 +1631,8 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                 Delete last recording
               </Button>
             </div>
-            {recordingState.error ? <p className="mt-3 text-xs text-[#f28b82]">{recordingState.error}</p> : null}
-            {recordingState.info ? <p className="mt-3 text-xs text-[#a8dab5]">{recordingState.info}</p> : null}
+            {recordingState.error ? <p className="mt-3 text-xs text-[#A9A9A9]">{recordingState.error}</p> : null}
+            {recordingState.info ? <p className="mt-3 text-xs text-[#C7C7C7]">{recordingState.info}</p> : null}
           </div>
         ) : null}
       </div>
@@ -1644,12 +1644,12 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
             stagePriorityMode
               ? "min-h-[58vh] sm:min-h-[66vh] lg:min-h-[74vh]"
               : "min-h-[340px] sm:min-h-[460px] lg:min-h-[520px]"
-          } bg-[linear-gradient(180deg,rgba(8,12,9,0.26),rgba(8,12,9,0.12))] p-4 sm:p-5`}
+          } bg-[linear-gradient(180deg,rgba(10,10,10,0.26),rgba(10,10,10,0.12))] p-4 sm:p-5`}
         >
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">Stage</div>
-              <div className="mt-1 text-sm text-[#dfe4d6]">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#949494]">Stage</div>
+              <div className="mt-1 text-sm text-[#E1E1E1]">
                 {featuredParticipant
                   ? `${participantLabel(featuredParticipant)} is currently featured.`
                   : "Waiting for participants to join the stage."}
@@ -1657,19 +1657,19 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {pinnedIdentity ? (
-                <span className="rounded-full border border-[#2b372d] bg-[#111611]/86 px-3 py-1.5 text-xs text-[#dfe4d6]">
+                <span className="rounded-full border border-black bg-[#141414]/86 px-3 py-1.5 text-xs text-[#E1E1E1]">
                   Pinned view active
                 </span>
               ) : null}
               {audienceFocusMode ? (
-                <span className="rounded-full border border-[#2b372d] bg-[#111611]/86 px-3 py-1.5 text-xs text-[#dfe4d6]">
+                <span className="rounded-full border border-black bg-[#141414]/86 px-3 py-1.5 text-xs text-[#E1E1E1]">
                   Audience focus mode
                 </span>
               ) : null}
             </div>
           </div>
           {connecting ? (
-            <div className="flex h-[220px] items-center justify-center rounded-[28px] border border-[#2b372d] bg-[#111611]/88 text-[#dfe4d6] sm:h-[320px] lg:h-[460px]">
+            <div className="flex h-[220px] items-center justify-center rounded-[28px] border border-black panel-gradient text-[#E1E1E1] sm:h-[320px] lg:h-[460px]">
               Connecting to meeting...
             </div>
           ) : useFeaturedLayout ? (
@@ -1783,38 +1783,38 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
           )}
 
           {meetingError ? (
-            <div className="mt-4 rounded-2xl border border-[#ea4335]/35 bg-[#ea4335]/10 px-4 py-3 text-sm text-[#ffd9d6]">
+            <div className="mt-4 rounded-2xl border border-[#737373]/35 bg-[#737373]/10 px-4 py-3 text-sm text-[#E4E4E4]">
               {meetingError}
             </div>
           ) : null}
           {meetingInfo ? (
-            <div className="mt-4 rounded-2xl border border-[#2b372d] bg-[#111611]/88 px-4 py-3 text-sm text-[#dfe4d6]">
+            <div className="mt-4 rounded-2xl border border-black panel-gradient px-4 py-3 text-sm text-[#E1E1E1]">
               {meetingInfo}
             </div>
           ) : null}
           {permissionState.error ? (
-            <div className="mt-4 rounded-2xl border border-[#ea4335]/35 bg-[#ea4335]/10 px-4 py-3 text-sm text-[#ffd9d6]">
+            <div className="mt-4 rounded-2xl border border-[#737373]/35 bg-[#737373]/10 px-4 py-3 text-sm text-[#E4E4E4]">
               {permissionState.error}
             </div>
           ) : null}
           {permissionState.info ? (
-            <div className="mt-4 rounded-2xl border border-[#2b372d] bg-[#111611]/88 px-4 py-3 text-sm text-[#dfe4d6]">
+            <div className="mt-4 rounded-2xl border border-black panel-gradient px-4 py-3 text-sm text-[#E1E1E1]">
               {permissionState.info}
             </div>
           ) : null}
         </div>
 
         {sidePanelOpen ? (
-          <aside className="border-t border-[#263126] bg-[#0f1510]/84 backdrop-blur-sm xl:border-l xl:border-t-0">
-            <div className="border-b border-[#263126] px-4 py-3">
-              <div className="rounded-full bg-[#111611]/88 p-1">
+          <aside className="border-t border-black bg-[#131313]/84 backdrop-blur-sm xl:border-l xl:border-t-0">
+            <div className="border-b border-black px-4 py-3">
+              <div className="rounded-full panel-gradient p-1">
                 <div className="grid grid-cols-2 gap-1">
                   <button
                     type="button"
                     className={`rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition ${
                       panelTab === "people"
-                        ? "bg-gradient-to-r from-[#d6dfcb] to-[#a6b899] text-[#101410]"
-                        : "text-[#8f9989] hover:bg-[#171d17]"
+                        ? "bg-gradient-to-r from-[#DADADA] to-[#AFAFAF] text-[#121212]"
+                        : "text-[#949494] hover:bg-[#1B1B1B]"
                     }`}
                     onClick={() => setPanelTab("people")}
                   >
@@ -1824,8 +1824,8 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                     type="button"
                     className={`rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition ${
                       panelTab === "chat"
-                        ? "bg-gradient-to-r from-[#d6dfcb] to-[#a6b899] text-[#101410]"
-                        : "text-[#8f9989] hover:bg-[#171d17]"
+                        ? "bg-gradient-to-r from-[#DADADA] to-[#AFAFAF] text-[#121212]"
+                        : "text-[#949494] hover:bg-[#1B1B1B]"
                     }`}
                     onClick={() => setPanelTab("chat")}
                   >
@@ -1838,10 +1838,10 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
           {panelTab === "people" ? (
             <div className="max-h-[320px] overflow-y-auto p-4 sm:max-h-[420px] xl:h-[520px] xl:max-h-none">
               <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8f9989]">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
                   Participants
                 </div>
-                <span className="rounded-full border border-[#2b372d] bg-[#111611]/86 px-2.5 py-1 text-[11px] text-[#dfe4d6]">
+                <span className="rounded-full border border-black bg-[#141414]/86 px-2.5 py-1 text-[11px] text-[#E1E1E1]">
                   {participantCount}
                 </span>
               </div>
@@ -1862,17 +1862,17 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                   return (
                     <div
                       key={entry.id}
-                      className="rounded-[24px] border border-[#2b372d] bg-[#111611]/88 px-4 py-4 text-sm text-[#dfe4d6]"
+                      className="rounded-[24px] border border-black panel-gradient px-4 py-4 text-sm text-[#E1E1E1]"
                     >
                       <div className="flex items-start gap-3">
                         {participantAvatarUrl ? (
                           <img
                             src={participantAvatarUrl}
                             alt={participantLabel(entry)}
-                            className="h-11 w-11 flex-none rounded-full border border-[#2b372d] object-cover"
+                            className="h-11 w-11 flex-none rounded-full border border-black object-cover"
                           />
                         ) : (
-                          <div className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-[#202820] text-sm font-semibold text-white">
+                          <div className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-[#252525] text-sm font-semibold text-white">
                             {participantInitials(participantLabel(entry))}
                           </div>
                         )}
@@ -1880,7 +1880,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                           <div className="flex flex-wrap items-start justify-between gap-2">
                             <div className="min-w-0">
                               <div className="truncate font-semibold text-white">{participantLabel(entry)}</div>
-                              <div className="mt-1 text-xs text-[#b7c0b0]">
+                              <div className="mt-1 text-xs text-[#BBBBBB]">
                                 {media.hasCamera ? "Camera on" : "Camera off"} | {media.hasAudio ? "Mic on" : "Mic off"}
                                 {media.hasScreenShare ? " | Presenting" : ""}
                               </div>
@@ -1889,7 +1889,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                               {roleBadges.map((badge) => (
                                 <span
                                   key={`${entry.id}-${badge}`}
-                                  className="rounded-full border border-[#2b372d] bg-[#0d120f] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#dfe4d6]"
+                                  className="rounded-full border border-black bg-[#101010] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#E1E1E1]"
                                 >
                                   {badge}
                                 </span>
@@ -1898,16 +1898,16 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                           </div>
 
                           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                            <div className="rounded-2xl border border-[#2b372d] bg-[#0d120f] px-3 py-2.5">
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8f9989]">
+                            <div className="rounded-2xl border border-black panel-gradient px-3 py-2.5">
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#949494]">
                                 Microphone
                               </div>
                               <div className="mt-1 text-sm font-medium text-white">
                                 {speakerAccessEnabled ? "Allowed" : "Locked"}
                               </div>
                             </div>
-                            <div className="rounded-2xl border border-[#2b372d] bg-[#0d120f] px-3 py-2.5">
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8f9989]">
+                            <div className="rounded-2xl border border-black panel-gradient px-3 py-2.5">
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#949494]">
                                 Camera / screen
                               </div>
                               <div className="mt-1 text-sm font-medium text-white">
@@ -1921,8 +1921,8 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                             variant={speakerAccessEnabled ? "danger" : "secondary"}
                             className={`w-full rounded-full px-3 py-2 text-xs shadow-none sm:max-w-[180px] ${
                               speakerAccessEnabled
-                                ? "border-[#f28b82] bg-[#ea4335] text-white hover:bg-[#d93025]"
-                                : "border-[#2f3a30] bg-[#111612]/92 text-[#d7e0cc] hover:bg-[#171d17]"
+                                ? "border-[#A9A9A9] bg-[#737373] text-white hover:bg-[#616161]"
+                                : "border-black bg-[#141414]/92 text-[#DBDBDB] hover:bg-[#1B1B1B]"
                             }`}
                             loading={loadingSpeaker}
                             onClick={() => handleSpeakerPermission(participantUserId, !speakerAccessEnabled)}
@@ -1932,7 +1932,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                         </div>
                       ) : null}
                       {isModeratorByDefault(participantUserId) ? (
-                        <div className="mt-3 rounded-2xl border border-[#2b372d] bg-[#0d120f] px-3 py-2.5 text-xs text-[#b7c0b0]">
+                        <div className="mt-3 rounded-2xl border border-black panel-gradient px-3 py-2.5 text-xs text-[#BBBBBB]">
                           Core moderation access comes from the session host or assigned instructor role.
                         </div>
                       ) : null}
@@ -1947,7 +1947,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
             <div className="flex max-h-[360px] flex-col sm:max-h-[420px] xl:h-[520px] xl:max-h-none">
               <div className="flex-1 space-y-3 overflow-y-auto p-4">
                 {messages.length === 0 ? (
-                  <div className="rounded-[22px] border border-[#2b372d] bg-[#111611]/88 px-4 py-3 text-sm text-[#b7c0b0]">
+                  <div className="rounded-[22px] border border-black panel-gradient px-4 py-3 text-sm text-[#BBBBBB]">
                     No messages yet.
                   </div>
                 ) : (
@@ -1956,8 +1956,8 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                       key={message.id}
                       className={`rounded-[22px] border px-4 py-3 text-sm ${
                         message.isSelf
-                          ? "ml-6 border-[#d2dcc7]/20 bg-[#1b251c] text-[#eef4e7]"
-                          : "mr-6 border-[#2b372d] bg-[#111611]/88 text-[#dfe4d6]"
+                          ? "ml-6 border-[#D7D7D7]/20 bg-[#212121] text-[#F1F1F1]"
+                          : "mr-6 border-black panel-gradient text-[#E1E1E1]"
                       }`}
                     >
                       <div className="font-semibold text-white">{message.sender}</div>
@@ -1966,16 +1966,16 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                   ))
                 )}
               </div>
-              <form onSubmit={sendMessage} className="border-t border-[#263126] p-4">
+              <form onSubmit={sendMessage} className="border-t border-black p-4">
                 <input
-                  className="w-full rounded-full border border-[#2f3a30] bg-[#111612]/92 px-4 py-3 text-sm text-white outline-none placeholder:text-[#8f9989] focus:border-[#b9c7ab]"
+                  className="w-full rounded-full border border-black bg-[#141414]/92 px-4 py-3 text-sm text-white outline-none placeholder:text-[#949494] focus:border-[#C0C0C0]"
                   placeholder="Send a message"
                   value={chatInput}
                   onChange={(event) => setChatInput(event.target.value)}
                 />
                 <Button
                   type="submit"
-                  className="mt-3 w-full rounded-full border border-[#d2dcc7] bg-gradient-to-r from-[#d6dfcb] to-[#a6b899] py-3 text-[#101410] shadow-none hover:from-[#e2e8db] hover:to-[#b8c7ad]"
+                  className="mt-3 w-full rounded-full border border-[#D7D7D7] bg-gradient-to-r from-[#DADADA] to-[#AFAFAF] py-3 text-[#121212] shadow-none hover:from-[#E5E5E5] hover:to-[#C0C0C0]"
                 >
                   Send
                 </Button>
@@ -1986,7 +1986,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
         ) : null}
       </div>
 
-      <div className="relative border-t border-[#263126] bg-[#0f1510]/84 px-4 py-4 backdrop-blur-sm">
+      <div className="relative border-t border-black bg-[#131313]/84 px-4 py-4 backdrop-blur-sm">
         <div className="flex flex-wrap items-center justify-center gap-3">
           {canPresent || canSpeak ? (
           <>
@@ -1994,8 +1994,8 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
               variant={controls.mic ? "secondary" : "danger"}
               className={`min-w-[126px] rounded-full px-5 py-3 shadow-none ${
                 controls.mic
-                  ? "border-[#2f3a30] bg-[#111612]/92 text-[#d7e0cc] hover:bg-[#171d17]"
-                  : "border-[#f28b82] bg-[#ea4335] text-white hover:bg-[#d93025]"
+                  ? "border-black bg-[#141414]/92 text-[#DBDBDB] hover:bg-[#1B1B1B]"
+                  : "border-[#A9A9A9] bg-[#737373] text-white hover:bg-[#616161]"
               }`}
               onClick={toggleMicrophone}
               loading={controlBusy}
@@ -2008,8 +2008,8 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                   variant={controls.camera ? "secondary" : "danger"}
                   className={`min-w-[126px] rounded-full px-5 py-3 shadow-none ${
                     controls.camera
-                      ? "border-[#2f3a30] bg-[#111612]/92 text-[#d7e0cc] hover:bg-[#171d17]"
-                      : "border-[#f28b82] bg-[#ea4335] text-white hover:bg-[#d93025]"
+                      ? "border-black bg-[#141414]/92 text-[#DBDBDB] hover:bg-[#1B1B1B]"
+                      : "border-[#A9A9A9] bg-[#737373] text-white hover:bg-[#616161]"
                   }`}
                   onClick={toggleCamera}
                   loading={controlBusy}
@@ -2020,8 +2020,8 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                   variant={controls.screen ? "primary" : "secondary"}
                   className={`min-w-[148px] rounded-full px-5 py-3 shadow-none ${
                     controls.screen
-                      ? "border border-[#d2dcc7] bg-gradient-to-r from-[#d6dfcb] to-[#a6b899] text-[#101410] hover:from-[#e2e8db] hover:to-[#b8c7ad]"
-                      : "border-[#2f3a30] bg-[#111612]/92 text-[#d7e0cc] hover:bg-[#171d17]"
+                      ? "border border-[#D7D7D7] bg-gradient-to-r from-[#DADADA] to-[#AFAFAF] text-[#121212] hover:from-[#E5E5E5] hover:to-[#C0C0C0]"
+                      : "border-black bg-[#141414]/92 text-[#DBDBDB] hover:bg-[#1B1B1B]"
                   }`}
                   onClick={toggleScreenShare}
                   loading={controlBusy}
@@ -2030,27 +2030,27 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                 </Button>
               </>
             ) : (
-              <span className="rounded-full border border-[#2b372d] bg-[#111611]/86 px-4 py-3 text-sm text-[#dfe4d6]">
+              <span className="rounded-full border border-black bg-[#141414]/86 px-4 py-3 text-sm text-[#E1E1E1]">
                 Presenter-only: camera and screen share
               </span>
             )}
           </>
         ) : (
-          <span className="rounded-full border border-[#2b372d] bg-[#111611]/86 px-4 py-3 text-sm text-[#dfe4d6]">
+          <span className="rounded-full border border-black bg-[#141414]/86 px-4 py-3 text-sm text-[#E1E1E1]">
             Viewer mode: media publishing is disabled for this account.
           </span>
         )}
           <Button
             variant="danger"
-            className="min-w-[126px] rounded-full border-[#f28b82] bg-[#ea4335] px-5 py-3 text-white shadow-none hover:bg-[#d93025]"
+            className="min-w-[126px] rounded-full border-[#A9A9A9] bg-[#737373] px-5 py-3 text-white shadow-none hover:bg-[#616161]"
             onClick={handleLeaveMeeting}
           >
             Leave
           </Button>
         </div>
       </div>
-      <div className="relative border-t border-[#263126] bg-[#0d120f]/88 px-4 py-3 text-xs text-[#8f9989] backdrop-blur-sm">
-        For full desktop presentation, choose <span className="text-[#dfe4d6]">Entire Screen</span> in the browser share picker.
+      <div className="relative border-t border-black panel-gradient px-4 py-3 text-xs text-[#949494] backdrop-blur-sm">
+        For full desktop presentation, choose <span className="text-[#E1E1E1]">Entire Screen</span> in the browser share picker.
       </div>
     </section>
   );

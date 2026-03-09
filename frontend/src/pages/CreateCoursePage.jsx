@@ -68,14 +68,14 @@ export function CourseForm({ form, setForm, onSubmit, error, loading }) {
         />
       </div>
       <label className="block">
-        <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#aeb8a3]">
+        <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#B3B3B3]">
           Thumbnail Upload
         </span>
         <input
           key={form.thumbnail_file?.name || "thumbnail-file-empty"}
           type="file"
           accept="image/jpeg,image/png,image/webp"
-          className="w-full rounded-xl border border-[#2a332d] bg-[#0f1310] px-3.5 py-2.5 text-sm text-white file:mr-3 file:rounded-lg file:border-0 file:bg-[#b9c7ab] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[#0d120f] focus:border-[#b9c7ab] focus:outline-none focus:ring-2 focus:ring-[#b9c7ab]/20"
+          className="w-full rounded-xl border border-black bg-[#111111] px-3.5 py-2.5 text-sm text-white file:mr-3 file:rounded-lg file:border-0 file:bg-[#C0C0C0] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[#101010] focus:border-[#C0C0C0] focus:outline-none focus:ring-2 focus:ring-[#C0C0C0]/20"
           onChange={(e) =>
             setForm((p) => ({
               ...p,
@@ -83,14 +83,14 @@ export function CourseForm({ form, setForm, onSubmit, error, loading }) {
             }))
           }
         />
-        <span className="mt-1.5 block text-xs text-[#8e9987]">
+        <span className="mt-1.5 block text-xs text-[#949494]">
           Hostinger-friendly option. Uploaded files are stored on the app media volume and override the URL above.
         </span>
         {form.thumbnail_file ? (
-          <span className="mt-1.5 block text-xs text-[#d4dbc8]">Selected: {form.thumbnail_file.name}</span>
+          <span className="mt-1.5 block text-xs text-[#D7D7D7]">Selected: {form.thumbnail_file.name}</span>
         ) : null}
       </label>
-      <label className="flex items-center gap-2 rounded-xl border border-[#2a332d] bg-[#0a0d0a] px-3 py-2 text-sm text-[#d4dbc8]">
+      <label className="flex items-center gap-2 rounded-xl border border-black bg-[#0C0C0C] px-3 py-2 text-sm text-[#D7D7D7]">
         <input
           type="checkbox"
           checked={form.is_published}
@@ -152,7 +152,7 @@ export default function CreateCoursePage() {
         ]}
       />
 
-      <div className="mx-auto mt-5 max-w-4xl rounded-2xl border border-[#2a332d] bg-[#0f1310]/92 p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
+      <div className="mx-auto mt-5 max-w-4xl rounded-2xl border border-black panel-gradient p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
         <CourseForm
           form={form}
           setForm={setForm}

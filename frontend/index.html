@@ -9,7 +9,7 @@
     <link rel="shortcut icon" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/logo.jpeg" />
     <link rel="preload" as="image" href="/logo.jpeg" fetchpriority="high" />
-    <meta name="theme-color" content="#050808" />
+    <meta name="theme-color" content="#050505" />
     <style>
       body.preload-active {
         overflow: hidden;
@@ -73,7 +73,7 @@
         inset: 0;
         z-index: 0;
         overflow: hidden;
-        background: #030506;
+        background: #040404;
       }
 
       #boot-loader .loader-grid .loader-brand-bg {
@@ -98,7 +98,7 @@
       #boot-loader .loader-grid::before {
         background:
           linear-gradient(180deg, rgba(0, 0, 0, 0.46), rgba(0, 0, 0, 0.58) 56%, rgba(0, 0, 0, 0.72)),
-          radial-gradient(circle at 20% 10%, rgba(185, 199, 171, 0.18), transparent 40%);
+          radial-gradient(circle at 20% 10%, rgba(255, 255, 255, 0.12), transparent 40%);
         opacity: 1;
       }
 
@@ -106,9 +106,9 @@
         background:
           linear-gradient(
             180deg,
-            rgba(2, 4, 2, 0.08),
-            rgba(1, 2, 1, 0.2) 62%,
-            rgba(0, 1, 0, 0.34)
+            rgba(8, 8, 8, 0.08),
+            rgba(6, 6, 6, 0.2) 62%,
+            rgba(3, 3, 3, 0.34)
           );
         opacity: 1;
       }
@@ -143,10 +143,10 @@
         position: absolute;
         inset: 8%;
         border-radius: 9999px;
-        border: 1px solid rgba(196, 202, 210, 0.3);
+        border: 1px solid rgba(210, 210, 210, 0.3);
         box-shadow:
-          0 0 20px rgba(154, 163, 172, 0.16),
-          inset 0 0 14px rgba(196, 202, 210, 0.1);
+          0 0 20px rgba(160, 160, 160, 0.16),
+          inset 0 0 14px rgba(210, 210, 210, 0.1);
         animation: halo-pulse 3.6s ease-in-out infinite;
         z-index: 1;
       }
@@ -169,15 +169,15 @@
         border-radius: 9999px;
         animation: orbit-spin 5600ms linear infinite;
         box-shadow:
-          inset 0 0 0 2px rgba(201, 213, 189, 0.34),
-          0 0 16px rgba(153, 170, 142, 0.12);
+          inset 0 0 0 2px rgba(215, 215, 215, 0.28),
+          0 0 16px rgba(190, 190, 190, 0.1);
         background: conic-gradient(
           from 0deg,
-          rgba(201, 213, 189, 0.58) 0deg,
-          rgba(201, 213, 189, 0.34) 75deg,
-          rgba(201, 213, 189, 0.14) 190deg,
-          rgba(201, 213, 189, 0.08) 280deg,
-          rgba(201, 213, 189, 0.54) 360deg
+          rgba(225, 225, 225, 0.54) 0deg,
+          rgba(225, 225, 225, 0.3) 75deg,
+          rgba(225, 225, 225, 0.12) 190deg,
+          rgba(225, 225, 225, 0.06) 280deg,
+          rgba(225, 225, 225, 0.5) 360deg
         );
         -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
         mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
@@ -192,11 +192,11 @@
         width: 10px;
         height: 10px;
         border-radius: 9999px;
-        background: #b7beb5;
+        background: #d6d6d6;
         transform: translate(-50%, -50%);
         box-shadow:
-          0 0 10px rgba(183, 190, 181, 0.52),
-          0 0 18px rgba(183, 190, 181, 0.34);
+          0 0 10px rgba(214, 214, 214, 0.48),
+          0 0 18px rgba(214, 214, 214, 0.3);
       }
 
       #boot-loader .loader-orbit::after {
@@ -209,20 +209,20 @@
         gap: 8px;
         margin: 0;
         padding: 6px 12px;
-        border: 1px solid rgba(201, 213, 189, 0.24);
+        border: 1px solid rgba(222, 222, 222, 0.22);
         border-radius: 9999px;
-        background: rgba(9, 13, 9, 0.62);
+        background: rgba(12, 12, 12, 0.66);
         font-family: Consolas, "Courier New", monospace;
         font-size: 14px;
         font-weight: 600;
-        color: rgba(215, 224, 204, 0.94);
+        color: rgba(229, 229, 229, 0.94);
         letter-spacing: 0.1em;
         text-transform: none;
-        text-shadow: 0 0 12px rgba(185, 199, 171, 0.2);
+        text-shadow: 0 0 12px rgba(255, 255, 255, 0.14);
       }
 
       #boot-loader .loader-prompt {
-        color: rgba(201, 213, 189, 0.95);
+        color: rgba(232, 232, 232, 0.95);
       }
 
       #boot-loader .loader-typed {
@@ -231,7 +231,7 @@
         white-space: nowrap;
         clip-path: inset(0 100% 0 0);
         letter-spacing: 0.06em;
-        border-right: 2px solid rgba(185, 199, 171, 0.9);
+        border-right: 2px solid rgba(234, 234, 234, 0.9);
         animation:
           type-word 1.8s steps(24, end) 180ms forwards,
           caret-blink 720ms step-end infinite;
@@ -288,7 +288,7 @@
 
       @keyframes caret-blink {
         0%, 49% {
-          border-color: rgba(185, 199, 171, 0.9);
+          border-color: rgba(234, 234, 234, 0.9);
         }
 
         50%, 100% {
@@ -353,8 +353,8 @@
         var cell = 32;
         var rafId = 0;
         var active = true;
-        var glyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        var matrixGlyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+          var glyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+          var matrixGlyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         var matrixColumns = [];
         var matrixSpacing = 20;
         var matrixCharSize = 12;
@@ -424,18 +424,18 @@
               var x = column.x + Math.sin(t * 0.92 + tailStep * 0.46) * column.jitter;
 
               if (tailStep === 0) {
-                ctx.fillStyle = "rgba(214, 243, 228," + Math.min(0.82, 0.58 + flicker * 0.22) + ")";
-              } else {
-                ctx.fillStyle = "rgba(122, 199, 170," + Math.min(0.7, alpha) + ")";
+                  ctx.fillStyle = "rgba(255, 255, 255," + Math.min(0.82, 0.58 + flicker * 0.22) + ")";
+                } else {
+                  ctx.fillStyle = "rgba(210, 210, 210," + Math.min(0.7, alpha) + ")";
+                }
+                ctx.fillText(glyph, x, y);
               }
-              ctx.fillText(glyph, x, y);
             }
           }
-        }
 
         function drawGrid(t) {
           ctx.clearRect(0, 0, width, height);
-          ctx.fillStyle = "rgba(3, 5, 6, 0.24)";
+          ctx.fillStyle = "rgba(4, 4, 4, 0.24)";
           ctx.fillRect(0, 0, width, height);
 
           var glowA = ctx.createRadialGradient(
@@ -446,8 +446,8 @@
             height * 0.12,
             width * 0.6
           );
-          glowA.addColorStop(0, "rgba(132, 170, 149, 0.18)");
-          glowA.addColorStop(1, "rgba(132, 170, 149, 0)");
+          glowA.addColorStop(0, "rgba(255, 255, 255, 0.12)");
+          glowA.addColorStop(1, "rgba(255, 255, 255, 0)");
           ctx.fillStyle = glowA;
           ctx.fillRect(0, 0, width, height);
 
@@ -459,8 +459,8 @@
             height * 0.86,
             width * 0.54
           );
-          glowB.addColorStop(0, "rgba(98, 132, 117, 0.18)");
-          glowB.addColorStop(1, "rgba(98, 132, 117, 0)");
+          glowB.addColorStop(0, "rgba(220, 220, 220, 0.1)");
+          glowB.addColorStop(1, "rgba(220, 220, 220, 0)");
           ctx.fillStyle = glowB;
           ctx.fillRect(0, 0, width, height);
 
@@ -482,7 +482,7 @@
             }
             var rowIndex = Math.round((y + cell) / cell);
             ctx.strokeStyle =
-              rowIndex % 4 === 0 ? "rgba(182, 215, 194, 0.24)" : "rgba(123, 155, 136, 0.16)";
+              rowIndex % 4 === 0 ? "rgba(255, 255, 255, 0.24)" : "rgba(230, 230, 230, 0.16)";
             ctx.lineWidth = 1;
             ctx.stroke();
           }
@@ -501,7 +501,7 @@
             }
             var colIndex = Math.round((gx + cell) / cell);
             ctx.strokeStyle =
-              colIndex % 5 === 0 ? "rgba(175, 209, 188, 0.22)" : "rgba(113, 148, 128, 0.15)";
+              colIndex % 5 === 0 ? "rgba(245, 245, 245, 0.22)" : "rgba(215, 215, 215, 0.15)";
             ctx.lineWidth = 1;
             ctx.stroke();
           }
@@ -517,10 +517,10 @@
               var idx = Math.abs(Math.floor(glyphX * 7 + glyphY * 11 + t * 28)) % glyphs.length;
               var glyph = glyphs[idx];
               ctx.fillStyle =
-                signal > 0.88 ? "rgba(190, 235, 214, 0.48)" : "rgba(132, 193, 170, 0.38)";
+                signal > 0.88 ? "rgba(255, 255, 255, 0.52)" : "rgba(228, 228, 228, 0.38)";
               ctx.fillText(glyph, glyphPos[0], glyphPos[1]);
               if (signal > 0.7) {
-                ctx.fillStyle = "rgba(106, 168, 146, 0.26)";
+                ctx.fillStyle = "rgba(206, 206, 206, 0.26)";
                 ctx.fillText(
                   glyphs[(idx + 17) % glyphs.length],
                   glyphPos[0] + cell * 0.32,
