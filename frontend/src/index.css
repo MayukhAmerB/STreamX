@@ -6,6 +6,21 @@
 
 :root {
   color-scheme: light;
+  --site-zoom: 0.9;
+}
+
+html {
+  zoom: var(--site-zoom);
+}
+
+@supports not (zoom: 1) {
+  body {
+    transform: scale(var(--site-zoom));
+    transform-origin: top left;
+    width: calc(100% / var(--site-zoom));
+    min-height: calc(100vh / var(--site-zoom));
+    overflow-x: hidden;
+  }
 }
 
 @font-face {
