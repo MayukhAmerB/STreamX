@@ -21,6 +21,7 @@ from config.cookies import REFRESH_COOKIE, clear_auth_cookies, set_auth_cookies
 from config.response import api_response
 from config.throttling import LoginRateThrottle
 
+from .async_jobs import async_jobs_enabled, enqueue_email_job
 from .serializers import (
     GoogleLoginSerializer,
     LoginSerializer,
@@ -348,11 +349,32 @@ class PasswordResetRequestView(APIView):
                 from_email=from_email,
                 to=[user.email],
             )
-            try:
-                email_message.send(fail_silently=False)
-                log_security_event("auth.password_reset_request_sent", request=request, target_user_id=user.id)
-            except Exception:
-                log_security_event("auth.password_reset_request_email_failed", request=request, target_user_id=user.id)
+            if async_jobs_enabled():
+                try:
+                    enqueue_email_job(
+                        subject=email_message.subject,
+                        body=email_message.body,
+                        from_email=email_message.from_email,
+                        to=email_message.to,
+                        max_attempts=int(getattr(settings, "ASYNC_EMAIL_MAX_ATTEMPTS", 5)),
+                    )
+                    log_security_event(
+                        "auth.password_reset_request_queued",
+                        request=request,
+                        target_user_id=user.id,
+                    )
+                except Exception:
+                    try:
+                        email_message.send(fail_silently=False)
+                        log_security_event("auth.password_reset_request_sent", request=request, target_user_id=user.id)
+                    except Exception:
+                        log_security_event("auth.password_reset_request_email_failed", request=request, target_user_id=user.id)
+            else:
+                try:
+                    email_message.send(fail_silently=False)
+                    log_security_event("auth.password_reset_request_sent", request=request, target_user_id=user.id)
+                except Exception:
+                    log_security_event("auth.password_reset_request_email_failed", request=request, target_user_id=user.id)
         else:
             log_security_event("auth.password_reset_request_unknown_email", request=request, email=email)
         return api_response(
@@ -452,16 +474,38 @@ class ContactMessageView(APIView):
             reply_to=[data["email"]],
         )
 
-        try:
-            email.send(fail_silently=False)
-        except Exception:
-            log_security_event("contact.submit_email_failed", request=request, sender_email=data["email"])
-            return api_response(
-                success=False,
-                message="Unable to send contact message right now.",
-                errors={"detail": "Email delivery failed."},
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        if async_jobs_enabled():
+            try:
+                enqueue_email_job(
+                    subject=email.subject,
+                    body=email.body,
+                    from_email=email.from_email,
+                    to=email.to,
+                    reply_to=email.reply_to,
+                    max_attempts=int(getattr(settings, "ASYNC_EMAIL_MAX_ATTEMPTS", 5)),
+                )
+            except Exception:
+                try:
+                    email.send(fail_silently=False)
+                except Exception:
+                    log_security_event("contact.submit_email_failed", request=request, sender_email=data["email"])
+                    return api_response(
+                        success=False,
+                        message="Unable to send contact message right now.",
+                        errors={"detail": "Email delivery failed."},
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
+        else:
+            try:
+                email.send(fail_silently=False)
+            except Exception:
+                log_security_event("contact.submit_email_failed", request=request, sender_email=data["email"])
+                return api_response(
+                    success=False,
+                    message="Unable to send contact message right now.",
+                    errors={"detail": "Email delivery failed."},
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
         log_security_event("contact.submit_success", request=request, sender_email=data["email"])
         return api_response(

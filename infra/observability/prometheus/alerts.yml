@@ -1,0 +1,39 @@
+groups:
+  - name: streamx-observability
+    interval: 30s
+    rules:
+      - alert: StreamXBackendDown
+        expr: up{job="streamx_backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "StreamX backend is down"
+          description: "Prometheus cannot scrape backend /metrics for 2 minutes."
+
+      - alert: StreamXApiLatencyHigh
+        expr: histogram_quantile(0.95, sum(rate(streamx_http_request_latency_seconds_bucket[5m])) by (le)) > 1.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "StreamX API p95 latency is high"
+          description: "p95 API latency exceeded 1.5s for 10 minutes."
+
+      - alert: StreamXJoinFailuresSpiking
+        expr: sum(increase(streamx_realtime_join_total{result="failure"}[10m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Realtime join failures are spiking"
+          description: "More than 10 join failures observed over 10 minutes."
+
+      - alert: StreamXRecordingFailuresSpiking
+        expr: sum(increase(streamx_realtime_recording_operations_total{result="failure"}[10m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Recording failures are spiking"
+          description: "More than 5 recording start/stop failures observed over 10 minutes."

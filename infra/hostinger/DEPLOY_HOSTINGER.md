@@ -130,10 +130,23 @@ Backups:
 ls -la .hostinger-backups
 ```
 
+Backup options (optional env vars):
+
+- `HOSTINGER_BACKUP_RETENTION_DAYS` (default `14`)
+- `HOSTINGER_BACKUP_RETENTION_COUNT` (default `14`)
+- `HOSTINGER_BACKUP_INCLUDE_REDIS` (default `1`)
+- `HOSTINGER_BACKUP_OFFSITE_COMMAND` (shell command; receives `HOSTINGER_BACKUP_DIR`)
+
 Restore the latest backup if needed:
 
 ```bash
 HOSTINGER_RESTORE_CONFIRM=1 ./infra/hostinger/restore-data.sh latest
+```
+
+Dry-run restore integrity verification (recommended before destructive restore):
+
+```bash
+HOSTINGER_RESTORE_DRY_RUN=1 ./infra/hostinger/restore-data.sh latest
 ```
 
 Systemd timer for automatic daily backups:
@@ -144,6 +157,43 @@ cp infra/hostinger/systemd/hostinger-backup.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now hostinger-backup.timer
 systemctl list-timers hostinger-backup.timer
+```
+
+Uptime probe timer (optional):
+
+```bash
+cp infra/hostinger/systemd/hostinger-uptime-alert.service /etc/systemd/system/
+cp infra/hostinger/systemd/hostinger-uptime-alert.timer /etc/systemd/system/
+chmod +x infra/hostinger/uptime-alert.sh
+systemctl daemon-reload
+systemctl enable --now hostinger-uptime-alert.timer
+systemctl list-timers hostinger-uptime-alert.timer
+```
+
+Observability stack (optional Prometheus + Grafana):
+
+```bash
+docker compose -f infra/observability/docker-compose.observability.yml up -d
+```
+
+Async worker for queued emails/webhook retries (optional):
+
+```bash
+docker compose \
+  --env-file backend/.env.hostinger.production \
+  -f docker-compose.hostinger.yml \
+  -f infra/hostinger/docker-compose.hostinger.async-workers.yml \
+  up -d --build
+```
+
+Resource-limit override for realtime hardening (optional):
+
+```bash
+docker compose \
+  --env-file backend/.env.hostinger.production \
+  -f docker-compose.hostinger.yml \
+  -f infra/hostinger/docker-compose.hostinger.resource-limits.yml \
+  up -d --build --remove-orphans
 ```
 
 Important:

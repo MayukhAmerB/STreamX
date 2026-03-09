@@ -1,0 +1,30 @@
+services:
+  backend:
+    cpus: "${BACKEND_CPUS:-2.0}"
+    mem_limit: "${BACKEND_MEM_LIMIT:-2g}"
+    mem_reservation: "${BACKEND_MEM_RESERVATION:-1g}"
+    pids_limit: 512
+
+  transcoder:
+    cpus: "${TRANSCODER_CPUS:-3.0}"
+    mem_limit: "${TRANSCODER_MEM_LIMIT:-4g}"
+    mem_reservation: "${TRANSCODER_MEM_RESERVATION:-2g}"
+    pids_limit: 768
+
+  livekit:
+    cpus: "${LIVEKIT_CPUS:-3.0}"
+    mem_limit: "${LIVEKIT_MEM_LIMIT:-4g}"
+    mem_reservation: "${LIVEKIT_MEM_RESERVATION:-2g}"
+    pids_limit: 1024
+
+  livekit-egress:
+    cpus: "${LIVEKIT_EGRESS_CPUS:-3.0}"
+    mem_limit: "${LIVEKIT_EGRESS_MEM_LIMIT:-4g}"
+    mem_reservation: "${LIVEKIT_EGRESS_MEM_RESERVATION:-2g}"
+    pids_limit: 1024
+
+  owncast:
+    cpus: "${OWNCAST_CPUS:-1.5}"
+    mem_limit: "${OWNCAST_MEM_LIMIT:-1g}"
+    mem_reservation: "${OWNCAST_MEM_RESERVATION:-512m}"
+    pids_limit: 512

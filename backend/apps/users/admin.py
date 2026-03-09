@@ -8,7 +8,7 @@ from rest_framework.authtoken.models import Token
 
 from apps.courses.models import Enrollment, LiveClassEnrollment
 
-from .models import AuthConfiguration, User
+from .models import AsyncJob, AuthConfiguration, User
 
 admin.site.enable_nav_sidebar = False
 
@@ -143,4 +143,39 @@ class AuthConfigurationAdmin(admin.ModelAdmin):
         return super().has_add_permission(request)
 
     def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(AsyncJob)
+class AsyncJobAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "job_type",
+        "status",
+        "attempts",
+        "max_attempts",
+        "run_after",
+        "created_at",
+        "updated_at",
+    )
+    list_filter = ("job_type", "status")
+    search_fields = ("id", "job_type", "status", "last_error")
+    ordering = ("status", "run_after", "-created_at")
+    readonly_fields = (
+        "job_type",
+        "status",
+        "attempts",
+        "max_attempts",
+        "run_after",
+        "locked_at",
+        "completed_at",
+        "payload",
+        "result_payload",
+        "last_error",
+        "created_at",
+        "updated_at",
+    )
+    fields = readonly_fields
+
+    def has_add_permission(self, request):
         return False

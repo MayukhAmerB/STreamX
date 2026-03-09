@@ -1,0 +1,10 @@
+[Unit]
+Description=Run StreamX uptime probe every 2 minutes
+
+[Timer]
+OnCalendar=*:0/2
+Persistent=true
+Unit=hostinger-uptime-alert.service
+
+[Install]
+WantedBy=timers.target

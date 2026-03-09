@@ -9,6 +9,8 @@ import uuid
 from django.conf import settings
 from django.db import connections
 
+from config.metrics import observe_http_request
+
 
 _request_id_ctx = contextvars.ContextVar("request_id", default="-")
 _request_start_ns_ctx = contextvars.ContextVar("request_start_ns", default=0)
@@ -168,6 +170,8 @@ class PerformanceBudgetMiddleware:
 
             if response is not None and self.response_time_header:
                 response["X-Response-Time-Ms"] = str(elapsed_ms)
+
+            observe_http_request(request, status_code=status_code, elapsed_ms=elapsed_ms)
 
 
 class RequestContextMiddleware:

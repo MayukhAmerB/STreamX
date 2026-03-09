@@ -29,21 +29,24 @@ Status: completed in this pass
 
 ## Phase 2
 
-Status: recommended next
+Status: in progress
 
 - Run `python manage.py transcode_lecture_streams --all-uploaded` on a schedule so uploaded lectures become HLS assets automatically.
-- Add retention and cleanup jobs for stale recordings and superseded transcoded artifacts.
+- Added backup retention/checksum verification and restore dry-run integrity checks.
+- Added restore runbook (`infra/hostinger/RESTORE_RUNBOOK.md`) for DR drills.
 - Add admin visibility for lecture source type, transcode status, and storage footprint.
 - Move large upload and transcode operations to dedicated workers if authoring volume grows.
 
 ## Phase 3
 
-Status: required before high concurrency claims become realistic
+Status: in progress
 
+- Added phased load-test scripts for 50/100/200 concurrent joins (`infra/loadtest/`).
+- Added compose resource-limits override for service isolation.
 - Split LiveKit, Owncast, and Django onto separate VPS instances or separate Hostinger compute tiers.
 - Move PostgreSQL and Redis off the app node if write volume or connection count increases.
 - Put course media and HLS assets behind object storage plus CDN inside the chosen hosting stack if VOD demand grows beyond a single disk/node.
-- Introduce background job orchestration for transcoding, recording post-processing, and notification workflows.
+- Added DB-backed async queue + worker command for email and webhook retry jobs.
 
 ## Scalability notes
 

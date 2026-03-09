@@ -7,6 +7,8 @@ from django.db import connections
 from django.http import JsonResponse
 from django.utils import timezone
 
+from config.metrics import build_metrics_response, get_metrics_authorization
+
 
 def _check_database():
     connection = connections["default"]
@@ -82,3 +84,16 @@ def readiness_view(request):
         "time": timezone.now().isoformat(),
     }
     return JsonResponse(payload, status=status_code)
+
+
+def metrics_view(request):
+    allowed, detail = get_metrics_authorization(request)
+    if not allowed:
+        return JsonResponse(
+            {
+                "status": "forbidden",
+                "detail": detail,
+            },
+            status=403,
+        )
+    return build_metrics_response()

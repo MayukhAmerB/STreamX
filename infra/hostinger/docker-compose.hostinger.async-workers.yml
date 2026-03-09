@@ -1,0 +1,40 @@
+services:
+  worker:
+    build:
+      context: ./backend
+    restart: always
+    env_file:
+      - ./backend/.env.hostinger.production
+    environment:
+      RUN_MIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "0"
+    command:
+      [
+        "python",
+        "manage.py",
+        "process_async_jobs",
+        "--batch-size",
+        "25",
+        "--poll-seconds",
+        "10",
+      ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - backend_media:/app/media
+      - recordings_data:/recordings:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "from pathlib import Path; import sys; cmd = Path('/proc/1/cmdline').read_text().replace('\\x00', ' '); sys.exit(0 if 'process_async_jobs' in cmd else 1)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - appnet

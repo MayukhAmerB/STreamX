@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 
 from config.audit import log_security_event
 from config.authentication import CookieJWTAuthentication
+from config.metrics import record_realtime_join, record_realtime_recording_operation
 from config.request_security import find_disallowed_query_params
 from config.response import api_response
 
@@ -124,6 +125,14 @@ def _get_active_session_recording(session):
         .order_by("-created_at")
         .first()
     )
+
+
+def _record_join_metric(*, result, mode, reason):
+    record_realtime_join(result=result, mode=mode, reason=reason)
+
+
+def _record_recording_metric(*, action, result, reason):
+    record_realtime_recording_operation(action=action, result=result, reason=reason)
 
 
 class RealtimeSessionListCreateView(APIView):
@@ -245,6 +254,7 @@ class RealtimeSessionJoinView(APIView):
     def post(self, request, pk):
         session = get_object_or_404(RealtimeSession.objects.with_related(), pk=pk)
         if session.status == RealtimeSession.STATUS_ENDED:
+            _record_join_metric(result="failure", mode="meeting", reason="session_ended")
             return api_response(
                 success=False,
                 message="Session has ended.",
@@ -254,6 +264,7 @@ class RealtimeSessionJoinView(APIView):
 
         serializer = RealtimeSessionJoinSerializer(data=request.data)
         if not serializer.is_valid():
+            _record_join_metric(result="failure", mode="meeting", reason="invalid_payload")
             return api_response(
                 success=False,
                 message="Unable to join session.",
@@ -263,6 +274,7 @@ class RealtimeSessionJoinView(APIView):
 
         access_decision = get_access_decision(session, request.user)
         if not access_decision.allowed:
+            _record_join_metric(result="failure", mode="meeting", reason="access_denied")
             return api_response(
                 success=False,
                 message=access_decision.message,
@@ -316,6 +328,11 @@ class RealtimeSessionJoinView(APIView):
 
         if participant_state.should_use_broadcast:
             urls = resolve_broadcast_urls(session, request=request)
+            _record_join_metric(
+                result="success",
+                mode="broadcast",
+                reason="overflow" if participant_state.overflow_triggered else "broadcast_session",
+            )
             data = {
                 "mode": "broadcast",
                 "overflow_triggered": participant_state.overflow_triggered,
@@ -332,6 +349,7 @@ class RealtimeSessionJoinView(APIView):
             return api_response(success=True, message="Broadcast join payload created.", data=data)
 
         if not is_livekit_configured():
+            _record_join_metric(result="failure", mode="meeting", reason="livekit_unconfigured")
             return api_response(
                 success=False,
                 message="Meeting service unavailable.",
@@ -361,6 +379,7 @@ class RealtimeSessionJoinView(APIView):
                 participant_metadata=participant_metadata,
             )
         except LiveKitConfigError as exc:
+            _record_join_metric(result="failure", mode="meeting", reason="token_build_failed")
             return api_response(
                 success=False,
                 message="Meeting service unavailable.",
@@ -402,6 +421,7 @@ class RealtimeSessionJoinView(APIView):
             },
         }
         cache_room_participant_count(room_name, participant_state.participant_count + 1)
+        _record_join_metric(result="success", mode="meeting", reason="ok")
         return api_response(success=True, message="Meeting join payload created.", data=data)
 
 
@@ -767,6 +787,7 @@ class RealtimeSessionRecordingStartView(APIView):
     def post(self, request, pk):
         session = get_object_or_404(RealtimeSession, pk=pk)
         if not _can_manage_session(request.user, session):
+            _record_recording_metric(action="start", result="failure", reason="access_denied")
             return api_response(
                 success=False,
                 message="Access denied.",
@@ -774,6 +795,7 @@ class RealtimeSessionRecordingStartView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
         if not bool(getattr(settings, "LIVEKIT_RECORDING_ENABLED", True)):
+            _record_recording_metric(action="start", result="failure", reason="recording_disabled")
             return api_response(
                 success=False,
                 message="Recording is disabled.",
@@ -781,6 +803,7 @@ class RealtimeSessionRecordingStartView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
         if not is_livekit_configured():
+            _record_recording_metric(action="start", result="failure", reason="livekit_unconfigured")
             return api_response(
                 success=False,
                 message="Recording service unavailable.",
@@ -795,6 +818,7 @@ class RealtimeSessionRecordingStartView(APIView):
 
         active_recording = _get_active_session_recording(session)
         if active_recording:
+            _record_recording_metric(action="start", result="noop", reason="already_active")
             data = RealtimeSessionRecordingSerializer(active_recording, context={"request": request}).data
             return api_response(
                 success=True,
@@ -827,6 +851,7 @@ class RealtimeSessionRecordingStartView(APIView):
             )
         except (LiveKitConfigError, LiveKitEgressError) as exc:
             recording.mark_failed(str(exc), payload={"start_error": str(exc)})
+            _record_recording_metric(action="start", result="failure", reason="livekit_error")
             return api_response(
                 success=False,
                 message="Unable to start recording.",
@@ -835,6 +860,7 @@ class RealtimeSessionRecordingStartView(APIView):
             )
 
         data = RealtimeSessionRecordingSerializer(recording, context={"request": request}).data
+        _record_recording_metric(action="start", result="success", reason="ok")
         return api_response(success=True, message="Recording started.", data=data)
 
 
@@ -844,6 +870,7 @@ class RealtimeSessionRecordingStopView(APIView):
     def post(self, request, pk):
         session = get_object_or_404(RealtimeSession, pk=pk)
         if not _can_manage_session(request.user, session):
+            _record_recording_metric(action="stop", result="failure", reason="access_denied")
             return api_response(
                 success=False,
                 message="Access denied.",
@@ -853,6 +880,7 @@ class RealtimeSessionRecordingStopView(APIView):
 
         recording = _get_active_session_recording(session)
         if not recording:
+            _record_recording_metric(action="stop", result="failure", reason="no_active_recording")
             return api_response(
                 success=False,
                 message="No active recording.",
@@ -861,6 +889,7 @@ class RealtimeSessionRecordingStopView(APIView):
             )
         if not recording.livekit_egress_id:
             recording.mark_failed("Missing LiveKit recording egress id.")
+            _record_recording_metric(action="stop", result="failure", reason="missing_egress_id")
             return api_response(
                 success=False,
                 message="Unable to stop recording.",
@@ -882,6 +911,7 @@ class RealtimeSessionRecordingStopView(APIView):
             )
         except (LiveKitConfigError, LiveKitEgressError) as exc:
             recording.mark_failed(str(exc), payload={"stop_error": str(exc)})
+            _record_recording_metric(action="stop", result="failure", reason="livekit_error")
             return api_response(
                 success=False,
                 message="Unable to stop recording cleanly.",
@@ -890,6 +920,7 @@ class RealtimeSessionRecordingStopView(APIView):
             )
 
         data = RealtimeSessionRecordingSerializer(recording, context={"request": request}).data
+        _record_recording_metric(action="stop", result="success", reason="ok")
         return api_response(success=True, message="Recording stopped.", data=data)
 
 

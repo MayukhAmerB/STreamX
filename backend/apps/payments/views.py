@@ -1,6 +1,7 @@
 import json
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import transaction
 from rest_framework import permissions, status
 from rest_framework.throttling import ScopedRateThrottle
@@ -18,6 +19,166 @@ from .services import (
     verify_razorpay_signature,
     verify_razorpay_webhook_signature,
 )
+
+
+def process_payment_webhook_payload(*, payload, signature="", request=None, source="api"):
+    event = str(payload.get("event") or "").strip().lower()
+    payload_data = payload.get("payload") or {}
+    payment_entity = ((payload_data.get("payment") or {}).get("entity") or {})
+    order_entity = ((payload_data.get("order") or {}).get("entity") or {})
+    order_id = str(payment_entity.get("order_id") or order_entity.get("id") or "").strip()
+    payment_id = str(payment_entity.get("id") or "").strip()
+    payment_status = str(payment_entity.get("status") or "").strip().lower()
+    amount_paise = payment_entity.get("amount")
+
+    if not order_id:
+        log_security_event(
+            "payment.webhook_ignored_missing_order",
+            request=request,
+            webhook_event=event or None,
+            source=source,
+        )
+        return {
+            "success": True,
+            "status_code": status.HTTP_200_OK,
+            "message": "Webhook ignored.",
+            "data": {"processed": False, "reason": "missing_order_id"},
+        }
+
+    payment = (
+        Payment.objects.select_related("course", "user")
+        .filter(razorpay_order_id=order_id)
+        .order_by("-created_at")
+        .first()
+    )
+    if not payment:
+        log_security_event(
+            "payment.webhook_payment_not_found",
+            request=request,
+            webhook_event=event or None,
+            razorpay_order_id=order_id,
+            source=source,
+        )
+        return {
+            "success": True,
+            "status_code": status.HTTP_200_OK,
+            "message": "Webhook ignored.",
+            "data": {"processed": False, "reason": "payment_not_found"},
+        }
+
+    if amount_paise is not None:
+        try:
+            expected_amount_paise = int(Decimal(payment.amount) * 100)
+            if int(amount_paise) != expected_amount_paise:
+                log_security_event(
+                    "payment.webhook_amount_mismatch",
+                    request=request,
+                    payment_id=payment.id,
+                    razorpay_order_id=order_id,
+                    source=source,
+                )
+                return {
+                    "success": False,
+                    "status_code": status.HTTP_400_BAD_REQUEST,
+                    "message": "Webhook verification failed.",
+                    "errors": {"detail": "Payment amount mismatch."},
+                }
+        except (TypeError, ValueError, ArithmeticError):
+            log_security_event(
+                "payment.webhook_invalid_amount",
+                request=request,
+                payment_id=payment.id,
+                razorpay_order_id=order_id,
+                source=source,
+            )
+            return {
+                "success": False,
+                "status_code": status.HTTP_400_BAD_REQUEST,
+                "message": "Webhook verification failed.",
+                "errors": {"detail": "Invalid payment amount in webhook payload."},
+            }
+
+    processed = False
+    with transaction.atomic():
+        if event == "payment.captured" or payment_status == "captured":
+            update_fields = []
+            if payment.status != Payment.STATUS_PAID:
+                payment.status = Payment.STATUS_PAID
+                update_fields.append("status")
+            if payment_id and payment.razorpay_payment_id != payment_id:
+                payment.razorpay_payment_id = payment_id
+                update_fields.append("razorpay_payment_id")
+            if signature and payment.razorpay_signature != signature:
+                payment.razorpay_signature = signature
+                update_fields.append("razorpay_signature")
+            if update_fields:
+                payment.save(update_fields=[*update_fields, "updated_at"])
+
+            enrollment, created = Enrollment.objects.get_or_create(
+                user=payment.user,
+                course=payment.course,
+                defaults={"payment_status": Enrollment.STATUS_PAID},
+            )
+            if not created and enrollment.payment_status != Enrollment.STATUS_PAID:
+                enrollment.payment_status = Enrollment.STATUS_PAID
+                enrollment.save(update_fields=["payment_status"])
+            processed = True
+            log_security_event(
+                "payment.webhook_payment_captured",
+                request=request,
+                payment_id=payment.id,
+                course_id=payment.course_id,
+                webhook_event=event or None,
+                source=source,
+            )
+        elif event == "payment.failed" or payment_status == "failed":
+            if payment.status != Payment.STATUS_PAID:
+                update_fields = []
+                if payment.status != Payment.STATUS_FAILED:
+                    payment.status = Payment.STATUS_FAILED
+                    update_fields.append("status")
+                if payment_id and payment.razorpay_payment_id != payment_id:
+                    payment.razorpay_payment_id = payment_id
+                    update_fields.append("razorpay_payment_id")
+                if signature and payment.razorpay_signature != signature:
+                    payment.razorpay_signature = signature
+                    update_fields.append("razorpay_signature")
+                if update_fields:
+                    payment.save(update_fields=[*update_fields, "updated_at"])
+                processed = True
+                log_security_event(
+                    "payment.webhook_payment_failed",
+                    request=request,
+                    payment_id=payment.id,
+                    course_id=payment.course_id,
+                    webhook_event=event or None,
+                    source=source,
+                )
+            else:
+                log_security_event(
+                    "payment.webhook_ignored_failed_after_paid",
+                    request=request,
+                    payment_id=payment.id,
+                    course_id=payment.course_id,
+                    webhook_event=event or None,
+                    source=source,
+                )
+        else:
+            log_security_event(
+                "payment.webhook_ignored_event",
+                request=request,
+                payment_id=payment.id,
+                course_id=payment.course_id,
+                webhook_event=event or None,
+                source=source,
+            )
+
+    return {
+        "success": True,
+        "status_code": status.HTTP_200_OK,
+        "message": "Webhook processed." if processed else "Webhook ignored.",
+        "data": {"processed": processed, "payment_id": payment.id, "status": payment.status},
+    }
 
 
 class CreateOrderView(APIView):
@@ -238,150 +399,57 @@ class PaymentWebhookView(APIView):
             )
 
         event = str(payload.get("event") or "").strip().lower()
-        payload_data = payload.get("payload") or {}
-        payment_entity = ((payload_data.get("payment") or {}).get("entity") or {})
-        order_entity = ((payload_data.get("order") or {}).get("entity") or {})
-        order_id = str(payment_entity.get("order_id") or order_entity.get("id") or "").strip()
-        payment_id = str(payment_entity.get("id") or "").strip()
-        payment_status = str(payment_entity.get("status") or "").strip().lower()
-        amount_paise = payment_entity.get("amount")
-
-        if not order_id:
+        try:
+            result = process_payment_webhook_payload(
+                payload=payload,
+                signature=signature,
+                request=request,
+                source="api",
+            )
+        except Exception as exc:  # noqa: BLE001
             log_security_event(
-                "payment.webhook_ignored_missing_order",
+                "payment.webhook_processing_failed",
                 request=request,
                 webhook_event=event or None,
+                error=str(exc)[:1000],
             )
-            return api_response(
-                success=True,
-                message="Webhook ignored.",
-                data={"processed": False, "reason": "missing_order_id"},
-            )
+            if bool(getattr(settings, "ASYNC_JOBS_ENABLED", False)):
+                try:
+                    from apps.users.async_jobs import enqueue_payment_webhook_retry_job
 
-        payment = (
-            Payment.objects.select_related("course", "user")
-            .filter(razorpay_order_id=order_id)
-            .order_by("-created_at")
-            .first()
-        )
-        if not payment:
-            log_security_event(
-                "payment.webhook_payment_not_found",
-                request=request,
-                webhook_event=event or None,
-                razorpay_order_id=order_id,
-            )
-            return api_response(
-                success=True,
-                message="Webhook ignored.",
-                data={"processed": False, "reason": "payment_not_found"},
-            )
-
-        if amount_paise is not None:
-            try:
-                expected_amount_paise = int(Decimal(payment.amount) * 100)
-                if int(amount_paise) != expected_amount_paise:
-                    log_security_event(
-                        "payment.webhook_amount_mismatch",
-                        request=request,
-                        payment_id=payment.id,
-                        razorpay_order_id=order_id,
+                    retry_job = enqueue_payment_webhook_retry_job(
+                        payload=payload,
+                        signature=signature,
+                        max_attempts=int(getattr(settings, "ASYNC_WEBHOOK_RETRY_MAX_ATTEMPTS", 6)),
                     )
+                except Exception:
+                    retry_job = None
+
+                if retry_job is not None:
                     return api_response(
-                        success=False,
-                        message="Webhook verification failed.",
-                        errors={"detail": "Payment amount mismatch."},
-                        status_code=status.HTTP_400_BAD_REQUEST,
+                        success=True,
+                        message="Webhook queued for retry.",
+                        data={
+                            "processed": False,
+                            "queued": True,
+                            "job_id": retry_job.id,
+                        },
+                        status_code=status.HTTP_202_ACCEPTED,
                     )
-            except (TypeError, ValueError, ArithmeticError):
-                log_security_event(
-                    "payment.webhook_invalid_amount",
-                    request=request,
-                    payment_id=payment.id,
-                    razorpay_order_id=order_id,
-                )
-                return api_response(
-                    success=False,
-                    message="Webhook verification failed.",
-                    errors={"detail": "Invalid payment amount in webhook payload."},
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                )
 
-        processed = False
-        with transaction.atomic():
-            if event == "payment.captured" or payment_status == "captured":
-                update_fields = []
-                if payment.status != Payment.STATUS_PAID:
-                    payment.status = Payment.STATUS_PAID
-                    update_fields.append("status")
-                if payment_id and payment.razorpay_payment_id != payment_id:
-                    payment.razorpay_payment_id = payment_id
-                    update_fields.append("razorpay_payment_id")
-                if signature and payment.razorpay_signature != signature:
-                    payment.razorpay_signature = signature
-                    update_fields.append("razorpay_signature")
-                if update_fields:
-                    payment.save(update_fields=[*update_fields, "updated_at"])
-
-                enrollment, created = Enrollment.objects.get_or_create(
-                    user=payment.user,
-                    course=payment.course,
-                    defaults={"payment_status": Enrollment.STATUS_PAID},
-                )
-                if not created and enrollment.payment_status != Enrollment.STATUS_PAID:
-                    enrollment.payment_status = Enrollment.STATUS_PAID
-                    enrollment.save(update_fields=["payment_status"])
-                processed = True
-                log_security_event(
-                    "payment.webhook_payment_captured",
-                    request=request,
-                    payment_id=payment.id,
-                    course_id=payment.course_id,
-                    webhook_event=event or None,
-                )
-            elif event == "payment.failed" or payment_status == "failed":
-                if payment.status != Payment.STATUS_PAID:
-                    update_fields = []
-                    if payment.status != Payment.STATUS_FAILED:
-                        payment.status = Payment.STATUS_FAILED
-                        update_fields.append("status")
-                    if payment_id and payment.razorpay_payment_id != payment_id:
-                        payment.razorpay_payment_id = payment_id
-                        update_fields.append("razorpay_payment_id")
-                    if signature and payment.razorpay_signature != signature:
-                        payment.razorpay_signature = signature
-                        update_fields.append("razorpay_signature")
-                    if update_fields:
-                        payment.save(update_fields=[*update_fields, "updated_at"])
-                    processed = True
-                    log_security_event(
-                        "payment.webhook_payment_failed",
-                        request=request,
-                        payment_id=payment.id,
-                        course_id=payment.course_id,
-                        webhook_event=event or None,
-                    )
-                else:
-                    log_security_event(
-                        "payment.webhook_ignored_failed_after_paid",
-                        request=request,
-                        payment_id=payment.id,
-                        course_id=payment.course_id,
-                        webhook_event=event or None,
-                    )
-            else:
-                log_security_event(
-                    "payment.webhook_ignored_event",
-                    request=request,
-                    payment_id=payment.id,
-                    course_id=payment.course_id,
-                    webhook_event=event or None,
-                )
+            return api_response(
+                success=False,
+                message="Webhook processing failed.",
+                errors={"detail": "Transient webhook processing failure."},
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         return api_response(
-            success=True,
-            message="Webhook processed." if processed else "Webhook ignored.",
-            data={"processed": processed, "payment_id": payment.id, "status": payment.status},
+            success=bool(result.get("success", True)),
+            message=str(result.get("message") or "Webhook processed."),
+            data=result.get("data"),
+            errors=result.get("errors"),
+            status_code=int(result.get("status_code", status.HTTP_200_OK)),
         )
 
 

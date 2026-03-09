@@ -1,0 +1,9 @@
+[Unit]
+Description=StreamX uptime alert probe
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/alsyed/StreamX
+ExecStart=/opt/alsyed/StreamX/infra/hostinger/uptime-alert.sh

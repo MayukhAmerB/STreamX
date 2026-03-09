@@ -1,4 +1,5 @@
 from datetime import timedelta
+import logging
 from pathlib import Path
 
 import dj_database_url
@@ -385,6 +386,42 @@ for _raw_budget_row in env_list(
         PERF_PATH_BUDGETS[path_prefix] = max(50, int(budget_value))
     except (TypeError, ValueError):
         continue
+
+METRICS_ENABLED = env_bool("METRICS_ENABLED", True)
+METRICS_AUTH_TOKEN = env("METRICS_AUTH_TOKEN", "").strip()
+ASYNC_JOBS_ENABLED = env_bool("ASYNC_JOBS_ENABLED", False)
+ASYNC_JOBS_POLL_SECONDS = env_int("ASYNC_JOBS_POLL_SECONDS", 10)
+ASYNC_JOBS_LOCK_TIMEOUT_SECONDS = env_int("ASYNC_JOBS_LOCK_TIMEOUT_SECONDS", 300)
+ASYNC_EMAIL_MAX_ATTEMPTS = env_int("ASYNC_EMAIL_MAX_ATTEMPTS", 5)
+ASYNC_WEBHOOK_RETRY_MAX_ATTEMPTS = env_int("ASYNC_WEBHOOK_RETRY_MAX_ATTEMPTS", 6)
+
+SENTRY_DSN = env("SENTRY_DSN", "").strip()
+SENTRY_ENVIRONMENT = env("SENTRY_ENVIRONMENT", APP_ENV).strip() or APP_ENV
+try:
+    SENTRY_TRACES_SAMPLE_RATE = float(env("SENTRY_TRACES_SAMPLE_RATE", "0.0"))
+except (TypeError, ValueError):
+    SENTRY_TRACES_SAMPLE_RATE = 0.0
+SENTRY_TRACES_SAMPLE_RATE = max(0.0, min(1.0, SENTRY_TRACES_SAMPLE_RATE))
+SENTRY_SEND_PII = env_bool("SENTRY_SEND_PII", False)
+
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.django import DjangoIntegration
+        from sentry_sdk.integrations.logging import LoggingIntegration
+    except ImportError:
+        sentry_sdk = None
+    if sentry_sdk is not None:
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            environment=SENTRY_ENVIRONMENT,
+            integrations=[
+                DjangoIntegration(),
+                LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
+            ],
+            traces_sample_rate=SENTRY_TRACES_SAMPLE_RATE,
+            send_default_pii=SENTRY_SEND_PII,
+        )
 
 OWNCAST_BASE_URL = env("OWNCAST_BASE_URL", "")
 OWNCAST_STREAM_PUBLIC_BASE_URL = env("OWNCAST_STREAM_PUBLIC_BASE_URL", "")
