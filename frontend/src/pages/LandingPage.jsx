@@ -527,24 +527,24 @@ export default function LandingPage() {
               })}
             </div>
 
-            <div className="mt-6 rounded-2xl border border-[#c4d2b8]/45 bg-[linear-gradient(90deg,#13170f_0%,#5f6d52_52%,#b8c8aa_100%)] p-5 text-white shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
+            <div className="mt-6 rounded-2xl border border-[#c7c7c7]/40 bg-[linear-gradient(90deg,#121212_0%,#5f5f5f_52%,#d8d8d8_100%)] p-5 text-white shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h3 className="font-reference text-2xl font-semibold">
                     Ready to start your cybersecurity journey?
                   </h3>
-                  <p className="mt-2 text-sm text-[#e7eddd]">
+                  <p className="mt-2 text-sm text-[#f1f1f1]">
                     Join our flagship course and learn OSINT plus web application pentesting with a structured workflow.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Link to="/courses">
-                    <button className="rounded-full border border-[#2f3a30]/45 px-4 py-2 text-sm font-semibold text-[#1a2318] hover:bg-black/5">
+                    <button className="rounded-full border border-white/65 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">
                       Explore
                     </button>
                   </Link>
                   <Link to={`/courses/${featuredLiveCourse.id}`}>
-                    <button className="rounded-full bg-[#f6f8f1] px-4 py-2 text-sm font-semibold text-[#1c2418] hover:bg-white">
+                    <button className="rounded-full bg-[#f2f4f8] px-4 py-2 text-sm font-semibold text-[#202835] hover:bg-white">
                       Join Now
                     </button>
                   </Link>
