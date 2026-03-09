@@ -74,7 +74,7 @@ export default function CourseListPage() {
             className="h-full w-full object-cover opacity-[0.15]"
           />
           <div className="absolute inset-0 bg-gradient-to-br from-black/86 via-black/78 to-[#0d130f]/94" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_18%,rgba(185,199,171,0.14),transparent_38%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_18%,rgba(187,192,202,0.14),transparent_38%)]" />
         </div>
 
         <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:28px_28px]" />
@@ -99,8 +99,8 @@ export default function CourseListPage() {
                   <div className="mt-1 text-xl font-semibold text-white">{summary.live}</div>
                   <div className="mt-1 text-xs text-[#b7c0b0]">Ready for enrollment</div>
                 </div>
-                <div className="h-full rounded-2xl border border-amber-200/10 bg-amber-100/5 p-3 backdrop-blur-sm">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-amber-200/80">
+                <div className="h-full rounded-2xl border border-[#c8cdd5]/35 bg-[#d6dae0]/16 p-3 backdrop-blur-sm">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-[#c9ced7]">
                     Coming Soon
                   </div>
                   <div className="mt-1 text-xl font-semibold text-white">{summary.comingSoon}</div>
@@ -188,7 +188,7 @@ export default function CourseListPage() {
       ) : null}
 
       <div className="relative rounded-[26px] border border-[#202920] bg-[#090d09]/70 p-4 sm:p-5">
-        <div className="absolute inset-0 rounded-[26px] bg-[radial-gradient(circle_at_0%_0%,rgba(185,199,171,0.07),transparent_35%)]" />
+        <div className="absolute inset-0 rounded-[26px] bg-[radial-gradient(circle_at_0%_0%,rgba(187,192,202,0.07),transparent_35%)]" />
         <div className="relative grid auto-rows-fr gap-5 lg:grid-cols-2 xl:grid-cols-3">
           {courses.map((course) => (
             <CourseCard key={course.id} course={course} />

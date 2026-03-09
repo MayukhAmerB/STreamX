@@ -144,7 +144,7 @@ export default function CoursePaymentPage() {
             className="h-full w-full object-cover opacity-[0.14]"
           />
           <div className="absolute inset-0 bg-gradient-to-br from-black/90 via-black/80 to-[#0d130f]/95" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(185,199,171,0.1),transparent_36%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(187,192,202,0.1),transparent_36%)]" />
         </div>
 
         <div className="relative grid gap-6 p-5 sm:p-6 lg:grid-cols-[1.1fr_0.9fr]">
@@ -159,8 +159,8 @@ export default function CoursePaymentPage() {
               <span
                 className={`rounded-full px-3 py-1 text-[10px] font-semibold tracking-[0.14em] ${
                   launchStatus.isLive
-                    ? "border border-[#d7e4ce] bg-[#eef3e8] text-[#1f2d21]"
-                    : "border border-amber-200/90 bg-amber-50 text-amber-900"
+                    ? "border border-[#f4e6b9]/80 bg-[linear-gradient(135deg,#fffef8_0%,#fff5d8_55%,#ebd594_100%)] text-[#2a2412]"
+                    : "border border-[#c8cdd5] bg-[#d6dae0] text-[#111319]"
                 }`}
               >
                 {launchStatus.label}
@@ -220,7 +220,7 @@ export default function CoursePaymentPage() {
             <div className="mt-4 space-y-2">
               {launchStatus.isComingSoon ? (
                 <Button
-                  className="w-full border border-amber-300/20 bg-amber-100/5 text-amber-200 hover:bg-amber-100/5"
+                  className="w-full border border-[#c8cdd5] bg-[#d6dae0] text-[#111319] hover:bg-[#d6dae0]"
                   disabled
                 >
                   Coming Soon

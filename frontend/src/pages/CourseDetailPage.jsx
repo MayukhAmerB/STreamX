@@ -267,7 +267,7 @@ export default function CourseDetailPage() {
             className="h-full w-full object-cover opacity-[0.2]"
           />
           <div className="absolute inset-0 bg-gradient-to-br from-black/90 via-black/76 to-[#0d130f]/95" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(185,199,171,0.12),transparent_40%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(187,192,202,0.12),transparent_40%)]" />
           <div className="absolute inset-0 opacity-15 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:26px_26px]" />
         </div>
 
@@ -283,8 +283,8 @@ export default function CourseDetailPage() {
               <span
                 className={`rounded-full px-3 py-1 text-[10px] font-semibold tracking-[0.14em] ${
                   launchStatus.isLive
-                    ? "border border-[#d7e4ce] bg-[#eef3e8] text-[#1f2d21]"
-                    : "border border-amber-200/90 bg-amber-50 text-amber-900"
+                    ? "border border-[#f4e6b9]/80 bg-[linear-gradient(135deg,#fffef8_0%,#fff5d8_55%,#ebd594_100%)] text-[#2a2412]"
+                    : "border border-[#c8cdd5] bg-[#d6dae0] text-[#111319]"
                 }`}
               >
                 {launchStatus.label}
@@ -355,7 +355,7 @@ export default function CourseDetailPage() {
                         e.currentTarget.style.display = "none";
                       }}
                     />
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_10%,rgba(185,199,171,0.12),transparent_42%)]" />
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_10%,rgba(187,192,202,0.12),transparent_42%)]" />
                     <div className="absolute inset-0 opacity-15 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:22px_22px]" />
                   </div>
                 )}
@@ -508,8 +508,8 @@ export default function CourseDetailPage() {
               <span
                 className={`rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.14em] ${
                   launchStatus.isLive
-                    ? "border border-[#d7e4ce] bg-[#eef3e8] text-[#1f2d21]"
-                    : "border border-amber-200/90 bg-amber-50 text-amber-900"
+                    ? "border border-[#f4e6b9]/80 bg-[linear-gradient(135deg,#fffef8_0%,#fff5d8_55%,#ebd594_100%)] text-[#2a2412]"
+                    : "border border-[#c8cdd5] bg-[#d6dae0] text-[#111319]"
                 }`}
               >
                 {launchStatus.label}
@@ -537,7 +537,7 @@ export default function CourseDetailPage() {
             <div className="mt-4 space-y-2">
               {launchStatus.isComingSoon ? (
                 <Button
-                  className="w-full border border-amber-300/20 bg-amber-100/5 text-amber-200 hover:bg-amber-100/5"
+                  className="w-full border border-[#c8cdd5] bg-[#d6dae0] text-[#111319] hover:bg-[#d6dae0]"
                   disabled
                 >
                   Coming Soon

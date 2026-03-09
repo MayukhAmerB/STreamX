@@ -31,11 +31,11 @@ function CourseCard({ course }) {
 
   return (
     <article className="hover-lift group relative flex h-full min-h-[560px] self-stretch flex-col overflow-hidden rounded-[22px] border border-[#253027] bg-[#0b100d] text-white shadow-[0_20px_48px_rgba(0,0,0,0.28)] transition duration-300 hover:border-[#39453a] sm:min-h-[620px]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(185,199,171,0.12),transparent_42%)]" />
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d8e0cf]/30 to-transparent" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(187,192,202,0.12),transparent_42%)]" />
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d8dde5]/30 to-transparent" />
 
       <div className="relative h-[200px] bg-[#090b09] sm:h-[230px] lg:h-[260px] xl:h-[280px]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_15%,rgba(185,199,171,0.12),transparent_42%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_15%,rgba(187,192,202,0.12),transparent_42%)]" />
         {thumbnailSrc ? (
           <img
             src={thumbnailSrc}
@@ -71,8 +71,8 @@ function CourseCard({ course }) {
           <div
             className={`shrink-0 rounded-full px-3 py-1 text-[10px] font-semibold tracking-[0.12em] shadow-sm ${
               status.isLive
-                ? "border border-[#cde0c0] bg-[#eaf1e2] text-[#213023]"
-                : "border border-amber-200/80 bg-amber-50 text-amber-900"
+                ? "border border-[#f4e6b9]/80 bg-[linear-gradient(135deg,#fffef8_0%,#fff5d8_55%,#ebd594_100%)] text-[#2a2412]"
+                : "border border-[#c8cdd5] bg-[#d6dae0] text-[#111319]"
             }`}
           >
             {status.label}
@@ -106,7 +106,7 @@ function CourseCard({ course }) {
             <div className="text-[10px] uppercase tracking-[0.14em] text-[#7f8b7c]">Access</div>
             <div
               className={`mt-1 text-sm font-semibold ${
-                status.isComingSoon ? "text-amber-200" : "text-[#dde4d3]"
+                status.isComingSoon ? "text-[#cfd4dc]" : "text-[#dde4d3]"
               }`}
             >
               {status.isComingSoon ? "Coming Soon" : formatINR(course.price)}
@@ -134,12 +134,12 @@ function CourseCard({ course }) {
             {status.isLive ? (
               <Link
                 to={`/courses/${course.id}`}
-                className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#c9d5bd] to-[#8fa184] px-3 py-2.5 text-sm font-semibold text-[#101410] transition hover:from-[#d7e0cc] hover:to-[#9daf93]"
+                className="glossy inline-flex items-center justify-center rounded-full border border-[#f4e8c2]/80 bg-[linear-gradient(135deg,#fffef8_0%,#fff4d1_55%,#e9cf87_100%)] px-3 py-2.5 text-sm font-semibold text-[#17140a] shadow-[0_10px_22px_rgba(0,0,0,0.22)] transition hover:bg-[linear-gradient(135deg,#ffffff_0%,#fff8df_55%,#eddba0_100%)]"
               >
                 Live
               </Link>
             ) : (
-              <span className="inline-flex items-center justify-center rounded-full border border-amber-200/20 bg-amber-100/5 px-3 py-2.5 text-sm font-semibold text-amber-200">
+              <span className="inline-flex items-center justify-center rounded-full border border-[#c8cdd5] bg-[#d6dae0] px-3 py-2.5 text-sm font-semibold text-[#111319]">
                 Coming Soon
               </span>
             )}

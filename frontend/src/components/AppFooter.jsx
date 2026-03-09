@@ -74,7 +74,7 @@ export default function AppFooter() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-[#c9d5bd]/22 bg-gradient-to-br from-[#101610] via-[#151d15] to-[#1d271e] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.24)]">
+          <section className="rounded-2xl border border-[#c5ccbf]/22 bg-gradient-to-br from-[#111412] via-[#171b18] to-[#1d231f] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.24)]">
             <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#d7e0cc]">Support</h3>
             <p className="mt-3 text-sm leading-6 text-[#d3dcc9]">
               Need help with enrollment, live classes, or account setup?

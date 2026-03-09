@@ -195,10 +195,12 @@ function SectionCard({ children, className = "" }) {
   );
 }
 
-function SectionTitle({ title, subtitle }) {
+function SectionTitle({ title, subtitle, titleClassName = "" }) {
   return (
     <div className="text-center">
-      <h2 className="font-reference text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+      <h2
+        className={`font-reference text-3xl font-semibold tracking-tight text-white sm:text-4xl ${titleClassName}`}
+      >
         {title}
       </h2>
       {subtitle ? (
@@ -410,6 +412,7 @@ export default function LandingPage() {
           <SectionCard>
             <SectionTitle
               title="Why learners choose Al syed Initiative"
+              titleClassName="uppercase tracking-[0.04em] sm:tracking-[0.05em]"
               subtitle="Cybersecurity training depth with a modern online learning experience focused on professional execution."
             />
             <div className="mt-6 grid auto-rows-fr gap-4 lg:grid-cols-3">
@@ -474,10 +477,10 @@ export default function LandingPage() {
                   } flex h-full flex-col rounded-2xl border border-[#243025] bg-[#0d120f] p-4 shadow-[0_10px_24px_rgba(0,0,0,0.25)]`}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="rounded-full border border-[#d8e1cf] bg-[#f3f5ee] px-2.5 py-1 text-[11px] font-semibold text-[#62755a]">
+                    <span className="rounded-full border border-[#d2d7df] bg-[#f3f5f8] px-2.5 py-1 text-[11px] font-semibold text-[#5c6470]">
                       Course {idx + 1}
                     </span>
-                    <span className="rounded-full border border-[#d8e1cf] bg-[#f3f5ee] px-2.5 py-1 text-[11px] font-semibold text-[#62755a]">
+                    <span className="rounded-full border border-[#d2d7df] bg-[#f3f5f8] px-2.5 py-1 text-[11px] font-semibold text-[#5c6470]">
                       {program.section_count ?? program.lessons ?? 0} sections
                     </span>
                   </div>
@@ -509,12 +512,12 @@ export default function LandingPage() {
                     </Link>
                     {status.isLive ? (
                       <Link to={detailsLink} className="flex-1">
-                        <button className="w-full rounded-full bg-gradient-to-r from-[#c9d5bd] to-[#8fa184] px-3 py-2 text-sm font-semibold text-[#101410] transition hover:from-[#d7e0cc] hover:to-[#9daf93]">
+                        <button className="glossy w-full rounded-full border border-[#f3e7bf]/80 bg-[linear-gradient(135deg,#fffef8_0%,#fff4d0_55%,#e9d08a_100%)] px-3 py-2 text-sm font-semibold text-[#17140a] shadow-[0_10px_24px_rgba(0,0,0,0.24)] transition hover:bg-[linear-gradient(135deg,#ffffff_0%,#fff7de_55%,#edd89a_100%)]">
                           Live
                         </button>
                       </Link>
                     ) : (
-                      <button className="flex-1 rounded-full border border-amber-200/20 bg-amber-100/5 px-3 py-2 text-sm font-semibold text-amber-200">
+                      <button className="flex-1 rounded-full border border-[#c8cdd5] bg-[#d6d9df] px-3 py-2 text-sm font-semibold text-[#12151c]">
                         Coming Soon
                       </button>
                     )}
@@ -524,7 +527,7 @@ export default function LandingPage() {
               })}
             </div>
 
-            <div className="mt-6 rounded-2xl border border-[#b9c7ab]/30 bg-gradient-to-r from-[#0f1410] via-[#62755a] to-[#b9c7ab] p-5 text-white shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
+            <div className="mt-6 rounded-2xl border border-[#b5bcc6]/30 bg-gradient-to-r from-[#12161c] via-[#4f5661] to-[#b7bcc4] p-5 text-white shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h3 className="font-reference text-2xl font-semibold">
@@ -541,7 +544,7 @@ export default function LandingPage() {
                     </button>
                   </Link>
                   <Link to={`/courses/${featuredLiveCourse.id}`}>
-                    <button className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#62755a] hover:bg-[#f3f5ee]">
+                    <button className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#363c46] hover:bg-[#eef1f5]">
                       Join Now
                     </button>
                   </Link>
