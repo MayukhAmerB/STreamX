@@ -328,6 +328,7 @@ class RealtimeSessionRecordingAdmin(admin.ModelAdmin):
         "started_by",
         "livekit_egress_id",
         "recording_player",
+        "admin_actions",
         "started_at",
         "ended_at",
         "created_at",
@@ -362,6 +363,7 @@ class RealtimeSessionRecordingAdmin(admin.ModelAdmin):
         "updated_at",
     )
     autocomplete_fields = ("session", "started_by")
+    actions = ("delete_selected_recordings",)
 
     def has_add_permission(self, request):
         return False
@@ -374,6 +376,20 @@ class RealtimeSessionRecordingAdmin(admin.ModelAdmin):
         for recording in queryset.iterator():
             delete_recording_assets(recording)
         super().delete_queryset(request, queryset)
+
+    @admin.action(
+        description="Delete selected recordings (and remove linked recording files)",
+        permissions=("change",),
+    )
+    def delete_selected_recordings(self, request, queryset):
+        self.delete_queryset(request, queryset)
+
+    @admin.display(description="Actions")
+    def admin_actions(self, obj):
+        if not getattr(obj, "pk", None):
+            return "-"
+        delete_url = reverse("admin:realtime_realtimesessionrecording_delete", args=[obj.pk])
+        return format_html('<a href="{}">Delete</a>', delete_url)
 
     class Media:
         js = ("admin/js/recordings_changelist_row_click.js",)
