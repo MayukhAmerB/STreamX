@@ -1978,7 +1978,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
               </div>
               <form onSubmit={sendMessage} className="border-t border-black p-4">
                 <input
-                  className="w-full rounded-full border border-black bg-[#141414]/92 px-4 py-3 text-sm text-white outline-none placeholder:text-[#949494] focus:border-[#C0C0C0]"
+                  className="w-full rounded-full border border-black bg-[#141414]/92 px-4 py-3 text-sm text-black caret-black outline-none placeholder:text-[#949494] focus:border-[#C0C0C0]"
                   placeholder="Send a message"
                   value={chatInput}
                   onChange={(event) => setChatInput(event.target.value)}
