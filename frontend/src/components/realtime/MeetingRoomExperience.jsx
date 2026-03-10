@@ -851,9 +851,6 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
       if (topic && topic !== "meeting-chat") {
         return;
       }
-      if (!participant) {
-        return;
-      }
 
       try {
         const decoded = textDecoder.decode(payloadBytes);
@@ -864,12 +861,14 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
         if (parsed.identity && parsed.identity === meeting.participant_identity) {
           return;
         }
+        const senderIdentity = participant?.identity || parsed.identity || "";
+        const senderName = participant?.name || parsed.sender || senderIdentity || "Participant";
         setMessages((prev) => [
           ...prev,
           {
             id: `${Date.now()}-${Math.random()}`,
-            identity: participant.identity || parsed.identity || "",
-            sender: participant.name || parsed.sender || participant.identity || "Participant",
+            identity: senderIdentity,
+            sender: senderName,
             text: parsed.text,
             ts: parsed.ts || new Date().toISOString(),
             isSelf: false,
@@ -1439,6 +1438,18 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
         reliable: true,
         topic: "meeting-chat",
       });
+      setMeetingError("");
+      return;
+    } catch {
+      // Some LiveKit server/client version mixes reject topic-based payloads.
+      // Retry without topic so chat remains functional.
+    }
+
+    try {
+      await room.localParticipant.publishData(textEncoder.encode(JSON.stringify(message)), {
+        reliable: true,
+      });
+      setMeetingError("");
     } catch {
       setMeetingError("Unable to send message.");
     }

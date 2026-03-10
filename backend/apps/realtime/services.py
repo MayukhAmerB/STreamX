@@ -17,6 +17,8 @@ from config.url_utils import get_media_public_url
 
 logger = logging.getLogger(__name__)
 LOCALHOST_HOSTNAMES = {"localhost", "127.0.0.1", "0.0.0.0", "testserver"}
+INTERNAL_DOCKER_HOSTNAMES = {"livekit", "livekit-server", "backend", "redis", "postgres", "owncast", "media"}
+NON_PUBLIC_HOSTNAMES = LOCALHOST_HOSTNAMES | INTERNAL_DOCKER_HOSTNAMES
 
 
 class LiveKitConfigError(Exception):
@@ -37,8 +39,8 @@ def is_livekit_configured():
     return bool(settings.LIVEKIT_URL and settings.LIVEKIT_API_KEY and settings.LIVEKIT_API_SECRET)
 
 
-def _normalize_livekit_http_base_url():
-    parsed = urlparse(settings.LIVEKIT_URL)
+def _normalize_livekit_http_base_url(raw_url):
+    parsed = urlparse(str(raw_url or "").strip())
     scheme = parsed.scheme.lower()
     if scheme == "wss":
         scheme = "https"
@@ -49,6 +51,29 @@ def _normalize_livekit_http_base_url():
 
     netloc = parsed.netloc or parsed.path
     return f"{scheme}://{netloc}".rstrip("/")
+
+
+def _get_livekit_server_base_urls():
+    raw_server_url = (getattr(settings, "LIVEKIT_SERVER_URL", "") or "").strip()
+    raw_client_url = (getattr(settings, "LIVEKIT_URL", "") or "").strip()
+
+    raw_candidates = [raw_server_url, raw_client_url]
+    normalized_candidates = []
+    for raw_url in raw_candidates:
+        if not raw_url:
+            continue
+        normalized_url = _normalize_livekit_http_base_url(raw_url)
+        if normalized_url and normalized_url not in normalized_candidates:
+            normalized_candidates.append(normalized_url)
+
+        host, port = _parse_url_host_and_port(raw_url)
+        if host in NON_PUBLIC_HOSTNAMES:
+            fallback_port = port.strip() if port else "7880"
+            docker_internal_url = f"http://livekit:{fallback_port}"
+            if docker_internal_url not in normalized_candidates:
+                normalized_candidates.append(docker_internal_url)
+
+    return normalized_candidates
 
 
 def _resolve_request_host(request):
@@ -129,7 +154,7 @@ def resolve_livekit_client_url(request=None):
     configured_port = netloc.split(":", 1)[1] if ":" in netloc else ""
 
     # If configured URL points to localhost, replace host with current request host.
-    if request_host and configured_host in LOCALHOST_HOSTNAMES:
+    if request_host and configured_host in NON_PUBLIC_HOSTNAMES:
         host = request_host
     else:
         host = configured_host or request_host
@@ -308,37 +333,55 @@ def get_room_participant_count(room_name, *, refresh=False):
         grants={"roomAdmin": True, "room": room_name},
         ttl_seconds=90,
     )
-    endpoint = f"{_normalize_livekit_http_base_url()}/twirp/livekit.RoomService/ListParticipants"
     payload = json.dumps({"room": room_name}).encode("utf-8")
-    request = Request(
-        endpoint,
-        data=payload,
-        method="POST",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {admin_token}",
-        },
-    )
+    base_urls = _get_livekit_server_base_urls()
+    if not base_urls:
+        logger.warning("LiveKit participant count unavailable: no LiveKit server URL configured.")
+        return ParticipantCountSnapshot(count=None, source="fallback")
 
-    try:
-        with urlopen(request, timeout=4) as response:
-            body = json.loads(response.read().decode("utf-8") or "{}")
-            participants = body.get("participants") or []
-            count = len(participants)
-            cache_room_participant_count(room_name, count)
-            return ParticipantCountSnapshot(count=count, source="livekit")
-    except HTTPError as exc:
-        if exc.code in {400, 404}:
-            cache_room_participant_count(room_name, 0)
-            return ParticipantCountSnapshot(count=0, source="livekit")
-        logger.warning("LiveKit participant count HTTP error: %s", exc)
-        return ParticipantCountSnapshot(count=None, source="fallback")
-    except URLError as exc:
-        logger.warning("LiveKit participant count network error: %s", exc)
-        return ParticipantCountSnapshot(count=None, source="fallback")
-    except Exception as exc:  # defensive fallback
-        logger.warning("LiveKit participant count unknown error: %s", exc)
-        return ParticipantCountSnapshot(count=None, source="fallback")
+    last_error = ""
+    for base_url in base_urls:
+        endpoint = f"{base_url}/twirp/livekit.RoomService/ListParticipants"
+        request = Request(
+            endpoint,
+            data=payload,
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {admin_token}",
+            },
+        )
+        try:
+            with urlopen(request, timeout=4) as response:
+                body = json.loads(response.read().decode("utf-8") or "{}")
+                participants = body.get("participants") or []
+                count = len(participants)
+                cache_room_participant_count(room_name, count)
+                return ParticipantCountSnapshot(count=count, source="livekit")
+        except HTTPError as exc:
+            if exc.code in {400, 404}:
+                cache_room_participant_count(room_name, 0)
+                return ParticipantCountSnapshot(count=0, source="livekit")
+            last_error = f"HTTP {exc.code}"
+            try:
+                body = exc.read().decode("utf-8")
+            except Exception:
+                body = str(exc)
+            logger.warning(
+                "LiveKit participant count HTTP error on %s: %s",
+                endpoint,
+                body or exc,
+            )
+        except URLError as exc:
+            last_error = f"network error: {exc}"
+            logger.warning("LiveKit participant count network error on %s: %s", endpoint, exc)
+        except Exception as exc:  # defensive fallback
+            last_error = f"unknown error: {exc}"
+            logger.warning("LiveKit participant count unknown error on %s: %s", endpoint, exc)
+
+    if last_error:
+        logger.warning("LiveKit participant count fallback after retries: %s", last_error)
+    return ParticipantCountSnapshot(count=None, source="fallback")
 
 
 def build_meet_embed_url(token, livekit_url=None):
@@ -447,30 +490,49 @@ def _build_egress_admin_token():
 
 
 def _twirp_post(path, payload):
-    endpoint = f"{_normalize_livekit_http_base_url()}/twirp/{path}"
-    request = Request(
-        endpoint,
-        data=json.dumps(payload).encode("utf-8"),
-        method="POST",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {_build_egress_admin_token()}",
-        },
-    )
-    try:
-        with urlopen(request, timeout=8) as response:
-            return json.loads(response.read().decode("utf-8") or "{}")
-    except HTTPError as exc:
-        body = ""
+    base_urls = _get_livekit_server_base_urls()
+    if not base_urls:
+        raise LiveKitEgressError(
+            "LiveKit server URL is not configured. Set LIVEKIT_SERVER_URL or LIVEKIT_URL."
+        )
+
+    auth_header = f"Bearer {_build_egress_admin_token()}"
+    request_body = json.dumps(payload).encode("utf-8")
+    last_error_message = ""
+
+    for base_url in base_urls:
+        endpoint = f"{base_url}/twirp/{path}"
+        request = Request(
+            endpoint,
+            data=request_body,
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": auth_header,
+            },
+        )
         try:
-            body = exc.read().decode("utf-8")
-        except Exception:
-            body = str(exc)
-        raise LiveKitEgressError(f"Egress HTTP {exc.code}: {body}") from exc
-    except URLError as exc:
-        raise LiveKitEgressError(f"Egress network error: {exc}") from exc
-    except Exception as exc:
-        raise LiveKitEgressError(f"Egress unknown error: {exc}") from exc
+            with urlopen(request, timeout=8) as response:
+                return json.loads(response.read().decode("utf-8") or "{}")
+        except HTTPError as exc:
+            body = ""
+            try:
+                body = exc.read().decode("utf-8")
+            except Exception:
+                body = str(exc)
+            last_error_message = f"Egress HTTP {exc.code}: {body}"
+            # Retry across configured base URLs on connectivity/proxy style failures.
+            if exc.code in {404, 405, 502, 503, 504}:
+                continue
+            raise LiveKitEgressError(last_error_message) from exc
+        except URLError as exc:
+            last_error_message = f"Egress network error: {exc}"
+            continue
+        except Exception as exc:
+            last_error_message = f"Egress unknown error: {exc}"
+            continue
+
+    raise LiveKitEgressError(last_error_message or "Egress request failed.")
 
 
 def start_room_broadcast_egress(*, room_name, rtmp_target_url, participant_identity=""):
