@@ -111,6 +111,7 @@ class CourseAdmin(admin.ModelAdmin):
         "admin_actions",
         "updated_at",
     )
+    list_display_links = ("id", "title")
     list_filter = ("category", "level", "launch_status", "is_published", "created_at", "updated_at")
     search_fields = ("title", "slug", "description", "instructor__email", "instructor__full_name")
     list_editable = ("launch_status", "price", "is_published", "instructor")
@@ -154,6 +155,25 @@ class CourseAdmin(admin.ModelAdmin):
                     "instructor",
                     "instructor_admin_link",
                 )
+            },
+        ),
+        (
+            "Course Detail Content (shown on public course page)",
+            {
+                "description": (
+                    "These fields control About, Course Overview, What You Will Cover, "
+                    "Expected Outcomes, Enrollment note, and Course Snapshot text on the course page."
+                ),
+                "fields": (
+                    "about_the_course",
+                    "course_overview",
+                    "what_you_will_learn",
+                    "expected_outcomes",
+                    "enrollment_message",
+                    "snapshot_category",
+                    "snapshot_level",
+                    "snapshot_instructor",
+                ),
             },
         ),
         (

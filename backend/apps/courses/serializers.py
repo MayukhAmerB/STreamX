@@ -19,6 +19,23 @@ from .models import (
 )
 
 
+def _normalize_text_list(value):
+    if value in (None, ""):
+        return []
+    if not isinstance(value, list):
+        raise serializers.ValidationError("Enter a valid list of text values.")
+
+    normalized = []
+    for item in value:
+        text = str(item or "").strip()
+        if not text:
+            continue
+        if contains_active_content(text):
+            raise serializers.ValidationError("Suspicious script or active-content payload detected.")
+        normalized.append(text)
+    return normalized
+
+
 class LectureSerializer(serializers.ModelSerializer):
     video_file_url = serializers.SerializerMethodField(read_only=True)
 
@@ -229,6 +246,14 @@ class CourseDetailSerializer(serializers.ModelSerializer):
             "title",
             "slug",
             "description",
+            "about_the_course",
+            "course_overview",
+            "what_you_will_learn",
+            "expected_outcomes",
+            "enrollment_message",
+            "snapshot_category",
+            "snapshot_level",
+            "snapshot_instructor",
             "thumbnail",
             "price",
             "category",
@@ -302,6 +327,42 @@ class CourseWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Suspicious script or active-content payload detected.")
         return value
 
+    def validate_about_the_course(self, value):
+        if contains_active_content(value):
+            raise serializers.ValidationError("Suspicious script or active-content payload detected.")
+        return value
+
+    def validate_course_overview(self, value):
+        if contains_active_content(value):
+            raise serializers.ValidationError("Suspicious script or active-content payload detected.")
+        return value
+
+    def validate_enrollment_message(self, value):
+        if contains_active_content(value):
+            raise serializers.ValidationError("Suspicious script or active-content payload detected.")
+        return value
+
+    def validate_snapshot_category(self, value):
+        if contains_active_content(value):
+            raise serializers.ValidationError("Suspicious script or active-content payload detected.")
+        return value
+
+    def validate_snapshot_level(self, value):
+        if contains_active_content(value):
+            raise serializers.ValidationError("Suspicious script or active-content payload detected.")
+        return value
+
+    def validate_snapshot_instructor(self, value):
+        if contains_active_content(value):
+            raise serializers.ValidationError("Suspicious script or active-content payload detected.")
+        return value
+
+    def validate_what_you_will_learn(self, value):
+        return _normalize_text_list(value)
+
+    def validate_expected_outcomes(self, value):
+        return _normalize_text_list(value)
+
     def validate_thumbnail(self, value):
         if value and not is_safe_public_http_url(value):
             raise serializers.ValidationError(
@@ -323,6 +384,14 @@ class CourseWriteSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "description",
+            "about_the_course",
+            "course_overview",
+            "what_you_will_learn",
+            "expected_outcomes",
+            "enrollment_message",
+            "snapshot_category",
+            "snapshot_level",
+            "snapshot_instructor",
             "thumbnail",
             "thumbnail_file",
             "price",

@@ -17,6 +17,21 @@ from config.url_utils import get_media_public_url
 from .cache_utils import bump_course_list_cache_version, bump_live_class_list_cache_version
 
 
+def _sanitize_string_list(value):
+    if value in (None, ""):
+        return []
+    if not isinstance(value, list):
+        raise ValidationError("Enter a valid list of text items.")
+
+    cleaned = []
+    for item in value:
+        text = str(item or "").strip()
+        if not text:
+            continue
+        cleaned.append(text)
+    return cleaned
+
+
 class Course(models.Model):
     CATEGORY_OSINT = "osint"
     CATEGORY_WEB_PENTESTING = "web_pentesting"
@@ -44,6 +59,14 @@ class Course(models.Model):
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True, blank=True)
     description = models.TextField()
+    about_the_course = models.TextField(blank=True, default="")
+    course_overview = models.TextField(blank=True, default="")
+    what_you_will_learn = models.JSONField(blank=True, default=list)
+    expected_outcomes = models.JSONField(blank=True, default=list)
+    enrollment_message = models.TextField(blank=True, default="")
+    snapshot_category = models.CharField(max_length=255, blank=True, default="")
+    snapshot_level = models.CharField(max_length=255, blank=True, default="")
+    snapshot_instructor = models.CharField(max_length=255, blank=True, default="")
     thumbnail = models.URLField(blank=True, default="")
     thumbnail_file = models.ImageField(upload_to="course_thumbnails/", blank=True, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -75,6 +98,20 @@ class Course(models.Model):
         super().clean()
         validate_no_active_content(self.title, "title")
         validate_no_active_content(self.description, "description")
+        validate_no_active_content(self.about_the_course, "about_the_course")
+        validate_no_active_content(self.course_overview, "course_overview")
+        validate_no_active_content(self.enrollment_message, "enrollment_message")
+        validate_no_active_content(self.snapshot_category, "snapshot_category")
+        validate_no_active_content(self.snapshot_level, "snapshot_level")
+        validate_no_active_content(self.snapshot_instructor, "snapshot_instructor")
+
+        self.what_you_will_learn = _sanitize_string_list(self.what_you_will_learn)
+        self.expected_outcomes = _sanitize_string_list(self.expected_outcomes)
+        for index, item in enumerate(self.what_you_will_learn):
+            validate_no_active_content(item, f"what_you_will_learn[{index}]")
+        for index, item in enumerate(self.expected_outcomes):
+            validate_no_active_content(item, f"expected_outcomes[{index}]")
+
         validate_safe_public_url(self.thumbnail, "thumbnail")
         validate_profile_image_upload(self.thumbnail_file, "thumbnail_file")
 

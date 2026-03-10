@@ -45,6 +45,10 @@ function formatLevel(level) {
 }
 
 function deriveOutcomes(course, sections, launchStatus) {
+  if (Array.isArray(course?.expected_outcomes) && course.expected_outcomes.length) {
+    return course.expected_outcomes.filter(Boolean).slice(0, 4);
+  }
+
   if (Array.isArray(course?.learning_points) && course.learning_points.length) {
     return course.learning_points.filter(Boolean).slice(0, 4);
   }
@@ -62,6 +66,15 @@ function deriveOutcomes(course, sections, launchStatus) {
     `Follow a ${formatLevel(course?.level).toLowerCase()} progression with structured modules.`,
     launchStatus.isComingSoon ? "Prepare for launch updates and curriculum release." : "Start learning immediately after enrollment.",
   ];
+}
+
+function toParagraphList(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return [];
+  return raw
+    .split(/\r?\n+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function buildExtendedCourseDescription(course, sections) {
@@ -180,6 +193,11 @@ export default function CourseDetailPage() {
   const launchStatus = useMemo(() => getCourseLaunchStatus(course), [course]);
   const highlights = useMemo(() => {
     if (!course) return [];
+    const configuredHighlights = Array.isArray(course.what_you_will_learn)
+      ? course.what_you_will_learn.filter(Boolean).slice(0, 6)
+      : [];
+    if (configuredHighlights.length) return configuredHighlights;
+
     const sectionTitles = sections.map((section) => section.title).slice(0, 4);
     if (sectionTitles.length) return sectionTitles;
     return [
@@ -193,6 +211,38 @@ export default function CourseDetailPage() {
   const extendedCourseDescription = useMemo(
     () => buildExtendedCourseDescription(course, sections),
     [course, sections]
+  );
+  const aboutCourseParagraphs = useMemo(() => {
+    const configured = toParagraphList(course?.about_the_course);
+    return configured.length ? configured : extendedCourseDescription;
+  }, [course?.about_the_course, extendedCourseDescription]);
+  const courseOverviewText = useMemo(
+    () =>
+      String(course?.course_overview || "").trim() ||
+      course?.description ||
+      "Structured cybersecurity training with practical modules and guided progression.",
+    [course?.course_overview, course?.description]
+  );
+  const enrollmentInfoText = useMemo(() => {
+    const configured = String(course?.enrollment_message || "").trim();
+    if (configured) return configured;
+    return launchStatus.isComingSoon
+      ? "This track is not live yet. We will open enrollment once the curriculum release is ready."
+      : ENABLE_DIRECT_PAYMENTS
+        ? "Payment (Card/UPI) works after backend and Razorpay credentials are configured."
+        : "Enrollment requests are reviewed by admin. Course access is enabled after approval.";
+  }, [course?.enrollment_message, launchStatus.isComingSoon]);
+  const snapshotCategoryText = useMemo(
+    () => String(course?.snapshot_category || "").trim() || formatCategory(course?.category),
+    [course?.snapshot_category, course?.category]
+  );
+  const snapshotLevelText = useMemo(
+    () => String(course?.snapshot_level || "").trim() || formatLevel(course?.level),
+    [course?.snapshot_level, course?.level]
+  );
+  const snapshotInstructorText = useMemo(
+    () => String(course?.snapshot_instructor || "").trim() || course?.instructor?.full_name || "Instructor",
+    [course?.snapshot_instructor, course?.instructor?.full_name]
   );
 
   const handleEnrollNow = async () => {
@@ -324,7 +374,7 @@ export default function CourseDetailPage() {
                 About This Course
               </div>
               <div className="mt-3 space-y-2">
-                {extendedCourseDescription.map((paragraph, index) => (
+                {aboutCourseParagraphs.map((paragraph, index) => (
                   <p key={`${index}-${paragraph.slice(0, 24)}`} className="text-sm leading-7 text-[#CACACA]">
                     {paragraph}
                   </p>
@@ -364,8 +414,7 @@ export default function CourseDetailPage() {
                       Course Overview
                     </div>
                     <p className="mt-2 line-clamp-4 text-sm leading-6 text-[#D8D8D8]">
-                      {course.description ||
-                        "Structured cybersecurity training with practical modules and guided progression."}
+                      {courseOverviewText}
                     </p>
                   </div>
                 </div>
@@ -568,11 +617,7 @@ export default function CourseDetailPage() {
             </div>
 
             <p className="mt-3 text-xs leading-5 text-[#949494]">
-              {launchStatus.isComingSoon
-                ? "This track is not live yet. We will open enrollment once the curriculum release is ready."
-                : ENABLE_DIRECT_PAYMENTS
-                  ? "Payment (Card/UPI) works after backend and Razorpay credentials are configured."
-                  : "Enrollment requests are reviewed by admin. Course access is enabled after approval."}
+              {enrollmentInfoText}
             </p>
           </div>
 
@@ -584,17 +629,17 @@ export default function CourseDetailPage() {
               <div className="rounded-xl border border-black panel-gradient px-3 py-3">
                 <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Category</div>
                 <div className="mt-1 text-sm font-semibold text-[#E3E3E3]">
-                  {formatCategory(course.category)}
+                  {snapshotCategoryText}
                 </div>
               </div>
               <div className="rounded-xl border border-black panel-gradient px-3 py-3">
                 <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Level</div>
-                <div className="mt-1 text-sm font-semibold text-[#E3E3E3]">{formatLevel(course.level)}</div>
+                <div className="mt-1 text-sm font-semibold text-[#E3E3E3]">{snapshotLevelText}</div>
               </div>
               <div className="rounded-xl border border-black panel-gradient px-3 py-3">
                 <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Instructor</div>
                 <div className="mt-1 text-sm font-semibold text-[#E3E3E3]">
-                  {course.instructor?.full_name || "Instructor"}
+                  {snapshotInstructorText}
                 </div>
               </div>
             </div>
