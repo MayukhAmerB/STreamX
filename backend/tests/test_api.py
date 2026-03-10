@@ -21,6 +21,7 @@ from django.test import override_settings
 from rest_framework.test import APITestCase
 from PIL import Image
 
+from config.url_utils import get_media_public_url
 from apps.courses.models import (
     Course,
     Enrollment,
@@ -616,6 +617,22 @@ class HostingerMediaUploadTests(BaseAPITestCase):
         lecture = Lecture.objects.get(title="Uploaded Lecture")
         self.assertTrue(bool(lecture.video_file))
         self.assertEqual(lecture.video_key, "")
+
+
+class MediaPublicUrlTests(APITestCase):
+    @override_settings(MEDIA_PUBLIC_BASE_URL="https://alsyedinitiative.com/media")
+    def test_media_public_url_avoids_duplicate_media_prefix(self):
+        self.assertEqual(
+            get_media_public_url("/media/course_thumbnails/test.jpg"),
+            "https://alsyedinitiative.com/media/course_thumbnails/test.jpg",
+        )
+
+    @override_settings(MEDIA_PUBLIC_BASE_URL="https://alsyedinitiative.com")
+    def test_media_public_url_supports_origin_only_base(self):
+        self.assertEqual(
+            get_media_public_url("/media/course_thumbnails/test.jpg"),
+            "https://alsyedinitiative.com/media/course_thumbnails/test.jpg",
+        )
 
 
 class InstructorDeletionSafetyTests(APITestCase):

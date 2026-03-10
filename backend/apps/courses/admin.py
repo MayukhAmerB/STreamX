@@ -1,3 +1,5 @@
+import json
+
 from django import forms
 from django.contrib import admin, messages
 from django.db.models import Count
@@ -16,6 +18,142 @@ from .models import (
 )
 from .cache_utils import bump_course_list_cache_version
 from .services import VideoTranscodeError, transcode_lecture_to_hls
+
+
+def _parse_admin_list_field(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return []
+
+    parsed_items = None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        parsed = None
+
+    if isinstance(parsed, list):
+        parsed_items = parsed
+    elif isinstance(parsed, str):
+        parsed_items = [parsed]
+
+    if parsed_items is None:
+        if "\n" in raw:
+            parsed_items = raw.splitlines()
+        elif "," in raw:
+            parsed_items = raw.split(",")
+        else:
+            parsed_items = [raw]
+
+    cleaned = []
+    for item in parsed_items:
+        text = str(item or "").strip()
+        text = text.lstrip("-* ").strip()
+        if text:
+            cleaned.append(text)
+    return cleaned
+
+
+class CourseAdminForm(forms.ModelForm):
+    what_you_will_learn = forms.CharField(
+        required=False,
+        label="What You Will Cover",
+        help_text="Enter one highlight per line. Example: Web Pentesting track",
+        widget=forms.Textarea(
+            attrs={
+                "rows": 4,
+                "placeholder": "Web Pentesting track\nBeginner level\nLaunching soon",
+            }
+        ),
+    )
+    expected_outcomes = forms.CharField(
+        required=False,
+        label="Expected Outcomes",
+        help_text="Enter one outcome per line. These render as the outcome cards.",
+        widget=forms.Textarea(
+            attrs={
+                "rows": 5,
+                "placeholder": (
+                    "Build web pentesting workflow habits.\n"
+                    "Follow a beginner progression with structured modules."
+                ),
+            }
+        ),
+    )
+
+    class Meta:
+        model = Course
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        instance = getattr(self, "instance", None)
+        if instance and instance.pk:
+            self.fields["what_you_will_learn"].initial = "\n".join(instance.what_you_will_learn or [])
+            self.fields["expected_outcomes"].initial = "\n".join(instance.expected_outcomes or [])
+
+        textarea_rows = {
+            "description": 3,
+            "about_the_course": 4,
+            "course_overview": 4,
+            "enrollment_message": 3,
+        }
+        for field_name, rows in textarea_rows.items():
+            field = self.fields.get(field_name)
+            if field:
+                field.widget.attrs.setdefault("rows", rows)
+                field.widget.attrs.setdefault("placeholder", "")
+
+        self.fields["title"].help_text = "Frontend: Hero title"
+        self.fields["description"].label = "Short Description"
+        self.fields["description"].help_text = "Frontend: Hero subtitle under title"
+        self.fields["about_the_course"].label = "About This Course"
+        self.fields["about_the_course"].help_text = (
+            "Frontend container: About This Course card (left side of hero section)."
+        )
+        self.fields["course_overview"].label = "Course Overview"
+        self.fields["course_overview"].help_text = (
+            "Frontend container: Course Overview overlay card on thumbnail."
+        )
+        self.fields["enrollment_message"].label = "Enrollment Note"
+        self.fields["enrollment_message"].help_text = (
+            "Frontend container: Enrollment panel note text (right panel)."
+        )
+        self.fields["snapshot_category"].label = "Snapshot Category"
+        self.fields["snapshot_level"].label = "Snapshot Level"
+        self.fields["snapshot_instructor"].label = "Snapshot Instructor"
+        self.fields["snapshot_category"].help_text = "Frontend container: Course Snapshot > Category"
+        self.fields["snapshot_level"].help_text = "Frontend container: Course Snapshot > Level"
+        self.fields["snapshot_instructor"].help_text = "Frontend container: Course Snapshot > Instructor"
+
+        self.fields["about_the_course"].widget.attrs.update(
+            {
+                "placeholder": (
+                    "Coming soon: a beginner-friendly web application pentesting track with fundamentals, "
+                    "setup, and testing mindset."
+                )
+            }
+        )
+        self.fields["course_overview"].widget.attrs.update(
+            {
+                "placeholder": (
+                    "Coming soon: beginner-friendly web application pentesting track with fundamentals, "
+                    "setup, and testing mindset."
+                )
+            }
+        )
+        self.fields["enrollment_message"].widget.attrs.update(
+            {
+                "placeholder": (
+                    "This track is not live yet. We will open enrollment once the curriculum release is ready."
+                )
+            }
+        )
+
+    def clean_what_you_will_learn(self):
+        return _parse_admin_list_field(self.cleaned_data.get("what_you_will_learn"))
+
+    def clean_expected_outcomes(self):
+        return _parse_admin_list_field(self.cleaned_data.get("expected_outcomes"))
 
 
 class LectureInlineForm(forms.ModelForm):
@@ -97,6 +235,7 @@ class LectureInline(admin.TabularInline):
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
+    form = CourseAdminForm
     list_display = (
         "id",
         "title",
@@ -117,6 +256,8 @@ class CourseAdmin(admin.ModelAdmin):
     list_editable = ("launch_status", "price", "is_published", "instructor")
     readonly_fields = (
         "slug",
+        "frontend_container_guide",
+        "enrollment_container_source",
         "thumbnail_preview",
         "instructor_admin_link",
         "section_count_display",
@@ -131,61 +272,96 @@ class CourseAdmin(admin.ModelAdmin):
     actions = ("mark_live", "mark_coming_soon", "publish_courses", "unpublish_courses")
     fieldsets = (
         (
-            "Course Basics",
+            "Frontend Container Map (Read First)",
             {
-                "fields": (
-                    "title",
-                    "slug",
-                    "description",
-                    "thumbnail",
-                    "thumbnail_file",
-                    "thumbnail_preview",
-                )
+                "description": "Use the sections below to keep admin inputs aligned with frontend cards/containers.",
+                "fields": ("frontend_container_guide",),
             },
         ),
         (
-            "Catalog & Pricing",
+            "Container 1: Hero Header",
             {
                 "fields": (
                     "category",
                     "level",
                     "launch_status",
-                    "price",
-                    "is_published",
-                    "instructor",
-                    "instructor_admin_link",
+                    "title",
+                    "description",
+                    "slug",
                 )
             },
         ),
         (
-            "Course Detail Content (shown on public course page)",
+            "Container 2: Hero Left Cards",
+            {
+                "fields": (
+                    "price",
+                    "about_the_course",
+                )
+            },
+        ),
+        (
+            "Container 3: Hero Right Media Card",
+            {
+                "fields": (
+                    "thumbnail",
+                    "thumbnail_file",
+                    "thumbnail_preview",
+                    "course_overview",
+                )
+            },
+        ),
+        (
+            "Container 4: What You Will Cover (Chip Row)",
             {
                 "description": (
-                    "These fields control About, Course Overview, What You Will Cover, "
-                    "Expected Outcomes, Enrollment note, and Course Snapshot text on the course page."
+                    "Enter one item per line. Each line becomes one frontend chip."
                 ),
                 "fields": (
-                    "about_the_course",
-                    "course_overview",
                     "what_you_will_learn",
-                    "expected_outcomes",
-                    "enrollment_message",
-                    "snapshot_category",
-                    "snapshot_level",
-                    "snapshot_instructor",
                 ),
             },
         ),
         (
-            "Curriculum Management",
+            "Container 5: Expected Outcomes (Outcome Cards)",
+            {
+                "description": "Enter one item per line. Each line becomes one outcome card.",
+                "fields": (
+                    "expected_outcomes",
+                ),
+            },
+        ),
+        (
+            "Container 6: Enrollment Panel (Right Side)",
+            {
+                "fields": (
+                    "enrollment_message",
+                    "enrollment_container_source",
+                ),
+            },
+        ),
+        (
+            "Container 7: Course Snapshot Card",
+            {
+                "fields": (
+                    "snapshot_category",
+                    "snapshot_level",
+                    "snapshot_instructor",
+                    "instructor",
+                    "instructor_admin_link",
+                ),
+            },
+        ),
+        (
+            "Container 8: Course Roadmap (Modules/Lectures)",
             {
                 "description": (
-                    "Course creation and course details are managed here. Use the separate Modules page "
-                    "to add module names, module descriptions, and module video lectures."
+                    "Roadmap content is controlled from Modules page. Keep module-edit workflow unchanged."
                 ),
                 "fields": ("section_count_display", "lecture_count_display", "module_admin_link"),
             },
         ),
+        ("Publishing", {"fields": ("is_published",)}),
         ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
     )
 
@@ -263,6 +439,34 @@ class CourseAdmin(admin.ModelAdmin):
         delete_url = reverse("admin:courses_course_delete", args=[obj.pk])
         return format_html('<a href="{}">Edit</a> | <a href="{}">Delete</a>', edit_url, delete_url)
 
+    @admin.display(description="Frontend Container Mapping")
+    def frontend_container_guide(self, obj):
+        return format_html(
+            """
+            <div style="line-height:1.5;">
+              <div><strong>1. Hero Header:</strong> category, level, launch status, title, short description</div>
+              <div><strong>2. Hero Left Cards:</strong> price + About This Course</div>
+              <div><strong>3. Hero Right Media Card:</strong> thumbnail + Course Overview overlay</div>
+              <div><strong>4. What You Will Cover:</strong> one line = one chip</div>
+              <div><strong>5. Expected Outcomes:</strong> one line = one outcome card</div>
+              <div><strong>6. Enrollment Panel:</strong> Enrollment note + launch/price source</div>
+              <div><strong>7. Course Snapshot:</strong> snapshot category/level/instructor</div>
+              <div><strong>8. Course Roadmap:</strong> modules/lectures from Modules page</div>
+            </div>
+            """
+        )
+
+    @admin.display(description="Enrollment Status & Price Source")
+    def enrollment_container_source(self, obj):
+        launch_value = getattr(obj, "launch_status", None) or "coming_soon"
+        launch_label = dict(Course.LAUNCH_STATUS_CHOICES).get(launch_value, launch_value)
+        price_value = getattr(obj, "price", None)
+        return format_html(
+            "This panel uses launch status <strong>{}</strong> and price <strong>{}</strong> from Container 1/2.",
+            launch_label,
+            price_value if price_value is not None else "-",
+        )
+
     @admin.action(description="Mark selected courses as Live")
     def mark_live(self, request, queryset):
         queryset.update(launch_status=Course.STATUS_LIVE)
@@ -311,6 +515,10 @@ class ModuleAdmin(admin.ModelAdmin):
         "order",
     )
     readonly_fields = ()
+
+    class Media:
+        js = ("admin/js/courses_upload_progress.js",)
+        css = {"all": ("admin/css/courses_upload_progress.css",)}
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("course").annotate(

@@ -1,0 +1,52 @@
+.upload-progress-panel {
+  display: none;
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--hairline-color, #c4c8cc);
+  border-radius: 10px;
+  background: var(--body-bg, #fff);
+  color: var(--body-fg, #111);
+}
+
+.upload-progress-panel.is-visible {
+  display: block;
+}
+
+.upload-progress-panel.is-error {
+  border-color: #ba2121;
+  background: #fff1f1;
+  color: #ba2121;
+}
+
+.upload-progress-panel__header,
+.upload-progress-panel__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.upload-progress-panel__header {
+  margin-bottom: 8px;
+}
+
+.upload-progress-panel__track {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #d7dbe0;
+  margin-bottom: 8px;
+}
+
+.upload-progress-panel__bar {
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #2f81f7, #79c0ff);
+  transition: width 0.2s ease;
+}
+
+.upload-progress-panel__meta {
+  font-size: 12px;
+  opacity: 0.9;
+}
