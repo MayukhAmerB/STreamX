@@ -120,7 +120,8 @@ class Course(models.Model):
         if self._has_accessible_thumbnail_file():
             if request:
                 thumbnail_path = reverse("course-thumbnail", args=[self.pk])
-                return request.build_absolute_uri(thumbnail_path)
+                version = int(self.updated_at.timestamp() * 1_000_000) if self.updated_at else 0
+                return request.build_absolute_uri(f"{thumbnail_path}?v={version}")
             return get_media_public_url(self.thumbnail_file.url, request=request)
         return self.thumbnail
 

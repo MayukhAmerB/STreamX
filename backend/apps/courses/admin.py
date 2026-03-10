@@ -407,7 +407,11 @@ class CourseAdmin(admin.ModelAdmin):
     @admin.display(description="Thumbnail Preview")
     def thumbnail_preview(self, obj):
         if getattr(obj, "_has_accessible_thumbnail_file", None) and obj._has_accessible_thumbnail_file():
-            preview_url = reverse("course-thumbnail", args=[obj.pk]) if obj.pk else obj.thumbnail_file.url
+            if obj.pk:
+                version = int(obj.updated_at.timestamp() * 1_000_000) if getattr(obj, "updated_at", None) else 0
+                preview_url = f"{reverse('course-thumbnail', args=[obj.pk])}?v={version}"
+            else:
+                preview_url = obj.thumbnail_file.url
             return format_html(
                 '<img src="{}" alt="{}" style="max-width: 360px; border-radius: 10px; border: 1px solid #ddd;" />',
                 preview_url,

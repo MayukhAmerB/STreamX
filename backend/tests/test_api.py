@@ -17,7 +17,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.urls import reverse
-from django.test import override_settings
+from django.test import RequestFactory, override_settings
 from rest_framework.test import APITestCase
 from PIL import Image
 
@@ -639,6 +639,7 @@ class MediaPublicUrlTests(APITestCase):
             with override_settings(
                 MEDIA_ROOT=tmpdir,
                 MEDIA_PUBLIC_BASE_URL="https://alsyedinitiative.com/media",
+                ALLOWED_HOSTS=["api.alsyedinitiative.com", "testserver", "localhost"],
             ):
                 instructor = User.objects.create_user(
                     email="thumb-fallback@test.com",
@@ -709,6 +710,46 @@ class MediaPublicUrlTests(APITestCase):
                 self.assertEqual(response["X-Content-Type-Options"], "nosniff")
                 self.assertIn("max-age=3600", response["Cache-Control"])
                 self.assertGreater(sum(len(chunk) for chunk in response.streaming_content), 0)
+
+    def test_course_thumbnail_url_uses_version_query_when_request_present(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with override_settings(
+                MEDIA_ROOT=tmpdir,
+                MEDIA_PUBLIC_BASE_URL="https://alsyedinitiative.com/media",
+                ALLOWED_HOSTS=["api.alsyedinitiative.com", "testserver", "localhost"],
+            ):
+                instructor = User.objects.create_user(
+                    email="thumb-version@test.com",
+                    password="StrongPass@123",
+                    full_name="Thumbnail Version Instructor",
+                    role=User.ROLE_INSTRUCTOR,
+                )
+                image_buffer = BytesIO()
+                Image.new("RGB", (90, 90), color="#222222").save(image_buffer, format="JPEG")
+                image_buffer.seek(0)
+                thumbnail_file = SimpleUploadedFile(
+                    "thumb-version.jpg",
+                    image_buffer.read(),
+                    content_type="image/jpeg",
+                )
+                course = Course.objects.create(
+                    title="Thumbnail Version Course",
+                    description="URL cache-busting behavior test",
+                    price=Decimal("129.00"),
+                    instructor=instructor,
+                    is_published=True,
+                    thumbnail_file=thumbnail_file,
+                )
+
+                request = RequestFactory().get(
+                    "/",
+                    secure=True,
+                    HTTP_HOST="api.alsyedinitiative.com",
+                )
+                thumbnail_url = course.get_thumbnail_url(request=request)
+
+                self.assertIn(f"/api/courses/{course.id}/thumbnail/", thumbnail_url)
+                self.assertIn("?v=", thumbnail_url)
 
 
 class InstructorDeletionSafetyTests(APITestCase):
