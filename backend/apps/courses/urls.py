@@ -4,6 +4,7 @@ from .views import (
     CourseDetailView,
     CourseEnrollView,
     CourseListCreateView,
+    CourseThumbnailView,
     InstructorCoursesView,
     LectureCreateView,
     LectureDetailView,
@@ -21,6 +22,7 @@ from .views import (
 urlpatterns = [
     path("courses/", CourseListCreateView.as_view(), name="course-list-create"),
     path("courses/<int:pk>/", CourseDetailView.as_view(), name="course-detail"),
+    path("courses/<int:pk>/thumbnail/", CourseThumbnailView.as_view(), name="course-thumbnail"),
     path("courses/enroll/", CourseEnrollView.as_view(), name="course-enroll"),
     path("sections/", SectionCreateView.as_view(), name="section-create"),
     path("sections/<int:pk>/", SectionDetailView.as_view(), name="section-detail"),

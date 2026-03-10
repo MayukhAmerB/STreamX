@@ -17,7 +17,6 @@ from .models import (
     Section,
 )
 from .cache_utils import bump_course_list_cache_version
-from config.url_utils import get_media_public_url
 from .services import VideoTranscodeError, transcode_lecture_to_hls
 
 
@@ -408,7 +407,7 @@ class CourseAdmin(admin.ModelAdmin):
     @admin.display(description="Thumbnail Preview")
     def thumbnail_preview(self, obj):
         if getattr(obj, "_has_accessible_thumbnail_file", None) and obj._has_accessible_thumbnail_file():
-            preview_url = get_media_public_url(obj.thumbnail_file.url)
+            preview_url = reverse("course-thumbnail", args=[obj.pk]) if obj.pk else obj.thumbnail_file.url
             return format_html(
                 '<img src="{}" alt="{}" style="max-width: 360px; border-radius: 10px; border: 1px solid #ddd;" />',
                 preview_url,

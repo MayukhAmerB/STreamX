@@ -226,6 +226,38 @@ class CourseListCreateView(APIView):
         )
 
 
+class CourseThumbnailView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    @staticmethod
+    def _can_access_thumbnail(request, course):
+        if course.is_published:
+            return True
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return False
+        if getattr(user, "is_staff", False) or getattr(user, "is_superuser", False):
+            return True
+        return bool(getattr(user, "id", None) and user.id == course.instructor_id)
+
+    def get(self, request, pk):
+        course = generics.get_object_or_404(Course.objects.select_related("instructor"), pk=pk)
+        if not self._can_access_thumbnail(request, course):
+            return HttpResponseNotFound("Thumbnail not found.")
+        if not course._has_accessible_thumbnail_file():
+            return HttpResponseNotFound("Thumbnail file missing.")
+
+        thumb = course.thumbnail_file
+        content_type, _ = mimetypes.guess_type(getattr(thumb, "name", ""))
+        response = FileResponse(
+            thumb.storage.open(thumb.name, "rb"),
+            content_type=content_type or "application/octet-stream",
+        )
+        response["X-Content-Type-Options"] = "nosniff"
+        response["Cache-Control"] = "public, max-age=3600" if course.is_published else "private, max-age=300"
+        return response
+
+
 class CourseDetailView(APIView):
     permission_classes = [permissions.AllowAny]
 

@@ -675,6 +675,41 @@ class MediaPublicUrlTests(APITestCase):
                 self.assertFalse(course._has_accessible_thumbnail_file())
                 self.assertEqual(course.get_thumbnail_url(), "https://example.com/fallback-thumb.jpg")
 
+    def test_course_thumbnail_endpoint_serves_uploaded_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with override_settings(
+                MEDIA_ROOT=tmpdir,
+                MEDIA_PUBLIC_BASE_URL="https://alsyedinitiative.com/media",
+            ):
+                instructor = User.objects.create_user(
+                    email="thumb-endpoint@test.com",
+                    password="StrongPass@123",
+                    full_name="Thumbnail Endpoint Instructor",
+                    role=User.ROLE_INSTRUCTOR,
+                )
+                image_buffer = BytesIO()
+                Image.new("RGB", (96, 96), color="#454545").save(image_buffer, format="JPEG")
+                image_buffer.seek(0)
+                thumbnail_file = SimpleUploadedFile(
+                    "thumb-endpoint.jpg",
+                    image_buffer.read(),
+                    content_type="image/jpeg",
+                )
+                course = Course.objects.create(
+                    title="Thumbnail Endpoint Course",
+                    description="Thumbnail endpoint behavior test",
+                    price=Decimal("149.00"),
+                    instructor=instructor,
+                    is_published=True,
+                    thumbnail_file=thumbnail_file,
+                )
+
+                response = self.client.get(reverse("course-thumbnail", args=[course.id]))
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+                self.assertIn("max-age=3600", response["Cache-Control"])
+                self.assertGreater(sum(len(chunk) for chunk in response.streaming_content), 0)
+
 
 class InstructorDeletionSafetyTests(APITestCase):
     def test_deleting_instructor_keeps_course_with_null_instructor(self):

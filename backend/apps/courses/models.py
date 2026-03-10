@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import models
 from django.db.models import Q
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -117,6 +118,9 @@ class Course(models.Model):
 
     def get_thumbnail_url(self, request=None):
         if self._has_accessible_thumbnail_file():
+            if request:
+                thumbnail_path = reverse("course-thumbnail", args=[self.pk])
+                return request.build_absolute_uri(thumbnail_path)
             return get_media_public_url(self.thumbnail_file.url, request=request)
         return self.thumbnail
 
