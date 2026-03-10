@@ -17,6 +17,7 @@ from .models import (
     Section,
 )
 from .cache_utils import bump_course_list_cache_version
+from config.url_utils import get_media_public_url
 from .services import VideoTranscodeError, transcode_lecture_to_hls
 
 
@@ -113,6 +114,12 @@ class CourseAdminForm(forms.ModelForm):
         self.fields["course_overview"].label = "Course Overview"
         self.fields["course_overview"].help_text = (
             "Frontend container: Course Overview overlay card on thumbnail."
+        )
+        self.fields["thumbnail_file"].help_text = (
+            "Upload image file (recommended). Uploaded file is used first on frontend and admin preview."
+        )
+        self.fields["thumbnail"].help_text = (
+            "Optional public image URL fallback if no uploaded thumbnail file is available."
         )
         self.fields["enrollment_message"].label = "Enrollment Note"
         self.fields["enrollment_message"].help_text = (
@@ -400,13 +407,16 @@ class CourseAdmin(admin.ModelAdmin):
 
     @admin.display(description="Thumbnail Preview")
     def thumbnail_preview(self, obj):
-        if getattr(obj, "thumbnail_file", None):
+        if getattr(obj, "_has_accessible_thumbnail_file", None) and obj._has_accessible_thumbnail_file():
+            preview_url = get_media_public_url(obj.thumbnail_file.url)
             return format_html(
                 '<img src="{}" alt="{}" style="max-width: 360px; border-radius: 10px; border: 1px solid #ddd;" />',
-                obj.thumbnail_file.url,
+                preview_url,
                 obj.title,
             )
         if not getattr(obj, "thumbnail", ""):
+            if getattr(obj, "thumbnail_file", None) and getattr(obj.thumbnail_file, "name", ""):
+                return "Uploaded thumbnail file path exists in DB but file is missing on storage."
             return "No thumbnail URL"
         return format_html(
             '<img src="{}" alt="{}" style="max-width: 360px; border-radius: 10px; border: 1px solid #ddd;" />',

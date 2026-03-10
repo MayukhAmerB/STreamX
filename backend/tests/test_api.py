@@ -634,6 +634,47 @@ class MediaPublicUrlTests(APITestCase):
             "https://alsyedinitiative.com/media/course_thumbnails/test.jpg",
         )
 
+    def test_course_thumbnail_file_url_falls_back_to_thumbnail_when_file_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with override_settings(
+                MEDIA_ROOT=tmpdir,
+                MEDIA_PUBLIC_BASE_URL="https://alsyedinitiative.com/media",
+            ):
+                instructor = User.objects.create_user(
+                    email="thumb-fallback@test.com",
+                    password="StrongPass@123",
+                    full_name="Thumbnail Fallback Instructor",
+                    role=User.ROLE_INSTRUCTOR,
+                )
+                image_buffer = BytesIO()
+                Image.new("RGB", (80, 80), color="#303030").save(image_buffer, format="JPEG")
+                image_buffer.seek(0)
+                thumbnail_file = SimpleUploadedFile(
+                    "thumb.jpg",
+                    image_buffer.read(),
+                    content_type="image/jpeg",
+                )
+                course = Course.objects.create(
+                    title="Thumbnail Fallback Course",
+                    description="Fallback behavior test",
+                    price=Decimal("199.00"),
+                    instructor=instructor,
+                    is_published=True,
+                    thumbnail="https://example.com/fallback-thumb.jpg",
+                    thumbnail_file=thumbnail_file,
+                )
+
+                file_name = course.thumbnail_file.name
+                self.assertTrue(course._has_accessible_thumbnail_file())
+                self.assertEqual(
+                    course.get_thumbnail_url(),
+                    f"https://alsyedinitiative.com/media/{file_name}",
+                )
+
+                course.thumbnail_file.storage.delete(file_name)
+                self.assertFalse(course._has_accessible_thumbnail_file())
+                self.assertEqual(course.get_thumbnail_url(), "https://example.com/fallback-thumb.jpg")
+
 
 class InstructorDeletionSafetyTests(APITestCase):
     def test_deleting_instructor_keeps_course_with_null_instructor(self):

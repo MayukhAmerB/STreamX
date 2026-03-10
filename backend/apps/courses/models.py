@@ -116,9 +116,23 @@ class Course(models.Model):
         validate_profile_image_upload(self.thumbnail_file, "thumbnail_file")
 
     def get_thumbnail_url(self, request=None):
-        if self.thumbnail_file:
+        if self._has_accessible_thumbnail_file():
             return get_media_public_url(self.thumbnail_file.url, request=request)
         return self.thumbnail
+
+    def _has_accessible_thumbnail_file(self):
+        thumbnail_file = getattr(self, "thumbnail_file", None)
+        if not thumbnail_file:
+            return False
+        if not getattr(thumbnail_file, "name", ""):
+            return False
+        storage = getattr(thumbnail_file, "storage", None)
+        if storage is None:
+            return False
+        try:
+            return bool(storage.exists(thumbnail_file.name))
+        except Exception:
+            return False
 
     def _normalize_thumbnail_file(self):
         """
