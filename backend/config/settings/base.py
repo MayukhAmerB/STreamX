@@ -194,7 +194,7 @@ REST_FRAMEWORK = {
         "anon": "50/minute",
         "user": "200/minute",
         "login": "10/minute",
-        "login_burst": "5/minute",
+        "login_burst": "10/minute",
         "contact": "5/hour",
         "public_enrollment_lead": "20/hour",
         "password_reset_request": "5/hour",
@@ -312,7 +312,7 @@ FFMPEG_BINARY = env("FFMPEG_BINARY", "ffmpeg")
 FFPROBE_BINARY = env("FFPROBE_BINARY", "ffprobe")
 SECURITY_BLOCK_SUSPICIOUS_INPUT = env_bool("SECURITY_BLOCK_SUSPICIOUS_INPUT", True)
 SECURITY_MAX_INSPECTION_BODY_BYTES = env_int("SECURITY_MAX_INSPECTION_BODY_BYTES", 16384)
-AUTH_LOGIN_MAX_FAILURES = env_int("AUTH_LOGIN_MAX_FAILURES", 3)
+AUTH_LOGIN_MAX_FAILURES = env_int("AUTH_LOGIN_MAX_FAILURES", 10)
 AUTH_LOGIN_LOCKOUT_SECONDS = env_int("AUTH_LOGIN_LOCKOUT_SECONDS", 3600)
 ACCOUNT_SELF_SERVICE_CREDENTIALS_ENABLED = env_bool("ACCOUNT_SELF_SERVICE_CREDENTIALS_ENABLED", False)
 COURSE_LIST_CACHE_TTL_SECONDS = env_int("COURSE_LIST_CACHE_TTL_SECONDS", 60)

@@ -265,7 +265,7 @@ class RateLimitTests(APITestCase):
 
     def test_login_endpoint_is_throttled(self):
         status_codes = []
-        max_failures = int(getattr(settings, 'AUTH_LOGIN_MAX_FAILURES', 3))
+        max_failures = int(getattr(settings, "AUTH_LOGIN_MAX_FAILURES", 10))
         for _ in range(max_failures + 1):
             response = self.client.post(
                 reverse("auth-login"),
@@ -293,6 +293,43 @@ class RateLimitTests(APITestCase):
         self.assertEqual(second.status_code, 429)
         self.assertEqual(second.data["errors"]["code"], "login_temporarily_locked")
 
+    @override_settings(AUTH_LOGIN_MAX_FAILURES=2, AUTH_LOGIN_LOCKOUT_SECONDS=120)
+    def test_login_lockout_is_scoped_to_target_email(self):
+        other_user = User.objects.create_user(
+            email="other-login@test.com",
+            password="StrongPass@123",
+            full_name="Other Login User",
+            role=User.ROLE_STUDENT,
+        )
+
+        first = self.client.post(
+            reverse("auth-login"),
+            {"email": self.user.email, "password": "WrongPass@123"},
+            format="json",
+        )
+        second = self.client.post(
+            reverse("auth-login"),
+            {"email": self.user.email, "password": "WrongPass@123"},
+            format="json",
+        )
+        third = self.client.post(
+            reverse("auth-login"),
+            {"email": self.user.email, "password": "WrongPass@123"},
+            format="json",
+        )
+
+        self.assertEqual(first.status_code, 400)
+        self.assertEqual(second.status_code, 400)
+        self.assertEqual(third.status_code, 429)
+        self.assertEqual(third.data["errors"]["code"], "login_temporarily_locked")
+
+        other_login = self.client.post(
+            reverse("auth-login"),
+            {"email": other_user.email, "password": "StrongPass@123"},
+            format="json",
+        )
+        self.assertEqual(other_login.status_code, 200)
+
     @override_settings(
         AUTH_LOGIN_MAX_FAILURES=100,
         AUTH_LOGIN_LOCKOUT_SECONDS=3600,
@@ -300,7 +337,7 @@ class RateLimitTests(APITestCase):
     )
     def test_login_throttle_ignores_untrusted_x_forwarded_for_header(self):
         status_codes = []
-        for idx in range(6):
+        for idx in range(11):
             response = self.client.post(
                 reverse("auth-login"),
                 {"email": self.user.email, "password": "WrongPass@123"},
@@ -310,8 +347,8 @@ class RateLimitTests(APITestCase):
             )
             status_codes.append(response.status_code)
 
-        self.assertEqual(status_codes[:5], [400] * 5)
-        self.assertEqual(status_codes[5], 429)
+        self.assertEqual(status_codes[:10], [400] * 10)
+        self.assertEqual(status_codes[10], 429)
 
 
 class UploadValidationTests(APITestCase):
