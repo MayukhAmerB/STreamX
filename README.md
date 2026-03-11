@@ -15,7 +15,7 @@ A comprehensive online education platform featuring interactive live meetings, s
 - **Real-time Collaboration**: Interactive video meetings powered by LiveKit
 - **Two-way Communication**: Students and instructors can join with camera and microphone
 - **Screen Sharing**: Presenters can share screens with audio
-- **Capacity Management**: Supports up to 300 active participants in meeting mode
+- **Capacity Management**: Supports up to 200 active participants in meeting mode (default production profile)
 - **Auto-scaling**: Automatically switches to broadcast mode when meeting capacity is reached
 - **Presenter Controls**: Hosts can grant/revoke presenter permissions for participants
 
@@ -310,10 +310,10 @@ export LIVEKIT_PUBLIC_URL="wss://your-domain.com"
    - Set `CSRF_TRUSTED_ORIGINS` to your frontend domain
    - Set `FRONTEND_PUBLIC_ORIGIN` for share links
 
-### Docker Production Build
+### Docker Production Build (Hostinger)
 
 ```bash
-docker-compose -f docker-compose.prod.yml up --build
+docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml up -d --build --remove-orphans
 ```
 
 ## 📝 Architecture Highlights
@@ -322,7 +322,7 @@ docker-compose -f docker-compose.prod.yml up --build
 
 The platform uses a hybrid architecture for real-time engagement:
 
-- **Meeting Mode**: Interactive WebRTC sessions for up to 300 participants
+- **Meeting Mode**: Interactive WebRTC sessions for up to 200 participants (default profile)
   - Two-way audio/video communication
   - Screen sharing capabilities
   - Real-time collaboration

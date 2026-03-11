@@ -63,9 +63,9 @@ function deriveEmbedUrl(baseUrl, targetPath) {
 
 function canManageSession(session, user) {
   if (!session) return false;
-  if (Boolean(session.can_manage)) return true;
-  if (Boolean(session.is_host)) return true;
-  return Boolean(user?.is_admin);
+  if (session.can_manage) return true;
+  if (session.is_host) return true;
+  return user?.is_admin === true;
 }
 
 function resolveRecordingMode(recording) {

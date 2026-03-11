@@ -150,6 +150,16 @@ services:
       - "7880:7880/tcp"
       - "7881:7881/tcp"
       - "${LIVEKIT_UDP_PORT:-7882}:${LIVEKIT_UDP_PORT:-7882}/udp"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "tr '\\0' ' ' </proc/1/cmdline | grep -q 'livekit-server'",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks:
       - appnet
 
@@ -167,6 +177,16 @@ services:
     volumes:
       - ./infra/hostinger/egress.yaml:/out/egress.yaml:ro
       - recordings_data:/recordings
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "tr '\\0' ' ' </proc/1/cmdline | grep -q '/entrypoint.sh'",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   owncast:
     image: gabekangas/owncast:latest
