@@ -78,7 +78,9 @@ def session_payload_for_create(validated_data):
     linked_live_class = payload.get("linked_live_class")
     if linked_live_class and not payload.get("linked_course"):
         payload["linked_course"] = linked_live_class.linked_course
-    payload.setdefault("meeting_capacity", settings.REALTIME_DEFAULT_MEETING_CAPACITY)
+    default_capacity = int(getattr(settings, "REALTIME_DEFAULT_MEETING_CAPACITY", 200) or 200)
+    payload.setdefault("meeting_capacity", max(2, min(200, default_capacity)))
+    payload["meeting_capacity"] = max(2, min(200, int(payload.get("meeting_capacity") or 200)))
     payload.setdefault("max_audience", settings.REALTIME_DEFAULT_MAX_AUDIENCE)
     payload.setdefault("status", RealtimeSession.STATUS_LIVE)
     return payload

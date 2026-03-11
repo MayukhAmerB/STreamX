@@ -12,7 +12,7 @@ const operationsCards = [
   },
   {
     title: "Meeting Operations",
-    detail: "Launch interactive classes up to 300 participants with auto-overflow to broadcast mode.",
+    detail: "Launch interactive classes up to 200 participants with auto-overflow to broadcast mode.",
     action: { label: "Open Meeting Control", href: "/meeting", external: false },
   },
   {

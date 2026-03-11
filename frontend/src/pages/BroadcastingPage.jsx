@@ -330,7 +330,7 @@ export default function BroadcastingPage() {
         description: form.description,
         linked_live_class_id: Number(form.linked_live_class_id),
         session_type: "broadcasting",
-        meeting_capacity: 300,
+        meeting_capacity: 200,
         max_audience: 50000,
         allow_overflow_broadcast: true,
         stream_embed_url: form.stream_embed_url,

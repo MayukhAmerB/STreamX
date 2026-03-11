@@ -89,7 +89,7 @@ class RealtimeSession(models.Model):
     room_name = models.CharField(max_length=255, unique=True, blank=True)
     livekit_room_name = models.CharField(max_length=255, blank=True, default="")
 
-    meeting_capacity = models.PositiveIntegerField(default=300)
+    meeting_capacity = models.PositiveIntegerField(default=200)
     max_audience = models.PositiveIntegerField(default=50000)
     allow_overflow_broadcast = models.BooleanField(default=True)
     presenter_user_ids = models.JSONField(default=list, blank=True)
@@ -135,8 +135,8 @@ class RealtimeSession(models.Model):
 
         if self.meeting_capacity < 2:
             raise ValidationError({"meeting_capacity": "Meeting capacity must be at least 2."})
-        if self.meeting_capacity > 300:
-            raise ValidationError({"meeting_capacity": "Meeting capacity cannot exceed 300."})
+        if self.meeting_capacity > 200:
+            raise ValidationError({"meeting_capacity": "Meeting capacity cannot exceed 200."})
         if self.max_audience < self.meeting_capacity:
             raise ValidationError(
                 {"max_audience": "Max audience must be greater than or equal to meeting capacity."}
@@ -620,7 +620,7 @@ class RealtimeConfiguration(models.Model):
         )
 
     def _resolve_adaptive_meeting_profile(self, *, participant_count=0, meeting_capacity=None):
-        safe_default_capacity = max(1, int(getattr(settings, "REALTIME_DEFAULT_MEETING_CAPACITY", 300)))
+        safe_default_capacity = max(1, int(getattr(settings, "REALTIME_DEFAULT_MEETING_CAPACITY", 200)))
         try:
             normalized_count = max(0, int(participant_count or 0))
         except (TypeError, ValueError):

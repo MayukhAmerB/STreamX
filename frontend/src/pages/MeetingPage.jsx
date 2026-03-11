@@ -20,7 +20,7 @@ const initialForm = {
   title: "",
   description: "",
   linked_live_class_id: "",
-  meeting_capacity: 300,
+  meeting_capacity: 200,
 };
 
 const meetingMarketingCards = [
@@ -38,7 +38,7 @@ const meetingMarketingCards = [
   },
 ];
 
-const meetingHeroHighlights = ["Two-way interaction", "Auto-overflow at 300", "Scale to 50,000 viewers"];
+const meetingHeroHighlights = ["Two-way interaction", "Auto-overflow at 200", "Scale to 50,000 viewers"];
 
 const meetingWorkflow = [
   {
@@ -158,7 +158,7 @@ export default function MeetingPage() {
         description: form.description,
         linked_live_class_id: Number(form.linked_live_class_id),
         session_type: "meeting",
-        meeting_capacity: Number(form.meeting_capacity || 300),
+        meeting_capacity: Number(form.meeting_capacity || 200),
         allow_overflow_broadcast: true,
         max_audience: 50000,
       };
@@ -232,7 +232,7 @@ export default function MeetingPage() {
                 Focused rooms for live teaching and real-time collaboration
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-[#BBBBBB]">
-                Keep sessions interactive with camera and microphone for up to 300 active
+                Keep sessions interactive with camera and microphone for up to 200 active
                 participants. Additional attendees are routed to broadcast mode automatically.
               </p>
 
@@ -292,7 +292,7 @@ export default function MeetingPage() {
                     <input
                       type="number"
                       min={2}
-                      max={300}
+                      max={200}
                       className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
                       value={form.meeting_capacity}
                       onChange={(e) => setForm((prev) => ({ ...prev, meeting_capacity: e.target.value }))}

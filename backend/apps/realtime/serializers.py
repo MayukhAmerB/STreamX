@@ -186,7 +186,7 @@ class RealtimeSessionCreateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         session_type = attrs.get("session_type", RealtimeSession.TYPE_MEETING)
         linked_live_class = attrs.get("linked_live_class")
-        meeting_capacity = attrs.get("meeting_capacity", 300)
+        meeting_capacity = attrs.get("meeting_capacity", 200)
         max_audience = attrs.get("max_audience", 50000)
 
         if not linked_live_class:
@@ -195,8 +195,8 @@ class RealtimeSessionCreateSerializer(serializers.ModelSerializer):
             else:
                 detail = "Select a live class for this broadcast session."
             raise serializers.ValidationError({"linked_live_class_id": detail})
-        if meeting_capacity > 300:
-            raise serializers.ValidationError({"meeting_capacity": "Meeting capacity cannot exceed 300."})
+        if meeting_capacity > 200:
+            raise serializers.ValidationError({"meeting_capacity": "Meeting capacity cannot exceed 200."})
         if max_audience > 50000:
             raise serializers.ValidationError({"max_audience": "Max audience cannot exceed 50000."})
         if max_audience < meeting_capacity:
@@ -205,7 +205,7 @@ class RealtimeSessionCreateSerializer(serializers.ModelSerializer):
             )
 
         if session_type == RealtimeSession.TYPE_BROADCASTING:
-            attrs.setdefault("meeting_capacity", 300)
+            attrs.setdefault("meeting_capacity", 200)
 
         rtmp_target_url = (attrs.get("rtmp_target_url") or "").strip()
         if rtmp_target_url and not is_safe_public_stream_url(rtmp_target_url):

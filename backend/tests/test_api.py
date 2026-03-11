@@ -1250,6 +1250,75 @@ class LectureVideoAccessTests(BaseAPITestCase):
                 f"/_protected_media/{lecture.stream_manifest_key}",
             )
 
+    def test_hls_protected_token_cannot_access_assets_outside_signed_root(self):
+        with tempfile.TemporaryDirectory() as temp_dir, override_settings(
+            MEDIA_ROOT=temp_dir,
+            COURSE_PROTECTED_MEDIA_USE_ACCEL_REDIRECT=True,
+        ):
+            stream_root = os.path.join("streams", "test-course", "lecture_100")
+            manifest_path = os.path.join(stream_root, "master.m3u8")
+            segment_path = os.path.join(stream_root, "segment_000.ts")
+            outside_path = os.path.join("streams", "test-course", "lecture_999", "segment_000.ts")
+
+            os.makedirs(os.path.dirname(os.path.join(temp_dir, manifest_path)), exist_ok=True)
+            os.makedirs(os.path.dirname(os.path.join(temp_dir, outside_path)), exist_ok=True)
+            with open(os.path.join(temp_dir, manifest_path), "w", encoding="utf-8") as handle:
+                handle.write("#EXTM3U\n#EXTINF:6.0,\nsegment_000.ts\n")
+            with open(os.path.join(temp_dir, segment_path), "wb") as handle:
+                handle.write(b"segment-inside-root")
+            with open(os.path.join(temp_dir, outside_path), "wb") as handle:
+                handle.write(b"segment-outside-root")
+
+            lecture = Lecture.objects.create(
+                section=self.section,
+                title="HLS Scoped Token Lecture",
+                description="Token must stay inside signed HLS root",
+                video_key="videos/source.mp4",
+                stream_status=Lecture.STREAM_READY,
+                stream_manifest_key=manifest_path.replace("\\", "/"),
+                order=4,
+                is_preview=False,
+            )
+            Enrollment.objects.create(
+                user=self.student,
+                course=self.course,
+                payment_status=Enrollment.STATUS_PAID,
+            )
+
+            self.login(self.student.email)
+            response = self.client.get(reverse("lecture-video", kwargs={"pk": lecture.id}))
+            self.assertEqual(response.status_code, 200)
+            playback_path = urlparse(response.data["data"]["playback_url"]).path
+            token = playback_path.split("/playback/", 1)[1].split("/", 1)[0]
+
+            allowed_segment_response = self.client.get(
+                reverse(
+                    "lecture-playback-asset",
+                    kwargs={
+                        "pk": lecture.id,
+                        "token": token,
+                        "asset_path": segment_path.replace("\\", "/"),
+                    },
+                )
+            )
+            self.assertEqual(allowed_segment_response.status_code, 200)
+            self.assertEqual(
+                allowed_segment_response.headers.get("X-Accel-Redirect"),
+                f"/_protected_media/{segment_path.replace(os.sep, '/')}",
+            )
+
+            denied_segment_response = self.client.get(
+                reverse(
+                    "lecture-playback-asset",
+                    kwargs={
+                        "pk": lecture.id,
+                        "token": token,
+                        "asset_path": outside_path.replace("\\", "/"),
+                    },
+                )
+            )
+            self.assertEqual(denied_segment_response.status_code, 404)
+
     def test_course_detail_hides_uploaded_video_paths(self):
         with tempfile.TemporaryDirectory() as temp_dir, override_settings(MEDIA_ROOT=temp_dir):
             lecture = Lecture.objects.create(
@@ -1481,6 +1550,26 @@ class RealtimeSessionTests(APITestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("linked_live_class_id", response.data["errors"])
+
+    def test_meeting_create_rejects_capacity_above_200(self):
+        self.login(self.host.email)
+        response = self.client.post(
+            reverse("realtime-session-list-create"),
+            {
+                "title": "Capacity Above Limit",
+                "description": "Should be blocked",
+                "session_type": "meeting",
+                "linked_live_class_id": self.live_class.id,
+                "meeting_capacity": 201,
+                "max_audience": 1000,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data["errors"]["meeting_capacity"][0],
+            "Meeting capacity cannot exceed 200.",
+        )
 
     def test_realtime_list_rejects_unknown_query_params(self):
         self.login(self.viewer.email)

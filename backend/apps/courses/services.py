@@ -1,5 +1,7 @@
 import json
+import hashlib
 import subprocess
+import time
 from os.path import basename
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlparse
@@ -7,6 +9,7 @@ from urllib.parse import urlparse
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
+from django.core.cache import cache
 from django.core import signing
 from django.urls import reverse
 
@@ -26,6 +29,7 @@ class ProtectedMediaError(Exception):
 
 
 PROTECTED_LECTURE_MEDIA_SIGNING_SALT = "courses.protected-lecture-media"
+PROTECTED_LECTURE_MEDIA_CACHE_PREFIX = "courses:protected-media-token"
 ADAPTIVE_HLS_PROFILES = [
     {
         "name": "360p",
@@ -196,18 +200,99 @@ def build_protected_lecture_playback_url(request, lecture, storage_key, *, expir
     return build_public_url(playback_path, request=request), expires_in
 
 
-def validate_protected_lecture_playback_request(token, lecture_id, asset_path, *, max_age):
-    try:
-        payload = signing.loads(
-            token,
-            max_age=max_age,
-            salt=PROTECTED_LECTURE_MEDIA_SIGNING_SALT,
-        )
-    except signing.BadSignature as exc:
-        raise ProtectedMediaError("Invalid or expired protected media token.") from exc
+def _protected_media_token_cache_key(token, lecture_id):
+    token_hash = hashlib.sha256(str(token or "").encode("utf-8")).hexdigest()
+    return f"{PROTECTED_LECTURE_MEDIA_CACHE_PREFIX}:{int(lecture_id)}:{token_hash}"
 
-    if int(payload.get("lecture_id", 0) or 0) != int(lecture_id):
-        raise ProtectedMediaError("Protected media token does not match the lecture.")
+
+def _protected_media_token_remaining_ttl(token, max_age):
+    now = int(time.time())
+    max_age = max(1, int(max_age or 1))
+    try:
+        timestamp_b62 = str(token).rsplit(":", 2)[1]
+        issued_at = int(signing.b62_decode(timestamp_b62))
+    except Exception:
+        # Fail-safe fallback when token timestamp cannot be parsed.
+        return min(max_age, 60)
+    return max(1, max_age - max(0, now - issued_at))
+
+
+def _load_cached_protected_media_token_payload(token, lecture_id):
+    if not bool(getattr(settings, "COURSE_PROTECTED_MEDIA_TOKEN_CACHE_ENABLED", True)):
+        return None
+
+    cache_key = _protected_media_token_cache_key(token, lecture_id)
+    now = int(time.time())
+    try:
+        cached_payload = cache.get(cache_key)
+    except Exception:
+        return None
+
+    if not isinstance(cached_payload, dict):
+        return None
+
+    expires_at = int(cached_payload.get("expires_at") or 0)
+    payload = cached_payload.get("payload")
+    if not isinstance(payload, dict) or expires_at <= now:
+        return None
+    return payload
+
+
+def _store_cached_protected_media_token_payload(token, lecture_id, payload, *, max_age):
+    if not bool(getattr(settings, "COURSE_PROTECTED_MEDIA_TOKEN_CACHE_ENABLED", True)):
+        return
+
+    cache_ttl = _protected_media_token_remaining_ttl(token, max_age=max_age)
+    if cache_ttl <= 0:
+        return
+
+    cache_key = _protected_media_token_cache_key(token, lecture_id)
+    cache_entry = {
+        "payload": payload,
+        "expires_at": int(time.time()) + cache_ttl,
+    }
+    try:
+        cache.set(cache_key, cache_entry, timeout=cache_ttl)
+    except Exception:
+        # Playback must remain available even if cache backend is degraded.
+        return
+
+
+def validate_protected_lecture_playback_request(token, lecture_id, asset_path, *, max_age):
+    max_age = max(1, int(max_age or 1))
+    requested_lecture_id = int(lecture_id)
+    payload = _load_cached_protected_media_token_payload(token, requested_lecture_id)
+
+    if payload is None:
+        try:
+            signed_payload = signing.loads(
+                token,
+                max_age=max_age,
+                salt=PROTECTED_LECTURE_MEDIA_SIGNING_SALT,
+            )
+        except signing.BadSignature as exc:
+            raise ProtectedMediaError("Invalid or expired protected media token.") from exc
+
+        payload_lecture_id = int(signed_payload.get("lecture_id", 0) or 0)
+        if payload_lecture_id != requested_lecture_id:
+            raise ProtectedMediaError("Protected media token does not match the lecture.")
+
+        asset_type = str(signed_payload.get("asset_type", "")).strip().lower()
+        if asset_type not in {"hls", "file"}:
+            raise ProtectedMediaError("Unsupported protected media asset type.")
+
+        root_prefix = normalize_storage_key(signed_payload.get("root_prefix"))
+        payload = {
+            "lecture_id": payload_lecture_id,
+            "asset_type": asset_type,
+            "root_prefix": root_prefix,
+        }
+        _store_cached_protected_media_token_payload(
+            token,
+            requested_lecture_id,
+            payload,
+            max_age=max_age,
+        )
 
     normalized_path = normalize_storage_key(asset_path)
     asset_type = str(payload.get("asset_type", "")).strip().lower()
