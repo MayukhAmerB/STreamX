@@ -1974,16 +1974,16 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
             </div>
 
           {panelTab === "people" ? (
-            <div className="max-h-[320px] overflow-y-auto p-4 sm:max-h-[420px] xl:h-[520px] xl:max-h-none">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
+            <div className="max-h-[320px] overflow-y-auto p-3 sm:max-h-[420px] xl:h-[520px] xl:max-h-none xl:p-4">
+              <div className="mb-3 flex items-center justify-between gap-2 px-1">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8E8E8E]">
                   Participants
                 </div>
-                <span className="rounded-full border border-black bg-[#141414]/86 px-2.5 py-1 text-[11px] text-[#E1E1E1]">
+                <span className="rounded-full border border-black bg-[#151515] px-2.5 py-1 text-[11px] text-[#E1E1E1]">
                   {participantCount}
                 </span>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {participantsOrdered.map((entry) => {
                   const media = getParticipantMediaState(entry.participant);
                   const participantUserId = parseUserIdFromIdentity(entry.participant.identity);
@@ -1991,6 +1991,14 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                   const speakerAccessEnabled = hasSpeakerAccess(participantUserId);
                   const loadingSpeaker = permissionState.loadingKey === `speaker:${participantUserId}`;
                   const participantAvatarUrl = String(entry?.profileImageUrl || "").trim();
+                  const mediaSummary = `${media.hasCamera ? "Camera on" : "Camera off"} | ${
+                    media.hasAudio ? "Mic on" : "Mic off"
+                  }${media.hasScreenShare ? " | Presenting" : ""}`;
+                  const accessModeLabel = presenterAccessEnabled
+                    ? "Stage"
+                    : speakerAccessEnabled
+                      ? "Mic enabled"
+                      : "Listener";
                   const roleBadges = [
                     isModeratorByDefault(participantUserId) ? "Host / Instructor" : "",
                     presenterAccessEnabled ? "Stage" : "",
@@ -2000,80 +2008,94 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
                   return (
                     <div
                       key={entry.id}
-                      className="rounded-[24px] border border-black panel-gradient px-4 py-4 text-sm text-[#E1E1E1]"
+                      className="rounded-[18px] border border-black bg-[#111111]/95 px-3 py-3 text-sm text-[#E1E1E1] shadow-[0_10px_18px_rgba(0,0,0,0.22)]"
                     >
-                      <div className="flex items-start gap-3">
+                      <div className="flex items-start gap-2.5">
                         {participantAvatarUrl ? (
                           <img
                             src={participantAvatarUrl}
                             alt={participantLabel(entry)}
-                            className="h-11 w-11 flex-none rounded-full border border-black object-cover"
+                            className="h-10 w-10 flex-none rounded-full border border-black object-cover"
                           />
                         ) : (
-                          <div className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-[#252525] text-sm font-semibold text-white">
+                          <div className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-[#252525] text-sm font-semibold text-white">
                             {participantInitials(participantLabel(entry))}
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-start justify-between gap-2">
                             <div className="min-w-0">
-                              <div className="truncate font-semibold text-white">{participantLabel(entry)}</div>
-                              <div className="mt-1 text-xs text-[#BBBBBB]">
-                                {media.hasCamera ? "Camera on" : "Camera off"} | {media.hasAudio ? "Mic on" : "Mic off"}
-                                {media.hasScreenShare ? " | Presenting" : ""}
+                              <div className="truncate text-[15px] font-semibold text-white">
+                                {participantLabel(entry)}
                               </div>
+                              <div className="mt-0.5 text-[11px] text-[#AFAFAF]">{mediaSummary}</div>
                             </div>
-                            <div className="flex flex-wrap justify-end gap-1.5">
+                            <div className="rounded-full border border-black bg-[#171717] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#D9D9D9]">
+                              {accessModeLabel}
+                            </div>
+                          </div>
+
+                          {roleBadges.length > 0 ? (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
                               {roleBadges.map((badge) => (
                                 <span
                                   key={`${entry.id}-${badge}`}
-                                  className="rounded-full border border-black bg-[#101010] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#E1E1E1]"
+                                  className="rounded-full border border-black bg-[#151515] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#CFCFCF]"
                                 >
                                   {badge}
                                 </span>
                               ))}
                             </div>
-                          </div>
+                          ) : null}
 
-                          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                            <div className="rounded-2xl border border-black panel-gradient px-3 py-2.5">
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#949494]">
+                          <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
+                            <div className="rounded-xl border border-black bg-[#161616] px-2.5 py-2">
+                              <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#8F8F8F]">
                                 Microphone
                               </div>
-                              <div className="mt-1 text-sm font-medium text-white">
+                              <div
+                                className={`mt-1 text-xs font-semibold ${
+                                  speakerAccessEnabled ? "text-[#ECECEC]" : "text-[#AFAFAF]"
+                                }`}
+                              >
                                 {speakerAccessEnabled ? "Allowed" : "Locked"}
                               </div>
                             </div>
-                            <div className="rounded-2xl border border-black panel-gradient px-3 py-2.5">
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#949494]">
+                            <div className="rounded-xl border border-black bg-[#161616] px-2.5 py-2">
+                              <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#8F8F8F]">
                                 Camera / screen
                               </div>
-                              <div className="mt-1 text-sm font-medium text-white">
+                              <div
+                                className={`mt-1 text-xs font-semibold ${
+                                  presenterAccessEnabled ? "text-[#ECECEC]" : "text-[#AFAFAF]"
+                                }`}
+                              >
                                 {presenterAccessEnabled ? "Allowed" : "Locked"}
                               </div>
                             </div>
                           </div>
-                      {canManageParticipants && participantUserId && !entry.isLocal && !presenterAccessEnabled ? (
-                        <div className="mt-3">
-                          <Button
-                            variant={speakerAccessEnabled ? "danger" : "secondary"}
-                            className={`w-full rounded-full px-3 py-2 text-xs shadow-none sm:max-w-[180px] ${
-                              speakerAccessEnabled
-                                ? "border-[#A9A9A9] bg-[#737373] text-white hover:bg-[#616161]"
-                                : "border-black bg-[#141414]/92 text-[#DBDBDB] hover:bg-[#1B1B1B]"
-                            }`}
-                            loading={loadingSpeaker}
-                            onClick={() => handleSpeakerPermission(participantUserId, !speakerAccessEnabled)}
-                          >
-                            {speakerAccessEnabled ? "Revoke mic" : "Allow mic"}
-                          </Button>
-                        </div>
-                      ) : null}
-                      {isModeratorByDefault(participantUserId) ? (
-                        <div className="mt-3 rounded-2xl border border-black panel-gradient px-3 py-2.5 text-xs text-[#BBBBBB]">
-                          Core moderation access comes from the session host or assigned instructor role.
-                        </div>
-                      ) : null}
+
+                          {canManageParticipants && participantUserId && !entry.isLocal && !presenterAccessEnabled ? (
+                            <div className="mt-2.5">
+                              <Button
+                                variant={speakerAccessEnabled ? "danger" : "secondary"}
+                                className={`w-full rounded-full px-3 py-2 text-[11px] shadow-none sm:max-w-[180px] ${
+                                  speakerAccessEnabled
+                                    ? "border-[#A9A9A9] bg-[#737373] text-white hover:bg-[#616161]"
+                                    : "border-black bg-[#1A1A1A] text-[#DADADA] hover:bg-[#222222]"
+                                }`}
+                                loading={loadingSpeaker}
+                                onClick={() => handleSpeakerPermission(participantUserId, !speakerAccessEnabled)}
+                              >
+                                {speakerAccessEnabled ? "Revoke mic" : "Allow mic"}
+                              </Button>
+                            </div>
+                          ) : null}
+                          {isModeratorByDefault(participantUserId) ? (
+                            <div className="mt-2 text-[11px] text-[#8F8F8F]">
+                              Core moderation is inherited from host/instructor role.
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     </div>
