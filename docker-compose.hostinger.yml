@@ -181,7 +181,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "tr '\\0' ' ' </proc/1/cmdline | grep -q '/entrypoint.sh'",
+          "tr '\\0' ' ' </proc/1/cmdline | grep -q 'egress'",
         ]
       interval: 30s
       timeout: 5s
