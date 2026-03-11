@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import time
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
@@ -27,6 +28,10 @@ class LiveKitConfigError(Exception):
 
 class LiveKitEgressError(Exception):
     """Raised when starting/stopping egress fails."""
+
+
+class LiveKitRoomServiceError(Exception):
+    """Raised when LiveKit room service actions fail."""
 
 
 class ParticipantCountSnapshot:
@@ -255,6 +260,184 @@ def _build_server_token(*, identity, grants, ttl_seconds=3600, participant_name=
     if isinstance(token, bytes):
         return token.decode("utf-8")
     return token
+
+
+def _build_room_admin_token(room_name):
+    if not is_livekit_configured():
+        raise LiveKitConfigError("LiveKit is not configured. Set LIVEKIT_URL, LIVEKIT_API_KEY and LIVEKIT_API_SECRET.")
+    return _build_server_token(
+        identity="server-room-admin",
+        grants={"roomAdmin": True, "room": room_name},
+        ttl_seconds=120,
+    )
+
+
+def _twirp_room_service_post(*, room_name, method_name, payload, timeout=4):
+    base_urls = _get_livekit_server_base_urls()
+    if not base_urls:
+        raise LiveKitRoomServiceError(
+            "LiveKit server URL is not configured. Set LIVEKIT_SERVER_URL or LIVEKIT_URL."
+        )
+
+    auth_header = f"Bearer {_build_room_admin_token(room_name)}"
+    request_body = json.dumps(payload).encode("utf-8")
+    last_error_message = ""
+
+    for base_url in base_urls:
+        endpoint = f"{base_url}/twirp/livekit.RoomService/{method_name}"
+        request = Request(
+            endpoint,
+            data=request_body,
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": auth_header,
+            },
+        )
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                return json.loads(response.read().decode("utf-8") or "{}")
+        except HTTPError as exc:
+            body = ""
+            try:
+                body = exc.read().decode("utf-8")
+            except Exception:
+                body = str(exc)
+            last_error_message = f"RoomService {method_name} HTTP {exc.code}: {body}"
+            if exc.code in {404, 405, 502, 503, 504}:
+                continue
+            raise LiveKitRoomServiceError(last_error_message) from exc
+        except URLError as exc:
+            last_error_message = f"RoomService {method_name} network error: {exc}"
+            continue
+        except Exception as exc:
+            last_error_message = f"RoomService {method_name} unknown error: {exc}"
+            continue
+
+    raise LiveKitRoomServiceError(last_error_message or f"RoomService {method_name} request failed.")
+
+
+_LIVEKIT_USER_IDENTITY_RE = re.compile(r"^user-(\d+)-")
+
+
+def _parse_user_id_from_participant_identity(identity):
+    identity_str = str(identity or "").strip()
+    match = _LIVEKIT_USER_IDENTITY_RE.match(identity_str)
+    if not match:
+        return None
+    try:
+        user_id = int(match.group(1))
+    except (TypeError, ValueError):
+        return None
+    return user_id if user_id > 0 else None
+
+
+def _list_room_participants(room_name):
+    payload = {"room": room_name}
+    response = _twirp_room_service_post(
+        room_name=room_name,
+        method_name="ListParticipants",
+        payload=payload,
+        timeout=4,
+    )
+    participants = response.get("participants") or []
+    return participants if isinstance(participants, list) else []
+
+
+def apply_live_speaker_permission_update(*, session, target_user_id, allow_microphone):
+    """
+    Apply speaker permission changes for already-connected participants without forcing rejoin.
+
+    Returns a diagnostics payload used by API responses and telemetry.
+    """
+    room_name = str(getattr(session, "livekit_room_name", "") or getattr(session, "room_name", "") or "").strip()
+    result = {
+        "applied": False,
+        "room_name": room_name,
+        "target_user_id": int(target_user_id),
+        "allow_microphone": bool(allow_microphone),
+        "connected_matches": 0,
+        "updated_identities": [],
+        "muted_track_count": 0,
+        "errors": [],
+    }
+
+    if not room_name or not is_livekit_configured():
+        return result
+
+    try:
+        participants = _list_room_participants(room_name)
+    except Exception as exc:
+        result["errors"].append(str(exc))
+        return result
+
+    matched_rows = []
+    for participant in participants:
+        identity = str(participant.get("identity") or "").strip()
+        if not identity:
+            continue
+        if _parse_user_id_from_participant_identity(identity) != int(target_user_id):
+            continue
+        matched_rows.append((identity, participant))
+
+    result["connected_matches"] = len(matched_rows)
+    if not matched_rows:
+        # No active participant session to update right now.
+        result["applied"] = True
+        return result
+
+    publish_sources = ["MICROPHONE"] if allow_microphone else []
+    for identity, participant in matched_rows:
+        try:
+            _twirp_room_service_post(
+                room_name=room_name,
+                method_name="UpdateParticipant",
+                payload={
+                    "room": room_name,
+                    "identity": identity,
+                    "permission": {
+                        "canPublish": bool(allow_microphone),
+                        "canSubscribe": True,
+                        "canPublishData": True,
+                        "canPublishSources": publish_sources,
+                    },
+                },
+                timeout=4,
+            )
+            result["updated_identities"].append(identity)
+        except Exception as exc:
+            result["errors"].append(f"{identity}: {exc}")
+            continue
+
+        if allow_microphone:
+            continue
+
+        # Revoke should take effect immediately; mute any already-published microphone tracks.
+        for track in participant.get("tracks") or []:
+            source = str(track.get("source") or "").strip().lower()
+            track_sid = str(track.get("sid") or track.get("trackSid") or "").strip()
+            if not track_sid:
+                continue
+            if "microphone" not in source and source not in {"mic"}:
+                continue
+            try:
+                _twirp_room_service_post(
+                    room_name=room_name,
+                    method_name="MutePublishedTrack",
+                    payload={
+                        "room": room_name,
+                        "identity": identity,
+                        "trackSid": track_sid,
+                        "muted": True,
+                    },
+                    timeout=4,
+                )
+                result["muted_track_count"] += 1
+            except Exception as exc:
+                result["errors"].append(f"{identity}:{track_sid}:{exc}")
+
+    result["applied"] = len(result["updated_identities"]) == result["connected_matches"] and not result["errors"]
+    return result
 
 
 def build_participant_token(

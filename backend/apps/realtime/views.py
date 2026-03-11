@@ -37,6 +37,7 @@ from .serializers import (
     RealtimePresenterPermissionSerializer,
 )
 from .services import (
+    apply_live_speaker_permission_update,
     build_participant_metadata,
     cache_room_participant_count,
     delete_recording_assets,
@@ -524,11 +525,26 @@ def _update_participant_permission(*, request, pk, permission_action, permission
         actor = session.grant_speaker if permission_action == "grant" else session.revoke_speaker
         speaker_ids = actor(target_user_id)
         presenter_ids = session.get_presenter_user_ids()
+        live_update = apply_live_speaker_permission_update(
+            session=session,
+            target_user_id=target_user_id,
+            allow_microphone=(permission_action == "grant"),
+        )
 
     if permission_action == "grant":
         message = f"{target_label} access granted."
     else:
         message = f"{target_label} access revoked."
+
+    note = "Permission update saved."
+    if permission_kind == "speaker":
+        connected_matches = int(live_update.get("connected_matches") or 0)
+        if connected_matches <= 0:
+            note = "Permission saved. The user is not currently connected; it will apply on next join."
+        elif live_update.get("applied"):
+            note = "Permission applied instantly for connected participant sessions."
+        else:
+            note = "Permission saved. Live update was partial; ask the participant to toggle microphone once."
 
     data = {
         "session": RealtimeSessionListSerializer(session, context={"request": request}).data,
@@ -541,7 +557,8 @@ def _update_participant_permission(*, request, pk, permission_action, permission
             "role": target_user.role,
         },
         "updated_permission": permission_kind,
-        "note": "Permission updates apply on participant rejoin.",
+        "note": note,
+        "live_update": live_update if permission_kind == "speaker" else {},
     }
     return api_response(success=True, message=message, data=data)
 

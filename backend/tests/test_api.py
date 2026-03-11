@@ -2460,6 +2460,7 @@ class RealtimeSessionTests(APITestCase):
         LIVEKIT_API_SECRET="secret",
         LIVEKIT_MEET_URL="https://meet.livekit.io",
     )
+    @patch("apps.realtime.views.apply_live_speaker_permission_update")
     @patch("apps.realtime.views.build_meet_embed_url")
     @patch("apps.realtime.views.build_participant_token")
     @patch("apps.realtime.views.get_room_participant_count")
@@ -2468,10 +2469,17 @@ class RealtimeSessionTests(APITestCase):
         mock_participant_count,
         mock_build_token,
         mock_build_meet_url,
+        mock_apply_live_speaker_update,
     ):
         mock_participant_count.return_value = 1
         mock_build_token.return_value = "lk.token"
         mock_build_meet_url.return_value = "https://meet.livekit.io/?token=lk.token"
+        mock_apply_live_speaker_update.return_value = {
+            "applied": True,
+            "connected_matches": 0,
+            "updated_identities": [],
+            "errors": [],
+        }
 
         session = RealtimeSession.objects.create(
             title="Speaker Permission Session",
@@ -2518,15 +2526,23 @@ class RealtimeSessionTests(APITestCase):
         LIVEKIT_API_SECRET="secret",
         LIVEKIT_MEET_URL="https://meet.livekit.io",
     )
+    @patch("apps.realtime.views.apply_live_speaker_permission_update")
     @patch("apps.realtime.views.build_participant_token")
     @patch("apps.realtime.views.get_room_participant_count")
     def test_assigned_instructor_can_join_and_manage_permissions_without_being_host(
         self,
         mock_participant_count,
         mock_build_token,
+        mock_apply_live_speaker_update,
     ):
         mock_participant_count.return_value = 1
         mock_build_token.return_value = "lk.token"
+        mock_apply_live_speaker_update.return_value = {
+            "applied": True,
+            "connected_matches": 0,
+            "updated_identities": [],
+            "errors": [],
+        }
 
         admin_host = User.objects.create_user(
             email="adminhost@test.com",

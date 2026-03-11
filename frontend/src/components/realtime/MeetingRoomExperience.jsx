@@ -540,6 +540,40 @@ function parseUserIdFromIdentity(identity) {
   return Number.isInteger(userId) && userId > 0 ? userId : null;
 }
 
+function sourceIncludesMicrophone(sourceValue) {
+  const normalized = String(sourceValue || "").trim().toLowerCase();
+  return normalized.includes("microphone") || normalized === "mic";
+}
+
+function extractLocalCanSpeakFromPermissions(participant) {
+  const permissions = participant?.permissions || participant?.permission;
+  if (!permissions || typeof permissions !== "object") {
+    return null;
+  }
+  const canPublish = Boolean(permissions.canPublish);
+  const rawSources = Array.isArray(permissions.canPublishSources)
+    ? permissions.canPublishSources
+    : [];
+  if (rawSources.length === 0) {
+    return canPublish;
+  }
+  return canPublish && rawSources.some((source) => sourceIncludesMicrophone(source));
+}
+
+function resolvePermissionEventParticipant(firstArg, secondArg) {
+  const firstLooksLikeParticipant =
+    firstArg && typeof firstArg === "object" && typeof firstArg.identity === "string";
+  if (firstLooksLikeParticipant) {
+    return firstArg;
+  }
+  const secondLooksLikeParticipant =
+    secondArg && typeof secondArg === "object" && typeof secondArg.identity === "string";
+  if (secondLooksLikeParticipant) {
+    return secondArg;
+  }
+  return null;
+}
+
 function resolveRecordingMode(recording) {
   const source = String(recording?.source || "").trim().toLowerCase();
   if (source === "browser_fallback") {
@@ -604,6 +638,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
   const [panelTab, setPanelTab] = useState("people");
   const [sidePanelOpen, setSidePanelOpen] = useState(!audienceFocusMode);
   const [speakerUserIds, setSpeakerUserIds] = useState(() => normalizeUserIdList(meeting.speaker_user_ids));
+  const [runtimeCanSpeak, setRuntimeCanSpeak] = useState(Boolean(canSpeak));
   const [permissionState, setPermissionState] = useState({
     loadingKey: "",
     error: "",
@@ -715,6 +750,10 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     setSpeakerUserIds(normalizeUserIdList(meeting.speaker_user_ids));
     setPermissionState({ loadingKey: "", error: "", info: "" });
   }, [meeting.speaker_user_ids, session.id]);
+
+  useEffect(() => {
+    setRuntimeCanSpeak(Boolean(canSpeak || canPresent));
+  }, [canPresent, canSpeak, session.id]);
 
   useEffect(() => {
     setSidePanelOpen(!audienceFocusMode);
@@ -847,14 +886,75 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
       setConnectionLabel("disconnected");
       syncParticipants();
     });
+    const permissionsChangedEvent =
+      RoomEvent.ParticipantPermissionsChanged || "participantPermissionsChanged";
+    room.on(permissionsChangedEvent, (firstArg, secondArg) => {
+      const participant = resolvePermissionEventParticipant(firstArg, secondArg);
+      if (!participant || participant.identity !== room.localParticipant?.identity) {
+        return;
+      }
+      const canSpeakFromPermissions = extractLocalCanSpeakFromPermissions(participant);
+      if (typeof canSpeakFromPermissions !== "boolean") {
+        return;
+      }
+      const nextCanSpeak = Boolean(canSpeakFromPermissions || canPresent);
+      setRuntimeCanSpeak(nextCanSpeak);
+      if (!nextCanSpeak) {
+        room.localParticipant
+          .setMicrophoneEnabled(false)
+          .catch(() => {
+            // best-effort immediate mute on revoke
+          });
+      }
+      setMeetingInfo(
+        nextCanSpeak
+          ? "Microphone access granted by moderator. You can unmute now."
+          : "Microphone access revoked by moderator."
+      );
+      syncLocalControls();
+    });
     room.on(RoomEvent.DataReceived, (payloadBytes, participant, _kind, topic) => {
-      if (topic && topic !== "meeting-chat") {
+      if (topic && topic !== "meeting-chat" && topic !== "meeting-control") {
         return;
       }
 
       try {
         const decoded = textDecoder.decode(payloadBytes);
         const parsed = JSON.parse(decoded);
+        if (parsed?.type === "permission_update" && parsed?.permission === "speaker") {
+          const targetUserId = Number(parsed?.target_user_id || 0);
+          const shouldAllowSpeak = Boolean(parsed?.can_speak);
+          const senderMetadata = parseParticipantMetadata(participant);
+          const senderRole = String(senderMetadata?.role || "").trim().toLowerCase();
+          const senderIsModerator = Boolean(senderMetadata?.is_admin || senderRole === "instructor");
+          if (!senderIsModerator || !Number.isInteger(targetUserId) || targetUserId <= 0) {
+            return;
+          }
+          setSpeakerUserIds((previous) => {
+            const normalized = normalizeUserIdList(previous);
+            if (shouldAllowSpeak) {
+              return normalizeUserIdList([...normalized, targetUserId]);
+            }
+            return normalized.filter((value) => value !== targetUserId);
+          });
+          if (targetUserId === Number(user?.id || 0)) {
+            setRuntimeCanSpeak(Boolean(shouldAllowSpeak || canPresent));
+            if (!shouldAllowSpeak) {
+              room.localParticipant
+                .setMicrophoneEnabled(false)
+                .catch(() => {
+                  // best-effort immediate mute on revoke
+                });
+            }
+            setMeetingInfo(
+              shouldAllowSpeak
+                ? "Microphone access granted by moderator. You can unmute now."
+                : "Microphone access revoked by moderator."
+            );
+            syncLocalControls();
+          }
+          return;
+        }
         if (parsed.type !== "chat" || !parsed.text) {
           return;
         }
@@ -888,6 +988,10 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
             enforceRemotePublicationQuality(publication);
           }
         }
+        const canSpeakFromPermissions = extractLocalCanSpeakFromPermissions(room.localParticipant);
+        if (typeof canSpeakFromPermissions === "boolean") {
+          setRuntimeCanSpeak(Boolean(canSpeakFromPermissions || canPresent));
+        }
 
         if (canPresent) {
           try {
@@ -902,7 +1006,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
           }
         } else if (canSpeak) {
           setMeetingInfo(
-            "Discussion access enabled. You can use microphone and chat, but camera and screen sharing stay locked unless stage access is granted. Rejoin after moderation updates to apply new permissions."
+            "Discussion access enabled. You can use microphone and chat, but camera and screen sharing stay locked unless stage access is granted."
           );
         } else {
           setMeetingInfo("Listener mode enabled. Microphone, camera, and screen sharing are locked until an instructor or admin grants access.");
@@ -957,6 +1061,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
   }, [
     canPresent,
     canSpeak,
+    canManageParticipants,
     enforceRemotePublicationQuality,
     mediaProfile.cameraCaptureHeight,
     mediaProfile.cameraCaptureWidth,
@@ -968,6 +1073,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     premiumProfileEnabled,
     syncLocalControls,
     syncParticipants,
+    user?.id,
   ]);
 
   useEffect(() => {
@@ -1064,6 +1170,8 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
       ),
     [hasPresenterAccess, speakerUserIds]
   );
+  const localUserId = Number(user?.id) || null;
+  const effectiveCanSpeak = Boolean(canPresent || runtimeCanSpeak || hasSpeakerAccess(localUserId));
   const moderationSummary = useMemo(
     () => ({
       micGrants: speakerUserIds.filter((userId) => !hasPresenterAccess(userId)).length,
@@ -1111,7 +1219,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
       featureName = "microphone",
       shouldValidateMediaApi = null,
     } = options;
-    if (permissionRequirement === "speak" && !canSpeak) {
+    if (permissionRequirement === "speak" && !effectiveCanSpeak) {
       setMeetingError("Microphone access is disabled for your role in this meeting.");
       return;
     }
@@ -1210,10 +1318,30 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
         : await revokeRealtimeSpeaker(session.id, userId);
       const data = apiData(response, {});
       setSpeakerUserIds(normalizeUserIdList(data.speaker_user_ids));
+      const room = roomRef.current;
+      if (room?.localParticipant) {
+        const payload = {
+          type: "permission_update",
+          permission: "speaker",
+          target_user_id: Number(userId),
+          can_speak: Boolean(grantAccess),
+          ts: new Date().toISOString(),
+        };
+        try {
+          await room.localParticipant.publishData(textEncoder.encode(JSON.stringify(payload)), {
+            reliable: true,
+            topic: "meeting-control",
+          });
+        } catch {
+          // Best effort. Backend already persists + applies LiveKit permissions directly.
+        }
+      }
       setPermissionState({
         loadingKey: "",
         error: "",
-        info: `${grantAccess ? "Mic access granted" : "Mic access revoked"} for user ${userId}. Rejoin required to apply.`,
+        info: `${grantAccess ? "Mic access granted" : "Mic access revoked"} for user ${userId}. ${
+          String(data.note || "").trim() || "Applied live for connected participants."
+        }`,
       });
     } catch (err) {
       setPermissionState({
@@ -1473,7 +1601,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     ? "Moderator"
     : canPresent
       ? "Presenter"
-      : canSpeak
+      : effectiveCanSpeak
         ? "Speaker"
         : "Listener";
   const latestRecordingPlaybackUrl = resolveRecordingPlaybackUrl(recordingState.latestCompleted);
@@ -1998,7 +2126,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
 
       <div className="relative border-t border-black bg-[#131313]/84 px-4 py-4 backdrop-blur-sm">
         <div className="flex flex-wrap items-center justify-center gap-3">
-          {canPresent || canSpeak ? (
+          {canPresent || effectiveCanSpeak ? (
           <>
             <Button
               variant={controls.mic ? "secondary" : "danger"}
