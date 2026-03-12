@@ -1,4 +1,7 @@
 import os
+import re
+import secrets
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -26,12 +29,18 @@ class RealtimeSessionQuerySet(models.QuerySet):
 class RealtimeSession(models.Model):
     TYPE_MEETING = "meeting"
     TYPE_BROADCASTING = "broadcasting"
+    STREAM_SERVICE_ALSYED = "alsyed_stream"
+    STREAM_SERVICE_OBS = "obs_stream"
     MAX_MEETING_CAPACITY = 200
     MAX_AUDIENCE_LIMIT = 500
     MAX_STAGE_PARTICIPANTS = 5
     SESSION_TYPE_CHOICES = [
         (TYPE_MEETING, "Meeting"),
         (TYPE_BROADCASTING, "Broadcasting"),
+    ]
+    STREAM_SERVICE_CHOICES = [
+        (STREAM_SERVICE_ALSYED, "Alsyed Stream (Browser Host Studio)"),
+        (STREAM_SERVICE_OBS, "Alsyed OBS Stream"),
     ]
 
     STATUS_SCHEDULED = "scheduled"
@@ -97,6 +106,12 @@ class RealtimeSession(models.Model):
     allow_overflow_broadcast = models.BooleanField(default=True)
     presenter_user_ids = models.JSONField(default=list, blank=True)
     speaker_user_ids = models.JSONField(default=list, blank=True)
+    stream_service = models.CharField(
+        max_length=20,
+        choices=STREAM_SERVICE_CHOICES,
+        default=STREAM_SERVICE_ALSYED,
+    )
+    obs_stream_key = models.CharField(max_length=120, blank=True, default="")
 
     stream_embed_url = models.URLField(blank=True, default="")
     chat_embed_url = models.URLField(blank=True, default="")
@@ -132,6 +147,7 @@ class RealtimeSession(models.Model):
         validate_no_active_content(self.room_name, "room_name")
         validate_no_active_content(self.livekit_room_name, "livekit_room_name")
         validate_no_active_content(self.rtmp_target_url, "rtmp_target_url")
+        validate_no_active_content(self.obs_stream_key, "obs_stream_key")
         validate_safe_public_stream_url(self.rtmp_target_url, "rtmp_target_url")
         validate_safe_public_url(self.stream_embed_url, "stream_embed_url")
         validate_safe_public_url(self.chat_embed_url, "chat_embed_url")
@@ -156,6 +172,17 @@ class RealtimeSession(models.Model):
             else:
                 detail = "Select a linked live class for broadcast sessions."
             raise ValidationError({"linked_live_class": detail})
+        if self.session_type == self.TYPE_MEETING and self.stream_service != self.STREAM_SERVICE_ALSYED:
+            raise ValidationError({"stream_service": "Meeting sessions support only Alsyed Stream mode."})
+        obs_key = str(self.obs_stream_key or "").strip()
+        if obs_key and not re.match(r"^[A-Za-z0-9._~-]{8,120}$", obs_key):
+            raise ValidationError(
+                {
+                    "obs_stream_key": (
+                        "OBS stream key may contain letters, numbers, dot, underscore, tilde, and dash only."
+                    )
+                }
+            )
         if not isinstance(self.presenter_user_ids, list):
             raise ValidationError({"presenter_user_ids": "Presenter user IDs must be a list."})
         normalized_presenters = self.get_presenter_user_ids()
@@ -190,6 +217,9 @@ class RealtimeSession(models.Model):
 
         if not self.livekit_room_name:
             self.livekit_room_name = self.room_name
+        self.obs_stream_key = str(self.obs_stream_key or "").strip()
+        if self.session_type == self.TYPE_BROADCASTING and self.stream_service == self.STREAM_SERVICE_OBS:
+            self.obs_stream_key = self.obs_stream_key or self.default_obs_stream_key()
 
         if self.linked_live_class_id and not self.linked_course_id:
             self.linked_course_id = self.linked_live_class.linked_course_id
@@ -219,7 +249,7 @@ class RealtimeSession(models.Model):
 
     def mark_stream_live(self, egress_id):
         self.stream_status = self.STREAM_LIVE
-        self.livekit_egress_id = egress_id or self.livekit_egress_id
+        self.livekit_egress_id = egress_id or ""
         self.livekit_egress_error = ""
         self.save(
             update_fields=[
@@ -247,6 +277,79 @@ class RealtimeSession(models.Model):
         self.stream_status = self.STREAM_FAILED
         self.livekit_egress_error = str(message or "")[:1000]
         self.save(update_fields=["stream_status", "livekit_egress_error", "updated_at"])
+
+    @staticmethod
+    def _extract_stream_key_from_target(raw_target):
+        value = str(raw_target or "").strip()
+        if not value:
+            return ""
+        parsed = urlparse(value)
+        path_rows = [row for row in str(parsed.path or "").split("/") if row]
+        return path_rows[-1] if path_rows else ""
+
+    @staticmethod
+    def _extract_server_url_from_target(raw_target):
+        value = str(raw_target or "").strip()
+        if not value:
+            return ""
+        parsed = urlparse(value)
+        if not parsed.scheme or not parsed.netloc:
+            return ""
+        path_rows = [row for row in str(parsed.path or "").split("/") if row]
+        base_path = ""
+        if len(path_rows) > 1:
+            base_path = "/" + "/".join(path_rows[:-1])
+        elif len(path_rows) == 1:
+            base_path = f"/{path_rows[0]}"
+        return f"{parsed.scheme}://{parsed.netloc}{base_path}".rstrip("/")
+
+    @classmethod
+    def generate_obs_stream_key(cls):
+        generated = re.sub(r"[^A-Za-z0-9]", "", secrets.token_urlsafe(36))
+        if len(generated) < 20:
+            generated = f"{generated}{secrets.token_hex(16)}"
+        return generated[:60]
+
+    def default_obs_stream_key(self):
+        candidates = [
+            getattr(settings, "OWNCAST_STREAM_KEY", ""),
+            self._extract_stream_key_from_target(getattr(settings, "OWNCAST_RTMP_TARGET", "")),
+            self._extract_stream_key_from_target(self.rtmp_target_url),
+        ]
+        for candidate in candidates:
+            normalized = str(candidate or "").strip()
+            if normalized:
+                return normalized
+        return self.generate_obs_stream_key()
+
+    def resolve_obs_stream_server_url(self):
+        explicit_server_url = str(getattr(settings, "OWNCAST_OBS_STREAM_SERVER_URL", "") or "").strip()
+        if explicit_server_url:
+            return explicit_server_url.rstrip("/")
+        candidates = [
+            self._extract_server_url_from_target(getattr(settings, "OWNCAST_RTMP_TARGET", "")),
+            self._extract_server_url_from_target(self.rtmp_target_url),
+        ]
+        for candidate in candidates:
+            normalized = str(candidate or "").strip()
+            if normalized:
+                return normalized.rstrip("/")
+        return "rtmp://owncast:1935/live"
+
+    def resolve_stream_target_url(self):
+        if self.stream_service == self.STREAM_SERVICE_OBS:
+            server_url = self.resolve_obs_stream_server_url()
+            stream_key = str(self.obs_stream_key or "").strip() or self.default_obs_stream_key()
+            return f"{server_url.rstrip('/')}/{stream_key}".rstrip("/")
+        return (self.rtmp_target_url or "").strip() or (
+            getattr(settings, "OWNCAST_RTMP_TARGET", "") or ""
+        ).strip()
+
+    def rotate_obs_stream_key(self, *, save=True):
+        self.obs_stream_key = self.generate_obs_stream_key()
+        if save:
+            self.save(update_fields=["obs_stream_key", "updated_at"])
+        return self.obs_stream_key
 
     def get_presenter_user_ids(self):
         return self._normalize_user_id_list(self.presenter_user_ids)

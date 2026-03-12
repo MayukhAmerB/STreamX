@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 from config.url_utils import get_media_public_url
 
 from .models import RealtimeConfiguration, RealtimeSession, RealtimeSessionRecording
-from .services import delete_recording_assets
+from .services import delete_recording_assets, resolve_obs_stream_server_url
 
 
 class RealtimeConfigurationAdminForm(forms.ModelForm):
@@ -205,6 +205,7 @@ class RealtimeSessionAdmin(admin.ModelAdmin):
         "id",
         "title",
         "session_type",
+        "stream_service",
         "status",
         "stream_status",
         "linked_live_class",
@@ -232,7 +233,78 @@ class RealtimeSessionAdmin(admin.ModelAdmin):
         "ended_at",
         "livekit_egress_id",
         "livekit_egress_error",
+        "obs_stream_server_url_display",
+        "obs_stream_target_url_display",
     )
+    fieldsets = (
+        (
+            "Session",
+            {
+                "fields": (
+                    "title",
+                    "slug",
+                    "description",
+                    "session_type",
+                    "status",
+                    "host",
+                    "linked_live_class",
+                    "linked_course",
+                )
+            },
+        ),
+        (
+            "Capacity & Stage Control",
+            {
+                "fields": (
+                    "meeting_capacity",
+                    "max_audience",
+                    "allow_overflow_broadcast",
+                    "presenter_user_ids",
+                    "speaker_user_ids",
+                )
+            },
+        ),
+        (
+            "Broadcast Delivery",
+            {
+                "fields": (
+                    "stream_service",
+                    "stream_embed_url",
+                    "chat_embed_url",
+                    "rtmp_target_url",
+                    "obs_stream_key",
+                    "obs_stream_server_url_display",
+                    "obs_stream_target_url_display",
+                )
+            },
+        ),
+        (
+            "Runtime",
+            {
+                "fields": (
+                    "room_name",
+                    "livekit_room_name",
+                    "stream_status",
+                    "livekit_egress_id",
+                    "livekit_egress_error",
+                    "started_at",
+                    "ended_at",
+                    "created_at",
+                    "updated_at",
+                )
+            },
+        ),
+    )
+
+    @admin.display(description="OBS Server URL")
+    def obs_stream_server_url_display(self, obj):
+        return resolve_obs_stream_server_url(session=obj)
+
+    @admin.display(description="OBS Stream Target")
+    def obs_stream_target_url_display(self, obj):
+        if obj.stream_service != RealtimeSession.STREAM_SERVICE_OBS:
+            return "-"
+        return obj.resolve_stream_target_url()
 
 
 @admin.register(RealtimeConfiguration)

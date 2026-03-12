@@ -195,9 +195,8 @@ services:
     volumes:
       - owncast_data:/app/data
     ports:
-      - "127.0.0.1:8080:8080"
-    expose:
-      - "1935"
+      - "${OWNCAST_HTTP_BIND_ADDRESS:-127.0.0.1}:8080:8080"
+      - "${OWNCAST_RTMP_BIND_ADDRESS:-127.0.0.1}:1935:1935"
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080"]
       interval: 30s

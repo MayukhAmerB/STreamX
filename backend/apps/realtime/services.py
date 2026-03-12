@@ -3,6 +3,7 @@ import hashlib
 import logging
 import re
 import time
+import base64
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import Request, urlopen
@@ -33,6 +34,14 @@ class LiveKitEgressError(Exception):
 
 class LiveKitRoomServiceError(Exception):
     """Raised when LiveKit room service actions fail."""
+
+
+class OwncastConfigError(Exception):
+    """Raised when Owncast admin integration is requested without required settings."""
+
+
+class OwncastAdminError(Exception):
+    """Raised when Owncast admin API calls fail."""
 
 
 class ParticipantCountSnapshot:
@@ -226,6 +235,123 @@ def _resolve_public_service_base_url(configured_base_url, request=None, default_
     if port:
         return f"{scheme}://{host}:{port}"
     return f"{scheme}://{host}"
+
+
+def _extract_stream_key_from_rtmp_target(raw_target):
+    value = str(raw_target or "").strip()
+    if not value:
+        return ""
+    parsed = urlparse(value)
+    path_rows = [row for row in str(parsed.path or "").split("/") if row]
+    return path_rows[-1] if path_rows else ""
+
+
+def _extract_server_url_from_rtmp_target(raw_target):
+    value = str(raw_target or "").strip()
+    if not value:
+        return ""
+    parsed = urlparse(value)
+    if not parsed.scheme or not parsed.netloc:
+        return ""
+    path_rows = [row for row in str(parsed.path or "").split("/") if row]
+    base_path = ""
+    if len(path_rows) > 1:
+        base_path = "/" + "/".join(path_rows[:-1])
+    elif len(path_rows) == 1:
+        base_path = f"/{path_rows[0]}"
+    return f"{parsed.scheme}://{parsed.netloc}{base_path}".rstrip("/")
+
+
+def resolve_obs_stream_server_url(*, request=None, session=None):
+    configured_obs_server_url = str(getattr(settings, "OWNCAST_OBS_STREAM_SERVER_URL", "") or "").strip()
+    if configured_obs_server_url:
+        return configured_obs_server_url.rstrip("/")
+
+    derived_server_url = _extract_server_url_from_rtmp_target(getattr(settings, "OWNCAST_RTMP_TARGET", ""))
+    if not derived_server_url and session is not None:
+        derived_server_url = _extract_server_url_from_rtmp_target(getattr(session, "rtmp_target_url", ""))
+
+    if derived_server_url:
+        parsed = urlparse(derived_server_url)
+        host = str(parsed.hostname or "").strip()
+        scheme = str(parsed.scheme or "rtmp").strip().lower() or "rtmp"
+        path = str(parsed.path or "/live").strip() or "/live"
+        if not path.startswith("/"):
+            path = f"/{path}"
+        if host in NON_PUBLIC_HOSTNAMES:
+            request_host = _resolve_request_host(request)
+            if request_host and request_host not in NON_PUBLIC_HOSTNAMES:
+                host = request_host
+        if host:
+            port = parsed.port or 1935
+            return f"{scheme}://{host}:{port}{path}".rstrip("/")
+
+    public_stream_base = _resolve_public_service_base_url(
+        getattr(settings, "OWNCAST_STREAM_PUBLIC_BASE_URL", "") or getattr(settings, "OWNCAST_BASE_URL", ""),
+        request=request,
+        default_port="8080",
+    )
+    if public_stream_base:
+        parsed = urlparse(public_stream_base)
+        host = str(parsed.hostname or "").strip()
+        if host:
+            return f"rtmp://{host}:1935/live"
+    return "rtmp://owncast:1935/live"
+
+
+def build_obs_rtmp_target_url(*, stream_server_url, stream_key):
+    server = str(stream_server_url or "").strip().rstrip("/")
+    key = str(stream_key or "").strip()
+    if not server or not key:
+        return ""
+    return f"{server}/{key}".rstrip("/")
+
+
+def sync_owncast_stream_key(stream_key):
+    admin_password = str(getattr(settings, "OWNCAST_ADMIN_PASSWORD", "") or "").strip()
+    admin_username = str(getattr(settings, "OWNCAST_ADMIN_USERNAME", "admin") or "admin").strip() or "admin"
+    if not admin_password:
+        raise OwncastConfigError("OWNCAST_ADMIN_PASSWORD is required to rotate Owncast stream key.")
+
+    base_url = str(
+        getattr(settings, "OWNCAST_ADMIN_API_BASE_URL", "") or getattr(settings, "OWNCAST_BASE_URL", "")
+    ).strip().rstrip("/")
+    if not base_url:
+        raise OwncastConfigError("OWNCAST_ADMIN_API_BASE_URL or OWNCAST_BASE_URL is required.")
+
+    target_key = str(stream_key or "").strip()
+    if not target_key:
+        raise OwncastAdminError("Stream key cannot be empty.")
+
+    auth_token = base64.b64encode(f"{admin_username}:{admin_password}".encode("utf-8")).decode("utf-8")
+    endpoint = f"{base_url}/api/admin/changekey"
+    request = Request(
+        endpoint,
+        data=json.dumps({"key": target_key}).encode("utf-8"),
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Basic {auth_token}",
+        },
+    )
+    try:
+        with urlopen(request, timeout=10) as response:
+            raw_payload = response.read().decode("utf-8") or "{}"
+        parsed_payload = json.loads(raw_payload)
+        if not bool(parsed_payload.get("success", True)):
+            raise OwncastAdminError(str(parsed_payload.get("errorMessage") or "Owncast key update failed."))
+        return parsed_payload
+    except HTTPError as exc:
+        response_body = ""
+        try:
+            response_body = exc.read().decode("utf-8")
+        except Exception:
+            response_body = str(exc)
+        raise OwncastAdminError(f"Owncast admin API HTTP {exc.code}: {response_body}") from exc
+    except URLError as exc:
+        raise OwncastAdminError(f"Owncast admin API network error: {exc}") from exc
+    except Exception as exc:
+        raise OwncastAdminError(f"Owncast admin API unknown error: {exc}") from exc
 
 
 def build_session_join_url(session_id, request=None):

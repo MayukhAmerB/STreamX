@@ -16,6 +16,7 @@ from .views import (
     RealtimeSessionSpeakerPermissionView,
     RealtimeSessionStreamStartView,
     RealtimeSessionStreamStopView,
+    RealtimeSessionStreamRotateKeyView,
 )
 
 urlpatterns = [
@@ -25,6 +26,11 @@ urlpatterns = [
     path("sessions/<int:pk>/host-token/", RealtimeSessionHostTokenView.as_view(), name="realtime-session-host-token"),
     path("sessions/<int:pk>/stream/start/", RealtimeSessionStreamStartView.as_view(), name="realtime-session-stream-start"),
     path("sessions/<int:pk>/stream/stop/", RealtimeSessionStreamStopView.as_view(), name="realtime-session-stream-stop"),
+    path(
+        "sessions/<int:pk>/stream/rotate-key/",
+        RealtimeSessionStreamRotateKeyView.as_view(),
+        name="realtime-session-stream-rotate-key",
+    ),
     path(
         "sessions/<int:pk>/recordings/",
         RealtimeSessionRecordingListView.as_view(),

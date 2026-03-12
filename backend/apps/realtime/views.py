@@ -45,6 +45,8 @@ from .services import (
     delete_recording_assets,
     LiveKitEgressError,
     LiveKitConfigError,
+    OwncastAdminError,
+    OwncastConfigError,
     build_recording_filepath,
     build_host_publisher_identity,
     build_host_publisher_token,
@@ -55,11 +57,13 @@ from .services import (
     is_livekit_configured,
     resolve_recording_local_path,
     resolve_livekit_client_url,
+    resolve_obs_stream_server_url,
     resolve_broadcast_urls,
     start_room_recording_egress,
     start_room_broadcast_egress,
     stop_room_recording_egress,
     stop_room_broadcast_egress,
+    sync_owncast_stream_key,
 )
 
 User = get_user_model()
@@ -136,6 +140,30 @@ def _record_join_metric(*, result, mode, reason):
 
 def _record_recording_metric(*, action, result, reason):
     record_realtime_recording_operation(action=action, result=result, reason=reason)
+
+def _rotate_obs_stream_key_if_enabled(*, session, force=False):
+    if (
+        session.session_type != RealtimeSession.TYPE_BROADCASTING
+        or session.stream_service != RealtimeSession.STREAM_SERVICE_OBS
+        or (
+            not force
+            and not bool(getattr(settings, "OWNCAST_ROTATE_STREAM_KEY_ON_STOP", True))
+        )
+    ):
+        return {"rotated": False, "error": ""}
+
+    old_key = str(session.obs_stream_key or "").strip() or session.default_obs_stream_key()
+    new_key = session.generate_obs_stream_key()
+    try:
+        sync_owncast_stream_key(new_key)
+    except (OwncastConfigError, OwncastAdminError) as exc:
+        session.obs_stream_key = old_key
+        session.save(update_fields=["obs_stream_key", "updated_at"])
+        return {"rotated": False, "error": str(exc)}
+
+    session.obs_stream_key = new_key
+    session.save(update_fields=["obs_stream_key", "updated_at"])
+    return {"rotated": True, "error": ""}
 
 
 class RealtimeSessionListCreateView(APIView):
@@ -454,6 +482,15 @@ class RealtimeSessionEndView(APIView):
         if session.status != RealtimeSession.STATUS_ENDED:
             session.mark_ended()
 
+        if (
+            session.stream_service == RealtimeSession.STREAM_SERVICE_OBS
+            and session.stream_status != RealtimeSession.STREAM_STOPPED
+        ):
+            rotation_result = _rotate_obs_stream_key_if_enabled(session=session)
+            if rotation_result["error"]:
+                session.livekit_egress_error = str(rotation_result["error"])[:1000]
+                session.save(update_fields=["livekit_egress_error", "updated_at"])
+
         data = RealtimeSessionListSerializer(session, context={"request": request}).data
         return api_response(success=True, message="Realtime session ended.", data=data)
 
@@ -615,6 +652,25 @@ class RealtimeSessionHostTokenView(APIView):
                 errors={"detail": "Only host, assigned instructor, or admin can start browser publishing."},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
+        realtime_config = RealtimeConfiguration.get_solo()
+        if session.stream_service == RealtimeSession.STREAM_SERVICE_OBS:
+            return api_response(
+                success=True,
+                message="OBS stream details ready.",
+                data={
+                    "session": RealtimeSessionListSerializer(session, context={"request": request}).data,
+                    "stream_service": session.stream_service,
+                    "broadcast_profile": realtime_config.to_broadcast_dict(
+                        audience_count=session.max_audience,
+                        max_audience=session.max_audience,
+                    ),
+                    "obs": {
+                        "stream_server_url": resolve_obs_stream_server_url(request=request, session=session),
+                        "stream_key": str(session.obs_stream_key or session.default_obs_stream_key()),
+                    },
+                },
+            )
+
         if not is_livekit_configured():
             return api_response(
                 success=False,
@@ -630,12 +686,12 @@ class RealtimeSessionHostTokenView(APIView):
 
         token_payload = build_host_publisher_token(session=session, user=request.user)
         livekit_client_url = resolve_livekit_client_url(request=request)
-        realtime_config = RealtimeConfiguration.get_solo()
         return api_response(
             success=True,
             message="Host publisher token created.",
             data={
                 "session": RealtimeSessionListSerializer(session, context={"request": request}).data,
+                "stream_service": session.stream_service,
                 "livekit_url": livekit_client_url,
                 "room_name": session.livekit_room_name or session.room_name,
                 "participant_identity": token_payload["identity"],
@@ -644,6 +700,10 @@ class RealtimeSessionHostTokenView(APIView):
                     audience_count=session.max_audience,
                     max_audience=session.max_audience,
                 ),
+                "obs": {
+                    "stream_server_url": resolve_obs_stream_server_url(request=request, session=session),
+                    "stream_key": str(session.obs_stream_key or session.default_obs_stream_key()),
+                },
             },
         )
 
@@ -661,7 +721,7 @@ class RealtimeSessionStreamStartView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        rtmp_target_url = (session.rtmp_target_url or "").strip() or (settings.OWNCAST_RTMP_TARGET or "").strip()
+        rtmp_target_url = session.resolve_stream_target_url()
         if not rtmp_target_url:
             return api_response(
                 success=False,
@@ -675,7 +735,9 @@ class RealtimeSessionStreamStartView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        if session.stream_status == RealtimeSession.STREAM_LIVE and session.livekit_egress_id:
+        if session.stream_status == RealtimeSession.STREAM_LIVE and (
+            session.stream_service == RealtimeSession.STREAM_SERVICE_OBS or session.livekit_egress_id
+        ):
             return api_response(
                 success=True,
                 message="Stream already live.",
@@ -683,6 +745,26 @@ class RealtimeSessionStreamStartView(APIView):
             )
 
         session.mark_stream_starting()
+        if session.stream_service == RealtimeSession.STREAM_SERVICE_OBS:
+            stream_key = str(session.obs_stream_key or "").strip() or session.default_obs_stream_key()
+            session.obs_stream_key = stream_key
+            session.save(update_fields=["obs_stream_key", "updated_at"])
+            try:
+                sync_owncast_stream_key(stream_key)
+            except (OwncastConfigError, OwncastAdminError) as exc:
+                session.mark_stream_failed(str(exc))
+                return api_response(
+                    success=False,
+                    message="Unable to prepare OBS stream key.",
+                    errors={"detail": str(exc)},
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+            session.mark_stream_live("")
+            session.livekit_egress_error = ""
+            session.save(update_fields=["livekit_egress_error", "updated_at"])
+            data = RealtimeSessionListSerializer(session, context={"request": request}).data
+            return api_response(success=True, message="OBS stream prepared. Start streaming from OBS now.", data=data)
+
         try:
             participant_identity = (
                 build_host_publisher_identity(session.host_id, session.id)
@@ -721,6 +803,22 @@ class RealtimeSessionStreamStopView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
+        if session.stream_service == RealtimeSession.STREAM_SERVICE_OBS:
+            session.mark_stream_stopped()
+            rotation_result = _rotate_obs_stream_key_if_enabled(session=session)
+            if rotation_result["error"]:
+                session.livekit_egress_error = str(rotation_result["error"])[:1000]
+                session.save(update_fields=["livekit_egress_error", "updated_at"])
+                data = RealtimeSessionListSerializer(session, context={"request": request}).data
+                return api_response(
+                    success=True,
+                    message="Live stream stopped, but OBS key rotation failed. Check stream error details.",
+                    data=data,
+                )
+
+            data = RealtimeSessionListSerializer(session, context={"request": request}).data
+            return api_response(success=True, message="Live stream stopped.", data=data)
+
         try:
             stop_room_broadcast_egress(egress_id=session.livekit_egress_id)
             session.mark_stream_stopped()
@@ -735,6 +833,43 @@ class RealtimeSessionStreamStopView(APIView):
 
         data = RealtimeSessionListSerializer(session, context={"request": request}).data
         return api_response(success=True, message="Live stream stopped.", data=data)
+
+
+class RealtimeSessionStreamRotateKeyView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        session = get_object_or_404(RealtimeSession, pk=pk)
+        if not _can_manage_session(request.user, session):
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "Only host, assigned instructor, or admin can rotate OBS stream key."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        if session.stream_service != RealtimeSession.STREAM_SERVICE_OBS:
+            return api_response(
+                success=False,
+                message="Key rotation unavailable.",
+                errors={"detail": "OBS key rotation is available only for OBS stream mode sessions."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        rotation_result = _rotate_obs_stream_key_if_enabled(session=session, force=True)
+        if rotation_result["error"]:
+            session.livekit_egress_error = str(rotation_result["error"])[:1000]
+            session.save(update_fields=["livekit_egress_error", "updated_at"])
+            return api_response(
+                success=False,
+                message="Unable to rotate OBS stream key.",
+                errors={"detail": rotation_result["error"]},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        session.livekit_egress_error = ""
+        session.save(update_fields=["livekit_egress_error", "updated_at"])
+        data = RealtimeSessionListSerializer(session, context={"request": request}).data
+        return api_response(success=True, message="OBS stream key rotated.", data=data)
 
 
 class RealtimeSessionRecordingListView(APIView):

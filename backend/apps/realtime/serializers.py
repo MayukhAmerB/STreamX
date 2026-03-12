@@ -14,7 +14,7 @@ from config.url_utils import get_media_public_url
 from apps.courses.models import LiveClass
 
 from .models import RealtimeSession, RealtimeSessionRecording
-from .services import build_session_join_url
+from .services import build_session_join_url, resolve_broadcast_urls, resolve_obs_stream_server_url
 
 
 class RealtimeSessionListSerializer(serializers.ModelSerializer):
@@ -24,6 +24,9 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
     join_url = serializers.SerializerMethodField()
     linked_live_class = serializers.SerializerMethodField()
     linked_course = serializers.SerializerMethodField()
+    obs_stream_server_url = serializers.SerializerMethodField()
+    stream_embed_url = serializers.SerializerMethodField()
+    chat_embed_url = serializers.SerializerMethodField()
 
     class Meta:
         model = RealtimeSession
@@ -46,6 +49,9 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
             "allow_overflow_broadcast",
             "presenter_user_ids",
             "speaker_user_ids",
+            "stream_service",
+            "obs_stream_server_url",
+            "obs_stream_key",
             "join_url",
             "stream_embed_url",
             "chat_embed_url",
@@ -79,6 +85,39 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
     def get_join_url(self, obj):
         request = self.context.get("request")
         return build_session_join_url(obj.id, request=request)
+
+    def get_obs_stream_server_url(self, obj):
+        request = self.context.get("request")
+        return resolve_obs_stream_server_url(request=request, session=obj)
+
+    def get_obs_stream_key(self, obj):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not obj.is_moderator_allowed(user):
+            return ""
+        return str(obj.obs_stream_key or "")
+
+    def _get_resolved_broadcast_urls(self, obj):
+        cache_key = f"broadcast_urls:{obj.id}"
+        cached = self.context.get(cache_key)
+        if isinstance(cached, dict):
+            return cached
+        request = self.context.get("request")
+        resolved = resolve_broadcast_urls(obj, request=request)
+        self.context[cache_key] = resolved
+        return resolved
+
+    def get_stream_embed_url(self, obj):
+        if obj.session_type != RealtimeSession.TYPE_BROADCASTING:
+            return str(obj.stream_embed_url or "").strip()
+        resolved = self._get_resolved_broadcast_urls(obj)
+        return str(resolved.get("stream_embed_url") or "").strip()
+
+    def get_chat_embed_url(self, obj):
+        if obj.session_type != RealtimeSession.TYPE_BROADCASTING:
+            return str(obj.chat_embed_url or "").strip()
+        resolved = self._get_resolved_broadcast_urls(obj)
+        return str(resolved.get("chat_embed_url") or "").strip()
 
     def get_linked_live_class(self, obj):
         live_class = getattr(obj, "linked_live_class", None)
@@ -133,6 +172,8 @@ class RealtimeSessionCreateSerializer(serializers.ModelSerializer):
             "meeting_capacity",
             "max_audience",
             "allow_overflow_broadcast",
+            "stream_service",
+            "obs_stream_key",
             "stream_embed_url",
             "chat_embed_url",
             "rtmp_target_url",
@@ -148,6 +189,8 @@ class RealtimeSessionCreateSerializer(serializers.ModelSerializer):
             "meeting_capacity": {"required": False},
             "max_audience": {"required": False},
             "allow_overflow_broadcast": {"required": False},
+            "stream_service": {"required": False},
+            "obs_stream_key": {"required": False, "allow_blank": True},
         }
 
     def validate_title(self, value):
@@ -219,6 +262,8 @@ class RealtimeSessionCreateSerializer(serializers.ModelSerializer):
 
         if session_type == RealtimeSession.TYPE_BROADCASTING:
             attrs.setdefault("meeting_capacity", RealtimeSession.MAX_MEETING_CAPACITY)
+        if session_type == RealtimeSession.TYPE_MEETING:
+            attrs["stream_service"] = RealtimeSession.STREAM_SERVICE_ALSYED
 
         rtmp_target_url = (attrs.get("rtmp_target_url") or "").strip()
         if rtmp_target_url and not is_safe_public_stream_url(rtmp_target_url):

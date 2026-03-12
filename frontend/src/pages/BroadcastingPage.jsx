@@ -11,6 +11,7 @@ import {
   getRealtimeHostToken,
   joinRealtimeSession,
   listRealtimeRecordings,
+  rotateRealtimeStreamKey,
   listRealtimeSessions,
   startRealtimeRecording,
   startRealtimeStream,
@@ -29,10 +30,15 @@ const initialForm = {
   title: "",
   description: "",
   linked_live_class_id: "",
+  stream_service: "alsyed_stream",
+  obs_stream_server_url: "",
+  obs_stream_key: "",
   stream_embed_url: "",
   chat_embed_url: "",
   rtmp_target_url: "",
 };
+const STREAM_SERVICE_ALSYED = "alsyed_stream";
+const STREAM_SERVICE_OBS = "obs_stream";
 
 const defaultBroadcastProfile = {
   capture_width: 640,
@@ -63,11 +69,44 @@ function deriveEmbedUrl(baseUrl, targetPath) {
   }
 }
 
+function inferObsServerUrl() {
+  if (typeof window === "undefined") {
+    return "rtmp://your-server:1935/live";
+  }
+  const host = String(window.location.hostname || "").trim() || "localhost";
+  return `rtmp://${host}:1935/live`;
+}
+
+function generateObsStreamKey(length = 36) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const chars = [];
+  if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
+    const randomBuffer = new Uint8Array(length);
+    window.crypto.getRandomValues(randomBuffer);
+    for (let i = 0; i < length; i += 1) {
+      chars.push(alphabet[randomBuffer[i] % alphabet.length]);
+    }
+    return chars.join("");
+  }
+  for (let i = 0; i < length; i += 1) {
+    chars.push(alphabet[Math.floor(Math.random() * alphabet.length)]);
+  }
+  return chars.join("");
+}
+
 function canManageSession(session, user) {
   if (!session) return false;
   if (session.can_manage) return true;
   if (session.is_host) return true;
   return user?.is_admin === true;
+}
+
+function isObsStreamMode(session) {
+  return String(session?.stream_service || "").trim().toLowerCase() === STREAM_SERVICE_OBS;
+}
+
+function getStreamServiceLabel(session) {
+  return isObsStreamMode(session) ? "Alsyed OBS Stream" : "Alsyed Stream";
 }
 
 function resolveRecordingMode(recording) {
@@ -143,6 +182,7 @@ export default function BroadcastingPage() {
     error: "",
     info: "",
   });
+  const [obsKeyState, setObsKeyState] = useState({ loading: false, error: "", info: "" });
   const [shareState, setShareState] = useState({ error: "", info: "" });
 
   const [studioSession, setStudioSession] = useState(null);
@@ -172,6 +212,17 @@ export default function BroadcastingPage() {
   const fallbackRecorderRef = useRef(null);
 
   const highlightedSessionId = searchParams.get("session");
+
+  useEffect(() => {
+    setForm((prev) => {
+      if (prev.stream_service !== STREAM_SERVICE_OBS) return prev;
+      return {
+        ...prev,
+        obs_stream_server_url: prev.obs_stream_server_url || inferObsServerUrl(),
+        obs_stream_key: prev.obs_stream_key || generateObsStreamKey(),
+      };
+    });
+  }, []);
 
   const loadSessions = async () => {
     try {
@@ -337,12 +388,15 @@ export default function BroadcastingPage() {
         description: form.description,
         linked_live_class_id: Number(form.linked_live_class_id),
         session_type: "broadcasting",
+        stream_service: form.stream_service,
+        obs_stream_key: form.stream_service === STREAM_SERVICE_OBS ? form.obs_stream_key : "",
         meeting_capacity: 200,
         max_audience: 500,
         allow_overflow_broadcast: true,
-        stream_embed_url: form.stream_embed_url,
-        chat_embed_url: form.chat_embed_url,
-        rtmp_target_url: form.rtmp_target_url,
+        stream_embed_url: form.stream_service === STREAM_SERVICE_ALSYED ? form.stream_embed_url : "",
+        chat_embed_url: form.stream_service === STREAM_SERVICE_ALSYED ? form.chat_embed_url : "",
+        rtmp_target_url:
+          form.stream_service === STREAM_SERVICE_ALSYED ? form.rtmp_target_url : form.obs_stream_server_url,
       };
       const response = await createRealtimeSession(payload);
       const created = apiData(response, null);
@@ -384,8 +438,20 @@ export default function BroadcastingPage() {
   };
 
   const handleOpenStudio = (session) => {
+    const obsMode = isObsStreamMode(session);
+    if (obsMode) {
+      disconnectStudio();
+    }
     setStudioSession(session);
-    setStudioState((prev) => ({ ...prev, error: "", info: "Host studio selected." }));
+    setStudioState((prev) => ({
+      ...prev,
+      error: "",
+      connected: obsMode ? false : prev.connected,
+      info: obsMode
+        ? "OBS mode selected. Configure OBS with server URL + stream key, then click Start Live."
+        : "Host studio selected.",
+    }));
+    setObsKeyState({ loading: false, error: "", info: "" });
   };
 
   const getSessionStreamUrl = (session) => {
@@ -398,6 +464,11 @@ export default function BroadcastingPage() {
     }
     return "";
   };
+
+  const getObsStreamServerUrl = (session) =>
+    String(session?.obs_stream_server_url || "").trim();
+
+  const getObsStreamKey = (session) => String(session?.obs_stream_key || "").trim();
 
   const buildJoinLink = (session) => {
     if (session?.join_url) {
@@ -436,6 +507,43 @@ export default function BroadcastingPage() {
       return;
     }
     await copyText(streamUrl, "Stream URL copied.", "Unable to copy stream URL.");
+  };
+
+  const handleCopyObsServerUrl = async (session) => {
+    const serverUrl = getObsStreamServerUrl(session);
+    if (!serverUrl) {
+      setShareState({ error: "OBS server URL is not available for this session.", info: "" });
+      return;
+    }
+    await copyText(serverUrl, "OBS server URL copied.", "Unable to copy OBS server URL.");
+  };
+
+  const handleCopyObsStreamKey = async (session) => {
+    const streamKey = getObsStreamKey(session);
+    if (!streamKey) {
+      setShareState({ error: "OBS stream key is not available for this session.", info: "" });
+      return;
+    }
+    await copyText(streamKey, "OBS stream key copied.", "Unable to copy OBS stream key.");
+  };
+
+  const handleRegenerateCreateObsKey = () => {
+    setForm((prev) => ({ ...prev, obs_stream_key: generateObsStreamKey() }));
+  };
+
+  const handleRotateObsStreamKey = async () => {
+    if (!studioSession?.id || !isObsStreamMode(studioSession)) return;
+    setObsKeyState({ loading: true, error: "", info: "" });
+    try {
+      const response = await rotateRealtimeStreamKey(studioSession.id);
+      const updated = apiData(response, null);
+      if (updated) {
+        syncSessionRow(updated);
+      }
+      setObsKeyState({ loading: false, error: "", info: "OBS stream key rotated successfully." });
+    } catch (err) {
+      setObsKeyState({ loading: false, error: apiMessage(err, "Unable to rotate OBS stream key."), info: "" });
+    }
   };
 
   const handleDeleteSession = async (session) => {
@@ -498,6 +606,17 @@ export default function BroadcastingPage() {
 
   const handleConnectSource = async (source = defaultBroadcastSource) => {
     if (!studioSession) return;
+    if (isObsStreamMode(studioSession)) {
+      setStudioState((prev) => ({
+        ...prev,
+        connecting: false,
+        connected: false,
+        actionLoading: false,
+        error: "",
+        info: "OBS mode is active. Publish from OBS using the server URL and stream key below.",
+      }));
+      return;
+    }
     const nextSource = source === "screen" ? "screen" : "camera";
     const sourceLabel = nextSource === "screen" ? "screen share" : "camera";
     setStudioState({
@@ -676,7 +795,8 @@ export default function BroadcastingPage() {
 
   const handleStartLive = async () => {
     if (!studioSession) return;
-    if (!studioState.connected) {
+    const obsMode = isObsStreamMode(studioSession);
+    if (!obsMode && !studioState.connected) {
       setStudioState((prev) => ({ ...prev, error: "Connect camera or screen share first before starting live." }));
       return;
     }
@@ -692,9 +812,13 @@ export default function BroadcastingPage() {
         ...prev,
         actionLoading: false,
         error: "",
-        info: "You are live. Viewers can watch from the broadcast player.",
+        info: obsMode
+          ? "OBS mode is live. Start streaming in OBS to publish to viewers."
+          : "You are live. Viewers can watch from the broadcast player.",
       }));
-      await handleJoin(studioSession.id);
+      if (!obsMode) {
+        await handleJoin(studioSession.id);
+      }
     } catch (err) {
       setStudioState((prev) => ({
         ...prev,
@@ -894,6 +1018,9 @@ export default function BroadcastingPage() {
   }, [highlightedSessionId, isAuthenticated]);
 
   const studioStreamUrl = getSessionStreamUrl(studioSession);
+  const studioObsServerUrl = getObsStreamServerUrl(studioSession);
+  const studioObsStreamKey = getObsStreamKey(studioSession);
+  const isObsStudioMode = isObsStreamMode(studioSession);
   const activeStreamUrl = useMemo(() => {
     const direct = String(activeBroadcast?.broadcast?.stream_embed_url || "").trim();
     if (direct) return direct;
@@ -982,24 +1109,82 @@ export default function BroadcastingPage() {
                       ))}
                     </select>
                   </div>
-                  <input
-                    className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
-                    placeholder="Stream embed URL (optional)"
-                    value={form.stream_embed_url}
-                    onChange={(e) => setForm((prev) => ({ ...prev, stream_embed_url: e.target.value }))}
-                  />
-                  <input
-                    className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
-                    placeholder="Chat embed URL (optional)"
-                    value={form.chat_embed_url}
-                    onChange={(e) => setForm((prev) => ({ ...prev, chat_embed_url: e.target.value }))}
-                  />
-                  <input
-                    className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
-                    placeholder="RTMP target URL (optional)"
-                    value={form.rtmp_target_url}
-                    onChange={(e) => setForm((prev) => ({ ...prev, rtmp_target_url: e.target.value }))}
-                  />
+                  <div>
+                    <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-[#949494]">
+                      Streaming Service
+                    </label>
+                    <select
+                      className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
+                      value={form.stream_service}
+                      onChange={(e) => {
+                        const nextService = e.target.value;
+                        setForm((prev) => {
+                          if (nextService !== STREAM_SERVICE_OBS) {
+                            return { ...prev, stream_service: nextService };
+                          }
+                          return {
+                            ...prev,
+                            stream_service: nextService,
+                            obs_stream_server_url: prev.obs_stream_server_url || inferObsServerUrl(),
+                            obs_stream_key: prev.obs_stream_key || generateObsStreamKey(),
+                          };
+                        });
+                      }}
+                    >
+                      <option value={STREAM_SERVICE_ALSYED}>Alsyed Stream (Browser Host Studio)</option>
+                      <option value={STREAM_SERVICE_OBS}>Alsyed OBS Stream (OBS Ingest)</option>
+                    </select>
+                  </div>
+                  {form.stream_service === STREAM_SERVICE_ALSYED ? (
+                    <>
+                      <input
+                        className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
+                        placeholder="Stream embed URL (optional)"
+                        value={form.stream_embed_url}
+                        onChange={(e) => setForm((prev) => ({ ...prev, stream_embed_url: e.target.value }))}
+                      />
+                      <input
+                        className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
+                        placeholder="Chat embed URL (optional)"
+                        value={form.chat_embed_url}
+                        onChange={(e) => setForm((prev) => ({ ...prev, chat_embed_url: e.target.value }))}
+                      />
+                      <input
+                        className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
+                        placeholder="RTMP target URL (optional)"
+                        value={form.rtmp_target_url}
+                        onChange={(e) => setForm((prev) => ({ ...prev, rtmp_target_url: e.target.value }))}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
+                        placeholder="OBS server URL (rtmp://your-host:1935/live)"
+                        value={form.obs_stream_server_url}
+                        onChange={(e) => setForm((prev) => ({ ...prev, obs_stream_server_url: e.target.value }))}
+                      />
+                      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                        <input
+                          className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
+                          placeholder="OBS stream key"
+                          value={form.obs_stream_key}
+                          onChange={(e) => setForm((prev) => ({ ...prev, obs_stream_key: e.target.value }))}
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="w-full sm:w-auto"
+                          onClick={handleRegenerateCreateObsKey}
+                        >
+                          Regenerate Key
+                        </Button>
+                      </div>
+                      <p className="text-xs text-[#AFAFAF]">
+                        Use this server URL and stream key in OBS. After stream stop/end, key rotation is applied by backend policy.
+                      </p>
+                    </>
+                  )}
                   <Button type="submit" className="w-full" loading={createState.loading}>
                     Create Broadcast
                   </Button>
@@ -1039,6 +1224,9 @@ export default function BroadcastingPage() {
             <div>
               <h3 className="font-reference text-xl font-semibold text-white">Host Studio</h3>
               <p className="mt-1 text-xs text-[#949494]">Session: {studioSession.title}</p>
+              <p className="mt-1 text-[11px] text-[#B8B8B8]">
+                Service: {getStreamServiceLabel(studioSession)}
+              </p>
             </div>
             <span className="rounded-full border border-black bg-[#171717] px-3 py-1 text-xs uppercase tracking-[0.12em] text-[#CDCDCD]">
               {studioSession.stream_status || "idle"}
@@ -1079,113 +1267,219 @@ export default function BroadcastingPage() {
                   </Button>
                 </div>
               </div>
+              {isObsStudioMode ? (
+                <>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.12em] text-[#949494]">OBS Server URL</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <code className="max-w-full truncate rounded-md bg-[#0E0E0E] px-2 py-1 text-xs text-[#DFDFDF]">
+                        {studioObsServerUrl || "OBS server URL unavailable"}
+                      </code>
+                      <Button
+                        variant="secondary"
+                        className="px-3 py-1.5 text-xs"
+                        onClick={() => handleCopyObsServerUrl(studioSession)}
+                        disabled={!studioObsServerUrl}
+                      >
+                        Copy
+                      </Button>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.12em] text-[#949494]">OBS Stream Key</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <code className="max-w-full truncate rounded-md bg-[#0E0E0E] px-2 py-1 text-xs text-[#DFDFDF]">
+                        {studioObsStreamKey || "OBS stream key unavailable"}
+                      </code>
+                      <Button
+                        variant="secondary"
+                        className="px-3 py-1.5 text-xs"
+                        onClick={() => handleCopyObsStreamKey(studioSession)}
+                        disabled={!studioObsStreamKey}
+                      >
+                        Copy
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="px-3 py-1.5 text-xs"
+                        onClick={handleRotateObsStreamKey}
+                        loading={obsKeyState.loading}
+                      >
+                        Rotate
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              ) : null}
             </div>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="overflow-hidden rounded-2xl border border-black bg-black">
-              <video
-                ref={previewVideoRef}
-                autoPlay
-                muted
-                playsInline
-                className="h-[220px] w-full object-cover sm:h-[280px] lg:h-[320px]"
-              />
+              {isObsStudioMode ? (
+                studioStreamUrl ? (
+                  <iframe
+                    title="OBS Broadcast Monitor"
+                    src={studioStreamUrl}
+                    className="h-[220px] w-full sm:h-[280px] lg:h-[320px]"
+                    allow="autoplay; fullscreen"
+                  />
+                ) : (
+                  <div className="flex h-[220px] items-center justify-center px-6 text-center text-sm text-[#BBBBBB] sm:h-[280px] lg:h-[320px]">
+                    Stream preview appears here after OBS starts publishing.
+                  </div>
+                )
+              ) : (
+                <video
+                  ref={previewVideoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="h-[220px] w-full object-cover sm:h-[280px] lg:h-[320px]"
+                />
+              )}
             </div>
             <div className="rounded-2xl border border-black panel-gradient p-4">
-              <div className="grid gap-2 sm:grid-cols-3">
-                <Button onClick={handleConnectCamera} loading={studioState.connecting || studioState.actionLoading}>
-                  {studioState.connected && studioVideoSource === "camera" ? "Reconnect Camera" : "Connect Camera"}
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={handleShareScreen}
-                  loading={studioState.connecting}
-                  disabled={studioState.actionLoading}
-                >
-                  {studioState.connected && studioVideoSource === "screen" ? "Reshare Screen" : "Share Screen"}
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={disconnectStudio}
-                  disabled={!studioState.connected || studioState.actionLoading}
-                >
-                  Disconnect
-                </Button>
-                <Button
-                  onClick={handleStartLive}
-                  disabled={studioSession.stream_status === "live" || studioState.actionLoading}
-                  loading={studioState.actionLoading && studioSession.stream_status !== "live"}
-                >
-                  Start Live
-                </Button>
-                <Button
-                  variant="danger"
-                  onClick={handleStopLive}
-                  disabled={studioSession.stream_status !== "live" || studioState.actionLoading}
-                >
-                  Stop Live
-                </Button>
-              </div>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <Button
-                  variant="secondary"
-                  onClick={handleStartRecording}
-                  loading={studioRecordingState.loading}
-                  disabled={Boolean(studioRecordingState.active)}
-                >
-                  Start Recording
-                </Button>
-                <Button
-                  variant="danger"
-                  onClick={handleStopRecording}
-                  loading={studioRecordingState.loading}
-                  disabled={!studioRecordingState.active}
-                >
-                  Stop Recording
-                </Button>
-              </div>
+              {!isObsStudioMode ? (
+                <>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <Button onClick={handleConnectCamera} loading={studioState.connecting || studioState.actionLoading}>
+                      {studioState.connected && studioVideoSource === "camera" ? "Reconnect Camera" : "Connect Camera"}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={handleShareScreen}
+                      loading={studioState.connecting}
+                      disabled={studioState.actionLoading}
+                    >
+                      {studioState.connected && studioVideoSource === "screen" ? "Reshare Screen" : "Share Screen"}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={disconnectStudio}
+                      disabled={!studioState.connected || studioState.actionLoading}
+                    >
+                      Disconnect
+                    </Button>
+                    <Button
+                      onClick={handleStartLive}
+                      disabled={studioSession.stream_status === "live" || studioState.actionLoading}
+                      loading={studioState.actionLoading && studioSession.stream_status !== "live"}
+                    >
+                      Start Live
+                    </Button>
+                    <Button
+                      variant="danger"
+                      onClick={handleStopLive}
+                      disabled={studioSession.stream_status !== "live" || studioState.actionLoading}
+                    >
+                      Stop Live
+                    </Button>
+                  </div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <Button
+                      variant="secondary"
+                      onClick={handleStartRecording}
+                      loading={studioRecordingState.loading}
+                      disabled={Boolean(studioRecordingState.active)}
+                    >
+                      Start Recording
+                    </Button>
+                    <Button
+                      variant="danger"
+                      onClick={handleStopRecording}
+                      loading={studioRecordingState.loading}
+                      disabled={!studioRecordingState.active}
+                    >
+                      Stop Recording
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button
+                    onClick={handleStartLive}
+                    disabled={studioSession.stream_status === "live" || studioState.actionLoading}
+                    loading={studioState.actionLoading && studioSession.stream_status !== "live"}
+                  >
+                    Start Live
+                  </Button>
+                  <Button
+                    variant="danger"
+                    onClick={handleStopLive}
+                    disabled={studioSession.stream_status !== "live" || studioState.actionLoading}
+                  >
+                    Stop Live
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={handleRotateObsStreamKey}
+                    loading={obsKeyState.loading}
+                  >
+                    Rotate OBS Key
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleCopyObsStreamKey(studioSession)}
+                    disabled={!studioObsStreamKey}
+                  >
+                    Copy OBS Key
+                  </Button>
+                </div>
+              )}
 
               {studioState.error ? <p className="mt-3 text-xs text-red-300">{studioState.error}</p> : null}
               {studioState.info ? <p className="mt-3 text-xs text-zinc-300">{studioState.info}</p> : null}
-              {studioRecordingState.error ? <p className="mt-2 text-xs text-red-300">{studioRecordingState.error}</p> : null}
-              {studioRecordingState.info ? <p className="mt-2 text-xs text-zinc-300">{studioRecordingState.info}</p> : null}
-              <p className="mt-2 text-[11px] text-[#A4A4A4]">
-                Active source: {studioVideoSource === "screen" ? "Screen share" : "Camera"}.
-              </p>
-              <p className="mt-1 text-[11px] text-[#A4A4A4]">
-                Active profile: {studioProfile.capture_width}x{studioProfile.capture_height} at{" "}
-                {studioProfile.fps}fps, max {studioProfile.max_video_bitrate_kbps} kbps.
-              </p>
-              <p className="mt-1 text-[11px] text-[#A4A4A4]">
-                Recording status: {studioRecordingState.active?.status || "idle"}
-                {studioRecordingState.active
-                  ? ` (${studioRecordingState.mode === "screenity-fallback" ? "browser fallback" : "livekit"})`
-                  : ""}
-                .
-              </p>
-              {resolveRecordingPlaybackUrl(studioRecordingState.latestCompleted) ? (
-                <a
-                  href={resolveRecordingPlaybackUrl(studioRecordingState.latestCompleted)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2 inline-flex rounded-full border border-black bg-[#1B1B1B] px-3 py-1.5 text-xs text-[#DFDFDF] hover:bg-[#252525]"
-                >
-                  Open Last Recording
-                </a>
-              ) : null}
-              <Button
-                variant="danger"
-                className="mt-2 inline-flex px-3 py-1.5 text-xs"
-                onClick={handleDeleteLatestRecording}
-                loading={studioRecordingState.loading}
-                disabled={!studioRecordingState.latestCompleted?.id || Boolean(studioRecordingState.active)}
-              >
-                Delete Last Recording
-              </Button>
+              {!isObsStudioMode ? (
+                <>
+                  {studioRecordingState.error ? <p className="mt-2 text-xs text-red-300">{studioRecordingState.error}</p> : null}
+                  {studioRecordingState.info ? <p className="mt-2 text-xs text-zinc-300">{studioRecordingState.info}</p> : null}
+                  <p className="mt-2 text-[11px] text-[#A4A4A4]">
+                    Active source: {studioVideoSource === "screen" ? "Screen share" : "Camera"}.
+                  </p>
+                  <p className="mt-1 text-[11px] text-[#A4A4A4]">
+                    Active profile: {studioProfile.capture_width}x{studioProfile.capture_height} at{" "}
+                    {studioProfile.fps}fps, max {studioProfile.max_video_bitrate_kbps} kbps.
+                  </p>
+                  <p className="mt-1 text-[11px] text-[#A4A4A4]">
+                    Recording status: {studioRecordingState.active?.status || "idle"}
+                    {studioRecordingState.active
+                      ? ` (${studioRecordingState.mode === "screenity-fallback" ? "browser fallback" : "livekit"})`
+                      : ""}
+                    .
+                  </p>
+                  {resolveRecordingPlaybackUrl(studioRecordingState.latestCompleted) ? (
+                    <a
+                      href={resolveRecordingPlaybackUrl(studioRecordingState.latestCompleted)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex rounded-full border border-black bg-[#1B1B1B] px-3 py-1.5 text-xs text-[#DFDFDF] hover:bg-[#252525]"
+                    >
+                      Open Last Recording
+                    </a>
+                  ) : null}
+                  <Button
+                    variant="danger"
+                    className="mt-2 inline-flex px-3 py-1.5 text-xs"
+                    onClick={handleDeleteLatestRecording}
+                    loading={studioRecordingState.loading}
+                    disabled={!studioRecordingState.latestCompleted?.id || Boolean(studioRecordingState.active)}
+                  >
+                    Delete Last Recording
+                  </Button>
+                </>
+              ) : (
+                <p className="mt-2 text-[11px] text-[#A4A4A4]">
+                  OBS mode: publish from OBS using the server URL and key, then monitor playback from this panel.
+                </p>
+              )}
               {studioSession.livekit_egress_error ? (
-                <p className="mt-2 text-xs text-amber-300">Egress: {studioSession.livekit_egress_error}</p>
+                <p className="mt-2 text-xs text-amber-300">
+                  {isObsStudioMode ? "Stream" : "Egress"}: {studioSession.livekit_egress_error}
+                </p>
               ) : null}
+              {obsKeyState.error ? <p className="mt-2 text-xs text-red-300">{obsKeyState.error}</p> : null}
+              {obsKeyState.info ? <p className="mt-2 text-xs text-zinc-300">{obsKeyState.info}</p> : null}
             </div>
           </div>
         </section>
@@ -1328,6 +1622,9 @@ export default function BroadcastingPage() {
                         <h4 className="font-reference text-lg text-white">{session.title}</h4>
                         <span className="rounded-full border border-black bg-[#171717] px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-[#CDCDCD]">
                           {session.stream_status === "live" ? "Live" : "Ready"}
+                        </span>
+                        <span className="rounded-full border border-black bg-[#171717] px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-[#CDCDCD]">
+                          {getStreamServiceLabel(session)}
                         </span>
                       </div>
                       <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">

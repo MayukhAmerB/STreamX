@@ -2263,6 +2263,99 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(session.livekit_egress_id, "EG_test_123")
 
     @override_settings(
+        OWNCAST_RTMP_TARGET="rtmp://owncast:1935/live/default-key",
+        OWNCAST_OBS_STREAM_SERVER_URL="rtmp://obs.example.com:1935/live",
+    )
+    @patch("apps.realtime.views.sync_owncast_stream_key")
+    @patch("apps.realtime.views.start_room_broadcast_egress")
+    def test_start_stream_obs_mode_skips_livekit_egress(self, mock_start_egress, mock_sync_key):
+        mock_sync_key.return_value = {"success": True}
+        session = RealtimeSession.objects.create(
+            title="OBS Mode Session",
+            description="OBS ingest mode stream start",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_service=RealtimeSession.STREAM_SERVICE_OBS,
+            obs_stream_key="ObsStreamKey123",
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+        )
+
+        self.login(self.host.email)
+        response = self.client.post(
+            reverse("realtime-session-stream-start", kwargs={"pk": session.id}),
+            {},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        session.refresh_from_db()
+        self.assertEqual(session.stream_status, RealtimeSession.STREAM_LIVE)
+        self.assertEqual(session.livekit_egress_id, "")
+        mock_sync_key.assert_called_once_with("ObsStreamKey123")
+        mock_start_egress.assert_not_called()
+
+    @override_settings(
+        OWNCAST_RTMP_TARGET="rtmp://owncast:1935/live/default-key",
+        OWNCAST_OBS_STREAM_SERVER_URL="rtmp://obs.example.com:1935/live",
+    )
+    @patch("apps.realtime.views.build_host_publisher_token")
+    def test_host_token_returns_obs_payload_for_obs_mode(self, mock_build_host_token):
+        mock_build_host_token.return_value = {"identity": "host-1", "token": "token-1"}
+        session = RealtimeSession.objects.create(
+            title="OBS Host Token Session",
+            description="OBS host token payload",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_service=RealtimeSession.STREAM_SERVICE_OBS,
+            obs_stream_key="ObsTokenKey123",
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+        )
+
+        self.login(self.host.email)
+        response = self.client.post(reverse("realtime-session-host-token", kwargs={"pk": session.id}), {}, format="json")
+        self.assertEqual(response.status_code, 200)
+        payload = response.data["data"]
+        self.assertEqual(payload["stream_service"], RealtimeSession.STREAM_SERVICE_OBS)
+        self.assertEqual(payload["obs"]["stream_server_url"], "rtmp://obs.example.com:1935/live")
+        self.assertEqual(payload["obs"]["stream_key"], "ObsTokenKey123")
+        self.assertNotIn("token", payload)
+        mock_build_host_token.assert_not_called()
+
+    @override_settings(
+        OWNCAST_RTMP_TARGET="rtmp://owncast:1935/live/default-key",
+        OWNCAST_OBS_STREAM_SERVER_URL="rtmp://obs.example.com:1935/live",
+    )
+    @patch("apps.realtime.views.sync_owncast_stream_key")
+    def test_rotate_obs_stream_key_endpoint_rotates_key(self, mock_sync_key):
+        mock_sync_key.return_value = {"success": True}
+        session = RealtimeSession.objects.create(
+            title="Rotate OBS Key Session",
+            description="Manual key rotation",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_service=RealtimeSession.STREAM_SERVICE_OBS,
+            obs_stream_key="RotateMe12345",
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+        )
+
+        self.login(self.host.email)
+        response = self.client.post(
+            reverse("realtime-session-stream-rotate-key", kwargs={"pk": session.id}),
+            {},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        session.refresh_from_db()
+        self.assertNotEqual(session.obs_stream_key, "RotateMe12345")
+        self.assertEqual(session.stream_service, RealtimeSession.STREAM_SERVICE_OBS)
+        mock_sync_key.assert_called_once_with(session.obs_stream_key)
+
+    @override_settings(
         LIVEKIT_URL="ws://livekit.test",
         LIVEKIT_API_KEY="devkey",
         LIVEKIT_API_SECRET="secret",

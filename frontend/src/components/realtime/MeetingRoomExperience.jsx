@@ -361,6 +361,22 @@ function parseParticipantMetadata(participant) {
   }
 }
 
+function deriveEmbedSiblingUrl(baseUrl, targetPath) {
+  const raw = String(baseUrl || "").trim();
+  if (!raw) {
+    return "";
+  }
+  try {
+    const parsed = new URL(raw);
+    parsed.pathname = targetPath;
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return "";
+  }
+}
+
 function MeetingTile({ entry, isFeatured = false, isSpeaking = false, isPinned = false, onPin }) {
   const videoRef = useRef(null);
   const audioRef = useRef(null);
@@ -631,6 +647,13 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
   const { user } = useAuth();
   const session = payload?.session || {};
   const meeting = payload?.meeting || {};
+  const isBroadcastControlSession = session?.session_type === "broadcasting";
+  const broadcastMonitorUrl = useMemo(() => {
+    if (!isBroadcastControlSession) return "";
+    const direct = String(session?.stream_embed_url || "").trim();
+    if (direct) return direct;
+    return deriveEmbedSiblingUrl(session?.chat_embed_url, "/embed/video");
+  }, [isBroadcastControlSession, session?.stream_embed_url, session?.chat_embed_url]);
   const canPresentFromPayload = Boolean(meeting?.permissions?.can_present);
   const canSpeakFromPayload = Boolean(meeting?.permissions?.can_speak || canPresentFromPayload);
   const canManageParticipants = Boolean(
@@ -1833,20 +1856,39 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
             </div>
           </div>
 
-          <div className="grid gap-3 sm:min-w-[340px] sm:grid-cols-[minmax(0,1fr)_auto]">
-            <div className="rounded-[22px] border border-black panel-gradient px-4 py-3 backdrop-blur-sm">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
-                Share link
-              </div>
-              <code className="mt-2 block truncate rounded-xl bg-[#101010] px-3 py-2 text-xs text-[#E1E1E1]">
-                {shareableJoinLink || "Join link unavailable"}
-              </code>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Button
-                variant="secondary"
-                className="rounded-full border-black bg-[#141414]/92 px-4 py-2 text-[#DBDBDB] shadow-none hover:bg-[#1B1B1B]"
-                onClick={handleCopyJoinLink}
+	          <div className="grid gap-3 sm:min-w-[340px] sm:grid-cols-[minmax(0,1fr)_auto]">
+	            <div className="rounded-[22px] border border-black panel-gradient px-4 py-3 backdrop-blur-sm">
+	              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
+	                Share link
+	              </div>
+	              <code className="mt-2 block truncate rounded-xl bg-[#101010] px-3 py-2 text-xs text-[#E1E1E1]">
+	                {shareableJoinLink || "Join link unavailable"}
+	              </code>
+	            </div>
+              {isBroadcastControlSession ? (
+                <div className="overflow-hidden rounded-[22px] border border-black panel-gradient backdrop-blur-sm sm:col-span-2">
+                  <div className="border-b border-black px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
+                    Broadcast monitor
+                  </div>
+                  {broadcastMonitorUrl ? (
+                    <iframe
+                      title="Broadcast Live Output"
+                      src={broadcastMonitorUrl}
+                      className="h-[170px] w-full sm:h-[210px]"
+                      allow="autoplay; fullscreen"
+                    />
+                  ) : (
+                    <div className="flex h-[170px] items-center justify-center px-4 text-center text-xs text-[#BBBBBB] sm:h-[210px]">
+                      Live broadcast output appears here once stream publishing starts.
+                    </div>
+                  )}
+                </div>
+              ) : null}
+	            <div className="flex flex-col gap-2">
+	              <Button
+	                variant="secondary"
+	                className="rounded-full border-black bg-[#141414]/92 px-4 py-2 text-[#DBDBDB] shadow-none hover:bg-[#1B1B1B]"
+	                onClick={handleCopyJoinLink}
               >
                 Copy link
               </Button>

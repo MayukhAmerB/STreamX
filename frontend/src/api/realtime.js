@@ -11,6 +11,7 @@ export const endRealtimeSession = (id) => apiClient.post(`/realtime/sessions/${i
 export const getRealtimeHostToken = (id) => apiClient.post(`/realtime/sessions/${id}/host-token/`);
 export const startRealtimeStream = (id) => apiClient.post(`/realtime/sessions/${id}/stream/start/`);
 export const stopRealtimeStream = (id) => apiClient.post(`/realtime/sessions/${id}/stream/stop/`);
+export const rotateRealtimeStreamKey = (id) => apiClient.post(`/realtime/sessions/${id}/stream/rotate-key/`);
 export const listRealtimeRecordings = (id) => apiClient.get(`/realtime/sessions/${id}/recordings/`);
 export const startRealtimeRecording = (id) => apiClient.post(`/realtime/sessions/${id}/recordings/start/`);
 export const stopRealtimeRecording = (id) => apiClient.post(`/realtime/sessions/${id}/recordings/stop/`);

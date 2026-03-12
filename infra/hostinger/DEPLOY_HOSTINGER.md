@@ -93,6 +93,20 @@ Allow inbound:
 - `7880/tcp`, `7881/tcp`
 - `7882/udp` (or your `LIVEKIT_UDP_PORT`)
 
+For WireGuard + firewall + nginx API rate-limits (recommended for OBS ingest hardening):
+
+```bash
+sudo bash infra/hostinger/network/setup-wireguard.sh \
+  --peer-name instructor-1 \
+  --peer-public-key "<peer-public-key>" \
+  --peer-ip 10.66.66.2/32
+
+sudo bash infra/hostinger/network/setup-firewall.sh
+sudo bash infra/hostinger/network/setup-nginx-rate-limits.sh
+```
+
+Reference: `infra/hostinger/network/README.md`
+
 ## 8) Operations
 
 Logs:
