@@ -11,7 +11,6 @@ import {
   getRealtimeHostToken,
   joinRealtimeSession,
   listRealtimeRecordings,
-  rotateRealtimeStreamKey,
   listRealtimeSessions,
   startRealtimeRecording,
   startRealtimeStream,
@@ -75,23 +74,6 @@ function inferObsServerUrl() {
   }
   const host = String(window.location.hostname || "").trim() || "localhost";
   return `rtmp://${host}:1935/live`;
-}
-
-function generateObsStreamKey(length = 36) {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
-  const chars = [];
-  if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
-    const randomBuffer = new Uint8Array(length);
-    window.crypto.getRandomValues(randomBuffer);
-    for (let i = 0; i < length; i += 1) {
-      chars.push(alphabet[randomBuffer[i] % alphabet.length]);
-    }
-    return chars.join("");
-  }
-  for (let i = 0; i < length; i += 1) {
-    chars.push(alphabet[Math.floor(Math.random() * alphabet.length)]);
-  }
-  return chars.join("");
 }
 
 function maskSecretValue(value) {
@@ -188,9 +170,7 @@ export default function BroadcastingPage() {
     error: "",
     info: "",
   });
-  const [obsKeyState, setObsKeyState] = useState({ loading: false, error: "", info: "" });
   const [shareState, setShareState] = useState({ error: "", info: "" });
-  const [isCreateObsKeyVisible, setIsCreateObsKeyVisible] = useState(false);
   const [isStudioObsKeyVisible, setIsStudioObsKeyVisible] = useState(false);
 
   const [studioSession, setStudioSession] = useState(null);
@@ -227,7 +207,6 @@ export default function BroadcastingPage() {
       return {
         ...prev,
         obs_stream_server_url: prev.obs_stream_server_url || inferObsServerUrl(),
-        obs_stream_key: prev.obs_stream_key || generateObsStreamKey(),
       };
     });
   }, []);
@@ -397,7 +376,7 @@ export default function BroadcastingPage() {
         linked_live_class_id: Number(form.linked_live_class_id),
         session_type: "broadcasting",
         stream_service: form.stream_service,
-        obs_stream_key: form.stream_service === STREAM_SERVICE_OBS ? form.obs_stream_key : "",
+        obs_stream_key: "",
         meeting_capacity: 200,
         max_audience: 500,
         allow_overflow_broadcast: true,
@@ -413,7 +392,6 @@ export default function BroadcastingPage() {
         setStudioSession(created);
       }
       setForm(initialForm);
-      setIsCreateObsKeyVisible(false);
       setCreateState({ loading: false, error: "", success: "Broadcast created. Open Host Studio to go live." });
     } catch (err) {
       setCreateState({ loading: false, error: apiMessage(err, "Unable to create broadcast."), success: "" });
@@ -461,7 +439,6 @@ export default function BroadcastingPage() {
         ? "OBS mode selected. Configure OBS with server URL + stream key, then click Start Live."
         : "Host studio selected.",
     }));
-    setObsKeyState({ loading: false, error: "", info: "" });
   };
 
   const getSessionStreamUrl = (session) => {
@@ -535,25 +512,6 @@ export default function BroadcastingPage() {
       return;
     }
     await copyText(streamKey, "OBS stream key copied.", "Unable to copy OBS stream key.");
-  };
-
-  const handleRegenerateCreateObsKey = () => {
-    setForm((prev) => ({ ...prev, obs_stream_key: generateObsStreamKey() }));
-  };
-
-  const handleRotateObsStreamKey = async () => {
-    if (!studioSession?.id || !isObsStreamMode(studioSession)) return;
-    setObsKeyState({ loading: true, error: "", info: "" });
-    try {
-      const response = await rotateRealtimeStreamKey(studioSession.id);
-      const updated = apiData(response, null);
-      if (updated) {
-        syncSessionRow(updated);
-      }
-      setObsKeyState({ loading: false, error: "", info: "OBS stream key rotated successfully." });
-    } catch (err) {
-      setObsKeyState({ loading: false, error: apiMessage(err, "Unable to rotate OBS stream key."), info: "" });
-    }
   };
 
   const handleDeleteSession = async (session) => {
@@ -1136,7 +1094,6 @@ export default function BroadcastingPage() {
                             ...prev,
                             stream_service: nextService,
                             obs_stream_server_url: prev.obs_stream_server_url || inferObsServerUrl(),
-                            obs_stream_key: prev.obs_stream_key || generateObsStreamKey(),
                           };
                         });
                       }}
@@ -1174,33 +1131,8 @@ export default function BroadcastingPage() {
                         value={form.obs_stream_server_url}
                         onChange={(e) => setForm((prev) => ({ ...prev, obs_stream_server_url: e.target.value }))}
                       />
-                      <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
-                        <input
-                          type={isCreateObsKeyVisible ? "text" : "password"}
-                          className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
-                          placeholder="OBS stream key"
-                          value={form.obs_stream_key}
-                          onChange={(e) => setForm((prev) => ({ ...prev, obs_stream_key: e.target.value }))}
-                        />
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="w-full sm:w-auto"
-                          onClick={() => setIsCreateObsKeyVisible((prev) => !prev)}
-                        >
-                          {isCreateObsKeyVisible ? "Hide" : "View"}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="w-full sm:w-auto"
-                          onClick={handleRegenerateCreateObsKey}
-                        >
-                          Regenerate Key
-                        </Button>
-                      </div>
                       <p className="text-xs text-[#AFAFAF]">
-                        Use this server URL and stream key in OBS. After stream stop/end, key rotation is applied by backend policy.
+                        OBS stream key is fixed and managed by server policy. Create the session, then copy key from Host Studio.
                       </p>
                     </>
                   )}
@@ -1330,14 +1262,6 @@ export default function BroadcastingPage() {
                       >
                         Copy
                       </Button>
-                      <Button
-                        variant="secondary"
-                        className="px-3 py-1.5 text-xs"
-                        onClick={handleRotateObsStreamKey}
-                        loading={obsKeyState.loading}
-                      >
-                        Rotate
-                      </Button>
                     </div>
                   </div>
                 </>
@@ -1444,13 +1368,6 @@ export default function BroadcastingPage() {
                   </Button>
                   <Button
                     variant="secondary"
-                    onClick={handleRotateObsStreamKey}
-                    loading={obsKeyState.loading}
-                  >
-                    Rotate OBS Key
-                  </Button>
-                  <Button
-                    variant="secondary"
                     onClick={() => handleCopyObsStreamKey(studioSession)}
                     disabled={!studioObsStreamKey}
                   >
@@ -1516,8 +1433,6 @@ export default function BroadcastingPage() {
                   {isObsStudioMode ? "Stream" : "Egress"}: {studioSession.livekit_egress_error}
                 </p>
               ) : null}
-              {obsKeyState.error ? <p className="mt-2 text-xs text-red-300">{obsKeyState.error}</p> : null}
-              {obsKeyState.info ? <p className="mt-2 text-xs text-zinc-300">{obsKeyState.info}</p> : null}
             </div>
           </div>
         </section>

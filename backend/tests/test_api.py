@@ -1674,8 +1674,8 @@ class RealtimeSessionTests(APITestCase):
         session_id = response.data["data"]["id"]
         session = RealtimeSession.objects.get(pk=session_id)
         self.assertEqual(session.stream_service, RealtimeSession.STREAM_SERVICE_OBS)
-        self.assertEqual(session.obs_stream_key, "CreateObsKey123")
-        mock_sync_key.assert_called_once_with("CreateObsKey123")
+        self.assertEqual(session.obs_stream_key, "default-key")
+        mock_sync_key.assert_called_once_with("default-key")
 
     @override_settings(
         OWNCAST_RTMP_TARGET="rtmp://owncast:1935/live/default-key",
@@ -2344,7 +2344,8 @@ class RealtimeSessionTests(APITestCase):
         session.refresh_from_db()
         self.assertEqual(session.stream_status, RealtimeSession.STREAM_LIVE)
         self.assertEqual(session.livekit_egress_id, "")
-        mock_sync_key.assert_called_once_with("ObsStreamKey123")
+        self.assertEqual(session.obs_stream_key, "default-key")
+        mock_sync_key.assert_called_once_with("default-key")
         mock_start_egress.assert_not_called()
 
     @override_settings(
@@ -2372,7 +2373,7 @@ class RealtimeSessionTests(APITestCase):
         payload = response.data["data"]
         self.assertEqual(payload["stream_service"], RealtimeSession.STREAM_SERVICE_OBS)
         self.assertEqual(payload["obs"]["stream_server_url"], "rtmp://obs.example.com:1935/live")
-        self.assertEqual(payload["obs"]["stream_key"], "ObsTokenKey123")
+        self.assertEqual(payload["obs"]["stream_key"], "default-key")
         self.assertNotIn("token", payload)
         mock_build_host_token.assert_not_called()
 
@@ -2381,7 +2382,7 @@ class RealtimeSessionTests(APITestCase):
         OWNCAST_OBS_STREAM_SERVER_URL="rtmp://obs.example.com:1935/live",
     )
     @patch("apps.realtime.views.sync_owncast_stream_key")
-    def test_rotate_obs_stream_key_endpoint_rotates_key(self, mock_sync_key):
+    def test_rotate_obs_stream_key_endpoint_syncs_fixed_key(self, mock_sync_key):
         mock_sync_key.return_value = {"success": True}
         session = RealtimeSession.objects.create(
             title="Rotate OBS Key Session",
@@ -2402,10 +2403,11 @@ class RealtimeSessionTests(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["message"], "OBS stream key synced (fixed key mode).")
         session.refresh_from_db()
-        self.assertNotEqual(session.obs_stream_key, "RotateMe12345")
+        self.assertEqual(session.obs_stream_key, "default-key")
         self.assertEqual(session.stream_service, RealtimeSession.STREAM_SERVICE_OBS)
-        mock_sync_key.assert_called_once_with(session.obs_stream_key)
+        mock_sync_key.assert_called_once_with("default-key")
 
     @override_settings(
         LIVEKIT_URL="ws://livekit.test",

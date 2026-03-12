@@ -145,23 +145,21 @@ def _rotate_obs_stream_key_if_enabled(*, session, force=False):
     if (
         session.session_type != RealtimeSession.TYPE_BROADCASTING
         or session.stream_service != RealtimeSession.STREAM_SERVICE_OBS
-        or (
-            not force
-            and not bool(getattr(settings, "OWNCAST_ROTATE_STREAM_KEY_ON_STOP", True))
-        )
     ):
         return {"rotated": False, "error": ""}
 
-    old_key = str(session.obs_stream_key or "").strip() or session.default_obs_stream_key()
-    new_key = session.generate_obs_stream_key()
+    # Fixed-key mode for Owncast OBS ingest:
+    # always sync and use canonical key from settings/target, never rotate per session.
+    fixed_key = str(session.default_obs_stream_key() or "").strip()
+    if not fixed_key:
+        return {"rotated": False, "error": "Unable to resolve fixed OBS stream key."}
+
     try:
-        sync_owncast_stream_key(new_key)
+        sync_owncast_stream_key(fixed_key)
     except (OwncastConfigError, OwncastAdminError) as exc:
-        session.obs_stream_key = old_key
-        session.save(update_fields=["obs_stream_key", "updated_at"])
         return {"rotated": False, "error": str(exc)}
 
-    session.obs_stream_key = new_key
+    session.obs_stream_key = fixed_key
     session.save(update_fields=["obs_stream_key", "updated_at"])
     return {"rotated": True, "error": ""}
 
@@ -255,7 +253,15 @@ class RealtimeSessionListCreateView(APIView):
             session.session_type == RealtimeSession.TYPE_BROADCASTING
             and session.stream_service == RealtimeSession.STREAM_SERVICE_OBS
         ):
-            stream_key = str(session.obs_stream_key or "").strip() or session.default_obs_stream_key()
+            stream_key = str(session.default_obs_stream_key() or "").strip()
+            if not stream_key:
+                session.delete()
+                return api_response(
+                    success=False,
+                    message="Unable to create OBS broadcast session.",
+                    errors={"detail": "Fixed OBS stream key is not configured."},
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
             session.obs_stream_key = stream_key
             session.save(update_fields=["obs_stream_key", "updated_at"])
             try:
@@ -671,6 +677,11 @@ class RealtimeSessionHostTokenView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
         realtime_config = RealtimeConfiguration.get_solo()
+        canonical_obs_key = str(session.default_obs_stream_key() or "").strip()
+        if session.stream_service == RealtimeSession.STREAM_SERVICE_OBS and canonical_obs_key:
+            if str(session.obs_stream_key or "").strip() != canonical_obs_key:
+                session.obs_stream_key = canonical_obs_key
+                session.save(update_fields=["obs_stream_key", "updated_at"])
         if session.stream_service == RealtimeSession.STREAM_SERVICE_OBS:
             return api_response(
                 success=True,
@@ -684,7 +695,7 @@ class RealtimeSessionHostTokenView(APIView):
                     ),
                     "obs": {
                         "stream_server_url": resolve_obs_stream_server_url(request=request, session=session),
-                        "stream_key": str(session.obs_stream_key or session.default_obs_stream_key()),
+                        "stream_key": canonical_obs_key,
                     },
                 },
             )
@@ -720,7 +731,7 @@ class RealtimeSessionHostTokenView(APIView):
                 ),
                 "obs": {
                     "stream_server_url": resolve_obs_stream_server_url(request=request, session=session),
-                    "stream_key": str(session.obs_stream_key or session.default_obs_stream_key()),
+                    "stream_key": canonical_obs_key,
                 },
             },
         )
@@ -764,7 +775,15 @@ class RealtimeSessionStreamStartView(APIView):
 
         session.mark_stream_starting()
         if session.stream_service == RealtimeSession.STREAM_SERVICE_OBS:
-            stream_key = str(session.obs_stream_key or "").strip() or session.default_obs_stream_key()
+            stream_key = str(session.default_obs_stream_key() or "").strip()
+            if not stream_key:
+                session.mark_stream_failed("Fixed OBS stream key is not configured.")
+                return api_response(
+                    success=False,
+                    message="Unable to prepare OBS stream key.",
+                    errors={"detail": "Fixed OBS stream key is not configured."},
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
             session.obs_stream_key = stream_key
             session.save(update_fields=["obs_stream_key", "updated_at"])
             try:
@@ -887,7 +906,7 @@ class RealtimeSessionStreamRotateKeyView(APIView):
         session.livekit_egress_error = ""
         session.save(update_fields=["livekit_egress_error", "updated_at"])
         data = RealtimeSessionListSerializer(session, context={"request": request}).data
-        return api_response(success=True, message="OBS stream key rotated.", data=data)
+        return api_response(success=True, message="OBS stream key synced (fixed key mode).", data=data)
 
 
 class RealtimeSessionRecordingListView(APIView):

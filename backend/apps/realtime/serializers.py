@@ -95,6 +95,8 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
         user = getattr(request, "user", None)
         if not obj.is_moderator_allowed(user):
             return ""
+        if obj.stream_service == RealtimeSession.STREAM_SERVICE_OBS:
+            return str(obj.default_obs_stream_key() or "").strip()
         return str(obj.obs_stream_key or "")
 
     def _get_resolved_broadcast_urls(self, obj):
