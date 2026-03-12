@@ -7,3 +7,11 @@ redis:
 
 template_port: 7980
 health_port: 7981
+
+# Keep costs aligned with low-CPU VPS plans so egress requests are accepted.
+# For larger nodes, these can be increased.
+cpu_cost:
+  room_composite_cpu_cost: 1.0
+  web_cpu_cost: 1.0
+  track_composite_cpu_cost: 1.0
+  track_cpu_cost: 0.5

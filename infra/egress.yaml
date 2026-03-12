@@ -5,3 +5,10 @@ redis:
   address: redis:6379
 template_port: 7980
 health_port: 7981
+
+# Keep costs aligned with low-CPU local/dev hosts so egress requests are accepted.
+cpu_cost:
+  room_composite_cpu_cost: 1.0
+  web_cpu_cost: 1.0
+  track_composite_cpu_cost: 1.0
+  track_cpu_cost: 0.5
