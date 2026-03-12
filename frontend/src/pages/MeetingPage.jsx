@@ -38,7 +38,7 @@ const meetingMarketingCards = [
   },
 ];
 
-const meetingHeroHighlights = ["Two-way interaction", "Auto-overflow at 200", "Broadcast cap at 600 viewers"];
+const meetingHeroHighlights = ["Two-way interaction", "Auto-overflow at 200", "Broadcast cap at 500 viewers"];
 
 const meetingWorkflow = [
   {
@@ -160,7 +160,7 @@ export default function MeetingPage() {
         session_type: "meeting",
         meeting_capacity: Number(form.meeting_capacity || 200),
         allow_overflow_broadcast: true,
-        max_audience: 600,
+        max_audience: 500,
       };
       const response = await createRealtimeSession(payload);
       const created = apiData(response, null);

@@ -1530,7 +1530,7 @@ class RealtimeSessionTests(APITestCase):
             linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
             meeting_capacity=200,
-            max_audience=600,
+            max_audience=500,
         )
 
         with patch(
@@ -1560,7 +1560,7 @@ class RealtimeSessionTests(APITestCase):
             linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
             meeting_capacity=200,
-            max_audience=600,
+            max_audience=500,
         )
 
         with patch(
@@ -1586,7 +1586,7 @@ class RealtimeSessionTests(APITestCase):
                 "session_type": "broadcasting",
                 "linked_live_class_id": self.live_class.id,
                 "meeting_capacity": 100,
-                "max_audience": 600,
+                "max_audience": 500,
                 "rtmp_target_url": "rtmp://127.0.0.1:1935/live/key",
             },
             format="json",
@@ -1603,7 +1603,7 @@ class RealtimeSessionTests(APITestCase):
                 "description": "Should be blocked",
                 "session_type": "broadcasting",
                 "meeting_capacity": 100,
-                "max_audience": 600,
+                "max_audience": 500,
             },
             format="json",
         )
@@ -1620,7 +1620,7 @@ class RealtimeSessionTests(APITestCase):
                 "session_type": "meeting",
                 "linked_live_class_id": self.live_class.id,
                 "meeting_capacity": 201,
-                "max_audience": 600,
+                "max_audience": 500,
             },
             format="json",
         )
@@ -1630,7 +1630,7 @@ class RealtimeSessionTests(APITestCase):
             "Meeting capacity cannot exceed 200.",
         )
 
-    def test_meeting_create_rejects_max_audience_above_600(self):
+    def test_meeting_create_rejects_max_audience_above_500(self):
         self.login(self.host.email)
         response = self.client.post(
             reverse("realtime-session-list-create"),
@@ -1640,14 +1640,14 @@ class RealtimeSessionTests(APITestCase):
                 "session_type": "meeting",
                 "linked_live_class_id": self.live_class.id,
                 "meeting_capacity": 200,
-                "max_audience": 601,
+                "max_audience": 501,
             },
             format="json",
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
             response.data["errors"]["max_audience"][0],
-            "Max audience cannot exceed 600.",
+            "Max audience cannot exceed 500.",
         )
 
     def test_realtime_list_rejects_unknown_query_params(self):
@@ -1902,7 +1902,7 @@ class RealtimeSessionTests(APITestCase):
             linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
             meeting_capacity=300,
-            max_audience=600,
+            max_audience=500,
         )
 
         self.login(self.viewer.email)
@@ -1954,7 +1954,7 @@ class RealtimeSessionTests(APITestCase):
             linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
             meeting_capacity=300,
-            max_audience=600,
+            max_audience=500,
         )
 
         self.login(self.viewer.email)
@@ -2003,7 +2003,7 @@ class RealtimeSessionTests(APITestCase):
             linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
             meeting_capacity=100,
-            max_audience=600,
+            max_audience=500,
             allow_overflow_broadcast=True,
             stream_embed_url="https://stream.example.com/embed/video",
             chat_embed_url="https://stream.example.com/embed/chat",
@@ -2192,7 +2192,7 @@ class RealtimeSessionTests(APITestCase):
             host=self.host,
             session_type=RealtimeSession.TYPE_BROADCASTING,
             status=RealtimeSession.STATUS_LIVE,
-            max_audience=600,
+            max_audience=500,
         )
 
         self.login(self.host.email)
@@ -2222,7 +2222,7 @@ class RealtimeSessionTests(APITestCase):
             host=self.host,
             session_type=RealtimeSession.TYPE_BROADCASTING,
             status=RealtimeSession.STATUS_LIVE,
-            max_audience=600,
+            max_audience=500,
         )
 
         self.login(self.host.email)
@@ -2677,7 +2677,7 @@ class RealtimeSessionTests(APITestCase):
             linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
             meeting_capacity=300,
-            max_audience=600,
+            max_audience=500,
         )
 
         self.login(self.viewer.email)
@@ -2746,7 +2746,7 @@ class RealtimeSessionTests(APITestCase):
             linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
             meeting_capacity=300,
-            max_audience=600,
+            max_audience=500,
         )
         self.login(self.host.email)
         stage_users = [
@@ -2815,7 +2815,7 @@ class RealtimeSessionTests(APITestCase):
             linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
             meeting_capacity=300,
-            max_audience=600,
+            max_audience=500,
         )
 
         self.login(self.host.email)
@@ -2885,7 +2885,7 @@ class RealtimeSessionTests(APITestCase):
             linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
             meeting_capacity=300,
-            max_audience=600,
+            max_audience=500,
         )
 
         self.login(self.host.email)
@@ -2956,5 +2956,6 @@ class RealtimeSessionTests(APITestCase):
             response.data["data"][0]["join_url"],
             f"http://203.0.113.20:5173/join-live?session={session.id}",
         )
+
 
 

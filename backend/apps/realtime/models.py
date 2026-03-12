@@ -27,7 +27,7 @@ class RealtimeSession(models.Model):
     TYPE_MEETING = "meeting"
     TYPE_BROADCASTING = "broadcasting"
     MAX_MEETING_CAPACITY = 200
-    MAX_AUDIENCE_LIMIT = 600
+    MAX_AUDIENCE_LIMIT = 500
     MAX_STAGE_PARTICIPANTS = 5
     SESSION_TYPE_CHOICES = [
         (TYPE_MEETING, "Meeting"),
@@ -507,7 +507,7 @@ class RealtimeConfiguration(models.Model):
         "capture_width": 1280,
         "capture_height": 720,
         "fps": 24,
-        "max_video_bitrate_kbps": 1800,
+        "max_video_bitrate_kbps": 1500,
     }
     BROADCAST_CONSTRAINED_PROFILE = {
         "capture_width": 854,
