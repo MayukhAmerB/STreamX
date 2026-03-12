@@ -94,6 +94,12 @@ function generateObsStreamKey(length = 36) {
   return chars.join("");
 }
 
+function maskSecretValue(value) {
+  const normalized = String(value || "");
+  if (!normalized) return "";
+  return "\u2022".repeat(Math.max(normalized.length, 12));
+}
+
 function canManageSession(session, user) {
   if (!session) return false;
   if (session.can_manage) return true;
@@ -184,6 +190,8 @@ export default function BroadcastingPage() {
   });
   const [obsKeyState, setObsKeyState] = useState({ loading: false, error: "", info: "" });
   const [shareState, setShareState] = useState({ error: "", info: "" });
+  const [isCreateObsKeyVisible, setIsCreateObsKeyVisible] = useState(false);
+  const [isStudioObsKeyVisible, setIsStudioObsKeyVisible] = useState(false);
 
   const [studioSession, setStudioSession] = useState(null);
   const [studioProfile, setStudioProfile] = useState(defaultBroadcastProfile);
@@ -405,6 +413,7 @@ export default function BroadcastingPage() {
         setStudioSession(created);
       }
       setForm(initialForm);
+      setIsCreateObsKeyVisible(false);
       setCreateState({ loading: false, error: "", success: "Broadcast created. Open Host Studio to go live." });
     } catch (err) {
       setCreateState({ loading: false, error: apiMessage(err, "Unable to create broadcast."), success: "" });
@@ -442,6 +451,7 @@ export default function BroadcastingPage() {
     if (obsMode) {
       disconnectStudio();
     }
+    setIsStudioObsKeyVisible(false);
     setStudioSession(session);
     setStudioState((prev) => ({
       ...prev,
@@ -1164,13 +1174,22 @@ export default function BroadcastingPage() {
                         value={form.obs_stream_server_url}
                         onChange={(e) => setForm((prev) => ({ ...prev, obs_stream_server_url: e.target.value }))}
                       />
-                      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                      <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
                         <input
+                          type={isCreateObsKeyVisible ? "text" : "password"}
                           className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
                           placeholder="OBS stream key"
                           value={form.obs_stream_key}
                           onChange={(e) => setForm((prev) => ({ ...prev, obs_stream_key: e.target.value }))}
                         />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="w-full sm:w-auto"
+                          onClick={() => setIsCreateObsKeyVisible((prev) => !prev)}
+                        >
+                          {isCreateObsKeyVisible ? "Hide" : "View"}
+                        </Button>
                         <Button
                           type="button"
                           variant="secondary"
@@ -1289,8 +1308,20 @@ export default function BroadcastingPage() {
                     <div className="text-[10px] uppercase tracking-[0.12em] text-[#949494]">OBS Stream Key</div>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <code className="max-w-full truncate rounded-md bg-[#0E0E0E] px-2 py-1 text-xs text-[#DFDFDF]">
-                        {studioObsStreamKey || "OBS stream key unavailable"}
+                        {studioObsStreamKey
+                          ? isStudioObsKeyVisible
+                            ? studioObsStreamKey
+                            : maskSecretValue(studioObsStreamKey)
+                          : "OBS stream key unavailable"}
                       </code>
+                      <Button
+                        variant="secondary"
+                        className="px-3 py-1.5 text-xs"
+                        onClick={() => setIsStudioObsKeyVisible((prev) => !prev)}
+                        disabled={!studioObsStreamKey}
+                      >
+                        {isStudioObsKeyVisible ? "Hide" : "View"}
+                      </Button>
                       <Button
                         variant="secondary"
                         className="px-3 py-1.5 text-xs"
@@ -1424,6 +1455,13 @@ export default function BroadcastingPage() {
                     disabled={!studioObsStreamKey}
                   >
                     Copy OBS Key
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setIsStudioObsKeyVisible((prev) => !prev)}
+                    disabled={!studioObsStreamKey}
+                  >
+                    {isStudioObsKeyVisible ? "Hide OBS Key" : "View OBS Key"}
                   </Button>
                 </div>
               )}
