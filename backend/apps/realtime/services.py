@@ -324,34 +324,59 @@ def sync_owncast_stream_key(stream_key):
         raise OwncastAdminError("Stream key cannot be empty.")
 
     auth_token = base64.b64encode(f"{admin_username}:{admin_password}".encode("utf-8")).decode("utf-8")
-    endpoint = f"{base_url}/api/admin/changekey"
-    request = Request(
-        endpoint,
-        data=json.dumps({"key": target_key}).encode("utf-8"),
-        method="POST",
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Basic {auth_token}",
-        },
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Basic {auth_token}",
+    }
+    # Newer Owncast releases (including v0.2.x) use /admin/config/streamkeys.
+    # Keep legacy fallback for older nodes still exposing /admin/changekey.
+    endpoint_candidates = (
+        (
+            f"{base_url}/api/admin/config/streamkeys",
+            {"value": [{"key": target_key, "comment": "StreamX OBS session key"}]},
+        ),
+        (
+            f"{base_url}/api/admin/changekey",
+            {"key": target_key},
+        ),
     )
-    try:
-        with urlopen(request, timeout=10) as response:
-            raw_payload = response.read().decode("utf-8") or "{}"
-        parsed_payload = json.loads(raw_payload)
-        if not bool(parsed_payload.get("success", True)):
-            raise OwncastAdminError(str(parsed_payload.get("errorMessage") or "Owncast key update failed."))
-        return parsed_payload
-    except HTTPError as exc:
-        response_body = ""
+
+    last_error = ""
+    for endpoint, payload in endpoint_candidates:
+        request = Request(
+            endpoint,
+            data=json.dumps(payload).encode("utf-8"),
+            method="POST",
+            headers=headers,
+        )
         try:
-            response_body = exc.read().decode("utf-8")
-        except Exception:
-            response_body = str(exc)
-        raise OwncastAdminError(f"Owncast admin API HTTP {exc.code}: {response_body}") from exc
-    except URLError as exc:
-        raise OwncastAdminError(f"Owncast admin API network error: {exc}") from exc
-    except Exception as exc:
-        raise OwncastAdminError(f"Owncast admin API unknown error: {exc}") from exc
+            with urlopen(request, timeout=10) as response:
+                raw_payload = response.read().decode("utf-8") or "{}"
+            parsed_payload = json.loads(raw_payload)
+            if not bool(parsed_payload.get("success", True)):
+                raise OwncastAdminError(
+                    str(parsed_payload.get("errorMessage") or parsed_payload.get("message") or "Owncast key update failed.")
+                )
+            return parsed_payload
+        except HTTPError as exc:
+            response_body = ""
+            try:
+                response_body = exc.read().decode("utf-8")
+            except Exception:
+                response_body = str(exc)
+            # Try next endpoint on not found to support mixed Owncast versions.
+            if exc.code == 404:
+                last_error = f"{endpoint} -> HTTP 404: {response_body}"
+                continue
+            raise OwncastAdminError(f"Owncast admin API HTTP {exc.code}: {response_body}") from exc
+        except URLError as exc:
+            raise OwncastAdminError(f"Owncast admin API network error: {exc}") from exc
+        except Exception as exc:
+            raise OwncastAdminError(f"Owncast admin API unknown error: {exc}") from exc
+
+    raise OwncastAdminError(
+        f"Owncast admin API returned 404 for all known stream-key endpoints. Last error: {last_error}"
+    )
 
 
 def build_session_join_url(session_id, request=None):
