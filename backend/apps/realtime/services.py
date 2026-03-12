@@ -774,7 +774,7 @@ def _twirp_post(path, payload):
             },
         )
         try:
-            with urlopen(request, timeout=8) as response:
+            with urlopen(request, timeout=settings.LIVEKIT_EGRESS_TWIRP_TIMEOUT_SECONDS) as response:
                 return json.loads(response.read().decode("utf-8") or "{}")
         except HTTPError as exc:
             body = ""
