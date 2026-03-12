@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db.models import Q
 
 from apps.courses.models import LiveClassEnrollment
@@ -35,6 +36,14 @@ class ParticipantState:
     participant_count_source: str
     should_use_broadcast: bool
     overflow_triggered: bool
+
+
+def _enrollment_access_cache_ttl_seconds():
+    return max(0, int(getattr(settings, "REALTIME_ENROLLMENT_ACCESS_CACHE_TTL_SECONDS", 10) or 0))
+
+
+def _build_enrollment_access_cache_key(*, user_id, live_class_id):
+    return f"realtime:join-access:user={int(user_id)}:live-class={int(live_class_id)}"
 
 
 def list_queryset(*, session_type: str, status_filter: str, user):
@@ -120,12 +129,25 @@ def get_access_decision(session: RealtimeSession, user) -> JoinAccessDecision:
                 is_admin=is_admin,
                 is_instructor_owner=is_instructor_owner,
             )
-        is_enrolled = LiveClassEnrollment.objects.filter(
+        cache_ttl_seconds = _enrollment_access_cache_ttl_seconds()
+        cache_key = _build_enrollment_access_cache_key(
             user_id=user.id,
             live_class_id=session.linked_live_class_id,
-            status=LiveClassEnrollment.STATUS_APPROVED,
-            live_class__is_active=True,
-        ).exists()
+        )
+        is_enrolled = None
+        if cache_ttl_seconds > 0:
+            is_enrolled = cache.get(cache_key)
+        if is_enrolled is None:
+            is_enrolled = LiveClassEnrollment.objects.filter(
+                user_id=user.id,
+                live_class_id=session.linked_live_class_id,
+                status=LiveClassEnrollment.STATUS_APPROVED,
+                live_class__is_active=True,
+            ).exists()
+            if cache_ttl_seconds > 0:
+                cache.set(cache_key, bool(is_enrolled), timeout=cache_ttl_seconds)
+        else:
+            is_enrolled = bool(is_enrolled)
         if not is_enrolled:
             return JoinAccessDecision(
                 allowed=False,
@@ -151,15 +173,16 @@ def get_access_decision(session: RealtimeSession, user) -> JoinAccessDecision:
 def build_permission_set(session: RealtimeSession, user, decision: JoinAccessDecision) -> JoinPermissionSet:
     can_manage_presenters = session.is_moderator_allowed(user)
     can_present = session.is_presenter_allowed(user)
-    can_speak = session.session_type == RealtimeSession.TYPE_MEETING and session.is_speaker_allowed(user)
+    can_speak = session.is_speaker_allowed(user)
     can_publish = bool(can_present or can_speak)
 
     can_publish_sources = None
-    if session.session_type == RealtimeSession.TYPE_MEETING:
-        if can_present:
-            can_publish_sources = ["camera", "microphone", "screen_share", "screen_share_audio"]
-        elif can_speak:
-            can_publish_sources = ["microphone"]
+    if can_present:
+        can_publish_sources = ["camera", "screen_share", "screen_share_audio"]
+        if can_speak:
+            can_publish_sources.append("microphone")
+    elif can_speak:
+        can_publish_sources = ["microphone"]
 
     return JoinPermissionSet(
         can_manage_presenters=can_manage_presenters,

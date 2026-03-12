@@ -35,6 +35,8 @@ from apps.courses.models import (
 from apps.courses.serializers import LectureSerializer
 from apps.courses.services import transcode_lecture_to_hls
 from apps.payments.models import Payment
+from apps.realtime import domain as realtime_domain
+from apps.realtime import services as realtime_services
 from apps.realtime.models import RealtimeConfiguration, RealtimeSession, RealtimeSessionRecording
 from apps.users.models import AuthConfiguration, User
 from apps.users.serializers import ProfileUpdateSerializer
@@ -1517,6 +1519,63 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         return response
 
+    @override_settings(REALTIME_ENROLLMENT_ACCESS_CACHE_TTL_SECONDS=30)
+    def test_join_access_enrollment_lookup_is_cached(self):
+        session = RealtimeSession.objects.create(
+            title="Cached Enrollment Session",
+            description="Enrollment cache should reduce repeated DB exists checks.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            meeting_capacity=200,
+            max_audience=600,
+        )
+
+        with patch(
+            "apps.realtime.domain.LiveClassEnrollment.objects.filter",
+            wraps=LiveClassEnrollment.objects.filter,
+        ) as mocked_filter:
+            first = realtime_domain.get_access_decision(session, self.viewer)
+            second = realtime_domain.get_access_decision(session, self.viewer)
+
+        self.assertTrue(first.allowed)
+        self.assertTrue(second.allowed)
+        self.assertEqual(mocked_filter.call_count, 1)
+
+    @override_settings(
+        OWNCAST_BASE_URL="https://stream.example.com",
+        OWNCAST_DEFAULT_STREAM_PATH="/embed/video",
+        OWNCAST_DEFAULT_CHAT_PATH="/embed/chat/readwrite",
+        REALTIME_BROADCAST_URL_CACHE_TTL_SECONDS=30,
+    )
+    def test_resolve_broadcast_urls_uses_cache(self):
+        session = RealtimeSession.objects.create(
+            title="Broadcast URL Cache Session",
+            description="Broadcast URL resolution should use short-TTL cache.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            meeting_capacity=200,
+            max_audience=600,
+        )
+
+        with patch(
+            "apps.realtime.services._resolve_public_service_base_url",
+            wraps=realtime_services._resolve_public_service_base_url,
+        ) as mocked_resolver:
+            first = realtime_services.resolve_broadcast_urls(session)
+            second = realtime_services.resolve_broadcast_urls(session)
+
+        self.assertEqual(first, second)
+        self.assertTrue(first["stream_embed_url"].endswith("/embed/video"))
+        self.assertTrue(first["chat_embed_url"].endswith("/embed/chat/readwrite"))
+        # First call resolves stream + chat bases (2 calls), second call is cache hit.
+        self.assertEqual(mocked_resolver.call_count, 2)
+
     def test_realtime_create_rejects_private_rtmp_target_url(self):
         self.login(self.host.email)
         response = self.client.post(
@@ -1963,6 +2022,131 @@ class RealtimeSessionTests(APITestCase):
             join_response.data["data"]["broadcast"]["stream_embed_url"],
             "https://stream.example.com/embed/video",
         )
+
+    @override_settings(
+        LIVEKIT_URL="ws://livekit.test",
+        LIVEKIT_API_KEY="devkey",
+        LIVEKIT_API_SECRET="secret",
+        LIVEKIT_MEET_URL="https://meet.livekit.io",
+    )
+    @patch("apps.realtime.views.build_meet_embed_url")
+    @patch("apps.realtime.views.build_participant_token")
+    def test_broadcast_join_returns_meeting_mode_for_moderator(self, mock_build_token, mock_build_meet_url):
+        mock_build_token.return_value = "lk.token"
+        mock_build_meet_url.return_value = "https://meet.livekit.io/?token=lk.token"
+
+        session = RealtimeSession.objects.create(
+            title="Broadcast Moderator Session",
+            description="Moderator should enter interactive stage room",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+            chat_embed_url="https://stream.example.com/embed/chat",
+        )
+
+        self.login(self.host.email)
+        join_response = self.client.post(
+            reverse("realtime-session-join", kwargs={"pk": session.id}),
+            {"display_name": "Admin Host"},
+            format="json",
+        )
+        self.assertEqual(join_response.status_code, 200)
+        self.assertEqual(join_response.data["data"]["mode"], "meeting")
+        self.assertTrue(join_response.data["data"]["meeting"]["permissions"]["can_present"])
+        self.assertTrue(join_response.data["data"]["meeting"]["permissions"]["can_speak"])
+        self.assertEqual(
+            mock_build_token.call_args.kwargs["can_publish_sources"],
+            ["camera", "screen_share", "screen_share_audio", "microphone"],
+        )
+
+    def test_broadcast_join_returns_broadcast_mode_for_regular_viewer(self):
+        session = RealtimeSession.objects.create(
+            title="Broadcast Viewer Session",
+            description="Viewer should stay in stream mode",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+            chat_embed_url="https://stream.example.com/embed/chat",
+        )
+
+        self.login(self.viewer.email)
+        join_response = self.client.post(
+            reverse("realtime-session-join", kwargs={"pk": session.id}),
+            {"display_name": "Viewer User"},
+            format="json",
+        )
+        self.assertEqual(join_response.status_code, 200)
+        self.assertEqual(join_response.data["data"]["mode"], "broadcast")
+        self.assertEqual(
+            join_response.data["data"]["broadcast"]["stream_embed_url"],
+            "https://stream.example.com/embed/video",
+        )
+
+    @override_settings(
+        LIVEKIT_URL="ws://livekit.test",
+        LIVEKIT_API_KEY="devkey",
+        LIVEKIT_API_SECRET="secret",
+        LIVEKIT_MEET_URL="https://meet.livekit.io",
+    )
+    @patch("apps.realtime.views.apply_live_presenter_permission_update")
+    @patch("apps.realtime.views.build_meet_embed_url")
+    @patch("apps.realtime.views.build_participant_token")
+    def test_broadcast_presenter_grant_allows_stage_join(
+        self,
+        mock_build_token,
+        mock_build_meet_url,
+        mock_apply_live_presenter_update,
+    ):
+        mock_build_token.return_value = "lk.token"
+        mock_build_meet_url.return_value = "https://meet.livekit.io/?token=lk.token"
+        mock_apply_live_presenter_update.return_value = {
+            "applied": True,
+            "connected_matches": 0,
+            "updated_identities": [],
+            "errors": [],
+        }
+
+        session = RealtimeSession.objects.create(
+            title="Broadcast Stage Grant Session",
+            description="Presenter grants should work for broadcasting too",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+            chat_embed_url="https://stream.example.com/embed/chat",
+        )
+
+        self.login(self.host.email)
+        grant_response = self.client.post(
+            reverse(
+                "realtime-session-presenter-permission",
+                kwargs={"pk": session.id, "permission_action": "grant"},
+            ),
+            {"user_id": self.viewer.id},
+            format="json",
+        )
+        self.assertEqual(grant_response.status_code, 200)
+        self.assertIn(self.viewer.id, grant_response.data["data"]["presenter_user_ids"])
+
+        self.client.post(reverse("auth-logout"))
+        self.login(self.viewer.email)
+        join_response = self.client.post(
+            reverse("realtime-session-join", kwargs={"pk": session.id}),
+            {"display_name": "Viewer User"},
+            format="json",
+        )
+        self.assertEqual(join_response.status_code, 200)
+        self.assertEqual(join_response.data["data"]["mode"], "meeting")
+        self.assertTrue(join_response.data["data"]["meeting"]["permissions"]["can_present"])
+        self.assertFalse(join_response.data["data"]["meeting"]["permissions"]["can_speak"])
 
     @override_settings(
         LIVEKIT_URL="ws://livekit.test",
@@ -2463,18 +2647,26 @@ class RealtimeSessionTests(APITestCase):
         LIVEKIT_API_SECRET="secret",
         LIVEKIT_MEET_URL="https://meet.livekit.io",
     )
+    @patch("apps.realtime.views.apply_live_presenter_permission_update")
     @patch("apps.realtime.views.build_meet_embed_url")
     @patch("apps.realtime.views.build_participant_token")
     @patch("apps.realtime.views.get_room_participant_count")
-    def test_student_cannot_receive_stage_access_and_stays_in_viewer_mode(
+    def test_student_receives_stage_access_after_presenter_granted(
         self,
         mock_participant_count,
         mock_build_token,
         mock_build_meet_url,
+        mock_apply_live_presenter_update,
     ):
         mock_participant_count.return_value = 1
         mock_build_token.return_value = "lk.token"
         mock_build_meet_url.return_value = "https://meet.livekit.io/?token=lk.token"
+        mock_apply_live_presenter_update.return_value = {
+            "applied": True,
+            "connected_matches": 0,
+            "updated_identities": [],
+            "errors": [],
+        }
 
         session = RealtimeSession.objects.create(
             title="Permission Session",
@@ -2508,11 +2700,8 @@ class RealtimeSessionTests(APITestCase):
             {"user_id": self.viewer.id},
             format="json",
         )
-        self.assertEqual(grant_response.status_code, 400)
-        self.assertEqual(
-            grant_response.data["errors"]["detail"],
-            "Only admin or the assigned instructor can use camera and screen share.",
-        )
+        self.assertEqual(grant_response.status_code, 200)
+        self.assertIn(self.viewer.id, grant_response.data["data"]["presenter_user_ids"])
 
         self.client.post(reverse("auth-logout"))
         self.login(self.viewer.email)
@@ -2522,7 +2711,7 @@ class RealtimeSessionTests(APITestCase):
             format="json",
         )
         self.assertEqual(after_grant.status_code, 200)
-        self.assertFalse(after_grant.data["data"]["meeting"]["permissions"]["can_present"])
+        self.assertTrue(after_grant.data["data"]["meeting"]["permissions"]["can_present"])
         self.assertFalse(after_grant.data["data"]["meeting"]["permissions"]["can_speak"])
         self.assertEqual(mock_build_token.call_count, 2)
         self.assertEqual(
@@ -2531,8 +2720,64 @@ class RealtimeSessionTests(APITestCase):
         )
         self.assertEqual(
             mock_build_token.call_args_list[1].kwargs["can_publish_sources"],
-            None,
+            ["camera", "screen_share", "screen_share_audio"],
         )
+
+    @override_settings(
+        LIVEKIT_URL="ws://livekit.test",
+        LIVEKIT_API_KEY="devkey",
+        LIVEKIT_API_SECRET="secret",
+        LIVEKIT_MEET_URL="https://meet.livekit.io",
+    )
+    @patch("apps.realtime.views.apply_live_presenter_permission_update")
+    def test_presenter_stage_limit_is_enforced(self, mock_apply_live_presenter_update):
+        mock_apply_live_presenter_update.return_value = {
+            "applied": True,
+            "connected_matches": 0,
+            "updated_identities": [],
+            "errors": [],
+        }
+        session = RealtimeSession.objects.create(
+            title="Stage Limit Session",
+            description="Stage capacity checks",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            meeting_capacity=300,
+            max_audience=600,
+        )
+        self.login(self.host.email)
+        stage_users = [
+            User.objects.create_user(
+                email=f"stage{i}@test.com",
+                password="StrongPass@123",
+                full_name=f"Stage User {i}",
+                role=User.ROLE_STUDENT,
+            )
+            for i in range(1, 7)
+        ]
+        for stage_user in stage_users[:5]:
+            response = self.client.post(
+                reverse(
+                    "realtime-session-presenter-permission",
+                    kwargs={"pk": session.id, "permission_action": "grant"},
+                ),
+                {"user_id": stage_user.id},
+                format="json",
+            )
+            self.assertEqual(response.status_code, 200)
+        overflow_response = self.client.post(
+            reverse(
+                "realtime-session-presenter-permission",
+                kwargs={"pk": session.id, "permission_action": "grant"},
+            ),
+            {"user_id": stage_users[5].id},
+            format="json",
+        )
+        self.assertEqual(overflow_response.status_code, 400)
+        self.assertIn("Stage is full", str(overflow_response.data.get("errors")))
 
     @override_settings(
         LIVEKIT_URL="ws://livekit.test",

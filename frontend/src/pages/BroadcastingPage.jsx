@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
-import { Room, createLocalAudioTrack, createLocalVideoTrack } from "livekit-client";
+import { Room, createLocalAudioTrack, createLocalScreenTracks, createLocalVideoTrack } from "livekit-client";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 import { listLiveClasses } from "../api/courses";
@@ -40,6 +40,8 @@ const defaultBroadcastProfile = {
   fps: 20,
   max_video_bitrate_kbps: 650,
 };
+
+const defaultBroadcastSource = "camera";
 
 function clampNumber(value, min, max, fallback) {
   const parsed = Number(value);
@@ -100,6 +102,7 @@ const broadcastMarketingCards = [
 
 const broadcastHeroHighlights = [
   "Host directly from browser",
+  "Camera + screen share",
   "Chat-first audience mode",
   "Supports up to 600 viewers",
 ];
@@ -111,7 +114,7 @@ const broadcastWorkflow = [
   },
   {
     step: "Publish",
-    detail: "Connect camera and microphone in Host Studio, then start live delivery.",
+    detail: "Connect camera or share screen with microphone in Host Studio, then start live delivery.",
   },
   {
     step: "Engage",
@@ -144,6 +147,7 @@ export default function BroadcastingPage() {
 
   const [studioSession, setStudioSession] = useState(null);
   const [studioProfile, setStudioProfile] = useState(defaultBroadcastProfile);
+  const [studioVideoSource, setStudioVideoSource] = useState(defaultBroadcastSource);
   const [studioState, setStudioState] = useState({
     connecting: false,
     connected: false,
@@ -163,6 +167,7 @@ export default function BroadcastingPage() {
   const roomRef = useRef(null);
   const localVideoTrackRef = useRef(null);
   const localAudioTrackRef = useRef(null);
+  const connectedStudioSessionIdRef = useRef(null);
   const previewVideoRef = useRef(null);
   const fallbackRecorderRef = useRef(null);
 
@@ -306,7 +311,9 @@ export default function BroadcastingPage() {
     if (previewVideoRef.current) {
       previewVideoRef.current.srcObject = null;
     }
+    connectedStudioSessionIdRef.current = null;
     setStudioProfile(defaultBroadcastProfile);
+    setStudioVideoSource(defaultBroadcastSource);
     setStudioState((prev) => ({ ...prev, connected: false }));
   };
 
@@ -356,6 +363,8 @@ export default function BroadcastingPage() {
     try {
       const response = await joinRealtimeSession(sessionId, {
         display_name: user?.full_name || "",
+        // Keep this page in viewer/broadcast context even for moderators.
+        prefer_broadcast: true,
       });
       const data = apiData(response, {});
       if (data.mode === "meeting") {
@@ -487,12 +496,27 @@ export default function BroadcastingPage() {
     }
   };
 
-  const handleConnectCamera = async () => {
+  const handleConnectSource = async (source = defaultBroadcastSource) => {
     if (!studioSession) return;
-    setStudioState({ connecting: true, connected: false, actionLoading: false, error: "", info: "Connecting camera..." });
+    const nextSource = source === "screen" ? "screen" : "camera";
+    const sourceLabel = nextSource === "screen" ? "screen share" : "camera";
+    setStudioState({
+      connecting: true,
+      connected: false,
+      actionLoading: false,
+      error: "",
+      info: `Connecting ${sourceLabel}...`,
+    });
 
     try {
-      disconnectStudio();
+      if (
+        roomRef.current &&
+        connectedStudioSessionIdRef.current &&
+        connectedStudioSessionIdRef.current !== studioSession.id
+      ) {
+        disconnectStudio();
+      }
+
       const tokenResponse = await getRealtimeHostToken(studioSession.id);
       const tokenData = apiData(tokenResponse, {});
       const serverProfile = tokenData.broadcast_profile || {};
@@ -518,25 +542,61 @@ export default function BroadcastingPage() {
         ),
       };
 
-      const room = new Room({
-        adaptiveStream: false,
-        dynacast: false,
-      });
-      await room.connect(tokenData.livekit_url, tokenData.token);
+      let room = roomRef.current;
+      if (!room) {
+        room = new Room({
+          adaptiveStream: false,
+          dynacast: false,
+        });
+        await room.connect(tokenData.livekit_url, tokenData.token);
+        roomRef.current = room;
+        connectedStudioSessionIdRef.current = studioSession.id;
+      }
 
-      const [videoTrack, audioTrack] = await Promise.all([
-        createLocalVideoTrack({
+      const previousVideoTrack = localVideoTrackRef.current;
+
+      let videoTrack = null;
+      if (nextSource === "screen") {
+        const createdTracks = await createLocalScreenTracks({
+          audio: false,
+          resolution: {
+            width: profile.capture_width,
+            height: profile.capture_height,
+            frameRate: profile.fps,
+          },
+        });
+        videoTrack = createdTracks.find((track) => track.kind === "video") || null;
+      } else {
+        videoTrack = await createLocalVideoTrack({
           facingMode: "user",
           resolution: {
             width: profile.capture_width,
             height: profile.capture_height,
           },
           frameRate: profile.fps,
-        }),
-        createLocalAudioTrack(),
-      ]);
+        });
+      }
+      if (!videoTrack) {
+        throw new Error("No video track available from selected source.");
+      }
+
+      if (!localAudioTrackRef.current) {
+        localAudioTrackRef.current = await createLocalAudioTrack();
+        await room.localParticipant.publishTrack(localAudioTrackRef.current);
+      }
+
       if (videoTrack?.mediaStreamTrack && "contentHint" in videoTrack.mediaStreamTrack) {
         videoTrack.mediaStreamTrack.contentHint = "detail";
+      }
+
+      if (previousVideoTrack) {
+        try {
+          await room.localParticipant.unpublishTrack(previousVideoTrack, true);
+        } catch {
+          // best effort cleanup before replacing video source
+        }
+        previousVideoTrack.detach();
+        previousVideoTrack.stop();
       }
 
       await room.localParticipant.publishTrack(videoTrack, {
@@ -547,40 +607,77 @@ export default function BroadcastingPage() {
         },
         degradationPreference: "maintain-resolution",
       });
-      await room.localParticipant.publishTrack(audioTrack);
 
       if (previewVideoRef.current) {
         videoTrack.attach(previewVideoRef.current);
       }
 
-      roomRef.current = room;
       localVideoTrackRef.current = videoTrack;
-      localAudioTrackRef.current = audioTrack;
       setStudioProfile(profile);
+      setStudioVideoSource(nextSource);
+
+      if (nextSource === "screen" && videoTrack?.mediaStreamTrack?.addEventListener) {
+        videoTrack.mediaStreamTrack.addEventListener(
+          "ended",
+          () => {
+            if (localVideoTrackRef.current === videoTrack) {
+              room.localParticipant.unpublishTrack(videoTrack, true).catch(() => {
+                // no-op
+              });
+              videoTrack.detach();
+              videoTrack.stop();
+              localVideoTrackRef.current = null;
+              if (previewVideoRef.current) {
+                previewVideoRef.current.srcObject = null;
+              }
+              setStudioVideoSource(defaultBroadcastSource);
+              setStudioState((prev) => ({
+                ...prev,
+                connected: false,
+                error: "",
+                info: "Screen share ended. Click Share Screen to present again, or switch to camera.",
+              }));
+            }
+          },
+          { once: true }
+        );
+      }
 
       setStudioState({
         connecting: false,
         connected: true,
         actionLoading: false,
         error: "",
-        info: `Camera connected (${profile.capture_width}x${profile.capture_height} @ ${profile.fps}fps, ${profile.max_video_bitrate_kbps}kbps). Click Start Live to begin streaming. If admin changes profile, reconnect camera to apply.`,
+        info: `${
+          nextSource === "screen" ? "Screen share" : "Camera"
+        } connected (${profile.capture_width}x${profile.capture_height} @ ${profile.fps}fps, ${profile.max_video_bitrate_kbps}kbps). Click Start Live to begin streaming. If admin changes profile, reconnect to apply.`,
       });
     } catch (err) {
-      disconnectStudio();
+      if (!roomRef.current) {
+        disconnectStudio();
+      }
       setStudioState({
         connecting: false,
-        connected: false,
+        connected: Boolean(localVideoTrackRef.current && localAudioTrackRef.current && roomRef.current),
         actionLoading: false,
-        error: apiMessage(err, "Unable to access camera/microphone for browser publishing."),
+        error: apiMessage(err, "Unable to access selected media source for browser publishing."),
         info: "",
       });
     }
   };
 
+  const handleConnectCamera = async () => {
+    await handleConnectSource("camera");
+  };
+
+  const handleShareScreen = async () => {
+    await handleConnectSource("screen");
+  };
+
   const handleStartLive = async () => {
     if (!studioSession) return;
     if (!studioState.connected) {
-      setStudioState((prev) => ({ ...prev, error: "Connect camera first before starting live." }));
+      setStudioState((prev) => ({ ...prev, error: "Connect camera or screen share first before starting live." }));
       return;
     }
 
@@ -832,7 +929,7 @@ export default function BroadcastingPage() {
                 One-to-many live streams with built-in viewer chat
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-[#BBBBBB]">
-                Hosts publish directly from browser camera and microphone. Live delivery is managed
+                Hosts publish directly from browser camera, screen share, and microphone. Live delivery is managed
                 through LiveKit + Owncast while viewers engage in chat-only mode.
               </p>
 
@@ -996,9 +1093,17 @@ export default function BroadcastingPage() {
               />
             </div>
             <div className="rounded-2xl border border-black panel-gradient p-4">
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-3">
                 <Button onClick={handleConnectCamera} loading={studioState.connecting || studioState.actionLoading}>
-                  {studioState.connected ? "Reconnect Camera" : "Connect Camera"}
+                  {studioState.connected && studioVideoSource === "camera" ? "Reconnect Camera" : "Connect Camera"}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={handleShareScreen}
+                  loading={studioState.connecting}
+                  disabled={studioState.actionLoading}
+                >
+                  {studioState.connected && studioVideoSource === "screen" ? "Reshare Screen" : "Share Screen"}
                 </Button>
                 <Button
                   variant="secondary"
@@ -1046,6 +1151,9 @@ export default function BroadcastingPage() {
               {studioRecordingState.error ? <p className="mt-2 text-xs text-red-300">{studioRecordingState.error}</p> : null}
               {studioRecordingState.info ? <p className="mt-2 text-xs text-zinc-300">{studioRecordingState.info}</p> : null}
               <p className="mt-2 text-[11px] text-[#A4A4A4]">
+                Active source: {studioVideoSource === "screen" ? "Screen share" : "Camera"}.
+              </p>
+              <p className="mt-1 text-[11px] text-[#A4A4A4]">
                 Active profile: {studioProfile.capture_width}x{studioProfile.capture_height} at{" "}
                 {studioProfile.fps}fps, max {studioProfile.max_video_bitrate_kbps} kbps.
               </p>
@@ -1242,6 +1350,11 @@ export default function BroadcastingPage() {
                       </Button>
                       {canManageSession(session, user) ? (
                         <>
+                          <Link to={`/join-live?session=${session.id}`} className="block w-full">
+                            <Button variant="secondary" className="w-full">
+                              Open Stage Control
+                            </Button>
+                          </Link>
                           <Button variant="secondary" className="w-full" onClick={() => handleOpenStudio(session)}>
                             Open Host Studio
                           </Button>

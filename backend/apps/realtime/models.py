@@ -28,6 +28,7 @@ class RealtimeSession(models.Model):
     TYPE_BROADCASTING = "broadcasting"
     MAX_MEETING_CAPACITY = 200
     MAX_AUDIENCE_LIMIT = 600
+    MAX_STAGE_PARTICIPANTS = 5
     SESSION_TYPE_CHOICES = [
         (TYPE_MEETING, "Meeting"),
         (TYPE_BROADCASTING, "Broadcasting"),
@@ -158,8 +159,10 @@ class RealtimeSession(models.Model):
         if not isinstance(self.presenter_user_ids, list):
             raise ValidationError({"presenter_user_ids": "Presenter user IDs must be a list."})
         normalized_presenters = self.get_presenter_user_ids()
-        if len(normalized_presenters) > 1000:
-            raise ValidationError({"presenter_user_ids": "Too many presenter overrides for one session."})
+        if len(normalized_presenters) > self.MAX_STAGE_PARTICIPANTS:
+            raise ValidationError(
+                {"presenter_user_ids": f"Stage supports up to {self.MAX_STAGE_PARTICIPANTS} participants."}
+            )
         if not isinstance(self.speaker_user_ids, list):
             raise ValidationError({"speaker_user_ids": "Speaker user IDs must be a list."})
         normalized_speakers = self.get_speaker_user_ids()
@@ -246,8 +249,7 @@ class RealtimeSession(models.Model):
         self.save(update_fields=["stream_status", "livekit_egress_error", "updated_at"])
 
     def get_presenter_user_ids(self):
-        # Stage access is reserved for moderators (host, assigned instructor, admin).
-        return []
+        return self._normalize_user_id_list(self.presenter_user_ids)
 
     def get_speaker_user_ids(self):
         return self._normalize_user_id_list(self.speaker_user_ids)
@@ -286,20 +288,41 @@ class RealtimeSession(models.Model):
         return bool(is_admin or user.id == self.host_id or self.is_instructor_owner(user))
 
     def is_presenter_allowed(self, user):
-        return self.is_moderator_allowed(user)
+        if self.is_moderator_allowed(user):
+            return True
+        return bool(user and getattr(user, "is_authenticated", False) and user.id in self.get_presenter_user_ids())
 
     def is_speaker_allowed(self, user):
-        if self.is_presenter_allowed(user):
+        if self.is_moderator_allowed(user):
             return True
         return bool(user and getattr(user, "is_authenticated", False) and user.id in self.get_speaker_user_ids())
 
     def grant_presenter(self, user_id):
-        self.presenter_user_ids = []
+        presenter_ids = self.get_presenter_user_ids()
+        try:
+            normalized_user_id = int(user_id)
+        except (TypeError, ValueError):
+            return presenter_ids
+        if normalized_user_id <= 0:
+            return presenter_ids
+        if normalized_user_id in presenter_ids:
+            return presenter_ids
+        if len(presenter_ids) >= self.MAX_STAGE_PARTICIPANTS:
+            raise ValidationError(
+                {"detail": f"Stage is full. Maximum {self.MAX_STAGE_PARTICIPANTS} participants are allowed."}
+            )
+        presenter_ids.append(normalized_user_id)
+        self.presenter_user_ids = sorted(set(presenter_ids))
         self.save(update_fields=["presenter_user_ids", "updated_at"])
         return self.presenter_user_ids
 
     def revoke_presenter(self, user_id):
-        self.presenter_user_ids = []
+        try:
+            normalized_user_id = int(user_id)
+        except (TypeError, ValueError):
+            return self.get_presenter_user_ids()
+        presenter_ids = [row for row in self.get_presenter_user_ids() if row != normalized_user_id]
+        self.presenter_user_ids = presenter_ids
         self.save(update_fields=["presenter_user_ids", "updated_at"])
         return self.presenter_user_ids
 

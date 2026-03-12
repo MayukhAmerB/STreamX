@@ -5,6 +5,7 @@ import time
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import FileResponse
 from django.http.response import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -37,6 +38,7 @@ from .serializers import (
     RealtimePresenterPermissionSerializer,
 )
 from .services import (
+    apply_live_presenter_permission_update,
     apply_live_speaker_permission_update,
     build_participant_metadata,
     cache_room_participant_count,
@@ -272,6 +274,7 @@ class RealtimeSessionJoinView(APIView):
                 errors=serializer.errors,
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
+        prefer_broadcast = bool(serializer.validated_data.get("prefer_broadcast", False))
 
         access_decision = get_access_decision(session, request.user)
         if not access_decision.allowed:
@@ -327,7 +330,16 @@ class RealtimeSessionJoinView(APIView):
                     participant_state=participant_state,
                 )
 
-        if participant_state.should_use_broadcast:
+        should_use_broadcast = participant_state.should_use_broadcast
+        if session.session_type == RealtimeSession.TYPE_BROADCASTING:
+            if prefer_broadcast:
+                should_use_broadcast = True
+            elif permissions_set.can_publish:
+                # StreamYard-like flow: moderators/stage users join interactive room,
+                # while regular attendees stay in broadcast viewer mode.
+                should_use_broadcast = False
+
+        if should_use_broadcast:
             urls = resolve_broadcast_urls(session, request=request)
             _record_join_metric(
                 result="success",
@@ -479,11 +491,11 @@ def _update_participant_permission(*, request, pk, permission_action, permission
             errors={"detail": "Only host, assigned instructor, or admin can manage participant permissions."},
             status_code=status.HTTP_403_FORBIDDEN,
         )
-    if session.session_type != RealtimeSession.TYPE_MEETING:
+    if session.session_type not in {RealtimeSession.TYPE_MEETING, RealtimeSession.TYPE_BROADCASTING}:
         return api_response(
             success=False,
             message="Participant control unavailable.",
-            errors={"detail": "Participant permissions are supported for meeting sessions only."},
+            errors={"detail": "Participant permissions are supported for meeting and broadcast sessions only."},
             status_code=status.HTTP_400_BAD_REQUEST,
         )
     if permission_action not in {"grant", "revoke"}:
@@ -513,22 +525,49 @@ def _update_participant_permission(*, request, pk, permission_action, permission
             status_code=status.HTTP_404_NOT_FOUND,
         )
 
-    target_label = "Presenter" if permission_kind == "presenter" else "Mic"
-    if permission_kind == "presenter":
+    target_label = "Stage" if permission_kind == "presenter" else "Mic"
+    try:
+        if permission_kind == "presenter":
+            actor = session.grant_presenter if permission_action == "grant" else session.revoke_presenter
+            presenter_ids = actor(target_user_id)
+            speaker_ids = session.get_speaker_user_ids()
+            allow_presenter = bool(
+                session.is_moderator_allowed(target_user) or target_user_id in presenter_ids
+            )
+            allow_microphone = bool(
+                session.is_moderator_allowed(target_user) or target_user_id in speaker_ids
+            )
+            live_update = apply_live_presenter_permission_update(
+                session=session,
+                target_user_id=target_user_id,
+                allow_presenter=allow_presenter,
+                allow_microphone=allow_microphone,
+            )
+        else:
+            actor = session.grant_speaker if permission_action == "grant" else session.revoke_speaker
+            speaker_ids = actor(target_user_id)
+            presenter_ids = session.get_presenter_user_ids()
+            allow_presenter = bool(
+                session.is_moderator_allowed(target_user) or target_user_id in presenter_ids
+            )
+            allow_microphone = bool(
+                session.is_moderator_allowed(target_user) or target_user_id in speaker_ids
+            )
+            live_update = apply_live_speaker_permission_update(
+                session=session,
+                target_user_id=target_user_id,
+                allow_presenter=allow_presenter,
+                allow_microphone=allow_microphone,
+            )
+    except DjangoValidationError as exc:
+        error_payload = {"detail": str(exc)}
+        if hasattr(exc, "message_dict") and exc.message_dict:
+            error_payload = exc.message_dict
         return api_response(
             success=False,
-            message="Stage access is restricted.",
-            errors={"detail": "Only admin or the assigned instructor can use camera and screen share."},
+            message="Participant permission update failed.",
+            errors=error_payload,
             status_code=status.HTTP_400_BAD_REQUEST,
-        )
-    else:
-        actor = session.grant_speaker if permission_action == "grant" else session.revoke_speaker
-        speaker_ids = actor(target_user_id)
-        presenter_ids = session.get_presenter_user_ids()
-        live_update = apply_live_speaker_permission_update(
-            session=session,
-            target_user_id=target_user_id,
-            allow_microphone=(permission_action == "grant"),
         )
 
     if permission_action == "grant":
@@ -537,14 +576,15 @@ def _update_participant_permission(*, request, pk, permission_action, permission
         message = f"{target_label} access revoked."
 
     note = "Permission update saved."
-    if permission_kind == "speaker":
-        connected_matches = int(live_update.get("connected_matches") or 0)
-        if connected_matches <= 0:
-            note = "Permission saved. The user is not currently connected; it will apply on next join."
-        elif live_update.get("applied"):
-            note = "Permission applied instantly for connected participant sessions."
-        else:
-            note = "Permission saved. Live update was partial; ask the participant to toggle microphone once."
+    connected_matches = int(live_update.get("connected_matches") or 0)
+    if connected_matches <= 0:
+        note = "Permission saved. The user is not currently connected; it will apply on next join."
+    elif live_update.get("applied"):
+        note = "Permission applied instantly for connected participant sessions."
+    elif permission_kind == "speaker":
+        note = "Permission saved. Live update was partial; ask the participant to toggle microphone once."
+    else:
+        note = "Permission saved. Live update was partial; ask the participant to refresh camera/screen sharing."
 
     data = {
         "session": RealtimeSessionListSerializer(session, context={"request": request}).data,
@@ -558,7 +598,7 @@ def _update_participant_permission(*, request, pk, permission_action, permission
         },
         "updated_permission": permission_kind,
         "note": note,
-        "live_update": live_update if permission_kind == "speaker" else {},
+        "live_update": live_update,
     }
     return api_response(success=True, message=message, data=data)
 

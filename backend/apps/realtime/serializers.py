@@ -236,6 +236,7 @@ class RealtimeSessionCreateSerializer(serializers.ModelSerializer):
 
 class RealtimeSessionJoinSerializer(serializers.Serializer):
     display_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    prefer_broadcast = serializers.BooleanField(required=False, default=False)
 
 
 class RealtimePresenterPermissionSerializer(serializers.Serializer):

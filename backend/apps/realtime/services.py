@@ -1,4 +1,5 @@
 import json
+import hashlib
 import logging
 import re
 import time
@@ -344,9 +345,27 @@ def _list_room_participants(room_name):
     return participants if isinstance(participants, list) else []
 
 
-def apply_live_speaker_permission_update(*, session, target_user_id, allow_microphone):
+def _build_livekit_publish_sources(*, allow_presenter, allow_microphone):
+    publish_sources = []
+    if allow_presenter:
+        publish_sources.extend(["CAMERA", "SCREEN_SHARE", "SCREEN_SHARE_AUDIO"])
+    if allow_microphone:
+        publish_sources.append("MICROPHONE")
+    return publish_sources
+
+
+def _track_source_needs_mute(*, source, allow_presenter, allow_microphone):
+    normalized_source = str(source or "").strip().lower()
+    if normalized_source in {"microphone", "mic"}:
+        return not allow_microphone
+    if normalized_source in {"camera", "screen_share", "screen_share_audio", "screen", "screenshare"}:
+        return not allow_presenter
+    return False
+
+
+def _apply_live_publish_permission_update(*, session, target_user_id, allow_presenter, allow_microphone):
     """
-    Apply speaker permission changes for already-connected participants without forcing rejoin.
+    Apply presenter/speaker permission changes for already-connected participants without forcing rejoin.
 
     Returns a diagnostics payload used by API responses and telemetry.
     """
@@ -355,6 +374,7 @@ def apply_live_speaker_permission_update(*, session, target_user_id, allow_micro
         "applied": False,
         "room_name": room_name,
         "target_user_id": int(target_user_id),
+        "allow_presenter": bool(allow_presenter),
         "allow_microphone": bool(allow_microphone),
         "connected_matches": 0,
         "updated_identities": [],
@@ -386,7 +406,11 @@ def apply_live_speaker_permission_update(*, session, target_user_id, allow_micro
         result["applied"] = True
         return result
 
-    publish_sources = ["MICROPHONE"] if allow_microphone else []
+    publish_sources = _build_livekit_publish_sources(
+        allow_presenter=bool(allow_presenter),
+        allow_microphone=bool(allow_microphone),
+    )
+    can_publish_any = bool(publish_sources)
     for identity, participant in matched_rows:
         try:
             _twirp_room_service_post(
@@ -396,7 +420,7 @@ def apply_live_speaker_permission_update(*, session, target_user_id, allow_micro
                     "room": room_name,
                     "identity": identity,
                     "permission": {
-                        "canPublish": bool(allow_microphone),
+                        "canPublish": can_publish_any,
                         "canSubscribe": True,
                         "canPublishData": True,
                         "canPublishSources": publish_sources,
@@ -409,16 +433,20 @@ def apply_live_speaker_permission_update(*, session, target_user_id, allow_micro
             result["errors"].append(f"{identity}: {exc}")
             continue
 
-        if allow_microphone:
+        if allow_presenter and allow_microphone:
             continue
 
-        # Revoke should take effect immediately; mute any already-published microphone tracks.
+        # Revoke should take effect immediately; mute any now-disallowed published tracks.
         for track in participant.get("tracks") or []:
             source = str(track.get("source") or "").strip().lower()
             track_sid = str(track.get("sid") or track.get("trackSid") or "").strip()
             if not track_sid:
                 continue
-            if "microphone" not in source and source not in {"mic"}:
+            if not _track_source_needs_mute(
+                source=source,
+                allow_presenter=bool(allow_presenter),
+                allow_microphone=bool(allow_microphone),
+            ):
                 continue
             try:
                 _twirp_room_service_post(
@@ -438,6 +466,24 @@ def apply_live_speaker_permission_update(*, session, target_user_id, allow_micro
 
     result["applied"] = len(result["updated_identities"]) == result["connected_matches"] and not result["errors"]
     return result
+
+
+def apply_live_speaker_permission_update(*, session, target_user_id, allow_microphone, allow_presenter=False):
+    return _apply_live_publish_permission_update(
+        session=session,
+        target_user_id=target_user_id,
+        allow_presenter=bool(allow_presenter),
+        allow_microphone=allow_microphone,
+    )
+
+
+def apply_live_presenter_permission_update(*, session, target_user_id, allow_presenter, allow_microphone):
+    return _apply_live_publish_permission_update(
+        session=session,
+        target_user_id=target_user_id,
+        allow_presenter=allow_presenter,
+        allow_microphone=allow_microphone,
+    )
 
 
 def build_participant_token(
@@ -583,6 +629,36 @@ def build_meet_embed_url(token, livekit_url=None):
 
 
 def resolve_broadcast_urls(session, request=None):
+    cache_ttl = max(0, int(getattr(settings, "REALTIME_BROADCAST_URL_CACHE_TTL_SECONDS", 15) or 0))
+
+    request_host = _resolve_request_host(request)
+    cache_key = ""
+    if cache_ttl > 0:
+        cache_fingerprint = "|".join(
+            [
+                str(getattr(session, "id", "")),
+                str(getattr(session, "stream_embed_url", "") or "").strip(),
+                str(getattr(session, "chat_embed_url", "") or "").strip(),
+                str(getattr(settings, "OWNCAST_STREAM_PUBLIC_BASE_URL", "") or "").strip(),
+                str(getattr(settings, "OWNCAST_CHAT_PUBLIC_BASE_URL", "") or "").strip(),
+                str(getattr(settings, "OWNCAST_BASE_URL", "") or "").strip(),
+                str(getattr(settings, "OWNCAST_DEFAULT_STREAM_PATH", "/embed/video") or "").strip(),
+                str(getattr(settings, "OWNCAST_DEFAULT_CHAT_PATH", "/embed/chat/readwrite") or "").strip(),
+                request_host,
+            ]
+        )
+        fingerprint_digest = hashlib.sha256(cache_fingerprint.encode("utf-8")).hexdigest()[:20]
+        cache_key = f"realtime:broadcast-urls:{fingerprint_digest}"
+        cached_payload = cache.get(cache_key)
+        if isinstance(cached_payload, dict):
+            cached_stream = str(cached_payload.get("stream_embed_url", "")).strip()
+            cached_chat = str(cached_payload.get("chat_embed_url", "")).strip()
+            if cached_stream or cached_chat:
+                return {
+                    "stream_embed_url": cached_stream,
+                    "chat_embed_url": cached_chat,
+                }
+
     def _normalized_embed_path(raw_path, fallback):
         path = str(raw_path or "").strip()
         if not path:
@@ -634,10 +710,13 @@ def resolve_broadcast_urls(session, request=None):
             _normalized_embed_path(settings.OWNCAST_DEFAULT_STREAM_PATH, "/embed/video"),
         )
 
-    return {
+    payload = {
         "stream_embed_url": stream_embed_url,
         "chat_embed_url": chat_embed_url,
     }
+    if cache_ttl > 0 and cache_key:
+        cache.set(cache_key, payload, timeout=cache_ttl)
+    return payload
 
 
 def build_host_publisher_identity(user_id, session_id):
