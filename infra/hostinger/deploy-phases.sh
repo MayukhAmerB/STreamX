@@ -22,6 +22,40 @@ log() {
   printf '[hostinger-phase-deploy] %s\n' "$*"
 }
 
+set_env_value() {
+  local key="$1"
+  local value="$2"
+  if grep -q "^${key}=" "$ENV_FILE"; then
+    sed -i "s|^${key}=.*|${key}=${value}|" "$ENV_FILE"
+  else
+    printf '%s=%s\n' "$key" "$value" >> "$ENV_FILE"
+  fi
+}
+
+apply_phase_runtime_profile() {
+  local web_concurrency
+  local gunicorn_threads
+  case "$PHASE" in
+    phase1|phase2|phase4)
+      # Single backend container phases: keep deterministic moderate concurrency.
+      set_env_value "WEB_CONCURRENCY" "2"
+      set_env_value "GUNICORN_THREADS" "2"
+      ;;
+    phase3|phase5)
+      # Backend-pool phases: reduce per-instance threading to protect DB headroom.
+      set_env_value "WEB_CONCURRENCY" "2"
+      set_env_value "GUNICORN_THREADS" "1"
+      ;;
+    *)
+      ;;
+  esac
+  web_concurrency="$(grep '^WEB_CONCURRENCY=' "$ENV_FILE" | tail -n1 | cut -d= -f2- || true)"
+  gunicorn_threads="$(grep '^GUNICORN_THREADS=' "$ENV_FILE" | tail -n1 | cut -d= -f2- || true)"
+  web_concurrency="${web_concurrency:-unset}"
+  gunicorn_threads="${gunicorn_threads:-unset}"
+  log "Runtime profile applied: WEB_CONCURRENCY=${web_concurrency}, GUNICORN_THREADS=${gunicorn_threads}"
+}
+
 compose_main() {
   docker compose --env-file "$ENV_FILE" "$@"
 }
@@ -29,6 +63,8 @@ compose_main() {
 compose_observability() {
   docker compose -f "$OBS_COMPOSE" "$@"
 }
+
+apply_phase_runtime_profile
 
 phase1() {
   log "Phase 1: stable baseline (app + async worker + observability)."

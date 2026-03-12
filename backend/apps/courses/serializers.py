@@ -281,17 +281,35 @@ class CourseDetailSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         return obj.get_thumbnail_url(request=request)
 
+    def _get_cached_enrollment(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return None
+        if request.user.id == obj.instructor_id:
+            return None
+
+        enrollment_cache = self.context.setdefault("course_enrollment_cache", {})
+        cache_key = (request.user.id, obj.id)
+        if cache_key in enrollment_cache:
+            return enrollment_cache[cache_key]
+
+        enrollment = (
+            Enrollment.objects.filter(user=request.user, course=obj)
+            .only("payment_status", "enrolled_at")
+            .order_by("-enrolled_at")
+            .first()
+        )
+        enrollment_cache[cache_key] = enrollment
+        return enrollment
+
     def get_is_enrolled(self, obj):
         request = self.context.get("request")
         if not request or not request.user.is_authenticated:
             return False
         if request.user.id == obj.instructor_id:
             return True
-        return Enrollment.objects.filter(
-            user=request.user,
-            course=obj,
-            payment_status=Enrollment.STATUS_PAID,
-        ).exists()
+        enrollment = self._get_cached_enrollment(obj)
+        return bool(enrollment and enrollment.payment_status == Enrollment.STATUS_PAID)
 
     def get_enrollment_status(self, obj):
         request = self.context.get("request")
@@ -299,11 +317,7 @@ class CourseDetailSerializer(serializers.ModelSerializer):
             return "none"
         if request.user.id == obj.instructor_id:
             return "approved"
-        enrollment = (
-            Enrollment.objects.filter(user=request.user, course=obj)
-            .order_by("-enrolled_at")
-            .first()
-        )
+        enrollment = self._get_cached_enrollment(obj)
         if not enrollment:
             return "none"
         if enrollment.payment_status == Enrollment.STATUS_PAID:

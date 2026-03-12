@@ -34,6 +34,7 @@ const DEFAULT_MEETING_MEDIA_PROFILE = {
 const meetingShellBackgroundImage =
   "https://i.pinimg.com/736x/e7/18/de/e718de74d25e0e9a2cf62cd126b3abb5.jpg";
 const MAX_STAGE_PARTICIPANTS = 5;
+const ROOM_STATE_REFRESH_DEBOUNCE_MS = 120;
 
 function clampWholeNumber(value, min, max, fallback) {
   const numeric = Number(value);
@@ -711,6 +712,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
   const connectedAtRef = useRef(null);
   const stageRef = useRef(null);
   const fallbackRecorderRef = useRef(null);
+  const roomStateRefreshTimerRef = useRef(null);
   const [isStageFullscreen, setIsStageFullscreen] = useState(false);
   const defaultModeratorUserIds = useMemo(
     () =>
@@ -902,26 +904,40 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     setActiveSpeakerIds([]);
     setElapsedSeconds(0);
 
-    const refreshRoomState = () => {
+    const flushRoomStateRefresh = () => {
+      if (roomStateRefreshTimerRef.current) {
+        window.clearTimeout(roomStateRefreshTimerRef.current);
+        roomStateRefreshTimerRef.current = null;
+      }
       syncParticipants();
       syncLocalControls();
     };
+    const scheduleRoomStateRefresh = () => {
+      if (roomStateRefreshTimerRef.current) {
+        return;
+      }
+      roomStateRefreshTimerRef.current = window.setTimeout(() => {
+        roomStateRefreshTimerRef.current = null;
+        syncParticipants();
+        syncLocalControls();
+      }, ROOM_STATE_REFRESH_DEBOUNCE_MS);
+    };
 
-    room.on(RoomEvent.ParticipantConnected, refreshRoomState);
-    room.on(RoomEvent.ParticipantDisconnected, refreshRoomState);
-    room.on(RoomEvent.TrackPublished, refreshRoomState);
-    room.on(RoomEvent.TrackUnpublished, refreshRoomState);
-    room.on(RoomEvent.LocalTrackPublished, refreshRoomState);
-    room.on(RoomEvent.LocalTrackUnpublished, refreshRoomState);
-    room.on(RoomEvent.TrackMuted, refreshRoomState);
-    room.on(RoomEvent.TrackUnmuted, refreshRoomState);
-    room.on(RoomEvent.ParticipantMetadataChanged, refreshRoomState);
-    room.on(RoomEvent.ParticipantNameChanged, refreshRoomState);
+    room.on(RoomEvent.ParticipantConnected, scheduleRoomStateRefresh);
+    room.on(RoomEvent.ParticipantDisconnected, scheduleRoomStateRefresh);
+    room.on(RoomEvent.TrackPublished, scheduleRoomStateRefresh);
+    room.on(RoomEvent.TrackUnpublished, scheduleRoomStateRefresh);
+    room.on(RoomEvent.LocalTrackPublished, scheduleRoomStateRefresh);
+    room.on(RoomEvent.LocalTrackUnpublished, scheduleRoomStateRefresh);
+    room.on(RoomEvent.TrackMuted, scheduleRoomStateRefresh);
+    room.on(RoomEvent.TrackUnmuted, scheduleRoomStateRefresh);
+    room.on(RoomEvent.ParticipantMetadataChanged, scheduleRoomStateRefresh);
+    room.on(RoomEvent.ParticipantNameChanged, scheduleRoomStateRefresh);
     room.on(RoomEvent.TrackSubscribed, (_track, publication) => {
       enforceRemotePublicationQuality(publication);
-      refreshRoomState();
+      scheduleRoomStateRefresh();
     });
-    room.on(RoomEvent.TrackUnsubscribed, refreshRoomState);
+    room.on(RoomEvent.TrackUnsubscribed, scheduleRoomStateRefresh);
     room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
       setActiveSpeakerIds(speakers.map((speaker) => speaker.identity));
     });
@@ -940,7 +956,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
       setConnected(false);
       setConnecting(false);
       setConnectionLabel("disconnected");
-      syncParticipants();
+      flushRoomStateRefresh();
     });
     const permissionsChangedEvent =
       RoomEvent.ParticipantPermissionsChanged || "participantPermissionsChanged";
@@ -1145,7 +1161,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
 
         connectedAtRef.current = Date.now();
         setElapsedSeconds(0);
-        refreshRoomState();
+        flushRoomStateRefresh();
         setConnecting(false);
         setConnected(true);
         setConnectionLabel("connected");
@@ -1180,6 +1196,10 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
 
     return () => {
       disposed = true;
+      if (roomStateRefreshTimerRef.current) {
+        window.clearTimeout(roomStateRefreshTimerRef.current);
+        roomStateRefreshTimerRef.current = null;
+      }
       room.removeAllListeners();
       room.disconnect();
       roomRef.current = null;
