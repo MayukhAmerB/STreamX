@@ -1650,6 +1650,58 @@ class RealtimeSessionTests(APITestCase):
             "Max audience cannot exceed 500.",
         )
 
+    @override_settings(
+        OWNCAST_RTMP_TARGET="rtmp://owncast:1935/live/default-key",
+    )
+    @patch("apps.realtime.views.sync_owncast_stream_key")
+    def test_broadcast_create_obs_mode_syncs_owncast_key(self, mock_sync_key):
+        mock_sync_key.return_value = {"success": True}
+        self.login(self.host.email)
+        response = self.client.post(
+            reverse("realtime-session-list-create"),
+            {
+                "title": "OBS Create Session",
+                "description": "Sync key on create",
+                "session_type": "broadcasting",
+                "linked_live_class_id": self.live_class.id,
+                "stream_service": RealtimeSession.STREAM_SERVICE_OBS,
+                "obs_stream_key": "CreateObsKey123",
+                "max_audience": 500,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        session_id = response.data["data"]["id"]
+        session = RealtimeSession.objects.get(pk=session_id)
+        self.assertEqual(session.stream_service, RealtimeSession.STREAM_SERVICE_OBS)
+        self.assertEqual(session.obs_stream_key, "CreateObsKey123")
+        mock_sync_key.assert_called_once_with("CreateObsKey123")
+
+    @override_settings(
+        OWNCAST_RTMP_TARGET="rtmp://owncast:1935/live/default-key",
+    )
+    @patch("apps.realtime.views.sync_owncast_stream_key")
+    def test_broadcast_create_obs_mode_fails_when_owncast_sync_fails(self, mock_sync_key):
+        mock_sync_key.side_effect = realtime_services.OwncastAdminError("Owncast sync failed")
+        self.login(self.host.email)
+        response = self.client.post(
+            reverse("realtime-session-list-create"),
+            {
+                "title": "OBS Create Failure Session",
+                "description": "Should fail when sync fails",
+                "session_type": "broadcasting",
+                "linked_live_class_id": self.live_class.id,
+                "stream_service": RealtimeSession.STREAM_SERVICE_OBS,
+                "obs_stream_key": "CreateObsFailKey123",
+                "max_audience": 500,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["message"], "Unable to create OBS broadcast session.")
+        self.assertIn("Owncast sync failed", response.data["errors"]["detail"])
+        self.assertFalse(RealtimeSession.objects.filter(title="OBS Create Failure Session").exists())
+
     def test_realtime_list_rejects_unknown_query_params(self):
         self.login(self.viewer.email)
         response = self.client.get(reverse("realtime-session-list-create"), {"filter": "host"})

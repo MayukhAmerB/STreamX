@@ -251,6 +251,24 @@ class RealtimeSessionListCreateView(APIView):
         payload = session_payload_for_create(serializer.validated_data)
 
         session = RealtimeSession.objects.create(host=request.user, **payload)
+        if (
+            session.session_type == RealtimeSession.TYPE_BROADCASTING
+            and session.stream_service == RealtimeSession.STREAM_SERVICE_OBS
+        ):
+            stream_key = str(session.obs_stream_key or "").strip() or session.default_obs_stream_key()
+            session.obs_stream_key = stream_key
+            session.save(update_fields=["obs_stream_key", "updated_at"])
+            try:
+                sync_owncast_stream_key(stream_key)
+            except (OwncastConfigError, OwncastAdminError) as exc:
+                session.delete()
+                return api_response(
+                    success=False,
+                    message="Unable to create OBS broadcast session.",
+                    errors={"detail": str(exc)},
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+
         data = RealtimeSessionListSerializer(session, context={"request": request}).data
         return api_response(
             success=True,
