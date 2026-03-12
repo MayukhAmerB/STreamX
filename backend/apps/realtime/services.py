@@ -224,12 +224,19 @@ def _resolve_public_service_base_url(configured_base_url, request=None, default_
     configured_port = netloc.split(":", 1)[1] if ":" in netloc else ""
 
     request_host = _resolve_request_host(request)
+    replaced_localhost = bool(request_host and configured_host in LOCALHOST_HOSTNAMES)
     if request_host and configured_host in LOCALHOST_HOSTNAMES:
         host = request_host
     else:
         host = configured_host or request_host
 
-    port = configured_port or default_port
+    # Do not force internal service ports (e.g. 8080) on public domains.
+    # Default port is only useful when the configured host is localhost/internal
+    # and we are translating it to an externally reachable request host.
+    port = configured_port
+    if not port and default_port:
+        if replaced_localhost or configured_host in NON_PUBLIC_HOSTNAMES:
+            port = default_port
     if not host:
         return configured_value
     if port:

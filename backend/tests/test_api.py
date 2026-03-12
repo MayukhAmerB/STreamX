@@ -1546,6 +1546,8 @@ class RealtimeSessionTests(APITestCase):
 
     @override_settings(
         OWNCAST_BASE_URL="https://stream.example.com",
+        OWNCAST_STREAM_PUBLIC_BASE_URL="https://stream.example.com",
+        OWNCAST_CHAT_PUBLIC_BASE_URL="https://stream.example.com",
         OWNCAST_DEFAULT_STREAM_PATH="/embed/video",
         OWNCAST_DEFAULT_CHAT_PATH="/embed/chat/readwrite",
         REALTIME_BROADCAST_URL_CACHE_TTL_SECONDS=30,
@@ -1571,8 +1573,10 @@ class RealtimeSessionTests(APITestCase):
             second = realtime_services.resolve_broadcast_urls(session)
 
         self.assertEqual(first, second)
-        self.assertTrue(first["stream_embed_url"].endswith("/embed/video"))
-        self.assertTrue(first["chat_embed_url"].endswith("/embed/chat/readwrite"))
+        self.assertEqual(first["stream_embed_url"], "https://stream.example.com/embed/video")
+        self.assertEqual(first["chat_embed_url"], "https://stream.example.com/embed/chat/readwrite")
+        self.assertNotIn(":8080", first["stream_embed_url"])
+        self.assertNotIn(":8080", first["chat_embed_url"])
         # First call resolves stream + chat bases (2 calls), second call is cache hit.
         self.assertEqual(mocked_resolver.call_count, 2)
 
