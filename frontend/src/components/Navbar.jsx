@@ -14,6 +14,7 @@ const navClass = ({ isActive }) =>
 
 export default function Navbar() {
   const { user, isAuthenticated, isInstructor, isAdmin, registrationEnabled, logout } = useAuth();
+  const canAccessControls = Boolean(isAdmin || isInstructor);
   const navigate = useNavigate();
   const location = useLocation();
   const isHome = location.pathname === "/";
@@ -126,7 +127,7 @@ export default function Navbar() {
                       Instructor
                     </Link>
                   ) : null}
-                  {isAdmin ? (
+                  {canAccessControls ? (
                     <Link
                       to="/control-center"
                       className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
@@ -134,7 +135,7 @@ export default function Navbar() {
                       Admin Control Center
                     </Link>
                   ) : null}
-                  {isAdmin ? (
+                  {canAccessControls ? (
                     <Link
                       to="/meeting"
                       className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
@@ -142,7 +143,7 @@ export default function Navbar() {
                       Meeting Control
                     </Link>
                   ) : null}
-                  {isAdmin ? (
+                  {canAccessControls ? (
                     <Link
                       to="/broadcasting"
                       className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
@@ -260,17 +261,17 @@ export default function Navbar() {
                       Instructor
                     </Link>
                   ) : null}
-                  {isAdmin ? (
+                  {canAccessControls ? (
                     <Link to="/control-center" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                       Admin Control Center
                     </Link>
                   ) : null}
-                  {isAdmin ? (
+                  {canAccessControls ? (
                     <Link to="/meeting" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                       Meeting Control
                     </Link>
                   ) : null}
-                  {isAdmin ? (
+                  {canAccessControls ? (
                     <Link to="/broadcasting" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                       Broadcast Control
                     </Link>

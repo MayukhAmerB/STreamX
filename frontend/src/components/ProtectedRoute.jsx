@@ -1,7 +1,11 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
-export default function ProtectedRoute({ requireInstructor = false, requireAdmin = false }) {
+export default function ProtectedRoute({
+  requireInstructor = false,
+  requireAdmin = false,
+  requireModerator = false,
+}) {
   const { loading, isAuthenticated, isInstructor, isAdmin } = useAuth();
   const location = useLocation();
 
@@ -13,6 +17,9 @@ export default function ProtectedRoute({ requireInstructor = false, requireAdmin
   }
   if (requireInstructor && !isInstructor) {
     return <Navigate to="/" replace />;
+  }
+  if (requireModerator && !(isInstructor || isAdmin)) {
+    return <Navigate to="/join-live" replace />;
   }
   if (requireAdmin && !isAdmin) {
     return <Navigate to="/join-live" replace />;

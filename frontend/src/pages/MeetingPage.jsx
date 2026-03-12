@@ -405,9 +405,9 @@ export default function MeetingPage() {
                         loading={joinState.loadingId === session.id}
                         onClick={() => handleJoin(session.id)}
                       >
-                        {session.is_host ? "Open Meeting Control" : "Join Meeting"}
+                        {session.can_manage ? "Open Meeting Control" : "Join Meeting"}
                       </Button>
-                      {session.is_host ? (
+                      {session.can_manage ? (
                         <Button
                           variant="danger"
                           className="w-full"

@@ -229,11 +229,13 @@ class RealtimeSessionListCreateView(APIView):
                 errors={"detail": "Authentication credentials were not provided."},
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
-        if not (getattr(request.user, "is_staff", False) or getattr(request.user, "is_superuser", False)):
+        is_admin = bool(getattr(request.user, "is_staff", False) or getattr(request.user, "is_superuser", False))
+        is_instructor = str(getattr(request.user, "role", "")).strip().lower() == "instructor"
+        if not (is_admin or is_instructor):
             return api_response(
                 success=False,
                 message="Access denied.",
-                errors={"detail": "Only admin accounts can create live sessions."},
+                errors={"detail": "Only admin or instructor accounts can create live sessions."},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
@@ -245,6 +247,21 @@ class RealtimeSessionListCreateView(APIView):
                 errors=serializer.errors,
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
+
+        linked_live_class = serializer.validated_data.get("linked_live_class")
+        if not is_admin:
+            linked_course = getattr(linked_live_class, "linked_course", None)
+            if not linked_course or linked_course.instructor_id != request.user.id:
+                return api_response(
+                    success=False,
+                    message="Access denied.",
+                    errors={
+                        "detail": (
+                            "Instructors can create sessions only for live classes assigned to their courses."
+                        )
+                    },
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
 
         payload = session_payload_for_create(serializer.validated_data)
 

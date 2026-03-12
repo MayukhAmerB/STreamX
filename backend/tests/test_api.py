@@ -1833,6 +1833,68 @@ class RealtimeSessionTests(APITestCase):
             "Max audience cannot exceed 500.",
         )
 
+    def test_instructor_can_create_session_for_assigned_live_class(self):
+        instructor = User.objects.create_user(
+            email="assigned-instructor@test.com",
+            password="StrongPass@123",
+            full_name="Assigned Instructor",
+            role=User.ROLE_INSTRUCTOR,
+        )
+        assigned_course = Course.objects.create(
+            title="Assigned Instructor Course",
+            description="Instructor-owned course for realtime tests.",
+            price=Decimal("499.00"),
+            instructor=instructor,
+            is_published=True,
+        )
+        assigned_live_class = LiveClass.objects.create(
+            title="Assigned Instructor Live Class",
+            description="Live class tied to assigned instructor course.",
+            level=LiveClass.LEVEL_BEGINNER,
+            month_number=1,
+            is_active=True,
+            linked_course=assigned_course,
+        )
+
+        self.login(instructor.email)
+        response = self.client.post(
+            reverse("realtime-session-list-create"),
+            {
+                "title": "Instructor Meeting Session",
+                "description": "Instructor should be allowed to create this session.",
+                "session_type": "meeting",
+                "linked_live_class_id": assigned_live_class.id,
+                "meeting_capacity": 120,
+                "max_audience": 500,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["data"]["host"]["id"], instructor.id)
+
+    def test_instructor_cannot_create_session_for_unassigned_live_class(self):
+        outsider_instructor = User.objects.create_user(
+            email="outsider-instructor@test.com",
+            password="StrongPass@123",
+            full_name="Outsider Instructor",
+            role=User.ROLE_INSTRUCTOR,
+        )
+        self.login(outsider_instructor.email)
+        response = self.client.post(
+            reverse("realtime-session-list-create"),
+            {
+                "title": "Forbidden Instructor Session",
+                "description": "Instructor should not create sessions for other instructors.",
+                "session_type": "meeting",
+                "linked_live_class_id": self.live_class.id,
+                "meeting_capacity": 120,
+                "max_audience": 500,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("assigned to their courses", response.data["errors"]["detail"])
+
     @override_settings(
         OWNCAST_RTMP_TARGET="rtmp://owncast:1935/live/default-key",
     )

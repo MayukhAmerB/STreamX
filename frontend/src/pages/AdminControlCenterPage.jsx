@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 import WorkflowGuidePanel from "../components/admin/WorkflowGuidePanel";
+import { useAuth } from "../hooks/useAuth";
 import { resolveDjangoAdminUrl } from "../utils/backendUrl";
 
 const operationsCards = [
@@ -46,7 +47,12 @@ const securityChecklist = [
 ];
 
 export default function AdminControlCenterPage() {
+  const { user } = useAuth();
+  const isAdmin = Boolean(user?.is_admin);
   const djangoAdminUrl = resolveDjangoAdminUrl();
+  const visibleOperationsCards = isAdmin
+    ? operationsCards
+    : operationsCards.filter((card) => !card.action.external);
 
   return (
     <PageShell
@@ -55,7 +61,7 @@ export default function AdminControlCenterPage() {
       badge="ADMIN OPERATIONS"
     >
       <div className="grid gap-4 lg:grid-cols-3">
-        {operationsCards.map((card) => (
+        {visibleOperationsCards.map((card) => (
           <article
             key={card.title}
             className="rounded-2xl border border-black panel-gradient p-4 shadow-[0_14px_34px_rgba(0,0,0,0.24)]"

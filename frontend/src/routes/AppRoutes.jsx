@@ -42,7 +42,7 @@ export default function AppRoutes() {
           <Route path="/courses/:id/payment" element={<CoursePaymentPage />} />
           <Route path="/join-live" element={<JoinLivePage />} />
         </Route>
-        <Route element={<ProtectedRoute requireAdmin />}>
+        <Route element={<ProtectedRoute requireModerator />}>
           <Route path="/control-center" element={<AdminControlCenterPage />} />
           <Route path="/meeting" element={<MeetingPage />} />
           <Route path="/broadcasting" element={<BroadcastingPage />} />
