@@ -55,6 +55,31 @@ def _issue_tokens_for_user(user):
     return str(refresh.access_token), str(refresh)
 
 
+def _blacklist_refresh_token_string(refresh_token):
+    token_value = str(refresh_token or "").strip()
+    if not token_value:
+        return
+    try:
+        token = RefreshToken(token_value)
+        token.blacklist()
+    except Exception:
+        # Blacklist app may be unavailable or token already invalid/blacklisted.
+        return
+
+
+def _revoke_all_refresh_tokens_for_user(user):
+    if not user:
+        return
+    try:
+        from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+    except Exception:
+        return
+
+    outstanding_tokens = OutstandingToken.objects.filter(user=user).only("id")
+    for outstanding in outstanding_tokens:
+        BlacklistedToken.objects.get_or_create(token=outstanding)
+
+
 def _serialize_user(user, request=None):
     return UserSerializer(user, context={"request": request} if request else {}).data
 
@@ -171,6 +196,7 @@ class LogoutView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
+        _blacklist_refresh_token_string(request.COOKIES.get(REFRESH_COOKIE))
         response = api_response(success=True, message="Logged out successfully.", data=None)
         clear_auth_cookies(response)
         return response
@@ -198,8 +224,13 @@ class RefreshTokenView(APIView):
                 errors={"detail": str(exc)},
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
+        issued_refresh = refresh
+        if bool(getattr(settings, "SIMPLE_JWT", {}).get("ROTATE_REFRESH_TOKENS", False)):
+            if bool(getattr(settings, "SIMPLE_JWT", {}).get("BLACKLIST_AFTER_ROTATION", False)):
+                _blacklist_refresh_token_string(refresh_token)
+            issued_refresh = RefreshToken.for_user(user)
         response = api_response(success=True, message="Token refreshed.", data=None)
-        set_auth_cookies(response, str(refresh.access_token), str(refresh))
+        set_auth_cookies(response, str(issued_refresh.access_token), str(issued_refresh))
         return _attach_csrf_token(response, request)
 
 
@@ -268,7 +299,7 @@ class GoogleLoginView(APIView):
             email=email,
             defaults={
                 "full_name": info.get("name", email.split("@")[0]),
-                "role": serializer.validated_data.get("role", User.ROLE_STUDENT),
+                "role": User.ROLE_STUDENT,
                 "oauth_provider": "google",
                 "oauth_provider_uid": info.get("sub", ""),
             },
@@ -421,6 +452,7 @@ class PasswordResetConfirmView(APIView):
             )
         user.set_password(data["new_password"])
         user.save(update_fields=["password"])
+        _revoke_all_refresh_tokens_for_user(user)
         log_security_event("auth.password_reset_confirm_success", request=request, target_user_id=user.id)
         return api_response(success=True, message="Password has been reset successfully.", data=None)
 
@@ -577,6 +609,7 @@ class ChangePasswordView(APIView):
             )
         request.user.set_password(data["new_password"])
         request.user.save(update_fields=["password"])
+        _revoke_all_refresh_tokens_for_user(request.user)
         log_security_event("auth.password_change_success", request=request)
         return _auth_success_response(request.user, "Password changed successfully.", request=request)
 

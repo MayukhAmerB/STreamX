@@ -25,6 +25,7 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
     linked_live_class = serializers.SerializerMethodField()
     linked_course = serializers.SerializerMethodField()
     obs_stream_server_url = serializers.SerializerMethodField()
+    obs_stream_key = serializers.SerializerMethodField()
     stream_embed_url = serializers.SerializerMethodField()
     chat_embed_url = serializers.SerializerMethodField()
 

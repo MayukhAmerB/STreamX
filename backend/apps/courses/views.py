@@ -702,6 +702,7 @@ class LectureProtectedMediaView(APIView):
                 pk,
                 asset_path,
                 max_age=resolve_lecture_playback_expires_in(None),
+                request=request,
             )
         except ProtectedMediaError:
             return HttpResponseNotFound("Protected lecture asset not found.")

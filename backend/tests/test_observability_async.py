@@ -39,6 +39,15 @@ class MetricsEndpointTests(APITestCase):
         )
         self.assertIn(allowed_bearer.status_code, (200, 503))
 
+    @override_settings(DEBUG=False, METRICS_AUTH_TOKEN="")
+    def test_metrics_endpoint_blocks_public_requests_when_token_missing(self):
+        denied = self.client.get(
+            reverse("metrics"),
+            REMOTE_ADDR="8.8.8.8",
+            HTTP_X_FORWARDED_FOR="8.8.8.8",
+        )
+        self.assertEqual(denied.status_code, 403)
+
 
 @override_settings(
     EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",

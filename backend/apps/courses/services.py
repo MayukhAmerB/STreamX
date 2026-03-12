@@ -180,11 +180,19 @@ def build_protected_lecture_playback_url(request, lecture, storage_key, *, expir
     else:
         root_prefix = normalized_path
 
+    request_user = getattr(request, "user", None)
+    request_user_id = (
+        int(getattr(request_user, "id", 0) or 0)
+        if request_user and getattr(request_user, "is_authenticated", False)
+        else 0
+    )
+
     token = signing.dumps(
         {
             "lecture_id": int(lecture.id),
             "asset_type": asset_type,
             "root_prefix": root_prefix,
+            "subject_uid": request_user_id,
         },
         salt=PROTECTED_LECTURE_MEDIA_SIGNING_SALT,
         compress=True,
@@ -258,7 +266,7 @@ def _store_cached_protected_media_token_payload(token, lecture_id, payload, *, m
         return
 
 
-def validate_protected_lecture_playback_request(token, lecture_id, asset_path, *, max_age):
+def validate_protected_lecture_playback_request(token, lecture_id, asset_path, *, max_age, request=None):
     max_age = max(1, int(max_age or 1))
     requested_lecture_id = int(lecture_id)
     payload = _load_cached_protected_media_token_payload(token, requested_lecture_id)
@@ -282,10 +290,12 @@ def validate_protected_lecture_playback_request(token, lecture_id, asset_path, *
             raise ProtectedMediaError("Unsupported protected media asset type.")
 
         root_prefix = normalize_storage_key(signed_payload.get("root_prefix"))
+        subject_uid = int(signed_payload.get("subject_uid", 0) or 0)
         payload = {
             "lecture_id": payload_lecture_id,
             "asset_type": asset_type,
             "root_prefix": root_prefix,
+            "subject_uid": subject_uid,
         }
         _store_cached_protected_media_token_payload(
             token,
@@ -297,6 +307,17 @@ def validate_protected_lecture_playback_request(token, lecture_id, asset_path, *
     normalized_path = normalize_storage_key(asset_path)
     asset_type = str(payload.get("asset_type", "")).strip().lower()
     root_prefix = normalize_storage_key(payload.get("root_prefix"))
+    subject_uid = int(payload.get("subject_uid", 0) or 0)
+
+    if subject_uid > 0:
+        request_user = getattr(request, "user", None)
+        request_user_id = (
+            int(getattr(request_user, "id", 0) or 0)
+            if request_user and getattr(request_user, "is_authenticated", False)
+            else 0
+        )
+        if request_user_id != subject_uid:
+            raise ProtectedMediaError("Protected media token user mismatch.")
 
     if asset_type == "hls":
         if normalized_path != root_prefix and not normalized_path.startswith(f"{root_prefix}/"):

@@ -1,8 +1,10 @@
 import re
 from typing import Tuple
+import ipaddress
 
 from django.conf import settings
 from django.http import HttpResponse
+from config.client_ip import resolve_client_ip
 
 try:
     from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
@@ -42,6 +44,14 @@ def _request_route_label(request):
 
 def _metrics_enabled():
     return bool(_PROMETHEUS_AVAILABLE and getattr(settings, "METRICS_ENABLED", True))
+
+
+def _is_private_or_loopback_ip(ip_text):
+    try:
+        ip_obj = ipaddress.ip_address(str(ip_text or "").strip())
+    except ValueError:
+        return False
+    return bool(ip_obj.is_private or ip_obj.is_loopback)
 
 
 if _PROMETHEUS_AVAILABLE:
@@ -122,7 +132,12 @@ def record_async_job_execution(*, job, result):
 def get_metrics_authorization(request) -> Tuple[bool, str]:
     token = str(getattr(settings, "METRICS_AUTH_TOKEN", "") or "").strip()
     if not token:
-        return True, ""
+        if bool(getattr(settings, "DEBUG", False)):
+            return True, ""
+        client_ip = resolve_client_ip(request)
+        if _is_private_or_loopback_ip(client_ip):
+            return True, ""
+        return False, "Metrics token is required in production."
 
     provided = str(request.headers.get("X-Metrics-Token", "") or "").strip()
     if provided and provided == token:

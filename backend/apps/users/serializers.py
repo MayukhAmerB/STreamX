@@ -63,6 +63,9 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ("email", "full_name", "phone_number", "password", "role")
+        extra_kwargs = {
+            "role": {"required": False},
+        }
 
     def validate_password(self, value):
         validate_password(value)
@@ -76,8 +79,13 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate_phone_number(self, value):
         return validate_phone_number_value(value)
 
+    def validate_role(self, value):
+        # Public/self-service registration is always student-only.
+        return User.ROLE_STUDENT
+
     def create(self, validated_data):
         password = validated_data.pop("password")
+        validated_data["role"] = User.ROLE_STUDENT
         return User.objects.create_user(password=password, **validated_data)
 
 
@@ -124,6 +132,10 @@ class GoogleLoginSerializer(serializers.Serializer):
         required=False,
         default=User.ROLE_STUDENT,
     )
+
+    def validate_role(self, value):
+        # Public/social signup must never elevate role.
+        return User.ROLE_STUDENT
 
 
 class PasswordResetRequestSerializer(serializers.Serializer):

@@ -137,6 +137,99 @@ class AuthTests(APITestCase):
         self.assertTrue(login_resp.data["success"])
         self.assertIn("csrftoken", login_resp.cookies)
 
+    def test_register_cannot_elevate_role_to_instructor(self):
+        config = AuthConfiguration.get_solo()
+        config.registration_enabled = True
+        config.save(update_fields=["registration_enabled", "updated_at"])
+
+        register_resp = self.client.post(
+            reverse("auth-register"),
+            {
+                "email": "rolecheck@test.com",
+                "full_name": "Role Check",
+                "password": "StrongPass@123",
+                "role": "instructor",
+            },
+            format="json",
+        )
+        self.assertEqual(register_resp.status_code, 200)
+        created_user = User.objects.get(email="rolecheck@test.com")
+        self.assertEqual(created_user.role, User.ROLE_STUDENT)
+
+    @override_settings(GOOGLE_CLIENT_ID="google-client-id")
+    @patch("apps.users.views.verify_google_credential")
+    def test_google_signup_cannot_elevate_role_to_instructor(self, mock_verify_google):
+        config = AuthConfiguration.get_solo()
+        config.registration_enabled = True
+        config.save(update_fields=["registration_enabled", "updated_at"])
+
+        mock_verify_google.return_value = {
+            "email": "google-role@test.com",
+            "name": "Google Role",
+            "sub": "google-subject-1",
+        }
+        response = self.client.post(
+            reverse("auth-google"),
+            {"credential": "dummy", "role": "instructor"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        created_user = User.objects.get(email="google-role@test.com")
+        self.assertEqual(created_user.role, User.ROLE_STUDENT)
+
+    def test_logout_blacklists_refresh_token(self):
+        config = AuthConfiguration.get_solo()
+        config.registration_enabled = True
+        config.save(update_fields=["registration_enabled", "updated_at"])
+
+        self.client.post(
+            reverse("auth-register"),
+            {
+                "email": "logoutblacklist@test.com",
+                "full_name": "Logout Blacklist",
+                "password": "StrongPass@123",
+                "role": "student",
+            },
+            format="json",
+        )
+        issued_refresh = self.client.cookies.get("refresh_token").value
+
+        logout_resp = self.client.post(reverse("auth-logout"), format="json")
+        self.assertEqual(logout_resp.status_code, 200)
+
+        attack_client = self.client_class()
+        attack_client.cookies["refresh_token"] = issued_refresh
+        refresh_resp = attack_client.post(reverse("auth-refresh"), {}, format="json")
+        self.assertEqual(refresh_resp.status_code, 401)
+
+    @override_settings(ACCOUNT_SELF_SERVICE_CREDENTIALS_ENABLED=True)
+    def test_change_password_revokes_preexisting_refresh_tokens(self):
+        user = User.objects.create_user(
+            email="changepass@test.com",
+            password="StrongPass@123",
+            full_name="Change Password User",
+            role=User.ROLE_STUDENT,
+        )
+        login_resp = self.client.post(
+            reverse("auth-login"),
+            {"email": user.email, "password": "StrongPass@123"},
+            format="json",
+        )
+        self.assertEqual(login_resp.status_code, 200)
+        issued_refresh = self.client.cookies.get("refresh_token").value
+
+        change_resp = self.client.post(
+            reverse("auth-change-password"),
+            {"current_password": "StrongPass@123", "new_password": "NewStrongPass@123"},
+            format="json",
+        )
+        self.assertEqual(change_resp.status_code, 200)
+
+        stale_client = self.client_class()
+        stale_client.cookies["refresh_token"] = issued_refresh
+        stale_refresh = stale_client.post(reverse("auth-refresh"), {}, format="json")
+        self.assertEqual(stale_refresh.status_code, 401)
+
     def test_register_is_blocked_when_disabled(self):
         config = AuthConfiguration.get_solo()
         config.registration_enabled = False
@@ -236,6 +329,16 @@ class AuthTests(APITestCase):
 
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
+
+        stale_client = self.client_class()
+        login_before_reset = stale_client.post(
+            reverse("auth-login"),
+            {"email": user.email, "password": "StrongPass@123"},
+            format="json",
+        )
+        self.assertEqual(login_before_reset.status_code, 200)
+        stale_refresh_token = stale_client.cookies.get("refresh_token").value
+
         confirm_resp = self.client.post(
             reverse("auth-password-reset-confirm"),
             {
@@ -246,6 +349,10 @@ class AuthTests(APITestCase):
             format="json",
         )
         self.assertEqual(confirm_resp.status_code, 200)
+
+        stale_client.cookies["refresh_token"] = stale_refresh_token
+        stale_refresh = stale_client.post(reverse("auth-refresh"), {}, format="json")
+        self.assertEqual(stale_refresh.status_code, 401)
         self.client.post(reverse("auth-logout"))
         login_resp = self.client.post(
             reverse("auth-login"),
@@ -331,6 +438,38 @@ class RateLimitTests(APITestCase):
             format="json",
         )
         self.assertEqual(other_login.status_code, 200)
+
+    @override_settings(AUTH_LOGIN_MAX_FAILURES=2, AUTH_LOGIN_LOCKOUT_SECONDS=120)
+    def test_login_lockout_is_scoped_to_email_plus_client_ip(self):
+        first = self.client.post(
+            reverse("auth-login"),
+            {"email": self.user.email, "password": "WrongPass@123"},
+            format="json",
+            REMOTE_ADDR="198.51.100.10",
+        )
+        second = self.client.post(
+            reverse("auth-login"),
+            {"email": self.user.email, "password": "WrongPass@123"},
+            format="json",
+            REMOTE_ADDR="198.51.100.10",
+        )
+        locked = self.client.post(
+            reverse("auth-login"),
+            {"email": self.user.email, "password": "WrongPass@123"},
+            format="json",
+            REMOTE_ADDR="198.51.100.10",
+        )
+        self.assertEqual(first.status_code, 400)
+        self.assertEqual(second.status_code, 400)
+        self.assertEqual(locked.status_code, 429)
+
+        unaffected_ip_login = self.client.post(
+            reverse("auth-login"),
+            {"email": self.user.email, "password": "StrongPass@123"},
+            format="json",
+            REMOTE_ADDR="203.0.113.44",
+        )
+        self.assertEqual(unaffected_ip_login.status_code, 200)
 
     @override_settings(
         AUTH_LOGIN_MAX_FAILURES=100,
@@ -1321,6 +1460,46 @@ class LectureVideoAccessTests(BaseAPITestCase):
             )
             self.assertEqual(denied_segment_response.status_code, 404)
 
+    def test_protected_playback_token_is_user_bound(self):
+        with tempfile.TemporaryDirectory() as temp_dir, override_settings(
+            MEDIA_ROOT=temp_dir,
+            COURSE_PROTECTED_MEDIA_USE_ACCEL_REDIRECT=True,
+        ):
+            lecture = Lecture.objects.create(
+                section=self.section,
+                title="User Bound Playback Lecture",
+                description="Token must be bound to issuing user.",
+                video_file=SimpleUploadedFile("bound.mp4", b"bound-video", content_type="video/mp4"),
+                order=6,
+                is_preview=False,
+            )
+            Enrollment.objects.create(
+                user=self.student,
+                course=self.course,
+                payment_status=Enrollment.STATUS_PAID,
+            )
+            other_student = User.objects.create_user(
+                email="token-other@test.com",
+                password="StrongPass@123",
+                full_name="Token Other Student",
+                role=User.ROLE_STUDENT,
+            )
+            Enrollment.objects.create(
+                user=other_student,
+                course=self.course,
+                payment_status=Enrollment.STATUS_PAID,
+            )
+
+            self.login(self.student.email)
+            response = self.client.get(reverse("lecture-video", kwargs={"pk": lecture.id}))
+            self.assertEqual(response.status_code, 200)
+            playback_path = urlparse(response.data["data"]["playback_url"]).path
+
+            self.client.post(reverse("auth-logout"))
+            self.login(other_student.email)
+            shared_attempt = self.client.get(playback_path)
+            self.assertEqual(shared_attempt.status_code, 404)
+
     def test_course_detail_hides_uploaded_video_paths(self):
         with tempfile.TemporaryDirectory() as temp_dir, override_settings(MEDIA_ROOT=temp_dir):
             lecture = Lecture.objects.create(
@@ -1705,6 +1884,34 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(response.data["message"], "Unable to create OBS broadcast session.")
         self.assertIn("Owncast sync failed", response.data["errors"]["detail"])
         self.assertFalse(RealtimeSession.objects.filter(title="OBS Create Failure Session").exists())
+
+    @override_settings(
+        OWNCAST_RTMP_TARGET="rtmp://owncast:1935/live/default-key",
+    )
+    def test_realtime_session_payload_hides_obs_key_for_non_moderators(self):
+        session = RealtimeSession.objects.create(
+            title="OBS Hidden Key Session",
+            description="OBS key must be hidden from non moderators.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_service=RealtimeSession.STREAM_SERVICE_OBS,
+            obs_stream_key="HiddenObsKey123",
+            max_audience=500,
+        )
+
+        self.login(self.viewer.email)
+        response = self.client.get(reverse("realtime-session-detail", kwargs={"pk": session.id}))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["obs_stream_key"], "")
+
+        self.client.post(reverse("auth-logout"))
+        self.login(self.host.email)
+        host_response = self.client.get(reverse("realtime-session-detail", kwargs={"pk": session.id}))
+        self.assertEqual(host_response.status_code, 200)
+        self.assertEqual(host_response.data["data"]["obs_stream_key"], "default-key")
 
     def test_realtime_list_rejects_unknown_query_params(self):
         self.login(self.viewer.email)
