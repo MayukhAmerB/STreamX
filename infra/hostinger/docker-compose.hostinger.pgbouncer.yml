@@ -1,0 +1,65 @@
+services:
+  pgbouncer:
+    image: edoburu/pgbouncer:1.24.1
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgres://${POSTGRES_USER:-alsyed_app}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in environment}@postgres:5432/${POSTGRES_DB:-alsyedacademy}"
+      POOL_MODE: "${PGBOUNCER_POOL_MODE:-transaction}"
+      MAX_CLIENT_CONN: "${PGBOUNCER_MAX_CLIENT_CONN:-1000}"
+      DEFAULT_POOL_SIZE: "${PGBOUNCER_DEFAULT_POOL_SIZE:-50}"
+      RESERVE_POOL_SIZE: "${PGBOUNCER_RESERVE_POOL_SIZE:-10}"
+      RESERVE_POOL_TIMEOUT: "${PGBOUNCER_RESERVE_POOL_TIMEOUT:-5}"
+      IGNORE_STARTUP_PARAMETERS: "${PGBOUNCER_IGNORE_STARTUP_PARAMETERS:-extra_float_digits,options}"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "tr '\\0' ' ' </proc/1/cmdline | grep -q 'pgbouncer'",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - appnet
+
+  backend:
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-alsyed_app}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in environment}@pgbouncer:5432/${POSTGRES_DB:-alsyedacademy}"
+      DATABASE_CONN_MAX_AGE: "${DATABASE_CONN_MAX_AGE:-300}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+
+  transcoder:
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-alsyed_app}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in environment}@pgbouncer:5432/${POSTGRES_DB:-alsyedacademy}"
+      DATABASE_CONN_MAX_AGE: "${DATABASE_CONN_MAX_AGE:-300}"
+      RUN_MIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+
+  worker:
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-alsyed_app}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in environment}@pgbouncer:5432/${POSTGRES_DB:-alsyedacademy}"
+      DATABASE_CONN_MAX_AGE: "${DATABASE_CONN_MAX_AGE:-300}"
+      RUN_MIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy

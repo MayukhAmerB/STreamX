@@ -26,6 +26,8 @@ class RealtimeSessionQuerySet(models.QuerySet):
 class RealtimeSession(models.Model):
     TYPE_MEETING = "meeting"
     TYPE_BROADCASTING = "broadcasting"
+    MAX_MEETING_CAPACITY = 200
+    MAX_AUDIENCE_LIMIT = 600
     SESSION_TYPE_CHOICES = [
         (TYPE_MEETING, "Meeting"),
         (TYPE_BROADCASTING, "Broadcasting"),
@@ -89,8 +91,8 @@ class RealtimeSession(models.Model):
     room_name = models.CharField(max_length=255, unique=True, blank=True)
     livekit_room_name = models.CharField(max_length=255, blank=True, default="")
 
-    meeting_capacity = models.PositiveIntegerField(default=200)
-    max_audience = models.PositiveIntegerField(default=50000)
+    meeting_capacity = models.PositiveIntegerField(default=MAX_MEETING_CAPACITY)
+    max_audience = models.PositiveIntegerField(default=MAX_AUDIENCE_LIMIT)
     allow_overflow_broadcast = models.BooleanField(default=True)
     presenter_user_ids = models.JSONField(default=list, blank=True)
     speaker_user_ids = models.JSONField(default=list, blank=True)
@@ -135,14 +137,18 @@ class RealtimeSession(models.Model):
 
         if self.meeting_capacity < 2:
             raise ValidationError({"meeting_capacity": "Meeting capacity must be at least 2."})
-        if self.meeting_capacity > 200:
-            raise ValidationError({"meeting_capacity": "Meeting capacity cannot exceed 200."})
+        if self.meeting_capacity > self.MAX_MEETING_CAPACITY:
+            raise ValidationError(
+                {"meeting_capacity": f"Meeting capacity cannot exceed {self.MAX_MEETING_CAPACITY}."}
+            )
         if self.max_audience < self.meeting_capacity:
             raise ValidationError(
                 {"max_audience": "Max audience must be greater than or equal to meeting capacity."}
             )
-        if self.max_audience > 50000:
-            raise ValidationError({"max_audience": "Max audience cannot exceed 50000."})
+        if self.max_audience > self.MAX_AUDIENCE_LIMIT:
+            raise ValidationError(
+                {"max_audience": f"Max audience cannot exceed {self.MAX_AUDIENCE_LIMIT}."}
+            )
         if not self.linked_live_class_id:
             if self.session_type == self.TYPE_MEETING:
                 detail = "Select a linked live class for meeting sessions."
@@ -454,6 +460,38 @@ class RealtimeSessionRecording(models.Model):
 
 
 class RealtimeConfiguration(models.Model):
+    BROADCAST_QUALITY_MODE_LOW = "low"
+    BROADCAST_QUALITY_MODE_PREMIUM_HD = "premium_hd"
+    BROADCAST_QUALITY_MODE_ADAPTIVE = "adaptive"
+    BROADCAST_QUALITY_MODE_CHOICES = [
+        (BROADCAST_QUALITY_MODE_LOW, "Low"),
+        (BROADCAST_QUALITY_MODE_PREMIUM_HD, "Premium HD"),
+        (BROADCAST_QUALITY_MODE_ADAPTIVE, "Adaptive"),
+    ]
+    BROADCAST_LOW_PROFILE = {
+        "capture_width": 640,
+        "capture_height": 360,
+        "fps": 20,
+        "max_video_bitrate_kbps": 650,
+    }
+    BROADCAST_PREMIUM_PROFILE = {
+        "capture_width": 1920,
+        "capture_height": 1080,
+        "fps": 30,
+        "max_video_bitrate_kbps": 3800,
+    }
+    BROADCAST_ADAPTIVE_BASE_PROFILE = {
+        "capture_width": 1280,
+        "capture_height": 720,
+        "fps": 24,
+        "max_video_bitrate_kbps": 1800,
+    }
+    BROADCAST_CONSTRAINED_PROFILE = {
+        "capture_width": 854,
+        "capture_height": 480,
+        "fps": 20,
+        "max_video_bitrate_kbps": 1100,
+    }
     MEETING_QUALITY_MODE_LOW = "low"
     MEETING_QUALITY_MODE_PREMIUM_HD = "premium_hd"
     MEETING_QUALITY_MODE_ADAPTIVE = "adaptive"
@@ -497,6 +535,11 @@ class RealtimeConfiguration(models.Model):
     broadcast_capture_height = models.PositiveIntegerField(default=360)
     broadcast_capture_fps = models.PositiveIntegerField(default=20)
     broadcast_max_video_bitrate_kbps = models.PositiveIntegerField(default=650)
+    broadcast_quality_mode = models.CharField(
+        max_length=20,
+        choices=BROADCAST_QUALITY_MODE_CHOICES,
+        default=BROADCAST_QUALITY_MODE_LOW,
+    )
     meeting_camera_capture_width = models.PositiveIntegerField(default=1280)
     meeting_camera_capture_height = models.PositiveIntegerField(default=720)
     meeting_camera_capture_fps = models.PositiveIntegerField(default=24)
@@ -585,6 +628,22 @@ class RealtimeConfiguration(models.Model):
         return dict(cls.MEETING_LOW_PROFILE)
 
     @classmethod
+    def low_broadcast_profile(cls):
+        return dict(cls.BROADCAST_LOW_PROFILE)
+
+    @classmethod
+    def premium_broadcast_profile(cls):
+        return dict(cls.BROADCAST_PREMIUM_PROFILE)
+
+    @classmethod
+    def adaptive_base_broadcast_profile(cls):
+        return dict(cls.BROADCAST_ADAPTIVE_BASE_PROFILE)
+
+    @classmethod
+    def constrained_broadcast_profile(cls):
+        return dict(cls.BROADCAST_CONSTRAINED_PROFILE)
+
+    @classmethod
     def premium_meeting_profile(cls):
         return dict(cls.MEETING_PREMIUM_PROFILE)
 
@@ -595,6 +654,15 @@ class RealtimeConfiguration(models.Model):
     @classmethod
     def adaptive_base_meeting_profile(cls):
         return dict(cls.MEETING_ADAPTIVE_BASE_PROFILE)
+
+    def apply_broadcast_profile(self, profile):
+        profile = profile or {}
+        self.broadcast_capture_width = int(profile.get("capture_width", self.broadcast_capture_width))
+        self.broadcast_capture_height = int(profile.get("capture_height", self.broadcast_capture_height))
+        self.broadcast_capture_fps = int(profile.get("fps", self.broadcast_capture_fps))
+        self.broadcast_max_video_bitrate_kbps = int(
+            profile.get("max_video_bitrate_kbps", self.broadcast_max_video_bitrate_kbps)
+        )
 
     def apply_meeting_profile(self, profile):
         profile = profile or {}
@@ -639,6 +707,32 @@ class RealtimeConfiguration(models.Model):
             return self.adaptive_base_meeting_profile()
         return self.constrained_meeting_profile()
 
+    def _resolve_adaptive_broadcast_profile(self, *, audience_count=0, max_audience=None):
+        safe_default_max_audience = max(
+            1,
+            int(getattr(settings, "REALTIME_DEFAULT_MAX_AUDIENCE", RealtimeSession.MAX_AUDIENCE_LIMIT)),
+        )
+        try:
+            normalized_count = max(0, int(audience_count or 0))
+        except (TypeError, ValueError):
+            normalized_count = 0
+        try:
+            normalized_max = int(max_audience or 0)
+        except (TypeError, ValueError):
+            normalized_max = 0
+        safe_max = max(1, normalized_max or safe_default_max_audience)
+        load_ratio = normalized_count / safe_max
+
+        # Adaptive tiers:
+        # - Start at 720p for normal attendance.
+        # - Shift to 480p as audience load rises to preserve stream stability.
+        # - Drop to low profile only under extreme overload/fallback conditions.
+        if load_ratio <= 0.35 and normalized_count <= 200:
+            return self.adaptive_base_broadcast_profile()
+        if load_ratio <= 1.00 and normalized_count <= safe_max:
+            return self.constrained_broadcast_profile()
+        return self.low_broadcast_profile()
+
     @classmethod
     def get_solo(cls):
         obj, _ = cls.objects.get_or_create(
@@ -648,6 +742,7 @@ class RealtimeConfiguration(models.Model):
                 "broadcast_capture_height": 360,
                 "broadcast_capture_fps": 20,
                 "broadcast_max_video_bitrate_kbps": 650,
+                "broadcast_quality_mode": cls.BROADCAST_QUALITY_MODE_LOW,
                 "meeting_camera_capture_width": 854,
                 "meeting_camera_capture_height": 480,
                 "meeting_camera_capture_fps": 20,
@@ -661,13 +756,16 @@ class RealtimeConfiguration(models.Model):
         )
         return obj
 
-    def to_broadcast_dict(self):
-        return {
-            "capture_width": self.broadcast_capture_width,
-            "capture_height": self.broadcast_capture_height,
-            "fps": self.broadcast_capture_fps,
-            "max_video_bitrate_kbps": self.broadcast_max_video_bitrate_kbps,
-        }
+    def to_broadcast_dict(self, *, audience_count=0, max_audience=None):
+        mode = str(self.broadcast_quality_mode or self.BROADCAST_QUALITY_MODE_LOW).strip().lower()
+        if mode == self.BROADCAST_QUALITY_MODE_PREMIUM_HD:
+            return self.premium_broadcast_profile()
+        if mode == self.BROADCAST_QUALITY_MODE_ADAPTIVE:
+            return self._resolve_adaptive_broadcast_profile(
+                audience_count=audience_count,
+                max_audience=max_audience,
+            )
+        return self.low_broadcast_profile()
 
     def to_meeting_dict(self, *, participant_count=0, meeting_capacity=None):
         mode = str(self.meeting_quality_mode or self.MEETING_QUALITY_MODE_LOW).strip().lower()

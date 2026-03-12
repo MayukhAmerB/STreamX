@@ -1,0 +1,6 @@
+services:
+  pgbouncer:
+    cpus: "${PGBOUNCER_CPUS:-0.75}"
+    mem_limit: "${PGBOUNCER_MEM_LIMIT:-512m}"
+    mem_reservation: "${PGBOUNCER_MEM_RESERVATION:-256m}"
+    pids_limit: 256

@@ -600,7 +600,10 @@ class RealtimeSessionHostTokenView(APIView):
                 "room_name": session.livekit_room_name or session.room_name,
                 "participant_identity": token_payload["identity"],
                 "token": token_payload["token"],
-                "broadcast_profile": realtime_config.to_broadcast_dict(),
+                "broadcast_profile": realtime_config.to_broadcast_dict(
+                    audience_count=session.max_audience,
+                    max_audience=session.max_audience,
+                ),
             },
         )
 

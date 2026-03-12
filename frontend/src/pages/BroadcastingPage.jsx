@@ -101,7 +101,7 @@ const broadcastMarketingCards = [
 const broadcastHeroHighlights = [
   "Host directly from browser",
   "Chat-first audience mode",
-  "Supports up to 50,000 viewers",
+  "Supports up to 600 viewers",
 ];
 
 const broadcastWorkflow = [
@@ -331,7 +331,7 @@ export default function BroadcastingPage() {
         linked_live_class_id: Number(form.linked_live_class_id),
         session_type: "broadcasting",
         meeting_capacity: 200,
-        max_audience: 50000,
+        max_audience: 600,
         allow_overflow_broadcast: true,
         stream_embed_url: form.stream_embed_url,
         chat_embed_url: form.chat_embed_url,

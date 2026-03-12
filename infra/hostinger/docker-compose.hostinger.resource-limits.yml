@@ -1,8 +1,26 @@
 services:
+  postgres:
+    cpus: "${POSTGRES_CPUS:-2.0}"
+    mem_limit: "${POSTGRES_MEM_LIMIT:-8g}"
+    mem_reservation: "${POSTGRES_MEM_RESERVATION:-4g}"
+    pids_limit: 512
+
+  redis:
+    cpus: "${REDIS_CPUS:-1.0}"
+    mem_limit: "${REDIS_MEM_LIMIT:-2g}"
+    mem_reservation: "${REDIS_MEM_RESERVATION:-1g}"
+    pids_limit: 256
+
   backend:
     cpus: "${BACKEND_CPUS:-2.0}"
     mem_limit: "${BACKEND_MEM_LIMIT:-2g}"
     mem_reservation: "${BACKEND_MEM_RESERVATION:-1g}"
+    pids_limit: 512
+
+  worker:
+    cpus: "${WORKER_CPUS:-1.0}"
+    mem_limit: "${WORKER_MEM_LIMIT:-1.5g}"
+    mem_reservation: "${WORKER_MEM_RESERVATION:-768m}"
     pids_limit: 512
 
   transcoder:
@@ -28,3 +46,15 @@ services:
     mem_limit: "${OWNCAST_MEM_LIMIT:-1g}"
     mem_reservation: "${OWNCAST_MEM_RESERVATION:-512m}"
     pids_limit: 512
+
+  media:
+    cpus: "${MEDIA_CPUS:-0.75}"
+    mem_limit: "${MEDIA_MEM_LIMIT:-1g}"
+    mem_reservation: "${MEDIA_MEM_RESERVATION:-512m}"
+    pids_limit: 256
+
+  frontend:
+    cpus: "${FRONTEND_CPUS:-0.75}"
+    mem_limit: "${FRONTEND_MEM_LIMIT:-1g}"
+    mem_reservation: "${FRONTEND_MEM_RESERVATION:-512m}"
+    pids_limit: 256

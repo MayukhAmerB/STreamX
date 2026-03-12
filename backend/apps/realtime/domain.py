@@ -78,10 +78,28 @@ def session_payload_for_create(validated_data):
     linked_live_class = payload.get("linked_live_class")
     if linked_live_class and not payload.get("linked_course"):
         payload["linked_course"] = linked_live_class.linked_course
-    default_capacity = int(getattr(settings, "REALTIME_DEFAULT_MEETING_CAPACITY", 200) or 200)
-    payload.setdefault("meeting_capacity", max(2, min(200, default_capacity)))
-    payload["meeting_capacity"] = max(2, min(200, int(payload.get("meeting_capacity") or 200)))
-    payload.setdefault("max_audience", settings.REALTIME_DEFAULT_MAX_AUDIENCE)
+    default_capacity = int(
+        getattr(settings, "REALTIME_DEFAULT_MEETING_CAPACITY", RealtimeSession.MAX_MEETING_CAPACITY)
+        or RealtimeSession.MAX_MEETING_CAPACITY
+    )
+    payload.setdefault("meeting_capacity", max(2, min(RealtimeSession.MAX_MEETING_CAPACITY, default_capacity)))
+    payload["meeting_capacity"] = max(
+        2,
+        min(RealtimeSession.MAX_MEETING_CAPACITY, int(payload.get("meeting_capacity") or 0)),
+    )
+
+    default_max_audience = int(
+        getattr(settings, "REALTIME_DEFAULT_MAX_AUDIENCE", RealtimeSession.MAX_AUDIENCE_LIMIT)
+        or RealtimeSession.MAX_AUDIENCE_LIMIT
+    )
+    payload.setdefault(
+        "max_audience",
+        max(payload["meeting_capacity"], min(RealtimeSession.MAX_AUDIENCE_LIMIT, default_max_audience)),
+    )
+    payload["max_audience"] = max(
+        payload["meeting_capacity"],
+        min(RealtimeSession.MAX_AUDIENCE_LIMIT, int(payload.get("max_audience") or 0)),
+    )
     payload.setdefault("status", RealtimeSession.STATUS_LIVE)
     return payload
 

@@ -12,8 +12,9 @@ from .services import delete_recording_assets
 
 
 class RealtimeConfigurationAdminForm(forms.ModelForm):
-    BROADCAST_MODE_CURRENT = "broadcast_current"
-    BROADCAST_MODE_PREMIUM_HD = "broadcast_premium_hd"
+    BROADCAST_MODE_LOW = RealtimeConfiguration.BROADCAST_QUALITY_MODE_LOW
+    BROADCAST_MODE_PREMIUM_HD = RealtimeConfiguration.BROADCAST_QUALITY_MODE_PREMIUM_HD
+    BROADCAST_MODE_ADAPTIVE = RealtimeConfiguration.BROADCAST_QUALITY_MODE_ADAPTIVE
     MEETING_MODE_LOW = RealtimeConfiguration.MEETING_QUALITY_MODE_LOW
     MEETING_MODE_PREMIUM_HD = RealtimeConfiguration.MEETING_QUALITY_MODE_PREMIUM_HD
     MEETING_MODE_ADAPTIVE = RealtimeConfiguration.MEETING_QUALITY_MODE_ADAPTIVE
@@ -21,21 +22,24 @@ class RealtimeConfigurationAdminForm(forms.ModelForm):
     broadcast_quality_mode = forms.ChoiceField(
         label="Broadcast Quality Preset",
         required=False,
-        initial=BROADCAST_MODE_CURRENT,
+        initial=BROADCAST_MODE_LOW,
         widget=forms.RadioSelect,
         choices=(
             (
-                BROADCAST_MODE_CURRENT,
-                "Default profile (keeps your current bitrate/resolution, e.g. existing 480p setup)",
+                BROADCAST_MODE_LOW,
+                "Low profile (640x360 @ 20fps, 650 kbps)",
             ),
             (
                 BROADCAST_MODE_PREMIUM_HD,
                 "Premium broadcast profile (1920x1080 @ 30fps, 3800 kbps)",
             ),
+            (
+                BROADCAST_MODE_ADAPTIVE,
+                "Adaptive profile (starts at 720p, drops to 480p/360p based on audience load)",
+            ),
         ),
         help_text=(
-            "Select Premium broadcast profile to apply 1080p defaults automatically. "
-            "Leave on Default profile to use the current manual values."
+            "Choose the broadcast quality profile for Host Studio publishing."
         ),
     )
     meeting_quality_mode = forms.ChoiceField(
@@ -92,10 +96,22 @@ class RealtimeConfigurationAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.instance and self.instance.pk and self._is_high_broadcast_profile(self.instance):
-            self.fields["broadcast_quality_mode"].initial = self.BROADCAST_MODE_PREMIUM_HD
+        if self.instance and self.instance.pk:
+            current_broadcast_mode = str(
+                getattr(self.instance, "broadcast_quality_mode", "") or ""
+            ).strip().lower()
+            if current_broadcast_mode in {
+                self.BROADCAST_MODE_LOW,
+                self.BROADCAST_MODE_PREMIUM_HD,
+                self.BROADCAST_MODE_ADAPTIVE,
+            }:
+                self.fields["broadcast_quality_mode"].initial = current_broadcast_mode
+            elif self._is_high_broadcast_profile(self.instance):
+                self.fields["broadcast_quality_mode"].initial = self.BROADCAST_MODE_PREMIUM_HD
+            else:
+                self.fields["broadcast_quality_mode"].initial = self.BROADCAST_MODE_LOW
         else:
-            self.fields["broadcast_quality_mode"].initial = self.BROADCAST_MODE_CURRENT
+            self.fields["broadcast_quality_mode"].initial = self.BROADCAST_MODE_LOW
         if self.instance and self.instance.pk:
             current_meeting_mode = str(
                 getattr(self.instance, "meeting_quality_mode", "") or ""
@@ -113,9 +129,8 @@ class RealtimeConfigurationAdminForm(forms.ModelForm):
         else:
             self.fields["meeting_quality_mode"].initial = self.MEETING_MODE_LOW
         self.fields["broadcast_quality_mode"].help_text = (
-            "Select Premium broadcast profile to apply 1080p defaults automatically. "
             "This affects only Broadcast Host Studio sessions. "
-            "For a live host studio, reconnect camera to apply changes."
+            "For a live host studio, reconnect camera to apply changes immediately."
         )
         self.fields["meeting_camera_capture_width"].help_text = (
             "Meeting profile updates apply on participant rejoin or after re-enabling camera."
@@ -146,13 +161,23 @@ class RealtimeConfigurationAdminForm(forms.ModelForm):
         instance = super().save(commit=False)
         selected_broadcast_mode = self.cleaned_data.get(
             "broadcast_quality_mode",
-            self.BROADCAST_MODE_CURRENT,
+            self.BROADCAST_MODE_LOW,
         )
+        if selected_broadcast_mode not in {
+            self.BROADCAST_MODE_LOW,
+            self.BROADCAST_MODE_PREMIUM_HD,
+            self.BROADCAST_MODE_ADAPTIVE,
+        }:
+            selected_broadcast_mode = self.BROADCAST_MODE_LOW
+        instance.broadcast_quality_mode = selected_broadcast_mode
         if selected_broadcast_mode == self.BROADCAST_MODE_PREMIUM_HD:
-            instance.broadcast_capture_width = 1920
-            instance.broadcast_capture_height = 1080
-            instance.broadcast_capture_fps = 30
-            instance.broadcast_max_video_bitrate_kbps = 3800
+            instance.apply_broadcast_profile(RealtimeConfiguration.premium_broadcast_profile())
+        elif selected_broadcast_mode == self.BROADCAST_MODE_ADAPTIVE:
+            # Save adaptive baseline; final profile is resolved per host token by audience load.
+            instance.apply_broadcast_profile(RealtimeConfiguration.adaptive_base_broadcast_profile())
+        else:
+            instance.apply_broadcast_profile(RealtimeConfiguration.low_broadcast_profile())
+
         selected_meeting_mode = self.cleaned_data.get("meeting_quality_mode", self.MEETING_MODE_LOW)
         if selected_meeting_mode not in {
             self.MEETING_MODE_LOW,
@@ -163,16 +188,6 @@ class RealtimeConfigurationAdminForm(forms.ModelForm):
         instance.meeting_quality_mode = selected_meeting_mode
         if selected_meeting_mode == self.MEETING_MODE_PREMIUM_HD:
             instance.apply_meeting_profile(RealtimeConfiguration.premium_meeting_profile())
-            # Keep broadcast quality aligned with premium meeting profile unless
-            # admin has explicitly selected a custom broadcast mode.
-            if (
-                selected_broadcast_mode == self.BROADCAST_MODE_CURRENT
-                and not self._is_high_broadcast_profile(instance)
-            ):
-                instance.broadcast_capture_width = 1920
-                instance.broadcast_capture_height = 1080
-                instance.broadcast_capture_fps = 30
-                instance.broadcast_max_video_bitrate_kbps = 3800
         elif selected_meeting_mode == self.MEETING_MODE_ADAPTIVE:
             # Save adaptive baseline; final profile is resolved per join from participant load.
             instance.apply_meeting_profile(RealtimeConfiguration.adaptive_base_meeting_profile())

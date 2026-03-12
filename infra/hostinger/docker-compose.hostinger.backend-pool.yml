@@ -1,0 +1,96 @@
+services:
+  backend-2:
+    build:
+      context: ./backend
+    restart: always
+    env_file:
+      - ./backend/.env.hostinger.production
+    environment:
+      RUN_MIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - backend_media:/app/media
+      - recordings_data:/recordings:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import sys,urllib.request;req=urllib.request.Request('http://127.0.0.1:8000/health/live',headers={'Host':'${API_HOSTNAME:-api.alsyedinitiative.com}','X-Forwarded-Proto':'https'});resp=urllib.request.urlopen(req,timeout=3);sys.exit(0 if resp.status==200 else 1)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks:
+      - appnet
+
+  backend-3:
+    build:
+      context: ./backend
+    restart: always
+    env_file:
+      - ./backend/.env.hostinger.production
+    environment:
+      RUN_MIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - backend_media:/app/media
+      - recordings_data:/recordings:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import sys,urllib.request;req=urllib.request.Request('http://127.0.0.1:8000/health/live',headers={'Host':'${API_HOSTNAME:-api.alsyedinitiative.com}','X-Forwarded-Proto':'https'});resp=urllib.request.urlopen(req,timeout=3);sys.exit(0 if resp.status==200 else 1)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks:
+      - appnet
+
+  backend-4:
+    build:
+      context: ./backend
+    restart: always
+    env_file:
+      - ./backend/.env.hostinger.production
+    environment:
+      RUN_MIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - backend_media:/app/media
+      - recordings_data:/recordings:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import sys,urllib.request;req=urllib.request.Request('http://127.0.0.1:8000/health/live',headers={'Host':'${API_HOSTNAME:-api.alsyedinitiative.com}','X-Forwarded-Proto':'https'});resp=urllib.request.urlopen(req,timeout=3);sys.exit(0 if resp.status==200 else 1)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks:
+      - appnet

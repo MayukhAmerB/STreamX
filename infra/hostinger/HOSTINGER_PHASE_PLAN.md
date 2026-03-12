@@ -29,17 +29,19 @@ Status: completed in this pass
 
 ## Phase 2
 
-Status: in progress
+Status: implemented (optional overlay)
 
 - Run `python manage.py transcode_lecture_streams --all-uploaded` on a schedule so uploaded lectures become HLS assets automatically.
 - Added backup retention/checksum verification and restore dry-run integrity checks.
 - Added restore runbook (`infra/hostinger/RESTORE_RUNBOOK.md`) for DR drills.
 - Add admin visibility for lecture source type, transcode status, and storage footprint.
 - Move large upload and transcode operations to dedicated workers if authoring volume grows.
+- Added safe phased deploy runner: `infra/hostinger/deploy-phases.sh`.
+- Added non-breaking phase execution guide: `infra/hostinger/SINGLE_VPS_SCALE_PHASES.md`.
 
 ## Phase 3
 
-Status: in progress
+Status: implemented (optional overlay)
 
 - Added phased load-test scripts for 50/100/200 concurrent joins (`infra/loadtest/`).
 - Added compose resource-limits override for service isolation.
@@ -47,6 +49,23 @@ Status: in progress
 - Move PostgreSQL and Redis off the app node if write volume or connection count increases.
 - Put course media and HLS assets behind object storage plus CDN inside the chosen hosting stack if VOD demand grows beyond a single disk/node.
 - Added DB-backed async queue + worker command for email and webhook retry jobs.
+- Added optional backend pool overlay: `infra/hostinger/docker-compose.hostinger.backend-pool.yml` (`backend-2/3/4`).
+- Added optional internal gateway LB overlay: `infra/hostinger/docker-compose.hostinger.gateway-lb.yml`.
+- Added gateway nginx config: `infra/hostinger/nginx/gateway-lb.conf`.
+
+## Phase 4
+
+Status: implemented (optional overlay)
+
+- Added optional PgBouncer overlay to route backend DB connections through pooling:
+  - `infra/hostinger/docker-compose.hostinger.pgbouncer.yml`
+- Added optional PgBouncer overlay for backend pool services:
+  - `infra/hostinger/docker-compose.hostinger.pgbouncer.pool.yml`
+- Added optional PostgreSQL tuning overlay:
+  - `infra/hostinger/docker-compose.hostinger.postgres-tuning.yml`
+- Added phased rollout entries in `infra/hostinger/deploy-phases.sh`:
+  - `phase4`: pgbouncer+tuning
+  - `phase5`: backend pool + gateway + pgbouncer+tuning
 
 ## Scalability notes
 

@@ -117,6 +117,23 @@ git pull
 ./infra/hostinger/deploy-safe.sh
 ```
 
+Phased rollout (recommended for scale hardening without breaking current flow):
+
+```bash
+chmod +x infra/hostinger/deploy-phases.sh
+./infra/hostinger/deploy-phases.sh phase1
+./infra/hostinger/deploy-phases.sh phase2
+./infra/hostinger/deploy-phases.sh phase3
+./infra/hostinger/deploy-phases.sh phase4
+./infra/hostinger/deploy-phases.sh phase5
+```
+
+Reference: `infra/hostinger/SINGLE_VPS_SCALE_PHASES.md`
+
+PgBouncer-specific rollout and verification:
+
+- `infra/hostinger/PGBOUNCER_ROLLOUT.md`
+
 Destructive fresh rebuild of the whole Docker stack:
 
 ```bash

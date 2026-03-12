@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.conf import settings
 from django.urls import reverse
 from rest_framework import serializers
 
@@ -186,8 +187,12 @@ class RealtimeSessionCreateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         session_type = attrs.get("session_type", RealtimeSession.TYPE_MEETING)
         linked_live_class = attrs.get("linked_live_class")
-        meeting_capacity = attrs.get("meeting_capacity", 200)
-        max_audience = attrs.get("max_audience", 50000)
+        meeting_capacity = attrs.get("meeting_capacity", RealtimeSession.MAX_MEETING_CAPACITY)
+        default_max_audience = int(
+            getattr(settings, "REALTIME_DEFAULT_MAX_AUDIENCE", RealtimeSession.MAX_AUDIENCE_LIMIT)
+            or RealtimeSession.MAX_AUDIENCE_LIMIT
+        )
+        max_audience = attrs.get("max_audience", default_max_audience)
 
         if not linked_live_class:
             if session_type == RealtimeSession.TYPE_MEETING:
@@ -195,17 +200,25 @@ class RealtimeSessionCreateSerializer(serializers.ModelSerializer):
             else:
                 detail = "Select a live class for this broadcast session."
             raise serializers.ValidationError({"linked_live_class_id": detail})
-        if meeting_capacity > 200:
-            raise serializers.ValidationError({"meeting_capacity": "Meeting capacity cannot exceed 200."})
-        if max_audience > 50000:
-            raise serializers.ValidationError({"max_audience": "Max audience cannot exceed 50000."})
+        if meeting_capacity > RealtimeSession.MAX_MEETING_CAPACITY:
+            raise serializers.ValidationError(
+                {
+                    "meeting_capacity": (
+                        f"Meeting capacity cannot exceed {RealtimeSession.MAX_MEETING_CAPACITY}."
+                    )
+                }
+            )
+        if max_audience > RealtimeSession.MAX_AUDIENCE_LIMIT:
+            raise serializers.ValidationError(
+                {"max_audience": f"Max audience cannot exceed {RealtimeSession.MAX_AUDIENCE_LIMIT}."}
+            )
         if max_audience < meeting_capacity:
             raise serializers.ValidationError(
                 {"max_audience": "Max audience must be greater than or equal to meeting capacity."}
             )
 
         if session_type == RealtimeSession.TYPE_BROADCASTING:
-            attrs.setdefault("meeting_capacity", 200)
+            attrs.setdefault("meeting_capacity", RealtimeSession.MAX_MEETING_CAPACITY)
 
         rtmp_target_url = (attrs.get("rtmp_target_url") or "").strip()
         if rtmp_target_url and not is_safe_public_stream_url(rtmp_target_url):

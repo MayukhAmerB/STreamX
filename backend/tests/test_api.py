@@ -1527,7 +1527,7 @@ class RealtimeSessionTests(APITestCase):
                 "session_type": "broadcasting",
                 "linked_live_class_id": self.live_class.id,
                 "meeting_capacity": 100,
-                "max_audience": 1000,
+                "max_audience": 600,
                 "rtmp_target_url": "rtmp://127.0.0.1:1935/live/key",
             },
             format="json",
@@ -1544,7 +1544,7 @@ class RealtimeSessionTests(APITestCase):
                 "description": "Should be blocked",
                 "session_type": "broadcasting",
                 "meeting_capacity": 100,
-                "max_audience": 1000,
+                "max_audience": 600,
             },
             format="json",
         )
@@ -1561,7 +1561,7 @@ class RealtimeSessionTests(APITestCase):
                 "session_type": "meeting",
                 "linked_live_class_id": self.live_class.id,
                 "meeting_capacity": 201,
-                "max_audience": 1000,
+                "max_audience": 600,
             },
             format="json",
         )
@@ -1569,6 +1569,26 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(
             response.data["errors"]["meeting_capacity"][0],
             "Meeting capacity cannot exceed 200.",
+        )
+
+    def test_meeting_create_rejects_max_audience_above_600(self):
+        self.login(self.host.email)
+        response = self.client.post(
+            reverse("realtime-session-list-create"),
+            {
+                "title": "Audience Above Limit",
+                "description": "Should be blocked",
+                "session_type": "meeting",
+                "linked_live_class_id": self.live_class.id,
+                "meeting_capacity": 200,
+                "max_audience": 601,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data["errors"]["max_audience"][0],
+            "Max audience cannot exceed 600.",
         )
 
     def test_realtime_list_rejects_unknown_query_params(self):
@@ -1823,7 +1843,7 @@ class RealtimeSessionTests(APITestCase):
             linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
             meeting_capacity=300,
-            max_audience=50000,
+            max_audience=600,
         )
 
         self.login(self.viewer.email)
@@ -1875,7 +1895,7 @@ class RealtimeSessionTests(APITestCase):
             linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
             meeting_capacity=300,
-            max_audience=50000,
+            max_audience=600,
         )
 
         self.login(self.viewer.email)
@@ -1924,7 +1944,7 @@ class RealtimeSessionTests(APITestCase):
             linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
             meeting_capacity=100,
-            max_audience=50000,
+            max_audience=600,
             allow_overflow_broadcast=True,
             stream_embed_url="https://stream.example.com/embed/video",
             chat_embed_url="https://stream.example.com/embed/chat",
@@ -1969,6 +1989,66 @@ class RealtimeSessionTests(APITestCase):
         allowed = self.client.post(reverse("realtime-session-host-token", kwargs={"pk": session.id}), {}, format="json")
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(allowed.data["data"]["token"], "token-1")
+
+    @override_settings(
+        LIVEKIT_URL="ws://livekit.test",
+        LIVEKIT_API_KEY="devkey",
+        LIVEKIT_API_SECRET="secret",
+    )
+    @patch("apps.realtime.views.build_host_publisher_token")
+    def test_host_token_uses_low_broadcast_profile_in_low_mode(self, mock_build_host_token):
+        mock_build_host_token.return_value = {"identity": "host-1", "token": "token-1"}
+        config = RealtimeConfiguration.get_solo()
+        config.broadcast_quality_mode = RealtimeConfiguration.BROADCAST_QUALITY_MODE_LOW
+        config.save(update_fields=["broadcast_quality_mode", "updated_at"])
+
+        session = RealtimeSession.objects.create(
+            title="Low Broadcast Profile Session",
+            description="Low profile check",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            status=RealtimeSession.STATUS_LIVE,
+            max_audience=600,
+        )
+
+        self.login(self.host.email)
+        response = self.client.post(reverse("realtime-session-host-token", kwargs={"pk": session.id}), {}, format="json")
+        self.assertEqual(response.status_code, 200)
+        profile = response.data["data"]["broadcast_profile"]
+        self.assertEqual(profile["capture_width"], 640)
+        self.assertEqual(profile["capture_height"], 360)
+        self.assertEqual(profile["fps"], 20)
+        self.assertEqual(profile["max_video_bitrate_kbps"], 650)
+
+    @override_settings(
+        LIVEKIT_URL="ws://livekit.test",
+        LIVEKIT_API_KEY="devkey",
+        LIVEKIT_API_SECRET="secret",
+    )
+    @patch("apps.realtime.views.build_host_publisher_token")
+    def test_host_token_uses_adaptive_broadcast_profile_for_high_audience(self, mock_build_host_token):
+        mock_build_host_token.return_value = {"identity": "host-1", "token": "token-1"}
+        config = RealtimeConfiguration.get_solo()
+        config.broadcast_quality_mode = RealtimeConfiguration.BROADCAST_QUALITY_MODE_ADAPTIVE
+        config.save(update_fields=["broadcast_quality_mode", "updated_at"])
+
+        session = RealtimeSession.objects.create(
+            title="Adaptive Broadcast Profile Session",
+            description="Adaptive profile check",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            status=RealtimeSession.STATUS_LIVE,
+            max_audience=600,
+        )
+
+        self.login(self.host.email)
+        response = self.client.post(reverse("realtime-session-host-token", kwargs={"pk": session.id}), {}, format="json")
+        self.assertEqual(response.status_code, 200)
+        profile = response.data["data"]["broadcast_profile"]
+        self.assertEqual(profile["capture_width"], 854)
+        self.assertEqual(profile["capture_height"], 480)
+        self.assertEqual(profile["fps"], 20)
+        self.assertEqual(profile["max_video_bitrate_kbps"], 1100)
 
     @override_settings(
         OWNCAST_RTMP_TARGET="rtmp://localhost:1935/live/stream-key",
@@ -2405,7 +2485,7 @@ class RealtimeSessionTests(APITestCase):
             linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
             meeting_capacity=300,
-            max_audience=50000,
+            max_audience=600,
         )
 
         self.login(self.viewer.email)
@@ -2490,7 +2570,7 @@ class RealtimeSessionTests(APITestCase):
             linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
             meeting_capacity=300,
-            max_audience=50000,
+            max_audience=600,
         )
 
         self.login(self.host.email)
@@ -2560,7 +2640,7 @@ class RealtimeSessionTests(APITestCase):
             linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
             meeting_capacity=300,
-            max_audience=50000,
+            max_audience=600,
         )
 
         self.login(self.host.email)
@@ -2631,4 +2711,5 @@ class RealtimeSessionTests(APITestCase):
             response.data["data"][0]["join_url"],
             f"http://203.0.113.20:5173/join-live?session={session.id}",
         )
+
 

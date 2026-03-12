@@ -1,0 +1,24 @@
+services:
+  backend-2:
+    cpus: "${BACKEND_POOL_CPUS:-1.5}"
+    mem_limit: "${BACKEND_POOL_MEM_LIMIT:-2g}"
+    mem_reservation: "${BACKEND_POOL_MEM_RESERVATION:-1g}"
+    pids_limit: 512
+
+  backend-3:
+    cpus: "${BACKEND_POOL_CPUS:-1.5}"
+    mem_limit: "${BACKEND_POOL_MEM_LIMIT:-2g}"
+    mem_reservation: "${BACKEND_POOL_MEM_RESERVATION:-1g}"
+    pids_limit: 512
+
+  backend-4:
+    cpus: "${BACKEND_POOL_CPUS:-1.5}"
+    mem_limit: "${BACKEND_POOL_MEM_LIMIT:-2g}"
+    mem_reservation: "${BACKEND_POOL_MEM_RESERVATION:-1g}"
+    pids_limit: 512
+
+  gateway:
+    cpus: "${GATEWAY_CPUS:-0.75}"
+    mem_limit: "${GATEWAY_MEM_LIMIT:-512m}"
+    mem_reservation: "${GATEWAY_MEM_RESERVATION:-256m}"
+    pids_limit: 256

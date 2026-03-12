@@ -1,0 +1,42 @@
+services:
+  backend-2:
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-alsyed_app}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in environment}@pgbouncer:5432/${POSTGRES_DB:-alsyedacademy}"
+      DATABASE_CONN_MAX_AGE: "${DATABASE_CONN_MAX_AGE:-300}"
+      RUN_MIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+
+  backend-3:
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-alsyed_app}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in environment}@pgbouncer:5432/${POSTGRES_DB:-alsyedacademy}"
+      DATABASE_CONN_MAX_AGE: "${DATABASE_CONN_MAX_AGE:-300}"
+      RUN_MIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+
+  backend-4:
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-alsyed_app}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in environment}@pgbouncer:5432/${POSTGRES_DB:-alsyedacademy}"
+      DATABASE_CONN_MAX_AGE: "${DATABASE_CONN_MAX_AGE:-300}"
+      RUN_MIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
