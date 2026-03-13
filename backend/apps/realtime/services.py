@@ -314,11 +314,11 @@ def build_obs_rtmp_target_url(*, stream_server_url, stream_key):
     return f"{server}/{key}".rstrip("/")
 
 
-def sync_owncast_stream_key(stream_key):
+def _resolve_owncast_admin_request_context():
     admin_password = str(getattr(settings, "OWNCAST_ADMIN_PASSWORD", "") or "").strip()
     admin_username = str(getattr(settings, "OWNCAST_ADMIN_USERNAME", "admin") or "admin").strip() or "admin"
     if not admin_password:
-        raise OwncastConfigError("OWNCAST_ADMIN_PASSWORD is required to rotate Owncast stream key.")
+        raise OwncastConfigError("OWNCAST_ADMIN_PASSWORD is required to manage Owncast admin settings.")
 
     base_url = str(
         getattr(settings, "OWNCAST_ADMIN_API_BASE_URL", "") or getattr(settings, "OWNCAST_BASE_URL", "")
@@ -326,60 +326,177 @@ def sync_owncast_stream_key(stream_key):
     if not base_url:
         raise OwncastConfigError("OWNCAST_ADMIN_API_BASE_URL or OWNCAST_BASE_URL is required.")
 
-    target_key = str(stream_key or "").strip()
-    if not target_key:
-        raise OwncastAdminError("Stream key cannot be empty.")
-
     auth_token = base64.b64encode(f"{admin_username}:{admin_password}".encode("utf-8")).decode("utf-8")
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Basic {auth_token}",
     }
+    return base_url, headers
+
+
+def _owncast_admin_post_json(*, base_url, endpoint_path, payload, headers, timeout=10):
+    endpoint = f"{str(base_url).rstrip('/')}/{str(endpoint_path).lstrip('/')}"
+    request = Request(
+        endpoint,
+        data=json.dumps(payload).encode("utf-8"),
+        method="POST",
+        headers=headers,
+    )
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            raw_payload = response.read().decode("utf-8") or "{}"
+        try:
+            parsed_payload = json.loads(raw_payload)
+        except json.JSONDecodeError:
+            parsed_payload = {}
+        if isinstance(parsed_payload, dict) and not bool(parsed_payload.get("success", True)):
+            raise OwncastAdminError(
+                str(
+                    parsed_payload.get("errorMessage")
+                    or parsed_payload.get("message")
+                    or "Owncast admin API returned an unsuccessful response."
+                )
+            )
+        return parsed_payload if isinstance(parsed_payload, dict) else {}
+    except HTTPError as exc:
+        response_body = ""
+        try:
+            response_body = exc.read().decode("utf-8")
+        except Exception:
+            response_body = str(exc)
+        raise OwncastAdminError(f"Owncast admin API HTTP {exc.code}: {response_body}") from exc
+    except URLError as exc:
+        raise OwncastAdminError(f"Owncast admin API network error: {exc}") from exc
+    except OwncastAdminError:
+        raise
+    except Exception as exc:
+        raise OwncastAdminError(f"Owncast admin API unknown error: {exc}") from exc
+
+
+def _is_owncast_404_error(error_message):
+    return "HTTP 404" in str(error_message or "")
+
+
+def sync_owncast_chat_settings():
+    """
+    Ensure broadcast chat is writable for viewers by default.
+
+    Owncast chat can be left disabled (or auth-only) from previous admin state.
+    We re-apply chat toggles from backend so broadcast UX remains consistent.
+    """
+    base_url, headers = _resolve_owncast_admin_request_context()
+
+    result = {
+        "chat_disable_synced": False,
+        "chat_require_auth_synced": False,
+        "warnings": [],
+    }
+
+    disable_payload_candidates = (
+        {"value": False},
+        {"disable": False},
+        {"disabled": False},
+    )
+    disable_error = ""
+    for payload in disable_payload_candidates:
+        try:
+            _owncast_admin_post_json(
+                base_url=base_url,
+                endpoint_path="/api/admin/config/chat/disable",
+                payload=payload,
+                headers=headers,
+            )
+            result["chat_disable_synced"] = True
+            disable_error = ""
+            break
+        except OwncastAdminError as exc:
+            disable_error = str(exc)
+            continue
+
+    if not result["chat_disable_synced"] and disable_error:
+        if _is_owncast_404_error(disable_error):
+            result["warnings"].append(
+                "Owncast chat disable endpoint unavailable (HTTP 404). Chat state was not auto-synced."
+            )
+        else:
+            raise OwncastAdminError(f"Unable to sync Owncast chat disabled setting: {disable_error}")
+
+    require_auth_payload_candidates = (
+        {"value": False},
+        {"requireauthentication": False},
+        {"required": False},
+    )
+    require_auth_error = ""
+    for payload in require_auth_payload_candidates:
+        try:
+            _owncast_admin_post_json(
+                base_url=base_url,
+                endpoint_path="/api/admin/config/chat/requireauthentication",
+                payload=payload,
+                headers=headers,
+            )
+            result["chat_require_auth_synced"] = True
+            require_auth_error = ""
+            break
+        except OwncastAdminError as exc:
+            require_auth_error = str(exc)
+            continue
+
+    if not result["chat_require_auth_synced"] and require_auth_error:
+        if _is_owncast_404_error(require_auth_error):
+            result["warnings"].append(
+                "Owncast chat auth endpoint unavailable (HTTP 404)."
+            )
+        else:
+            result["warnings"].append(
+                f"Owncast chat auth setting was not synced: {require_auth_error}"
+            )
+
+    return result
+
+
+def sync_owncast_stream_key(stream_key):
+    base_url, headers = _resolve_owncast_admin_request_context()
+
+    target_key = str(stream_key or "").strip()
+    if not target_key:
+        raise OwncastAdminError("Stream key cannot be empty.")
     # Newer Owncast releases (including v0.2.x) use /admin/config/streamkeys.
     # Keep legacy fallback for older nodes still exposing /admin/changekey.
     endpoint_candidates = (
         (
-            f"{base_url}/api/admin/config/streamkeys",
+            "/api/admin/config/streamkeys",
             {"value": [{"key": target_key, "comment": "StreamX OBS session key"}]},
         ),
         (
-            f"{base_url}/api/admin/changekey",
+            "/api/admin/changekey",
             {"key": target_key},
         ),
     )
 
     last_error = ""
     for endpoint, payload in endpoint_candidates:
-        request = Request(
-            endpoint,
-            data=json.dumps(payload).encode("utf-8"),
-            method="POST",
-            headers=headers,
-        )
         try:
-            with urlopen(request, timeout=10) as response:
-                raw_payload = response.read().decode("utf-8") or "{}"
-            parsed_payload = json.loads(raw_payload)
-            if not bool(parsed_payload.get("success", True)):
-                raise OwncastAdminError(
-                    str(parsed_payload.get("errorMessage") or parsed_payload.get("message") or "Owncast key update failed.")
-                )
-            return parsed_payload
-        except HTTPError as exc:
-            response_body = ""
+            parsed_payload = _owncast_admin_post_json(
+                base_url=base_url,
+                endpoint_path=endpoint,
+                payload=payload,
+                headers=headers,
+            )
             try:
-                response_body = exc.read().decode("utf-8")
-            except Exception:
-                response_body = str(exc)
+                chat_sync_result = sync_owncast_chat_settings()
+                warnings = chat_sync_result.get("warnings") or []
+                if warnings:
+                    logger.warning("Owncast chat sync warnings: %s", warnings)
+            except (OwncastConfigError, OwncastAdminError) as chat_exc:
+                logger.warning("Owncast chat sync skipped after key update: %s", chat_exc)
+            return parsed_payload
+        except OwncastAdminError as exc:
             # Try next endpoint on not found to support mixed Owncast versions.
-            if exc.code == 404:
-                last_error = f"{endpoint} -> HTTP 404: {response_body}"
+            if _is_owncast_404_error(exc):
+                last_error = f"{endpoint} -> {exc}"
                 continue
-            raise OwncastAdminError(f"Owncast admin API HTTP {exc.code}: {response_body}") from exc
-        except URLError as exc:
-            raise OwncastAdminError(f"Owncast admin API network error: {exc}") from exc
-        except Exception as exc:
-            raise OwncastAdminError(f"Owncast admin API unknown error: {exc}") from exc
+            raise
 
     raise OwncastAdminError(
         f"Owncast admin API returned 404 for all known stream-key endpoints. Last error: {last_error}"

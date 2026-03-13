@@ -59,6 +59,7 @@ from .services import (
     resolve_livekit_client_url,
     resolve_obs_stream_server_url,
     resolve_broadcast_urls,
+    sync_owncast_chat_settings,
     start_room_recording_egress,
     start_room_broadcast_egress,
     stop_room_recording_egress,
@@ -140,6 +141,29 @@ def _record_join_metric(*, result, mode, reason):
 
 def _record_recording_metric(*, action, result, reason):
     record_realtime_recording_operation(action=action, result=result, reason=reason)
+
+
+def _sync_owncast_chat_settings_non_blocking(*, session):
+    if str(getattr(session, "session_type", "")).strip() != RealtimeSession.TYPE_BROADCASTING:
+        return
+    if not str(getattr(settings, "OWNCAST_ADMIN_PASSWORD", "") or "").strip():
+        return
+    try:
+        result = sync_owncast_chat_settings()
+        warnings = result.get("warnings") or []
+        if warnings:
+            realtime_ops_logger.warning(
+                "Realtime broadcast chat sync warnings. session_id=%s warnings=%s",
+                getattr(session, "id", None),
+                warnings,
+            )
+    except (OwncastConfigError, OwncastAdminError) as exc:
+        realtime_ops_logger.warning(
+            "Realtime broadcast chat sync skipped. session_id=%s error=%s",
+            getattr(session, "id", None),
+            str(exc),
+        )
+
 
 def _rotate_obs_stream_key_if_enabled(*, session, force=False):
     if (
@@ -266,6 +290,7 @@ class RealtimeSessionListCreateView(APIView):
         payload = session_payload_for_create(serializer.validated_data)
 
         session = RealtimeSession.objects.create(host=request.user, **payload)
+        _sync_owncast_chat_settings_non_blocking(session=session)
         if (
             session.session_type == RealtimeSession.TYPE_BROADCASTING
             and session.stream_service == RealtimeSession.STREAM_SERVICE_OBS
@@ -816,6 +841,7 @@ class RealtimeSessionStreamStartView(APIView):
             session.mark_stream_live("")
             session.livekit_egress_error = ""
             session.save(update_fields=["livekit_egress_error", "updated_at"])
+            _sync_owncast_chat_settings_non_blocking(session=session)
             data = RealtimeSessionListSerializer(session, context={"request": request}).data
             return api_response(success=True, message="OBS stream prepared. Start streaming from OBS now.", data=data)
 
@@ -831,6 +857,7 @@ class RealtimeSessionStreamStartView(APIView):
                 participant_identity=participant_identity,
             )
             session.mark_stream_live(egress_id)
+            _sync_owncast_chat_settings_non_blocking(session=session)
         except (LiveKitConfigError, LiveKitEgressError) as exc:
             session.mark_stream_failed(str(exc))
             return api_response(
