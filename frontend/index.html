@@ -327,6 +327,13 @@
       (function () {
         var loader = document.getElementById("boot-loader");
         if (!loader) return;
+        var forceBootTimeout = window.setTimeout(function () {
+          document.body.classList.add("app-ready");
+          document.body.classList.remove("preload-active");
+          if (loader.isConnected) {
+            loader.remove();
+          }
+        }, 10000);
         var markReady = function () {
           loader.classList.add("logo-ready");
         };
@@ -535,6 +542,7 @@
 
         function stopAnimation() {
           active = false;
+          window.clearTimeout(forceBootTimeout);
           if (rafId) {
             window.cancelAnimationFrame(rafId);
           }
