@@ -4,6 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="google" content="notranslate" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+    />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/jpeg" href="/logo.jpeg" />
     <link rel="shortcut icon" href="/favicon.svg" />
@@ -351,7 +362,7 @@
 
         var canvas = document.getElementById("loader-grid-canvas");
         if (!canvas) return;
-        var ctx = canvas.getContext("2d", { alpha: true });
+        var ctx = canvas.getContext("2d", { alpha: true, desynchronized: true });
         if (!ctx) return;
 
         var dpr = 1;
@@ -360,11 +371,16 @@
         var cell = 32;
         var rafId = 0;
         var active = true;
-          var glyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-          var matrixGlyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        var glyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        var matrixGlyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         var matrixColumns = [];
         var matrixSpacing = 20;
         var matrixCharSize = 12;
+        var gridTextSize = 10;
+        var matrixFont = "12px Consolas, 'Courier New', monospace";
+        var glowAGradient = null;
+        var glowBGradient = null;
+        var pausedForHiddenTab = false;
         var prefersReducedMotion =
           window.matchMedia &&
           window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -398,13 +414,40 @@
           }
         }
 
+        function updateStaticPaintState() {
+          glowAGradient = ctx.createRadialGradient(
+            width * 0.18,
+            height * 0.12,
+            0,
+            width * 0.18,
+            height * 0.12,
+            width * 0.6
+          );
+          glowAGradient.addColorStop(0, "rgba(255, 255, 255, 0.12)");
+          glowAGradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+
+          glowBGradient = ctx.createRadialGradient(
+            width * 0.82,
+            height * 0.86,
+            0,
+            width * 0.82,
+            height * 0.86,
+            width * 0.54
+          );
+          glowBGradient.addColorStop(0, "rgba(220, 220, 220, 0.1)");
+          glowBGradient.addColorStop(1, "rgba(220, 220, 220, 0)");
+
+          gridTextSize = Math.max(9, Math.floor(cell * 0.34));
+          matrixFont = matrixCharSize + "px Consolas, 'Courier New', monospace";
+        }
+
         function drawMatrixRain(t) {
           if (!matrixColumns.length) {
             return;
           }
 
           var rowStep = Math.max(12, Math.floor(matrixCharSize * 1.24));
-          ctx.font = matrixCharSize + "px Consolas, 'Courier New', monospace";
+          ctx.font = matrixFont;
           ctx.textBaseline = "middle";
 
           for (var cIndex = 0; cIndex < matrixColumns.length; cIndex += 1) {
@@ -445,30 +488,10 @@
           ctx.fillStyle = "rgba(4, 4, 4, 0.24)";
           ctx.fillRect(0, 0, width, height);
 
-          var glowA = ctx.createRadialGradient(
-            width * 0.18,
-            height * 0.12,
-            0,
-            width * 0.18,
-            height * 0.12,
-            width * 0.6
-          );
-          glowA.addColorStop(0, "rgba(255, 255, 255, 0.12)");
-          glowA.addColorStop(1, "rgba(255, 255, 255, 0)");
-          ctx.fillStyle = glowA;
+          ctx.fillStyle = glowAGradient;
           ctx.fillRect(0, 0, width, height);
 
-          var glowB = ctx.createRadialGradient(
-            width * 0.82,
-            height * 0.86,
-            0,
-            width * 0.82,
-            height * 0.86,
-            width * 0.54
-          );
-          glowB.addColorStop(0, "rgba(220, 220, 220, 0.1)");
-          glowB.addColorStop(1, "rgba(220, 220, 220, 0)");
-          ctx.fillStyle = glowB;
+          ctx.fillStyle = glowBGradient;
           ctx.fillRect(0, 0, width, height);
 
           var sampleStep = Math.max(8, Math.floor(cell * 0.34));
@@ -513,7 +536,7 @@
             ctx.stroke();
           }
 
-          ctx.font = Math.max(9, Math.floor(cell * 0.34)) + "px Consolas, 'Courier New', monospace";
+          ctx.font = gridTextSize + "px Consolas, 'Courier New', monospace";
           ctx.textBaseline = "middle";
 
           for (var glyphY = -cell; glyphY <= maxY; glyphY += cell * 2) {
@@ -547,6 +570,7 @@
             window.cancelAnimationFrame(rafId);
           }
           window.removeEventListener("resize", resize);
+          document.removeEventListener("visibilitychange", handleVisibilityChange);
         }
 
         function drawFrame(timestamp) {
@@ -564,6 +588,26 @@
           rafId = window.requestAnimationFrame(drawFrame);
         }
 
+        function handleVisibilityChange() {
+          if (!active) return;
+          if (document.visibilityState === "hidden") {
+            pausedForHiddenTab = true;
+            if (rafId) {
+              window.cancelAnimationFrame(rafId);
+              rafId = 0;
+            }
+            return;
+          }
+          if (
+            pausedForHiddenTab &&
+            !prefersReducedMotion &&
+            !document.body.classList.contains("app-ready")
+          ) {
+            pausedForHiddenTab = false;
+            rafId = window.requestAnimationFrame(drawFrame);
+          }
+        }
+
         function resize() {
           dpr = Math.min(window.devicePixelRatio || 1, 2);
           width = Math.max(window.innerWidth, 1);
@@ -573,6 +617,7 @@
           canvas.height = Math.floor(height * dpr);
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           createMatrixColumns();
+          updateStaticPaintState();
           drawGrid(0);
         }
 
@@ -584,6 +629,7 @@
         }
 
         window.addEventListener("resize", resize);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
       })();
     </script>
     <script type="module" src="/src/main.jsx"></script>

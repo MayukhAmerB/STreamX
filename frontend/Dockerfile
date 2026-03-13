@@ -19,6 +19,7 @@ ENV VITE_RAZORPAY_KEY_ID=${VITE_RAZORPAY_KEY_ID}
 ENV VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
 
 RUN npm run build
+RUN find dist -type f \( -name "*.js" -o -name "*.css" -o -name "*.html" -o -name "*.svg" -o -name "*.json" \) -exec gzip -kf9 {} \;
 
 FROM nginx:1.27-alpine AS runtime
 

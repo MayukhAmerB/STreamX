@@ -1,14 +1,17 @@
-const storyIllustration =
-  "https://i.pinimg.com/736x/7e/ef/46/7eef463e943f15d31e296ad596b00080.jpg";
+import storyIllustration from "../assets/story-mission.jpg";
 
 const journeyBlocks = [
   {
     title: "Our Story",
-    body: "Al syed Initiative was built by people who genuinely love cybersecurity. We focus on structured training in OSINT, reconnaissance, and web application penetration testing because we believe deep curiosity and disciplined practice are what make this field meaningful.",
+    body: `Al Syed Initiative is a cybersecurity education and awareness project under the ADL Front (Advanced Digital Lawforce Front), founded by cyber activist Al Syed. It was created to carry forward his work and mindset by building a generation capable of critical thinking, responsible investigation, and confidence in the digital world.
+
+The initiative is built on the belief that knowledge, discipline, and digital awareness are the strongest tools of the modern information age, and that if one voice is silenced, thousands more should be ready to rise. Through training in OSINT, reconnaissance, and web application security, it develops individuals with ethical responsibility, discipline, and investigative thinking.`,
   },
   {
     title: "Our Mission",
-    body: "Our mission is to nurture passion for cybersecurity through clear structure, ethical testing habits, and evidence-driven thinking. We want every learner to enjoy the process of discovery, analysis, and responsible security practice.",
+    body: `Our mission is to empower individuals to stand against injustice and manipulation in the digital world through digital literacy, ethical hacking, and investigative thinking.
+
+By teaching practical skills in ethical hacking, OSINT research, and security analysis, we aim to build people who think independently, act responsibly, and challenge digital oppression and misinformation, creating a generation that is aware, capable, and courageous in the digital age.`,
   },
 ];
 
@@ -34,7 +37,7 @@ export default function StoryJourneySection({ className = "" }) {
                 <h3 className="font-reference text-4xl font-semibold uppercase leading-tight text-white sm:text-[2.6rem]">
                   {block.title}
                 </h3>
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-[#C8C8C8] sm:text-base">
+                <p className="mt-3 max-w-3xl whitespace-pre-line text-sm leading-7 text-[#C8C8C8] sm:text-base">
                   {block.body}
                 </p>
               </div>
@@ -45,11 +48,18 @@ export default function StoryJourneySection({ className = "" }) {
         <div className="relative min-h-[340px] overflow-hidden border-t border-[#1F1F1F] lg:min-h-full lg:border-l lg:border-t-0">
           <img
             src={storyIllustration}
-            alt="Knowledge is power illustration"
-            className="absolute inset-0 h-full w-full object-cover object-center"
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full scale-110 object-cover opacity-70 blur-[18px]"
             loading="lazy"
           />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.05)_0%,rgba(0,0,0,0.45)_100%)]" />
+          <div className="absolute inset-0 bg-black/28" />
+          <img
+            src={storyIllustration}
+            alt="Knowledge is power illustration"
+            className="absolute left-1/2 top-1/2 h-auto max-h-[82%] w-auto max-w-[82%] -translate-x-1/2 -translate-y-1/2 object-contain"
+            loading="lazy"
+          />
         </div>
       </div>
     </section>
