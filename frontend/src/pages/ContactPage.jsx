@@ -44,7 +44,7 @@ const contactLinks = [
 function ContactChannelIcon({ name }) {
   if (name === "Instagram") {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4.5 w-4.5">
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0">
         <rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" strokeWidth="1.8" />
         <circle cx="12" cy="12" r="3.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
         <circle cx="17" cy="7" r="1.2" fill="currentColor" />
@@ -53,21 +53,21 @@ function ContactChannelIcon({ name }) {
   }
   if (name === "X") {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4.5 w-4.5">
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0">
         <path d="M6 5l12 14M17.6 5L6.4 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
       </svg>
     );
   }
   if (name.startsWith("WhatsApp")) {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4.5 w-4.5">
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0">
         <path d="M12 4.5a7.5 7.5 0 0 0-6.6 11.1L4.7 19l3.5-.6A7.5 7.5 0 1 0 12 4.5Z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
         <path d="M9.7 9.2c-.2-.5-.5-.4-.7-.4h-.3c-.2 0-.5.1-.7.4-.2.3-.8.8-.8 2s.8 2.4.9 2.6c.1.2 1.5 2.4 3.7 3.2 1.8.7 2.2.6 2.5.5.4-.1 1.1-.5 1.2-1 .1-.4.1-.8.1-.9-.1-.1-.3-.2-.7-.4s-1.1-.5-1.3-.6c-.2-.1-.4-.1-.5.1-.2.2-.6.6-.7.8-.1.2-.3.2-.5.1-.2-.1-.9-.3-1.6-1-.6-.6-1-1.3-1.2-1.6-.1-.2 0-.3.1-.4l.3-.4.2-.3c.1-.1.1-.3 0-.4l-.7-1.7Z" fill="currentColor" />
       </svg>
     );
   }
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4.5 w-4.5">
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0">
       <path d="M4 7h16v10H4z" fill="none" stroke="currentColor" strokeWidth="1.8" />
       <path d="M4.8 7.8l7.2 5.6 7.2-5.6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>

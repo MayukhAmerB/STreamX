@@ -7,6 +7,8 @@ export default function GlobalPageBackground() {
   const [enableBeams, setEnableBeams] = useState(false);
   const [beamQuality, setBeamQuality] = useState("low");
   const [showSideBeams, setShowSideBeams] = useState(false);
+  const fallbackBeamBackground =
+    "h-full w-full bg-[radial-gradient(80%_80%_at_70%_20%,rgba(255,255,255,0.14)_0%,rgba(255,255,255,0.04)_35%,rgba(0,0,0,0)_70%)]";
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof navigator === "undefined") return undefined;
@@ -17,21 +19,25 @@ export default function GlobalPageBackground() {
     const cores = navigator.hardwareConcurrency || 4;
     const memory = navigator.deviceMemory || 4;
     const viewportWidth = window.innerWidth || 1024;
-    const lowPowerDevice =
-      saveData || reducedMotion || viewportWidth < 1024 || (cores <= 4 && memory <= 4);
+    const forceStaticBackground = saveData || reducedMotion;
 
-    if (lowPowerDevice) {
+    if (forceStaticBackground) {
       setEnableBeams(false);
       setBeamQuality("low");
       setShowSideBeams(false);
       return undefined;
     }
 
+    // Keep beams enabled by default and tune quality instead of hard-disabling on narrower devices.
+    setEnableBeams(true);
     if (cores >= 8 && memory >= 8 && viewportWidth >= 1400) {
       setBeamQuality("high");
       setShowSideBeams(true);
-    } else {
+    } else if (cores >= 6 && memory >= 6 && viewportWidth >= 1024) {
       setBeamQuality("medium");
+      setShowSideBeams(false);
+    } else {
+      setBeamQuality("low");
       setShowSideBeams(false);
     }
 
@@ -65,7 +71,7 @@ export default function GlobalPageBackground() {
       <div className="absolute inset-0 bg-black" />
       <div className="absolute inset-0 opacity-[0.5]">
         {enableBeams ? (
-          <Suspense fallback={null}>
+          <Suspense fallback={<div className={fallbackBeamBackground} />}>
             <Beams
               beamWidth={3}
               beamHeight={30}
@@ -79,7 +85,7 @@ export default function GlobalPageBackground() {
             />
           </Suspense>
         ) : (
-          <div className="h-full w-full bg-[radial-gradient(80%_80%_at_70%_20%,rgba(255,255,255,0.14)_0%,rgba(255,255,255,0.04)_35%,rgba(0,0,0,0)_70%)]" />
+          <div className={fallbackBeamBackground} />
         )}
       </div>
       {enableBeams && showSideBeams ? (
