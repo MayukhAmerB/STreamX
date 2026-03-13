@@ -37,3 +37,84 @@ groups:
         annotations:
           summary: "Recording failures are spiking"
           description: "More than 5 recording start/stop failures observed over 10 minutes."
+
+      - alert: StreamXNodeExporterDown
+        expr: up{job="node_exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node exporter is down"
+          description: "Prometheus cannot scrape host metrics from node-exporter for 2 minutes."
+
+      - alert: StreamXHostCpuHigh
+        expr: (100 - (avg by (instance) (rate(node_cpu_seconds_total{job="node_exporter",mode="idle"}[5m])) * 100)) > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host CPU usage is high"
+          description: "Host CPU usage has been above 85% for 10 minutes."
+
+      - alert: StreamXHostMemoryHigh
+        expr: ((1 - (node_memory_MemAvailable_bytes{job="node_exporter"} / node_memory_MemTotal_bytes{job="node_exporter"})) * 100) > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host memory usage is high"
+          description: "Host memory usage has been above 90% for 10 minutes."
+
+      - alert: StreamXRootDiskLow
+        expr: (node_filesystem_avail_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay"}) * 100 < 10
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Root disk free space is low"
+          description: "Root filesystem free space has been below 10% for 15 minutes."
+
+      - alert: StreamXRedisExporterDown
+        expr: up{job="redis_exporter"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis exporter is down"
+          description: "Prometheus cannot scrape redis-exporter for 2 minutes."
+
+      - alert: StreamXRedisDown
+        expr: redis_up{job="redis_exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "redis_exporter reports redis_up=0 for 2 minutes."
+
+      - alert: StreamXPostgresExporterDown
+        expr: up{job="postgres_exporter"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Postgres exporter is down"
+          description: "Prometheus cannot scrape postgres-exporter for 2 minutes."
+
+      - alert: StreamXPostgresDown
+        expr: pg_up{job="postgres_exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "postgres_exporter reports pg_up=0 for 2 minutes."
+
+      - alert: StreamXAsyncDeadJobsDetected
+        expr: sum(increase(streamx_async_jobs_total{result="dead"}[10m])) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Async jobs moved to dead state"
+          description: "At least one async job was marked dead in the last 10 minutes."

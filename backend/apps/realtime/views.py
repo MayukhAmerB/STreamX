@@ -18,6 +18,7 @@ from rest_framework.views import APIView
 from config.audit import log_security_event
 from config.authentication import CookieJWTAuthentication
 from config.metrics import record_realtime_join, record_realtime_recording_operation
+from config.pagination import apply_optional_pagination
 from config.request_security import find_disallowed_query_params
 from config.response import api_response
 
@@ -75,15 +76,30 @@ def _can_manage_session(user, session):
     return bool(getattr(session, "is_moderator_allowed", None) and session.is_moderator_allowed(user))
 
 
-def _build_session_list_cache_key(*, user_id, is_admin, session_type, status_filter):
+def _build_session_list_cache_key(
+    *,
+    user_id,
+    is_admin,
+    session_type,
+    status_filter,
+    paginate,
+    page,
+    page_size,
+):
     normalized_session_type = session_type or "-"
     normalized_status = status_filter or "-"
+    normalized_paginate = 1 if paginate else 0
+    normalized_page = int(page or 1)
+    normalized_page_size = int(page_size or 20)
     return (
         "realtime-session-list:"
         f"user={user_id}:"
         f"admin={1 if is_admin else 0}:"
         f"session_type={normalized_session_type}:"
-        f"status={normalized_status}"
+        f"status={normalized_status}:"
+        f"paginate={normalized_paginate}:"
+        f"page={normalized_page}:"
+        f"page_size={normalized_page_size}"
     )
 
 
@@ -201,7 +217,7 @@ class RealtimeSessionListCreateView(APIView):
     def get(self, request):
         disallowed_query_params = find_disallowed_query_params(
             request,
-            {"session_type", "status"},
+            {"session_type", "status", "paginate", "page", "page_size"},
         )
         if disallowed_query_params:
             log_security_event(
@@ -219,6 +235,13 @@ class RealtimeSessionListCreateView(APIView):
 
         session_type = (request.query_params.get("session_type") or "").strip().lower()
         status_filter = (request.query_params.get("status") or "").strip().lower()
+        paginate_requested = str(request.query_params.get("paginate", "")).strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        page = request.query_params.get("page", "1")
+        page_size = request.query_params.get("page_size", "20")
         is_admin = bool(getattr(request.user, "is_staff", False) or getattr(request.user, "is_superuser", False))
         cache_ttl = max(0, int(getattr(settings, "REALTIME_SESSION_LIST_CACHE_TTL_SECONDS", 5)))
         cache_key = _build_session_list_cache_key(
@@ -226,6 +249,9 @@ class RealtimeSessionListCreateView(APIView):
             is_admin=is_admin,
             session_type=session_type,
             status_filter=status_filter,
+            paginate=paginate_requested,
+            page=page,
+            page_size=page_size,
         )
 
         if cache_ttl > 0:
@@ -238,9 +264,18 @@ class RealtimeSessionListCreateView(APIView):
             status_filter=status_filter,
             user=request.user,
         )
-
-        serializer = RealtimeSessionListSerializer(queryset, many=True, context={"request": request})
-        payload = serializer.data
+        paged_queryset, page_meta = apply_optional_pagination(
+            request,
+            queryset,
+            default_page_size=20,
+            max_page_size=100,
+        )
+        serializer = RealtimeSessionListSerializer(paged_queryset, many=True, context={"request": request})
+        payload = (
+            {"results": serializer.data, "pagination": page_meta}
+            if page_meta is not None
+            else serializer.data
+        )
         if cache_ttl > 0:
             cache.set(cache_key, payload, timeout=cache_ttl)
         return api_response(success=True, message="Realtime sessions fetched.", data=payload)

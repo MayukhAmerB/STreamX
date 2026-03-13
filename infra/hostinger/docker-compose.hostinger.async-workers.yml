@@ -10,13 +10,9 @@ services:
       RUN_COLLECTSTATIC: "0"
     command:
       [
-        "python",
-        "manage.py",
-        "process_async_jobs",
-        "--batch-size",
-        "25",
-        "--poll-seconds",
-        "10",
+        "sh",
+        "-c",
+        "python manage.py process_async_jobs --batch-size ${ASYNC_JOBS_BATCH_SIZE:-25} --poll-seconds ${ASYNC_JOBS_WORKER_POLL_SECONDS:-10}",
       ]
     depends_on:
       postgres:

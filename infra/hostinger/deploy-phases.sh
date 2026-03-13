@@ -32,6 +32,17 @@ set_env_value() {
   fi
 }
 
+get_env_value() {
+  local key="$1"
+  grep "^${key}=" "$ENV_FILE" | tail -n1 | cut -d= -f2- || true
+}
+
+is_truthy() {
+  local value
+  value="$(echo "${1:-}" | tr '[:upper:]' '[:lower:]' | xargs)"
+  [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
+}
+
 apply_phase_runtime_profile() {
   local web_concurrency
   local gunicorn_threads
@@ -61,14 +72,60 @@ compose_main() {
 }
 
 compose_observability() {
-  docker compose -f "$OBS_COMPOSE" "$@"
+  docker compose --env-file "$ENV_FILE" -f "$OBS_COMPOSE" "$@"
 }
 
+ensure_redis_url() {
+  local redis_url_value
+  redis_url_value="$(grep '^REDIS_URL=' "$ENV_FILE" | tail -n1 | cut -d= -f2- || true)"
+  if [[ -z "${redis_url_value// }" ]]; then
+    set_env_value "REDIS_URL" "redis://redis:6379/1"
+    log "REDIS_URL was empty. Defaulted to redis://redis:6379/1 for shared cache/throttling reliability."
+  fi
+}
+
+ensure_redis_url
 apply_phase_runtime_profile
+
+resolve_async_worker_replicas() {
+  local replicas_raw
+  replicas_raw="${ASYNC_WORKER_REPLICAS:-}"
+  if [[ -z "${replicas_raw// }" ]]; then
+    replicas_raw="$(get_env_value "ASYNC_WORKER_REPLICAS")"
+  fi
+  replicas_raw="$(echo "${replicas_raw:-1}" | xargs)"
+  if [[ ! "$replicas_raw" =~ ^[0-9]+$ ]]; then
+    replicas_raw="1"
+  fi
+  if (( replicas_raw < 1 )); then
+    replicas_raw="1"
+  fi
+  echo "$replicas_raw"
+}
+
+scale_async_workers() {
+  local enabled_value
+  enabled_value="$(get_env_value "ASYNC_JOBS_ENABLED")"
+  if ! is_truthy "$enabled_value"; then
+    log "ASYNC_JOBS_ENABLED is not truthy; worker scaling skipped."
+    return
+  fi
+
+  local replicas
+  replicas="$(resolve_async_worker_replicas)"
+  if (( replicas <= 1 )); then
+    log "Async worker replicas: 1 (default)."
+    return
+  fi
+
+  compose_main "$@" up -d --no-recreate --scale "worker=${replicas}" worker
+  log "Async worker replicas scaled to ${replicas}."
+}
 
 phase1() {
   log "Phase 1: stable baseline (app + async worker + observability)."
   compose_main -f "$BASE_COMPOSE" -f "$ASYNC_COMPOSE" up -d --build --remove-orphans
+  scale_async_workers -f "$BASE_COMPOSE" -f "$ASYNC_COMPOSE"
   compose_main -f "$BASE_COMPOSE" exec -T backend python manage.py migrate
   compose_observability up -d --remove-orphans
 }
@@ -76,6 +133,7 @@ phase1() {
 phase2() {
   log "Phase 2: baseline + resource isolation limits."
   compose_main -f "$BASE_COMPOSE" -f "$LIMITS_COMPOSE" -f "$ASYNC_COMPOSE" up -d --build --remove-orphans
+  scale_async_workers -f "$BASE_COMPOSE" -f "$LIMITS_COMPOSE" -f "$ASYNC_COMPOSE"
   compose_main -f "$BASE_COMPOSE" exec -T backend python manage.py migrate
   compose_observability up -d --remove-orphans
 }
@@ -90,6 +148,13 @@ phase3() {
     -f "$POOL_COMPOSE" \
     -f "$GATEWAY_COMPOSE" \
     up -d --build --remove-orphans
+  scale_async_workers \
+    -f "$BASE_COMPOSE" \
+    -f "$LIMITS_COMPOSE" \
+    -f "$LIMITS_POOL_COMPOSE" \
+    -f "$ASYNC_COMPOSE" \
+    -f "$POOL_COMPOSE" \
+    -f "$GATEWAY_COMPOSE"
   compose_main -f "$BASE_COMPOSE" exec -T backend python manage.py migrate
   compose_observability up -d --remove-orphans
   log "If you want host-nginx to use gateway LB, proxy to 127.0.0.1:8088."
@@ -105,6 +170,13 @@ phase4() {
     -f "$PGBOUNCER_COMPOSE" \
     -f "$POSTGRES_TUNING_COMPOSE" \
     up -d --build --remove-orphans
+  scale_async_workers \
+    -f "$BASE_COMPOSE" \
+    -f "$LIMITS_COMPOSE" \
+    -f "$LIMITS_PGBOUNCER_COMPOSE" \
+    -f "$ASYNC_COMPOSE" \
+    -f "$PGBOUNCER_COMPOSE" \
+    -f "$POSTGRES_TUNING_COMPOSE"
   compose_main -f "$BASE_COMPOSE" exec -T backend python manage.py migrate
   compose_observability up -d --remove-orphans
 }
@@ -123,6 +195,17 @@ phase5() {
     -f "$PGBOUNCER_POOL_COMPOSE" \
     -f "$POSTGRES_TUNING_COMPOSE" \
     up -d --build --remove-orphans
+  scale_async_workers \
+    -f "$BASE_COMPOSE" \
+    -f "$LIMITS_COMPOSE" \
+    -f "$LIMITS_POOL_COMPOSE" \
+    -f "$LIMITS_PGBOUNCER_COMPOSE" \
+    -f "$ASYNC_COMPOSE" \
+    -f "$POOL_COMPOSE" \
+    -f "$GATEWAY_COMPOSE" \
+    -f "$PGBOUNCER_COMPOSE" \
+    -f "$PGBOUNCER_POOL_COMPOSE" \
+    -f "$POSTGRES_TUNING_COMPOSE"
   compose_main -f "$BASE_COMPOSE" exec -T backend python manage.py migrate
   compose_observability up -d --remove-orphans
   log "If you want host-nginx to use gateway LB, proxy to 127.0.0.1:8088."
