@@ -7,7 +7,7 @@ import { featuredCourse } from "../utils/featuredCourse";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
 
 const pageBackgroundImage =
-  "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
+  "https://i.pinimg.com/736x/8d/ad/8a/8dad8ae3fa8915b93754dfffdd421b62.jpg";
 
 export default function CourseListPage() {
   const [courses, setCourses] = useState([]);
@@ -63,7 +63,11 @@ export default function CourseListPage() {
   }, [courses]);
 
   return (
-    <PageShell title="Course Catalog" subtitle="Browse OSINT and web application pentesting tracks.">
+    <PageShell
+      title="Course Catalog"
+      subtitle="Browse OSINT and web application pentesting tracks."
+      decryptTitle
+    >
       <section className="relative mb-6 overflow-hidden rounded-[30px] border border-black bg-[#080808] shadow-[0_26px_70px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">
           <img
@@ -93,26 +97,26 @@ export default function CourseListPage() {
 
               <div className="mt-5 grid gap-3 sm:auto-rows-fr sm:grid-cols-2 xl:grid-cols-4">
                 <div className="h-full rounded-2xl border border-black bg-[linear-gradient(135deg,#FFFFFF_0%,#F4F4F4_58%,#E1E1E1_100%)] p-3">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-[#444444]">Live Tracks</div>
-                  <div className="mt-1 text-xl font-semibold text-[#111111]">{summary.live}</div>
-                  <div className="mt-1 text-xs text-[#2E2E2E]">Ready for enrollment</div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#444444]">Live Tracks</div>
+                  <div className="mt-1 text-xl font-extrabold text-[#111111]">{summary.live}</div>
+                  <div className="mt-1 text-xs font-semibold text-[#2E2E2E]">Ready for enrollment</div>
                 </div>
                 <div className="h-full rounded-2xl border border-black bg-[linear-gradient(135deg,#FFFFFF_0%,#F4F4F4_58%,#E1E1E1_100%)] p-3">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-[#444444]">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#444444]">
                     Coming Soon
                   </div>
-                  <div className="mt-1 text-xl font-semibold text-[#111111]">{summary.comingSoon}</div>
-                  <div className="mt-1 text-xs text-[#2E2E2E]">Upcoming releases</div>
+                  <div className="mt-1 text-xl font-extrabold text-[#111111]">{summary.comingSoon}</div>
+                  <div className="mt-1 text-xs font-semibold text-[#2E2E2E]">Upcoming releases</div>
                 </div>
                 <div className="h-full rounded-2xl border border-black bg-[linear-gradient(135deg,#FFFFFF_0%,#F4F4F4_58%,#E1E1E1_100%)] p-3">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-[#444444]">OSINT</div>
-                  <div className="mt-1 text-xl font-semibold text-[#111111]">{summary.osint}</div>
-                  <div className="mt-1 text-xs text-[#2E2E2E]">Investigation tracks</div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#444444]">OSINT</div>
+                  <div className="mt-1 text-xl font-extrabold text-[#111111]">{summary.osint}</div>
+                  <div className="mt-1 text-xs font-semibold text-[#2E2E2E]">Investigation tracks</div>
                 </div>
                 <div className="h-full rounded-2xl border border-black bg-[linear-gradient(135deg,#FFFFFF_0%,#F4F4F4_58%,#E1E1E1_100%)] p-3">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-[#444444]">Web Pentesting</div>
-                  <div className="mt-1 text-xl font-semibold text-[#111111]">{summary.web}</div>
-                  <div className="mt-1 text-xs text-[#2E2E2E]">Application security</div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#444444]">Web Pentesting</div>
+                  <div className="mt-1 text-xl font-extrabold text-[#111111]">{summary.web}</div>
+                  <div className="mt-1 text-xs font-semibold text-[#2E2E2E]">Application security</div>
                 </div>
               </div>
             </div>

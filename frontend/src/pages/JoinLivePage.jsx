@@ -164,6 +164,7 @@ export default function JoinLivePage() {
       title="Join Live"
       subtitle="Access all active meetings and broadcasts from one premium live operations screen."
       badge="LIVE ACCESS"
+      decryptTitle
     >
       <section className="relative mb-6 overflow-hidden rounded-[30px] border border-black bg-[#080808] shadow-[0_26px_70px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">

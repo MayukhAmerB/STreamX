@@ -7,6 +7,7 @@
 :root {
   color-scheme: light;
   --site-zoom: 0.9;
+  --heading-scale: 1.44;
 }
 
 html {
@@ -58,7 +59,8 @@ h4,
 h5,
 h6 {
   font-family: "Inter", "Segoe UI", Arial, system-ui, sans-serif;
-  font-weight: 800;
+  font-weight: 900;
+  font-size: calc(1em * var(--heading-scale));
   text-transform: uppercase;
 }
 
@@ -189,6 +191,25 @@ h6 {
   81% {
     opacity: 0.4;
   }
+}
+
+.hero-glitch-ribbon {
+  pointer-events: none;
+  border: 1px solid rgba(150,150,150,0.36);
+  background: rgba(0,0,0,0.56);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 10px 22px rgba(0,0,0,0.3);
+}
+
+.hero-glitch-ribbon-line {
+  margin: 0;
+  white-space: nowrap;
+  font-family: "Courier New", "Consolas", monospace;
+  font-size: clamp(9px, 0.76vw, 11px);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.34);
+  animation: heroGlitchSlideA 16s linear infinite;
 }
 
 @keyframes riseIn {
@@ -329,6 +350,13 @@ h6 {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .hero-glitch-line-a,
+  .hero-glitch-line-b,
+  .hero-glitch-line-c,
+  .hero-glitch-ribbon-line {
+    animation: none !important;
+  }
+
   .reveal-up,
   .floating-soft {
     animation: none !important;
@@ -344,5 +372,11 @@ h6 {
 
   .glossy:hover::after {
     animation: none;
+  }
+}
+
+@media (max-width: 1024px) {
+  .hero-glitch-overlay {
+    display: none;
   }
 }

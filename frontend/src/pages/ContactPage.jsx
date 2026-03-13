@@ -11,26 +11,32 @@ const pageBackgroundImage =
 const contactLinks = [
   {
     name: "Instagram",
-    href: "https://instagram.com/alsyedinitiative",
-    handle: "@alsyedinitiative",
+    href: "https://www.instagram.com/adl.response",
+    handle: "@adl.response",
     accent: "from-[#DBDBDB] to-[#A9A9A9]",
   },
   {
     name: "X",
-    href: "https://x.com/alsyedinitiative",
-    handle: "@alsyedinitiative",
+    href: "https://x.com/AdlFront",
+    handle: "@AdlFront",
     accent: "from-[#E0E0E0] to-[#A8A8A8]",
   },
   {
-    name: "WhatsApp",
-    href: "https://wa.me/0000000000",
-    handle: "+00 0000 000000",
+    name: "WhatsApp (Primary)",
+    href: "https://wa.me/919970875040",
+    handle: "+91 99708 75040",
     accent: "from-[#DADADA] to-[#919191]",
   },
   {
+    name: "WhatsApp (Alternate)",
+    href: "https://wa.me/919800415583",
+    handle: "+91 9800415583",
+    accent: "from-[#E1E1E1] to-[#ABABAB]",
+  },
+  {
     name: "Email",
-    href: "mailto:contact@alsyedinitiative.com",
-    handle: "contact@alsyedinitiative.com",
+    href: "mailto:alsyedinitiative@gmail.com",
+    handle: "alsyedinitiative@gmail.com",
     accent: "from-[#EAEAEA] to-[#CFCFCF]",
   },
 ];
@@ -52,7 +58,7 @@ function ContactChannelIcon({ name }) {
       </svg>
     );
   }
-  if (name === "WhatsApp") {
+  if (name.startsWith("WhatsApp")) {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4.5 w-4.5">
         <path d="M12 4.5a7.5 7.5 0 0 0-6.6 11.1L4.7 19l3.5-.6A7.5 7.5 0 1 0 12 4.5Z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
@@ -103,6 +109,7 @@ export default function ContactPage() {
     <PageShell
       title="Contact"
       subtitle="Reach us on social platforms or send a message directly from the form below."
+      decryptTitle
     >
       <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[28px] border border-black bg-[#080808] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">
@@ -125,9 +132,8 @@ export default function ContactPage() {
               Reach us directly or send a message from the contact form
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[#BBBBBB]">
-              We support contact through Instagram, X, WhatsApp, and email. The form below is wired
-              to the Django backend email endpoint and can use Django's built-in SMTP email backend
-              when configured.
+              Connect through Instagram, X, both WhatsApp numbers, or primary email. The form below
+              is wired to the Django backend contact email endpoint.
             </p>
           </div>
 
@@ -135,14 +141,13 @@ export default function ContactPage() {
             <section className="rounded-2xl border border-black panel-gradient p-6 backdrop-blur-sm">
               <h2 className="font-reference text-2xl font-semibold text-white">Connect With Us</h2>
               <p className="mt-3 text-sm leading-6 text-[#BBBBBB]">
-                Choose your preferred channel. Replace the placeholder handles with your real brand
-                links any time.
+                Choose your preferred channel and reach us instantly.
               </p>
 
               <div className="mt-5 space-y-3">
                 {contactLinks.map((item) => (
                   <a
-                    key={item.name}
+                    key={`${item.name}-${item.href}`}
                     href={item.href}
                     target={item.href.startsWith("mailto:") ? undefined : "_blank"}
                     rel={item.href.startsWith("mailto:") ? undefined : "noreferrer"}
@@ -168,8 +173,7 @@ export default function ContactPage() {
             <section className="rounded-2xl border border-black panel-gradient p-6 backdrop-blur-sm">
               <h2 className="font-reference text-2xl font-semibold text-white">Send a Message</h2>
               <p className="mt-3 text-sm leading-6 text-[#BBBBBB]">
-                This form sends email through the backend endpoint. Configure SMTP in Django to
-                deliver messages from your real mailbox.
+                This form sends email through the backend contact endpoint and SMTP configuration.
               </p>
 
               <form onSubmit={onSubmit} className="mt-5 space-y-4">
@@ -195,6 +199,8 @@ export default function ContactPage() {
                   rows={6}
                   value={form.message}
                   onChange={onChange("message")}
+                  minLength={10}
+                  hint="Minimum 10 characters."
                   className="[&_textarea]:resize-y"
                   required
                 />

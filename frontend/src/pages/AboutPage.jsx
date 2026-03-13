@@ -1,4 +1,5 @@
 import PageShell from "../components/PageShell";
+import StoryJourneySection from "../components/StoryJourneySection";
 
 const pageBackgroundImage =
   "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
@@ -26,6 +27,7 @@ export default function AboutPage() {
     <PageShell
       title="About Us"
       subtitle="Al syed Initiative helps learners build practical cybersecurity skills with structured training."
+      decryptTitle
     >
       <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[28px] border border-black bg-[#080808] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">
@@ -141,6 +143,8 @@ export default function AboutPage() {
               ))}
             </div>
           </section>
+
+          <StoryJourneySection className="mt-6" />
         </div>
       </div>
     </PageShell>

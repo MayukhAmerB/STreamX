@@ -9,7 +9,7 @@ import { apiData, apiMessage } from "../utils/api";
 import { formatINR } from "../utils/currency";
 
 const pageBackgroundImage =
-  "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
+  "https://i.pinimg.com/1200x/54/57/f0/5457f05bea206d3aeccf6749065d453b.jpg";
 
 const classSchedule = {
   days: ["Friday", "Saturday", "Sunday"],
@@ -198,6 +198,7 @@ export default function LiveClassesPage() {
     <PageShell
       title="Live Classes"
       subtitle="Weekend live OSINT classes with a structured month-by-month progression."
+      decryptTitle
     >
       <section className="relative mb-6 overflow-hidden rounded-[30px] border border-black bg-[#080808] shadow-[0_26px_70px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">

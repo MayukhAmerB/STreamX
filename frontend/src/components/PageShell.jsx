@@ -1,4 +1,6 @@
-export default function PageShell({ title, subtitle, action, badge, children }) {
+import DecryptedText from "./DecryptedText";
+
+export default function PageShell({ title, subtitle, action, badge, children, decryptTitle = false }) {
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 text-white sm:px-5 lg:px-6">
       {(title || subtitle || action) && (
@@ -12,7 +14,9 @@ export default function PageShell({ title, subtitle, action, badge, children }) 
                     {badge}
                   </div>
                 ) : null}
-                <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-[1.75rem]">{title}</h1>
+                <h1 className="text-3xl font-black tracking-tight text-white sm:text-[2.2rem]">
+                  {decryptTitle ? <DecryptedText text={title} /> : title}
+                </h1>
                 {subtitle ? <p className="mt-2 max-w-3xl text-sm leading-7 text-[#BBBBBB]">{subtitle}</p> : null}
               </div>
             ) : null}

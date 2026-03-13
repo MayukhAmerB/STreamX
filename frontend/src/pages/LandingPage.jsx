@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { listCourses } from "../api/courses";
 import Button from "../components/Button";
+import StoryJourneySection from "../components/StoryJourneySection";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
 import { apiData } from "../utils/api";
 import { featuredCourse } from "../utils/featuredCourse";
@@ -273,6 +274,12 @@ export default function LandingPage() {
       </div>
 
       <section className="landing-hero relative z-10 overflow-hidden px-4 pb-8 pt-6 sm:pt-10">
+        <div
+          aria-hidden="true"
+          className="hero-glitch-ribbon absolute left-1/2 top-3 z-20 hidden w-[min(96%,1040px)] -translate-x-1/2 overflow-hidden rounded-full px-4 py-1 sm:block"
+        >
+          <p className="hero-glitch-ribbon-line">{heroGlitchLine}</p>
+        </div>
         <div className="absolute inset-0">
           <div className="absolute inset-0 bg-black" />
           <div aria-hidden="true" className="hero-glitch-overlay absolute inset-0 overflow-hidden">
@@ -418,6 +425,8 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
+
+          <StoryJourneySection className="reveal-up reveal-delay-1" />
 
           <SectionCard>
             <SectionTitle
