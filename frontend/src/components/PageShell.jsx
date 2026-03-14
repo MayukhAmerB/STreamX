@@ -1,8 +1,18 @@
 import DecryptedText from "./DecryptedText";
 
-export default function PageShell({ title, subtitle, action, badge, children, decryptTitle = false }) {
+export default function PageShell({
+  title,
+  subtitle,
+  action,
+  badge,
+  children,
+  decryptTitle = false,
+  containerClassName = "",
+}) {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-8 text-white sm:px-5 lg:px-6">
+    <section
+      className={`mx-auto max-w-7xl px-4 py-8 text-white sm:px-5 lg:px-6 ${containerClassName}`.trim()}
+    >
       {(title || subtitle || action) && (
         <div className="relative mb-6 overflow-hidden rounded-3xl border border-black panel-gradient p-5 shadow-[0_22px_60px_rgba(0,0,0,0.3)] backdrop-blur-sm sm:p-6">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_8%,rgba(192,192,192,0.14),transparent_35%)]" />

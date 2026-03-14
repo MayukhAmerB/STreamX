@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
+import BroadcastViewerTheater from "../components/realtime/BroadcastViewerTheater";
 import MeetingRoomExperience from "../components/realtime/MeetingRoomExperience";
 import { joinRealtimeSession, listRealtimeSessions } from "../api/realtime";
 import { useAuth } from "../hooks/useAuth";
@@ -152,6 +153,7 @@ export default function JoinLivePage() {
       subtitle="Access all active meetings and broadcasts from one premium live operations screen."
       badge="LIVE ACCESS"
       decryptTitle
+      containerClassName="xl:max-w-[86rem] 2xl:max-w-[92rem]"
     >
       <section className="relative mb-6 overflow-hidden rounded-[30px] border border-black bg-[#080808] shadow-[0_26px_70px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">
@@ -241,47 +243,12 @@ export default function JoinLivePage() {
       ) : null}
 
       {activeSession?.mode === "broadcast" ? (
-        <section className="mb-6 rounded-[26px] border border-black panel-gradient p-4 sm:p-5">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-xs uppercase tracking-[0.14em] text-[#949494]">Now Viewing</div>
-              <span className="text-sm text-[#DFDFDF]">{activeSession.session?.title}</span>
-            </div>
-            <span className="rounded-full border border-black bg-[#171717] px-3 py-1 text-xs uppercase tracking-[0.12em] text-[#CDCDCD]">
-              Live Broadcast
-            </span>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
-            <div className="overflow-hidden rounded-2xl border border-black bg-black">
-              {activeBroadcastStreamUrl ? (
-                <iframe
-                  title="Broadcast Stream"
-                  src={activeBroadcastStreamUrl}
-                  className="h-[260px] w-full sm:h-[340px] lg:h-[460px]"
-                  allow="autoplay; fullscreen"
-                />
-              ) : (
-                <div className="flex h-[260px] items-center justify-center px-6 text-center text-sm text-[#BBBBBB] sm:h-[340px] lg:h-[460px]">
-                  Stream URL not configured for this session.
-                </div>
-              )}
-            </div>
-            <div className="overflow-hidden rounded-2xl border border-black panel-gradient">
-              {activeBroadcastChatUrl ? (
-                <iframe
-                  title="Broadcast Chat"
-                  src={activeBroadcastChatUrl}
-                  className="h-[260px] w-full sm:h-[340px] lg:h-[460px]"
-                  allow="clipboard-read; clipboard-write"
-                />
-              ) : (
-                <div className="flex h-[260px] items-center justify-center px-6 text-center text-sm text-[#BBBBBB] sm:h-[340px] lg:h-[460px]">
-                  Chat URL not configured for this session.
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
+        <BroadcastViewerTheater
+          title={activeSession.session?.title}
+          streamUrl={activeBroadcastStreamUrl}
+          chatUrl={activeBroadcastChatUrl}
+          badgeLabel="Live Broadcast"
+        />
       ) : null}
 
       <section className="rounded-[26px] border border-black panel-gradient p-4 sm:p-5">

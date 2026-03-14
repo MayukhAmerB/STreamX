@@ -3,8 +3,10 @@ import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { Room, createLocalAudioTrack, createLocalScreenTracks, createLocalVideoTrack } from "livekit-client";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
+import BroadcastViewerTheater from "../components/realtime/BroadcastViewerTheater";
 import { listLiveClasses } from "../api/courses";
 import {
+  createRealtimeOwncastChatLaunch,
   createRealtimeSession,
   deleteRealtimeRecording,
   endRealtimeSession,
@@ -513,7 +515,7 @@ export default function BroadcastingPage() {
       });
       return;
     }
-    const popup = window.open(chatUrl, "_blank", "noopener,noreferrer");
+    const popup = window.open("", "_blank", "noopener,noreferrer");
     if (!popup) {
       setShareState({
         error: "Popup blocked by browser. Allow popups and use 'Copy Chat Link' if needed.",
@@ -521,7 +523,35 @@ export default function BroadcastingPage() {
       });
       return;
     }
-    setShareState({ error: "", info: "Broadcast chat opened in a new tab." });
+    const loadingMarkup =
+      "<!doctype html><html><body style='margin:0;background:#0b0f19;color:#d8dbe3;font-family:system-ui,Segoe UI,Roboto,sans-serif;display:grid;place-items:center;min-height:100vh;'><div>Preparing broadcast chat...</div></body></html>";
+    popup.document.write(loadingMarkup);
+    popup.document.close();
+
+    (async () => {
+      let launchUrl = chatUrl;
+      let usedFallback = false;
+      if (session?.id) {
+        try {
+          const launchResponse = await createRealtimeOwncastChatLaunch(session.id);
+          const launchData = apiData(launchResponse, {});
+          const candidate = String(launchData?.launch_url || "").trim();
+          if (candidate) {
+            launchUrl = candidate;
+          }
+        } catch (err) {
+          usedFallback = true;
+          setShareState({
+            error: `${apiMessage(err, "Unable to prepare personalized chat launch.")} Opened default chat link instead.`,
+            info: "",
+          });
+        }
+      }
+      popup.location.replace(launchUrl);
+      if (!usedFallback) {
+        setShareState({ error: "", info: "Broadcast chat opened in a new tab." });
+      }
+    })();
   };
 
   const handleCopyObsServerUrl = async (session) => {
@@ -1031,7 +1061,7 @@ export default function BroadcastingPage() {
     activeBroadcastUrls.writableChatEmbedUrl || activeBroadcastUrls.chatEmbedUrl;
 
   return (
-    <PageShell title="" subtitle="">
+    <PageShell title="" subtitle="" containerClassName="xl:max-w-[86rem] 2xl:max-w-[92rem]">
       <section className="relative mb-6 overflow-hidden rounded-[30px] border border-black bg-[#080808] shadow-[0_26px_70px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">
           <img
@@ -1566,36 +1596,13 @@ export default function BroadcastingPage() {
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
-            <div className="overflow-hidden rounded-2xl border border-black bg-black">
-              {activeStreamUrl ? (
-                <iframe
-                  title="Broadcast Stream"
-                  src={activeStreamUrl}
-                  className="h-[260px] w-full sm:h-[340px] lg:h-[440px]"
-                  allow="autoplay; fullscreen"
-                />
-              ) : (
-                <div className="flex h-[260px] items-center justify-center px-6 text-center text-sm text-[#BBBBBB] sm:h-[340px] lg:h-[440px]">
-                  Stream URL not configured for this session.
-                </div>
-              )}
-            </div>
-            <div className="overflow-hidden rounded-2xl border border-black panel-gradient">
-              {activeChatUrl ? (
-                <iframe
-                  title="Broadcast Chat"
-                  src={activeChatUrl}
-                  className="h-[260px] w-full sm:h-[340px] lg:h-[440px]"
-                  allow="clipboard-read; clipboard-write"
-                />
-              ) : (
-                <div className="flex h-[260px] items-center justify-center px-6 text-center text-sm text-[#BBBBBB] sm:h-[340px] lg:h-[440px]">
-                  Chat URL not configured for this session.
-                </div>
-              )}
-            </div>
-          </div>
+          <BroadcastViewerTheater
+            title={activeBroadcast.session?.title}
+            streamUrl={activeStreamUrl}
+            chatUrl={activeChatUrl}
+            showHeaderMeta={false}
+            withContainer={false}
+          />
         </section>
       ) : null}
 

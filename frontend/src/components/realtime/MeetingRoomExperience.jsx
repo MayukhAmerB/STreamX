@@ -3,6 +3,7 @@ import { Room, RoomEvent, Track, VideoQuality } from "livekit-client";
 import Button from "../Button";
 import meetingAdminLogo from "../../assets/logo.jpeg";
 import {
+  createRealtimeOwncastChatLaunch,
   deleteRealtimeRecording,
   grantRealtimePresenter,
   grantRealtimeSpeaker,
@@ -1381,12 +1382,39 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
       setMeetingError("Broadcast chat URL is not configured for this session.");
       return;
     }
-    const popup = window.open(broadcastChatUrl, "_blank", "noopener,noreferrer");
+    const popup = window.open("", "_blank", "noopener,noreferrer");
     if (!popup) {
       setMeetingError("Popup blocked by browser. Allow popups and use 'Copy Chat' if needed.");
       return;
     }
-    setMeetingInfo("Broadcast chat opened in a new tab.");
+    const loadingMarkup =
+      "<!doctype html><html><body style='margin:0;background:#0b0f19;color:#d8dbe3;font-family:system-ui,Segoe UI,Roboto,sans-serif;display:grid;place-items:center;min-height:100vh;'><div>Preparing broadcast chat...</div></body></html>";
+    popup.document.write(loadingMarkup);
+    popup.document.close();
+
+    (async () => {
+      let launchUrl = broadcastChatUrl;
+      let usedFallback = false;
+      if (session?.id) {
+        try {
+          const launchResponse = await createRealtimeOwncastChatLaunch(session.id);
+          const launchData = apiData(launchResponse, {});
+          const candidate = String(launchData?.launch_url || "").trim();
+          if (candidate) {
+            launchUrl = candidate;
+          }
+        } catch (err) {
+          usedFallback = true;
+          setMeetingError(
+            `${apiMessage(err, "Unable to prepare personalized chat launch.")} Opened default chat link instead.`
+          );
+        }
+      }
+      popup.location.replace(launchUrl);
+      if (!usedFallback) {
+        setMeetingInfo("Broadcast chat opened in a new tab.");
+      }
+    })();
   };
 
   const runControlAction = async (

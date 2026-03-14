@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    RealtimeOwncastChatBridgeView,
     RealtimeSessionBrowserRecordingUploadView,
     RealtimeSessionDetailView,
     RealtimeSessionEndView,
@@ -17,13 +18,24 @@ from .views import (
     RealtimeSessionStreamStartView,
     RealtimeSessionStreamStopView,
     RealtimeSessionStreamRotateKeyView,
+    RealtimeSessionOwncastChatLaunchView,
 )
 
 urlpatterns = [
     path("sessions/", RealtimeSessionListCreateView.as_view(), name="realtime-session-list-create"),
     path("sessions/<int:pk>/", RealtimeSessionDetailView.as_view(), name="realtime-session-detail"),
     path("sessions/<int:pk>/join/", RealtimeSessionJoinView.as_view(), name="realtime-session-join"),
+    path(
+        "sessions/<int:pk>/broadcast-chat/launch/",
+        RealtimeSessionOwncastChatLaunchView.as_view(),
+        name="realtime-session-owncast-chat-launch",
+    ),
     path("sessions/<int:pk>/host-token/", RealtimeSessionHostTokenView.as_view(), name="realtime-session-host-token"),
+    path(
+        "owncast/chat-bridge/",
+        RealtimeOwncastChatBridgeView.as_view(),
+        name="realtime-owncast-chat-bridge",
+    ),
     path("sessions/<int:pk>/stream/start/", RealtimeSessionStreamStartView.as_view(), name="realtime-session-stream-start"),
     path("sessions/<int:pk>/stream/stop/", RealtimeSessionStreamStopView.as_view(), name="realtime-session-stream-stop"),
     path(

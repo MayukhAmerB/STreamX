@@ -503,6 +503,92 @@ def sync_owncast_stream_key(stream_key):
     )
 
 
+def register_owncast_chat_user(*, display_name):
+    """
+    Register a chat identity in Owncast and return an access token.
+
+    This uses Owncast's public chat register endpoint so the app can bind
+    authenticated platform usernames to Owncast chat identities.
+    """
+    preferred_display_name = str(display_name or "").strip()
+    if not preferred_display_name:
+        preferred_display_name = "Viewer"
+    if len(preferred_display_name) > 80:
+        preferred_display_name = preferred_display_name[:80].strip() or "Viewer"
+
+    base_candidates = []
+    for raw_base in (
+        str(getattr(settings, "OWNCAST_ADMIN_API_BASE_URL", "") or "").strip(),
+        str(getattr(settings, "OWNCAST_BASE_URL", "") or "").strip(),
+    ):
+        normalized_base = raw_base.rstrip("/")
+        if normalized_base and normalized_base not in base_candidates:
+            base_candidates.append(normalized_base)
+
+    if not base_candidates:
+        raise OwncastConfigError("OWNCAST_ADMIN_API_BASE_URL or OWNCAST_BASE_URL is required.")
+
+    payload = {"displayName": preferred_display_name}
+    last_error = ""
+
+    for base_url in base_candidates:
+        endpoint = f"{base_url}/api/chat/register"
+        request = Request(
+            endpoint,
+            data=json.dumps(payload).encode("utf-8"),
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "X-Forwarded-User": preferred_display_name,
+            },
+        )
+        try:
+            with urlopen(request, timeout=10) as response:
+                raw_payload = response.read().decode("utf-8") or "{}"
+            try:
+                parsed_payload = json.loads(raw_payload)
+            except json.JSONDecodeError:
+                parsed_payload = {}
+
+            if not isinstance(parsed_payload, dict):
+                raise OwncastAdminError("Owncast register API returned an invalid response payload.")
+
+            access_token = str(parsed_payload.get("accessToken") or "").strip()
+            if not access_token:
+                error_message = str(
+                    parsed_payload.get("errorMessage")
+                    or parsed_payload.get("message")
+                    or "Owncast register API did not return an access token."
+                ).strip()
+                raise OwncastAdminError(error_message)
+
+            resolved_display_name = str(parsed_payload.get("displayName") or preferred_display_name).strip()
+            return {
+                "access_token": access_token,
+                "display_name": resolved_display_name or preferred_display_name,
+                "display_color": str(parsed_payload.get("displayColor") or "").strip(),
+            }
+        except HTTPError as exc:
+            body = ""
+            try:
+                body = exc.read().decode("utf-8")
+            except Exception:
+                body = str(exc)
+            last_error = f"Owncast register API HTTP {exc.code}: {body}"
+            continue
+        except URLError as exc:
+            last_error = f"Owncast register API network error: {exc}"
+            continue
+        except OwncastAdminError as exc:
+            last_error = str(exc)
+            continue
+        except Exception as exc:
+            last_error = f"Owncast register API unknown error: {exc}"
+            continue
+
+    raise OwncastAdminError(last_error or "Unable to register Owncast chat user.")
+
+
 def build_session_join_url(session_id, request=None):
     if not session_id:
         return ""

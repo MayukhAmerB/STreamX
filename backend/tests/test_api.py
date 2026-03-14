@@ -6,13 +6,13 @@ import tempfile
 from decimal import Decimal
 from io import BytesIO
 from types import SimpleNamespace
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
-from django.core import mail
+from django.core import mail, signing
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
@@ -2412,6 +2412,107 @@ class RealtimeSessionTests(APITestCase):
             join_response.data["data"]["broadcast"]["stream_embed_url"],
             "https://stream.example.com/embed/video",
         )
+
+    @override_settings(OWNCAST_CHAT_BRIDGE_ENABLED=True)
+    @patch("apps.realtime.views.register_owncast_chat_user")
+    def test_broadcast_chat_launch_returns_stream_bridge_url(self, mock_register_chat_user):
+        mock_register_chat_user.return_value = {
+            "access_token": "bridge-access-token-123",
+            "display_name": "Viewer User",
+            "display_color": "#ffffff",
+        }
+        session = RealtimeSession.objects.create(
+            title="Broadcast Chat Launch Session",
+            description="Launch URL should point to stream chat bridge.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+            chat_embed_url="https://stream.example.com/embed/chat/readwrite",
+        )
+
+        self.login(self.viewer.email)
+        response = self.client.post(
+            reverse("realtime-session-owncast-chat-launch", kwargs={"pk": session.id}),
+            {},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        launch_url = response.data["data"]["launch_url"]
+        parsed_launch_url = urlparse(launch_url)
+        self.assertEqual(parsed_launch_url.scheme, "https")
+        self.assertEqual(parsed_launch_url.netloc, "stream.example.com")
+        self.assertEqual(parsed_launch_url.path, "/api/realtime/owncast/chat-bridge/")
+
+        token_values = parse_qs(parsed_launch_url.query).get("token") or []
+        self.assertTrue(token_values)
+        signed_payload = signing.loads(
+            token_values[0],
+            max_age=120,
+            salt="realtime.owncast-chat-bridge",
+        )
+        self.assertEqual(signed_payload["access_token"], "bridge-access-token-123")
+        self.assertEqual(signed_payload["display_name"], "Viewer User")
+        self.assertEqual(signed_payload["session_id"], session.id)
+        self.assertEqual(signed_payload["user_id"], self.viewer.id)
+
+    @override_settings(OWNCAST_CHAT_BRIDGE_ENABLED=True)
+    @patch("apps.realtime.views.register_owncast_chat_user")
+    def test_broadcast_chat_launch_rejects_non_broadcast_session(self, mock_register_chat_user):
+        session = RealtimeSession.objects.create(
+            title="Meeting Session",
+            description="Chat launch should be blocked for meeting sessions.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+
+        self.login(self.viewer.email)
+        response = self.client.post(
+            reverse("realtime-session-owncast-chat-launch", kwargs={"pk": session.id}),
+            {},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("broadcasting sessions", response.data["errors"]["detail"])
+        mock_register_chat_user.assert_not_called()
+
+    def test_owncast_chat_bridge_renders_local_storage_bootstrap_html(self):
+        signed_token = signing.dumps(
+            {
+                "access_token": "bridge-access-token-123",
+                "display_name": "Viewer User",
+                "next_path": "/embed/chat/readwrite/",
+                "session_id": 99,
+                "user_id": self.viewer.id,
+            },
+            salt="realtime.owncast-chat-bridge",
+            compress=True,
+        )
+
+        response = self.client.get(
+            reverse("realtime-owncast-chat-bridge"),
+            {"token": signed_token},
+        )
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode("utf-8")
+        self.assertIn('localStorage.setItem("accessToken"', html)
+        self.assertIn("bridge-access-token-123", html)
+        self.assertIn("/embed/chat/readwrite/", html)
+        self.assertEqual(response["Cache-Control"], "no-store, max-age=0")
+
+    def test_owncast_chat_bridge_rejects_invalid_signature(self):
+        response = self.client.get(
+            reverse("realtime-owncast-chat-bridge"),
+            {"token": "invalid-token"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["message"], "Invalid chat bridge request.")
+        self.assertIn("invalid or expired", response.data["errors"]["detail"])
 
     @override_settings(
         LIVEKIT_URL="ws://livekit.test",

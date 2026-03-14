@@ -1,12 +1,15 @@
 import logging
 import mimetypes
 import time
+import json
+from urllib.parse import quote, urlparse
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core import signing
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.http import FileResponse
+from django.http import FileResponse, HttpResponse
 from django.http.response import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -60,6 +63,7 @@ from .services import (
     resolve_livekit_client_url,
     resolve_obs_stream_server_url,
     resolve_broadcast_urls,
+    register_owncast_chat_user,
     sync_owncast_chat_settings,
     start_room_recording_egress,
     start_room_broadcast_egress,
@@ -70,6 +74,93 @@ from .services import (
 
 User = get_user_model()
 realtime_ops_logger = logging.getLogger("ops.realtime")
+_OWNCAST_CHAT_BRIDGE_SIGNING_SALT = "realtime.owncast-chat-bridge"
+_OWNCAST_CHAT_BRIDGE_NEXT_PATH = "/embed/chat/readwrite/"
+
+
+def _owncast_chat_bridge_ttl_seconds():
+    configured = int(getattr(settings, "OWNCAST_CHAT_BRIDGE_TTL_SECONDS", 120) or 120)
+    return max(30, configured)
+
+
+def _resolve_owncast_chat_origin(chat_embed_url):
+    parsed = urlparse(str(chat_embed_url or "").strip())
+    if parsed.scheme.lower() not in {"http", "https"}:
+        return ""
+    if not parsed.netloc:
+        return ""
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _resolve_owncast_display_name(user):
+    full_name = str(getattr(user, "full_name", "") or "").strip()
+    if full_name:
+        return full_name[:80]
+
+    email = str(getattr(user, "email", "") or "").strip()
+    if email:
+        local_part = email.split("@", 1)[0].strip()
+        if local_part:
+            return local_part[:80]
+
+    return "Viewer"
+
+
+def _render_owncast_chat_bridge_html(*, access_token, display_name, next_path):
+    html = f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Opening chat...</title>
+    <style>
+      html, body {{
+        margin: 0;
+        padding: 0;
+        background: #0b0f19;
+        color: #d8dbe3;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }}
+      main {{
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        padding: 24px;
+      }}
+      p {{ margin: 0.5rem 0; }}
+      a {{ color: #ffffff; }}
+    </style>
+  </head>
+  <body>
+    <main>
+      <div>
+        <p>Preparing Owncast chat session...</p>
+        <p>If you are not redirected automatically, <a href="{next_path}">open chat</a>.</p>
+      </div>
+    </main>
+    <script>
+      (() => {{
+        const accessToken = {json.dumps(access_token)};
+        const displayName = {json.dumps(display_name)};
+        const nextPath = {json.dumps(next_path)};
+        try {{
+          localStorage.setItem("accessToken", accessToken);
+          if (displayName) {{
+            localStorage.setItem("username", displayName);
+          }}
+        }} catch (error) {{
+          // best effort only
+        }}
+        window.location.replace(nextPath);
+      }})();
+    </script>
+  </body>
+</html>
+"""
+    response = HttpResponse(html, content_type="text/html; charset=utf-8")
+    response["Cache-Control"] = "no-store, max-age=0"
+    return response
 
 
 def _can_manage_session(user, session):
@@ -565,6 +656,126 @@ class RealtimeSessionJoinView(APIView):
         cache_room_participant_count(room_name, participant_state.participant_count + 1)
         _record_join_metric(result="success", mode="meeting", reason="ok")
         return api_response(success=True, message="Meeting join payload created.", data=data)
+
+
+class RealtimeSessionOwncastChatLaunchView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        session = get_object_or_404(RealtimeSession.objects.with_related(), pk=pk)
+        access_decision = get_access_decision(session, request.user)
+        if not access_decision.allowed:
+            return api_response(
+                success=False,
+                message=access_decision.message,
+                errors={"detail": access_decision.detail},
+                status_code=access_decision.status_code,
+            )
+        if session.session_type != RealtimeSession.TYPE_BROADCASTING:
+            return api_response(
+                success=False,
+                message="Broadcast chat launch unavailable.",
+                errors={"detail": "This endpoint is available only for broadcasting sessions."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        if not bool(getattr(settings, "OWNCAST_CHAT_BRIDGE_ENABLED", False)):
+            return api_response(
+                success=False,
+                message="Broadcast chat bridge is disabled.",
+                errors={"detail": "Enable OWNCAST_CHAT_BRIDGE_ENABLED to use personalized Owncast chat launch."},
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        urls = resolve_broadcast_urls(session, request=request)
+        chat_embed_url = str(urls.get("chat_embed_url") or "").strip()
+        chat_origin = _resolve_owncast_chat_origin(chat_embed_url)
+        if not chat_origin:
+            return api_response(
+                success=False,
+                message="Broadcast chat launch unavailable.",
+                errors={"detail": "Broadcast chat URL is not configured for this session."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        display_name = _resolve_owncast_display_name(request.user)
+        try:
+            chat_user = register_owncast_chat_user(display_name=display_name)
+        except (OwncastConfigError, OwncastAdminError) as exc:
+            return api_response(
+                success=False,
+                message="Unable to prepare broadcast chat session.",
+                errors={"detail": str(exc)},
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        bridge_payload = signing.dumps(
+            {
+                "access_token": str(chat_user.get("access_token") or "").strip(),
+                "display_name": str(chat_user.get("display_name") or display_name).strip(),
+                "next_path": _OWNCAST_CHAT_BRIDGE_NEXT_PATH,
+                "session_id": int(session.id),
+                "user_id": int(request.user.id),
+            },
+            salt=_OWNCAST_CHAT_BRIDGE_SIGNING_SALT,
+            compress=True,
+        )
+        launch_url = f"{chat_origin}/api/realtime/owncast/chat-bridge/?token={quote(bridge_payload, safe='')}"
+        return api_response(
+            success=True,
+            message="Owncast chat launch URL prepared.",
+            data={
+                "launch_url": launch_url,
+                "chat_embed_url": chat_embed_url,
+                "display_name": str(chat_user.get("display_name") or display_name).strip() or display_name,
+                "expires_in_seconds": _owncast_chat_bridge_ttl_seconds(),
+            },
+        )
+
+
+class RealtimeOwncastChatBridgeView(APIView):
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = []
+
+    def get(self, request):
+        token = str(request.query_params.get("token") or "").strip()
+        if not token:
+            return api_response(
+                success=False,
+                message="Invalid chat bridge request.",
+                errors={"detail": "Missing chat bridge token."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            payload = signing.loads(
+                token,
+                salt=_OWNCAST_CHAT_BRIDGE_SIGNING_SALT,
+                max_age=_owncast_chat_bridge_ttl_seconds(),
+            )
+        except signing.BadSignature:
+            return api_response(
+                success=False,
+                message="Invalid chat bridge request.",
+                errors={"detail": "Chat bridge token is invalid or expired."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        access_token = str(payload.get("access_token") or "").strip()
+        if not access_token:
+            return api_response(
+                success=False,
+                message="Invalid chat bridge request.",
+                errors={"detail": "Chat bridge token did not include an access token."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        display_name = str(payload.get("display_name") or "").strip()[:80]
+        return _render_owncast_chat_bridge_html(
+            access_token=access_token,
+            display_name=display_name,
+            next_path=_OWNCAST_CHAT_BRIDGE_NEXT_PATH,
+        )
 
 
 class RealtimeSessionEndView(APIView):

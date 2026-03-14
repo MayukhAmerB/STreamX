@@ -7,6 +7,8 @@ export const getRealtimeSession = (id) =>
   dedupedGet(`/realtime/sessions/${id}/`, {}, () => apiClient.get(`/realtime/sessions/${id}/`));
 export const createRealtimeSession = (payload) => apiClient.post("/realtime/sessions/", payload);
 export const joinRealtimeSession = (id, payload = {}) => apiClient.post(`/realtime/sessions/${id}/join/`, payload);
+export const createRealtimeOwncastChatLaunch = (id) =>
+  apiClient.post(`/realtime/sessions/${id}/broadcast-chat/launch/`);
 export const endRealtimeSession = (id) => apiClient.post(`/realtime/sessions/${id}/end/`);
 export const getRealtimeHostToken = (id) => apiClient.post(`/realtime/sessions/${id}/host-token/`);
 export const startRealtimeStream = (id) => apiClient.post(`/realtime/sessions/${id}/stream/start/`);
