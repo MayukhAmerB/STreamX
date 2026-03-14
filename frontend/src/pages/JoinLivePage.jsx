@@ -5,6 +5,7 @@ import PageShell from "../components/PageShell";
 import MeetingRoomExperience from "../components/realtime/MeetingRoomExperience";
 import { joinRealtimeSession, listRealtimeSessions } from "../api/realtime";
 import { useAuth } from "../hooks/useAuth";
+import { resolveBroadcastEmbedUrls } from "../utils/broadcastUrls";
 import { apiData, apiMessage } from "../utils/api";
 
 const pageBackgroundImage =
@@ -28,20 +29,6 @@ function statusBadgeClass(status) {
 
 function sessionTypeLabel(sessionType) {
   return sessionType === "broadcasting" ? "Broadcast" : "Meeting";
-}
-
-function deriveEmbedUrl(baseUrl, targetPath) {
-  const raw = String(baseUrl || "").trim();
-  if (!raw) return "";
-  try {
-    const parsed = new URL(raw);
-    parsed.pathname = targetPath;
-    parsed.search = "";
-    parsed.hash = "";
-    return parsed.toString();
-  } catch {
-    return "";
-  }
 }
 
 export default function JoinLivePage() {
@@ -145,19 +132,19 @@ export default function JoinLivePage() {
     handleJoin(highlightedSessionId);
   }, [activeSession, autoJoinConsumed, highlightedSessionId]);
 
-  const activeBroadcastStreamUrl = useMemo(() => {
-    if (!activeSession || activeSession.mode !== "broadcast") return "";
-    const direct = String(activeSession.broadcast?.stream_embed_url || "").trim();
-    if (direct) return direct;
-    return deriveEmbedUrl(activeSession.broadcast?.chat_embed_url, "/embed/video");
+  const activeBroadcastUrls = useMemo(() => {
+    if (!activeSession || activeSession.mode !== "broadcast") {
+      return { streamEmbedUrl: "", chatEmbedUrl: "", writableChatEmbedUrl: "" };
+    }
+    return resolveBroadcastEmbedUrls({
+      streamEmbedUrl: activeSession.broadcast?.stream_embed_url,
+      chatEmbedUrl: activeSession.broadcast?.chat_embed_url,
+    });
   }, [activeSession]);
 
-  const activeBroadcastChatUrl = useMemo(() => {
-    if (!activeSession || activeSession.mode !== "broadcast") return "";
-    const direct = String(activeSession.broadcast?.chat_embed_url || "").trim();
-    if (direct) return direct;
-    return deriveEmbedUrl(activeSession.broadcast?.stream_embed_url, "/embed/chat/readwrite");
-  }, [activeSession]);
+  const activeBroadcastStreamUrl = activeBroadcastUrls.streamEmbedUrl;
+  const activeBroadcastChatUrl =
+    activeBroadcastUrls.writableChatEmbedUrl || activeBroadcastUrls.chatEmbedUrl;
 
   return (
     <PageShell

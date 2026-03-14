@@ -20,6 +20,7 @@ import {
 } from "../api/realtime";
 import { useAuth } from "../hooks/useAuth";
 import { ScreenityFallbackRecorder } from "../services/recording/ScreenityFallbackRecorder";
+import { resolveBroadcastEmbedUrls } from "../utils/broadcastUrls";
 import { apiData, apiMessage } from "../utils/api";
 
 const pageBackgroundImage =
@@ -52,20 +53,6 @@ function clampNumber(value, min, max, fallback) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(max, Math.max(min, Math.round(parsed)));
-}
-
-function deriveEmbedUrl(baseUrl, targetPath) {
-  const raw = String(baseUrl || "").trim();
-  if (!raw) return "";
-  try {
-    const parsed = new URL(raw);
-    parsed.pathname = targetPath;
-    parsed.search = "";
-    parsed.hash = "";
-    return parsed.toString();
-  } catch {
-    return "";
-  }
 }
 
 function inferObsServerUrl() {
@@ -442,14 +429,23 @@ export default function BroadcastingPage() {
   };
 
   const getSessionStreamUrl = (session) => {
-    const explicitUrl = (session?.stream_embed_url || "").trim();
-    if (explicitUrl) {
-      return explicitUrl;
-    }
-    if (activeBroadcast?.session?.id === session?.id) {
-      return (activeBroadcast?.broadcast?.stream_embed_url || "").trim();
-    }
-    return "";
+    const fallbackPayload =
+      activeBroadcast?.session?.id === session?.id ? activeBroadcast?.broadcast : null;
+    const urls = resolveBroadcastEmbedUrls({
+      streamEmbedUrl: session?.stream_embed_url || fallbackPayload?.stream_embed_url,
+      chatEmbedUrl: session?.chat_embed_url || fallbackPayload?.chat_embed_url,
+    });
+    return urls.streamEmbedUrl;
+  };
+
+  const getSessionChatUrl = (session) => {
+    const fallbackPayload =
+      activeBroadcast?.session?.id === session?.id ? activeBroadcast?.broadcast : null;
+    const urls = resolveBroadcastEmbedUrls({
+      streamEmbedUrl: session?.stream_embed_url || fallbackPayload?.stream_embed_url,
+      chatEmbedUrl: session?.chat_embed_url || fallbackPayload?.chat_embed_url,
+    });
+    return urls.writableChatEmbedUrl || urls.chatEmbedUrl;
   };
 
   const getObsStreamServerUrl = (session) =>
@@ -494,6 +490,38 @@ export default function BroadcastingPage() {
       return;
     }
     await copyText(streamUrl, "Stream URL copied.", "Unable to copy stream URL.");
+  };
+
+  const handleCopyChatLink = async (session) => {
+    const chatUrl = getSessionChatUrl(session);
+    if (!chatUrl) {
+      setShareState({
+        error: "Broadcast chat URL is not configured for this session.",
+        info: "",
+      });
+      return;
+    }
+    await copyText(chatUrl, "Chat link copied.", "Unable to copy chat link.");
+  };
+
+  const handleOpenBroadcastChat = (session) => {
+    const chatUrl = getSessionChatUrl(session);
+    if (!chatUrl) {
+      setShareState({
+        error: "Broadcast chat URL is not configured for this session.",
+        info: "",
+      });
+      return;
+    }
+    const popup = window.open(chatUrl, "_blank", "noopener,noreferrer");
+    if (!popup) {
+      setShareState({
+        error: "Popup blocked by browser. Allow popups and use 'Copy Chat Link' if needed.",
+        info: "",
+      });
+      return;
+    }
+    setShareState({ error: "", info: "Broadcast chat opened in a new tab." });
   };
 
   const handleCopyObsServerUrl = async (session) => {
@@ -986,19 +1014,21 @@ export default function BroadcastingPage() {
   }, [highlightedSessionId, isAuthenticated]);
 
   const studioStreamUrl = getSessionStreamUrl(studioSession);
+  const studioChatUrl = getSessionChatUrl(studioSession);
   const studioObsServerUrl = getObsStreamServerUrl(studioSession);
   const studioObsStreamKey = getObsStreamKey(studioSession);
   const isObsStudioMode = isObsStreamMode(studioSession);
-  const activeStreamUrl = useMemo(() => {
-    const direct = String(activeBroadcast?.broadcast?.stream_embed_url || "").trim();
-    if (direct) return direct;
-    return deriveEmbedUrl(activeBroadcast?.broadcast?.chat_embed_url, "/embed/video");
-  }, [activeBroadcast]);
-  const activeChatUrl = useMemo(() => {
-    const direct = String(activeBroadcast?.broadcast?.chat_embed_url || "").trim();
-    if (direct) return direct;
-    return deriveEmbedUrl(activeBroadcast?.broadcast?.stream_embed_url, "/embed/chat/readwrite");
-  }, [activeBroadcast]);
+  const activeBroadcastUrls = useMemo(
+    () =>
+      resolveBroadcastEmbedUrls({
+        streamEmbedUrl: activeBroadcast?.broadcast?.stream_embed_url,
+        chatEmbedUrl: activeBroadcast?.broadcast?.chat_embed_url,
+      }),
+    [activeBroadcast]
+  );
+  const activeStreamUrl = activeBroadcastUrls.streamEmbedUrl;
+  const activeChatUrl =
+    activeBroadcastUrls.writableChatEmbedUrl || activeBroadcastUrls.chatEmbedUrl;
 
   return (
     <PageShell title="" subtitle="">
@@ -1215,6 +1245,30 @@ export default function BroadcastingPage() {
                     disabled={!studioStreamUrl}
                   >
                     Copy
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.12em] text-[#949494]">Broadcast Chat URL</div>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <code className="max-w-full truncate rounded-md bg-[#0E0E0E] px-2 py-1 text-xs text-[#DFDFDF]">
+                    {studioChatUrl || "Broadcast chat URL unavailable for this session."}
+                  </code>
+                  <Button
+                    variant="secondary"
+                    className="px-3 py-1.5 text-xs"
+                    onClick={() => handleOpenBroadcastChat(studioSession)}
+                    disabled={!studioChatUrl}
+                  >
+                    Open Broadcast Chat
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className="px-3 py-1.5 text-xs"
+                    onClick={() => handleCopyChatLink(studioSession)}
+                    disabled={!studioChatUrl}
+                  >
+                    Copy Chat Link
                   </Button>
                 </div>
               </div>

@@ -15,6 +15,7 @@ import {
 } from "../../api/realtime";
 import { useAuth } from "../../hooks/useAuth";
 import { ScreenityFallbackRecorder } from "../../services/recording/ScreenityFallbackRecorder";
+import { resolveBroadcastEmbedUrls } from "../../utils/broadcastUrls";
 import { apiData, apiMessage } from "../../utils/api";
 
 const textEncoder = new TextEncoder();
@@ -362,22 +363,6 @@ function parseParticipantMetadata(participant) {
   }
 }
 
-function deriveEmbedSiblingUrl(baseUrl, targetPath) {
-  const raw = String(baseUrl || "").trim();
-  if (!raw) {
-    return "";
-  }
-  try {
-    const parsed = new URL(raw);
-    parsed.pathname = targetPath;
-    parsed.search = "";
-    parsed.hash = "";
-    return parsed.toString();
-  } catch {
-    return "";
-  }
-}
-
 function MeetingTile({ entry, isFeatured = false, isSpeaking = false, isPinned = false, onPin }) {
   const videoRef = useRef(null);
   const audioRef = useRef(null);
@@ -649,12 +634,18 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
   const session = payload?.session || {};
   const meeting = payload?.meeting || {};
   const isBroadcastControlSession = session?.session_type === "broadcasting";
-  const broadcastMonitorUrl = useMemo(() => {
-    if (!isBroadcastControlSession) return "";
-    const direct = String(session?.stream_embed_url || "").trim();
-    if (direct) return direct;
-    return deriveEmbedSiblingUrl(session?.chat_embed_url, "/embed/video");
+  const broadcastEmbedUrls = useMemo(() => {
+    if (!isBroadcastControlSession) {
+      return { streamEmbedUrl: "", chatEmbedUrl: "", writableChatEmbedUrl: "" };
+    }
+    return resolveBroadcastEmbedUrls({
+      streamEmbedUrl: session?.stream_embed_url,
+      chatEmbedUrl: session?.chat_embed_url,
+    });
   }, [isBroadcastControlSession, session?.stream_embed_url, session?.chat_embed_url]);
+  const broadcastMonitorUrl = broadcastEmbedUrls.streamEmbedUrl;
+  const broadcastChatUrl =
+    broadcastEmbedUrls.writableChatEmbedUrl || broadcastEmbedUrls.chatEmbedUrl;
   const canPresentFromPayload = Boolean(meeting?.permissions?.can_present);
   const canSpeakFromPayload = Boolean(meeting?.permissions?.can_speak || canPresentFromPayload);
   const canManageParticipants = Boolean(
@@ -1372,6 +1363,32 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     }
   };
 
+  const handleCopyBroadcastChatLink = async () => {
+    if (!broadcastChatUrl) {
+      setMeetingError("Broadcast chat URL is not configured for this session.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(broadcastChatUrl);
+      setMeetingInfo("Broadcast chat link copied.");
+    } catch {
+      setMeetingError("Unable to copy broadcast chat link.");
+    }
+  };
+
+  const handleOpenBroadcastChat = () => {
+    if (!broadcastChatUrl) {
+      setMeetingError("Broadcast chat URL is not configured for this session.");
+      return;
+    }
+    const popup = window.open(broadcastChatUrl, "_blank", "noopener,noreferrer");
+    if (!popup) {
+      setMeetingError("Popup blocked by browser. Allow popups and use 'Copy Chat' if needed.");
+      return;
+    }
+    setMeetingInfo("Broadcast chat opened in a new tab.");
+  };
+
   const runControlAction = async (
     operation,
     fallbackError,
@@ -1893,8 +1910,28 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
 	            </div>
               {isBroadcastControlSession ? (
                 <div className="overflow-hidden rounded-[22px] border border-black panel-gradient backdrop-blur-sm sm:col-span-2">
-                  <div className="border-b border-black px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
-                    Broadcast monitor
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black px-4 py-2.5">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
+                      Broadcast monitor
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Button
+                        variant="secondary"
+                        className="rounded-full border-black bg-[#141414]/92 px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] text-[#DBDBDB] shadow-none hover:bg-[#1B1B1B]"
+                        onClick={handleOpenBroadcastChat}
+                        disabled={!broadcastChatUrl}
+                      >
+                        Open Broadcast Chat
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="rounded-full border-black bg-[#141414]/92 px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] text-[#DBDBDB] shadow-none hover:bg-[#1B1B1B]"
+                        onClick={handleCopyBroadcastChatLink}
+                        disabled={!broadcastChatUrl}
+                      >
+                        Copy Chat
+                      </Button>
+                    </div>
                   </div>
                   {broadcastMonitorUrl ? (
                     <iframe
