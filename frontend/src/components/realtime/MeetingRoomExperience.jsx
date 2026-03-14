@@ -1262,33 +1262,6 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     return rows;
   }, [activeSpeakerIds, participants]);
 
-  const featuredParticipant = useMemo(() => {
-    if (pinnedIdentity) {
-      return participantsOrdered.find((entry) => entry.participant.identity === pinnedIdentity) || null;
-    }
-    const screenshareOwner = participantsOrdered.find((entry) => getParticipantMediaState(entry.participant).hasScreenShare);
-    if (screenshareOwner) {
-      return screenshareOwner;
-    }
-    const activeSpeaker = participantsOrdered.find((entry) =>
-      activeSpeakerIds.includes(entry.participant.identity)
-    );
-    return activeSpeaker || participantsOrdered[0] || null;
-  }, [activeSpeakerIds, participantsOrdered, pinnedIdentity]);
-
-  const otherParticipants = useMemo(() => {
-    if (!featuredParticipant) {
-      return [];
-    }
-    return participantsOrdered.filter((entry) => entry.id !== featuredParticipant.id);
-  }, [featuredParticipant, participantsOrdered]);
-
-  const featuredHasScreenShare = featuredParticipant
-    ? getParticipantMediaState(featuredParticipant.participant).hasScreenShare
-    : false;
-  const useFeaturedLayout = Boolean(featuredParticipant) && (otherParticipants.length > 0 || featuredHasScreenShare);
-  const stagePriorityMode = audienceFocusMode && !sidePanelOpen;
-  const shareableJoinLink = buildJoinLink(session);
   const isModeratorByDefault = useCallback(
     (userId) => Boolean(userId && defaultModeratorUserIds.includes(userId)),
     [defaultModeratorUserIds]
@@ -1325,6 +1298,39 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
       ),
     [hasCoreModeratorAccess, speakerUserIds]
   );
+  const stageParticipants = useMemo(
+    () =>
+      participantsOrdered.filter((entry) => {
+        const participantUserId = parseUserIdFromIdentity(entry?.participant?.identity);
+        return hasPresenterAccess(participantUserId);
+      }),
+    [hasPresenterAccess, participantsOrdered]
+  );
+  const featuredParticipant = useMemo(() => {
+    if (pinnedIdentity) {
+      return stageParticipants.find((entry) => entry.participant.identity === pinnedIdentity) || null;
+    }
+    const screenshareOwner = stageParticipants.find((entry) => getParticipantMediaState(entry.participant).hasScreenShare);
+    if (screenshareOwner) {
+      return screenshareOwner;
+    }
+    const activeSpeaker = stageParticipants.find((entry) =>
+      activeSpeakerIds.includes(entry.participant.identity)
+    );
+    return activeSpeaker || stageParticipants[0] || null;
+  }, [activeSpeakerIds, pinnedIdentity, stageParticipants]);
+  const otherParticipants = useMemo(() => {
+    if (!featuredParticipant) {
+      return [];
+    }
+    return stageParticipants.filter((entry) => entry.id !== featuredParticipant.id);
+  }, [featuredParticipant, stageParticipants]);
+  const featuredHasScreenShare = featuredParticipant
+    ? getParticipantMediaState(featuredParticipant.participant).hasScreenShare
+    : false;
+  const useFeaturedLayout = Boolean(featuredParticipant) && (otherParticipants.length > 0 || featuredHasScreenShare);
+  const stagePriorityMode = audienceFocusMode && !sidePanelOpen;
+  const shareableJoinLink = buildJoinLink(session);
   const localUserId = Number(user?.id) || null;
   const effectiveCanPresent = Boolean(runtimeCanPresent || hasPresenterAccess(localUserId));
   const effectiveCanSpeak = Boolean(runtimeCanSpeak || hasSpeakerAccess(localUserId));
@@ -2145,7 +2151,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
             )
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {participantsOrdered.map((entry) => (
+              {stageParticipants.map((entry) => (
                 <MemoMeetingTile
                   key={entry.id}
                   entry={entry}
