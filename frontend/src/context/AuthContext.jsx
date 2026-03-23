@@ -1,4 +1,5 @@
 import { createContext, useEffect, useMemo, useRef, useState } from "react";
+import { AUTH_SESSION_EXPIRED_EVENT } from "../api/client";
 import {
   fetchAuthConfig,
   fetchCsrfToken,
@@ -58,6 +59,18 @@ export function AuthProvider({ children }) {
     refreshCsrf();
     refreshUser();
     refreshAuthConfig();
+  }, []);
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setUser(null);
+      setLoading(false);
+    };
+
+    window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => {
+      window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
+    };
   }, []);
 
   const login = async (payload) => {

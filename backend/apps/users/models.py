@@ -26,6 +26,7 @@ class User(AbstractUser):
     two_factor_secret = models.CharField(max_length=64, blank=True, default="")
     oauth_provider = models.CharField(max_length=50, blank=True, default="")
     oauth_provider_uid = models.CharField(max_length=255, blank=True, default="")
+    active_session_version = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

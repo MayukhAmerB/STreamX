@@ -202,6 +202,78 @@ class AuthTests(APITestCase):
         refresh_resp = attack_client.post(reverse("auth-refresh"), {}, format="json")
         self.assertEqual(refresh_resp.status_code, 401)
 
+    def test_non_admin_second_login_invalidates_first_device_session(self):
+        user = User.objects.create_user(
+            email="single-session@test.com",
+            password="StrongPass@123",
+            full_name="Single Session User",
+            role=User.ROLE_STUDENT,
+        )
+
+        first_client = self.client_class()
+        first_login = first_client.post(
+            reverse("auth-login"),
+            {"email": user.email, "password": "StrongPass@123"},
+            format="json",
+        )
+        self.assertEqual(first_login.status_code, 200)
+        first_refresh = first_client.cookies.get("refresh_token").value
+
+        second_client = self.client_class()
+        second_login = second_client.post(
+            reverse("auth-login"),
+            {"email": user.email, "password": "StrongPass@123"},
+            format="json",
+        )
+        self.assertEqual(second_login.status_code, 200)
+
+        stale_current_user = first_client.get(reverse("auth-user"))
+        self.assertEqual(stale_current_user.status_code, 401)
+
+        first_client.cookies["refresh_token"] = first_refresh
+        stale_refresh = first_client.post(reverse("auth-refresh"), {}, format="json")
+        self.assertEqual(stale_refresh.status_code, 401)
+        self.assertFalse(stale_refresh.data["success"])
+
+        active_current_user = second_client.get(reverse("auth-user"))
+        self.assertEqual(active_current_user.status_code, 200)
+
+    def test_admin_can_keep_concurrent_sessions_across_devices(self):
+        admin_user = User.objects.create_user(
+            email="admin-multi@test.com",
+            password="StrongPass@123",
+            full_name="Admin Multi Session",
+            role=User.ROLE_INSTRUCTOR,
+            is_staff=True,
+        )
+
+        first_client = self.client_class()
+        first_login = first_client.post(
+            reverse("auth-login"),
+            {"email": admin_user.email, "password": "StrongPass@123"},
+            format="json",
+        )
+        self.assertEqual(first_login.status_code, 200)
+        first_refresh = first_client.cookies.get("refresh_token").value
+
+        second_client = self.client_class()
+        second_login = second_client.post(
+            reverse("auth-login"),
+            {"email": admin_user.email, "password": "StrongPass@123"},
+            format="json",
+        )
+        self.assertEqual(second_login.status_code, 200)
+
+        first_current_user = first_client.get(reverse("auth-user"))
+        self.assertEqual(first_current_user.status_code, 200)
+
+        first_client.cookies["refresh_token"] = first_refresh
+        first_refresh_response = first_client.post(reverse("auth-refresh"), {}, format="json")
+        self.assertEqual(first_refresh_response.status_code, 200)
+
+        second_current_user = second_client.get(reverse("auth-user"))
+        self.assertEqual(second_current_user.status_code, 200)
+
     @override_settings(ACCOUNT_SELF_SERVICE_CREDENTIALS_ENABLED=True)
     def test_change_password_revokes_preexisting_refresh_tokens(self):
         user = User.objects.create_user(

@@ -4,6 +4,15 @@ const unsafeMethods = new Set(["post", "put", "patch", "delete"]);
 let csrfTokenCache = "";
 let csrfBootstrapPromise = null;
 
+export const AUTH_SESSION_EXPIRED_EVENT = "auth:session-expired";
+
+function notifySessionExpired(detail = {}) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.dispatchEvent(new CustomEvent(AUTH_SESSION_EXPIRED_EVENT, { detail }));
+}
+
 function extractCsrfToken(response) {
   const headerToken = response?.headers?.["x-csrftoken"];
   const bodyToken = response?.data?.csrf_token;
@@ -97,7 +106,13 @@ apiClient.interceptors.response.use(
       try {
         await apiClient.post("/auth/refresh/");
         return apiClient(error.config);
-      } catch {
+      } catch (refreshError) {
+        notifySessionExpired({
+          detail:
+            refreshError?.response?.data?.errors?.detail ||
+            refreshError?.response?.data?.detail ||
+            "Your session is no longer active.",
+        });
         return Promise.reject(error);
       }
     }

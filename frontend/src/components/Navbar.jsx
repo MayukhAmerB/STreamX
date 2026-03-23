@@ -87,6 +87,9 @@ export default function Navbar() {
           <NavLink to="/contact" className={navClass}>
             Contact
           </NavLink>
+          <NavLink to="/faqs" className={navClass}>
+            FAQs
+          </NavLink>
         </nav>
         <div className="flex shrink-0 items-center gap-2">
           {isAuthenticated ? (
@@ -239,6 +242,9 @@ export default function Navbar() {
             </NavLink>
             <NavLink to="/contact" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
               Contact
+            </NavLink>
+            <NavLink to="/faqs" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+              FAQs
             </NavLink>
           </nav>
 

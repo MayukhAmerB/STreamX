@@ -2,6 +2,7 @@
 from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings
 from django.core.mail import EmailMessage
+from django.db import transaction
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_bytes, force_str
@@ -37,6 +38,12 @@ from .serializers import (
 )
 from .models import AuthConfiguration
 from .security import clear_failed_login, get_lockout_state, register_failed_login
+from .session_policy import (
+    SESSION_VERSION_CLAIM,
+    get_active_session_version,
+    should_enforce_single_session,
+    token_matches_active_session,
+)
 from .services import GoogleAuthError, verify_google_credential
 
 User = get_user_model()
@@ -50,8 +57,26 @@ def _self_service_credentials_enabled():
     return bool(getattr(settings, "ACCOUNT_SELF_SERVICE_CREDENTIALS_ENABLED", False))
 
 
-def _issue_tokens_for_user(user):
+def _rotate_single_session_version(user):
+    if not should_enforce_single_session(user):
+        return get_active_session_version(user)
+
+    with transaction.atomic():
+        locked_user = User.objects.select_for_update().get(pk=user.pk)
+        locked_user.active_session_version = get_active_session_version(locked_user) + 1
+        locked_user.save(update_fields=["active_session_version"])
+        _revoke_all_refresh_tokens_for_user(locked_user)
+        user.active_session_version = locked_user.active_session_version
+
+    return get_active_session_version(user)
+
+
+def _issue_tokens_for_user(user, *, rotate_session=False):
+    if rotate_session:
+        _rotate_single_session_version(user)
     refresh = RefreshToken.for_user(user)
+    if should_enforce_single_session(user):
+        refresh[SESSION_VERSION_CLAIM] = get_active_session_version(user)
     return str(refresh.access_token), str(refresh)
 
 
@@ -94,8 +119,19 @@ def _attach_csrf_token(response, request):
     return response
 
 
-def _auth_success_response(user, message, request=None):
-    access, refresh = _issue_tokens_for_user(user)
+def _refresh_token_error_response(request, *, message, detail):
+    response = api_response(
+        success=False,
+        message=message,
+        errors={"detail": detail},
+        status_code=status.HTTP_401_UNAUTHORIZED,
+    )
+    clear_auth_cookies(response)
+    return _attach_csrf_token(response, request)
+
+
+def _auth_success_response(user, message, request=None, *, rotate_session=True):
+    access, refresh = _issue_tokens_for_user(user, rotate_session=rotate_session)
     response = api_response(
         success=True,
         message=message,
@@ -208,27 +244,34 @@ class RefreshTokenView(APIView):
     def post(self, request):
         refresh_token = request.COOKIES.get(REFRESH_COOKIE)
         if not refresh_token:
-            return api_response(
-                success=False,
+            return _refresh_token_error_response(
+                request,
                 message="Refresh token missing.",
-                errors={"detail": "Refresh token missing."},
-                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token missing.",
             )
         try:
             refresh = RefreshToken(refresh_token)
             user = User.objects.get(id=refresh["user_id"])
         except (TokenError, User.DoesNotExist, KeyError) as exc:
-            return api_response(
-                success=False,
+            return _refresh_token_error_response(
+                request,
                 message="Invalid refresh token.",
-                errors={"detail": str(exc)},
-                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=str(exc),
+            )
+        if not token_matches_active_session(refresh, user):
+            _blacklist_refresh_token_string(refresh_token)
+            return _refresh_token_error_response(
+                request,
+                message="Session expired.",
+                detail="This account is active on another device. Please log in again.",
             )
         issued_refresh = refresh
         if bool(getattr(settings, "SIMPLE_JWT", {}).get("ROTATE_REFRESH_TOKENS", False)):
             if bool(getattr(settings, "SIMPLE_JWT", {}).get("BLACKLIST_AFTER_ROTATION", False)):
                 _blacklist_refresh_token_string(refresh_token)
             issued_refresh = RefreshToken.for_user(user)
+            if should_enforce_single_session(user):
+                issued_refresh[SESSION_VERSION_CLAIM] = get_active_session_version(user)
         response = api_response(success=True, message="Token refreshed.", data=None)
         set_auth_cookies(response, str(issued_refresh.access_token), str(issued_refresh))
         return _attach_csrf_token(response, request)
