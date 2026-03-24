@@ -1,6 +1,6 @@
 # Realtime Join Load Testing
 
-This folder contains phased load tests for meeting joins at:
+This folder contains phased load tests for realtime joins at:
 
 - 50 concurrent joiners
 - 100 concurrent joiners
@@ -10,16 +10,19 @@ This folder contains phased load tests for meeting joins at:
 
 - `k6` installed
 - One active realtime session id
-- One valid JWT bearer token for a user allowed to join that session
+- JWT bearer token access for users allowed to join that session
+
+For viewer load tests, do not reuse one token across all virtual users. The join endpoint is throttled per user, so a single shared token will quickly produce misleading failures. Supply one token per viewer with `AUTH_TOKENS` or `AUTH_TOKENS_FILE`.
 
 ## Run all phases
 
 ```bash
 cd /opt/alsyed/StreamX
 export BASE_URL="https://api.alsyedinitiative.com"
-export SESSION_ID="123"
-export AUTH_TOKEN="eyJhbGciOi..."
+export SESSION_ID="88"
+export AUTH_TOKENS_FILE="/opt/alsyed/StreamX/infra/loadtest/viewer-tokens.txt"
 export DURATION="3m"
+export PREFER_BROADCAST="1"
 ./infra/loadtest/run-realtime-join-phases.sh
 ```
 
@@ -27,12 +30,33 @@ export DURATION="3m"
 
 ```bash
 BASE_URL="https://api.alsyedinitiative.com" \
-SESSION_ID="123" \
-AUTH_TOKEN="eyJhbGciOi..." \
+SESSION_ID="88" \
+AUTH_TOKENS_FILE="/opt/alsyed/StreamX/infra/loadtest/viewer-tokens.txt" \
+PREFER_BROADCAST="1" \
 VUS=100 \
 DURATION="3m" \
 k6 run infra/loadtest/realtime-join.js
 ```
+
+If you only want one token for a quick smoke test, `AUTH_TOKEN` still works:
+
+```bash
+BASE_URL="https://api.alsyedinitiative.com" \
+SESSION_ID="88" \
+AUTH_TOKEN="eyJhbGciOi..." \
+VUS=1 \
+DURATION="1m" \
+k6 run infra/loadtest/realtime-join.js
+```
+
+## Supported environment variables
+
+- `AUTH_TOKEN`: one bearer token for smoke tests or single-user runs
+- `AUTH_TOKENS`: comma-separated or newline-separated bearer tokens
+- `AUTH_TOKENS_FILE`: file path containing one token per line
+- `PREFER_BROADCAST`: set to `1` for broadcast-viewer joins
+- `DEBUG_ERRORS`: set to `1` to log failing status/body previews
+- `SLEEP_SECONDS`: per-iteration pause, defaults to `1`
 
 ## What to watch during test
 
