@@ -65,6 +65,23 @@ DURATION="10m" \
 k6 run infra/loadtest/realtime-join.js
 ```
 
+## Run a burst-plus-spread reconnect test
+
+This simulates all viewers joining right away, then each viewer rejoining a fixed number of times spread across the next 10 minutes.
+
+```bash
+BASE_URL="https://api.alsyedinitiative.com" \
+SESSION_ID="88" \
+AUTH_TOKENS_FILE="/opt/alsyed/StreamX/infra/loadtest/viewer-tokens.txt" \
+PREFER_BROADCAST="1" \
+SPREAD_REJOINS_PER_USER="40" \
+SPREAD_WINDOW_SECONDS="600" \
+SPREAD_JITTER_SECONDS="12" \
+VUS=500 \
+DURATION="10m" \
+k6 run infra/loadtest/realtime-join.js
+```
+
 ## Supported environment variables
 
 - `AUTH_TOKEN`: one bearer token for smoke tests or single-user runs
@@ -74,6 +91,9 @@ k6 run infra/loadtest/realtime-join.js
 - `DEBUG_ERRORS`: set to `1` to log failing status/body previews
 - `JOIN_ONCE`: set to `1` to make each VU join only once
 - `HOLD_AFTER_JOIN_SECONDS`: how long each VU should stay idle after a successful join
+- `SPREAD_REJOINS_PER_USER`: after the initial join, how many additional joins each user should perform
+- `SPREAD_WINDOW_SECONDS`: total time window across which those rejoins are distributed
+- `SPREAD_JITTER_SECONDS`: random delay added inside each rejoin slot to avoid perfect synchronization
 - `SLEEP_SECONDS`: per-iteration pause, defaults to `1`
 
 ## What to watch during test

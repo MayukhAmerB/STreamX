@@ -12,7 +12,11 @@ const PREFER_BROADCAST = parseBoolean(__ENV.PREFER_BROADCAST || "false");
 const DEBUG_ERRORS = parseBoolean(__ENV.DEBUG_ERRORS || "false");
 const JOIN_ONCE = parseBoolean(__ENV.JOIN_ONCE || "false");
 const HOLD_AFTER_JOIN_SECONDS = Number(__ENV.HOLD_AFTER_JOIN_SECONDS || 0);
+const SPREAD_REJOINS_PER_USER = Number(__ENV.SPREAD_REJOINS_PER_USER || 0);
+const SPREAD_WINDOW_SECONDS = Number(__ENV.SPREAD_WINDOW_SECONDS || 0);
+const SPREAD_JITTER_SECONDS = Number(__ENV.SPREAD_JITTER_SECONDS || 0);
 const JOIN_PATH = `/api/realtime/sessions/${SESSION_ID}/join/`;
+const VU_START_TIMES_MS = {};
 
 if (!SESSION_ID) {
   throw new Error("SESSION_ID is required.");
@@ -112,26 +116,23 @@ function logJoinFailure(response, details) {
   );
 }
 
-export const options = {
-  scenarios: {
-    joiners: {
-      executor: "constant-vus",
-      vus: VUS,
-      duration: __ENV.DURATION || "3m",
-    },
-  },
-  thresholds: {
-    http_req_failed: ["rate<0.05"],
-    http_req_duration: ["p(95)<2500"],
-  },
-};
-
-export default function () {
-  if (JOIN_ONCE && __ITER > 0) {
-    sleep(HOLD_AFTER_JOIN_SECONDS > 0 ? HOLD_AFTER_JOIN_SECONDS : SLEEP_SECONDS);
-    return;
+function sleepUntilOffsetSeconds(offsetSeconds) {
+  const startedAt = VU_START_TIMES_MS[__VU] || Date.now();
+  const targetTimeMs = startedAt + Math.max(0, offsetSeconds) * 1000;
+  const remainingSeconds = (targetTimeMs - Date.now()) / 1000;
+  if (remainingSeconds > 0) {
+    sleep(remainingSeconds);
   }
+}
 
+function spreadOffsetSeconds(iterationIndex) {
+  const baseIntervalSeconds = SPREAD_WINDOW_SECONDS / SPREAD_REJOINS_PER_USER;
+  const slotStartSeconds = (iterationIndex - 1) * baseIntervalSeconds;
+  const jitterSeconds = SPREAD_JITTER_SECONDS > 0 ? Math.random() * SPREAD_JITTER_SECONDS : 0;
+  return slotStartSeconds + jitterSeconds;
+}
+
+function performJoin() {
   const payloadBody = {
     display_name: `LoadUser-${__VU}-${__ITER}`,
   };
@@ -164,6 +165,49 @@ export default function () {
     "join returned 200": (r) => r.status === 200,
     "join success payload": () => joinSucceeded,
   });
+}
+
+export const options = {
+  scenarios: {
+    joiners: {
+      executor: "constant-vus",
+      vus: VUS,
+      duration: __ENV.DURATION || "3m",
+    },
+  },
+  thresholds: {
+    http_req_failed: ["rate<0.05"],
+    http_req_duration: ["p(95)<2500"],
+  },
+};
+
+export default function () {
+  if (!VU_START_TIMES_MS[__VU]) {
+    VU_START_TIMES_MS[__VU] = Date.now();
+  }
+
+  if (SPREAD_REJOINS_PER_USER > 0) {
+    if (__ITER === 0) {
+      performJoin();
+      return;
+    }
+
+    if (__ITER <= SPREAD_REJOINS_PER_USER) {
+      sleepUntilOffsetSeconds(spreadOffsetSeconds(__ITER));
+      performJoin();
+      return;
+    }
+
+    sleep(SLEEP_SECONDS);
+    return;
+  }
+
+  if (JOIN_ONCE && __ITER > 0) {
+    sleep(HOLD_AFTER_JOIN_SECONDS > 0 ? HOLD_AFTER_JOIN_SECONDS : SLEEP_SECONDS);
+    return;
+  }
+
+  performJoin();
 
   if (JOIN_ONCE) {
     sleep(HOLD_AFTER_JOIN_SECONDS > 0 ? HOLD_AFTER_JOIN_SECONDS : SLEEP_SECONDS);
