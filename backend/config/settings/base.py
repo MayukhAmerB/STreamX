@@ -9,6 +9,16 @@ from config.env import env, env_bool, env_int, env_list
 # Developer credit: Ibrahim Mohsin Mayukh Bhatt
 BASE_DIR = Path(__file__).resolve().parents[2]
 
+
+def _dedupe_preserve_order(values):
+    return list(dict.fromkeys([value for value in values if value]))
+
+
+def append_internal_allowed_hosts(hosts):
+    if not hosts:
+        return hosts
+    return _dedupe_preserve_order([*hosts, *INTERNAL_ALLOWED_HOSTS])
+
 SECRET_KEY = env("DJANGO_SECRET_KEY", "dev-only-secret-key")
 DEBUG = env_bool("DEBUG", False)
 APP_ENV = env("APP_ENV", "production" if not DEBUG else "development").strip().lower()
@@ -16,6 +26,11 @@ ALLOWED_HOSTS = env_list(
     "ALLOWED_HOSTS",
     ["localhost", "127.0.0.1"] if DEBUG else [],
 )
+INTERNAL_ALLOWED_HOSTS = env_list(
+    "INTERNAL_ALLOWED_HOSTS",
+    ["backend", "backend-2", "backend-3", "backend-4", "gateway"],
+)
+ALLOWED_HOSTS = append_internal_allowed_hosts(ALLOWED_HOSTS)
 ENABLE_WHITENOISE_STATIC = env_bool("ENABLE_WHITENOISE_STATIC", not DEBUG)
 if ENABLE_WHITENOISE_STATIC:
     try:

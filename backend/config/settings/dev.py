@@ -29,6 +29,7 @@ if _primary_lan_ip and _primary_lan_ip not in _lan_ips:
 elif _primary_lan_ip and _primary_lan_ip in _lan_ips:
     _lan_ips = [_primary_lan_ip, *[ip for ip in _lan_ips if ip != _primary_lan_ip]]
 ALLOWED_HOSTS = list(dict.fromkeys([*ALLOWED_HOSTS, *_lan_ips]))
+ALLOWED_HOSTS = append_internal_allowed_hosts(ALLOWED_HOSTS)
 
 # Development cookies and TLS settings
 SESSION_COOKIE_SECURE = False

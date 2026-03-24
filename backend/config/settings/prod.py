@@ -6,6 +6,7 @@ from .base import *  # noqa
 
 DEBUG = False
 APP_ENV = "production"
+ALLOWED_HOSTS = append_internal_allowed_hosts(ALLOWED_HOSTS)
 
 SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
 SESSION_COOKIE_SECURE = True

@@ -48,6 +48,16 @@ class MetricsEndpointTests(APITestCase):
         )
         self.assertEqual(denied.status_code, 403)
 
+    def test_metrics_endpoint_accepts_backend_pool_service_hosts(self):
+        for host in ("backend:8000", "backend-2:8000", "backend-3:8000", "backend-4:8000"):
+            with self.subTest(host=host):
+                response = self.client.get(
+                    reverse("metrics"),
+                    HTTP_HOST=host,
+                    REMOTE_ADDR="127.0.0.1",
+                )
+                self.assertIn(response.status_code, (200, 503))
+
 
 @override_settings(
     EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
