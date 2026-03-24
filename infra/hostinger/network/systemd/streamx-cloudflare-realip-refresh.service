@@ -1,0 +1,9 @@
+[Unit]
+Description=Refresh StreamX Cloudflare real IP nginx config
+After=network-online.target nginx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/alsyed/StreamX
+ExecStart=/usr/bin/env bash /opt/alsyed/StreamX/infra/hostinger/network/setup-cloudflare-real-ip.sh
