@@ -18,7 +18,7 @@ groups:
           severity: warning
         annotations:
           summary: "One or more StreamX backend replicas are down"
-          description: "At least one backend /metrics target has been unavailable for 5 minutes."
+          description: "{{ printf \"%.0f\" $value }} backend replica(s) have been unavailable for 5 minutes."
 
       - alert: StreamXApiLatencyHigh
         expr: histogram_quantile(0.95, sum(rate(streamx_http_request_latency_seconds_bucket[5m])) by (le)) > 1.5

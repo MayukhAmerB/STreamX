@@ -47,6 +47,7 @@ Default dashboard is auto-provisioned:
 Phase 5 note:
 
 - Prometheus scrapes all backend pool members (`backend`, `backend-2`, `backend-3`, `backend-4`) so API and realtime metrics stay complete after gateway load-balancing is enabled.
+- Grafana includes backend-pool health and per-replica request, latency, and 5xx panels so load-balancing issues are visible at a glance.
 
 ## 3) Enable uptime alerts
 
