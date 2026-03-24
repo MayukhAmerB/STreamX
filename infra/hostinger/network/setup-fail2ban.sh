@@ -103,6 +103,7 @@ write_streamx_jails() {
 [DEFAULT]
 banaction = ufw
 backend = auto
+allowipv6 = auto
 usedns = no
 bantime = ${FAIL2BAN_DEFAULT_BANTIME}
 findtime = ${FAIL2BAN_DEFAULT_FINDTIME}
@@ -142,10 +143,26 @@ validate_local_files() {
   fi
 }
 
+wait_for_fail2ban_socket() {
+  local socket_path="/var/run/fail2ban/fail2ban.sock"
+  local attempts=20
+
+  for ((i=1; i<=attempts; i++)); do
+    if [[ -S "$socket_path" ]]; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  log "Fail2ban socket did not appear at $socket_path in time."
+  return 1
+}
+
 restart_and_verify_fail2ban() {
   systemctl enable --now fail2ban
   fail2ban-client -d >/dev/null
   systemctl restart fail2ban
+  wait_for_fail2ban_socket
   fail2ban-client status
   fail2ban-client status sshd >/dev/null
   fail2ban-client status streamx-auth-abuse >/dev/null

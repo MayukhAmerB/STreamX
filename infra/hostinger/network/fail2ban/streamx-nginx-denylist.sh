@@ -5,6 +5,7 @@ NGINX_FAIL2BAN_DIR="${NGINX_FAIL2BAN_DIR:-/etc/nginx/streamx-fail2ban}"
 NGINX_FAIL2BAN_LIST="${NGINX_FAIL2BAN_LIST:-$NGINX_FAIL2BAN_DIR/ipset.conf}"
 NGINX_FAIL2BAN_GEO_CONF="${NGINX_FAIL2BAN_GEO_CONF:-/etc/nginx/conf.d/12-streamx-fail2ban-geo.conf}"
 NGINX_FAIL2BAN_SNIPPET="${NGINX_FAIL2BAN_SNIPPET:-/etc/nginx/snippets/streamx_fail2ban_block.conf}"
+NGINX_FAIL2BAN_BACKUP_DIR="${NGINX_FAIL2BAN_BACKUP_DIR:-$NGINX_FAIL2BAN_DIR/backups}"
 NGINX_SITE_FILE="${NGINX_SITE_FILE:-/etc/nginx/sites-enabled/alsyedinitiative.conf}"
 
 log() {
@@ -45,7 +46,7 @@ PY
 }
 
 write_static_nginx_files() {
-  install -d "$NGINX_FAIL2BAN_DIR" /etc/nginx/conf.d /etc/nginx/snippets
+  install -d "$NGINX_FAIL2BAN_DIR" "$NGINX_FAIL2BAN_BACKUP_DIR" /etc/nginx/conf.d /etc/nginx/snippets
   if [[ ! -f "$NGINX_FAIL2BAN_LIST" ]]; then
     install -m 0644 /dev/null "$NGINX_FAIL2BAN_LIST"
   fi
@@ -177,7 +178,7 @@ ensure() {
     exit 1
   fi
 
-  local site_backup="${site_file}.bak.fail2ban.$(date +%F-%H%M%S)"
+  local site_backup="$NGINX_FAIL2BAN_BACKUP_DIR/$(basename "$site_file").bak.fail2ban.$(date +%F-%H%M%S)"
   cp "$site_file" "$site_backup"
   patch_site_file "$site_file"
 
