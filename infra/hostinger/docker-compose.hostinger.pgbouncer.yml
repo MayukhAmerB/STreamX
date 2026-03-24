@@ -7,6 +7,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: "postgres://${POSTGRES_USER:-alsyed_app}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in environment}@postgres:5432/${POSTGRES_DB:-alsyedacademy}"
+      AUTH_TYPE: "${PGBOUNCER_AUTH_TYPE:-scram-sha-256}"
       POOL_MODE: "${PGBOUNCER_POOL_MODE:-transaction}"
       MAX_CLIENT_CONN: "${PGBOUNCER_MAX_CLIENT_CONN:-1000}"
       DEFAULT_POOL_SIZE: "${PGBOUNCER_DEFAULT_POOL_SIZE:-50}"
