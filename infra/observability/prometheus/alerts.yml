@@ -3,13 +3,22 @@ groups:
     interval: 30s
     rules:
       - alert: StreamXBackendDown
-        expr: up{job="streamx_backend"} == 0
+        expr: sum(up{job="streamx_backend"}) == 0
         for: 2m
         labels:
           severity: critical
         annotations:
-          summary: "StreamX backend is down"
-          description: "Prometheus cannot scrape backend /metrics for 2 minutes."
+          summary: "StreamX backend pool is down"
+          description: "Prometheus cannot scrape any backend /metrics target for 2 minutes."
+
+      - alert: StreamXBackendReplicaDown
+        expr: sum(up{job="streamx_backend"} == 0) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "One or more StreamX backend replicas are down"
+          description: "At least one backend /metrics target has been unavailable for 5 minutes."
 
       - alert: StreamXApiLatencyHigh
         expr: histogram_quantile(0.95, sum(rate(streamx_http_request_latency_seconds_bucket[5m])) by (le)) > 1.5

@@ -11,6 +11,14 @@ scrape_configs:
     static_configs:
       - targets:
           - backend:8000
+        labels:
+          backend_role: primary
+      - targets:
+          - backend-2:8000
+          - backend-3:8000
+          - backend-4:8000
+        labels:
+          backend_role: pool
 
   - job_name: node_exporter
     static_configs:

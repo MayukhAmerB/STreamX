@@ -44,6 +44,10 @@ Default dashboard is auto-provisioned:
 
 - `StreamX API + Realtime Overview`
 
+Phase 5 note:
+
+- Prometheus scrapes all backend pool members (`backend`, `backend-2`, `backend-3`, `backend-4`) so API and realtime metrics stay complete after gateway load-balancing is enabled.
+
 ## 3) Enable uptime alerts
 
 Install timer units:
