@@ -49,6 +49,22 @@ DURATION="1m" \
 k6 run infra/loadtest/realtime-join.js
 ```
 
+## Run a realistic long-session viewer test
+
+This simulates viewers joining once and then staying connected for the rest of the test window instead of rejoining every second.
+
+```bash
+BASE_URL="https://api.alsyedinitiative.com" \
+SESSION_ID="88" \
+AUTH_TOKENS_FILE="/opt/alsyed/StreamX/infra/loadtest/viewer-tokens.txt" \
+PREFER_BROADCAST="1" \
+JOIN_ONCE="1" \
+HOLD_AFTER_JOIN_SECONDS="600" \
+VUS=150 \
+DURATION="10m" \
+k6 run infra/loadtest/realtime-join.js
+```
+
 ## Supported environment variables
 
 - `AUTH_TOKEN`: one bearer token for smoke tests or single-user runs
@@ -56,6 +72,8 @@ k6 run infra/loadtest/realtime-join.js
 - `AUTH_TOKENS_FILE`: file path containing one token per line
 - `PREFER_BROADCAST`: set to `1` for broadcast-viewer joins
 - `DEBUG_ERRORS`: set to `1` to log failing status/body previews
+- `JOIN_ONCE`: set to `1` to make each VU join only once
+- `HOLD_AFTER_JOIN_SECONDS`: how long each VU should stay idle after a successful join
 - `SLEEP_SECONDS`: per-iteration pause, defaults to `1`
 
 ## What to watch during test

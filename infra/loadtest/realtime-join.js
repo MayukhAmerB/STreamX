@@ -10,6 +10,8 @@ const VUS = Number(__ENV.VUS || 50);
 const SLEEP_SECONDS = Number(__ENV.SLEEP_SECONDS || 1);
 const PREFER_BROADCAST = parseBoolean(__ENV.PREFER_BROADCAST || "false");
 const DEBUG_ERRORS = parseBoolean(__ENV.DEBUG_ERRORS || "false");
+const JOIN_ONCE = parseBoolean(__ENV.JOIN_ONCE || "false");
+const HOLD_AFTER_JOIN_SECONDS = Number(__ENV.HOLD_AFTER_JOIN_SECONDS || 0);
 const JOIN_PATH = `/api/realtime/sessions/${SESSION_ID}/join/`;
 
 if (!SESSION_ID) {
@@ -125,6 +127,11 @@ export const options = {
 };
 
 export default function () {
+  if (JOIN_ONCE && __ITER > 0) {
+    sleep(HOLD_AFTER_JOIN_SECONDS > 0 ? HOLD_AFTER_JOIN_SECONDS : SLEEP_SECONDS);
+    return;
+  }
+
   const payloadBody = {
     display_name: `LoadUser-${__VU}-${__ITER}`,
   };
@@ -157,6 +164,11 @@ export default function () {
     "join returned 200": (r) => r.status === 200,
     "join success payload": () => joinSucceeded,
   });
+
+  if (JOIN_ONCE) {
+    sleep(HOLD_AFTER_JOIN_SECONDS > 0 ? HOLD_AFTER_JOIN_SECONDS : SLEEP_SECONDS);
+    return;
+  }
 
   sleep(SLEEP_SECONDS);
 }
