@@ -16,6 +16,8 @@ docker compose \
 
 This caps resource contention so `livekit`, `livekit-egress`, and `transcoder` do not starve `backend`.
 
+For browser-host broadcasts on the single VPS profile, keep `LIVEKIT_EGRESS_CPUS` at `3.0` or higher and `LIVEKIT_EGRESS_TWIRP_TIMEOUT_SECONDS` at `60` or higher. Participant egress is the bridge between browser-published WebRTC media and RTMP output, and undersizing it or canceling the startup request too quickly can cause `StartParticipantEgress` timeouts even when the rest of the app remains healthy.
+
 ## 2) Separate realtime stack from app server (recommended)
 
 When scaling beyond small-medium cohorts:

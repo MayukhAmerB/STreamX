@@ -37,6 +37,31 @@ get_env_value() {
   grep "^${key}=" "$ENV_FILE" | tail -n1 | cut -d= -f2- || true
 }
 
+ensure_env_min_float() {
+  local key="$1"
+  local minimum="$2"
+  local current
+  current="$(get_env_value "$key")"
+  current="$(echo "${current:-}" | xargs)"
+
+  if [[ -z "${current// }" ]]; then
+    set_env_value "$key" "$minimum"
+    log "Resource profile applied: ${key}=${minimum} (was unset)."
+    return
+  fi
+
+  if [[ ! "$current" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+    set_env_value "$key" "$minimum"
+    log "Resource profile applied: ${key}=${minimum} (replaced non-numeric value '${current}')."
+    return
+  fi
+
+  if awk "BEGIN { exit !(${current} < ${minimum}) }"; then
+    set_env_value "$key" "$minimum"
+    log "Resource profile applied: ${key} raised from ${current} to ${minimum}."
+  fi
+}
+
 is_truthy() {
   local value
   value="$(echo "${1:-}" | tr '[:upper:]' '[:lower:]' | xargs)"
@@ -67,6 +92,22 @@ apply_phase_runtime_profile() {
   log "Runtime profile applied: WEB_CONCURRENCY=${web_concurrency}, GUNICORN_THREADS=${gunicorn_threads}"
 }
 
+apply_phase_resource_profile() {
+  case "$PHASE" in
+    phase2|phase3|phase4|phase5)
+      # Browser-host broadcasts depend on LiveKit participant egress.
+      # Keep a floor that avoids the 1.5 vCPU profile timing out while still
+      # preserving the rest of the Phase 5 application topology.
+      ensure_env_min_float "LIVEKIT_EGRESS_CPUS" "3.0"
+      # Give LiveKit participant egress enough time to attach to the published
+      # browser tracks and start the RTMP pipeline on the single-node profile.
+      ensure_env_min_float "LIVEKIT_EGRESS_TWIRP_TIMEOUT_SECONDS" "60"
+      ;;
+    *)
+      ;;
+  esac
+}
+
 compose_main() {
   docker compose --env-file "$ENV_FILE" "$@"
 }
@@ -86,6 +127,7 @@ ensure_redis_url() {
 
 ensure_redis_url
 apply_phase_runtime_profile
+apply_phase_resource_profile
 
 resolve_async_worker_replicas() {
   local replicas_raw

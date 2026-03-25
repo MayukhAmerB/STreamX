@@ -69,14 +69,22 @@ LIVEKIT_CPUS=2.0
 LIVEKIT_MEM_LIMIT=6g
 LIVEKIT_MEM_RESERVATION=3g
 
-LIVEKIT_EGRESS_CPUS=1.5
+LIVEKIT_EGRESS_CPUS=3.0
 LIVEKIT_EGRESS_MEM_LIMIT=4g
 LIVEKIT_EGRESS_MEM_RESERVATION=2g
+LIVEKIT_EGRESS_TWIRP_TIMEOUT_SECONDS=60
 
 OWNCAST_CPUS=0.5
 OWNCAST_MEM_LIMIT=1g
 OWNCAST_MEM_RESERVATION=512m
 ```
+
+Why `LIVEKIT_EGRESS_CPUS=3.0`:
+
+- Browser Host Studio uses LiveKit participant egress to relay the host's WebRTC media to RTMP.
+- On the single-node `8 vCPU / 32 GB` profile, `1.5` vCPU leaves egress below the safe floor for some stream presets and can surface as `Egress ... timed out` during `StartParticipantEgress`.
+- Keeping egress at `3.0` preserves headroom for browser-host broadcasts without changing the rest of the Phase 5 topology.
+- A `60` second egress Twirp timeout gives the egress worker enough time to attach to browser-published tracks and start the RTMP stream before the API gives up.
 
 ## Phase 3 (Backend Pool + Internal Gateway LB)
 
