@@ -2760,6 +2760,107 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(session.stream_status, RealtimeSession.STREAM_LIVE)
         self.assertEqual(session.livekit_egress_id, "EG_test_123")
 
+    @patch("apps.realtime.services._twirp_post")
+    @patch("apps.realtime.services._list_room_participants")
+    def test_start_room_broadcast_egress_uses_track_composite_for_screen_share(self, mock_list_participants, mock_twirp_post):
+        mock_list_participants.return_value = [
+            {
+                "identity": "host-1-session-77",
+                "tracks": [
+                    {"sid": "TR_screen_share", "source": "SCREEN_SHARE"},
+                    {"sid": "TR_microphone", "source": "MICROPHONE"},
+                ],
+            }
+        ]
+        mock_twirp_post.return_value = {"egress_id": "EG_track_composite"}
+
+        egress_id = realtime_services.start_room_broadcast_egress(
+            room_name="screen-share-room",
+            rtmp_target_url="rtmp://owncast:1935/live/test-key",
+            participant_identity="host-1-session-77",
+        )
+
+        self.assertEqual(egress_id, "EG_track_composite")
+        self.assertEqual(mock_twirp_post.call_count, 1)
+        self.assertEqual(mock_twirp_post.call_args.args[0], "livekit.Egress/StartTrackCompositeEgress")
+        self.assertEqual(
+            mock_twirp_post.call_args.args[1],
+            {
+                "room_name": "screen-share-room",
+                "video_track_id": "TR_screen_share",
+                "audio_track_id": "TR_microphone",
+                "stream_outputs": [{"urls": ["rtmp://owncast:1935/live/test-key"]}],
+            },
+        )
+
+    @patch("apps.realtime.services._twirp_post")
+    @patch("apps.realtime.services._list_room_participants")
+    def test_start_room_broadcast_egress_falls_back_to_participant_egress_without_screen_share(
+        self,
+        mock_list_participants,
+        mock_twirp_post,
+    ):
+        mock_list_participants.return_value = [
+            {
+                "identity": "host-1-session-77",
+                "tracks": [
+                    {"sid": "TR_camera", "source": "CAMERA"},
+                    {"sid": "TR_microphone", "source": "MICROPHONE"},
+                ],
+            }
+        ]
+        mock_twirp_post.return_value = {"egress_id": "EG_participant_only"}
+
+        egress_id = realtime_services.start_room_broadcast_egress(
+            room_name="camera-room",
+            rtmp_target_url="rtmp://owncast:1935/live/test-key",
+            participant_identity="host-1-session-77",
+        )
+
+        self.assertEqual(egress_id, "EG_participant_only")
+        self.assertEqual(mock_twirp_post.call_count, 1)
+        self.assertEqual(mock_twirp_post.call_args.args[0], "livekit.Egress/StartParticipantEgress")
+        self.assertEqual(
+            mock_twirp_post.call_args.args[1],
+            {
+                "room_name": "camera-room",
+                "identity": "host-1-session-77",
+                "stream_outputs": [{"urls": ["rtmp://owncast:1935/live/test-key"]}],
+            },
+        )
+
+    @patch("apps.realtime.services._twirp_post")
+    @patch("apps.realtime.services._list_room_participants")
+    def test_start_room_broadcast_egress_falls_back_when_track_composite_fails(
+        self,
+        mock_list_participants,
+        mock_twirp_post,
+    ):
+        mock_list_participants.return_value = [
+            {
+                "identity": "host-1-session-77",
+                "tracks": [
+                    {"sid": "TR_screen_share", "source": "SCREEN_SHARE"},
+                    {"sid": "TR_microphone", "source": "MICROPHONE"},
+                ],
+            }
+        ]
+        mock_twirp_post.side_effect = [
+            realtime_services.LiveKitEgressError("track composite failed"),
+            {"egress_id": "EG_participant_fallback"},
+        ]
+
+        egress_id = realtime_services.start_room_broadcast_egress(
+            room_name="fallback-room",
+            rtmp_target_url="rtmp://owncast:1935/live/test-key",
+            participant_identity="host-1-session-77",
+        )
+
+        self.assertEqual(egress_id, "EG_participant_fallback")
+        self.assertEqual(mock_twirp_post.call_count, 2)
+        self.assertEqual(mock_twirp_post.call_args_list[0].args[0], "livekit.Egress/StartTrackCompositeEgress")
+        self.assertEqual(mock_twirp_post.call_args_list[1].args[0], "livekit.Egress/StartParticipantEgress")
+
     @override_settings(
         OWNCAST_RTMP_TARGET="rtmp://owncast:1935/live/default-key",
         OWNCAST_OBS_STREAM_SERVER_URL="rtmp://obs.example.com:1935/live",

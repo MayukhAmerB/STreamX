@@ -706,6 +706,70 @@ def _list_room_participants(room_name):
     return participants if isinstance(participants, list) else []
 
 
+def _normalize_livekit_track_source(source):
+    return str(source or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _select_participant_track_sid(participant, *, preferred_sources):
+    normalized_preferences = {_normalize_livekit_track_source(item) for item in preferred_sources or []}
+    for track in participant.get("tracks") or []:
+        source = _normalize_livekit_track_source(track.get("source"))
+        if source not in normalized_preferences:
+            continue
+        track_sid = str(track.get("sid") or track.get("trackSid") or "").strip()
+        if track_sid:
+            return track_sid
+    return ""
+
+
+def _build_screen_share_track_composite_payload(*, room_name, participant_identity, rtmp_target_url):
+    try:
+        participants = _list_room_participants(room_name)
+    except LiveKitRoomServiceError as exc:
+        logger.warning(
+            "LiveKit screen-share track lookup failed for room=%s identity=%s: %s",
+            room_name,
+            participant_identity,
+            exc,
+        )
+        return None
+
+    participant = next(
+        (
+            item
+            for item in participants
+            if str(item.get("identity") or "").strip() == str(participant_identity or "").strip()
+        ),
+        None,
+    )
+    if not isinstance(participant, dict):
+        return None
+
+    screen_share_track_id = _select_participant_track_sid(
+        participant,
+        preferred_sources={"screen_share"},
+    )
+    if not screen_share_track_id:
+        return None
+
+    audio_track_id = _select_participant_track_sid(
+        participant,
+        preferred_sources={"microphone"},
+    ) or _select_participant_track_sid(
+        participant,
+        preferred_sources={"screen_share_audio"},
+    )
+
+    payload = {
+        "room_name": room_name,
+        "video_track_id": screen_share_track_id,
+        "stream_outputs": [{"urls": [rtmp_target_url]}],
+    }
+    if audio_track_id:
+        payload["audio_track_id"] = audio_track_id
+    return payload
+
+
 def _build_livekit_publish_sources(*, allow_presenter, allow_microphone):
     publish_sources = []
     if allow_presenter:
@@ -1162,12 +1226,29 @@ def start_room_broadcast_egress(*, room_name, rtmp_target_url, participant_ident
     # Prefer participant egress for browser-published host media because it avoids
     # the headless-browser ICE path used by room-composite egress.
     if participant_identity:
-        payload = {
+        participant_payload = {
             "room_name": room_name,
             "identity": participant_identity,
             "stream_outputs": [{"urls": [rtmp_target_url]}],
         }
-        data = _twirp_post("livekit.Egress/StartParticipantEgress", payload)
+        screen_share_payload = _build_screen_share_track_composite_payload(
+            room_name=room_name,
+            participant_identity=participant_identity,
+            rtmp_target_url=rtmp_target_url,
+        )
+        if screen_share_payload:
+            try:
+                data = _twirp_post("livekit.Egress/StartTrackCompositeEgress", screen_share_payload)
+            except LiveKitEgressError as exc:
+                logger.warning(
+                    "LiveKit track composite egress failed for room=%s identity=%s; falling back to participant egress: %s",
+                    room_name,
+                    participant_identity,
+                    exc,
+                )
+                data = _twirp_post("livekit.Egress/StartParticipantEgress", participant_payload)
+        else:
+            data = _twirp_post("livekit.Egress/StartParticipantEgress", participant_payload)
     else:
         payload = {
             "room_name": room_name,
