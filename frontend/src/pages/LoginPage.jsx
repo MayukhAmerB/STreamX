@@ -9,6 +9,14 @@ import PageShell from "../components/PageShell";
 import { useAuth } from "../hooks/useAuth";
 import { apiMessage } from "../utils/api";
 
+function normalizeEmailInput(value) {
+  return String(value || "").replace(/\s+/g, "").trim().toLowerCase();
+}
+
+function hasEdgeWhitespace(value) {
+  return /^\s|\s$/.test(String(value || ""));
+}
+
 export default function LoginPage() {
   const { login, googleLogin, registrationEnabled, googleLoginEnabled } = useAuth();
   const navigate = useNavigate();
@@ -18,11 +26,29 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const [emailWhitespaceWarning, setEmailWhitespaceWarning] = useState("");
   const [needs2FA, setNeeds2FA] = useState(false);
   const frontendGoogleOAuthEnabled = Boolean(
     import.meta.env.VITE_GOOGLE_CLIENT_ID && String(import.meta.env.VITE_GOOGLE_CLIENT_ID).trim().toLowerCase() !== "disabled"
   );
   const showGoogleLogin = Boolean(googleLoginEnabled && frontendGoogleOAuthEnabled);
+
+  const setNormalizedEmail = (value, { fromPaste = false } = {}) => {
+    const rawValue = String(value || "");
+    const normalizedValue = normalizeEmailInput(rawValue);
+    setEmailWhitespaceWarning(
+      hasEdgeWhitespace(rawValue)
+        ? `Email ${fromPaste ? "paste" : "input"} had a space before or after it. The extra space was removed automatically.`
+        : ""
+    );
+    setForm((prev) => ({ ...prev, email: normalizedValue }));
+  };
+
+  const passwordWhitespaceWarning = hasEdgeWhitespace(form.password)
+    ? "Password contains a space before or after it. If that was not intentional, remove the extra space before logging in."
+    : "";
+
+  const hasWhitespaceWarning = Boolean(emailWhitespaceWarning || passwordWhitespaceWarning);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,8 +56,12 @@ export default function LoginPage() {
     setError("");
     setInfo("");
     try {
+      const normalizedEmail = normalizeEmailInput(form.email);
+      if (normalizedEmail !== form.email) {
+        setNormalizedEmail(normalizedEmail);
+      }
       await login({
-        email: form.email,
+        email: normalizedEmail,
         password: form.password,
         ...(needs2FA ? { otp_code: form.otp_code } : {}),
       });
@@ -60,14 +90,18 @@ export default function LoginPage() {
   };
 
   const handleResetRequest = async () => {
-    if (!form.email) {
+    const normalizedEmail = normalizeEmailInput(form.email);
+    if (!normalizedEmail) {
       setError("Enter your email first.");
       return;
     }
     setError("");
     setInfo("");
     try {
-      await requestPasswordReset({ email: form.email });
+      if (normalizedEmail !== form.email) {
+        setNormalizedEmail(normalizedEmail);
+      }
+      await requestPasswordReset({ email: normalizedEmail });
       setInfo("Password reset request sent (or stubbed if email provider is not configured).");
     } catch (err) {
       setError(apiMessage(err, "Unable to request password reset."));
@@ -171,7 +205,17 @@ export default function LoginPage() {
                 type="email"
                 placeholder="you@example.com"
                 value={form.email}
-                onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                onChange={(e) => setNormalizedEmail(e.target.value)}
+                onBlur={(e) => setNormalizedEmail(e.target.value)}
+                onPaste={(e) => {
+                  const pastedText = e.clipboardData?.getData("text");
+                  if (!pastedText) return;
+                  e.preventDefault();
+                  setNormalizedEmail(pastedText, { fromPaste: true });
+                }}
                 required
               />
               <FormInput
@@ -204,6 +248,12 @@ export default function LoginPage() {
               {info ? (
                 <div className="rounded-xl border border-zinc-400/20 bg-zinc-500/10 px-3 py-2 text-sm text-zinc-200">
                   {info}
+                </div>
+              ) : null}
+              {hasWhitespaceWarning ? (
+                <div className="rounded-xl border border-amber-300/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+                  {emailWhitespaceWarning ? <div>{emailWhitespaceWarning}</div> : null}
+                  {passwordWhitespaceWarning ? <div>{passwordWhitespaceWarning}</div> : null}
                 </div>
               ) : null}
 
