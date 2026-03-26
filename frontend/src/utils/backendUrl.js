@@ -1,4 +1,4 @@
-function resolveApiBaseUrl() {
+function resolveConfiguredApiBaseUrl() {
   return String(import.meta.env.VITE_API_BASE_URL || "/api").trim();
 }
 
@@ -36,7 +36,7 @@ export function resolveBackendOrigin() {
     return configuredBackendOrigin;
   }
 
-  const apiBaseUrl = resolveApiBaseUrl();
+  const apiBaseUrl = resolveConfiguredApiBaseUrl();
 
   if (/^https?:\/\//i.test(apiBaseUrl)) {
     try {
@@ -67,6 +67,41 @@ export function resolveBackendOrigin() {
   }
 
   return "";
+}
+
+export function resolveApiBaseUrl() {
+  const configuredApiBaseUrl = resolveConfiguredApiBaseUrl();
+  if (!configuredApiBaseUrl) {
+    return "/api";
+  }
+
+  if (/^https?:\/\//i.test(configuredApiBaseUrl)) {
+    return configuredApiBaseUrl.replace(/\/+$/, "");
+  }
+
+  if (configuredApiBaseUrl.startsWith("//")) {
+    if (typeof window === "undefined") {
+      return configuredApiBaseUrl.replace(/\/+$/, "");
+    }
+    return `${window.location.protocol}${configuredApiBaseUrl}`.replace(/\/+$/, "");
+  }
+
+  const normalizedPath = configuredApiBaseUrl.startsWith("/")
+    ? configuredApiBaseUrl
+    : `/${configuredApiBaseUrl}`;
+
+  if (typeof window !== "undefined" && window.location?.hostname) {
+    const host = String(window.location.hostname || "").trim().toLowerCase();
+    const isLocalhost = host === "localhost" || host === "127.0.0.1";
+    if (!isLocalhost && host.includes(".")) {
+      const backendOrigin = resolveBackendOrigin();
+      if (backendOrigin) {
+        return `${backendOrigin}${normalizedPath}`.replace(/\/+$/, "");
+      }
+    }
+  }
+
+  return normalizedPath.replace(/\/+$/, "");
 }
 
 export function resolveDjangoAdminUrl() {

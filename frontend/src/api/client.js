@@ -1,4 +1,5 @@
 import axios from "axios";
+import { resolveApiBaseUrl } from "../utils/backendUrl";
 
 const unsafeMethods = new Set(["post", "put", "patch", "delete"]);
 let csrfTokenCache = "";
@@ -25,7 +26,7 @@ function extractCsrfToken(response) {
 }
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
+  baseURL: resolveApiBaseUrl(),
   withCredentials: true,
   withXSRFToken: true,
   xsrfCookieName: "csrftoken",
@@ -33,7 +34,7 @@ const apiClient = axios.create({
 });
 
 const csrfBootstrapClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
+  baseURL: resolveApiBaseUrl(),
   withCredentials: true,
 });
 
