@@ -5,6 +5,7 @@ import Button from "../components/Button";
 import StoryJourneySection from "../components/StoryJourneySection";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
 import { apiData } from "../utils/api";
+import { readCachedCourseCatalog, writeCachedCourseCatalog } from "../utils/courseCatalog";
 import { featuredCourse } from "../utils/featuredCourse";
 
 const heroCardImage =
@@ -227,10 +228,12 @@ export default function LandingPage() {
       try {
         const response = await listCourses();
         if (!active) return;
-        setCatalogCourses(sortCatalogCourses(apiData(response, [])));
+        const apiCourses = Array.isArray(apiData(response, [])) ? apiData(response, []) : [];
+        writeCachedCourseCatalog(apiCourses);
+        setCatalogCourses(sortCatalogCourses(apiCourses));
       } catch {
         if (!active) return;
-        setCatalogCourses([]);
+        setCatalogCourses(sortCatalogCourses(readCachedCourseCatalog()));
       }
     })();
     return () => {
@@ -251,6 +254,8 @@ export default function LandingPage() {
       featuredCourse
     );
   }, [catalogCourses]);
+
+  const featuredLiveCourseLink = featuredLiveCourse?._fallbackLink || `/courses/${featuredLiveCourse.id}`;
 
   const landingPrograms = useMemo(() => {
     if (catalogCourses.length) return catalogCourses;
@@ -311,7 +316,7 @@ export default function LandingPage() {
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link to={`/courses/${featuredLiveCourse.id}`}>
+                <Link to={featuredLiveCourseLink}>
                   <Button className="rounded-full bg-gradient-to-r from-[#CFCFCF] to-[#989898] px-5 text-[#121212] hover:from-[#DBDBDB] hover:to-[#A6A6A6]">
                     View Flagship Course
                   </Button>
@@ -562,7 +567,7 @@ export default function LandingPage() {
                       Explore
                     </button>
                   </Link>
-                  <Link to={`/courses/${featuredLiveCourse.id}`}>
+                  <Link to={featuredLiveCourseLink}>
                     <button className="rounded-full bg-[#F4F4F4] px-4 py-2 text-sm font-semibold text-[#272727] hover:bg-white">
                       Join Now
                     </button>

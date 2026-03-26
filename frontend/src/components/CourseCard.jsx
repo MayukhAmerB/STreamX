@@ -21,6 +21,7 @@ function CourseCard({ course }) {
   const status = getCourseLaunchStatus(course);
   const categoryLabel = formatCategory(course?.category);
   const levelLabel = formatLevel(course?.level);
+  const detailsLink = course?._fallbackLink || `/courses/${course.id}`;
   const [thumbnailSrc, setThumbnailSrc] = useState(course?.thumbnail || "");
   const safeTitle = course?.title || "Untitled course";
   const safeDescription = course?.description || "Cybersecurity course track.";
@@ -126,14 +127,14 @@ function CourseCard({ course }) {
         <div className="mt-auto pt-4">
           <div className="grid grid-cols-2 gap-2">
             <Link
-              to={`/courses/${course.id}`}
+              to={detailsLink}
               className="inline-flex items-center justify-center rounded-full border border-black bg-[#141414] px-3 py-2.5 text-sm font-semibold text-[#DBDBDB] transition hover:bg-[#1B1B1B]"
             >
               View Details
             </Link>
             {status.isLive ? (
               <Link
-                to={`/courses/${course.id}`}
+                to={detailsLink}
                 className="glossy inline-flex items-center justify-center rounded-full border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-3 py-2.5 text-sm font-semibold text-[#1A1A1A] shadow-[0_8px_18px_rgba(0,0,0,0.14)] transition hover:bg-[linear-gradient(135deg,#FFFDF2_0%,#F9EFD1_55%,#EEDFB4_100%)]"
               >
                 Live

@@ -3,14 +3,18 @@ import CourseCard from "../components/CourseCard";
 import PageShell from "../components/PageShell";
 import { listCourses } from "../api/courses";
 import { apiData } from "../utils/api";
-import { featuredCourse } from "../utils/featuredCourse";
+import {
+  filterCourseCatalog,
+  readCachedCourseCatalog,
+  writeCachedCourseCatalog,
+} from "../utils/courseCatalog";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
 
 const pageBackgroundImage =
   "https://i.pinimg.com/736x/8d/ad/8a/8dad8ae3fa8915b93754dfffdd421b62.jpg";
 
 export default function CourseListPage() {
-  const [courses, setCourses] = useState([]);
+  const [courses, setCourses] = useState(() => readCachedCourseCatalog());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -19,18 +23,46 @@ export default function CourseListPage() {
     let active = true;
     const timer = setTimeout(async () => {
       setLoading(true);
+
+      const fetchCourses = async () => {
+        let lastError = null;
+
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            const response = await listCourses(search ? { search } : {});
+            const apiCourses = apiData(response, []);
+            return Array.isArray(apiCourses) ? apiCourses : [];
+          } catch (err) {
+            lastError = err;
+            if (attempt === 0) {
+              await new Promise((resolve) => {
+                window.setTimeout(resolve, 350);
+              });
+            }
+          }
+        }
+
+        throw lastError;
+      };
+
       try {
-        const response = await listCourses(search ? { search } : {});
+        const apiCourses = await fetchCourses();
         if (active) {
-          const apiCourses = apiData(response, []);
-          setCourses(apiCourses.length ? apiCourses : [featuredCourse]);
+          if (!search) {
+            writeCachedCourseCatalog(apiCourses);
+          }
+          setCourses(apiCourses);
           setError("");
         }
       } catch {
         if (active) {
-          const matches = featuredCourse.title.toLowerCase().includes(search.toLowerCase());
-          setCourses(matches || !search ? [featuredCourse] : []);
-          setError("Showing local featured course preview. Backend is unavailable.");
+          const cachedCourses = filterCourseCatalog(readCachedCourseCatalog(), search);
+          setCourses(cachedCourses);
+          setError(
+            cachedCourses.length
+              ? "Showing last synced course catalog. Live refresh failed."
+              : "Course catalog is temporarily unavailable. Please try again."
+          );
         }
       } finally {
         if (active) setLoading(false);
@@ -189,9 +221,9 @@ export default function CourseListPage() {
           {error}
         </div>
       ) : null}
-      {!loading && !error && courses.length === 0 ? (
+      {!loading && courses.length === 0 ? (
         <div className="rounded-2xl border border-black bg-[linear-gradient(135deg,#FFFFFF_0%,#F4F4F4_58%,#E1E1E1_100%)] p-6 text-sm text-[#1D1D1D]">
-          No courses found.
+          {search ? "No courses found." : "No courses are available right now."}
         </div>
       ) : null}
 

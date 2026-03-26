@@ -1,5 +1,7 @@
 ﻿export const featuredCourse = {
   id: 1,
+  _fallbackLink: "/courses",
+  _isLocalFallback: true,
   title: "OSINT for Cyber security and Web Application Penetration Testing",
   slug: "osint-for-cyber-security-and-web-application-penetration-testing",
   description:
