@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import CourseCard from "../components/CourseCard";
 import PageShell from "../components/PageShell";
 import { listCourses } from "../api/courses";
@@ -123,8 +124,9 @@ export default function CourseListPage() {
                 {loading ? "Loading courses..." : `${courses.length} courses across OSINT and Web Pentesting`}
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-[#BBBBBB]">
-                Explore beginner to advanced tracks. Live courses are ready for enrollment, and
-                upcoming tracks are marked as coming soon.
+                Review the published training tracks and plan your learning path. Full course access
+                will be coming live soon, while live classes remain the fastest way to start
+                learning right away.
               </p>
 
               <div className="mt-5 grid gap-3 sm:auto-rows-fr sm:grid-cols-2 xl:grid-cols-4">
@@ -221,6 +223,28 @@ export default function CourseListPage() {
           {error}
         </div>
       ) : null}
+      <div className="mb-4 rounded-[24px] border border-black bg-[linear-gradient(135deg,#FFFFFF_0%,#F4F4F4_58%,#E1E1E1_100%)] p-4 shadow-[0_16px_36px_rgba(0,0,0,0.2)] sm:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#555555]">
+              Important Notice
+            </div>
+            <h3 className="mt-2 font-reference text-xl font-semibold text-[#111111] sm:text-2xl">
+              Courses will be coming live soon
+            </h3>
+            <p className="mt-2 max-w-2xl text-sm leading-7 text-[#2E2E2E]">
+              Meanwhile, all students are requested to enroll in the live classes section to keep
+              learning with the active instructor-led batches.
+            </p>
+          </div>
+          <Link
+            to="/live-classes"
+            className="inline-flex items-center justify-center rounded-xl border border-black bg-[#111111] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#202020]"
+          >
+            Go to Live Classes
+          </Link>
+        </div>
+      </div>
       {!loading && courses.length === 0 ? (
         <div className="rounded-2xl border border-black bg-[linear-gradient(135deg,#FFFFFF_0%,#F4F4F4_58%,#E1E1E1_100%)] p-6 text-sm text-[#1D1D1D]">
           {search ? "No courses found." : "No courses are available right now."}

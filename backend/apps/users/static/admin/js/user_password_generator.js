@@ -1,7 +1,7 @@
 (function () {
-  const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-  const NUMBERS = "0123456789";
-  const SYMBOLS = "!@#$%^&*";
+  const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  const NUMBERS = "23456789";
+  const SYMBOLS = "!@#$%&*";
 
   function secureRandomInt(maxExclusive) {
     if (!window.crypto || !window.crypto.getRandomValues || maxExclusive <= 0) {
@@ -72,7 +72,8 @@
 
     const hint = document.createElement("p");
     hint.className = "help enterprise-password-generator-hint";
-    hint.textContent = "Rule: 8 letters, 2 numbers, 2 symbols (12 total).";
+    hint.textContent =
+      "Rule: 8 letters, 2 numbers, 2 symbols (12 total). Similar-looking characters such as O/0 and I/l/1 are excluded to reduce login errors.";
 
     generateButton.addEventListener("click", function () {
       const generated = generatePassword();
@@ -84,7 +85,8 @@
       }
       output.value = generated;
       copyButton.disabled = false;
-      hint.textContent = "Generated and applied to password fields.";
+      hint.textContent =
+        "Generated and applied to password fields. Similar-looking characters were excluded to make sharing and typing safer.";
     });
 
     copyButton.addEventListener("click", function () {

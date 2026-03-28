@@ -70,11 +70,11 @@ export default function Navbar() {
       >
         <BrandLogo className="min-w-0 flex-1 lg:flex-none" />
         <nav className="hidden items-center gap-5 lg:flex">
-          <NavLink to="/courses" className={navClass}>
-            Courses
-          </NavLink>
           <NavLink to="/live-classes" className={navClass}>
             Live Classes
+          </NavLink>
+          <NavLink to="/courses" className={navClass}>
+            Courses
           </NavLink>
           {isAuthenticated ? (
             <NavLink to="/join-live" className={navClass}>
@@ -226,11 +226,11 @@ export default function Navbar() {
       {mobileMenuOpen ? (
         <div className="mx-auto mt-2 max-w-7xl overflow-hidden rounded-2xl border border-black panel-gradient p-3 shadow-[0_18px_34px_rgba(0,0,0,0.34)] backdrop-blur lg:hidden">
           <nav className="grid gap-1">
-            <NavLink to="/courses" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-              Courses
-            </NavLink>
             <NavLink to="/live-classes" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
               Live Classes
+            </NavLink>
+            <NavLink to="/courses" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+              Courses
             </NavLink>
             {isAuthenticated ? (
               <NavLink to="/join-live" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
