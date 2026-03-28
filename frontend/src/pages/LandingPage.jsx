@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { listCourses } from "../api/courses";
+import { enrollInLiveClass, listCourses, listLiveClasses } from "../api/courses";
 import Button from "../components/Button";
+import PublicEnrollmentRequestModal from "../components/PublicEnrollmentRequestModal";
 import StoryJourneySection from "../components/StoryJourneySection";
+import { useAuth } from "../hooks/useAuth";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
-import { apiData } from "../utils/api";
+import { apiData, apiMessage } from "../utils/api";
 import { readCachedCourseCatalog, writeCachedCourseCatalog } from "../utils/courseCatalog";
+import { formatINR } from "../utils/currency";
 import { featuredCourse } from "../utils/featuredCourse";
 
 const heroCardImage =
@@ -72,47 +75,58 @@ const steps = [
   },
 ];
 
-const popularPrograms = [
+const fallbackLandingLiveClasses = [
   {
-    id: "osint-beginner",
-    title: "OSINT Beginner",
-    lessons: 2,
-    bullets: ["Search operator fundamentals", "Evidence capture and source validation"],
+    id: "osint-beginner-fallback",
+    title: "OSINT Live Class - Month 1 (Beginner)",
+    level: "beginner",
+    month_number: 1,
+    description:
+      "Foundational OSINT training covering intelligence basics, legal boundaries, search engine intelligence, and SOCMINT fundamentals.",
+    schedule_days: "Friday, Saturday, Sunday",
+    class_duration_minutes: 60,
+    price: 1499,
+    enrollment_count: 0,
+    is_enrolled: false,
+    enrollment_status: "none",
   },
   {
-    id: "osint-intermediate",
-    title: "OSINT Intermediate",
-    lessons: 2,
-    bullets: ["Target profiling workflow", "Correlation and investigation notes"],
+    id: "osint-intermediate-fallback",
+    title: "OSINT Live Class - Month 2 (Intermediate)",
+    level: "intermediate",
+    month_number: 2,
+    description:
+      "Practical OSINT workflows for people research, domain intelligence, media analysis, and evidence correlation.",
+    schedule_days: "Friday, Saturday, Sunday",
+    class_duration_minutes: 60,
+    price: 2499,
+    enrollment_count: 0,
+    is_enrolled: false,
+    enrollment_status: "none",
   },
   {
-    id: "osint-advanced",
-    title: "OSINT Advanced",
-    lessons: 2,
-    bullets: ["Advanced collection planning", "Validation and reporting workflow"],
-  },
-  {
-    id: "web-pentest-beginner",
-    title: "Web Application Pentesting Beginner",
-    lessons: 0,
-    bullets: ["Fundamentals and testing setup", "Beginner methodology track (coming soon)"],
-  },
-  {
-    id: "web-pentest-intermediate",
-    title: "Web Application Pentesting Intermediate",
-    lessons: 0,
-    bullets: ["Recon and auth testing flow", "Intermediate workflow track (coming soon)"],
-  },
-  {
-    id: "web-pentest-advanced",
-    title: "Web Application Pentesting Advanced",
-    lessons: 0,
-    bullets: ["Advanced testing scenarios", "Reporting and validation track (coming soon)"],
+    id: "osint-advanced-fallback",
+    title: "OSINT Live Class - Month 3 (Advanced)",
+    level: "advanced",
+    month_number: 3,
+    description:
+      "Advanced investigation workflow covering profiling, geolocation, archive analysis, and end-to-end intelligence work.",
+    schedule_days: "Friday, Saturday, Sunday",
+    class_duration_minutes: 60,
+    price: 3999,
+    enrollment_count: 0,
+    is_enrolled: false,
+    enrollment_status: "none",
   },
 ];
 
 const levelOrder = { beginner: 1, intermediate: 2, advanced: 3 };
 const categoryOrder = { osint: 1, web_pentesting: 2 };
+const monthByLevel = {
+  beginner: { month: 1, label: "Month 1", subtitle: "Foundation" },
+  intermediate: { month: 2, label: "Month 2", subtitle: "Practical Skills" },
+  advanced: { month: 3, label: "Month 3", subtitle: "Investigation & Intelligence" },
+};
 const cornerGlowPanelBg =
   "bg-[radial-gradient(circle_at_100%_0%,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0.035)_24%,rgba(255,255,255,0)_52%),linear-gradient(130deg,#000000_74%,#111111_100%)]";
 const cornerGlowCardBg =
@@ -153,6 +167,23 @@ function programBulletsForCourse(course) {
     return ["Advanced testing scenarios", "Reporting and validation track (coming soon)"];
   }
   return ["Structured learning path", "Practical workflow-based progression"];
+}
+
+function formatLevel(level) {
+  if (!level) return "Program";
+  return level.charAt(0).toUpperCase() + level.slice(1);
+}
+
+function formatLiveClassPrice(value) {
+  const amount = Number(value ?? 0);
+  if (!Number.isFinite(amount) || amount <= 0) return "Free";
+  return formatINR(amount);
+}
+
+function toValidLiveClassId(value) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  return parsed;
 }
 
 function IconBadge({ type }) {
@@ -220,7 +251,12 @@ function SectionTitle({ title, subtitle, titleClassName = "" }) {
 }
 
 export default function LandingPage() {
+  const { isAuthenticated } = useAuth();
   const [catalogCourses, setCatalogCourses] = useState([]);
+  const [landingLiveClasses, setLandingLiveClasses] = useState([]);
+  const [landingLiveClassesError, setLandingLiveClassesError] = useState("");
+  const [landingActionState, setLandingActionState] = useState({});
+  const [landingPublicLeadTarget, setLandingPublicLeadTarget] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -236,6 +272,29 @@ export default function LandingPage() {
         setCatalogCourses(sortCatalogCourses(readCachedCourseCatalog()));
       }
     })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const response = await listLiveClasses();
+        if (!active) return;
+        const liveClasses = apiData(response, []);
+        setLandingLiveClasses(liveClasses.length ? liveClasses : fallbackLandingLiveClasses);
+        setLandingLiveClassesError("");
+      } catch {
+        if (!active) return;
+        setLandingLiveClasses(fallbackLandingLiveClasses);
+        setLandingLiveClassesError(
+          "Showing local live classes preview while the live class feed is unavailable."
+        );
+      }
+    })();
+
     return () => {
       active = false;
     };
@@ -258,18 +317,79 @@ export default function LandingPage() {
   const featuredLiveCourseLink = featuredLiveCourse?._fallbackLink || `/courses/${featuredLiveCourse.id}`;
 
   const landingPrograms = useMemo(() => {
-    if (catalogCourses.length) return catalogCourses;
-    return popularPrograms.map((program, index) => ({
-      id: program.id,
-      title: program.title,
-      description: "Structured lessons focused on practical workflow and real application in security assessments.",
-      section_count: program.lessons,
-      launch_status: getCourseLaunchStatus(program).key === "coming_soon" ? "coming_soon" : "live",
-      _fallbackLink: "/courses",
-      _bullets: program.bullets,
-      _index: index,
+    return [...landingLiveClasses].sort((a, b) => {
+      const aLevel = levelOrder[String(a?.level || "").toLowerCase()] || a?.month_number || 99;
+      const bLevel = levelOrder[String(b?.level || "").toLowerCase()] || b?.month_number || 99;
+      if (aLevel !== bLevel) return aLevel - bLevel;
+      return String(a?.title || "").localeCompare(String(b?.title || ""));
+    });
+  }, [landingLiveClasses]);
+
+  const handleLandingEnroll = async (liveClassId) => {
+    const targetId = toValidLiveClassId(liveClassId);
+    if (!targetId) {
+      setLandingActionState((prev) => ({
+        ...prev,
+        [liveClassId]: {
+          loading: false,
+          error: "Enrollment is unavailable in preview mode.",
+          success: "",
+        },
+      }));
+      return;
+    }
+
+    setLandingActionState((prev) => ({
+      ...prev,
+      [liveClassId]: { loading: true, error: "", success: "" },
     }));
-  }, [catalogCourses]);
+
+    try {
+      const response = await enrollInLiveClass({ live_class_id: targetId });
+      const data = apiData(response, {});
+      const enrollmentStatus = String(
+        data?.enrollment_status || (data?.enrolled ? "approved" : "pending")
+      ).toLowerCase();
+
+      setLandingLiveClasses((prev) =>
+        prev.map((item) =>
+          item.id === liveClassId
+            ? {
+                ...item,
+                is_enrolled: enrollmentStatus === "approved",
+                enrollment_status: enrollmentStatus,
+                enrollment_count:
+                  enrollmentStatus === "approved" && !data.already_enrolled
+                    ? (item.enrollment_count || 0) + 1
+                    : item.enrollment_count || 0,
+              }
+            : item
+        )
+      );
+
+      setLandingActionState((prev) => ({
+        ...prev,
+        [liveClassId]: {
+          loading: false,
+          error: "",
+          success:
+            response?.data?.message ||
+            (enrollmentStatus === "approved"
+              ? "Already enrolled."
+              : "Enrollment request submitted for admin approval."),
+        },
+      }));
+    } catch (err) {
+      setLandingActionState((prev) => ({
+        ...prev,
+        [liveClassId]: {
+          loading: false,
+          error: apiMessage(err, "Unable to enroll."),
+          success: "",
+        },
+      }));
+    }
+  };
 
   return (
     <div className="relative bg-transparent text-[#F6F6F6]">
@@ -485,14 +605,25 @@ export default function LandingPage() {
           <SectionCard className="p-5 sm:p-6">
             <SectionTitle
               title="Popular programs"
-              subtitle="Browse our OSINT and web application pentesting tracks with staged availability."
+              subtitle="Browse our current live OSINT classes and enroll directly from the landing page."
             />
+
+            {landingLiveClassesError ? (
+              <div className="mt-6 rounded-xl border border-amber-300/30 bg-amber-100/10 px-4 py-3 text-sm text-amber-200">
+                {landingLiveClassesError}
+              </div>
+            ) : null}
 
             <div className="mt-6 grid auto-rows-fr gap-4 md:grid-cols-2 xl:grid-cols-3">
               {landingPrograms.map((program, idx) => {
-                const status = getCourseLaunchStatus(program);
-                const bullets = program._bullets || programBulletsForCourse(program);
-                const detailsLink = program._fallbackLink || `/courses/${program.id}`;
+                const levelKey = String(program?.level || "").toLowerCase();
+                const monthMeta = monthByLevel[levelKey] || {
+                  month: program?.month_number || 0,
+                  label: `Month ${program?.month_number || ""}`.trim(),
+                  subtitle: formatLevel(program?.level),
+                };
+                const enrollmentStatus = String(program.enrollment_status || "").toLowerCase();
+                const detailsLink = "/live-classes";
                 return (
                 <div
                   key={program.id}
@@ -502,11 +633,15 @@ export default function LandingPage() {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="rounded-full border border-black bg-[#111111] px-2.5 py-1 text-[11px] font-semibold text-[#D6D6D6]">
-                      Course {idx + 1}
+                      {monthMeta.label || `Live Class ${idx + 1}`}
                     </span>
-                    <span className="rounded-full border border-black bg-[#111111] px-2.5 py-1 text-[11px] font-semibold text-[#D6D6D6]">
-                      {program.section_count ?? program.lessons ?? 0} sections
+                    <span className="rounded-full border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-2.5 py-1 text-[11px] font-semibold text-[#1A1A1A]">
+                      Live
                     </span>
+                  </div>
+
+                  <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#949494]">
+                    {monthMeta.subtitle}
                   </div>
 
                   <h3 className="mt-4 font-reference text-2xl font-semibold leading-tight text-white">
@@ -514,37 +649,94 @@ export default function LandingPage() {
                   </h3>
 
                   <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
-                    Structured lessons focused on practical workflow and real application in security assessments.
+                    {program.description || "OSINT live class track with guided progression."}
                   </p>
 
-                  <ul className="mt-4 space-y-2 text-sm text-[#BBBBBB]">
-                    {bullets.map((bullet) => (
-                      <li key={bullet} className="flex items-start gap-2">
-                        <span className="mt-1 inline-flex h-4 w-4 items-center justify-center" aria-hidden="true">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#DBDBDB]" />
-                        </span>
-                        <span>{bullet}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="mt-4 grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-3">
+                    <div className="h-full rounded-xl border border-black bg-[#121212] px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Schedule</div>
+                      <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
+                        {program.schedule_days || "Fri / Sat / Sun"}
+                      </div>
+                    </div>
+                    <div className="h-full rounded-xl border border-black bg-[#121212] px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Duration</div>
+                      <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
+                        {program.class_duration_minutes
+                          ? `${program.class_duration_minutes} min`
+                          : "1 hour"}
+                      </div>
+                    </div>
+                    <div className="h-full rounded-xl border border-black bg-[#121212] px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Price</div>
+                      <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
+                        {formatLiveClassPrice(program.price)}
+                      </div>
+                    </div>
+                  </div>
 
-                  <div className="mt-auto flex gap-2 pt-4">
-                    <Link to={detailsLink} className="flex-1">
-                      <button className="w-full rounded-full border border-black bg-[#141414] px-3 py-2 text-sm font-semibold text-[#DBDBDB] transition hover:bg-[#1B1B1B]">
-                        View Details
-                      </button>
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                    <span className="rounded-full border border-black bg-[#141414] px-3 py-1 text-xs font-semibold text-[#CACACA]">
+                      {(program.enrollment_count ?? 0)} enrolled
+                    </span>
+                    <Link
+                      to={detailsLink}
+                      className="inline-flex items-center justify-center rounded-full border border-black bg-[#141414] px-4 py-2 text-sm font-semibold text-[#DBDBDB] transition hover:bg-[#1B1B1B]"
+                    >
+                      View Details
                     </Link>
-                    {status.isLive ? (
-                      <Link to={detailsLink} className="flex-1">
-                        <button className="w-full rounded-full border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-3 py-2 text-sm font-semibold text-[#1A1A1A] shadow-[0_10px_24px_rgba(0,0,0,0.2)] transition hover:bg-[linear-gradient(135deg,#FFFDF2_0%,#F9EFD1_55%,#EEDFB4_100%)]">
-                          Live
-                        </button>
-                      </Link>
+                  </div>
+
+                  <div className="mt-auto pt-4">
+                    {program.is_enrolled || enrollmentStatus === "approved" ? (
+                      <Button className="w-full" disabled>
+                        Enrolled
+                      </Button>
+                    ) : enrollmentStatus === "pending" ? (
+                      <Button className="w-full" disabled>
+                        Pending Approval
+                      </Button>
+                    ) : isAuthenticated ? (
+                      <Button
+                        className="w-full"
+                        onClick={() => handleLandingEnroll(program.id)}
+                        loading={Boolean(landingActionState[program.id]?.loading)}
+                      >
+                        Enroll
+                      </Button>
                     ) : (
-                      <button className="flex-1 rounded-full border border-[#B7B7B7] bg-gradient-to-r from-[#CFCFCF] to-[#989898] px-3 py-2 text-sm font-semibold text-[#121212] shadow-[0_8px_18px_rgba(0,0,0,0.2)] transition hover:from-[#DBDBDB] hover:to-[#A6A6A6]">
-                        Coming Soon
-                      </button>
+                      <Button
+                        className="w-full"
+                        onClick={() => {
+                          const targetId = toValidLiveClassId(program.id);
+                          if (!targetId) {
+                            setLandingActionState((prev) => ({
+                              ...prev,
+                              [program.id]: {
+                                loading: false,
+                                error: "Enrollment is unavailable in preview mode.",
+                                success: "",
+                              },
+                            }));
+                            return;
+                          }
+                          setLandingPublicLeadTarget({
+                            id: targetId,
+                            title: program.title,
+                          });
+                        }}
+                      >
+                        Enroll
+                      </Button>
                     )}
+                    {landingActionState[program.id]?.error ? (
+                      <p className="mt-2 text-xs text-red-300">{landingActionState[program.id].error}</p>
+                    ) : null}
+                    {landingActionState[program.id]?.success ? (
+                      <p className="mt-2 text-xs text-zinc-300">
+                        {landingActionState[program.id].success}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 );
@@ -578,6 +770,16 @@ export default function LandingPage() {
           </SectionCard>
         </div>
       </div>
+
+      <PublicEnrollmentRequestModal
+        isOpen={Boolean(landingPublicLeadTarget)}
+        onClose={() => setLandingPublicLeadTarget(null)}
+        targetType="live_class"
+        targetId={landingPublicLeadTarget?.id}
+        targetName={landingPublicLeadTarget?.title}
+        sourcePath="/"
+        loginPath="/login"
+      />
     </div>
   );
 }
