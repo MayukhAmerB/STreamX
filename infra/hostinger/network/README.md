@@ -36,7 +36,7 @@ Default behavior:
 
 - `deny incoming`, `allow outgoing`
 - allow SSH (rate-limited), 80/443
-- allow LiveKit ports (`7880/tcp`, `7881/tcp`, `7882/udp`)
+- allow LiveKit ports (`7880/tcp`, `7881/tcp`, `7882/udp`, `443/udp`, `5349/tcp`)
 - allow RTMP `1935/tcp` from WireGuard subnet only
 
 If you intentionally want public RTMP:

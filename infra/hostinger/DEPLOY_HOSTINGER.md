@@ -41,6 +41,7 @@ Important:
   - `backend/.env.hostinger.production`
   - `infra/hostinger/livekit.yaml`
   - `infra/hostinger/egress.yaml`
+- By default the LiveKit TURN cert mounts expect `/etc/letsencrypt/live/alsyedinitiative.com/fullchain.pem` and `/etc/letsencrypt/live/alsyedinitiative.com/privkey.pem`. If Certbot created a different lineage such as `alsyedinitiative.com-0001`, set `LIVEKIT_TURN_CERT_PATH` and `LIVEKIT_TURN_KEY_PATH` in `backend/.env.hostinger.production` before deploying.
 
 ## 4) Build and start stack
 
@@ -87,11 +88,25 @@ certbot --nginx -d alsyedinitiative.com -d www.alsyedinitiative.com -d api.alsye
 
 Create A records to VPS IP: `@`, `www`, `api`, `livekit`, `stream`.
 
+Recommended proxy split:
+
+- Proxy ON: `@`, `www`
+- DNS only: `api`, `livekit`, `stream`, `monitor`
+
 Allow inbound:
 
 - `80/tcp`, `443/tcp`
 - `7880/tcp`, `7881/tcp`
 - `7882/udp` (or your `LIVEKIT_UDP_PORT`)
+- `443/udp` (TURN/UDP)
+- `5349/tcp` (TURN/TLS)
+
+On an existing production host, prefer additive UFW rules instead of rerunning the full reset script:
+
+```bash
+sudo ufw allow 443/udp
+sudo ufw allow 5349/tcp
+```
 
 For WireGuard + firewall + nginx API rate-limits (recommended for OBS ingest hardening):
 
@@ -129,6 +144,24 @@ Deploy updates:
 ```bash
 git pull
 ./infra/hostinger/deploy-safe.sh
+```
+
+Phase 5-compatible targeted rollout for TURN changes:
+
+```bash
+docker compose \
+  --env-file backend/.env.hostinger.production \
+  -f docker-compose.hostinger.yml \
+  -f infra/hostinger/docker-compose.hostinger.resource-limits.yml \
+  -f infra/hostinger/docker-compose.hostinger.resource-limits.pool.yml \
+  -f infra/hostinger/docker-compose.hostinger.resource-limits.pgbouncer.yml \
+  -f infra/hostinger/docker-compose.hostinger.async-workers.yml \
+  -f infra/hostinger/docker-compose.hostinger.backend-pool.yml \
+  -f infra/hostinger/docker-compose.hostinger.gateway-lb.yml \
+  -f infra/hostinger/docker-compose.hostinger.pgbouncer.yml \
+  -f infra/hostinger/docker-compose.hostinger.pgbouncer.pool.yml \
+  -f infra/hostinger/docker-compose.hostinger.postgres-tuning.yml \
+  up -d --no-deps livekit livekit-egress
 ```
 
 Phased rollout (recommended for scale hardening without breaking current flow):

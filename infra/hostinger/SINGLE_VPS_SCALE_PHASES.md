@@ -163,6 +163,7 @@ Reason:
 
 - frontend/content caching benefits from Cloudflare proxy
 - realtime signaling/media paths are more predictable in DNS-only mode
+- TURN and WebRTC transport for `livekit` are significantly more reliable when Cloudflare proxy is bypassed
 
 ## Validation checklist per phase
 
@@ -187,3 +188,4 @@ curl -fsS -H "Host: api.alsyedinitiative.com" -H "X-Forwarded-Proto: https" http
 - Meeting join
 - Chat
 - Recording start/stop
+- Join from a restrictive/mobile network and verify participant stays connected without repeated reconnect loops

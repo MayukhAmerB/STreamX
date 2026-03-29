@@ -4,6 +4,9 @@ set -euo pipefail
 SSH_PORT="${SSH_PORT:-22}"
 WG_SUBNET="${WG_SUBNET:-10.66.66.0/24}"
 RTMP_PUBLIC="${RTMP_PUBLIC:-0}"
+LIVEKIT_UDP_PORT="${LIVEKIT_UDP_PORT:-7882}"
+LIVEKIT_TURN_UDP_PORT="${LIVEKIT_TURN_UDP_PORT:-443}"
+LIVEKIT_TURN_TLS_PORT="${LIVEKIT_TURN_TLS_PORT:-5349}"
 
 apt-get update -y
 apt-get install -y ufw
@@ -22,7 +25,9 @@ ufw allow 443/tcp
 # LiveKit ports (meeting traffic)
 ufw allow 7880/tcp
 ufw allow 7881/tcp
-ufw allow 7882/udp
+ufw allow "${LIVEKIT_UDP_PORT}/udp"
+ufw allow "${LIVEKIT_TURN_UDP_PORT}/udp"
+ufw allow "${LIVEKIT_TURN_TLS_PORT}/tcp"
 
 # WireGuard transport
 ufw allow 51820/udp
