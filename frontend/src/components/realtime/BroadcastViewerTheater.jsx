@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 function EmptyPanel({ className, message }) {
   return (
@@ -12,20 +12,59 @@ export default function BroadcastViewerTheater({
   title = "",
   streamUrl = "",
   chatUrl = "",
+  streamStatus = "",
+  sessionStatus = "",
   badgeLabel = "Live Broadcast",
   headerLabel = "Now Viewing",
   streamTitle = "Broadcast Stream",
   chatTitle = "Broadcast Chat",
   streamFallbackMessage = "Stream URL not configured for this session.",
   chatFallbackMessage = "Chat URL not configured for this session.",
+  statusMessage = "",
+  onRefreshStream = null,
   showHeaderMeta = true,
   withContainer = true,
   className = "",
 }) {
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
+  const [streamFrameVersion, setStreamFrameVersion] = useState(0);
+  const previousStreamStatusRef = useRef(streamStatus);
   const layoutClassName = showHeaderMeta
     ? "mt-3 grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:items-stretch"
     : "grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:items-stretch";
+  const normalizedStreamStatus = String(streamStatus || "").trim().toLowerCase();
+  const normalizedSessionStatus = String(sessionStatus || "").trim().toLowerCase();
+  const isStreamUnavailable = Boolean(
+    streamUrl && normalizedSessionStatus !== "ended" && normalizedStreamStatus && normalizedStreamStatus !== "live"
+  );
+  const resolvedStatusMessage =
+    String(statusMessage || "").trim() ||
+    (normalizedSessionStatus === "ended"
+      ? "This broadcast session has ended."
+      : isStreamUnavailable
+        ? "The live video is temporarily offline. Keep chat open while the host reconnects OBS."
+        : "");
+
+  const refreshStreamFrame = () => {
+    setStreamFrameVersion((previous) => previous + 1);
+    if (typeof onRefreshStream === "function") {
+      onRefreshStream();
+    }
+  };
+
+  useEffect(() => {
+    const previousStatus = String(previousStreamStatusRef.current || "").trim().toLowerCase();
+    if (previousStatus && previousStatus !== "live" && normalizedStreamStatus === "live") {
+      setStreamFrameVersion((previous) => previous + 1);
+    }
+    previousStreamStatusRef.current = normalizedStreamStatus;
+  }, [normalizedStreamStatus]);
+
+  useEffect(() => {
+    if (isStreamUnavailable) {
+      setMobileChatOpen(true);
+    }
+  }, [isStreamUnavailable]);
 
   const content = (
     <>
@@ -41,10 +80,26 @@ export default function BroadcastViewerTheater({
         </div>
       ) : null}
 
+      {resolvedStatusMessage ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-black bg-[#141414] px-4 py-3 text-sm text-[#D7D7D7]">
+          <span>{resolvedStatusMessage}</span>
+          {streamUrl ? (
+            <button
+              type="button"
+              onClick={refreshStreamFrame}
+              className="rounded-full border border-black bg-[#1B1B1B] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[#E2E2E2] transition hover:bg-[#232323]"
+            >
+              Retry Video
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className={layoutClassName}>
         <div className="overflow-hidden rounded-2xl border border-black bg-black shadow-[0_14px_34px_rgba(0,0,0,0.24)]">
           {streamUrl ? (
             <iframe
+              key={`${streamUrl}|${streamFrameVersion}`}
               title={streamTitle}
               src={streamUrl}
               className="block aspect-video w-full min-h-[260px] sm:min-h-[360px] lg:min-h-[520px] lg:max-h-[calc(100vh-220px)]"

@@ -10,6 +10,7 @@ import {
   createRealtimeSession,
   deleteRealtimeRecording,
   endRealtimeSession,
+  getRealtimeSession,
   getRealtimeHostToken,
   joinRealtimeSession,
   listRealtimeRecordings,
@@ -839,7 +840,7 @@ export default function BroadcastingPage() {
         actionLoading: false,
         error: "",
         info: obsMode
-          ? "OBS mode is live. Start streaming in OBS to publish to viewers."
+          ? obsStartInfoMessage
           : "You are live. Viewers can watch from the broadcast player.",
       }));
       if (!obsMode) {
@@ -1043,6 +1044,73 @@ export default function BroadcastingPage() {
     handleJoin(sessionId);
   }, [highlightedSessionId, isAuthenticated]);
 
+  useEffect(() => {
+    if (!studioSession?.id) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const refreshStudioSession = async () => {
+      try {
+        const response = await getRealtimeSession(studioSession.id);
+        const latestSession = apiData(response, null);
+        if (!latestSession || cancelled) {
+          return;
+        }
+        syncSessionRow(latestSession);
+      } catch {
+        // retain current studio state during transient refresh failures
+      }
+    };
+
+    refreshStudioSession();
+    const intervalId = window.setInterval(refreshStudioSession, 8000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [studioSession?.id]);
+
+  useEffect(() => {
+    if (!activeBroadcast?.session?.id) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const refreshActiveBroadcast = async () => {
+      try {
+        const response = await getRealtimeSession(activeBroadcast.session.id);
+        const latestSession = apiData(response, null);
+        if (!latestSession || cancelled) {
+          return;
+        }
+        syncSessionRow(latestSession);
+        setActiveBroadcast((previous) => {
+          if (!previous || previous.session?.id !== latestSession.id) {
+            return previous;
+          }
+          return {
+            ...previous,
+            session: { ...previous.session, ...latestSession },
+            broadcast: {
+              ...previous.broadcast,
+              stream_status: latestSession.stream_status || previous.broadcast?.stream_status || "",
+            },
+          };
+        });
+      } catch {
+        // keep current viewer shell alive during transient refresh failures
+      }
+    };
+
+    refreshActiveBroadcast();
+    const intervalId = window.setInterval(refreshActiveBroadcast, 8000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [activeBroadcast?.session?.id]);
+
   const studioStreamUrl = getSessionStreamUrl(studioSession);
   const studioChatUrl = getSessionChatUrl(studioSession);
   const studioObsServerUrl = getObsStreamServerUrl(studioSession);
@@ -1059,6 +1127,46 @@ export default function BroadcastingPage() {
   const activeStreamUrl = activeBroadcastUrls.streamEmbedUrl;
   const activeChatUrl =
     activeBroadcastUrls.writableChatEmbedUrl || activeBroadcastUrls.chatEmbedUrl;
+  const activeBroadcastStatusMessage =
+    activeBroadcast?.session?.status === "ended"
+      ? "This broadcast session has ended."
+      : activeBroadcast?.broadcast?.stream_status &&
+          String(activeBroadcast.broadcast.stream_status).trim().toLowerCase() !== "live"
+        ? "The video stream is temporarily offline. Keep chat open while the host reconnects OBS."
+        : "";
+
+  const handleRefreshActiveBroadcast = async () => {
+    if (!activeBroadcast?.session?.id) {
+      return;
+    }
+    try {
+      const response = await getRealtimeSession(activeBroadcast.session.id);
+      const latestSession = apiData(response, null);
+      if (!latestSession) {
+        return;
+      }
+      syncSessionRow(latestSession);
+      setActiveBroadcast((previous) => {
+        if (!previous || previous.session?.id !== latestSession.id) {
+          return previous;
+        }
+        return {
+          ...previous,
+          session: { ...previous.session, ...latestSession },
+          broadcast: {
+            ...previous.broadcast,
+            stream_status: latestSession.stream_status || previous.broadcast?.stream_status || "",
+          },
+        };
+      });
+    } catch {
+      // leave the current viewer shell intact; the next poll can recover
+    }
+  };
+  const obsStartActionLabel =
+    isObsStudioMode && studioSession?.stream_status === "live" ? "Resume OBS" : "Start Live";
+  const obsStartInfoMessage =
+    "OBS stream is ready. If OBS warned that the connection dropped, start streaming again in OBS using the same server URL and key. Viewers stay in the same session.";
 
   return (
     <PageShell title="" subtitle="" containerClassName="xl:max-w-[86rem] 2xl:max-w-[92rem]">
@@ -1438,10 +1546,10 @@ export default function BroadcastingPage() {
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Button
                     onClick={handleStartLive}
-                    disabled={studioSession.stream_status === "live" || studioState.actionLoading}
-                    loading={studioState.actionLoading && studioSession.stream_status !== "live"}
+                    disabled={studioState.actionLoading}
+                    loading={studioState.actionLoading}
                   >
-                    Start Live
+                    {obsStartActionLabel}
                   </Button>
                   <Button
                     variant="danger"
@@ -1509,7 +1617,9 @@ export default function BroadcastingPage() {
                 </>
               ) : (
                 <p className="mt-2 text-[11px] text-[#A4A4A4]">
-                  OBS mode: publish from OBS using the server URL and key, then monitor playback from this panel.
+                  OBS mode: publish from OBS using the server URL and key, then monitor playback from this panel. If
+                  OBS shows a disconnect warning, keep this session open and use {obsStartActionLabel.toLowerCase()} to
+                  re-prepare the same stream without ending the class.
                 </p>
               )}
               {studioSession.livekit_egress_error ? (
@@ -1600,8 +1710,12 @@ export default function BroadcastingPage() {
             title={activeBroadcast.session?.title}
             streamUrl={activeStreamUrl}
             chatUrl={activeChatUrl}
+            streamStatus={activeBroadcast.broadcast?.stream_status}
+            sessionStatus={activeBroadcast.session?.status}
             showHeaderMeta={false}
             withContainer={false}
+            statusMessage={activeBroadcastStatusMessage}
+            onRefreshStream={handleRefreshActiveBroadcast}
           />
         </section>
       ) : null}

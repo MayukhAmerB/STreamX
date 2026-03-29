@@ -1052,8 +1052,10 @@ class RealtimeSessionStreamStartView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        if session.stream_status == RealtimeSession.STREAM_LIVE and (
-            session.stream_service == RealtimeSession.STREAM_SERVICE_OBS or session.livekit_egress_id
+        if (
+            session.stream_service != RealtimeSession.STREAM_SERVICE_OBS
+            and session.stream_status == RealtimeSession.STREAM_LIVE
+            and session.livekit_egress_id
         ):
             return api_response(
                 success=True,
@@ -1061,6 +1063,10 @@ class RealtimeSessionStreamStartView(APIView):
                 data=RealtimeSessionListSerializer(session, context={"request": request}).data,
             )
 
+        was_obs_marked_live = (
+            session.stream_service == RealtimeSession.STREAM_SERVICE_OBS
+            and session.stream_status == RealtimeSession.STREAM_LIVE
+        )
         session.mark_stream_starting()
         if session.stream_service == RealtimeSession.STREAM_SERVICE_OBS:
             stream_key = str(session.default_obs_stream_key() or "").strip()
@@ -1089,7 +1095,13 @@ class RealtimeSessionStreamStartView(APIView):
             session.save(update_fields=["livekit_egress_error", "updated_at"])
             _sync_owncast_chat_settings_non_blocking(session=session)
             data = RealtimeSessionListSerializer(session, context={"request": request}).data
-            return api_response(success=True, message="OBS stream prepared. Start streaming from OBS now.", data=data)
+            message = "OBS stream prepared. Start streaming from OBS now."
+            if was_obs_marked_live:
+                message = (
+                    "OBS stream re-prepared. If OBS showed a disconnect warning, "
+                    "resume publishing with the same server URL and key now."
+                )
+            return api_response(success=True, message=message, data=data)
 
         try:
             participant_identity = (

@@ -4,7 +4,7 @@ import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 import BroadcastViewerTheater from "../components/realtime/BroadcastViewerTheater";
 import MeetingRoomExperience from "../components/realtime/MeetingRoomExperience";
-import { joinRealtimeSession, listRealtimeSessions } from "../api/realtime";
+import { getRealtimeSession, joinRealtimeSession, listRealtimeSessions } from "../api/realtime";
 import { useAuth } from "../hooks/useAuth";
 import { resolveBroadcastEmbedUrls } from "../utils/broadcastUrls";
 import { apiData, apiMessage } from "../utils/api";
@@ -17,6 +17,32 @@ const modeOptions = [
   { key: "meeting", label: "Meetings" },
   { key: "broadcasting", label: "Broadcasts" },
 ];
+const ACTIVE_BROADCAST_STORAGE_KEY = "streamx:join-live:active-broadcast";
+
+function readPersistedBroadcastPayload() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(ACTIVE_BROADCAST_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && parsed.mode === "broadcast" && parsed.session?.id ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistBroadcastPayload(payload) {
+  if (typeof window === "undefined") return;
+  try {
+    if (payload && payload.mode === "broadcast" && payload.session?.id) {
+      window.localStorage.setItem(ACTIVE_BROADCAST_STORAGE_KEY, JSON.stringify(payload));
+      return;
+    }
+    window.localStorage.removeItem(ACTIVE_BROADCAST_STORAGE_KEY);
+  } catch {
+    // best-effort browser persistence only
+  }
+}
 
 function statusBadgeClass(status) {
   if (status === "live") {
@@ -40,7 +66,7 @@ export default function JoinLivePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [joinState, setJoinState] = useState({ loadingId: null, error: "", info: "" });
-  const [activeSession, setActiveSession] = useState(null);
+  const [activeSession, setActiveSession] = useState(() => readPersistedBroadcastPayload());
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState("all");
   const [autoJoinConsumed, setAutoJoinConsumed] = useState(false);
@@ -118,6 +144,7 @@ export default function JoinLivePage() {
       });
       const data = apiData(response, null);
       setActiveSession(data);
+      persistBroadcastPayload(data);
       setJoinState({ loadingId: null, error: "", info: "Joined live session." });
       await loadSessions();
     } catch (err) {
@@ -133,6 +160,70 @@ export default function JoinLivePage() {
     handleJoin(highlightedSessionId);
   }, [activeSession, autoJoinConsumed, highlightedSessionId]);
 
+  useEffect(() => {
+    if (!activeSession) {
+      persistBroadcastPayload(null);
+      return;
+    }
+    if (activeSession.mode === "broadcast") {
+      persistBroadcastPayload(activeSession);
+      return;
+    }
+    persistBroadcastPayload(null);
+  }, [activeSession]);
+
+  useEffect(() => {
+    if (activeSession?.mode !== "broadcast" || !activeSession?.session?.id) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const refreshSession = async () => {
+      try {
+        const response = await getRealtimeSession(activeSession.session.id);
+        const latestSession = apiData(response, null);
+        if (!latestSession || cancelled) {
+          return;
+        }
+        setSessions((previous) => {
+          const nextRows = previous.filter((item) => item.id !== latestSession.id);
+          if (latestSession.status !== "ended") {
+            nextRows.unshift(latestSession);
+          }
+          return nextRows;
+        });
+        setActiveSession((previous) => {
+          if (!previous || previous.mode !== "broadcast" || previous.session?.id !== latestSession.id) {
+            return previous;
+          }
+          const nextPayload = {
+            ...previous,
+            session: { ...previous.session, ...latestSession },
+            broadcast: {
+              ...previous.broadcast,
+              stream_status: latestSession.stream_status || previous.broadcast?.stream_status || "",
+            },
+          };
+          if (latestSession.status !== "ended") {
+            persistBroadcastPayload(nextPayload);
+          } else {
+            persistBroadcastPayload(null);
+          }
+          return nextPayload;
+        });
+      } catch {
+        // keep the current player shell alive during transient refresh failures
+      }
+    };
+
+    refreshSession();
+    const intervalId = window.setInterval(refreshSession, 8000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [activeSession?.mode, activeSession?.session?.id]);
+
   const activeBroadcastUrls = useMemo(() => {
     if (!activeSession || activeSession.mode !== "broadcast") {
       return { streamEmbedUrl: "", chatEmbedUrl: "", writableChatEmbedUrl: "" };
@@ -146,6 +237,47 @@ export default function JoinLivePage() {
   const activeBroadcastStreamUrl = activeBroadcastUrls.streamEmbedUrl;
   const activeBroadcastChatUrl =
     activeBroadcastUrls.writableChatEmbedUrl || activeBroadcastUrls.chatEmbedUrl;
+  const activeBroadcastStatusMessage =
+    activeSession?.mode === "broadcast"
+      ? activeSession?.session?.status === "ended"
+        ? "This broadcast session has ended."
+        : activeSession?.broadcast?.stream_status &&
+            String(activeSession.broadcast.stream_status).trim().toLowerCase() !== "live"
+          ? "The video stream is temporarily offline. Keep chat open while the host reconnects OBS."
+          : ""
+      : "";
+
+  const handleRefreshActiveBroadcast = async () => {
+    if (activeSession?.mode !== "broadcast" || !activeSession?.session?.id) {
+      return;
+    }
+    try {
+      const response = await getRealtimeSession(activeSession.session.id);
+      const latestSession = apiData(response, null);
+      if (!latestSession) {
+        return;
+      }
+      setActiveSession((previous) => {
+        if (!previous || previous.mode !== "broadcast" || previous.session?.id !== latestSession.id) {
+          return previous;
+        }
+        const nextPayload = {
+          ...previous,
+          session: { ...previous.session, ...latestSession },
+          broadcast: {
+            ...previous.broadcast,
+            stream_status: latestSession.stream_status || previous.broadcast?.stream_status || "",
+          },
+        };
+        if (latestSession.status !== "ended") {
+          persistBroadcastPayload(nextPayload);
+        }
+        return nextPayload;
+      });
+    } catch {
+      // keep the current shell intact; retry manually later
+    }
+  };
 
   return (
     <PageShell
@@ -247,7 +379,11 @@ export default function JoinLivePage() {
           title={activeSession.session?.title}
           streamUrl={activeBroadcastStreamUrl}
           chatUrl={activeBroadcastChatUrl}
+          streamStatus={activeSession.broadcast?.stream_status}
+          sessionStatus={activeSession.session?.status}
           badgeLabel="Live Broadcast"
+          statusMessage={activeBroadcastStatusMessage}
+          onRefreshStream={handleRefreshActiveBroadcast}
         />
       ) : null}
 
