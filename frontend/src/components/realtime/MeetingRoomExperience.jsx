@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Room, RoomEvent, Track, VideoQuality } from "livekit-client";
+import { DefaultReconnectPolicy, Room, RoomEvent, Track, VideoQuality } from "livekit-client";
 import Button from "../Button";
 import meetingAdminLogo from "../../assets/logo.jpeg";
 import {
@@ -37,6 +37,67 @@ const meetingShellBackgroundImage =
   "https://i.pinimg.com/736x/e7/18/de/e718de74d25e0e9a2cf62cd126b3abb5.jpg";
 const MAX_STAGE_PARTICIPANTS = 5;
 const ROOM_STATE_REFRESH_DEBOUNCE_MS = 120;
+const MOBILE_LISTENER_RECONNECT_DELAYS_MS = [
+  0,
+  500,
+  1500,
+  3000,
+  5000,
+  7000,
+  7000,
+  7000,
+  7000,
+  7000,
+  7000,
+  7000,
+  7000,
+  7000,
+  7000,
+];
+
+function resolveMeetingConnectionStrategy({
+  audienceFocusMode = false,
+  canPresent = false,
+  canSpeak = false,
+} = {}) {
+  if (typeof window === "undefined" || typeof navigator === "undefined") {
+    return {
+      isMobileDevice: false,
+      mobileListener: false,
+      saveData: false,
+      effectiveType: "",
+      preferRelayTransport: false,
+      conservativeReceiveProfile: false,
+    };
+  }
+
+  const userAgent = String(navigator.userAgent || "").toLowerCase();
+  const viewportWidth = Number(window.innerWidth || 0);
+  const touchCapable = Number(navigator.maxTouchPoints || 0) > 1;
+  const mobileUserAgent = /android|iphone|ipad|ipod|mobile|iemobile|opera mini/i.test(userAgent);
+  const isMobileDevice =
+    mobileUserAgent || (touchCapable && viewportWidth > 0 && viewportWidth <= 1024);
+
+  const connection =
+    navigator.connection || navigator.mozConnection || navigator.webkitConnection || null;
+  const effectiveType = String(connection?.effectiveType || "").trim().toLowerCase();
+  const saveData = connection?.saveData === true;
+  const weakNetwork = ["slow-2g", "2g", "3g"].includes(effectiveType);
+  const mobileListener = Boolean(isMobileDevice && !canPresent && !canSpeak);
+  const preferRelayTransport = Boolean(mobileListener || saveData || weakNetwork);
+  const conservativeReceiveProfile = Boolean(
+    mobileListener || audienceFocusMode || saveData || weakNetwork
+  );
+
+  return {
+    isMobileDevice,
+    mobileListener,
+    saveData,
+    effectiveType,
+    preferRelayTransport,
+    conservativeReceiveProfile,
+  };
+}
 
 function clampWholeNumber(value, min, max, fallback) {
   const numeric = Number(value);
@@ -666,6 +727,21 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
       mediaProfile.screenMaxVideoBitrateKbps >= 5000,
     [mediaProfile]
   );
+  const connectionStrategy = useMemo(
+    () =>
+      resolveMeetingConnectionStrategy({
+        audienceFocusMode,
+        canPresent: canPresentFromPayload,
+        canSpeak: canSpeakFromPayload,
+      }),
+    [audienceFocusMode, canPresentFromPayload, canSpeakFromPayload]
+  );
+  const reconnectPolicy = useMemo(() => {
+    if (connectionStrategy.preferRelayTransport) {
+      return new DefaultReconnectPolicy(MOBILE_LISTENER_RECONNECT_DELAYS_MS);
+    }
+    return new DefaultReconnectPolicy();
+  }, [connectionStrategy.preferRelayTransport]);
 
   const [meetingError, setMeetingError] = useState("");
   const [meetingInfo, setMeetingInfo] = useState("");
@@ -771,7 +847,12 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
 
   const enforceRemotePublicationQuality = useCallback(
     (publication) => {
-      if (!premiumProfileEnabled || !publication || publication.kind !== Track.Kind.Video) {
+      if (
+        connectionStrategy.conservativeReceiveProfile ||
+        !premiumProfileEnabled ||
+        !publication ||
+        publication.kind !== Track.Kind.Video
+      ) {
         return;
       }
       try {
@@ -791,7 +872,13 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
         // best-effort quality hints
       }
     },
-    [mediaProfile.screenCaptureHeight, mediaProfile.screenCaptureWidth, mediaProfile.screenFps, premiumProfileEnabled]
+    [
+      connectionStrategy.conservativeReceiveProfile,
+      mediaProfile.screenCaptureHeight,
+      mediaProfile.screenCaptureWidth,
+      mediaProfile.screenFps,
+      premiumProfileEnabled,
+    ]
   );
 
   useEffect(() => {
@@ -880,8 +967,9 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
 
     let disposed = false;
     const room = new Room({
-      adaptiveStream: premiumProfileEnabled ? false : true,
+      adaptiveStream: connectionStrategy.conservativeReceiveProfile ? true : !premiumProfileEnabled,
       dynacast: true,
+      reconnectPolicy,
     });
     roomRef.current = room;
 
@@ -1112,7 +1200,15 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
 
     const connectToRoom = async () => {
       try {
-        await room.connect(meeting.livekit_url, meeting.token);
+        const connectOptions = connectionStrategy.preferRelayTransport
+          ? {
+              maxRetries: 6,
+              peerConnectionTimeout: 25000,
+              websocketTimeout: 20000,
+              rtcConfig: { iceTransportPolicy: "relay" },
+            }
+          : undefined;
+        await room.connect(meeting.livekit_url, meeting.token, connectOptions);
         await room.startAudio();
         for (const remoteParticipant of room.remoteParticipants.values()) {
           for (const publication of remoteParticipant.trackPublications.values()) {
@@ -1171,7 +1267,11 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
         } else if (canSpeakFromPayload) {
           setMeetingInfo("Connected. Meeting is live. Your microphone is enabled by moderator approval.");
         } else {
-          setMeetingInfo("Connected. Meeting is live. You are in listener mode.");
+          setMeetingInfo(
+            connectionStrategy.mobileListener
+              ? "Connected. Mobile listener stability mode is enabled."
+              : "Connected. Meeting is live. You are in listener mode."
+          );
         }
       } catch (err) {
         if (disposed) {
@@ -1201,6 +1301,9 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     canPresentFromPayload,
     canSpeakFromPayload,
     canManageParticipants,
+    connectionStrategy.mobileListener,
+    connectionStrategy.preferRelayTransport,
+    connectionStrategy.conservativeReceiveProfile,
     enforceRemotePublicationQuality,
     mediaProfile.cameraCaptureHeight,
     mediaProfile.cameraCaptureWidth,
@@ -1210,6 +1313,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     meeting.participant_identity,
     meeting.token,
     premiumProfileEnabled,
+    reconnectPolicy,
     syncLocalControls,
     syncParticipants,
     user?.id,
