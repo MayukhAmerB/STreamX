@@ -517,7 +517,7 @@ export default function BroadcastingPage() {
       });
       return;
     }
-    const popup = window.open("", "_blank", "noopener,noreferrer");
+    const popup = window.open(chatUrl, "_blank");
     if (!popup) {
       setShareState({
         error: "Popup blocked by browser. Allow popups and use 'Copy Chat Link' if needed.",
@@ -525,14 +525,15 @@ export default function BroadcastingPage() {
       });
       return;
     }
-    const loadingMarkup =
-      "<!doctype html><html><body style='margin:0;background:#0b0f19;color:#d8dbe3;font-family:system-ui,Segoe UI,Roboto,sans-serif;display:grid;place-items:center;min-height:100vh;'><div>Preparing broadcast chat...</div></body></html>";
-    popup.document.write(loadingMarkup);
-    popup.document.close();
+    try {
+      popup.opener = null;
+    } catch {
+      // Best effort only; keep the working direct chat tab even if opener cannot be cleared.
+    }
+    setShareState({ error: "", info: "Broadcast chat opened in a new tab." });
 
     (async () => {
       let launchUrl = chatUrl;
-      let usedFallback = false;
       if (session?.id) {
         try {
           const launchResponse = await createRealtimeOwncastChatLaunch(session.id);
@@ -542,16 +543,18 @@ export default function BroadcastingPage() {
             launchUrl = candidate;
           }
         } catch (err) {
-          usedFallback = true;
           setShareState({
             error: `${apiMessage(err, "Unable to prepare personalized chat launch.")} Opened default chat link instead.`,
             info: "",
           });
         }
       }
-      popup.location.replace(launchUrl);
-      if (!usedFallback) {
-        setShareState({ error: "", info: "Broadcast chat opened in a new tab." });
+      if (launchUrl && launchUrl !== chatUrl && !popup.closed) {
+        try {
+          popup.location.replace(launchUrl);
+        } catch {
+          // The direct chat tab is already open, so failing to upgrade it is non-fatal.
+        }
       }
     })();
   };

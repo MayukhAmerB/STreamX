@@ -1783,19 +1783,20 @@ export default function MeetingRoomExperience({
       setMeetingError("Broadcast chat URL is not configured for this session.");
       return;
     }
-    const popup = window.open("", "_blank", "noopener,noreferrer");
+    const popup = window.open(broadcastChatUrl, "_blank");
     if (!popup) {
       setMeetingError("Popup blocked by browser. Allow popups and use 'Copy Chat' if needed.");
       return;
     }
-    const loadingMarkup =
-      "<!doctype html><html><body style='margin:0;background:#0b0f19;color:#d8dbe3;font-family:system-ui,Segoe UI,Roboto,sans-serif;display:grid;place-items:center;min-height:100vh;'><div>Preparing broadcast chat...</div></body></html>";
-    popup.document.write(loadingMarkup);
-    popup.document.close();
+    try {
+      popup.opener = null;
+    } catch {
+      // Best effort only; keep the working direct chat tab even if opener cannot be cleared.
+    }
+    setMeetingInfo("Broadcast chat opened in a new tab.");
 
     (async () => {
       let launchUrl = broadcastChatUrl;
-      let usedFallback = false;
       if (session?.id) {
         try {
           const launchResponse = await createRealtimeOwncastChatLaunch(session.id);
@@ -1805,15 +1806,17 @@ export default function MeetingRoomExperience({
             launchUrl = candidate;
           }
         } catch (err) {
-          usedFallback = true;
           setMeetingError(
             `${apiMessage(err, "Unable to prepare personalized chat launch.")} Opened default chat link instead.`
           );
         }
       }
-      popup.location.replace(launchUrl);
-      if (!usedFallback) {
-        setMeetingInfo("Broadcast chat opened in a new tab.");
+      if (launchUrl && launchUrl !== broadcastChatUrl && !popup.closed) {
+        try {
+          popup.location.replace(launchUrl);
+        } catch {
+          // The direct chat tab is already open, so failing to upgrade it is non-fatal.
+        }
       }
     })();
   };
