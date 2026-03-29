@@ -1,0 +1,10 @@
+{% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+  {{ block.super }}
+  {% if original and verify_password_url %}
+    <li>
+      <a href="{{ verify_password_url }}">Verify password</a>
+    </li>
+  {% endif %}
+{% endblock %}

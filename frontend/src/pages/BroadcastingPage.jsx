@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { Room, createLocalAudioTrack, createLocalScreenTracks, createLocalVideoTrack } from "livekit-client";
 import Button from "../components/Button";
@@ -22,6 +22,7 @@ import {
   uploadRealtimeBrowserRecording,
 } from "../api/realtime";
 import { useAuth } from "../hooks/useAuth";
+import useAdaptiveRealtimeSessionPolling from "../hooks/useAdaptiveRealtimeSessionPolling";
 import { ScreenityFallbackRecorder } from "../services/recording/ScreenityFallbackRecorder";
 import { resolveBroadcastEmbedUrls } from "../utils/broadcastUrls";
 import { apiData, apiMessage } from "../utils/api";
@@ -1034,15 +1035,18 @@ export default function BroadcastingPage() {
   };
 
   useEffect(() => {
-    if (!highlightedSessionId || !isAuthenticated || activeBroadcast) {
+    if (!highlightedSessionId || !isAuthenticated) {
       return;
     }
     const sessionId = Number(highlightedSessionId);
     if (!Number.isInteger(sessionId) || sessionId <= 0) {
       return;
     }
+    if (activeBroadcast?.session?.id === sessionId) {
+      return;
+    }
     handleJoin(sessionId);
-  }, [highlightedSessionId, isAuthenticated]);
+  }, [activeBroadcast?.session?.id, highlightedSessionId, isAuthenticated]);
 
   useEffect(() => {
     if (!studioSession?.id) {
@@ -1071,45 +1075,33 @@ export default function BroadcastingPage() {
     };
   }, [studioSession?.id]);
 
-  useEffect(() => {
-    if (!activeBroadcast?.session?.id) {
-      return undefined;
+  const applyActiveBroadcastSessionUpdate = useCallback((latestSession) => {
+    if (!latestSession) {
+      return;
     }
-
-    let cancelled = false;
-    const refreshActiveBroadcast = async () => {
-      try {
-        const response = await getRealtimeSession(activeBroadcast.session.id);
-        const latestSession = apiData(response, null);
-        if (!latestSession || cancelled) {
-          return;
-        }
-        syncSessionRow(latestSession);
-        setActiveBroadcast((previous) => {
-          if (!previous || previous.session?.id !== latestSession.id) {
-            return previous;
-          }
-          return {
-            ...previous,
-            session: { ...previous.session, ...latestSession },
-            broadcast: {
-              ...previous.broadcast,
-              stream_status: latestSession.stream_status || previous.broadcast?.stream_status || "",
-            },
-          };
-        });
-      } catch {
-        // keep current viewer shell alive during transient refresh failures
+    syncSessionRow(latestSession);
+    setActiveBroadcast((previous) => {
+      if (!previous || previous.session?.id !== latestSession.id) {
+        return previous;
       }
-    };
+      return {
+        ...previous,
+        session: { ...previous.session, ...latestSession },
+        broadcast: {
+          ...previous.broadcast,
+          stream_status: latestSession.stream_status || previous.broadcast?.stream_status || "",
+        },
+      };
+    });
+  }, [syncSessionRow]);
 
-    refreshActiveBroadcast();
-    const intervalId = window.setInterval(refreshActiveBroadcast, 8000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [activeBroadcast?.session?.id]);
+  const handleRefreshActiveBroadcast = useAdaptiveRealtimeSessionPolling({
+    enabled: Boolean(activeBroadcast?.session?.id),
+    sessionId: activeBroadcast?.session?.id,
+    sessionStatus: activeBroadcast?.session?.status,
+    streamStatus: activeBroadcast?.broadcast?.stream_status,
+    onSessionData: applyActiveBroadcastSessionUpdate,
+  });
 
   const studioStreamUrl = getSessionStreamUrl(studioSession);
   const studioChatUrl = getSessionChatUrl(studioSession);
@@ -1137,34 +1129,6 @@ export default function BroadcastingPage() {
         ? "The video stream is temporarily offline. Keep chat open while the host reconnects OBS."
         : "";
 
-  const handleRefreshActiveBroadcast = async () => {
-    if (!activeBroadcast?.session?.id) {
-      return;
-    }
-    try {
-      const response = await getRealtimeSession(activeBroadcast.session.id);
-      const latestSession = apiData(response, null);
-      if (!latestSession) {
-        return;
-      }
-      syncSessionRow(latestSession);
-      setActiveBroadcast((previous) => {
-        if (!previous || previous.session?.id !== latestSession.id) {
-          return previous;
-        }
-        return {
-          ...previous,
-          session: { ...previous.session, ...latestSession },
-          broadcast: {
-            ...previous.broadcast,
-            stream_status: latestSession.stream_status || previous.broadcast?.stream_status || "",
-          },
-        };
-      });
-    } catch {
-      // leave the current viewer shell intact; the next poll can recover
-    }
-  };
   const normalizedStudioStreamStatus = String(studioSession?.stream_status || "").trim().toLowerCase();
   const obsStartActionLabel =
     isObsStudioMode && ["starting", "live", "stopped", "failed"].includes(normalizedStudioStreamStatus)

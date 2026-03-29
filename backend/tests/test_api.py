@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, urlparse
 from unittest.mock import patch
 
 from django.conf import settings
+from django.contrib.admin.models import LogEntry
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
 from django.core import mail, signing
@@ -136,6 +137,51 @@ class AuthTests(APITestCase):
         self.assertEqual(login_resp.status_code, 200)
         self.assertTrue(login_resp.data["success"])
         self.assertIn("csrftoken", login_resp.cookies)
+
+    def test_login_accepts_lowercased_email_for_mixed_case_stored_account(self):
+        user = User.objects.create_user(
+            email="Ad195@Test.com",
+            password="StrongPass@123",
+            full_name="Mixed Case User",
+            role=User.ROLE_STUDENT,
+        )
+        self.assertEqual(user.email, "ad195@test.com")
+
+        login_resp = self.client.post(
+            reverse("auth-login"),
+            {"email": "ad195@test.com", "password": "StrongPass@123"},
+            format="json",
+        )
+        self.assertEqual(login_resp.status_code, 200)
+        self.assertTrue(login_resp.data["success"])
+
+    @override_settings(GOOGLE_CLIENT_ID="google-client-id")
+    @patch("apps.users.views.verify_google_credential")
+    def test_google_login_matches_existing_user_case_insensitively(self, mock_verify_google):
+        existing_user = User.objects.create_user(
+            email="MixedCaseGoogle@Test.com",
+            password="StrongPass@123",
+            full_name="Existing Google User",
+            role=User.ROLE_STUDENT,
+        )
+        mock_verify_google.return_value = {
+            "email": "mixedcasegoogle@test.com",
+            "name": "Existing Google User",
+            "sub": "google-existing-1",
+        }
+
+        response = self.client.post(
+            reverse("auth-google"),
+            {"credential": "dummy"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(User.objects.filter(email__iexact="mixedcasegoogle@test.com").count(), 1)
+
+        existing_user.refresh_from_db()
+        self.assertEqual(existing_user.email, "mixedcasegoogle@test.com")
+        self.assertEqual(existing_user.oauth_provider, "google")
+        self.assertEqual(existing_user.oauth_provider_uid, "google-existing-1")
 
     def test_register_cannot_elevate_role_to_instructor(self):
         config = AuthConfiguration.get_solo()
@@ -432,6 +478,68 @@ class AuthTests(APITestCase):
             format="json",
         )
         self.assertEqual(login_resp.status_code, 200)
+
+
+class AdminPasswordVerificationTests(APITestCase):
+    def setUp(self):
+        cache.clear()
+        self.superuser = User.objects.create_superuser(
+            email="superadmin@test.com",
+            password="StrongPass@123",
+            full_name="Super Admin",
+        )
+        self.staff_user = User.objects.create_user(
+            email="staffonly@test.com",
+            password="StrongPass@123",
+            full_name="Staff User",
+            is_staff=True,
+            role=User.ROLE_INSTRUCTOR,
+        )
+        self.target_user = User.objects.create_user(
+            email="verifyme@test.com",
+            password="VerifyMe@123",
+            full_name="Verify Me",
+            role=User.ROLE_STUDENT,
+        )
+
+    def test_superuser_can_open_password_verification_page(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(reverse("admin:users_user_verify_password", args=[self.target_user.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Verify password")
+        self.assertContains(response, self.target_user.email)
+
+    def test_superuser_can_verify_existing_user_password(self):
+        self.client.force_login(self.superuser)
+        candidate_password = "VerifyMe@123"
+        response = self.client.post(
+            reverse("admin:users_user_verify_password", args=[self.target_user.pk]),
+            {"password": candidate_password},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "matches the stored password hash")
+        self.assertNotContains(response, candidate_password)
+        self.assertTrue(
+            LogEntry.objects.filter(
+                user_id=self.superuser.pk,
+                object_id=str(self.target_user.pk),
+                change_message__contains="Password verification attempted.",
+            ).exists()
+        )
+
+    def test_superuser_sees_failure_for_wrong_password(self):
+        self.client.force_login(self.superuser)
+        response = self.client.post(
+            reverse("admin:users_user_verify_password", args=[self.target_user.pk]),
+            {"password": "WrongPassword@123"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "does not match the stored password hash")
+
+    def test_non_superuser_cannot_access_password_verification_page(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.get(reverse("admin:users_user_verify_password", args=[self.target_user.pk]))
+        self.assertEqual(response.status_code, 403)
 
 
 class RateLimitTests(APITestCase):

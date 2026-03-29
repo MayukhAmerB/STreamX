@@ -71,6 +71,12 @@ class RegisterSerializer(serializers.ModelSerializer):
         validate_password(value)
         return value
 
+    def validate_email(self, value):
+        normalized = User.objects.normalize_auth_email(value)
+        if User.objects.filter(email__iexact=normalized).exists():
+            raise serializers.ValidationError("A user with that email already exists.")
+        return normalized
+
     def validate_full_name(self, value):
         if contains_active_content(value):
             raise serializers.ValidationError("Suspicious script or active-content payload detected.")
@@ -95,7 +101,7 @@ class LoginSerializer(serializers.Serializer):
     otp_code = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     def validate(self, attrs):
-        email = str(attrs.get("email", "")).strip().lower()
+        email = User.objects.normalize_auth_email(attrs.get("email", ""))
         password = str(attrs.get("password", ""))
         if contains_suspicious_sqli(email) or contains_suspicious_sqli(password):
             raise serializers.ValidationError({"detail": "Suspicious input detected."})

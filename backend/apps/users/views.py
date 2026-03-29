@@ -186,7 +186,7 @@ class LoginView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        email = str(request.data.get("email", "")).strip().lower()
+        email = User.objects.normalize_auth_email(request.data.get("email", ""))
         is_locked, attempts, max_failures = get_lockout_state(email, request)
         if is_locked:
             log_security_event(
@@ -321,7 +321,7 @@ class GoogleLoginView(APIView):
                 errors={"detail": str(exc)},
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
-        email = info.get("email")
+        email = User.objects.normalize_auth_email(info.get("email"))
         if not email:
             return api_response(
                 success=False,
@@ -329,7 +329,7 @@ class GoogleLoginView(APIView):
                 errors={"detail": "Google account email is unavailable."},
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
-        existing_user = User.objects.filter(email=email).first()
+        existing_user = User.objects.filter(email__iexact=email).first()
         if existing_user is None and not _registration_enabled():
             return api_response(
                 success=False,
@@ -338,25 +338,35 @@ class GoogleLoginView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        user, created = User.objects.get_or_create(
-            email=email,
-            defaults={
-                "full_name": info.get("name", email.split("@")[0]),
-                "role": User.ROLE_STUDENT,
-                "oauth_provider": "google",
-                "oauth_provider_uid": info.get("sub", ""),
-            },
-        )
-        if not created:
+        if existing_user is None:
+            user = User.objects.create_user(
+                email=email,
+                password=None,
+                full_name=info.get("name", email.split("@")[0]),
+                role=User.ROLE_STUDENT,
+                oauth_provider="google",
+                oauth_provider_uid=info.get("sub", ""),
+            )
+            created = True
+        else:
+            user = existing_user
+            created = False
             updated = False
-            if not user.oauth_provider:
+            oauth_provider_needs_update = not user.oauth_provider
+            oauth_uid_needs_update = bool(info.get("sub") and user.oauth_provider_uid != info.get("sub"))
+            if oauth_provider_needs_update:
                 user.oauth_provider = "google"
                 updated = True
-            if info.get("sub") and user.oauth_provider_uid != info.get("sub"):
+            if oauth_uid_needs_update:
                 user.oauth_provider_uid = info["sub"]
                 updated = True
             if updated:
-                user.save(update_fields=["oauth_provider", "oauth_provider_uid", "updated_at"])
+                update_fields = ["updated_at"]
+                if oauth_provider_needs_update:
+                    update_fields.append("oauth_provider")
+                if oauth_uid_needs_update:
+                    update_fields.append("oauth_provider_uid")
+                user.save(update_fields=list(dict.fromkeys(update_fields)))
         return _auth_success_response(user, "Google login successful.", request=request)
 
 
@@ -402,7 +412,7 @@ class PasswordResetRequestView(APIView):
                 errors=serializer.errors,
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
-        email = serializer.validated_data["email"].strip().lower()
+        email = User.objects.normalize_auth_email(serializer.validated_data["email"])
         user = User.objects.filter(email__iexact=email, is_active=True).first()
         if user:
             uid = urlsafe_base64_encode(force_bytes(user.pk))

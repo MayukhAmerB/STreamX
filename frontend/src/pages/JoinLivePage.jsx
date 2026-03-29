@@ -1,11 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 import BroadcastViewerTheater from "../components/realtime/BroadcastViewerTheater";
 import MeetingRoomExperience from "../components/realtime/MeetingRoomExperience";
-import { getRealtimeSession, joinRealtimeSession, listRealtimeSessions } from "../api/realtime";
+import { joinRealtimeSession, listRealtimeSessions } from "../api/realtime";
 import { useAuth } from "../hooks/useAuth";
+import useAdaptiveRealtimeSessionPolling from "../hooks/useAdaptiveRealtimeSessionPolling";
+import {
+  clearPersistedMeetingSessionId,
+  persistMeetingSessionId,
+  readPersistedMeetingSessionId,
+} from "../utils/activeMeetingStorage";
 import { resolveBroadcastEmbedUrls } from "../utils/broadcastUrls";
 import { apiData, apiMessage } from "../utils/api";
 
@@ -88,8 +94,9 @@ function sessionTypeLabel(sessionType) {
 }
 
 export default function JoinLivePage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [searchParams] = useSearchParams();
+  const authenticatedUserId = Number(user?.id || 0) || null;
 
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -99,12 +106,17 @@ export default function JoinLivePage() {
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState("all");
   const [autoJoinConsumed, setAutoJoinConsumed] = useState(false);
+  const [meetingRestoreConsumed, setMeetingRestoreConsumed] = useState(false);
 
   const highlightedSessionId = useMemo(() => {
     const raw = searchParams.get("session");
     const value = Number(raw || 0);
     return Number.isInteger(value) && value > 0 ? value : null;
   }, [searchParams]);
+
+  useEffect(() => {
+    setAutoJoinConsumed(false);
+  }, [highlightedSessionId]);
 
   const loadSessions = async () => {
     try {
@@ -175,11 +187,25 @@ export default function JoinLivePage() {
       const nextActiveSession = data?.mode === "broadcast" ? sanitizeBroadcastPayload(data) : data;
       setActiveSession(nextActiveSession);
       persistBroadcastPayload(nextActiveSession);
+      persistMeetingSessionId(data?.mode === "meeting" ? data?.session?.id : null, authenticatedUserId);
       setJoinState({ loadingId: null, error: "", info: "Joined live session." });
       await loadSessions();
     } catch (err) {
       setJoinState({ loadingId: null, error: apiMessage(err, "Unable to join live session."), info: "" });
     }
+  };
+
+  const handleReconnectMeeting = async (sessionId) => {
+    const response = await joinRealtimeSession(sessionId, {
+      display_name: user?.full_name || "",
+    });
+    const data = apiData(response, null);
+    const nextActiveSession = data?.mode === "broadcast" ? sanitizeBroadcastPayload(data) : data;
+    setActiveSession(nextActiveSession);
+    persistBroadcastPayload(nextActiveSession);
+    persistMeetingSessionId(data?.mode === "meeting" ? data?.session?.id : null, authenticatedUserId);
+    await loadSessions();
+    return data;
   };
 
   useEffect(() => {
@@ -190,81 +216,118 @@ export default function JoinLivePage() {
       setAutoJoinConsumed(true);
       return;
     }
-    if (activeSession?.session?.id && activeSession.session.id !== highlightedSessionId) {
-      setActiveSession(null);
-      persistBroadcastPayload(null);
-    }
     setAutoJoinConsumed(true);
     handleJoin(highlightedSessionId);
   }, [activeSession?.session?.id, autoJoinConsumed, highlightedSessionId]);
 
   useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+    if (
+      meetingRestoreConsumed ||
+      !isAuthenticated ||
+      !authenticatedUserId ||
+      highlightedSessionId ||
+      activeSession?.mode === "broadcast"
+    ) {
+      return;
+    }
+    if (activeSession?.mode === "meeting" && activeSession?.session?.id) {
+      setMeetingRestoreConsumed(true);
+      return;
+    }
+    const persistedMeetingSessionId = readPersistedMeetingSessionId(authenticatedUserId);
+    setMeetingRestoreConsumed(true);
+    if (!persistedMeetingSessionId) {
+      return;
+    }
+    handleReconnectMeeting(persistedMeetingSessionId).catch(() => {
+      clearPersistedMeetingSessionId();
+    });
+  }, [
+    activeSession?.mode,
+    activeSession?.session?.id,
+    authLoading,
+    authenticatedUserId,
+    highlightedSessionId,
+    isAuthenticated,
+    meetingRestoreConsumed,
+  ]);
+
+  useEffect(() => {
+    if (authLoading) {
+      return;
+    }
     if (!activeSession) {
       persistBroadcastPayload(null);
+      clearPersistedMeetingSessionId();
       return;
     }
     if (activeSession.mode === "broadcast") {
       persistBroadcastPayload(activeSession);
+      clearPersistedMeetingSessionId();
+      return;
+    }
+    if (activeSession.mode === "meeting") {
+      persistBroadcastPayload(null);
+      persistMeetingSessionId(activeSession.session?.id, authenticatedUserId);
       return;
     }
     persistBroadcastPayload(null);
-  }, [activeSession]);
+    clearPersistedMeetingSessionId();
+  }, [activeSession, authLoading, authenticatedUserId]);
 
   useEffect(() => {
-    if (activeSession?.mode !== "broadcast" || !activeSession?.session?.id) {
-      return undefined;
+    if (authLoading) {
+      return;
     }
+    setMeetingRestoreConsumed(false);
+  }, [authLoading, authenticatedUserId]);
 
-    let cancelled = false;
-    const refreshSession = async () => {
-      try {
-        const response = await getRealtimeSession(activeSession.session.id);
-        const latestSession = apiData(response, null);
-        if (!latestSession || cancelled) {
-          return;
-        }
-        setSessions((previous) => {
-          const nextRows = previous.filter((item) => item.id !== latestSession.id);
-          if (latestSession.status !== "ended") {
-            nextRows.unshift(latestSession);
-          }
-          return nextRows;
-        });
-        setActiveSession((previous) => {
-          if (!previous || previous.mode !== "broadcast" || previous.session?.id !== latestSession.id) {
-            return previous;
-          }
-          const nextPayload = sanitizeBroadcastPayload({
-            ...previous,
-            session: { ...previous.session, ...latestSession },
-            broadcast: {
-              ...previous.broadcast,
-              stream_status: latestSession.stream_status || previous.broadcast?.stream_status || "",
-            },
-          });
-          if (!nextPayload) {
-            persistBroadcastPayload(null);
-            return null;
-          }
-          if (latestSession.status !== "ended") {
-            persistBroadcastPayload(nextPayload);
-          } else {
-            persistBroadcastPayload(null);
-          }
-          return nextPayload;
-        });
-      } catch {
-        // keep the current player shell alive during transient refresh failures
+  const applyActiveBroadcastSessionUpdate = useCallback((latestSession) => {
+    if (!latestSession) {
+      return;
+    }
+    setSessions((previous) => {
+      const nextRows = previous.filter((item) => item.id !== latestSession.id);
+      if (latestSession.status !== "ended") {
+        nextRows.unshift(latestSession);
       }
-    };
+      return nextRows;
+    });
+    setActiveSession((previous) => {
+      if (!previous || previous.mode !== "broadcast" || previous.session?.id !== latestSession.id) {
+        return previous;
+      }
+      const nextPayload = sanitizeBroadcastPayload({
+        ...previous,
+        session: { ...previous.session, ...latestSession },
+        broadcast: {
+          ...previous.broadcast,
+          stream_status: latestSession.stream_status || previous.broadcast?.stream_status || "",
+        },
+      });
+      if (!nextPayload) {
+        persistBroadcastPayload(null);
+        return null;
+      }
+      if (latestSession.status !== "ended") {
+        persistBroadcastPayload(nextPayload);
+      } else {
+        persistBroadcastPayload(null);
+      }
+      return nextPayload;
+    });
+  }, []);
 
-    refreshSession();
-    const intervalId = window.setInterval(refreshSession, 8000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [activeSession?.mode, activeSession?.session?.id]);
+  const handleRefreshActiveBroadcast = useAdaptiveRealtimeSessionPolling({
+    enabled: activeSession?.mode === "broadcast",
+    sessionId: activeSession?.mode === "broadcast" ? activeSession?.session?.id : null,
+    sessionStatus: activeSession?.session?.status,
+    streamStatus: activeSession?.broadcast?.stream_status,
+    onSessionData: applyActiveBroadcastSessionUpdate,
+  });
 
   const activeBroadcastUrls = useMemo(() => {
     if (!activeSession || activeSession.mode !== "broadcast") {
@@ -290,44 +353,6 @@ export default function JoinLivePage() {
           ? "The video stream is temporarily offline. Keep chat open while the host reconnects OBS."
           : ""
       : "";
-
-  const handleRefreshActiveBroadcast = async () => {
-    if (activeSession?.mode !== "broadcast" || !activeSession?.session?.id) {
-      return;
-    }
-    try {
-      const response = await getRealtimeSession(activeSession.session.id);
-      const latestSession = apiData(response, null);
-      if (!latestSession) {
-        return;
-      }
-      setActiveSession((previous) => {
-        if (!previous || previous.mode !== "broadcast" || previous.session?.id !== latestSession.id) {
-          return previous;
-        }
-        const nextPayload = sanitizeBroadcastPayload({
-          ...previous,
-          session: { ...previous.session, ...latestSession },
-          broadcast: {
-            ...previous.broadcast,
-            stream_status: latestSession.stream_status || previous.broadcast?.stream_status || "",
-          },
-        });
-        if (!nextPayload) {
-          persistBroadcastPayload(null);
-          return null;
-        }
-        if (latestSession.status !== "ended") {
-          persistBroadcastPayload(nextPayload);
-        } else {
-          persistBroadcastPayload(null);
-        }
-        return nextPayload;
-      });
-    } catch {
-      // keep the current shell intact; retry manually later
-    }
-  };
 
   return (
     <PageShell
@@ -419,7 +444,11 @@ export default function JoinLivePage() {
       {activeSession?.mode === "meeting" ? (
         <MeetingRoomExperience
           payload={activeSession}
-          onLeave={() => setActiveSession(null)}
+          onLeave={() => {
+            clearPersistedMeetingSessionId();
+            setActiveSession(null);
+          }}
+          onReconnect={handleReconnectMeeting}
           audiencePanel
         />
       ) : null}

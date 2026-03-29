@@ -1,12 +1,19 @@
+from django import forms
 from django.contrib import admin
 from django.contrib.admin.sites import NotRegistered
+from django.contrib.admin.utils import unquote
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import Group
+from django.core.exceptions import PermissionDenied
 from django.db.models import Count, Q
+from django.http import Http404
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
 from django.utils.html import format_html
 from rest_framework.authtoken.models import Token
 
 from apps.courses.models import Enrollment, LiveClassEnrollment
+from config.audit import log_security_event
 
 from .models import AsyncJob, AuthConfiguration, User
 
@@ -27,6 +34,19 @@ def highlighted_identity(value, color="#e8f1df", border="#3b4a3d", background="#
         background,
         color,
         text,
+    )
+
+
+class AdminPasswordVerificationForm(forms.Form):
+    password = forms.CharField(
+        label="Candidate password",
+        widget=forms.PasswordInput(
+            attrs={
+                "autocomplete": "new-password",
+                "style": "width:100%;max-width:420px;",
+            },
+        ),
+        help_text="Checks the entered password against the stored hash. The password is never saved.",
     )
 
 
@@ -71,6 +91,7 @@ class LiveClassEnrollmentInline(EnrollmentRequesterInlineMixin, admin.TabularInl
 @admin.register(User)
 class UserAdmin(DjangoUserAdmin):
     model = User
+    change_form_template = "admin/users/user/change_form.html"
     list_display = (
         "email",
         "full_name",
@@ -126,6 +147,81 @@ class UserAdmin(DjangoUserAdmin):
             },
         ),
     )
+
+    def get_urls(self):
+        info = self.model._meta.app_label, self.model._meta.model_name
+        custom_urls = [
+            path(
+                "<path:object_id>/verify-password/",
+                self.admin_site.admin_view(self.verify_password_view),
+                name=f"{info[0]}_{info[1]}_verify_password",
+            ),
+        ]
+        return custom_urls + super().get_urls()
+
+    def _verify_password_url(self, obj):
+        info = self.model._meta.app_label, self.model._meta.model_name
+        return reverse(f"admin:{info[0]}_{info[1]}_verify_password", args=[obj.pk])
+
+    def _ensure_superuser_verification_access(self, request):
+        if not request.user.is_active or not request.user.is_staff:
+            raise PermissionDenied
+        if not request.user.is_superuser:
+            raise PermissionDenied("Only superusers can verify stored passwords.")
+
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        extra_context = extra_context or {}
+        if object_id:
+            obj = self.get_object(request, unquote(object_id))
+            if obj is not None and request.user.is_superuser:
+                extra_context["verify_password_url"] = self._verify_password_url(obj)
+        return super().change_view(request, object_id, form_url=form_url, extra_context=extra_context)
+
+    def verify_password_view(self, request, object_id):
+        self._ensure_superuser_verification_access(request)
+        target_user = self.get_object(request, unquote(object_id))
+        if target_user is None:
+            raise Http404("User does not exist.")
+
+        form = AdminPasswordVerificationForm(request.POST or None)
+        verification_result = None
+        if request.method == "POST" and form.is_valid():
+            candidate_password = form.cleaned_data["password"]
+            has_usable_password = target_user.has_usable_password()
+            matches = bool(has_usable_password and target_user.check_password(candidate_password))
+            verification_result = {
+                "has_usable_password": has_usable_password,
+                "matches": matches,
+            }
+            log_security_event(
+                "admin.password_verification_attempt",
+                request=request,
+                target_user_id=target_user.id,
+                target_email=target_user.email,
+                has_usable_password=has_usable_password,
+                matched=matches,
+            )
+            self.log_change(
+                request,
+                target_user,
+                (
+                    "Password verification attempted. "
+                    f"has_usable_password={has_usable_password}; matched={matches}"
+                ),
+            )
+            form = AdminPasswordVerificationForm()
+
+        context = {
+            **self.admin_site.each_context(request),
+            "opts": self.model._meta,
+            "original": target_user,
+            "target_user": target_user,
+            "title": f"Verify password for {target_user.email}",
+            "form": form,
+            "verification_result": verification_result,
+            "verify_password_url": self._verify_password_url(target_user),
+        }
+        return TemplateResponse(request, "admin/users/user/verify_password.html", context)
 
     class Media:
         js = ("admin/js/user_password_generator.js",)

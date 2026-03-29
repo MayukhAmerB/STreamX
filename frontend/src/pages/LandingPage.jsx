@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { enrollInLiveClass, listCourses, listLiveClasses } from "../api/courses";
+import { listRealtimeSessions } from "../api/realtime";
 import Button from "../components/Button";
 import PublicEnrollmentRequestModal from "../components/PublicEnrollmentRequestModal";
 import StoryJourneySection from "../components/StoryJourneySection";
@@ -16,6 +17,8 @@ const heroCardImage =
 const heroGlitchBase =
   "AL SYED INITIATIVE // CYBERSECURITY // OSINT // WEB PENTESTING // LIVE TRAINING // ";
 const heroGlitchLine = `${heroGlitchBase}${heroGlitchBase}${heroGlitchBase}${heroGlitchBase}`;
+const HERO_LIVE_BROADCAST_VISIBLE_POLL_MS = 45000;
+const HERO_LIVE_BROADCAST_HIDDEN_POLL_MS = 180000;
 
 const stats = [
   { value: "1000+", label: "Students trained" },
@@ -180,6 +183,32 @@ function formatLiveClassPrice(value) {
   return formatINR(amount);
 }
 
+function selectHeroLiveBroadcast(payload) {
+  const rows = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.results)
+      ? payload.results
+      : [];
+
+  return (
+    [...rows]
+      .filter((session) => {
+        if (String(session?.session_type || "").trim().toLowerCase() !== "broadcasting") {
+          return false;
+        }
+        if (String(session?.status || "").trim().toLowerCase() === "ended") {
+          return false;
+        }
+        return String(session?.stream_status || "").trim().toLowerCase() === "live";
+      })
+      .sort((a, b) => {
+        const aTimestamp = new Date(a?.started_at || a?.created_at || 0).getTime();
+        const bTimestamp = new Date(b?.started_at || b?.created_at || 0).getTime();
+        return bTimestamp - aTimestamp;
+      })[0] || null
+  );
+}
+
 function toValidLiveClassId(value) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) return null;
@@ -257,6 +286,7 @@ export default function LandingPage() {
   const [landingLiveClassesError, setLandingLiveClassesError] = useState("");
   const [landingActionState, setLandingActionState] = useState({});
   const [landingPublicLeadTarget, setLandingPublicLeadTarget] = useState(null);
+  const [heroLiveBroadcast, setHeroLiveBroadcast] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -276,6 +306,81 @@ export default function LandingPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    let timeoutId = null;
+    let inFlight = false;
+
+    if (!isAuthenticated) {
+      setHeroLiveBroadcast(null);
+      return undefined;
+    }
+
+    const scheduleNextPoll = () => {
+      if (!active) return;
+      const delay =
+        document.visibilityState === "visible"
+          ? HERO_LIVE_BROADCAST_VISIBLE_POLL_MS
+          : HERO_LIVE_BROADCAST_HIDDEN_POLL_MS;
+      timeoutId = window.setTimeout(loadHeroLiveBroadcast, delay);
+    };
+
+    const loadHeroLiveBroadcast = async () => {
+      if (!active || inFlight) {
+        return;
+      }
+      inFlight = true;
+      try {
+        const response = await listRealtimeSessions({ session_type: "broadcasting", status: "all" });
+        if (!active) return;
+        setHeroLiveBroadcast(selectHeroLiveBroadcast(apiData(response, [])));
+      } catch {
+        if (!active) return;
+        setHeroLiveBroadcast(null);
+      } finally {
+        inFlight = false;
+        if (timeoutId) {
+          window.clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        scheduleNextPoll();
+      }
+    };
+
+    const triggerImmediateRefresh = () => {
+      if (!active) return;
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      loadHeroLiveBroadcast();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        triggerImmediateRefresh();
+      }
+    };
+
+    loadHeroLiveBroadcast();
+
+    window.addEventListener("focus", triggerImmediateRefresh);
+    window.addEventListener("pageshow", triggerImmediateRefresh);
+    window.addEventListener("online", triggerImmediateRefresh);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      active = false;
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+      window.removeEventListener("focus", triggerImmediateRefresh);
+      window.removeEventListener("pageshow", triggerImmediateRefresh);
+      window.removeEventListener("online", triggerImmediateRefresh);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     let active = true;
@@ -315,6 +420,7 @@ export default function LandingPage() {
   }, [catalogCourses]);
 
   const featuredLiveCourseLink = featuredLiveCourse?._fallbackLink || `/courses/${featuredLiveCourse.id}`;
+  const heroLiveBroadcastJoinPath = heroLiveBroadcast ? `/join-live?session=${heroLiveBroadcast.id}` : "/join-live";
 
   const landingPrograms = useMemo(() => {
     return [...landingLiveClasses].sort((a, b) => {
@@ -426,6 +532,16 @@ export default function LandingPage() {
                 Al syed Initiative Cybersecurity Platform
               </div>
 
+              {heroLiveBroadcast ? (
+                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-red-400/45 bg-red-500/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-red-100 shadow-[0_0_24px_rgba(220,38,38,0.18)]">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-80" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-400" />
+                  </span>
+                  Live Broadcast Running Now
+                </div>
+              ) : null}
+
               <h1 className="mt-5 max-w-xl font-reference text-4xl font-semibold leading-[1.02] tracking-tight text-white sm:text-5xl lg:text-6xl">
                 Learn Cyber Security with Expert-Led Practical Training
               </h1>
@@ -449,6 +565,16 @@ export default function LandingPage() {
                     Explore Programs
                   </Button>
                 </Link>
+                {isAuthenticated && heroLiveBroadcast ? (
+                  <Link to={heroLiveBroadcastJoinPath}>
+                    <Button
+                      variant="danger"
+                      className="rounded-full border-red-400/60 bg-[linear-gradient(135deg,#ef4444_0%,#b91c1c_100%)] px-5 text-white shadow-[0_16px_34px_rgba(220,38,38,0.28)] hover:bg-[linear-gradient(135deg,#f87171_0%,#dc2626_100%)]"
+                    >
+                      Join Live Now
+                    </Button>
+                  </Link>
+                ) : null}
               </div>
 
               <div className="mt-5 rounded-2xl border border-black bg-black/92 p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)]">

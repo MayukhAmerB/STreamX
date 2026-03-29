@@ -54,6 +54,7 @@ const MOBILE_LISTENER_RECONNECT_DELAYS_MS = [
   7000,
   7000,
 ];
+const MEETING_REJOIN_DELAYS_MS = [0, 1500, 4000, 8000, 12000, 15000];
 
 function resolveMeetingConnectionStrategy({
   audienceFocusMode = false,
@@ -412,6 +413,25 @@ function humanizeConnectionLabel(label) {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
+function isRecoverableConnectionState(label) {
+  const normalized = String(label || "").toLowerCase();
+  return normalized.includes("disconnect") || normalized.includes("fail");
+}
+
+function resolveAudioPlaybackStartError(err) {
+  const rawMessage = String(err?.message || "").trim();
+  const normalized = rawMessage.toLowerCase();
+  if (
+    normalized.includes("gesture") ||
+    normalized.includes("interact") ||
+    normalized.includes("autoplay") ||
+    normalized.includes("notallowederror")
+  ) {
+    return "Tap Enable Audio once to finish turning on meeting audio for this device.";
+  }
+  return rawMessage || "Tap Enable Audio to finish turning on meeting audio for this device.";
+}
+
 function parseParticipantMetadata(participant) {
   const rawMetadata = String(participant?.metadata || "").trim();
   if (!rawMetadata) {
@@ -691,7 +711,12 @@ function normalizeUserIdList(values) {
   );
 }
 
-export default function MeetingRoomExperience({ payload, onLeave, audiencePanel = false }) {
+export default function MeetingRoomExperience({
+  payload,
+  onLeave,
+  onReconnect,
+  audiencePanel = false,
+}) {
   const { user } = useAuth();
   const session = payload?.session || {};
   const meeting = payload?.meeting || {};
@@ -775,12 +800,23 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     latestCompleted: null,
     mode: "",
   });
+  const [audioUnlockRequired, setAudioUnlockRequired] = useState(false);
+  const [audioUnlockBusy, setAudioUnlockBusy] = useState(false);
+  const [rejoinState, setRejoinState] = useState({
+    loading: false,
+    error: "",
+    info: "",
+  });
 
   const roomRef = useRef(null);
   const connectedAtRef = useRef(null);
   const stageRef = useRef(null);
   const fallbackRecorderRef = useRef(null);
   const roomStateRefreshTimerRef = useRef(null);
+  const rejoinTimerRef = useRef(null);
+  const manualLeaveRef = useRef(false);
+  const reconnectingRef = useRef(false);
+  const previousSessionIdRef = useRef(session?.id || null);
   const [isStageFullscreen, setIsStageFullscreen] = useState(false);
   const defaultModeratorUserIds = useMemo(
     () =>
@@ -831,6 +867,74 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
 
     setParticipants([...localEntry, ...remoteEntries]);
   }, [meeting?.participant_profile_image_url, user?.is_admin, user?.profile_image_url]);
+
+  const clearPendingRejoinTimer = useCallback(() => {
+    if (rejoinTimerRef.current) {
+      window.clearTimeout(rejoinTimerRef.current);
+      rejoinTimerRef.current = null;
+    }
+  }, []);
+
+  const startRoomAudio = useCallback(
+    async (room, { userInitiated = false, announceSuccess = userInitiated } = {}) => {
+      if (!room) {
+        return false;
+      }
+      try {
+        await room.startAudio();
+        setAudioUnlockRequired(false);
+        if (userInitiated) {
+          setMeetingError("");
+          if (announceSuccess) {
+            setMeetingInfo("Meeting audio is enabled for this device.");
+          }
+        }
+        return true;
+      } catch (err) {
+        setAudioUnlockRequired(true);
+        if (userInitiated) {
+          setMeetingError(resolveAudioPlaybackStartError(err));
+        }
+        return false;
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (
+      typeof window === "undefined" ||
+      !audioUnlockRequired ||
+      !connected ||
+      !connectionStrategy.isMobileDevice
+    ) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let unlockAttempted = false;
+    const handleFirstGesture = () => {
+      if (cancelled || unlockAttempted) {
+        return;
+      }
+      unlockAttempted = true;
+      startRoomAudio(roomRef.current, { userInitiated: true, announceSuccess: false }).catch(() => {
+        // best-effort unlock attempt
+      });
+    };
+
+    const listenerOptions = { passive: true };
+    window.addEventListener("pointerdown", handleFirstGesture, listenerOptions);
+    window.addEventListener("touchend", handleFirstGesture, listenerOptions);
+    window.addEventListener("keydown", handleFirstGesture);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("pointerdown", handleFirstGesture, listenerOptions);
+      window.removeEventListener("touchend", handleFirstGesture, listenerOptions);
+      window.removeEventListener("keydown", handleFirstGesture);
+    };
+  }, [audioUnlockRequired, connected, connectionStrategy.isMobileDevice, startRoomAudio]);
 
   const syncLocalControls = useCallback(() => {
     const room = roomRef.current;
@@ -897,6 +1001,14 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
   }, [audienceFocusMode, session.id]);
 
   useEffect(() => {
+    manualLeaveRef.current = false;
+    reconnectingRef.current = false;
+    clearPendingRejoinTimer();
+    setRejoinState({ loading: false, error: "", info: "" });
+    setAudioUnlockBusy(false);
+  }, [clearPendingRejoinTimer, meeting.token, session.id]);
+
+  useEffect(() => {
     let active = true;
     if (!session.id) {
       setRecordingState({
@@ -947,6 +1059,7 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
 
   useEffect(() => {
     return () => {
+      clearPendingRejoinTimer();
       const recorder = fallbackRecorderRef.current;
       if (recorder?.isRecording) {
         recorder.stop().catch(() => {
@@ -955,7 +1068,155 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
       }
       fallbackRecorderRef.current = null;
     };
-  }, []);
+  }, [clearPendingRejoinTimer]);
+
+  const requestMeetingReconnect = useCallback(
+    async ({ automatic = false } = {}) => {
+      if (!onReconnect || !session?.id || reconnectingRef.current || manualLeaveRef.current) {
+        return false;
+      }
+      reconnectingRef.current = true;
+      clearPendingRejoinTimer();
+      setRejoinState({
+        loading: true,
+        error: "",
+        info: automatic
+          ? "Connection dropped. Rejoining the meeting..."
+          : "Rejoining the meeting...",
+      });
+      setMeetingError("");
+      setMeetingInfo(
+        automatic
+          ? "Connection dropped. Rejoining the meeting..."
+          : "Rejoining the meeting..."
+      );
+      setConnecting(true);
+      setConnected(false);
+      setConnectionLabel("reconnecting");
+      try {
+        await onReconnect(session.id);
+        setRejoinState({ loading: false, error: "", info: "Fresh meeting connection received." });
+        return true;
+      } catch (err) {
+        setRejoinState({
+          loading: false,
+          error: apiMessage(err, "Unable to reconnect to the meeting."),
+          info: "",
+        });
+        setConnecting(false);
+        setConnected(false);
+        setConnectionLabel("disconnected");
+        return false;
+      } finally {
+        reconnectingRef.current = false;
+      }
+    },
+    [clearPendingRejoinTimer, onReconnect, session?.id]
+  );
+
+  const scheduleMeetingReconnectAttempt = useCallback(
+    (attemptIndex = 0) => {
+      if (!onReconnect || !session?.id || manualLeaveRef.current) {
+        return;
+      }
+      if (attemptIndex >= MEETING_REJOIN_DELAYS_MS.length) {
+        setConnecting(false);
+        setConnected(false);
+        setConnectionLabel("disconnected");
+        setRejoinState({
+          loading: false,
+          error: "Connection lost. Tap Rejoin Meeting to reconnect with a fresh token.",
+          info: "",
+        });
+        return;
+      }
+      if (reconnectingRef.current) {
+        return;
+      }
+      clearPendingRejoinTimer();
+      const retryDelay = MEETING_REJOIN_DELAYS_MS[attemptIndex];
+      const offline =
+        typeof navigator !== "undefined" && navigator.onLine === false;
+      setConnecting(true);
+      setConnected(false);
+      setConnectionLabel("reconnecting");
+      setRejoinState({
+        loading: false,
+        error: "",
+        info: offline
+          ? "Your device appears offline. We'll retry this meeting when the connection returns."
+          : "Connection dropped. Rejoining the meeting...",
+      });
+      setMeetingError("");
+      setMeetingInfo(
+        offline
+          ? "Your device appears offline. We'll retry this meeting when the connection returns."
+          : "Connection dropped. Rejoining the meeting..."
+      );
+      rejoinTimerRef.current = window.setTimeout(async () => {
+        rejoinTimerRef.current = null;
+        const recovered = await requestMeetingReconnect({ automatic: true });
+        if (!recovered) {
+          scheduleMeetingReconnectAttempt(attemptIndex + 1);
+        }
+      }, retryDelay);
+    },
+    [clearPendingRejoinTimer, onReconnect, requestMeetingReconnect, session?.id]
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+    const handleOnline = () => {
+      if (
+        !connected &&
+        !connecting &&
+        isRecoverableConnectionState(connectionLabel) &&
+        !manualLeaveRef.current
+      ) {
+        scheduleMeetingReconnectAttempt(0);
+      }
+    };
+    window.addEventListener("online", handleOnline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [connected, connecting, connectionLabel, scheduleMeetingReconnectAttempt]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      return undefined;
+    }
+    const recoverVisibleMeeting = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+      const recoverable =
+        isRecoverableConnectionState(connectionLabel) ||
+        String(connectionLabel || "").toLowerCase().includes("reconnect") ||
+        Boolean(rejoinState.error);
+      if (!recoverable || connected || manualLeaveRef.current || reconnectingRef.current) {
+        return;
+      }
+      clearPendingRejoinTimer();
+      scheduleMeetingReconnectAttempt(0);
+    };
+    document.addEventListener("visibilitychange", recoverVisibleMeeting);
+    window.addEventListener("pageshow", recoverVisibleMeeting);
+    window.addEventListener("focus", recoverVisibleMeeting);
+    return () => {
+      document.removeEventListener("visibilitychange", recoverVisibleMeeting);
+      window.removeEventListener("pageshow", recoverVisibleMeeting);
+      window.removeEventListener("focus", recoverVisibleMeeting);
+    };
+  }, [
+    clearPendingRejoinTimer,
+    connected,
+    connectionLabel,
+    rejoinState.error,
+    scheduleMeetingReconnectAttempt,
+  ]);
 
   useEffect(() => {
     if (!meeting.livekit_url || !meeting.token) {
@@ -966,6 +1227,9 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     }
 
     let disposed = false;
+    let allowUnexpectedDisconnectRecovery = true;
+    const isSameSessionRefresh = previousSessionIdRef.current === session?.id;
+    previousSessionIdRef.current = session?.id || null;
     const room = new Room({
       adaptiveStream: connectionStrategy.conservativeReceiveProfile ? true : !premiumProfileEnabled,
       dynacast: true,
@@ -979,9 +1243,11 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     setConnected(false);
     setConnectionLabel("Connecting");
     setParticipants([]);
-    setMessages([]);
-    setPinnedIdentity("");
-    setActiveSpeakerIds([]);
+    if (!isSameSessionRefresh) {
+      setMessages([]);
+      setPinnedIdentity("");
+      setActiveSpeakerIds([]);
+    }
     setElapsedSeconds(0);
 
     const flushRoomStateRefresh = () => {
@@ -1029,14 +1295,20 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
       setConnectionLabel("reconnecting");
     });
     room.on(RoomEvent.Reconnected, () => {
+      clearPendingRejoinTimer();
+      setRejoinState({ loading: false, error: "", info: "" });
       setMeetingInfo("Connection restored.");
       setConnectionLabel("connected");
     });
     room.on(RoomEvent.Disconnected, () => {
       setConnected(false);
-      setConnecting(false);
       setConnectionLabel("disconnected");
       flushRoomStateRefresh();
+      if (!allowUnexpectedDisconnectRecovery || manualLeaveRef.current || disposed) {
+        setConnecting(false);
+        return;
+      }
+      scheduleMeetingReconnectAttempt(0);
     });
     const permissionsChangedEvent =
       RoomEvent.ParticipantPermissionsChanged || "participantPermissionsChanged";
@@ -1209,7 +1481,9 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
             }
           : undefined;
         await room.connect(meeting.livekit_url, meeting.token, connectOptions);
-        await room.startAudio();
+        clearPendingRejoinTimer();
+        setRejoinState({ loading: false, error: "", info: "" });
+        const audioStarted = await startRoomAudio(room);
         for (const remoteParticipant of room.remoteParticipants.values()) {
           for (const publication of remoteParticipant.trackPublications.values()) {
             enforceRemotePublicationQuality(publication);
@@ -1265,12 +1539,20 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
             }${premiumProfileEnabled ? " Premium HD receiver mode enabled." : ""}`
           );
         } else if (canSpeakFromPayload) {
-          setMeetingInfo("Connected. Meeting is live. Your microphone is enabled by moderator approval.");
+          setMeetingInfo(
+            audioStarted
+              ? "Connected. Meeting is live. Your microphone is enabled by moderator approval."
+              : "Connected. Your microphone is enabled by moderator approval. Tap Enable Audio if you cannot hear the room yet."
+          );
         } else {
           setMeetingInfo(
             connectionStrategy.mobileListener
-              ? "Connected. Mobile listener stability mode is enabled."
-              : "Connected. Meeting is live. You are in listener mode."
+              ? audioStarted
+                ? "Connected. Mobile listener stability mode is enabled."
+                : "Connected. Mobile listener stability mode is enabled. Tap Enable Audio if you cannot hear the room yet."
+              : audioStarted
+                ? "Connected. Meeting is live. You are in listener mode."
+                : "Connected. Meeting is live. Tap Enable Audio if you cannot hear the room yet."
           );
         }
       } catch (err) {
@@ -1288,6 +1570,8 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
 
     return () => {
       disposed = true;
+      allowUnexpectedDisconnectRecovery = false;
+      clearPendingRejoinTimer();
       if (roomStateRefreshTimerRef.current) {
         window.clearTimeout(roomStateRefreshTimerRef.current);
         roomStateRefreshTimerRef.current = null;
@@ -1312,8 +1596,11 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     meeting.livekit_url,
     meeting.participant_identity,
     meeting.token,
+    clearPendingRejoinTimer,
     premiumProfileEnabled,
     reconnectPolicy,
+    scheduleMeetingReconnectAttempt,
+    startRoomAudio,
     syncLocalControls,
     syncParticipants,
     user?.id,
@@ -1336,6 +1623,16 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
   }, [connected]);
 
   const participantCount = participants.length;
+  const recoveringMeetingConnection =
+    !manualLeaveRef.current &&
+    !connected &&
+    (rejoinState.loading ||
+      String(connectionLabel || "").toLowerCase().includes("reconnect") ||
+      isRecoverableConnectionState(connectionLabel));
+  const canShowRecoverableRejoin =
+    Boolean(onReconnect && session?.id) &&
+    !manualLeaveRef.current &&
+    recoveringMeetingConnection;
   const liveDurationLabel = useMemo(() => {
     if (!connectedAtRef.current || !connected) {
       return "";
@@ -1893,6 +2190,9 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
   };
 
   const handleLeaveMeeting = () => {
+    manualLeaveRef.current = true;
+    clearPendingRejoinTimer();
+    reconnectingRef.current = false;
     const fallbackRecorder = fallbackRecorderRef.current;
     if (fallbackRecorder?.isRecording) {
       fallbackRecorder.stop().catch(() => {
@@ -1910,6 +2210,19 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
     setMeetingInfo("You left the meeting.");
     if (onLeave) {
       onLeave();
+    }
+  };
+
+  const handleEnableAudio = async () => {
+    const room = roomRef.current;
+    if (!room) {
+      return;
+    }
+    setAudioUnlockBusy(true);
+    try {
+      await startRoomAudio(room, { userInitiated: true });
+    } finally {
+      setAudioUnlockBusy(false);
     }
   };
 
@@ -2223,8 +2536,44 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
             </div>
           </div>
           {connecting ? (
-            <div className="flex h-[220px] items-center justify-center rounded-[28px] border border-black panel-gradient text-[#E1E1E1] sm:h-[320px] lg:h-[460px]">
-              Connecting to meeting...
+            canShowRecoverableRejoin ? (
+              <div className="flex h-[220px] flex-col items-center justify-center gap-4 rounded-[28px] border border-black panel-gradient px-6 text-center text-[#E1E1E1] sm:h-[320px] lg:h-[460px]">
+                <div className="max-w-xl">
+                  <div className="text-lg font-semibold text-white">Reconnecting to the meeting</div>
+                  <div className="mt-2 text-sm text-[#BBBBBB]">
+                    We’re keeping your place in this room while the app requests a fresh connection.
+                  </div>
+                </div>
+                <Button
+                  variant="secondary"
+                  className="rounded-full border-black bg-[#141414]/92 px-5 py-3 text-[#DBDBDB] shadow-none hover:bg-[#1B1B1B]"
+                  loading={rejoinState.loading}
+                  onClick={() => requestMeetingReconnect({ automatic: false })}
+                >
+                  Rejoin Meeting
+                </Button>
+              </div>
+            ) : (
+              <div className="flex h-[220px] items-center justify-center rounded-[28px] border border-black panel-gradient text-[#E1E1E1] sm:h-[320px] lg:h-[460px]">
+                Connecting to meeting...
+              </div>
+            )
+          ) : canShowRecoverableRejoin ? (
+            <div className="flex h-[220px] flex-col items-center justify-center gap-4 rounded-[28px] border border-black panel-gradient px-6 text-center text-[#E1E1E1] sm:h-[320px] lg:h-[460px]">
+              <div className="max-w-xl">
+                <div className="text-lg font-semibold text-white">Connection interrupted</div>
+                <div className="mt-2 text-sm text-[#BBBBBB]">
+                  We’re keeping your place in this meeting and requesting a fresh join token now.
+                </div>
+              </div>
+              <Button
+                variant="secondary"
+                className="rounded-full border-black bg-[#141414]/92 px-5 py-3 text-[#DBDBDB] shadow-none hover:bg-[#1B1B1B]"
+                loading={rejoinState.loading}
+                onClick={() => requestMeetingReconnect({ automatic: false })}
+              >
+                Rejoin Meeting
+              </Button>
             </div>
           ) : useFeaturedLayout ? (
             otherParticipants.length > 0 ? (
@@ -2341,9 +2690,19 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
               {meetingError}
             </div>
           ) : null}
+          {rejoinState.error ? (
+            <div className="mt-4 rounded-2xl border border-[#737373]/35 bg-[#737373]/10 px-4 py-3 text-sm text-[#E4E4E4]">
+              {rejoinState.error}
+            </div>
+          ) : null}
           {meetingInfo ? (
             <div className="mt-4 rounded-2xl border border-black panel-gradient px-4 py-3 text-sm text-[#E1E1E1]">
               {meetingInfo}
+            </div>
+          ) : null}
+          {rejoinState.info ? (
+            <div className="mt-4 rounded-2xl border border-black panel-gradient px-4 py-3 text-sm text-[#E1E1E1]">
+              {rejoinState.info}
             </div>
           ) : null}
           {permissionState.error ? (
@@ -2588,6 +2947,26 @@ export default function MeetingRoomExperience({ payload, onLeave, audiencePanel 
 
       <div className="relative border-t border-black bg-[#131313]/84 px-4 py-4 backdrop-blur-sm">
         <div className="flex flex-wrap items-center justify-center gap-3">
+          {audioUnlockRequired && connected ? (
+            <Button
+              variant="secondary"
+              className="min-w-[156px] rounded-full border-black bg-[#141414]/92 px-5 py-3 text-[#DBDBDB] shadow-none hover:bg-[#1B1B1B]"
+              onClick={handleEnableAudio}
+              loading={audioUnlockBusy}
+            >
+              Enable Audio
+            </Button>
+          ) : null}
+          {canShowRecoverableRejoin ? (
+            <Button
+              variant="secondary"
+              className="min-w-[156px] rounded-full border-black bg-[#141414]/92 px-5 py-3 text-[#DBDBDB] shadow-none hover:bg-[#1B1B1B]"
+              onClick={() => requestMeetingReconnect({ automatic: false })}
+              loading={rejoinState.loading}
+            >
+              Rejoin Meeting
+            </Button>
+          ) : null}
           {effectiveCanPresent || effectiveCanSpeak ? (
           <>
             <Button

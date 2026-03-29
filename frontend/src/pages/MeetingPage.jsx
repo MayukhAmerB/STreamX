@@ -11,6 +11,11 @@ import {
   listRealtimeSessions,
 } from "../api/realtime";
 import { useAuth } from "../hooks/useAuth";
+import {
+  clearPersistedMeetingSessionId,
+  persistMeetingSessionId,
+  readPersistedMeetingSessionId,
+} from "../utils/activeMeetingStorage";
 import { apiData, apiMessage } from "../utils/api";
 
 const pageBackgroundImage =
@@ -56,8 +61,9 @@ const meetingWorkflow = [
 ];
 
 export default function MeetingPage() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, loading: authLoading, user } = useAuth();
   const navigate = useNavigate();
+  const authenticatedUserId = Number(user?.id || 0) || null;
 
   const [sessions, setSessions] = useState([]);
   const [liveClassOptions, setLiveClassOptions] = useState([]);
@@ -70,6 +76,7 @@ export default function MeetingPage() {
   const [joinState, setJoinState] = useState({ loadingId: null, error: "" });
   const [deleteState, setDeleteState] = useState({ loadingId: null, error: "", info: "" });
   const [activeMeeting, setActiveMeeting] = useState(null);
+  const [meetingRestoreConsumed, setMeetingRestoreConsumed] = useState(false);
 
   const loadSessions = async () => {
     try {
@@ -87,6 +94,48 @@ export default function MeetingPage() {
   useEffect(() => {
     loadSessions();
   }, []);
+
+  useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+    if (!isAuthenticated) {
+      setMeetingRestoreConsumed(false);
+      return;
+    }
+    if (!authenticatedUserId) {
+      return;
+    }
+    if (meetingRestoreConsumed || activeMeeting?.session?.id) {
+      return;
+    }
+    const persistedMeetingSessionId = readPersistedMeetingSessionId(authenticatedUserId);
+    setMeetingRestoreConsumed(true);
+    if (!persistedMeetingSessionId) {
+      return;
+    }
+    joinSession(persistedMeetingSessionId).catch(() => {
+      clearPersistedMeetingSessionId();
+    });
+  }, [activeMeeting?.session?.id, authLoading, authenticatedUserId, isAuthenticated, meetingRestoreConsumed]);
+
+  useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+    if (activeMeeting?.mode === "meeting" && activeMeeting?.session?.id) {
+      persistMeetingSessionId(activeMeeting.session.id, authenticatedUserId);
+      return;
+    }
+    clearPersistedMeetingSessionId();
+  }, [activeMeeting?.mode, activeMeeting?.session?.id, authLoading, authenticatedUserId]);
+
+  useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+    setMeetingRestoreConsumed(false);
+  }, [authLoading, authenticatedUserId]);
 
   useEffect(() => {
     let active = true;
@@ -134,6 +183,7 @@ export default function MeetingPage() {
     const data = apiData(response, {});
 
     if (data.mode === "broadcast") {
+      clearPersistedMeetingSessionId();
       navigate(`/broadcasting?session=${sessionId}`, {
         state: { autoJoinPayload: data },
       });
@@ -141,6 +191,7 @@ export default function MeetingPage() {
     }
 
     setActiveMeeting(data);
+    persistMeetingSessionId(data?.session?.id, authenticatedUserId);
     return data;
   };
 
@@ -200,6 +251,7 @@ export default function MeetingPage() {
       await endRealtimeSession(session.id);
       setSessions((prev) => prev.filter((row) => row.id !== session.id));
       if (activeMeeting?.session?.id === session.id) {
+        clearPersistedMeetingSessionId();
         setActiveMeeting(null);
       }
       setDeleteState({ loadingId: null, error: "", info: "Session deleted." });
@@ -350,7 +402,14 @@ export default function MeetingPage() {
       ) : null}
 
       {activeMeeting?.mode === "meeting" ? (
-        <MeetingRoomExperience payload={activeMeeting} onLeave={() => setActiveMeeting(null)} />
+        <MeetingRoomExperience
+          payload={activeMeeting}
+          onLeave={() => {
+            clearPersistedMeetingSessionId();
+            setActiveMeeting(null);
+          }}
+          onReconnect={joinSession}
+        />
       ) : null}
 
       <section className="rounded-[26px] border border-black panel-gradient p-4 sm:p-5">
