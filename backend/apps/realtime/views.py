@@ -63,6 +63,7 @@ from .services import (
     resolve_livekit_client_url,
     resolve_obs_stream_server_url,
     resolve_broadcast_urls,
+    refresh_obs_session_stream_health,
     register_owncast_chat_user,
     sync_owncast_chat_settings,
     start_room_recording_egress,
@@ -465,6 +466,7 @@ class RealtimeSessionDetailView(APIView):
                 errors={"detail": access_decision.detail},
                 status_code=access_decision.status_code,
             )
+        refresh_obs_session_stream_health(session)
         data = RealtimeSessionListSerializer(session, context={"request": request}).data
         return api_response(success=True, message="Realtime session fetched.", data=data)
 
@@ -505,6 +507,7 @@ class RealtimeSessionJoinView(APIView):
                 errors={"detail": access_decision.detail},
                 status_code=access_decision.status_code,
             )
+        refresh_obs_session_stream_health(session, force_refresh=True)
         if session.status == RealtimeSession.STATUS_SCHEDULED:
             session.mark_live()
         room_name = session.livekit_room_name or session.room_name
@@ -1090,7 +1093,7 @@ class RealtimeSessionStreamStartView(APIView):
                     errors={"detail": str(exc)},
                     status_code=status.HTTP_400_BAD_REQUEST,
                 )
-            session.mark_stream_live("")
+            refresh_obs_session_stream_health(session, force_refresh=True)
             session.livekit_egress_error = ""
             session.save(update_fields=["livekit_egress_error", "updated_at"])
             _sync_owncast_chat_settings_non_blocking(session=session)

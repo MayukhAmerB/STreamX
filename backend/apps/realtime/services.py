@@ -334,6 +334,119 @@ def _resolve_owncast_admin_request_context():
     return base_url, headers
 
 
+def _get_owncast_status_base_candidates():
+    candidates = []
+    for raw_base in (
+        str(getattr(settings, "OWNCAST_ADMIN_API_BASE_URL", "") or "").strip(),
+        str(getattr(settings, "OWNCAST_BASE_URL", "") or "").strip(),
+    ):
+        normalized_base = raw_base.rstrip("/")
+        if normalized_base and normalized_base not in candidates:
+            candidates.append(normalized_base)
+    return candidates
+
+
+def get_owncast_public_status(*, force_refresh=False):
+    cache_ttl = max(0, int(getattr(settings, "REALTIME_OWNCAST_STATUS_CACHE_TTL_SECONDS", 3) or 3))
+    cache_key = "realtime:owncast:public-status"
+    if not force_refresh and cache_ttl > 0:
+        cached_payload = cache.get(cache_key)
+        if isinstance(cached_payload, dict):
+            return cached_payload
+
+    last_error = ""
+    for base_url in _get_owncast_status_base_candidates():
+        endpoint = f"{base_url}/api/status"
+        request = Request(
+            endpoint,
+            method="GET",
+            headers={"Accept": "application/json"},
+        )
+        try:
+            with urlopen(request, timeout=5) as response:
+                raw_payload = response.read().decode("utf-8") or "{}"
+            parsed_payload = json.loads(raw_payload)
+            if not isinstance(parsed_payload, dict):
+                raise OwncastAdminError("Owncast status API returned an invalid payload.")
+
+            normalized_payload = {
+                "online": bool(parsed_payload.get("online")),
+                "viewerCount": parsed_payload.get("viewerCount"),
+                "streamTitle": str(parsed_payload.get("streamTitle") or "").strip(),
+                "lastConnectTime": str(parsed_payload.get("lastConnectTime") or "").strip(),
+                "lastDisconnectTime": str(parsed_payload.get("lastDisconnectTime") or "").strip(),
+                "serverTime": str(parsed_payload.get("serverTime") or "").strip(),
+            }
+            if cache_ttl > 0:
+                cache.set(cache_key, normalized_payload, timeout=cache_ttl)
+            return normalized_payload
+        except HTTPError as exc:
+            body = ""
+            try:
+                body = exc.read().decode("utf-8")
+            except Exception:
+                body = str(exc)
+            last_error = f"HTTP {exc.code}: {body}"
+            continue
+        except URLError as exc:
+            last_error = f"network error: {exc}"
+            continue
+        except Exception as exc:
+            last_error = str(exc)
+            continue
+
+    if last_error:
+        logger.debug("Owncast public status check failed: %s", last_error)
+    return {}
+
+
+def refresh_obs_session_stream_health(session, *, force_refresh=False, persist=True):
+    if not session:
+        return {"stream_status": "", "online": None, "changed": False}
+
+    if (
+        session.session_type != session.TYPE_BROADCASTING
+        or session.stream_service != session.STREAM_SERVICE_OBS
+        or session.status == session.STATUS_ENDED
+    ):
+        return {
+            "stream_status": str(getattr(session, "stream_status", "") or "").strip(),
+            "online": None,
+            "changed": False,
+        }
+
+    status_payload = get_owncast_public_status(force_refresh=force_refresh)
+    if "online" not in status_payload:
+        return {
+            "stream_status": str(getattr(session, "stream_status", "") or "").strip(),
+            "online": None,
+            "changed": False,
+        }
+
+    current_status = str(getattr(session, "stream_status", "") or "").strip().lower() or session.STREAM_IDLE
+    if bool(status_payload.get("online")):
+        next_status = session.STREAM_LIVE
+    elif current_status == session.STREAM_STARTING:
+        next_status = session.STREAM_STARTING
+    elif current_status == session.STREAM_FAILED:
+        next_status = session.STREAM_FAILED
+    elif current_status in {session.STREAM_LIVE, session.STREAM_STOPPED}:
+        next_status = session.STREAM_STOPPED
+    else:
+        next_status = session.STREAM_IDLE
+
+    changed = next_status != session.stream_status
+    session.stream_status = next_status
+    if persist and changed:
+        session.save(update_fields=["stream_status", "updated_at"])
+
+    return {
+        "stream_status": next_status,
+        "online": bool(status_payload.get("online")),
+        "changed": changed,
+    }
+
+
 def _owncast_admin_post_json(*, base_url, endpoint_path, payload, headers, timeout=10):
     endpoint = f"{str(base_url).rstrip('/')}/{str(endpoint_path).lstrip('/')}"
     request = Request(

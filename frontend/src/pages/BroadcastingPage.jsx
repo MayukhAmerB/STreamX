@@ -1130,6 +1130,8 @@ export default function BroadcastingPage() {
   const activeBroadcastStatusMessage =
     activeBroadcast?.session?.status === "ended"
       ? "This broadcast session has ended."
+      : String(activeBroadcast?.broadcast?.stream_status || "").trim().toLowerCase() === "starting"
+        ? "The host is reconnecting OBS. Keep chat open and the video will resume here when the stream is back."
       : activeBroadcast?.broadcast?.stream_status &&
           String(activeBroadcast.broadcast.stream_status).trim().toLowerCase() !== "live"
         ? "The video stream is temporarily offline. Keep chat open while the host reconnects OBS."
@@ -1163,8 +1165,11 @@ export default function BroadcastingPage() {
       // leave the current viewer shell intact; the next poll can recover
     }
   };
+  const normalizedStudioStreamStatus = String(studioSession?.stream_status || "").trim().toLowerCase();
   const obsStartActionLabel =
-    isObsStudioMode && studioSession?.stream_status === "live" ? "Resume OBS" : "Start Live";
+    isObsStudioMode && ["starting", "live", "stopped", "failed"].includes(normalizedStudioStreamStatus)
+      ? "Resume OBS"
+      : "Start Live";
   const obsStartInfoMessage =
     "OBS stream is ready. If OBS warned that the connection dropped, start streaming again in OBS using the same server URL and key. Viewers stay in the same session.";
 

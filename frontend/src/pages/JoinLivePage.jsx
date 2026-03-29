@@ -19,13 +19,41 @@ const modeOptions = [
 ];
 const ACTIVE_BROADCAST_STORAGE_KEY = "streamx:join-live:active-broadcast";
 
+function sanitizeBroadcastSession(session) {
+  if (!session?.id) return null;
+  return {
+    id: session.id,
+    title: session.title || "",
+    slug: session.slug || "",
+    session_type: session.session_type || "broadcasting",
+    status: session.status || "",
+    stream_status: session.stream_status || "",
+  };
+}
+
+function sanitizeBroadcastPayload(payload) {
+  if (!payload || payload.mode !== "broadcast") return null;
+  const session = sanitizeBroadcastSession(payload.session);
+  if (!session) return null;
+  return {
+    mode: "broadcast",
+    session,
+    broadcast: {
+      stream_embed_url: payload.broadcast?.stream_embed_url || "",
+      chat_embed_url: payload.broadcast?.chat_embed_url || "",
+      max_audience: payload.broadcast?.max_audience ?? null,
+      stream_status: payload.broadcast?.stream_status || session.stream_status || "",
+    },
+  };
+}
+
 function readPersistedBroadcastPayload() {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(ACTIVE_BROADCAST_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return parsed && parsed.mode === "broadcast" && parsed.session?.id ? parsed : null;
+    return sanitizeBroadcastPayload(parsed);
   } catch {
     return null;
   }
@@ -34,8 +62,9 @@ function readPersistedBroadcastPayload() {
 function persistBroadcastPayload(payload) {
   if (typeof window === "undefined") return;
   try {
-    if (payload && payload.mode === "broadcast" && payload.session?.id) {
-      window.localStorage.setItem(ACTIVE_BROADCAST_STORAGE_KEY, JSON.stringify(payload));
+    const sanitizedPayload = sanitizeBroadcastPayload(payload);
+    if (sanitizedPayload) {
+      window.localStorage.setItem(ACTIVE_BROADCAST_STORAGE_KEY, JSON.stringify(sanitizedPayload));
       return;
     }
     window.localStorage.removeItem(ACTIVE_BROADCAST_STORAGE_KEY);
@@ -143,8 +172,9 @@ export default function JoinLivePage() {
         display_name: user?.full_name || "",
       });
       const data = apiData(response, null);
-      setActiveSession(data);
-      persistBroadcastPayload(data);
+      const nextActiveSession = data?.mode === "broadcast" ? sanitizeBroadcastPayload(data) : data;
+      setActiveSession(nextActiveSession);
+      persistBroadcastPayload(nextActiveSession);
       setJoinState({ loadingId: null, error: "", info: "Joined live session." });
       await loadSessions();
     } catch (err) {
@@ -153,12 +183,20 @@ export default function JoinLivePage() {
   };
 
   useEffect(() => {
-    if (!highlightedSessionId || activeSession || autoJoinConsumed) {
+    if (!highlightedSessionId || autoJoinConsumed) {
       return;
+    }
+    if (activeSession?.session?.id === highlightedSessionId) {
+      setAutoJoinConsumed(true);
+      return;
+    }
+    if (activeSession?.session?.id && activeSession.session.id !== highlightedSessionId) {
+      setActiveSession(null);
+      persistBroadcastPayload(null);
     }
     setAutoJoinConsumed(true);
     handleJoin(highlightedSessionId);
-  }, [activeSession, autoJoinConsumed, highlightedSessionId]);
+  }, [activeSession?.session?.id, autoJoinConsumed, highlightedSessionId]);
 
   useEffect(() => {
     if (!activeSession) {
@@ -196,14 +234,18 @@ export default function JoinLivePage() {
           if (!previous || previous.mode !== "broadcast" || previous.session?.id !== latestSession.id) {
             return previous;
           }
-          const nextPayload = {
+          const nextPayload = sanitizeBroadcastPayload({
             ...previous,
             session: { ...previous.session, ...latestSession },
             broadcast: {
               ...previous.broadcast,
               stream_status: latestSession.stream_status || previous.broadcast?.stream_status || "",
             },
-          };
+          });
+          if (!nextPayload) {
+            persistBroadcastPayload(null);
+            return null;
+          }
           if (latestSession.status !== "ended") {
             persistBroadcastPayload(nextPayload);
           } else {
@@ -241,6 +283,8 @@ export default function JoinLivePage() {
     activeSession?.mode === "broadcast"
       ? activeSession?.session?.status === "ended"
         ? "This broadcast session has ended."
+        : String(activeSession?.broadcast?.stream_status || "").trim().toLowerCase() === "starting"
+          ? "The host is reconnecting OBS. Keep chat open and the video will resume here when the stream is back."
         : activeSession?.broadcast?.stream_status &&
             String(activeSession.broadcast.stream_status).trim().toLowerCase() !== "live"
           ? "The video stream is temporarily offline. Keep chat open while the host reconnects OBS."
@@ -261,16 +305,22 @@ export default function JoinLivePage() {
         if (!previous || previous.mode !== "broadcast" || previous.session?.id !== latestSession.id) {
           return previous;
         }
-        const nextPayload = {
+        const nextPayload = sanitizeBroadcastPayload({
           ...previous,
           session: { ...previous.session, ...latestSession },
           broadcast: {
             ...previous.broadcast,
             stream_status: latestSession.stream_status || previous.broadcast?.stream_status || "",
           },
-        };
+        });
+        if (!nextPayload) {
+          persistBroadcastPayload(null);
+          return null;
+        }
         if (latestSession.status !== "ended") {
           persistBroadcastPayload(nextPayload);
+        } else {
+          persistBroadcastPayload(null);
         }
         return nextPayload;
       });

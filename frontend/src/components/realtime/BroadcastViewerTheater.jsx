@@ -34,6 +34,9 @@ export default function BroadcastViewerTheater({
     : "grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:items-stretch";
   const normalizedStreamStatus = String(streamStatus || "").trim().toLowerCase();
   const normalizedSessionStatus = String(sessionStatus || "").trim().toLowerCase();
+  const isStreamStarting = Boolean(
+    streamUrl && normalizedSessionStatus !== "ended" && normalizedStreamStatus === "starting"
+  );
   const isStreamUnavailable = Boolean(
     streamUrl && normalizedSessionStatus !== "ended" && normalizedStreamStatus && normalizedStreamStatus !== "live"
   );
@@ -41,6 +44,8 @@ export default function BroadcastViewerTheater({
     String(statusMessage || "").trim() ||
     (normalizedSessionStatus === "ended"
       ? "This broadcast session has ended."
+      : isStreamStarting
+        ? "The host is reconnecting OBS. Keep chat open and the video will resume here when the stream is back."
       : isStreamUnavailable
         ? "The live video is temporarily offline. Keep chat open while the host reconnects OBS."
         : "");
