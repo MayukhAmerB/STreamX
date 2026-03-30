@@ -152,6 +152,43 @@ Rollback to stable baseline:
 
 This removes phase-specific containers via `--remove-orphans` and keeps persistent volumes.
 
+## Runtime Resource Profiles
+
+For day-to-day operations on the existing `phase5` topology, use the profile switcher instead of manually editing CPU values in the production env file.
+
+Files:
+
+- `infra/hostinger/resource-profiles/content.env`
+- `infra/hostinger/resource-profiles/broadcast.env`
+- `infra/hostinger/resource-profiles/meeting.env`
+
+Switcher:
+
+```bash
+chmod +x infra/hostinger/switch-phase5-resource-profile.sh
+./infra/hostinger/switch-phase5-resource-profile.sh content
+./infra/hostinger/switch-phase5-resource-profile.sh broadcast
+./infra/hostinger/switch-phase5-resource-profile.sh meeting
+```
+
+What it does:
+
+- backs up `backend/.env.hostinger.production`
+- applies only the managed CPU keys for the selected profile
+- recreates only the affected `phase5` services
+
+Profile intent:
+
+- `content`: balanced/default profile for normal app + course delivery workloads
+- `broadcast`: OBS broadcast day profile that prioritizes `owncast` while keeping `backend` protected
+- `meeting`: interactive meeting day profile that prioritizes `livekit`/`livekit-egress` while keeping `backend` protected
+
+Important:
+
+- `broadcast` is designed for `OBS -> Owncast -> viewers`
+- the `transcoder` service handles uploaded lecture HLS generation, not the OBS live path
+- `meeting` days are intended for interactive WebRTC-heavy classes, not OBS-first broadcasts
+
 ## Cloudflare content delivery policy
 
 Recommended DNS/proxy split:
