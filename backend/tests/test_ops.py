@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.test import TestCase
 from django.urls import reverse
 
@@ -19,3 +20,9 @@ class HealthEndpointTests(TestCase):
         response = self.client.get(reverse("health-live"))
         self.assertTrue(response.has_header("X-Request-ID"))
         self.assertGreaterEqual(len(response["X-Request-ID"]), 8)
+
+
+class MediaUploadPermissionSettingsTests(TestCase):
+    def test_local_upload_permissions_are_explicitly_configured(self):
+        self.assertEqual(settings.FILE_UPLOAD_PERMISSIONS, 0o644)
+        self.assertEqual(settings.FILE_UPLOAD_DIRECTORY_PERMISSIONS, 0o755)
