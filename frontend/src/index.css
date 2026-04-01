@@ -46,6 +46,11 @@ body {
   @apply antialiased;
 }
 
+[data-protected-playback-surface] video::-webkit-media-controls-fullscreen-button,
+[data-protected-playback-surface] video::-webkit-media-controls-picture-in-picture-button {
+  display: none !important;
+}
+
 a {
   color: inherit;
 }

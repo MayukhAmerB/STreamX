@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import ProtectedPlaybackSurface from "../ProtectedPlaybackSurface";
 
 function EmptyPanel({ className, message }) {
   return (
@@ -103,13 +104,18 @@ export default function BroadcastViewerTheater({
       <div className={layoutClassName}>
         <div className="overflow-hidden rounded-2xl border border-black bg-black shadow-[0_14px_34px_rgba(0,0,0,0.24)]">
           {streamUrl ? (
-            <iframe
-              key={`${streamUrl}|${streamFrameVersion}`}
-              title={streamTitle}
-              src={streamUrl}
-              className="block aspect-video w-full min-h-[260px] sm:min-h-[360px] lg:min-h-[520px] lg:max-h-[calc(100vh-220px)]"
-              allow="autoplay; fullscreen"
-            />
+            <ProtectedPlaybackSurface
+              className="aspect-video w-full min-h-[260px] sm:min-h-[360px] lg:min-h-[520px] lg:max-h-[calc(100vh-220px)]"
+              watermarkEnabled={Boolean(streamUrl)}
+            >
+              <iframe
+                key={`${streamUrl}|${streamFrameVersion}`}
+                title={streamTitle}
+                src={streamUrl}
+                className="block h-full w-full"
+                allow="autoplay"
+              />
+            </ProtectedPlaybackSurface>
           ) : (
             <EmptyPanel
               className="h-[260px] sm:h-[360px] lg:h-[520px] lg:max-h-[calc(100vh-220px)]"

@@ -3,6 +3,7 @@ import Hls from "hls.js";
 import { useParams } from "react-router-dom";
 import { getCourse, getLectureVideoUrl, updateLectureProgress } from "../api/courses";
 import PageShell from "../components/PageShell";
+import ProtectedPlaybackSurface from "../components/ProtectedPlaybackSurface";
 import { apiData, apiMessage } from "../utils/api";
 
 const PROGRESS_SYNC_INTERVAL_SECONDS = 15;
@@ -475,13 +476,22 @@ export default function CoursePlayerPage() {
 
           <div className="p-5">
             <div className="overflow-hidden rounded-[24px] border border-black bg-black">
-              <div className="aspect-video">
+              <ProtectedPlaybackSurface
+                className="aspect-video"
+                watermarkEnabled={Boolean(videoUrl)}
+                showFullscreenButton={Boolean(videoUrl)}
+              >
                 {videoUrl ? (
                   <video
                     key={`${playbackType}:${videoUrl}`}
                     ref={videoRef}
                     controls
+                    controlsList="nodownload nofullscreen noplaybackrate"
+                    disablePictureInPicture
+                    disableRemotePlayback
+                    playsInline
                     className="h-full w-full"
+                    onDoubleClick={(event) => event.preventDefault()}
                     onError={handleVideoError}
                   />
                 ) : (
@@ -489,7 +499,7 @@ export default function CoursePlayerPage() {
                     Select a lecture to play.
                   </div>
                 )}
-              </div>
+              </ProtectedPlaybackSurface>
             </div>
 
             <div className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
