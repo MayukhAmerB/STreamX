@@ -77,6 +77,11 @@ export default function Navbar() {
             Courses
           </NavLink>
           {isAuthenticated ? (
+            <NavLink to="/guides" className={navClass}>
+              Guides
+            </NavLink>
+          ) : null}
+          {isAuthenticated ? (
             <NavLink to="/join-live" className={navClass}>
               Join Live
             </NavLink>
@@ -109,6 +114,12 @@ export default function Navbar() {
                     className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
                   >
                       Your Courses
+                  </Link>
+                  <Link
+                    to="/guides"
+                    className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
+                  >
+                    Guides
                   </Link>
                   <Link
                     to="/profile"
@@ -233,6 +244,11 @@ export default function Navbar() {
               Courses
             </NavLink>
             {isAuthenticated ? (
+              <NavLink to="/guides" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+                Guides
+              </NavLink>
+            ) : null}
+            {isAuthenticated ? (
               <NavLink to="/join-live" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                 Join Live
               </NavLink>
@@ -258,6 +274,9 @@ export default function Navbar() {
                 <div className="grid gap-1">
                     <Link to="/my-courses" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                       Your Courses
+                  </Link>
+                  <Link to="/guides" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+                    Guides
                   </Link>
                   <Link to="/profile" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                     Profile

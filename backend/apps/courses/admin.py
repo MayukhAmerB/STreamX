@@ -10,6 +10,7 @@ from django.utils.translation import ngettext
 from .models import (
     Course,
     Enrollment,
+    GuideVideo,
     Lecture,
     LiveClass,
     LiveClassEnrollment,
@@ -237,6 +238,39 @@ class LectureInline(admin.TabularInline):
     show_change_link = True
     verbose_name = "Video Lecture"
     verbose_name_plural = "Video Lectures (upload video files here for each module)"
+
+
+class GuideVideoAdminForm(forms.ModelForm):
+    class Meta:
+        model = GuideVideo
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["title"].help_text = "Navbar page: guide card title"
+        self.fields["description"].help_text = "Optional short description shown under the guide title."
+        self.fields["video_file"].help_text = "Upload MP4, M4V, MOV, or WEBM. Maximum size: 500 MB."
+        self.fields["order"].help_text = "Lower numbers appear first on the Guides page."
+        self.fields["description"].widget.attrs.setdefault("rows", 4)
+
+
+@admin.register(GuideVideo)
+class GuideVideoAdmin(admin.ModelAdmin):
+    form = GuideVideoAdminForm
+    list_display = ("id", "title", "order", "is_published", "updated_at")
+    list_display_links = ("id", "title")
+    list_editable = ("order", "is_published")
+    search_fields = ("title", "description")
+    list_filter = ("is_published", "created_at", "updated_at")
+    ordering = ("order", "id")
+    readonly_fields = ("created_at", "updated_at")
+    save_on_top = True
+    list_per_page = 50
+    fieldsets = (
+        ("Guide Video", {"fields": ("title", "description", "video_file", "order")}),
+        ("Publishing", {"fields": ("is_published",)}),
+        ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
+    )
 
 
 @admin.register(Course)

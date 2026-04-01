@@ -17,6 +17,8 @@ from config.upload_validators import validate_profile_image_upload, validate_vid
 from config.url_utils import get_media_public_url
 from .cache_utils import bump_course_list_cache_version, bump_live_class_list_cache_version
 
+MAX_GUIDE_VIDEO_UPLOAD_BYTES = 500 * 1024 * 1024
+
 
 def _sanitize_string_list(value):
     if value in (None, ""):
@@ -257,6 +259,46 @@ def lecture_video_upload_path(instance, filename):
     section_id = instance.section_id or "module"
     safe_name = os.path.basename(filename or "video.mp4")
     return f"lecture_videos/{course_slug}/module_{section_id}/{safe_name}"
+
+
+def guide_video_upload_path(instance, filename):
+    safe_name = os.path.basename(filename or "guide-video.mp4")
+    return f"guide_videos/{safe_name}"
+
+
+class GuideVideo(models.Model):
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default="")
+    video_file = models.FileField(
+        upload_to=guide_video_upload_path,
+        help_text="Upload MP4, M4V, MOV, or WEBM. Maximum size: 500 MB.",
+    )
+    order = models.PositiveIntegerField(default=1)
+    is_published = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+        verbose_name = "Guide Video"
+        verbose_name_plural = "Guide Panel"
+        indexes = [
+            models.Index(fields=["is_published", "order"]),
+            models.Index(fields=["created_at"]),
+        ]
+
+    def clean(self):
+        super().clean()
+        validate_no_active_content(self.title, "title")
+        validate_no_active_content(self.description, "description")
+        validate_video_upload(
+            self.video_file,
+            "video_file",
+            max_bytes=MAX_GUIDE_VIDEO_UPLOAD_BYTES,
+        )
+
+    def __str__(self):
+        return self.title
 
 
 class Lecture(models.Model):

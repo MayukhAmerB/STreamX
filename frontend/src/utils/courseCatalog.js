@@ -1,5 +1,12 @@
 const COURSE_CATALOG_CACHE_KEY = "course-catalog-cache:v1";
 const COURSE_CATALOG_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const USER_SCOPED_COURSE_FIELDS = [
+  "is_enrolled",
+  "enrollment_status",
+  "enrolled_at",
+  "access_source",
+  "access_label",
+];
 
 function canUseStorage() {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
@@ -7,6 +14,22 @@ function canUseStorage() {
 
 function normalizeCourseArray(courses) {
   return Array.isArray(courses) ? courses.filter(Boolean) : [];
+}
+
+function stripUserScopedCourseFields(course) {
+  if (!course || typeof course !== "object") {
+    return course;
+  }
+
+  const normalizedCourse = { ...course };
+  USER_SCOPED_COURSE_FIELDS.forEach((field) => {
+    delete normalizedCourse[field];
+  });
+  return normalizedCourse;
+}
+
+function sanitizeCourseCatalogForCache(courses) {
+  return normalizeCourseArray(courses).map(stripUserScopedCourseFields);
 }
 
 export function filterCourseCatalog(courses, search = "") {
@@ -36,7 +59,7 @@ export function readCachedCourseCatalog({ maxAgeMs = COURSE_CATALOG_CACHE_MAX_AG
 
     const parsed = JSON.parse(raw);
     const cachedAt = Number(parsed?.cachedAt || 0);
-    const courses = normalizeCourseArray(parsed?.courses);
+    const courses = sanitizeCourseCatalogForCache(parsed?.courses);
     if (!courses.length) {
       return [];
     }
@@ -54,7 +77,7 @@ export function writeCachedCourseCatalog(courses) {
     return;
   }
 
-  const normalizedCourses = normalizeCourseArray(courses);
+  const normalizedCourses = sanitizeCourseCatalogForCache(courses);
   if (!normalizedCourses.length) {
     return;
   }

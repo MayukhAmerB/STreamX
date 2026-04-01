@@ -17,13 +17,14 @@ from config.response import api_response
 from apps.payments.models import Payment
 
 from .cache_utils import get_course_list_cache_version, get_live_class_list_cache_version
-from .models import Course, Enrollment, Lecture, LectureProgress, LiveClass, LiveClassEnrollment, PublicEnrollmentLead, Section
+from .models import Course, Enrollment, GuideVideo, Lecture, LectureProgress, LiveClass, LiveClassEnrollment, PublicEnrollmentLead, Section
 from .permissions import IsCourseInstructor, IsEnrolledInCourse, IsInstructor
 from .serializers import (
     CourseEnrollSerializer,
     CourseDetailSerializer,
     CourseListSerializer,
     CourseWriteSerializer,
+    GuideVideoListSerializer,
     LectureSerializer,
     LectureProgressStateSerializer,
     LectureProgressUpdateSerializer,
@@ -36,13 +37,17 @@ from .serializers import (
 from .services import (
     ProtectedMediaError,
     S3VideoError,
+    build_protected_guide_playback_url,
     build_protected_lecture_playback_url,
     generate_playback_url,
     generate_signed_video_url,
     normalize_storage_key,
+    resolve_guide_local_video_storage_key,
+    resolve_guide_playback_expires_in,
     resolve_local_media_storage_key,
     resolve_lecture_local_video_storage_key,
     resolve_lecture_playback_expires_in,
+    validate_protected_guide_playback_request,
     validate_protected_lecture_playback_request,
 )
 
@@ -126,6 +131,43 @@ def _build_lecture_progress_map(*, course, user):
     return {item.lecture_id: item for item in queryset}
 
 
+def _build_course_enrollment_status_map(*, courses, user):
+    if not user or not getattr(user, "is_authenticated", False):
+        return {}
+
+    course_items = list(courses or [])
+    if not course_items:
+        return {}
+
+    status_map = {}
+    course_ids = []
+    for course in course_items:
+        if getattr(course, "instructor_id", None) == user.id:
+            status_map[course.id] = "approved"
+            continue
+        course_ids.append(course.id)
+
+    if not course_ids:
+        return status_map
+
+    enrollments = (
+        Enrollment.objects.filter(user=user, course_id__in=course_ids)
+        .only("course_id", "payment_status", "enrolled_at")
+        .order_by("course_id", "-enrolled_at")
+    )
+    for enrollment in enrollments:
+        if enrollment.course_id in status_map:
+            continue
+        if enrollment.payment_status == Enrollment.STATUS_PAID:
+            status_map[enrollment.course_id] = "approved"
+        elif enrollment.payment_status == Enrollment.STATUS_PENDING:
+            status_map[enrollment.course_id] = "pending"
+        else:
+            status_map[enrollment.course_id] = "none"
+
+    return status_map
+
+
 class CourseListCreateView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -175,10 +217,16 @@ class CourseListCreateView(APIView):
             )
         queryset = queryset.order_by("-created_at")
         paged_queryset, page_meta = apply_optional_pagination(request, queryset)
+        serializer_context = {"request": request}
+        if request.user.is_authenticated:
+            serializer_context["course_enrollment_statuses"] = _build_course_enrollment_status_map(
+                courses=paged_queryset,
+                user=request.user,
+            )
         serializer = CourseListSerializer(
             paged_queryset,
             many=True,
-            context={"request": request},
+            context=serializer_context,
         )
         payload = (
             {"results": serializer.data, "pagination": page_meta}
@@ -384,6 +432,104 @@ class CourseDetailView(APIView):
             )
         course.delete()
         return api_response(success=True, message="Course deleted.", data=None)
+
+
+class GuideListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        guides = GuideVideo.objects.filter(is_published=True).order_by("order", "id")
+        serializer = GuideVideoListSerializer(guides, many=True)
+        return api_response(success=True, message="Guides fetched.", data=serializer.data)
+
+
+class GuideVideoView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "lecture_playback"
+
+    def get(self, request, pk):
+        guide = generics.get_object_or_404(GuideVideo.objects.filter(is_published=True), pk=pk)
+        if not getattr(guide, "video_file", None):
+            return api_response(
+                success=False,
+                message="Guide video not configured.",
+                errors={"detail": "No uploaded video file is configured for this guide."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        expires_in = resolve_guide_playback_expires_in(guide)
+        local_video_storage_key = resolve_guide_local_video_storage_key(guide)
+        if local_video_storage_key:
+            try:
+                playback_url, expires_in = build_protected_guide_playback_url(
+                    request,
+                    guide,
+                    local_video_storage_key,
+                    expires_in=expires_in,
+                )
+            except ProtectedMediaError as exc:
+                return api_response(
+                    success=False,
+                    message="Guide video URL generation failed.",
+                    errors={"detail": str(exc)},
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+            return api_response(
+                success=True,
+                message="Guide video URL generated.",
+                data={
+                    "signed_url": playback_url,
+                    "playback_url": playback_url,
+                    "playback_type": "file",
+                    "expires_in": expires_in,
+                },
+            )
+
+        try:
+            signed_url, expires_in = generate_playback_url(
+                request,
+                guide.video_file.name,
+                expires_in=expires_in,
+                signer=generate_signed_video_url,
+            )
+        except S3VideoError as exc:
+            return api_response(
+                success=False,
+                message="Guide video URL generation failed.",
+                errors={"detail": str(exc)},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        return api_response(
+            success=True,
+            message="Guide video URL generated.",
+            data={
+                "signed_url": signed_url,
+                "playback_url": signed_url,
+                "playback_type": "file",
+                "expires_in": expires_in,
+            },
+        )
+
+
+class GuideProtectedMediaView(APIView):
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "lecture_playback"
+
+    def get(self, request, pk, token, asset_path):
+        generics.get_object_or_404(GuideVideo.objects.filter(is_published=True), pk=pk)
+        try:
+            normalized_path = validate_protected_guide_playback_request(
+                token,
+                pk,
+                asset_path,
+                max_age=resolve_guide_playback_expires_in(None),
+                request=request,
+            )
+        except ProtectedMediaError:
+            return HttpResponseNotFound("Protected guide asset not found.")
+        return _build_protected_media_response(normalized_path)
 
 
 class SectionCreateView(APIView):

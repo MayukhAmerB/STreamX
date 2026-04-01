@@ -42,7 +42,10 @@ export default function MyCoursesPage() {
     (async () => {
       try {
         const response = await getMyCourses();
-        if (active) setCourses(apiData(response, []));
+        const myCourses = apiData(response, []);
+        if (active) {
+          setCourses(myCourses);
+        }
       } catch (err) {
         if (active) setError(apiMessage(err, "Failed to load your courses."));
       } finally {

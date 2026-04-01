@@ -30,6 +30,7 @@ class ProtectedMediaError(Exception):
 
 PROTECTED_LECTURE_MEDIA_SIGNING_SALT = "courses.protected-lecture-media"
 PROTECTED_LECTURE_MEDIA_CACHE_PREFIX = "courses:protected-media-token"
+PROTECTED_GUIDE_MEDIA_SIGNING_SALT = "courses.protected-guide-media"
 ADAPTIVE_HLS_PROFILES = [
     {
         "name": "360p",
@@ -167,6 +168,21 @@ def resolve_lecture_playback_expires_in(lecture):
     return max(1800, int(getattr(settings, "COURSE_PLAYBACK_URL_TTL_SECONDS", 21600)))
 
 
+def resolve_guide_playback_expires_in(guide):
+    configured = getattr(
+        settings,
+        "GUIDE_PLAYBACK_URL_TTL_SECONDS",
+        getattr(settings, "COURSE_PLAYBACK_URL_TTL_SECONDS", 21600),
+    )
+    return max(1800, int(configured))
+
+
+def resolve_guide_local_video_storage_key(guide):
+    if not guide or not getattr(guide, "video_file", None):
+        return ""
+    return resolve_local_media_storage_key(guide.video_file.name)
+
+
 def build_protected_lecture_playback_url(request, lecture, storage_key, *, expires_in, asset_type):
     normalized_path = normalize_storage_key(storage_key)
     asset_type = str(asset_type or "").strip().lower()
@@ -201,6 +217,34 @@ def build_protected_lecture_playback_url(request, lecture, storage_key, *, expir
         "lecture-playback-asset",
         kwargs={
             "pk": lecture.id,
+            "token": token,
+            "asset_path": normalized_path,
+        },
+    )
+    return build_public_url(playback_path, request=request), expires_in
+
+
+def build_protected_guide_playback_url(request, guide, storage_key, *, expires_in):
+    normalized_path = normalize_storage_key(storage_key)
+    request_user = getattr(request, "user", None)
+    request_user_id = (
+        int(getattr(request_user, "id", 0) or 0)
+        if request_user and getattr(request_user, "is_authenticated", False)
+        else 0
+    )
+    token = signing.dumps(
+        {
+            "guide_id": int(guide.id),
+            "root_prefix": normalized_path,
+            "subject_uid": request_user_id,
+        },
+        salt=PROTECTED_GUIDE_MEDIA_SIGNING_SALT,
+        compress=True,
+    )
+    playback_path = reverse(
+        "guide-playback-asset",
+        kwargs={
+            "pk": guide.id,
             "token": token,
             "asset_path": normalized_path,
         },
@@ -327,6 +371,42 @@ def validate_protected_lecture_playback_request(token, lecture_id, asset_path, *
             raise ProtectedMediaError("Protected media token does not allow this file.")
     else:
         raise ProtectedMediaError("Unsupported protected media asset type.")
+
+    return normalized_path
+
+
+def validate_protected_guide_playback_request(token, guide_id, asset_path, *, max_age, request=None):
+    max_age = max(1, int(max_age or 1))
+    requested_guide_id = int(guide_id)
+    try:
+        payload = signing.loads(
+            token,
+            max_age=max_age,
+            salt=PROTECTED_GUIDE_MEDIA_SIGNING_SALT,
+        )
+    except signing.BadSignature as exc:
+        raise ProtectedMediaError("Invalid or expired protected media token.") from exc
+
+    payload_guide_id = int(payload.get("guide_id", 0) or 0)
+    if payload_guide_id != requested_guide_id:
+        raise ProtectedMediaError("Protected media token does not match the guide.")
+
+    normalized_path = normalize_storage_key(asset_path)
+    root_prefix = normalize_storage_key(payload.get("root_prefix"))
+    subject_uid = int(payload.get("subject_uid", 0) or 0)
+
+    if subject_uid > 0:
+        request_user = getattr(request, "user", None)
+        request_user_id = (
+            int(getattr(request_user, "id", 0) or 0)
+            if request_user and getattr(request_user, "is_authenticated", False)
+            else 0
+        )
+        if request_user_id != subject_uid:
+            raise ProtectedMediaError("Protected media token user mismatch.")
+
+    if normalized_path != root_prefix:
+        raise ProtectedMediaError("Protected media token does not allow this file.")
 
     return normalized_path
 

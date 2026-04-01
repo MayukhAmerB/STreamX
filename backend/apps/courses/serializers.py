@@ -10,6 +10,7 @@ from .services import ProtectedMediaError, build_protected_lecture_playback_url,
 from .models import (
     Course,
     Enrollment,
+    GuideVideo,
     Lecture,
     LectureProgress,
     LiveClass,
@@ -194,10 +195,61 @@ class SectionNestedSerializer(serializers.ModelSerializer):
         fields = ("id", "title", "description", "order", "created_at", "lectures")
 
 
-class CourseListSerializer(serializers.ModelSerializer):
+class CourseEnrollmentStatusMixin:
+    def _normalize_enrollment_status(self, enrollment):
+        if not enrollment:
+            return "none"
+        if enrollment.payment_status == Enrollment.STATUS_PAID:
+            return "approved"
+        if enrollment.payment_status == Enrollment.STATUS_PENDING:
+            return "pending"
+        return "none"
+
+    def _get_cached_enrollment(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return None
+        if request.user.id == obj.instructor_id:
+            return None
+
+        enrollment_cache = self.context.setdefault("course_enrollment_cache", {})
+        cache_key = (request.user.id, obj.id)
+        if cache_key in enrollment_cache:
+            return enrollment_cache[cache_key]
+
+        enrollment = (
+            Enrollment.objects.filter(user=request.user, course=obj)
+            .only("payment_status", "enrolled_at")
+            .order_by("-enrolled_at")
+            .first()
+        )
+        enrollment_cache[cache_key] = enrollment
+        return enrollment
+
+    def get_enrollment_status(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return "none"
+        if request.user.id == obj.instructor_id:
+            return "approved"
+
+        status_map = self.context.get("course_enrollment_statuses")
+        if status_map is not None:
+            return status_map.get(obj.id, "none")
+
+        enrollment = self._get_cached_enrollment(obj)
+        return self._normalize_enrollment_status(enrollment)
+
+    def get_is_enrolled(self, obj):
+        return self.get_enrollment_status(obj) == "approved"
+
+
+class CourseListSerializer(CourseEnrollmentStatusMixin, serializers.ModelSerializer):
     thumbnail = serializers.SerializerMethodField()
     instructor = serializers.SerializerMethodField()
     section_count = serializers.IntegerField(read_only=True)
+    is_enrolled = serializers.SerializerMethodField()
+    enrollment_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -213,6 +265,8 @@ class CourseListSerializer(serializers.ModelSerializer):
             "launch_status",
             "is_published",
             "section_count",
+            "is_enrolled",
+            "enrollment_status",
             "instructor",
             "created_at",
             "updated_at",
@@ -232,7 +286,7 @@ class CourseListSerializer(serializers.ModelSerializer):
         return obj.get_thumbnail_url(request=request)
 
 
-class CourseDetailSerializer(serializers.ModelSerializer):
+class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSerializer):
     thumbnail = serializers.SerializerMethodField()
     instructor = serializers.SerializerMethodField()
     sections = SectionNestedSerializer(many=True, read_only=True)
@@ -281,51 +335,17 @@ class CourseDetailSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         return obj.get_thumbnail_url(request=request)
 
-    def _get_cached_enrollment(self, obj):
-        request = self.context.get("request")
-        if not request or not request.user.is_authenticated:
-            return None
-        if request.user.id == obj.instructor_id:
-            return None
 
-        enrollment_cache = self.context.setdefault("course_enrollment_cache", {})
-        cache_key = (request.user.id, obj.id)
-        if cache_key in enrollment_cache:
-            return enrollment_cache[cache_key]
-
-        enrollment = (
-            Enrollment.objects.filter(user=request.user, course=obj)
-            .only("payment_status", "enrolled_at")
-            .order_by("-enrolled_at")
-            .first()
+class GuideVideoListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GuideVideo
+        fields = (
+            "id",
+            "title",
+            "description",
+            "order",
+            "updated_at",
         )
-        enrollment_cache[cache_key] = enrollment
-        return enrollment
-
-    def get_is_enrolled(self, obj):
-        request = self.context.get("request")
-        if not request or not request.user.is_authenticated:
-            return False
-        if request.user.id == obj.instructor_id:
-            return True
-        enrollment = self._get_cached_enrollment(obj)
-        return bool(enrollment and enrollment.payment_status == Enrollment.STATUS_PAID)
-
-    def get_enrollment_status(self, obj):
-        request = self.context.get("request")
-        if not request or not request.user.is_authenticated:
-            return "none"
-        if request.user.id == obj.instructor_id:
-            return "approved"
-        enrollment = self._get_cached_enrollment(obj)
-        if not enrollment:
-            return "none"
-        if enrollment.payment_status == Enrollment.STATUS_PAID:
-            return "approved"
-        if enrollment.payment_status == Enrollment.STATUS_PENDING:
-            return "pending"
-        # Failed/rejected requests should return to "Enroll Now" state in UI.
-        return "none"
 
 
 class CourseWriteSerializer(serializers.ModelSerializer):

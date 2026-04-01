@@ -143,7 +143,7 @@ def validate_profile_image_upload(file_obj, field_name="profile_image"):
     _validate_profile_image_binary(file_obj, field_name)
 
 
-def validate_video_upload(file_obj, field_name="video_file"):
+def validate_video_upload(file_obj, field_name="video_file", max_bytes=None):
     if not file_obj:
         return
     _validate_filename(file_obj, field_name)
@@ -151,8 +151,11 @@ def validate_video_upload(file_obj, field_name="video_file"):
     if ext not in ALLOWED_VIDEO_EXTENSIONS:
         raise ValidationError({field_name: "Only MP4, M4V, MOV, or WEBM video files are allowed."})
     size = getattr(file_obj, "size", None)
-    max_video_upload_bytes = _max_video_upload_bytes()
+    max_video_upload_bytes = int(max_bytes or _max_video_upload_bytes())
     if size and size > max_video_upload_bytes:
+        if max_video_upload_bytes < 1024 * 1024 * 1024:
+            limit_mb = max_video_upload_bytes / float(1024 * 1024)
+            raise ValidationError({field_name: f"Video file is too large. Max allowed size is {limit_mb:.0f} MB."})
         limit_gb = max_video_upload_bytes / float(1024 * 1024 * 1024)
         raise ValidationError({field_name: f"Video file is too large. Max allowed size is {limit_gb:.0f} GB."})
     content_type = _content_type(file_obj)

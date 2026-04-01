@@ -2,6 +2,7 @@ import json
 import hashlib
 import hmac
 import os
+import shutil
 import tempfile
 from decimal import Decimal
 from io import BytesIO
@@ -26,6 +27,7 @@ from config.url_utils import get_media_public_url
 from apps.courses.models import (
     Course,
     Enrollment,
+    GuideVideo,
     Lecture,
     LectureProgress,
     LiveClass,
@@ -1328,6 +1330,169 @@ class MyCoursesViewTests(BaseAPITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["data"], [])
+
+
+class CourseListAccessTests(BaseAPITestCase):
+    def test_authenticated_course_list_includes_enrollment_access_flags(self):
+        pending_course = Course.objects.create(
+            title="Pending Access Course",
+            description="Pending enrollment should stay pending in the catalog.",
+            price=Decimal("299.00"),
+            instructor=self.instructor,
+            is_published=True,
+        )
+        no_access_course = Course.objects.create(
+            title="No Access Course",
+            description="No enrollment exists for this course.",
+            price=Decimal("199.00"),
+            instructor=self.instructor,
+            is_published=True,
+        )
+
+        Enrollment.objects.create(
+            user=self.student,
+            course=self.course,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        Enrollment.objects.create(
+            user=self.student,
+            course=pending_course,
+            payment_status=Enrollment.STATUS_PENDING,
+        )
+
+        self.login(self.student.email)
+        response = self.client.get(reverse("course-list-create"))
+
+        self.assertEqual(response.status_code, 200)
+        returned = {item["id"]: item for item in response.data["data"]}
+
+        self.assertTrue(returned[self.course.id]["is_enrolled"])
+        self.assertEqual(returned[self.course.id]["enrollment_status"], "approved")
+
+        self.assertFalse(returned[pending_course.id]["is_enrolled"])
+        self.assertEqual(returned[pending_course.id]["enrollment_status"], "pending")
+
+        self.assertFalse(returned[no_access_course.id]["is_enrolled"])
+        self.assertEqual(returned[no_access_course.id]["enrollment_status"], "none")
+
+
+class GuideVideoAccessTests(BaseAPITestCase):
+    def _guide_media_temp_root(self):
+        temp_root = os.path.join(settings.BASE_DIR, ".tmp-tests")
+        os.makedirs(temp_root, exist_ok=True)
+        return temp_root
+
+    def _guide_media_root(self, name):
+        media_root = os.path.join(self._guide_media_temp_root(), name)
+        shutil.rmtree(media_root, ignore_errors=True)
+        os.makedirs(media_root, exist_ok=True)
+        self.addCleanup(lambda: shutil.rmtree(media_root, ignore_errors=True))
+        return media_root
+
+    def test_guide_list_requires_auth_and_returns_only_published_guides(self):
+        GuideVideo.objects.create(
+            title="Published Guide",
+            description="Visible to authenticated users.",
+            video_file=SimpleUploadedFile(
+                "published-guide.mp4",
+                b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 64,
+                content_type="video/mp4",
+            ),
+            order=1,
+            is_published=True,
+        )
+        draft_guide = GuideVideo.objects.create(
+            title="Draft Guide",
+            description="Should stay hidden until published.",
+            video_file=SimpleUploadedFile(
+                "draft-guide.mp4",
+                b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 64,
+                content_type="video/mp4",
+            ),
+            order=2,
+            is_published=False,
+        )
+
+        unauthenticated = self.client.get(reverse("guide-list"))
+        self.assertEqual(unauthenticated.status_code, 401)
+
+        self.login(self.student.email)
+        response = self.client.get(reverse("guide-list"))
+
+        self.assertEqual(response.status_code, 200)
+        returned = {item["title"] for item in response.data["data"]}
+        self.assertIn("Published Guide", returned)
+        self.assertNotIn(draft_guide.title, returned)
+
+    def test_authenticated_user_can_get_protected_local_guide_playback_url(self):
+        with override_settings(
+            MEDIA_ROOT=self._guide_media_root("guide-playback-local"),
+            COURSE_PROTECTED_MEDIA_USE_ACCEL_REDIRECT=True,
+        ):
+            guide = GuideVideo.objects.create(
+                title="Platform Walkthrough",
+                description="How to use the dashboard.",
+                video_file=SimpleUploadedFile(
+                    "platform-guide.mp4",
+                    b"guide-video-bytes",
+                    content_type="video/mp4",
+                ),
+                order=1,
+                is_published=True,
+            )
+
+            self.login(self.student.email)
+            response = self.client.get(reverse("guide-video", kwargs={"pk": guide.id}))
+
+            self.assertEqual(response.status_code, 200)
+            playback_url = response.data["data"]["playback_url"]
+            self.assertIn(f"/api/guides/{guide.id}/playback/", playback_url)
+
+            protected_response = self.client.get(urlparse(playback_url).path)
+            self.assertEqual(protected_response.status_code, 200)
+            self.assertEqual(
+                protected_response.headers.get("X-Accel-Redirect"),
+                f"/_protected_media/{guide.video_file.name}",
+            )
+
+    def test_guide_protected_playback_token_is_user_bound(self):
+        with override_settings(
+            MEDIA_ROOT=self._guide_media_root("guide-playback-user-bound"),
+            COURSE_PROTECTED_MEDIA_USE_ACCEL_REDIRECT=True,
+        ):
+            guide = GuideVideo.objects.create(
+                title="User Bound Guide",
+                description="Playback token should stay bound to the issuing user.",
+                video_file=SimpleUploadedFile(
+                    "user-bound-guide.mp4",
+                    b"user-bound-guide-bytes",
+                    content_type="video/mp4",
+                ),
+                order=1,
+                is_published=True,
+            )
+
+            self.login(self.student.email)
+            response = self.client.get(reverse("guide-video", kwargs={"pk": guide.id}))
+            self.assertEqual(response.status_code, 200)
+            playback_path = urlparse(response.data["data"]["playback_url"]).path
+
+            other_user = User.objects.create_user(
+                email="guide-other-user@test.com",
+                password="StrongPass@123",
+                full_name="Guide Other User",
+                role=User.ROLE_STUDENT,
+            )
+            other_client = self.client_class()
+            other_login = other_client.post(
+                reverse("auth-login"),
+                {"email": other_user.email, "password": "StrongPass@123"},
+                format="json",
+            )
+            self.assertEqual(other_login.status_code, 200)
+
+            denied_response = other_client.get(playback_path)
+            self.assertEqual(denied_response.status_code, 404)
 
 
 class EnrollmentApprovalFlowTests(BaseAPITestCase):

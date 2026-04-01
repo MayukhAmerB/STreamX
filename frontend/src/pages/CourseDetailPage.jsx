@@ -557,24 +557,6 @@ export default function CourseDetailPage() {
               </span>
             </div>
 
-            <div className="mt-2 font-reference text-3xl font-semibold tracking-tight text-white">
-              {launchStatus.isComingSoon ? "Coming Soon" : formatINR(course.price)}
-            </div>
-            <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
-              {sections.length} modules / {lectureCount} lessons / {formatLevel(course.level)} level
-            </p>
-
-            <div className="mt-4 grid gap-2">
-              {highlights.slice(0, 4).map((point, index) => (
-                <div
-                  key={`${point}-${index}`}
-                  className="rounded-lg border border-black panel-gradient px-3 py-2 text-sm text-[#C8C8C8]"
-                >
-                  {point}
-                </div>
-              ))}
-            </div>
-
             <div className="mt-4 space-y-2">
               {launchStatus.isComingSoon ? (
                 <Button
@@ -602,7 +584,27 @@ export default function CourseDetailPage() {
               {enrollmentState.success ? (
                 <p className="text-xs text-zinc-300">{enrollmentState.success}</p>
               ) : null}
+            </div>
 
+            <div className="mt-4 font-reference text-3xl font-semibold tracking-tight text-white">
+              {launchStatus.isComingSoon ? "Coming Soon" : formatINR(course.price)}
+            </div>
+            <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
+              {sections.length} modules / {lectureCount} lessons / {formatLevel(course.level)} level
+            </p>
+
+            <div className="mt-4 grid gap-2">
+              {highlights.slice(0, 4).map((point, index) => (
+                <div
+                  key={`${point}-${index}`}
+                  className="rounded-lg border border-black panel-gradient px-3 py-2 text-sm text-[#C8C8C8]"
+                >
+                  {point}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 space-y-2">
               <Link to="/courses" className="block">
                 <Button variant="secondary" className="w-full">
                   Back to Catalog
