@@ -239,6 +239,37 @@ export default function CourseDetailPage() {
     [course?.snapshot_instructor, course?.instructor?.full_name]
   );
 
+  const renderPrimaryEnrollmentAction = ({ className = "w-full", showFeedback = false } = {}) => (
+    <div className="space-y-2">
+      {launchStatus.isComingSoon ? (
+        <Button
+          className={`border border-[#D1D1D1]/70 bg-[linear-gradient(90deg,#DBDBDB_0%,#C4C4C4_55%,#A1A1A1_100%)] text-[#141414] shadow-[0_8px_18px_rgba(0,0,0,0.18)] hover:bg-[linear-gradient(90deg,#E1E1E1_0%,#CBCBCB_55%,#ABABAB_100%)] ${className}`.trim()}
+          disabled
+        >
+          Coming Soon
+        </Button>
+      ) : hasApprovedEnrollment ? (
+        <Link to={`/learn/${course.id}`} className="block">
+          <Button className={className}>Go to Course</Button>
+        </Link>
+      ) : normalizedEnrollmentStatus === "pending" && !ENABLE_DIRECT_PAYMENTS ? (
+        <Button className={className} disabled>
+          Enrollment Pending
+        </Button>
+      ) : (
+        <Button className={className} onClick={handleEnrollNow} loading={enrollmentState.loading}>
+          Buy
+        </Button>
+      )}
+      {showFeedback && enrollmentState.error ? (
+        <p className="text-xs text-red-300">{enrollmentState.error}</p>
+      ) : null}
+      {showFeedback && enrollmentState.success ? (
+        <p className="text-xs text-zinc-300">{enrollmentState.success}</p>
+      ) : null}
+    </div>
+  );
+
   const handleEnrollNow = async () => {
     if (launchStatus.isComingSoon) return;
     if (!isAuthenticated) {
@@ -340,6 +371,10 @@ export default function CourseDetailPage() {
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[#BBBBBB]">
               {course.description || "Structured cybersecurity training with practical modules and guided progression."}
             </p>
+
+            <div className="mt-4 max-w-sm">
+              {renderPrimaryEnrollmentAction()}
+            </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-black panel-gradient p-3 backdrop-blur-sm">
@@ -557,33 +592,8 @@ export default function CourseDetailPage() {
               </span>
             </div>
 
-            <div className="mt-4 space-y-2">
-              {launchStatus.isComingSoon ? (
-                <Button
-                  className="w-full border border-[#D1D1D1]/70 bg-[linear-gradient(90deg,#DBDBDB_0%,#C4C4C4_55%,#A1A1A1_100%)] text-[#141414] shadow-[0_8px_18px_rgba(0,0,0,0.18)] hover:bg-[linear-gradient(90deg,#E1E1E1_0%,#CBCBCB_55%,#ABABAB_100%)]"
-                  disabled
-                >
-                  Coming Soon
-                </Button>
-              ) : hasApprovedEnrollment ? (
-                <Link to={`/learn/${course.id}`} className="block">
-                  <Button className="w-full">Go to Course</Button>
-                </Link>
-              ) : normalizedEnrollmentStatus === "pending" && !ENABLE_DIRECT_PAYMENTS ? (
-                <Button className="w-full" disabled>
-                  Enrollment Pending
-                </Button>
-              ) : (
-                <Button className="w-full" onClick={handleEnrollNow} loading={enrollmentState.loading}>
-                  Buy
-                </Button>
-              )}
-              {enrollmentState.error ? (
-                <p className="text-xs text-red-300">{enrollmentState.error}</p>
-              ) : null}
-              {enrollmentState.success ? (
-                <p className="text-xs text-zinc-300">{enrollmentState.success}</p>
-              ) : null}
+            <div className="mt-4">
+              {renderPrimaryEnrollmentAction({ showFeedback: true })}
             </div>
 
             <div className="mt-4 font-reference text-3xl font-semibold tracking-tight text-white">
