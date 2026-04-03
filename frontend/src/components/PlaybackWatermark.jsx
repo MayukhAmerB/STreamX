@@ -93,11 +93,11 @@ export default function PlaybackWatermark({ enabled = true, className = "" }) {
           transform: `translate(-50%, -50%) rotate(${position.rotate}deg)`,
         }}
       >
-        <div className="max-w-[72vw] rounded-2xl border border-white/12 bg-black/45 px-3 py-2 text-white shadow-[0_14px_34px_rgba(0,0,0,0.3)] backdrop-blur-sm">
-          <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-white/92">
+        <div className="max-w-[62vw] rounded-xl border border-white/5 bg-black/8 px-2 py-1 text-white/50 opacity-35 shadow-[0_6px_16px_rgba(0,0,0,0.08)] sm:max-w-[68vw] sm:px-2.5 sm:py-1.5 sm:opacity-40">
+          <div className="font-mono text-[8px] font-semibold uppercase tracking-[0.18em] text-white/34 sm:text-[9px] sm:tracking-[0.2em]">
             {identity.nameLabel}
           </div>
-          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 font-mono text-[9px] text-white/72">
+          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 font-mono text-[7px] text-white/24 sm:text-[8px]">
             {identity.detailParts.map((part) => (
               <span key={part}>{part}</span>
             ))}

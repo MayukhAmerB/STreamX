@@ -490,7 +490,7 @@ export default function CoursePlayerPage() {
                     disablePictureInPicture
                     disableRemotePlayback
                     playsInline
-                    className="h-full w-full"
+                    className="h-full w-full bg-black object-contain"
                     onDoubleClick={(event) => event.preventDefault()}
                     onError={handleVideoError}
                   />

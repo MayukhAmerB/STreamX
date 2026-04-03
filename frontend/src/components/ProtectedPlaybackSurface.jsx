@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import PlaybackWatermark from "./PlaybackWatermark";
-import { isNestedFullscreenTarget } from "../utils/protectedPlayback";
+import {
+  isNestedFullscreenTarget,
+  normalizeProtectedPlaybackClassName,
+} from "../utils/protectedPlayback";
 
 function canFullscreen(element) {
   return Boolean(
@@ -106,6 +109,11 @@ export default function ProtectedPlaybackSurface({
     return fullscreenLabel;
   }, [fullscreenLabel, isFullscreen]);
 
+  const surfaceClassName = useMemo(() => {
+    const normalizedClassName = normalizeProtectedPlaybackClassName(className, isFullscreen);
+    return `relative isolate overflow-hidden bg-black ${isFullscreen ? "h-full w-full" : ""} ${normalizedClassName}`.trim();
+  }, [className, isFullscreen]);
+
   const handleToggleFullscreen = async () => {
     try {
       if (getFullscreenElement() === containerRef.current) {
@@ -122,9 +130,15 @@ export default function ProtectedPlaybackSurface({
     <div
       ref={containerRef}
       data-protected-playback-surface="true"
-      className={`relative overflow-hidden bg-black ${isFullscreen ? "h-full w-full" : ""} ${className}`.trim()}
+      data-fullscreen={isFullscreen ? "true" : "false"}
+      className={surfaceClassName}
     >
-      {children}
+      <div
+        data-protected-playback-content="true"
+        className={`h-full w-full ${isFullscreen ? "flex items-center justify-center bg-black" : ""}`.trim()}
+      >
+        {children}
+      </div>
       <PlaybackWatermark enabled={watermarkEnabled} className={watermarkClassName} />
       {showFullscreenButton && fullscreenSupported ? (
         <div className="pointer-events-none absolute right-3 top-3 z-20">
