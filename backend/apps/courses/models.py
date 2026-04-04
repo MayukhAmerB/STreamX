@@ -13,11 +13,16 @@ from django.utils.text import slugify
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from config.model_validators import validate_no_active_content, validate_safe_public_url
-from config.upload_validators import validate_profile_image_upload, validate_video_upload
+from config.upload_validators import (
+    validate_profile_image_upload,
+    validate_resource_upload,
+    validate_video_upload,
+)
 from config.url_utils import get_media_public_url
 from .cache_utils import bump_course_list_cache_version, bump_live_class_list_cache_version
 
 MAX_GUIDE_VIDEO_UPLOAD_BYTES = 500 * 1024 * 1024
+MAX_LECTURE_RESOURCE_UPLOAD_BYTES = 100 * 1024 * 1024
 
 
 def _sanitize_string_list(value):
@@ -266,6 +271,17 @@ def guide_video_upload_path(instance, filename):
     return f"guide_videos/{safe_name}"
 
 
+def lecture_resource_upload_path(instance, filename):
+    lecture = getattr(instance, "lecture", None)
+    section = getattr(lecture, "section", None)
+    course = getattr(section, "course", None)
+    course_slug = getattr(course, "slug", "course") or "course"
+    section_id = getattr(lecture, "section_id", None) or "module"
+    lecture_id = getattr(instance, "lecture_id", None) or "lecture"
+    safe_name = os.path.basename(filename or "resource-file")
+    return f"lecture_resources/{course_slug}/module_{section_id}/lecture_{lecture_id}/{safe_name}"
+
+
 class GuideVideo(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
@@ -389,6 +405,48 @@ class Lecture(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class LectureResource(models.Model):
+    lecture = models.ForeignKey(Lecture, on_delete=models.CASCADE, related_name="resources")
+    title = models.CharField(max_length=255, blank=True, default="")
+    resource_file = models.FileField(
+        upload_to=lecture_resource_upload_path,
+        help_text="Upload TXT, PDF, PPT, PPTX, DOC, or DOCX files.",
+    )
+    order = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+        indexes = [
+            models.Index(fields=["lecture", "order"]),
+            models.Index(fields=["created_at"]),
+        ]
+        verbose_name = "Lecture Resource"
+        verbose_name_plural = "Lecture Resources"
+
+    def clean(self):
+        super().clean()
+        validate_no_active_content(self.title, "title")
+        validate_resource_upload(
+            self.resource_file,
+            "resource_file",
+            max_bytes=MAX_LECTURE_RESOURCE_UPLOAD_BYTES,
+        )
+
+    @property
+    def display_title(self):
+        text = str(self.title or "").strip()
+        if text:
+            return text
+        filename = os.path.basename(getattr(self.resource_file, "name", "") or "")
+        stem, _ = os.path.splitext(filename)
+        return stem or "Resource file"
+
+    def __str__(self):
+        return self.display_title
 
 
 class LectureProgress(models.Model):

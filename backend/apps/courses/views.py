@@ -17,7 +17,18 @@ from config.response import api_response
 from apps.payments.models import Payment
 
 from .cache_utils import get_course_list_cache_version, get_live_class_list_cache_version
-from .models import Course, Enrollment, GuideVideo, Lecture, LectureProgress, LiveClass, LiveClassEnrollment, PublicEnrollmentLead, Section
+from .models import (
+    Course,
+    Enrollment,
+    GuideVideo,
+    Lecture,
+    LectureProgress,
+    LectureResource,
+    LiveClass,
+    LiveClassEnrollment,
+    PublicEnrollmentLead,
+    Section,
+)
 from .permissions import IsCourseInstructor, IsEnrolledInCourse, IsInstructor
 from .serializers import (
     CourseEnrollSerializer,
@@ -92,7 +103,12 @@ def _course_prefetch_queryset():
     return Course.objects.select_related("instructor").prefetch_related(
         Prefetch(
             "sections",
-            queryset=Section.objects.all().prefetch_related("lectures"),
+            queryset=Section.objects.all().prefetch_related(
+                Prefetch(
+                    "lectures",
+                    queryset=Lecture.objects.all().prefetch_related("resources"),
+                )
+            ),
         )
     )
 
@@ -356,6 +372,10 @@ class CourseDetailView(APIView):
             cache_key = self._build_public_cache_key(course.pk, course.updated_at)
         serializer_context = {"request": request}
         if request.user.is_authenticated:
+            serializer_context["course_detail_enrollment_status"] = _build_course_enrollment_status_map(
+                courses=[course],
+                user=request.user,
+            ).get(course.id, "none")
             can_view_progress = bool(
                 request.user.id == course.instructor_id
                 or Enrollment.objects.filter(
@@ -853,6 +873,52 @@ class LectureProtectedMediaView(APIView):
         except ProtectedMediaError:
             return HttpResponseNotFound("Protected lecture asset not found.")
         return _build_protected_media_response(normalized_path)
+
+
+class LectureResourceDownloadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "lecture_playback"
+
+    def get(self, request, lecture_pk, pk):
+        resource = generics.get_object_or_404(
+            LectureResource.objects.select_related("lecture__section__course", "lecture__section__course__instructor"),
+            pk=pk,
+            lecture_id=lecture_pk,
+        )
+        lecture = resource.lecture
+        access_context = _get_lecture_access_context(lecture, request.user)
+        if not access_context["can_access"]:
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "You do not have access to this lecture resource."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        resource_file = getattr(resource, "resource_file", None)
+        file_name = str(getattr(resource_file, "name", "") or "").strip()
+        if not resource_file or not file_name:
+            return HttpResponseNotFound("Lecture resource not found.")
+
+        try:
+            file_handle = resource_file.storage.open(file_name, "rb")
+        except Exception:
+            return HttpResponseNotFound("Lecture resource not found.")
+
+        content_type, _ = mimetypes.guess_type(file_name)
+        response = FileResponse(
+            file_handle,
+            content_type=content_type or "application/octet-stream",
+            as_attachment=True,
+            filename=Path(file_name).name,
+        )
+        file_size = getattr(resource_file, "size", None)
+        if file_size:
+            response["Content-Length"] = str(file_size)
+        response["Cache-Control"] = "private, max-age=300"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
 
 
 class LectureProgressView(APIView):

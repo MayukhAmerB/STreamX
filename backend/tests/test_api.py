@@ -30,6 +30,7 @@ from apps.courses.models import (
     GuideVideo,
     Lecture,
     LectureProgress,
+    LectureResource,
     LiveClass,
     LiveClassEnrollment,
     PublicEnrollmentLead,
@@ -766,6 +767,43 @@ class UploadValidationTests(APITestCase):
         )
         self.assertFalse(serializer.is_valid())
         self.assertIn("video_file", serializer.errors)
+
+    def test_lecture_resource_rejects_invalid_document_extension(self):
+        instructor = User.objects.create_user(
+            email="resource@test.com",
+            password="StrongPass@123",
+            full_name="Resource Instructor",
+            role=User.ROLE_INSTRUCTOR,
+        )
+        course = Course.objects.create(
+            title="Resource Course",
+            description="Course description",
+            price=Decimal("100.00"),
+            instructor=instructor,
+            is_published=True,
+        )
+        section = Section.objects.create(course=course, title="Module 1", order=1)
+        lecture = Lecture.objects.create(
+            section=section,
+            title="Lecture With Resources",
+            description="Lecture description",
+            video_key="videos/resource.mp4",
+            order=1,
+            is_preview=False,
+        )
+        resource = LectureResource(
+            lecture=lecture,
+            title="Bad Resource",
+            resource_file=SimpleUploadedFile(
+                "malware.exe",
+                b"not-a-document",
+                content_type="application/octet-stream",
+            ),
+            order=1,
+        )
+
+        with self.assertRaisesMessage(Exception, "Only TXT, PDF, PPT, PPTX, DOC, or DOCX files are allowed."):
+            resource.full_clean()
 
 
 class SecurityHeaderTests(APITestCase):
@@ -1881,6 +1919,88 @@ class LectureVideoAccessTests(BaseAPITestCase):
         self.login(self.student.email)
         denied = self.client.get(reverse("lecture-video", kwargs={"pk": self.lecture.id}))
         self.assertEqual(denied.status_code, 403)
+
+
+class LectureResourceAccessTests(BaseAPITestCase):
+    def test_course_detail_only_includes_resources_for_accessible_lectures(self):
+        with tempfile.TemporaryDirectory() as temp_dir, override_settings(MEDIA_ROOT=temp_dir):
+            resource = LectureResource.objects.create(
+                lecture=self.lecture,
+                title="Investigation Worksheet",
+                resource_file=SimpleUploadedFile(
+                    "worksheet.pdf",
+                    b"%PDF-1.4 worksheet bytes",
+                    content_type="application/pdf",
+                ),
+                order=1,
+            )
+
+            public_response = self.client.get(reverse("course-detail", kwargs={"pk": self.course.id}))
+            self.assertEqual(public_response.status_code, 200)
+            public_lecture_payload = public_response.data["data"]["sections"][0]["lectures"][0]
+            self.assertEqual(public_lecture_payload["resources"], [])
+
+            self.login(self.student.email)
+            no_access_response = self.client.get(reverse("course-detail", kwargs={"pk": self.course.id}))
+            self.assertEqual(no_access_response.status_code, 200)
+            no_access_lecture_payload = no_access_response.data["data"]["sections"][0]["lectures"][0]
+            self.assertEqual(no_access_lecture_payload["resources"], [])
+
+            Enrollment.objects.create(
+                user=self.student,
+                course=self.course,
+                payment_status=Enrollment.STATUS_PAID,
+            )
+            enrolled_response = self.client.get(reverse("course-detail", kwargs={"pk": self.course.id}))
+            self.assertEqual(enrolled_response.status_code, 200)
+            lecture_payload = enrolled_response.data["data"]["sections"][0]["lectures"][0]
+            self.assertEqual(len(lecture_payload["resources"]), 1)
+            self.assertEqual(lecture_payload["resources"][0]["title"], resource.title)
+            self.assertIn(
+                reverse(
+                    "lecture-resource-download",
+                    kwargs={"lecture_pk": self.lecture.id, "pk": resource.id},
+                ),
+                lecture_payload["resources"][0]["download_url"],
+            )
+            self.assertNotIn("resource_file", lecture_payload["resources"][0])
+
+    def test_enrolled_student_can_download_lecture_resource_and_unenrolled_cannot(self):
+        with tempfile.TemporaryDirectory() as temp_dir, override_settings(MEDIA_ROOT=temp_dir):
+            resource = LectureResource.objects.create(
+                lecture=self.lecture,
+                title="Cheat Sheet",
+                resource_file=SimpleUploadedFile(
+                    "cheat-sheet.docx",
+                    b"docx-resource-bytes",
+                    content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                ),
+                order=1,
+            )
+
+            self.login(self.student.email)
+            denied_response = self.client.get(
+                reverse(
+                    "lecture-resource-download",
+                    kwargs={"lecture_pk": self.lecture.id, "pk": resource.id},
+                )
+            )
+            self.assertEqual(denied_response.status_code, 403)
+
+            Enrollment.objects.create(
+                user=self.student,
+                course=self.course,
+                payment_status=Enrollment.STATUS_PAID,
+            )
+            allowed_response = self.client.get(
+                reverse(
+                    "lecture-resource-download",
+                    kwargs={"lecture_pk": self.lecture.id, "pk": resource.id},
+                )
+            )
+            self.assertEqual(allowed_response.status_code, 200)
+            self.assertIn("attachment;", allowed_response["Content-Disposition"])
+            self.assertGreater(sum(len(chunk) for chunk in allowed_response.streaming_content), 0)
 
 
 class LectureProgressTests(BaseAPITestCase):

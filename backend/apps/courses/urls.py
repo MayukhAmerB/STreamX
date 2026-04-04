@@ -13,6 +13,7 @@ from .views import (
     LectureDetailView,
     LectureProgressView,
     LectureProtectedMediaView,
+    LectureResourceDownloadView,
     LectureVideoView,
     LiveClassEnrollView,
     LiveClassListView,
@@ -40,6 +41,11 @@ urlpatterns = [
     path("lectures/<int:pk>/", LectureDetailView.as_view(), name="lecture-detail"),
     path("lectures/<int:pk>/video/", LectureVideoView.as_view(), name="lecture-video"),
     path("lectures/<int:pk>/progress/", LectureProgressView.as_view(), name="lecture-progress"),
+    path(
+        "lectures/<int:lecture_pk>/resources/<int:pk>/download/",
+        LectureResourceDownloadView.as_view(),
+        name="lecture-resource-download",
+    ),
     path(
         "lectures/<int:pk>/playback/<str:token>/<path:asset_path>",
         LectureProtectedMediaView.as_view(),

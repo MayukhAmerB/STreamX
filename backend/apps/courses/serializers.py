@@ -1,10 +1,11 @@
 import re
 
 from rest_framework import serializers
+from django.urls import reverse
 
 from config.request_security import contains_active_content, is_safe_public_http_url
 from config.upload_validators import validate_profile_image_upload, validate_video_upload
-from config.url_utils import get_media_public_url
+from config.url_utils import build_public_url, get_media_public_url
 
 from .services import ProtectedMediaError, build_protected_lecture_playback_url, resolve_lecture_playback_expires_in
 from .models import (
@@ -12,6 +13,7 @@ from .models import (
     Enrollment,
     GuideVideo,
     Lecture,
+    LectureResource,
     LectureProgress,
     LiveClass,
     LiveClassEnrollment,
@@ -39,6 +41,7 @@ def _normalize_text_list(value):
 
 class LectureSerializer(serializers.ModelSerializer):
     video_file_url = serializers.SerializerMethodField(read_only=True)
+    resources = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Lecture
@@ -55,6 +58,7 @@ class LectureSerializer(serializers.ModelSerializer):
             "stream_error",
             "order",
             "is_preview",
+            "resources",
             "section",
             "created_at",
             "updated_at",
@@ -120,9 +124,64 @@ class LectureSerializer(serializers.ModelSerializer):
         except ProtectedMediaError:
             return None
 
+    def get_resources(self, obj):
+        resources = getattr(obj, "resources", None)
+        resource_items = resources.all() if resources is not None else []
+        return LectureResourceSerializer(resource_items, many=True, context=self.context).data
+
+
+class LectureResourceSerializer(serializers.ModelSerializer):
+    title = serializers.SerializerMethodField()
+    filename = serializers.SerializerMethodField()
+    file_extension = serializers.SerializerMethodField()
+    file_size = serializers.SerializerMethodField()
+    download_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LectureResource
+        fields = (
+            "id",
+            "title",
+            "filename",
+            "file_extension",
+            "file_size",
+            "download_url",
+            "order",
+            "created_at",
+            "updated_at",
+        )
+
+    def get_title(self, obj):
+        return obj.display_title
+
+    def get_filename(self, obj):
+        resource_file = getattr(obj, "resource_file", None)
+        if not resource_file:
+            return ""
+        return str(getattr(resource_file, "name", "") or "").replace("\\", "/").split("/")[-1]
+
+    def get_file_extension(self, obj):
+        filename = self.get_filename(obj)
+        if "." not in filename:
+            return ""
+        return filename.rsplit(".", 1)[-1].lower()
+
+    def get_file_size(self, obj):
+        resource_file = getattr(obj, "resource_file", None)
+        return int(getattr(resource_file, "size", 0) or 0)
+
+    def get_download_url(self, obj):
+        request = self.context.get("request")
+        path = reverse(
+            "lecture-resource-download",
+            kwargs={"lecture_pk": obj.lecture_id, "pk": obj.pk},
+        )
+        return build_public_url(path, request=request)
+
 
 class LectureNestedSerializer(serializers.ModelSerializer):
     progress = serializers.SerializerMethodField()
+    resources = serializers.SerializerMethodField()
 
     class Meta:
         model = Lecture
@@ -135,6 +194,7 @@ class LectureNestedSerializer(serializers.ModelSerializer):
             "stream_status",
             "stream_duration_seconds",
             "progress",
+            "resources",
             "created_at",
             "updated_at",
         )
@@ -145,6 +205,42 @@ class LectureNestedSerializer(serializers.ModelSerializer):
         if not progress:
             return None
         return LectureProgressStateSerializer(progress).data
+
+    def get_resources(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return []
+
+        course = getattr(getattr(obj, "section", None), "course", None)
+        if course is None:
+            return []
+
+        user = request.user
+        if getattr(user, "id", None) == getattr(course, "instructor_id", None):
+            can_access = True
+        elif obj.is_preview:
+            can_access = True
+        else:
+            course_enrollment_status = self.context.get("course_detail_enrollment_status")
+            if course_enrollment_status is None:
+                enrollment = (
+                    Enrollment.objects.filter(
+                        user=user,
+                        course=course,
+                        payment_status=Enrollment.STATUS_PAID,
+                    )
+                    .only("id")
+                    .first()
+                )
+                course_enrollment_status = "approved" if enrollment else "none"
+            can_access = course_enrollment_status == "approved"
+
+        if not can_access:
+            return []
+
+        resources = getattr(obj, "resources", None)
+        resource_items = resources.all() if resources is not None else []
+        return LectureResourceSerializer(resource_items, many=True, context=self.context).data
 
 
 class LectureProgressStateSerializer(serializers.ModelSerializer):

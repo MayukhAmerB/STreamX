@@ -12,6 +12,7 @@ from .models import (
     Enrollment,
     GuideVideo,
     Lecture,
+    LectureResource,
     LiveClass,
     LiveClassEnrollment,
     PublicEnrollmentLead,
@@ -237,7 +238,16 @@ class LectureInline(admin.TabularInline):
     ordering = ("order", "id")
     show_change_link = True
     verbose_name = "Video Lecture"
-    verbose_name_plural = "Video Lectures (upload video files here for each module)"
+    verbose_name_plural = "Video Lectures (upload videos here, then open a lecture to manage optional resources)"
+
+
+class LectureResourceInline(admin.TabularInline):
+    model = LectureResource
+    extra = 1
+    fields = ("order", "title", "resource_file")
+    ordering = ("order", "id")
+    verbose_name = "Resource File"
+    verbose_name_plural = "Resource Files (optional downloads for this lecture)"
 
 
 class GuideVideoAdminForm(forms.ModelForm):
@@ -632,6 +642,70 @@ class ModuleAdmin(admin.ModelAdmin):
                 % failed,
                 level=messages.ERROR,
             )
+
+
+@admin.register(Lecture)
+class LectureAdmin(admin.ModelAdmin):
+    form = LectureInlineForm
+    list_display = (
+        "id",
+        "title",
+        "section",
+        "course_title",
+        "order",
+        "is_preview",
+        "stream_status",
+        "resource_count",
+        "updated_at",
+    )
+    list_display_links = ("id", "title")
+    list_filter = (
+        "is_preview",
+        "stream_status",
+        "section__course__category",
+        "section__course__level",
+        "section__course__launch_status",
+    )
+    search_fields = ("title", "description", "section__title", "section__course__title")
+    autocomplete_fields = ("section",)
+    ordering = ("section__course", "section", "order", "id")
+    inlines = [LectureResourceInline]
+    readonly_fields = ("stream_status", "stream_manifest_key", "stream_duration_seconds", "stream_error", "created_at", "updated_at")
+    save_on_top = True
+    list_per_page = 50
+    fields = (
+        "section",
+        "title",
+        "description",
+        "order",
+        "is_preview",
+        "video_file",
+        "remove_uploaded_video",
+        "video_key",
+        "stream_status",
+        "stream_manifest_key",
+        "stream_duration_seconds",
+        "stream_error",
+        "created_at",
+        "updated_at",
+    )
+
+    class Media:
+        js = ("admin/js/courses_upload_progress.js",)
+        css = {"all": ("admin/css/courses_upload_progress.css",)}
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("section", "section__course").annotate(
+            _resource_count=Count("resources", distinct=True)
+        )
+
+    @admin.display(description="Course")
+    def course_title(self, obj):
+        return getattr(getattr(obj, "section", None), "course", None)
+
+    @admin.display(ordering="_resource_count", description="Resources")
+    def resource_count(self, obj):
+        return getattr(obj, "_resource_count", None) or obj.resources.count()
 
 
 @admin.register(Enrollment)

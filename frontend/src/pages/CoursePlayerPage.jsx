@@ -56,6 +56,13 @@ function formatSeconds(totalSeconds) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+function formatFileSize(totalBytes) {
+  const normalized = Math.max(0, Number(totalBytes) || 0);
+  if (normalized < 1024) return `${normalized} B`;
+  if (normalized < 1024 * 1024) return `${(normalized / 1024).toFixed(1)} KB`;
+  return `${(normalized / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default function CoursePlayerPage() {
   const { courseId } = useParams();
   const [course, setCourse] = useState(null);
@@ -96,6 +103,7 @@ export default function CoursePlayerPage() {
   }, [course]);
 
   const activeProgress = selectedLecture?.progress || null;
+  const selectedResources = selectedLecture?.resources || [];
 
   const syncLectureProgress = async ({
     lectureId,
@@ -516,31 +524,69 @@ export default function CoursePlayerPage() {
                 ) : null}
               </div>
 
-              <div className="rounded-2xl border border-black panel-gradient p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
-                  Progress Snapshot
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-black panel-gradient p-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
+                    Progress Snapshot
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-2xl border border-black panel-gradient p-3">
+                      <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">Completion</div>
+                      <div className="mt-1 text-2xl font-semibold text-white">
+                        {activeProgress?.percent_complete || 0}%
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-black panel-gradient p-3">
+                      <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">Last Position</div>
+                      <div className="mt-1 text-lg font-semibold text-white">
+                        {formatSeconds(activeProgress?.last_position_seconds || 0)}
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-black panel-gradient p-3">
+                      <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">Duration</div>
+                      <div className="mt-1 text-lg font-semibold text-white">
+                        {formatSeconds(
+                          activeProgress?.duration_seconds || selectedLecture?.stream_duration_seconds || 0
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-4 space-y-3">
-                  <div className="rounded-2xl border border-black panel-gradient p-3">
-                    <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">Completion</div>
-                    <div className="mt-1 text-2xl font-semibold text-white">
-                      {activeProgress?.percent_complete || 0}%
-                    </div>
+
+                <div className="rounded-2xl border border-black panel-gradient p-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
+                    Lesson Resources
                   </div>
-                  <div className="rounded-2xl border border-black panel-gradient p-3">
-                    <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">Last Position</div>
-                    <div className="mt-1 text-lg font-semibold text-white">
-                      {formatSeconds(activeProgress?.last_position_seconds || 0)}
+                  {selectedResources.length ? (
+                    <div className="mt-4 space-y-3">
+                      {selectedResources.map((resource) => (
+                        <a
+                          key={resource.id}
+                          href={resource.download_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-start justify-between gap-3 rounded-2xl border border-black panel-gradient px-3 py-3 transition hover:border-[#3B3B3B] hover:bg-[#141414]"
+                        >
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-white">
+                              {resource.title}
+                            </div>
+                            <div className="mt-1 text-xs text-[#949494]">
+                              {resource.filename}
+                              {resource.file_size ? ` · ${formatFileSize(resource.file_size)}` : ""}
+                            </div>
+                          </div>
+                          <span className="shrink-0 rounded-full border border-black bg-[#171717] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#BBBBBB]">
+                            {(resource.file_extension || "file").toUpperCase()}
+                          </span>
+                        </a>
+                      ))}
                     </div>
-                  </div>
-                  <div className="rounded-2xl border border-black panel-gradient p-3">
-                    <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">Duration</div>
-                    <div className="mt-1 text-lg font-semibold text-white">
-                      {formatSeconds(
-                        activeProgress?.duration_seconds || selectedLecture?.stream_duration_seconds || 0
-                      )}
-                    </div>
-                  </div>
+                  ) : (
+                    <p className="mt-3 text-sm leading-6 text-[#949494]">
+                      No resources were uploaded for this lecture.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

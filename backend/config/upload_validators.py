@@ -10,12 +10,23 @@ ALLOWED_PROFILE_IMAGE_FORMATS = {"JPEG", "PNG", "WEBP"}
 
 ALLOWED_VIDEO_EXTENSIONS = {"mp4", "m4v", "mov", "webm"}
 ALLOWED_VIDEO_CONTENT_TYPES = {"video/mp4", "video/quicktime", "video/webm", "application/octet-stream"}
+ALLOWED_RESOURCE_EXTENSIONS = {"txt", "pdf", "ppt", "pptx", "doc", "docx"}
+ALLOWED_RESOURCE_CONTENT_TYPES = {
+    "text/plain",
+    "application/pdf",
+    "application/msword",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/octet-stream",
+}
 
 MAX_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_PROFILE_IMAGE_WIDTH = 4096
 MAX_PROFILE_IMAGE_HEIGHT = 4096
 MAX_PROFILE_IMAGE_PIXELS = 16_000_000
 DEFAULT_MAX_VIDEO_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024  # 2 GB
+DEFAULT_MAX_RESOURCE_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MB
 
 
 def _max_video_upload_bytes():
@@ -162,3 +173,24 @@ def validate_video_upload(file_obj, field_name="video_file", max_bytes=None):
     if content_type and content_type not in ALLOWED_VIDEO_CONTENT_TYPES:
         raise ValidationError({field_name: "Unsupported video content type."})
     _validate_video_binary(file_obj, field_name)
+
+
+def validate_resource_upload(file_obj, field_name="resource_file", max_bytes=None):
+    if not file_obj:
+        return
+    _validate_filename(file_obj, field_name)
+    ext = _extension(file_obj)
+    if ext not in ALLOWED_RESOURCE_EXTENSIONS:
+        raise ValidationError(
+            {field_name: "Only TXT, PDF, PPT, PPTX, DOC, or DOCX files are allowed."}
+        )
+    size = getattr(file_obj, "size", None)
+    max_resource_upload_bytes = int(max_bytes or DEFAULT_MAX_RESOURCE_UPLOAD_BYTES)
+    if size and size > max_resource_upload_bytes:
+        limit_mb = max_resource_upload_bytes / float(1024 * 1024)
+        raise ValidationError(
+            {field_name: f"Resource file is too large. Max allowed size is {limit_mb:.0f} MB."}
+        )
+    content_type = _content_type(file_obj)
+    if content_type and content_type not in ALLOWED_RESOURCE_CONTENT_TYPES:
+        raise ValidationError({field_name: "Unsupported resource content type."})
