@@ -202,13 +202,14 @@ def build_protected_lecture_playback_url(request, lecture, storage_key, *, expir
         if request_user and getattr(request_user, "is_authenticated", False)
         else 0
     )
+    subject_uid = request_user_id if asset_type == "file" else 0
 
     token = signing.dumps(
         {
             "lecture_id": int(lecture.id),
             "asset_type": asset_type,
             "root_prefix": root_prefix,
-            "subject_uid": request_user_id,
+            "subject_uid": subject_uid,
         },
         salt=PROTECTED_LECTURE_MEDIA_SIGNING_SALT,
         compress=True,

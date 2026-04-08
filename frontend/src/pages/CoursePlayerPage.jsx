@@ -7,6 +7,25 @@ import ProtectedPlaybackSurface from "../components/ProtectedPlaybackSurface";
 import { apiData, apiMessage } from "../utils/api";
 
 const PROGRESS_SYNC_INTERVAL_SECONDS = 15;
+const PROGRESS_THROTTLE_BACKOFF_MS = 30000;
+
+function resolveRetryAfterMs(error, fallbackMs = PROGRESS_THROTTLE_BACKOFF_MS) {
+  const retryAfterHeader = error?.response?.headers?.["retry-after"];
+  if (!retryAfterHeader) return fallbackMs;
+
+  const retryAfterValue = String(retryAfterHeader).trim();
+  const seconds = Number(retryAfterValue);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.max(1000, seconds * 1000);
+  }
+
+  const retryAt = Date.parse(retryAfterValue);
+  if (Number.isFinite(retryAt)) {
+    return Math.max(1000, retryAt - Date.now());
+  }
+
+  return fallbackMs;
+}
 
 function flattenCourseLectures(course) {
   return (course?.sections || []).flatMap((section) =>
@@ -77,12 +96,36 @@ export default function CoursePlayerPage() {
   const resumeAppliedRef = useRef(false);
   const progressInFlightRef = useRef(false);
   const pendingProgressRef = useRef(null);
+  const deferredProgressRef = useRef(null);
+  const progressRetryAtRef = useRef(0);
+  const progressRetryTimerRef = useRef(null);
   const lastSyncedRef = useRef({
     lectureId: null,
     positionSeconds: 0,
     durationSeconds: 0,
     completed: false,
   });
+
+  function clearProgressRetryTimer() {
+    if (progressRetryTimerRef.current && typeof window !== "undefined") {
+      window.clearTimeout(progressRetryTimerRef.current);
+    }
+    progressRetryTimerRef.current = null;
+  }
+
+  function scheduleDeferredProgressRetry(delayMs) {
+    if (typeof window === "undefined") return;
+    clearProgressRetryTimer();
+    progressRetryTimerRef.current = window.setTimeout(() => {
+      progressRetryTimerRef.current = null;
+      progressRetryAtRef.current = 0;
+      const deferredSnapshot = deferredProgressRef.current;
+      deferredProgressRef.current = null;
+      if (deferredSnapshot) {
+        void syncLectureProgress({ ...deferredSnapshot, force: true });
+      }
+    }, delayMs);
+  }
 
   const lectureCount = useMemo(
     () => course?.sections?.reduce((acc, section) => acc + (section.lectures?.length || 0), 0) || 0,
@@ -116,6 +159,22 @@ export default function CoursePlayerPage() {
 
     const normalizedPosition = Math.max(0, Math.floor(Number(positionSeconds) || 0));
     const normalizedDuration = Math.max(0, Math.floor(Number(durationSeconds) || 0));
+    const progressSnapshot = {
+      lectureId,
+      positionSeconds: normalizedPosition,
+      durationSeconds: normalizedDuration,
+      completed,
+      force,
+    };
+    const retryDelayMs = progressRetryAtRef.current - Date.now();
+    if (retryDelayMs > 0) {
+      deferredProgressRef.current = progressSnapshot;
+      if (!progressRetryTimerRef.current) {
+        scheduleDeferredProgressRetry(retryDelayMs);
+      }
+      return null;
+    }
+
     const previousSync = lastSyncedRef.current;
     const shouldSkip =
       !force &&
@@ -125,13 +184,7 @@ export default function CoursePlayerPage() {
 
     if (shouldSkip) return null;
     if (progressInFlightRef.current) {
-      pendingProgressRef.current = {
-        lectureId,
-        positionSeconds: normalizedPosition,
-        durationSeconds: normalizedDuration,
-        completed,
-        force,
-      };
+      pendingProgressRef.current = progressSnapshot;
       return null;
     }
 
@@ -144,6 +197,9 @@ export default function CoursePlayerPage() {
         completed,
       });
       const snapshot = apiData(response);
+      clearProgressRetryTimer();
+      deferredProgressRef.current = null;
+      progressRetryAtRef.current = 0;
       lastSyncedRef.current = {
         lectureId,
         positionSeconds: normalizedPosition,
@@ -161,6 +217,21 @@ export default function CoursePlayerPage() {
       });
       return snapshot;
     } catch (err) {
+      if (err?.response?.status === 429) {
+        const throttleDelayMs = resolveRetryAfterMs(err);
+        progressRetryAtRef.current = Date.now() + throttleDelayMs;
+        deferredProgressRef.current = progressSnapshot;
+        scheduleDeferredProgressRetry(throttleDelayMs);
+        setProgressState({
+          saving: false,
+          error: `Progress saving paused after rate limiting. Retrying in ${Math.ceil(
+            throttleDelayMs / 1000
+          )}s.`,
+          savedAt: "",
+        });
+        return null;
+      }
+
       setProgressState({
         saving: false,
         error: apiMessage(err, "Unable to save lesson progress."),
@@ -230,6 +301,8 @@ export default function CoursePlayerPage() {
       active = false;
     };
   }, [courseId]);
+
+  useEffect(() => () => clearProgressRetryTimer(), []);
 
   useEffect(() => {
     if (!selectedLecture?.id) return;
