@@ -397,8 +397,6 @@ export default function CoursePlayerPage() {
     };
   }, [
     selectedLecture?.id,
-    selectedLecture?.progress?.resume_position_seconds,
-    selectedLecture?.progress?.completed,
     selectedLecture?.stream_duration_seconds,
     videoUrl,
   ]);
