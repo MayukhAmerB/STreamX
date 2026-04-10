@@ -5,6 +5,38 @@ import {
   normalizeProtectedPlaybackClassName,
 } from "../utils/protectedPlayback";
 
+function getScreenOrientationController() {
+  if (typeof screen === "undefined") return null;
+  return screen.orientation || screen.mozOrientation || screen.msOrientation || null;
+}
+
+async function lockLandscapeOrientation() {
+  const orientationController = getScreenOrientationController();
+  if (!orientationController || typeof orientationController.lock !== "function") {
+    return false;
+  }
+
+  try {
+    await orientationController.lock("landscape");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function unlockOrientation() {
+  const orientationController = getScreenOrientationController();
+  if (!orientationController || typeof orientationController.unlock !== "function") {
+    return;
+  }
+
+  try {
+    orientationController.unlock();
+  } catch {
+    // Best-effort only. Some browsers reject unlock when they ignored lock.
+  }
+}
+
 function canFullscreen(element) {
   return Boolean(
     element?.requestFullscreen ||
@@ -70,6 +102,7 @@ export default function ProtectedPlaybackSurface({
   fullscreenLabel = "Fullscreen",
 }) {
   const containerRef = useRef(null);
+  const orientationLockedRef = useRef(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fullscreenSupported, setFullscreenSupported] = useState(false);
 
@@ -82,11 +115,19 @@ export default function ProtectedPlaybackSurface({
 
       if (isNestedFullscreenTarget(container, fullscreenElement)) {
         setIsFullscreen(false);
+        if (orientationLockedRef.current) {
+          unlockOrientation();
+          orientationLockedRef.current = false;
+        }
         void exitAnyFullscreen();
         return;
       }
 
       setIsFullscreen(fullscreenElement === container);
+      if (!fullscreenElement && orientationLockedRef.current) {
+        unlockOrientation();
+        orientationLockedRef.current = false;
+      }
     };
 
     document.addEventListener("fullscreenchange", syncFullscreenState);
@@ -118,9 +159,14 @@ export default function ProtectedPlaybackSurface({
     try {
       if (getFullscreenElement() === containerRef.current) {
         await exitAnyFullscreen();
+        if (orientationLockedRef.current) {
+          unlockOrientation();
+          orientationLockedRef.current = false;
+        }
         return;
       }
       await requestElementFullscreen(containerRef.current);
+      orientationLockedRef.current = await lockLandscapeOrientation();
     } catch {
       // Best-effort enhancement only. Playback must remain usable if fullscreen fails.
     }
