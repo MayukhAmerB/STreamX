@@ -5,6 +5,8 @@ import {
   normalizeProtectedPlaybackClassName,
 } from "../utils/protectedPlayback";
 
+const VIDEO_SKIP_SECONDS = 10;
+
 function getScreenOrientationController() {
   if (typeof screen === "undefined") return null;
   return screen.orientation || screen.mozOrientation || screen.msOrientation || null;
@@ -93,6 +95,19 @@ function getFullscreenElement() {
   );
 }
 
+function formatPlaybackTime(totalSeconds) {
+  const normalized = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const hours = Math.floor(normalized / 3600);
+  const minutes = Math.floor((normalized % 3600) / 60);
+  const seconds = normalized % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 export default function ProtectedPlaybackSurface({
   children,
   watermarkEnabled = true,
@@ -100,11 +115,16 @@ export default function ProtectedPlaybackSurface({
   showFullscreenButton = true,
   watermarkClassName = "",
   fullscreenLabel = "Fullscreen",
+  videoRef = null,
+  videoSessionKey = "",
 }) {
   const containerRef = useRef(null);
   const orientationLockedRef = useRef(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fullscreenSupported, setFullscreenSupported] = useState(false);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [videoCurrentTime, setVideoCurrentTime] = useState(0);
+  const [videoPaused, setVideoPaused] = useState(true);
 
   useEffect(() => {
     setFullscreenSupported(canFullscreen(containerRef.current));
@@ -143,6 +163,49 @@ export default function ProtectedPlaybackSurface({
     };
   }, []);
 
+  useEffect(() => {
+    setVideoCurrentTime(0);
+    setVideoDuration(0);
+    setVideoPaused(true);
+  }, [videoSessionKey]);
+
+  useEffect(() => {
+    const videoElement = videoRef?.current;
+    if (!videoElement) return undefined;
+
+    const syncVideoState = () => {
+      const nextDuration = Number.isFinite(videoElement.duration) ? videoElement.duration : 0;
+      const nextTime = Number.isFinite(videoElement.currentTime) ? videoElement.currentTime : 0;
+      setVideoDuration(nextDuration);
+      setVideoCurrentTime(Math.min(nextTime, nextDuration || nextTime));
+      setVideoPaused(videoElement.paused);
+    };
+
+    syncVideoState();
+
+    const events = [
+      "loadedmetadata",
+      "durationchange",
+      "timeupdate",
+      "play",
+      "pause",
+      "seeking",
+      "seeked",
+      "ended",
+      "emptied",
+    ];
+
+    events.forEach((eventName) => {
+      videoElement.addEventListener(eventName, syncVideoState);
+    });
+
+    return () => {
+      events.forEach((eventName) => {
+        videoElement.removeEventListener(eventName, syncVideoState);
+      });
+    };
+  }, [videoRef, videoSessionKey]);
+
   const buttonLabel = useMemo(() => {
     if (isFullscreen) {
       return "Exit Fullscreen";
@@ -154,6 +217,49 @@ export default function ProtectedPlaybackSurface({
     const normalizedClassName = normalizeProtectedPlaybackClassName(className, isFullscreen);
     return `relative isolate overflow-hidden bg-black ${isFullscreen ? "h-full w-full" : ""} ${normalizedClassName}`.trim();
   }, [className, isFullscreen]);
+
+  const hasVideoControls = Boolean(videoRef);
+  const hasSeekableVideo = hasVideoControls && videoDuration > 0;
+  const progressPercent = hasSeekableVideo ? Math.min(100, (videoCurrentTime / videoDuration) * 100) : 0;
+  const playPauseLabel = videoPaused ? "Play" : "Pause";
+
+  const handleSeekChange = (event) => {
+    const videoElement = videoRef?.current;
+    if (!videoElement) return;
+
+    const nextTime = Math.max(0, Number(event.target.value) || 0);
+    videoElement.currentTime = nextTime;
+    setVideoCurrentTime(nextTime);
+  };
+
+  const handleSkipForward = () => {
+    const videoElement = videoRef?.current;
+    if (!videoElement) return;
+
+    const resolvedDuration = Number.isFinite(videoElement.duration) ? videoElement.duration : videoDuration;
+    const nextTime =
+      resolvedDuration > 0
+        ? Math.min(resolvedDuration, (videoElement.currentTime || 0) + VIDEO_SKIP_SECONDS)
+        : (videoElement.currentTime || 0) + VIDEO_SKIP_SECONDS;
+
+    videoElement.currentTime = nextTime;
+    setVideoCurrentTime(nextTime);
+  };
+
+  const handleTogglePlayback = async () => {
+    const videoElement = videoRef?.current;
+    if (!videoElement) return;
+
+    try {
+      if (videoElement.paused) {
+        await videoElement.play();
+      } else {
+        videoElement.pause();
+      }
+    } catch {
+      // Some browsers reject autoplay/play requests without a gesture.
+    }
+  };
 
   const handleToggleFullscreen = async () => {
     try {
@@ -186,8 +292,56 @@ export default function ProtectedPlaybackSurface({
         {children}
       </div>
       <PlaybackWatermark enabled={watermarkEnabled} className={watermarkClassName} />
+      {hasVideoControls ? (
+        <div className="pointer-events-none absolute inset-x-3 bottom-3 z-20">
+          <div className="pointer-events-auto rounded-2xl border border-white/12 bg-black/72 px-3 py-2.5 shadow-[0_18px_40px_rgba(0,0,0,0.34)] backdrop-blur-md">
+            <div className="flex items-center gap-2 text-[11px] font-semibold text-white/90 sm:text-xs">
+              <button
+                type="button"
+                onClick={handleTogglePlayback}
+                className="shrink-0 rounded-full border border-white/12 bg-white/10 px-3 py-1.5 transition hover:bg-white/18"
+              >
+                {playPauseLabel}
+              </button>
+              <span className="w-11 shrink-0 text-right tabular-nums text-white/75 sm:w-14">
+                {formatPlaybackTime(videoCurrentTime)}
+              </span>
+              <div className="relative flex-1">
+                <div className="absolute inset-y-1/2 left-0 right-0 -translate-y-1/2 rounded-full bg-white/12">
+                  <div
+                    className="h-1.5 rounded-full bg-white/85"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max={hasSeekableVideo ? videoDuration : 0}
+                  step="0.1"
+                  value={hasSeekableVideo ? Math.min(videoCurrentTime, videoDuration) : 0}
+                  onChange={handleSeekChange}
+                  disabled={!hasSeekableVideo}
+                  aria-label="Seek through video"
+                  className="relative h-6 w-full cursor-pointer appearance-none bg-transparent accent-white disabled:cursor-not-allowed disabled:opacity-45"
+                />
+              </div>
+              <span className="w-11 shrink-0 tabular-nums text-white/75 sm:w-14">
+                {formatPlaybackTime(videoDuration)}
+              </span>
+              <button
+                type="button"
+                onClick={handleSkipForward}
+                disabled={!hasSeekableVideo}
+                className="shrink-0 rounded-full border border-white/12 bg-white/10 px-3 py-1.5 transition hover:bg-white/18 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                +10s
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {showFullscreenButton && fullscreenSupported ? (
-        <div className="pointer-events-none absolute right-3 top-3 z-20">
+        <div className="pointer-events-none absolute right-3 top-3 z-30">
           <button
             type="button"
             onClick={handleToggleFullscreen}

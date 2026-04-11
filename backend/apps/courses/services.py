@@ -31,23 +31,13 @@ class ProtectedMediaError(Exception):
 PROTECTED_LECTURE_MEDIA_SIGNING_SALT = "courses.protected-lecture-media"
 PROTECTED_LECTURE_MEDIA_CACHE_PREFIX = "courses:protected-media-token"
 PROTECTED_GUIDE_MEDIA_SIGNING_SALT = "courses.protected-guide-media"
-HLS_SEGMENT_DURATION_SECONDS = 4
 ADAPTIVE_HLS_PROFILES = [
-    {
-        "name": "240p",
-        "width": 426,
-        "height": 240,
-        "video_bitrate": "400k",
-        "maxrate": "428k",
-        "bufsize": "600k",
-        "audio_bitrate": "64k",
-    },
     {
         "name": "360p",
         "width": 640,
         "height": 360,
-        "video_bitrate": "750k",
-        "maxrate": "803k",
+        "video_bitrate": "800k",
+        "maxrate": "856k",
         "bufsize": "1200k",
         "audio_bitrate": "96k",
     },
@@ -55,21 +45,71 @@ ADAPTIVE_HLS_PROFILES = [
         "name": "540p",
         "width": 960,
         "height": 540,
-        "video_bitrate": "1400k",
-        "maxrate": "1498k",
-        "bufsize": "2100k",
+        "video_bitrate": "1600k",
+        "maxrate": "1712k",
+        "bufsize": "2400k",
         "audio_bitrate": "128k",
     },
     {
         "name": "720p",
         "width": 1280,
         "height": 720,
-        "video_bitrate": "2400k",
-        "maxrate": "2568k",
-        "bufsize": "3600k",
+        "video_bitrate": "2800k",
+        "maxrate": "2996k",
+        "bufsize": "4200k",
         "audio_bitrate": "128k",
     },
 ]
+
+
+def resolve_hls_segment_duration_seconds():
+    return max(2, int(getattr(settings, "COURSE_HLS_SEGMENT_DURATION_SECONDS", 4) or 4))
+
+
+def resolve_hls_keyframe_interval_seconds():
+    segment_duration_seconds = resolve_hls_segment_duration_seconds()
+    configured = int(
+        getattr(settings, "COURSE_HLS_KEYFRAME_INTERVAL_SECONDS", segment_duration_seconds)
+        or segment_duration_seconds
+    )
+    return max(1, configured)
+
+
+def resolve_hls_crf_value():
+    return max(16, min(30, int(getattr(settings, "COURSE_HLS_CRF", 21) or 21)))
+
+
+def resolve_hls_x264_preset():
+    preset = str(getattr(settings, "COURSE_HLS_X264_PRESET", "medium") or "medium").strip().lower()
+    if preset in {"ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"}:
+        return preset
+    return "medium"
+
+
+def _parse_frame_rate(raw_value):
+    text = str(raw_value or "").strip()
+    if not text or text == "0/0":
+        return 30.0
+
+    if "/" in text:
+        numerator, denominator = text.split("/", 1)
+        try:
+            numerator_value = float(numerator)
+            denominator_value = float(denominator)
+        except (TypeError, ValueError):
+            return 30.0
+        if denominator_value <= 0:
+            return 30.0
+        frame_rate = numerator_value / denominator_value
+    else:
+        try:
+            frame_rate = float(text)
+        except (TypeError, ValueError):
+            return 30.0
+
+    if frame_rate <= 0:
+        return 30.0
+    return min(frame_rate, 120.0)
 
 
 def normalize_storage_key(storage_key):
@@ -474,7 +514,7 @@ def _probe_media_metadata(source_path):
         "-print_format",
         "json",
         "-show_entries",
-        "stream=index,codec_type,width,height:format=duration",
+        "stream=index,codec_type,width,height,avg_frame_rate:format=duration",
         str(source_path),
     ]
     result = subprocess.run(
@@ -501,6 +541,8 @@ def _probe_media_metadata(source_path):
         width = 0
         height = 0
 
+    frame_rate = _parse_frame_rate(video_stream.get("avg_frame_rate"))
+
     duration_seconds = None
     try:
         raw_duration = float((payload.get("format") or {}).get("duration") or 0)
@@ -512,6 +554,7 @@ def _probe_media_metadata(source_path):
     return {
         "width": width,
         "height": height,
+        "frame_rate": frame_rate,
         "duration_seconds": duration_seconds,
         "has_audio": bool(audio_stream),
     }
@@ -568,8 +611,12 @@ def _build_profile_transcode_command(
     source_path,
     profile,
     profile_dir,
+    frame_rate,
     has_audio,
 ):
+    segment_duration_seconds = resolve_hls_segment_duration_seconds()
+    keyframe_interval_seconds = resolve_hls_keyframe_interval_seconds()
+    keyframe_frame_count = max(1, int(round(max(frame_rate, 1.0) * keyframe_interval_seconds)))
     scale_filter = (
         f"scale={profile['width']}:{profile['height']}:"
         "force_original_aspect_ratio=decrease:force_divisible_by=2,"
@@ -585,17 +632,19 @@ def _build_profile_transcode_command(
         "-c:v",
         "libx264",
         "-preset",
-        "veryfast",
+        resolve_hls_x264_preset(),
         "-profile:v",
         "main",
         "-crf",
-        "21",
+        str(resolve_hls_crf_value()),
         "-sc_threshold",
         "0",
+        "-force_key_frames",
+        f"expr:gte(t,n_forced*{keyframe_interval_seconds})",
         "-g",
-        "48",
+        str(keyframe_frame_count),
         "-keyint_min",
-        "48",
+        str(keyframe_frame_count),
         "-b:v",
         profile["video_bitrate"],
         "-maxrate",
@@ -603,7 +652,7 @@ def _build_profile_transcode_command(
         "-bufsize",
         profile["bufsize"],
         "-hls_time",
-        str(HLS_SEGMENT_DURATION_SECONDS),
+        str(segment_duration_seconds),
         "-hls_playlist_type",
         "vod",
         "-hls_flags",
@@ -680,6 +729,7 @@ def transcode_lecture_to_hls(lecture):
                 source_path=source_path,
                 profile=profile,
                 profile_dir=profile_dir,
+                frame_rate=metadata["frame_rate"],
                 has_audio=metadata["has_audio"],
             )
             result = subprocess.run(

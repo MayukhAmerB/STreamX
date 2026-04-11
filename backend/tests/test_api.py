@@ -2065,7 +2065,13 @@ class LectureProgressTests(BaseAPITestCase):
 class AdaptiveHLSTranscodeTests(BaseAPITestCase):
     @patch("apps.courses.services.subprocess.run")
     def test_transcode_lecture_to_hls_generates_master_playlist_and_duration(self, mock_run):
-        with tempfile.TemporaryDirectory() as temp_dir, override_settings(MEDIA_ROOT=temp_dir):
+        with tempfile.TemporaryDirectory() as temp_dir, override_settings(
+            MEDIA_ROOT=temp_dir,
+            COURSE_HLS_SEGMENT_DURATION_SECONDS=4,
+            COURSE_HLS_KEYFRAME_INTERVAL_SECONDS=4,
+            COURSE_HLS_X264_PRESET="medium",
+            COURSE_HLS_CRF=21,
+        ):
             lecture = Lecture.objects.create(
                 section=self.section,
                 title="Adaptive Lecture",
@@ -2073,6 +2079,7 @@ class AdaptiveHLSTranscodeTests(BaseAPITestCase):
                 video_file=SimpleUploadedFile("adaptive.mp4", b"source-bytes", content_type="video/mp4"),
                 order=2,
             )
+            ffmpeg_commands = []
 
             def fake_run(cmd, check=False, capture_output=False, text=False):
                 executable = os.path.basename(str(cmd[0]))
@@ -2082,7 +2089,12 @@ class AdaptiveHLSTranscodeTests(BaseAPITestCase):
                         stdout=json.dumps(
                             {
                                 "streams": [
-                                    {"codec_type": "video", "width": 1280, "height": 720},
+                                    {
+                                        "codec_type": "video",
+                                        "width": 1280,
+                                        "height": 720,
+                                        "avg_frame_rate": "30/1",
+                                    },
                                     {"codec_type": "audio"},
                                 ],
                                 "format": {"duration": "612.4"},
@@ -2091,6 +2103,7 @@ class AdaptiveHLSTranscodeTests(BaseAPITestCase):
                         stderr="",
                     )
 
+                ffmpeg_commands.append(cmd)
                 output_path = cmd[-1]
                 segment_pattern = cmd[cmd.index("-hls_segment_filename") + 1]
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -2112,10 +2125,21 @@ class AdaptiveHLSTranscodeTests(BaseAPITestCase):
             self.assertTrue(os.path.exists(master_playlist_path))
             with open(master_playlist_path, "r", encoding="utf-8") as handle:
                 master_playlist = handle.read()
-            self.assertIn("240p/index.m3u8", master_playlist)
             self.assertIn("360p/index.m3u8", master_playlist)
             self.assertIn("540p/index.m3u8", master_playlist)
             self.assertIn("720p/index.m3u8", master_playlist)
+            self.assertEqual(len(ffmpeg_commands), 3)
+
+            for cmd in ffmpeg_commands:
+                self.assertEqual(cmd[cmd.index("-preset") + 1], "medium")
+                self.assertEqual(cmd[cmd.index("-crf") + 1], "21")
+                self.assertEqual(cmd[cmd.index("-hls_time") + 1], "4")
+                self.assertEqual(cmd[cmd.index("-g") + 1], "120")
+                self.assertEqual(cmd[cmd.index("-keyint_min") + 1], "120")
+                self.assertEqual(
+                    cmd[cmd.index("-force_key_frames") + 1],
+                    "expr:gte(t,n_forced*4)",
+                )
 
 
 class RealtimeSessionTests(APITestCase):

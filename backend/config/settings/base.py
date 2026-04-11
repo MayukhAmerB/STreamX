@@ -330,6 +330,18 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "no-reply@alsyedinitiative.local"
 CONTACT_RECEIVER_EMAIL = env("CONTACT_RECEIVER_EMAIL", DEFAULT_FROM_EMAIL)
 FFMPEG_BINARY = env("FFMPEG_BINARY", "ffmpeg")
 FFPROBE_BINARY = env("FFPROBE_BINARY", "ffprobe")
+COURSE_HLS_SEGMENT_DURATION_SECONDS = max(2, env_int("COURSE_HLS_SEGMENT_DURATION_SECONDS", 4))
+COURSE_HLS_KEYFRAME_INTERVAL_SECONDS = max(
+    1,
+    env_int("COURSE_HLS_KEYFRAME_INTERVAL_SECONDS", COURSE_HLS_SEGMENT_DURATION_SECONDS),
+)
+COURSE_HLS_CRF = env_int("COURSE_HLS_CRF", 21)
+_course_hls_x264_preset = env("COURSE_HLS_X264_PRESET", "medium").strip().lower()
+COURSE_HLS_X264_PRESET = (
+    _course_hls_x264_preset
+    if _course_hls_x264_preset in {"ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"}
+    else "medium"
+)
 SECURITY_BLOCK_SUSPICIOUS_INPUT = env_bool("SECURITY_BLOCK_SUSPICIOUS_INPUT", True)
 SECURITY_MAX_INSPECTION_BODY_BYTES = env_int("SECURITY_MAX_INSPECTION_BODY_BYTES", 16384)
 AUTH_LOGIN_MAX_FAILURES = env_int("AUTH_LOGIN_MAX_FAILURES", 10)

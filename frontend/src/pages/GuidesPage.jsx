@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
@@ -16,6 +16,7 @@ export function GuidesPageContent({
   videoError,
   onSelectGuide,
   onVideoError,
+  videoRef,
 }) {
   if (loading) {
     return <p className="text-sm text-[#BBBBBB]">Loading guides...</p>;
@@ -68,10 +69,13 @@ export function GuidesPageContent({
               className="aspect-video"
               watermarkEnabled={Boolean(videoUrl)}
               showFullscreenButton={Boolean(videoUrl)}
+              videoRef={videoUrl ? videoRef : null}
+              videoSessionKey={videoUrl || ""}
             >
               {videoUrl ? (
                 <video
                   key={videoUrl}
+                  ref={videoRef}
                   src={videoUrl}
                   controls
                   controlsList="nodownload nofullscreen noplaybackrate"
@@ -164,6 +168,7 @@ export default function GuidesPage() {
   const [loadingVideo, setLoadingVideo] = useState(false);
   const [error, setError] = useState("");
   const [videoError, setVideoError] = useState("");
+  const videoRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -253,6 +258,7 @@ export default function GuidesPage() {
         videoError={videoError}
         onSelectGuide={(guide) => setSelectedGuideId(guide.id)}
         onVideoError={() => setVideoError("This guide video could not be played in your browser.")}
+        videoRef={videoRef}
       />
     </PageShell>
   );

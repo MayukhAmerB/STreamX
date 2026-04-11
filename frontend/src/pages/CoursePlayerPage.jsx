@@ -326,11 +326,6 @@ export default function CoursePlayerPage() {
           maxMaxBufferLength: 60,
           maxBufferHole: 0.5,
           capLevelToPlayerSize: true,
-          startLevel: 0,
-          testBandwidth: true,
-          abrEwmaDefaultEstimate: 600000,
-          abrBandWidthFactor: 0.8,
-          abrBandWidthUpFactor: 0.6,
         });
         hls.loadSource(videoUrl);
         hls.attachMedia(videoElement);
@@ -568,6 +563,8 @@ export default function CoursePlayerPage() {
                 className="aspect-video"
                 watermarkEnabled={Boolean(videoUrl)}
                 showFullscreenButton={Boolean(videoUrl)}
+                videoRef={videoUrl ? videoRef : null}
+                videoSessionKey={videoUrl ? `${playbackType}:${videoUrl}` : ""}
               >
                 {videoUrl ? (
                   <video
