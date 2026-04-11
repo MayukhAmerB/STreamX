@@ -66,6 +66,8 @@ function shouldUseAppFullscreen() {
   );
 }
 
+const TOUCH_CLICK_SUPPRESSION_MS = SINGLE_CLICK_DELAY_MS + 220;
+
 async function requestElementFullscreen(element) {
   if (!element) return;
   if (typeof element.requestFullscreen === "function") {
@@ -536,7 +538,7 @@ export default function ProtectedPlaybackSurface({
       return;
     }
 
-    suppressClickUntilRef.current = Date.now() + DOUBLE_TAP_WINDOW_MS;
+    suppressClickUntilRef.current = Date.now() + TOUCH_CLICK_SUPPRESSION_MS;
     const now = Date.now();
     const previousTap = lastTapRef.current;
     if (previousTap.side === side && now - previousTap.timestamp <= DOUBLE_TAP_WINDOW_MS) {
@@ -603,14 +605,19 @@ export default function ProtectedPlaybackSurface({
         releaseOrientationLock();
         return;
       }
+      if (canFullscreen(containerElement)) {
+        try {
+          await requestElementFullscreen(containerElement);
+          orientationLockedRef.current = await lockLandscapeOrientation();
+          return;
+        } catch {
+          // Fall through to app fullscreen when the browser exposes the API
+          // but rejects the request on this device/browser combination.
+        }
+      }
       if (hasVideoControls && shouldUseAppFullscreen()) {
         setIsAppFullscreen(true);
         setControlsVisible(true);
-        orientationLockedRef.current = await lockLandscapeOrientation();
-        return;
-      }
-      if (canFullscreen(containerElement)) {
-        await requestElementFullscreen(containerElement);
         orientationLockedRef.current = await lockLandscapeOrientation();
         return;
       }
