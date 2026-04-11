@@ -625,6 +625,35 @@ class LectureQuestionCreateSerializer(serializers.Serializer):
         return normalized
 
 
+class LectureQuestionAdminListSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    student_name = serializers.CharField(source="user.full_name", read_only=True)
+    student_email = serializers.EmailField(source="user.email", read_only=True)
+    lecture_title = serializers.CharField(source="lecture.title", read_only=True)
+    course_id = serializers.IntegerField(source="lecture.section.course_id", read_only=True)
+    course_title = serializers.CharField(source="lecture.section.course.title", read_only=True)
+
+    class Meta:
+        model = LectureQuestion
+        fields = (
+            "id",
+            "question",
+            "status",
+            "status_label",
+            "admin_notes",
+            "student_name",
+            "student_email",
+            "lecture_id",
+            "lecture_title",
+            "course_id",
+            "course_title",
+            "created_at",
+            "updated_at",
+            "answered_at",
+        )
+        read_only_fields = fields
+
+
 class LiveClassEnrollSerializer(serializers.Serializer):
     live_class_id = serializers.IntegerField()
 

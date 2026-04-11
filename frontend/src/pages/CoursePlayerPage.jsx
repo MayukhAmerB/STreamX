@@ -37,12 +37,16 @@ function resolveRetryAfterMs(error, fallbackMs = PROGRESS_THROTTLE_BACKOFF_MS) {
 
 function flattenCourseLectures(course) {
   return (course?.sections || []).flatMap((section) =>
-    (section.lectures || []).map((lecture) => ({
-      ...lecture,
-      section_title: section.title,
-      section_description: section.description,
-    }))
+    (section.lectures || []).map((lecture) => withSectionMetadata(lecture, section))
   );
+}
+
+function withSectionMetadata(lecture, section = {}) {
+  return {
+    ...lecture,
+    section_title: section.title || lecture?.section_title || "",
+    section_description: section.description || lecture?.section_description || "",
+  };
 }
 
 function pickInitialLecture(course) {
@@ -182,15 +186,20 @@ export default function CoursePlayerPage() {
     };
   }, [course]);
 
-  const activeProgress = selectedLecture?.progress || null;
-  const selectedResources = selectedLecture?.resources || [];
+  const activeLectureDetails = useMemo(() => {
+    if (!selectedLecture?.id) return selectedLecture;
+    return flattenCourseLectures(course).find((lecture) => lecture.id === selectedLecture.id) || selectedLecture;
+  }, [course, selectedLecture]);
+
+  const activeProgress = activeLectureDetails?.progress || selectedLecture?.progress || null;
+  const selectedResources = activeLectureDetails?.resources || selectedLecture?.resources || [];
   const courseThumbnail = !thumbnailFailed && course?.thumbnail ? course.thumbnail : "";
   const lectureDescription = useMemo(
     () =>
-      normalizeDisplayText(selectedLecture?.description)
-      || normalizeDisplayText(selectedLecture?.section_description)
+      normalizeDisplayText(activeLectureDetails?.description)
+      || normalizeDisplayText(activeLectureDetails?.section_description)
       || normalizeDisplayText(course?.description),
-    [course?.description, selectedLecture?.description, selectedLecture?.section_description]
+    [activeLectureDetails?.description, activeLectureDetails?.section_description, course?.description]
   );
 
   useEffect(() => {
@@ -593,13 +602,9 @@ export default function CoursePlayerPage() {
     await loadVideoUrl(selectedLecture.id, true);
   };
 
-  const handleSelectLecture = (lecture, sectionTitle) => {
+  const handleSelectLecture = (lecture, section) => {
     void persistCurrentProgress({ force: true, completed: false });
-    setSelectedLecture({
-      ...lecture,
-      section_title: sectionTitle,
-      section_description: lecture.section_description || "",
-    });
+    setSelectedLecture(withSectionMetadata(lecture, section));
   };
 
   if (loading) {
@@ -684,7 +689,7 @@ export default function CoursePlayerPage() {
                       <button
                         key={lecture.id}
                         type="button"
-                        onClick={() => handleSelectLecture(lecture, section.title)}
+                        onClick={() => handleSelectLecture(lecture, section)}
                         className={`flex w-full items-start gap-3 px-3 py-3 text-left transition ${
                           isActive
                             ? "bg-[#DFDFDF] text-[#1D1D1D]"

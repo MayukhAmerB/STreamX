@@ -22,7 +22,6 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const djangoAdminUrl = resolveDjangoAdminUrl();
-  const lectureQuestionsAdminUrl = `${djangoAdminUrl.replace(/\/+$/, "")}/courses/lecturequestion/`;
 
   useEffect(() => {
     setMenuOpen(false);
@@ -167,14 +166,12 @@ export default function Navbar() {
                     </Link>
                   ) : null}
                   {isAdmin ? (
-                    <a
-                      href={lectureQuestionsAdminUrl}
-                      target="_blank"
-                      rel="noreferrer"
+                    <Link
+                      to="/lecture-questions"
                       className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
                     >
                       Lecture Questions
-                    </a>
+                    </Link>
                   ) : null}
                   {isAdmin ? (
                     <a
@@ -313,14 +310,12 @@ export default function Navbar() {
                     </Link>
                   ) : null}
                   {isAdmin ? (
-                    <a
-                      href={lectureQuestionsAdminUrl}
-                      target="_blank"
-                      rel="noreferrer"
+                    <Link
+                      to="/lecture-questions"
                       className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]"
                     >
                       Lecture Questions
-                    </a>
+                    </Link>
                   ) : null}
                   {isAdmin ? (
                     <a

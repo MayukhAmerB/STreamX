@@ -21,6 +21,11 @@ const operationsCards = [
     detail: "Run high-scale one-to-many streams with host studio controls and moderated audience chat.",
     action: { label: "Open Broadcast Control", href: "/broadcasting", external: false },
   },
+  {
+    title: "Lecture Questions",
+    detail: "Review student questions submitted from the course player and prepare Friday answers.",
+    action: { label: "Open Question Queue", href: "/lecture-questions", external: false, adminOnly: true },
+  },
 ];
 
 const adminPlaybook = [
@@ -52,7 +57,7 @@ export default function AdminControlCenterPage() {
   const djangoAdminUrl = resolveDjangoAdminUrl();
   const visibleOperationsCards = isAdmin
     ? operationsCards
-    : operationsCards.filter((card) => !card.action.external);
+    : operationsCards.filter((card) => !card.action.external && !card.action.adminOnly);
 
   return (
     <PageShell
@@ -60,7 +65,7 @@ export default function AdminControlCenterPage() {
       subtitle="Operational cockpit for users, content, live sessions, and platform governance."
       badge="ADMIN OPERATIONS"
     >
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-4">
         {visibleOperationsCards.map((card) => (
           <article
             key={card.title}

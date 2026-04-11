@@ -40,6 +40,7 @@ from .serializers import (
     GuideVideoListSerializer,
     LectureSerializer,
     LectureNoteSerializer,
+    LectureQuestionAdminListSerializer,
     LectureQuestionCreateSerializer,
     LectureQuestionSerializer,
     LectureProgressStateSerializer,
@@ -1115,6 +1116,50 @@ class LectureQuestionListCreateView(APIView):
             message="Question submitted.",
             data=LectureQuestionSerializer(question).data,
             status_code=status.HTTP_201_CREATED,
+        )
+
+
+class LectureQuestionAdminListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if not (getattr(request.user, "is_staff", False) or getattr(request.user, "is_superuser", False)):
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "Only admins can view lecture questions."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        queryset = LectureQuestion.objects.select_related("user", "lecture__section__course").order_by("-created_at")
+
+        status_filter = str(request.query_params.get("status") or "").strip().lower()
+        valid_statuses = {choice[0] for choice in LectureQuestion.STATUS_CHOICES}
+        if status_filter and status_filter != "all" and status_filter in valid_statuses:
+            queryset = queryset.filter(status=status_filter)
+
+        search = str(request.query_params.get("search") or "").strip()
+        if search:
+            queryset = queryset.filter(
+                Q(question__icontains=search)
+                | Q(user__email__icontains=search)
+                | Q(user__full_name__icontains=search)
+                | Q(lecture__title__icontains=search)
+                | Q(lecture__section__course__title__icontains=search)
+            )
+
+        paged_queryset, page_meta = apply_optional_pagination(
+            request,
+            queryset,
+            default_page_size=50,
+            max_page_size=100,
+        )
+        serialized_questions = LectureQuestionAdminListSerializer(paged_queryset, many=True).data
+        payload = {"results": serialized_questions, "pagination": page_meta} if page_meta else serialized_questions
+        return api_response(
+            success=True,
+            message="Lecture questions fetched.",
+            data=payload,
         )
 
 

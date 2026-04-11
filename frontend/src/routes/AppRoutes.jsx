@@ -19,6 +19,7 @@ const GuidesPage = lazy(() => import("../pages/GuidesPage"));
 const InstructorDashboardPage = lazy(() => import("../pages/InstructorDashboardPage"));
 const JoinLivePage = lazy(() => import("../pages/JoinLivePage"));
 const LandingPage = lazy(() => import("../pages/LandingPage"));
+const LectureQuestionsPage = lazy(() => import("../pages/LectureQuestionsPage"));
 const LiveClassesPage = lazy(() => import("../pages/LiveClassesPage"));
 const LoginPage = lazy(() => import("../pages/LoginPage"));
 const MeetingPage = lazy(() => import("../pages/MeetingPage"));
@@ -53,6 +54,9 @@ export default function AppRoutes() {
             <Route path="/control-center" element={<AdminControlCenterPage />} />
             <Route path="/meeting" element={<MeetingPage />} />
             <Route path="/broadcasting" element={<BroadcastingPage />} />
+          </Route>
+          <Route element={<ProtectedRoute requireAdmin />}>
+            <Route path="/lecture-questions" element={<LectureQuestionsPage />} />
           </Route>
           <Route element={<ProtectedRoute requireInstructor />}>
             <Route path="/instructor/dashboard" element={<InstructorDashboardPage />} />

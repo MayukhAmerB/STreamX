@@ -19,6 +19,8 @@ export const getLectureNote = (id) => apiClient.get(`/lectures/${id}/notes/`);
 export const updateLectureNote = (id, payload) => apiClient.put(`/lectures/${id}/notes/`, payload);
 export const getLectureQuestions = (id) => apiClient.get(`/lectures/${id}/questions/`);
 export const createLectureQuestion = (id, payload) => apiClient.post(`/lectures/${id}/questions/`, payload);
+export const listAdminLectureQuestions = (params = {}) =>
+  apiClient.get("/lecture-questions/", { params });
 export const getMyCourses = () => dedupedGet("/my-courses/", {}, () => apiClient.get("/my-courses/"));
 export const getInstructorCourses = () =>
   dedupedGet("/instructor/courses/", {}, () => apiClient.get("/instructor/courses/"));

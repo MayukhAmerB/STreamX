@@ -14,6 +14,7 @@ from .views import (
     LectureNoteView,
     LectureProgressView,
     LectureProtectedMediaView,
+    LectureQuestionAdminListView,
     LectureQuestionListCreateView,
     LectureResourceDownloadView,
     LectureVideoView,
@@ -45,6 +46,7 @@ urlpatterns = [
     path("lectures/<int:pk>/progress/", LectureProgressView.as_view(), name="lecture-progress"),
     path("lectures/<int:pk>/notes/", LectureNoteView.as_view(), name="lecture-notes"),
     path("lectures/<int:pk>/questions/", LectureQuestionListCreateView.as_view(), name="lecture-questions"),
+    path("lecture-questions/", LectureQuestionAdminListView.as_view(), name="lecture-question-admin-list"),
     path(
         "lectures/<int:lecture_pk>/resources/<int:pk>/download/",
         LectureResourceDownloadView.as_view(),
