@@ -22,6 +22,7 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const djangoAdminUrl = resolveDjangoAdminUrl();
+  const lectureQuestionsAdminUrl = `${djangoAdminUrl.replace(/\/+$/, "")}/courses/lecturequestion/`;
 
   useEffect(() => {
     setMenuOpen(false);
@@ -167,6 +168,16 @@ export default function Navbar() {
                   ) : null}
                   {isAdmin ? (
                     <a
+                      href={lectureQuestionsAdminUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
+                    >
+                      Lecture Questions
+                    </a>
+                  ) : null}
+                  {isAdmin ? (
+                    <a
                       href={djangoAdminUrl}
                       target="_blank"
                       rel="noreferrer"
@@ -300,6 +311,16 @@ export default function Navbar() {
                     <Link to="/broadcasting" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                       Broadcast Control
                     </Link>
+                  ) : null}
+                  {isAdmin ? (
+                    <a
+                      href={lectureQuestionsAdminUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]"
+                    >
+                      Lecture Questions
+                    </a>
                   ) : null}
                   {isAdmin ? (
                     <a

@@ -13,6 +13,8 @@ from .models import (
     Enrollment,
     GuideVideo,
     Lecture,
+    LectureNote,
+    LectureQuestion,
     LectureResource,
     LectureProgress,
     LiveClass,
@@ -587,6 +589,40 @@ class LectureProgressUpdateSerializer(serializers.Serializer):
     position_seconds = serializers.IntegerField(min_value=0)
     duration_seconds = serializers.IntegerField(min_value=1, required=False)
     completed = serializers.BooleanField(required=False)
+
+
+class LectureNoteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LectureNote
+        fields = ("id", "content", "created_at", "updated_at")
+        read_only_fields = ("id", "created_at", "updated_at")
+
+    def validate_content(self, value):
+        normalized = str(value or "")
+        if len(normalized) > 20000:
+            raise serializers.ValidationError("Lecture notes must be 20,000 characters or fewer.")
+        if contains_active_content(normalized):
+            raise serializers.ValidationError("Suspicious script or active-content payload detected.")
+        return normalized
+
+
+class LectureQuestionSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = LectureQuestion
+        fields = ("id", "question", "status", "status_label", "created_at", "updated_at")
+        read_only_fields = ("id", "question", "status", "status_label", "created_at", "updated_at")
+
+
+class LectureQuestionCreateSerializer(serializers.Serializer):
+    question = serializers.CharField(min_length=3, max_length=3000, trim_whitespace=True)
+
+    def validate_question(self, value):
+        normalized = str(value or "").strip()
+        if contains_active_content(normalized):
+            raise serializers.ValidationError("Suspicious script or active-content payload detected.")
+        return normalized
 
 
 class LiveClassEnrollSerializer(serializers.Serializer):

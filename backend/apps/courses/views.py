@@ -22,6 +22,8 @@ from .models import (
     Enrollment,
     GuideVideo,
     Lecture,
+    LectureNote,
+    LectureQuestion,
     LectureProgress,
     LectureResource,
     LiveClass,
@@ -37,6 +39,9 @@ from .serializers import (
     CourseWriteSerializer,
     GuideVideoListSerializer,
     LectureSerializer,
+    LectureNoteSerializer,
+    LectureQuestionCreateSerializer,
+    LectureQuestionSerializer,
     LectureProgressStateSerializer,
     LectureProgressUpdateSerializer,
     LiveClassEnrollSerializer,
@@ -982,6 +987,134 @@ class LectureProgressView(APIView):
             success=True,
             message="Lecture progress updated.",
             data=LectureProgressStateSerializer(progress).data,
+        )
+
+
+class LectureNoteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        lecture = generics.get_object_or_404(
+            Lecture.objects.select_related("section__course", "section__course__instructor"),
+            pk=pk,
+        )
+        access_context = _get_lecture_access_context(lecture, request.user)
+        if not access_context["can_access"]:
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "You do not have access to this lecture."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        note = LectureNote.objects.filter(user=request.user, lecture=lecture).first()
+        data = (
+            LectureNoteSerializer(note).data
+            if note
+            else {"id": None, "content": "", "created_at": None, "updated_at": None}
+        )
+        return api_response(
+            success=True,
+            message="Lecture notes fetched.",
+            data=data,
+        )
+
+    def put(self, request, pk):
+        return self._save(request, pk)
+
+    def patch(self, request, pk):
+        return self._save(request, pk)
+
+    def _save(self, request, pk):
+        lecture = generics.get_object_or_404(
+            Lecture.objects.select_related("section__course", "section__course__instructor"),
+            pk=pk,
+        )
+        access_context = _get_lecture_access_context(lecture, request.user)
+        if not access_context["can_access"]:
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "You do not have access to this lecture."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = LectureNoteSerializer(data=request.data)
+        if not serializer.is_valid():
+            return api_response(
+                success=False,
+                message="Lecture notes update failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        note, _ = LectureNote.objects.get_or_create(user=request.user, lecture=lecture)
+        note.content = serializer.validated_data.get("content", "")
+        note.save()
+        return api_response(
+            success=True,
+            message="Lecture notes saved.",
+            data=LectureNoteSerializer(note).data,
+        )
+
+
+class LectureQuestionListCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        lecture = generics.get_object_or_404(
+            Lecture.objects.select_related("section__course", "section__course__instructor"),
+            pk=pk,
+        )
+        access_context = _get_lecture_access_context(lecture, request.user)
+        if not access_context["can_access"]:
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "You do not have access to this lecture."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        questions = LectureQuestion.objects.filter(user=request.user, lecture=lecture).order_by("-created_at")
+        return api_response(
+            success=True,
+            message="Lecture questions fetched.",
+            data=LectureQuestionSerializer(questions, many=True).data,
+        )
+
+    def post(self, request, pk):
+        lecture = generics.get_object_or_404(
+            Lecture.objects.select_related("section__course", "section__course__instructor"),
+            pk=pk,
+        )
+        access_context = _get_lecture_access_context(lecture, request.user)
+        if not access_context["can_access"]:
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "You do not have access to this lecture."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = LectureQuestionCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return api_response(
+                success=False,
+                message="Question submission failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        question = LectureQuestion.objects.create(
+            user=request.user,
+            lecture=lecture,
+            question=serializer.validated_data["question"],
+        )
+        return api_response(
+            success=True,
+            message="Question submitted.",
+            data=LectureQuestionSerializer(question).data,
+            status_code=status.HTTP_201_CREATED,
         )
 
 

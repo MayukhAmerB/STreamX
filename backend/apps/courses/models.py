@@ -545,6 +545,90 @@ class LectureProgress(models.Model):
         return f"{self.user.email} -> {self.lecture.title}"
 
 
+class LectureNote(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="lecture_notes",
+    )
+    lecture = models.ForeignKey(
+        Lecture,
+        on_delete=models.CASCADE,
+        related_name="notes",
+    )
+    content = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "lecture"], name="crs_note_unique_user_lecture"),
+        ]
+        indexes = [
+            models.Index(fields=["user", "updated_at"], name="crs_note_user_upd_idx"),
+            models.Index(fields=["lecture", "updated_at"], name="crs_note_lect_upd_idx"),
+        ]
+
+    def clean(self):
+        super().clean()
+        validate_no_active_content(self.content, "content")
+
+    def __str__(self):
+        return f"{self.user.email} notes -> {self.lecture.title}"
+
+
+class LectureQuestion(models.Model):
+    STATUS_NEW = "new"
+    STATUS_REVIEWED = "reviewed"
+    STATUS_ANSWERED = "answered"
+    STATUS_CHOICES = [
+        (STATUS_NEW, "New"),
+        (STATUS_REVIEWED, "Reviewed"),
+        (STATUS_ANSWERED, "Answered"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="lecture_questions",
+    )
+    lecture = models.ForeignKey(
+        Lecture,
+        on_delete=models.CASCADE,
+        related_name="questions",
+    )
+    question = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_NEW)
+    admin_notes = models.TextField(blank=True, default="")
+    answered_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "created_at"], name="crs_q_user_created_idx"),
+            models.Index(fields=["lecture", "created_at"], name="crs_q_lect_created_idx"),
+            models.Index(fields=["status", "created_at"], name="crs_q_status_created_idx"),
+        ]
+
+    def clean(self):
+        super().clean()
+        validate_no_active_content(self.question, "question")
+        validate_no_active_content(self.admin_notes, "admin_notes")
+
+    def save(self, *args, **kwargs):
+        if self.status == self.STATUS_ANSWERED and not self.answered_at:
+            self.answered_at = timezone.now()
+        if self.status != self.STATUS_ANSWERED and self.answered_at:
+            self.answered_at = None
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.user.email} question -> {self.lecture.title}"
+
+
 class Enrollment(models.Model):
     STATUS_PENDING = "pending"
     STATUS_PAID = "paid"

@@ -12,6 +12,7 @@ from .models import (
     Enrollment,
     GuideVideo,
     Lecture,
+    LectureQuestion,
     LectureResource,
     LiveClass,
     LiveClassEnrollment,
@@ -706,6 +707,90 @@ class LectureAdmin(admin.ModelAdmin):
     @admin.display(ordering="_resource_count", description="Resources")
     def resource_count(self, obj):
         return getattr(obj, "_resource_count", None) or obj.resources.count()
+
+
+@admin.register(LectureQuestion)
+class LectureQuestionAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "status",
+        "student_name",
+        "student_email",
+        "course_title",
+        "lecture_title",
+        "question_preview",
+        "created_at",
+        "answered_at",
+    )
+    list_display_links = ("id", "question_preview")
+    list_editable = ("status",)
+    list_filter = ("status", "lecture__section__course", "created_at", "updated_at")
+    search_fields = (
+        "question",
+        "admin_notes",
+        "user__email",
+        "user__full_name",
+        "lecture__title",
+        "lecture__section__course__title",
+    )
+    raw_id_fields = ("user", "lecture")
+    readonly_fields = (
+        "student_name",
+        "student_email",
+        "course_title",
+        "lecture_title",
+        "question",
+        "created_at",
+        "updated_at",
+        "answered_at",
+    )
+    fields = (
+        "status",
+        "student_name",
+        "student_email",
+        "course_title",
+        "lecture_title",
+        "user",
+        "lecture",
+        "question",
+        "admin_notes",
+        "created_at",
+        "updated_at",
+        "answered_at",
+    )
+    ordering = ("-created_at",)
+    date_hierarchy = "created_at"
+    list_per_page = 50
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("user", "lecture__section__course")
+
+    @admin.display(description="Student")
+    def student_name(self, obj):
+        value = obj.user.full_name or obj.user.email
+        return format_html(
+            '<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid #3b4a3d;background:#111912;color:#e8f1df;font-weight:600;">{}</span>',
+            value,
+        )
+
+    @admin.display(description="Email")
+    def student_email(self, obj):
+        return obj.user.email
+
+    @admin.display(description="Course")
+    def course_title(self, obj):
+        return obj.lecture.section.course.title
+
+    @admin.display(description="Lecture")
+    def lecture_title(self, obj):
+        return obj.lecture.title
+
+    @admin.display(description="Question")
+    def question_preview(self, obj):
+        question = " ".join(str(obj.question or "").split())
+        if len(question) > 120:
+            question = f"{question[:117]}..."
+        return question
 
 
 @admin.register(Enrollment)

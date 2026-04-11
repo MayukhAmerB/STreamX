@@ -15,6 +15,10 @@ export const deleteLecture = (id) => apiClient.delete(`/lectures/${id}/`);
 export const getLectureVideoUrl = (id) => apiClient.get(`/lectures/${id}/video/`);
 export const getLectureProgress = (id) => apiClient.get(`/lectures/${id}/progress/`);
 export const updateLectureProgress = (id, payload) => apiClient.put(`/lectures/${id}/progress/`, payload);
+export const getLectureNote = (id) => apiClient.get(`/lectures/${id}/notes/`);
+export const updateLectureNote = (id, payload) => apiClient.put(`/lectures/${id}/notes/`, payload);
+export const getLectureQuestions = (id) => apiClient.get(`/lectures/${id}/questions/`);
+export const createLectureQuestion = (id, payload) => apiClient.post(`/lectures/${id}/questions/`, payload);
 export const getMyCourses = () => dedupedGet("/my-courses/", {}, () => apiClient.get("/my-courses/"));
 export const getInstructorCourses = () =>
   dedupedGet("/instructor/courses/", {}, () => apiClient.get("/instructor/courses/"));

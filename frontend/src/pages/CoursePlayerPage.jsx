@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
 import { useParams } from "react-router-dom";
-import { getCourse, getLectureVideoUrl, updateLectureProgress } from "../api/courses";
+import {
+  createLectureQuestion,
+  getCourse,
+  getLectureNote,
+  getLectureQuestions,
+  getLectureVideoUrl,
+  updateLectureNote,
+  updateLectureProgress,
+} from "../api/courses";
 import PageShell from "../components/PageShell";
 import ProtectedPlaybackSurface from "../components/ProtectedPlaybackSurface";
 import { apiData, apiMessage } from "../utils/api";
@@ -82,6 +90,18 @@ function formatFileSize(totalBytes) {
   return `${(normalized / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatDateTime(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toLocaleString(undefined, {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function CoursePlayerPage() {
   const { courseId } = useParams();
   const [course, setCourse] = useState(null);
@@ -93,7 +113,18 @@ export default function CoursePlayerPage() {
   const [retried, setRetried] = useState(false);
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
   const [progressState, setProgressState] = useState({ saving: false, error: "", savedAt: "" });
+  const [noteDraft, setNoteDraft] = useState("");
+  const [noteState, setNoteState] = useState({ loading: false, saving: false, error: "", savedAt: "" });
+  const [questionDraft, setQuestionDraft] = useState("");
+  const [questions, setQuestions] = useState([]);
+  const [questionState, setQuestionState] = useState({
+    loading: false,
+    submitting: false,
+    error: "",
+    success: "",
+  });
   const videoRef = useRef(null);
+  const selectedLectureIdRef = useRef(null);
   const resumeAppliedRef = useRef(false);
   const progressInFlightRef = useRef(false);
   const pendingProgressRef = useRef(null);
@@ -153,6 +184,131 @@ export default function CoursePlayerPage() {
   useEffect(() => {
     setThumbnailFailed(false);
   }, [course?.thumbnail]);
+
+  useEffect(() => {
+    selectedLectureIdRef.current = selectedLecture?.id || null;
+  }, [selectedLecture?.id]);
+
+  useEffect(() => {
+    const lectureId = selectedLecture?.id;
+    setQuestionDraft("");
+
+    if (!lectureId) {
+      setNoteDraft("");
+      setQuestions([]);
+      setNoteState({ loading: false, saving: false, error: "", savedAt: "" });
+      setQuestionState({ loading: false, submitting: false, error: "", success: "" });
+      return undefined;
+    }
+
+    let cancelled = false;
+    setNoteState({ loading: true, saving: false, error: "", savedAt: "" });
+    setQuestionState({ loading: true, submitting: false, error: "", success: "" });
+
+    getLectureNote(lectureId)
+      .then((response) => {
+        if (cancelled) return;
+        const note = apiData(response) || {};
+        setNoteDraft(note.content || "");
+        setNoteState({
+          loading: false,
+          saving: false,
+          error: "",
+          savedAt: note.updated_at ? formatDateTime(note.updated_at) : "",
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setNoteDraft("");
+        setNoteState({
+          loading: false,
+          saving: false,
+          error: apiMessage(err, "Unable to load your lecture notes."),
+          savedAt: "",
+        });
+      });
+
+    getLectureQuestions(lectureId)
+      .then((response) => {
+        if (cancelled) return;
+        setQuestions(apiData(response) || []);
+        setQuestionState({ loading: false, submitting: false, error: "", success: "" });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setQuestions([]);
+        setQuestionState({
+          loading: false,
+          submitting: false,
+          error: apiMessage(err, "Unable to load your lecture questions."),
+          success: "",
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedLecture?.id]);
+
+  const handleSaveNote = async () => {
+    if (!selectedLecture?.id) return;
+    const lectureId = selectedLecture.id;
+    setNoteState((current) => ({ ...current, saving: true, error: "" }));
+    try {
+      const response = await updateLectureNote(lectureId, { content: noteDraft });
+      if (selectedLectureIdRef.current !== lectureId) return;
+      const note = apiData(response) || {};
+      setNoteDraft(note.content || "");
+      setNoteState({
+        loading: false,
+        saving: false,
+        error: "",
+        savedAt: note.updated_at ? formatDateTime(note.updated_at) : "just now",
+      });
+    } catch (err) {
+      if (selectedLectureIdRef.current !== lectureId) return;
+      setNoteState((current) => ({
+        ...current,
+        saving: false,
+        error: apiMessage(err, "Unable to save your lecture notes."),
+      }));
+    }
+  };
+
+  const handleSubmitQuestion = async (event) => {
+    event.preventDefault();
+    if (!selectedLecture?.id || questionState.submitting) return;
+    const lectureId = selectedLecture.id;
+
+    const question = questionDraft.trim();
+    if (!question) {
+      setQuestionState((current) => ({ ...current, error: "Type your question before submitting.", success: "" }));
+      return;
+    }
+
+    setQuestionState((current) => ({ ...current, submitting: true, error: "", success: "" }));
+    try {
+      const response = await createLectureQuestion(lectureId, { question });
+      if (selectedLectureIdRef.current !== lectureId) return;
+      const createdQuestion = apiData(response);
+      setQuestions((current) => (createdQuestion ? [createdQuestion, ...current] : current));
+      setQuestionDraft("");
+      setQuestionState({
+        loading: false,
+        submitting: false,
+        error: "",
+        success: "Question submitted. Our team answers lecture questions every Friday.",
+      });
+    } catch (err) {
+      if (selectedLectureIdRef.current !== lectureId) return;
+      setQuestionState((current) => ({
+        ...current,
+        submitting: false,
+        error: apiMessage(err, "Unable to submit your question."),
+        success: "",
+      }));
+    }
+  };
 
   const syncLectureProgress = async ({
     lectureId,
@@ -443,7 +599,7 @@ export default function CoursePlayerPage() {
       subtitle={`${course?.sections?.length || 0} sections - ${lectureCount} lectures`}
     >
       <div className="grid items-start gap-5 xl:grid-cols-[340px_1fr]">
-        <aside className="self-start overflow-hidden rounded-[28px] border border-black panel-gradient shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
+        <aside className="self-start overflow-x-hidden rounded-[28px] border border-black panel-gradient shadow-[0_20px_60px_rgba(0,0,0,0.28)] xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto">
           <div className="border-b border-[#303030] bg-[radial-gradient(circle_at_top,rgba(192,192,192,0.12),transparent_48%)] p-5">
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#949494]">
               Course Videos
@@ -673,17 +829,70 @@ export default function CoursePlayerPage() {
             </div>
 
             <div className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-2xl border border-black panel-gradient p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
-                  Lesson Notes
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-black panel-gradient p-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
+                    Lecture Brief
+                  </div>
+                  <p className="mt-3 text-sm leading-7 text-[#D7D7D7]">
+                    {selectedLecture?.description || "Lecture description will appear here."}
+                  </p>
+                  {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
+                  {progressState.error ? (
+                    <p className="mt-3 text-sm text-amber-300">{progressState.error}</p>
+                  ) : null}
                 </div>
-                <p className="mt-3 text-sm leading-7 text-[#D7D7D7]">
-                  {selectedLecture?.description || "Lecture description will appear here."}
-                </p>
-                {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
-                {progressState.error ? (
-                  <p className="mt-3 text-sm text-amber-300">{progressState.error}</p>
-                ) : null}
+
+                <div className="rounded-2xl border border-[#2D2D2D] bg-[linear-gradient(145deg,#101010,#050505)] p-4 shadow-[0_16px_44px_rgba(0,0,0,0.24)]">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
+                        Your Private Lecture Notes
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-[#BDBDBD]">
+                        Note important points for this lecture here. These notes are saved only for your account and this exact lecture.
+                      </p>
+                    </div>
+                    {noteState.savedAt ? (
+                      <span className="rounded-full border border-[#DADADA]/15 bg-white/5 px-3 py-1 text-[11px] font-semibold text-[#D7D7D7]">
+                        Saved {noteState.savedAt}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <textarea
+                    value={noteDraft}
+                    onChange={(event) => {
+                      setNoteDraft(event.target.value);
+                      if (noteState.error) {
+                        setNoteState((current) => ({ ...current, error: "" }));
+                      }
+                    }}
+                    disabled={!selectedLecture?.id || noteState.loading}
+                    rows={8}
+                    maxLength={20000}
+                    placeholder={
+                      selectedLecture?.id
+                        ? "Write key commands, reminders, timestamps, or important takeaways..."
+                        : "Select a lecture to start writing notes."
+                    }
+                    className="mt-4 min-h-[220px] w-full resize-y rounded-2xl border border-[#303030] bg-black/60 px-4 py-3 text-sm leading-7 text-white outline-none transition placeholder:text-[#6F6F6F] focus:border-[#D8D8D8]/70"
+                  />
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-xs text-[#8F8F8F]">
+                      {noteState.loading ? "Loading your saved notes..." : `${noteDraft.length}/20000 characters`}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleSaveNote}
+                      disabled={!selectedLecture?.id || noteState.loading || noteState.saving}
+                      className="rounded-full border border-[#D8D8D8]/70 bg-[#F1F1F1] px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#101010] transition hover:bg-white disabled:cursor-not-allowed disabled:border-[#3A3A3A] disabled:bg-[#1E1E1E] disabled:text-[#7E7E7E]"
+                    >
+                      {noteState.saving ? "Saving..." : "Save Notes"}
+                    </button>
+                  </div>
+                  {noteState.error ? <p className="mt-3 text-sm text-amber-300">{noteState.error}</p> : null}
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -749,6 +958,95 @@ export default function CoursePlayerPage() {
                       No resources were uploaded for this lecture.
                     </p>
                   )}
+                </div>
+
+                <div className="rounded-2xl border border-[#2D2D2D] bg-[linear-gradient(145deg,#111111,#060606)] p-4 shadow-[0_16px_44px_rgba(0,0,0,0.22)]">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
+                    Ask a Question
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-[#BDBDBD]">
+                    Ask doubts from this lecture here. Questions are reviewed and answered every Friday.
+                  </p>
+
+                  <form className="mt-4 space-y-3" onSubmit={handleSubmitQuestion}>
+                    <textarea
+                      value={questionDraft}
+                      onChange={(event) => {
+                        setQuestionDraft(event.target.value);
+                        if (questionState.error || questionState.success) {
+                          setQuestionState((current) => ({ ...current, error: "", success: "" }));
+                        }
+                      }}
+                      disabled={!selectedLecture?.id || questionState.submitting}
+                      rows={5}
+                      maxLength={3000}
+                      placeholder={
+                        selectedLecture?.id
+                          ? "Write your question for the instructor..."
+                          : "Select a lecture before asking a question."
+                      }
+                      className="min-h-[130px] w-full resize-y rounded-2xl border border-[#303030] bg-black/60 px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-[#6F6F6F] focus:border-[#D8D8D8]/70"
+                    />
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-xs text-[#8F8F8F]">{questionDraft.length}/3000 characters</p>
+                      <button
+                        type="submit"
+                        disabled={!selectedLecture?.id || questionState.submitting}
+                        className="rounded-full border border-[#D8D8D8]/70 bg-[#F1F1F1] px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#101010] transition hover:bg-white disabled:cursor-not-allowed disabled:border-[#3A3A3A] disabled:bg-[#1E1E1E] disabled:text-[#7E7E7E]"
+                      >
+                        {questionState.submitting ? "Submitting..." : "Submit Question"}
+                      </button>
+                    </div>
+                  </form>
+
+                  {questionState.error ? <p className="mt-3 text-sm text-amber-300">{questionState.error}</p> : null}
+                  {questionState.success ? (
+                    <p className="mt-3 text-sm text-emerald-300">{questionState.success}</p>
+                  ) : null}
+
+                  <div className="mt-5 border-t border-[#242424] pt-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
+                      Your Questions
+                    </div>
+                    {questions.length ? (
+                      <div className="mt-3 space-y-3">
+                        {questions.map((question) => (
+                          <div
+                            key={question.id}
+                            className="rounded-2xl border border-[#2A2A2A] bg-black/45 px-3 py-3"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span
+                                className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                  question.status === "answered"
+                                    ? "border-emerald-300/35 bg-emerald-300/10 text-emerald-200"
+                                    : question.status === "reviewed"
+                                      ? "border-sky-300/35 bg-sky-300/10 text-sky-200"
+                                      : "border-[#DADADA]/15 bg-white/5 text-[#D7D7D7]"
+                                }`}
+                              >
+                                {question.status_label || question.status}
+                              </span>
+                              {question.created_at ? (
+                                <span className="text-[11px] text-[#8F8F8F]">
+                                  {formatDateTime(question.created_at)}
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[#E1E1E1]">
+                              {question.question}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm leading-6 text-[#949494]">
+                        {questionState.loading
+                          ? "Loading your submitted questions..."
+                          : "No questions submitted for this lecture yet."}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
