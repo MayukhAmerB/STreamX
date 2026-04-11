@@ -459,51 +459,51 @@ export default function CoursePlayerPage() {
           </div>
 
           <div className="max-h-[72vh] space-y-4 overflow-auto p-4">
-            <div className="overflow-hidden rounded-[24px] border border-black bg-[#0C0C0C]">
-              <div className="relative aspect-[16/10] border-b border-[#222222] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.14),transparent_32%),linear-gradient(135deg,#151515,#090909)]">
+            <div className="overflow-hidden rounded-[24px] border border-[#3B3B3B] bg-[#0C0C0C] p-3 shadow-[0_14px_36px_rgba(0,0,0,0.24)]">
+              <div className="flex gap-3">
                 {course?.thumbnail ? (
                   <img
                     src={course.thumbnail}
                     alt={course?.title || "Course cover"}
-                    className="h-full w-full object-cover"
+                    className="h-20 w-28 shrink-0 rounded-2xl border border-[#2F2F2F] object-cover"
                   />
-                ) : null}
-                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.1),rgba(0,0,0,0.72))]" />
-                <div className="absolute inset-x-0 bottom-0 p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">
-                    {course?.sections?.length || 0} modules | {lectureCount} lessons
+                ) : (
+                  <div className="flex h-20 w-28 shrink-0 items-center justify-center rounded-2xl border border-[#2F2F2F] bg-[linear-gradient(135deg,#1B1B1B,#080808)] text-[10px] font-semibold uppercase tracking-[0.16em] text-[#BDBDBD]">
+                    Course
                   </div>
-                  <div className="mt-2 line-clamp-2 text-lg font-semibold text-white">
-                    {course?.title || "Course library"}
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
+                    Now Watching
                   </div>
-                </div>
-              </div>
-              <div className="space-y-1 px-4 py-3">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
-                  Now Watching
-                </div>
-                <div className="line-clamp-2 text-sm font-semibold text-white">
-                  {selectedLecture?.title || "Select a lecture to begin"}
-                </div>
-                <div className="text-xs text-[#A7A7B7]">
-                  {selectedLecture?.section_title
-                    ? `${selectedLecture.section_title} | ${formatSeconds(
-                        selectedLecture.stream_duration_seconds || activeProgress?.duration_seconds || 0
-                      )}`
-                    : "Choose any lesson below to start watching."}
+                  <div className="mt-1 line-clamp-2 text-sm font-semibold text-white">
+                    {selectedLecture?.title || "Select a lecture to begin"}
+                  </div>
+                  <div className="mt-1 text-xs leading-5 text-[#A7A7B7]">
+                    {selectedLecture?.section_title
+                      ? `${selectedLecture.section_title} | ${formatSeconds(
+                          selectedLecture.stream_duration_seconds || activeProgress?.duration_seconds || 0
+                        )}`
+                      : `${course?.sections?.length || 0} modules | ${lectureCount} lessons`}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {(course?.sections || []).map((section) => (
-              <div key={section.id} className="rounded-2xl border border-black bg-[#121212] p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-sm font-semibold text-white">{section.title}</h2>
-                  <span className="rounded-full border border-black bg-[#171717] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#BBBBBB]">
+            {(course?.sections || []).map((section, sectionIndex) => (
+              <div key={section.id} className="overflow-hidden rounded-[24px] border border-[#3B3B3B] bg-[#101010] shadow-[0_14px_36px_rgba(0,0,0,0.2)]">
+                <div className="flex items-center justify-between gap-3 border-b border-[#303030] bg-[#171717] px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8F8F8F]">
+                      Module {sectionIndex + 1}
+                    </div>
+                    <h2 className="mt-1 truncate text-sm font-semibold text-white">{section.title}</h2>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-[#3A3A3A] bg-[#0A0A0A] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#BBBBBB]">
                     {(section.lectures || []).length} lessons
                   </span>
                 </div>
-                <div className="mt-3 space-y-2">
+                <div className="divide-y divide-[#252525]">
                   {(section.lectures || []).map((lecture) => {
                     const isActive = selectedLecture?.id === lecture.id;
                     const lectureProgress = lecture.progress;
@@ -513,54 +513,80 @@ export default function CoursePlayerPage() {
                         key={lecture.id}
                         type="button"
                         onClick={() => handleSelectLecture(lecture, section.title)}
-                        className={`w-full rounded-2xl border px-3 py-3 text-left transition ${
+                        className={`flex w-full items-start gap-3 px-3 py-3 text-left transition ${
                           isActive
-                            ? "border-[#C0C0C0] bg-[#DFDFDF] text-[#1D1D1D]"
-                            : "border-black bg-[#0C0C0C] text-[#D9D9D9] hover:border-black hover:bg-[#141414]"
+                            ? "bg-[#DFDFDF] text-[#1D1D1D]"
+                            : "bg-[#0C0C0C] text-[#D9D9D9] hover:bg-[#151515]"
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-semibold">{lecture.title}</div>
-                            <div
-                              className={`mt-1 text-xs ${
-                                isActive ? "text-[#3A3A3A]" : "text-[#949494]"
-                              }`}
-                            >
-                              {lectureProgress?.completed
-                                ? "Completed"
-                                : percentComplete > 0
-                                  ? `Resume from ${formatSeconds(
-                                      lectureProgress.resume_position_seconds || lectureProgress.last_position_seconds
-                                    )}`
-                                  : lecture.is_preview
-                                    ? "Preview lesson"
-                                    : "Not started"}
-                            </div>
-                          </div>
-                          <span
-                            className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                              lectureProgress?.completed
-                                ? "border border-zinc-300/80 bg-zinc-100 text-zinc-900"
-                                : percentComplete > 0
-                                  ? "border border-[#DADADA]/20 bg-white/10 text-[#E7E7E7]"
-                                  : "border border-black bg-[#171717] text-[#A1A1A1]"
+                        {course?.thumbnail ? (
+                          <img
+                            src={course.thumbnail}
+                            alt=""
+                            className={`h-14 w-20 shrink-0 rounded-xl object-cover ${
+                              isActive ? "border border-[#BDBDBD]" : "border border-[#2A2A2A]"
+                            }`}
+                          />
+                        ) : (
+                          <div
+                            className={`flex h-14 w-20 shrink-0 items-center justify-center rounded-xl border text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                              isActive
+                                ? "border-[#BDBDBD] bg-white/50 text-[#1D1D1D]"
+                                : "border-[#2A2A2A] bg-[#171717] text-[#A1A1A1]"
                             }`}
                           >
-                            {lectureProgress?.completed ? "Done" : `${percentComplete}%`}
-                          </span>
-                        </div>
-                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-black/25">
-                          <div
-                            className={`h-full rounded-full ${
-                              lectureProgress?.completed ? "bg-zinc-300" : "bg-[#C0C0C0]"
-                            }`}
-                            style={{ width: `${Math.max(0, Math.min(100, percentComplete))}%` }}
-                          />
+                            Video
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="line-clamp-2 text-sm font-semibold">{lecture.title}</div>
+                              <div
+                                className={`mt-1 text-xs ${
+                                  isActive ? "text-[#3A3A3A]" : "text-[#949494]"
+                                }`}
+                              >
+                                {lectureProgress?.completed
+                                  ? "Completed"
+                                  : percentComplete > 0
+                                    ? `Resume from ${formatSeconds(
+                                        lectureProgress.resume_position_seconds || lectureProgress.last_position_seconds
+                                      )}`
+                                    : lecture.is_preview
+                                      ? "Preview lesson"
+                                      : "Not started"}
+                              </div>
+                            </div>
+                            <span
+                              className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                lectureProgress?.completed
+                                  ? "border border-zinc-300/80 bg-zinc-100 text-zinc-900"
+                                  : percentComplete > 0
+                                    ? "border border-[#DADADA]/20 bg-white/10 text-[#E7E7E7]"
+                                    : "border border-[#2A2A2A] bg-[#171717] text-[#A1A1A1]"
+                              }`}
+                            >
+                              {lectureProgress?.completed ? "Done" : `${percentComplete}%`}
+                            </span>
+                          </div>
+                          <div className={`mt-3 h-1.5 overflow-hidden rounded-full ${isActive ? "bg-black/20" : "bg-black/35"}`}>
+                            <div
+                              className={`h-full rounded-full ${
+                                lectureProgress?.completed ? "bg-zinc-300" : "bg-[#C0C0C0]"
+                              }`}
+                              style={{ width: `${Math.max(0, Math.min(100, percentComplete))}%` }}
+                            />
+                          </div>
                         </div>
                       </button>
                     );
                   })}
+                  {!(section.lectures || []).length ? (
+                    <div className="px-4 py-5 text-sm text-[#949494]">
+                      No videos have been added to this module yet.
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ))}
