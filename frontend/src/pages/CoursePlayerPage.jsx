@@ -91,6 +91,7 @@ export default function CoursePlayerPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [retried, setRetried] = useState(false);
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
   const [progressState, setProgressState] = useState({ saving: false, error: "", savedAt: "" });
   const videoRef = useRef(null);
   const resumeAppliedRef = useRef(false);
@@ -147,6 +148,11 @@ export default function CoursePlayerPage() {
 
   const activeProgress = selectedLecture?.progress || null;
   const selectedResources = selectedLecture?.resources || [];
+  const courseThumbnail = !thumbnailFailed && course?.thumbnail ? course.thumbnail : "";
+
+  useEffect(() => {
+    setThumbnailFailed(false);
+  }, [course?.thumbnail]);
 
   const syncLectureProgress = async ({
     lectureId,
@@ -436,40 +442,36 @@ export default function CoursePlayerPage() {
       title={course?.title || "Course"}
       subtitle={`${course?.sections?.length || 0} sections - ${lectureCount} lectures`}
     >
-      <div className="grid gap-5 xl:grid-cols-[340px_1fr]">
-        <aside className="overflow-hidden rounded-[28px] border border-black panel-gradient shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
-          <div className="border-b border-[#222222] bg-[radial-gradient(circle_at_top,rgba(192,192,192,0.12),transparent_48%)] p-5">
+      <div className="grid items-start gap-5 xl:grid-cols-[340px_1fr]">
+        <aside className="self-start overflow-hidden rounded-[28px] border border-black panel-gradient shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
+          <div className="border-b border-[#303030] bg-[radial-gradient(circle_at_top,rgba(192,192,192,0.12),transparent_48%)] p-5">
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#949494]">
-              Your Progress
+              Course Videos
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-              <div className="rounded-2xl border border-black panel-gradient p-3">
-                <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">Completed</div>
-                <div className="mt-1 text-2xl font-semibold text-white">{lectureStats.completedCount}</div>
-              </div>
-              <div className="rounded-2xl border border-black panel-gradient p-3">
-                <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">In Progress</div>
-                <div className="mt-1 text-2xl font-semibold text-white">{lectureStats.startedCount}</div>
-              </div>
-              <div className="rounded-2xl border border-black panel-gradient p-3">
-                <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">Lessons</div>
-                <div className="mt-1 text-2xl font-semibold text-white">{lectureStats.total}</div>
-              </div>
+            <div className="mt-2 text-lg font-semibold text-white">
+              All lessons
+            </div>
+            <div className="mt-1 text-xs leading-5 text-[#A7A7B7]">
+              {course?.sections?.length || 0} modules | {lectureCount} lessons | {lectureStats.completedCount} completed
             </div>
           </div>
 
-          <div className="max-h-[72vh] space-y-4 overflow-auto p-4">
+          <div className="space-y-4 p-4">
             <div className="overflow-hidden rounded-[24px] border border-[#3B3B3B] bg-[#0C0C0C] p-3 shadow-[0_14px_36px_rgba(0,0,0,0.24)]">
               <div className="flex gap-3">
-                {course?.thumbnail ? (
+                {courseThumbnail ? (
                   <img
-                    src={course.thumbnail}
+                    src={courseThumbnail}
                     alt={course?.title || "Course cover"}
+                    onError={() => setThumbnailFailed(true)}
                     className="h-20 w-28 shrink-0 rounded-2xl border border-[#2F2F2F] object-cover"
                   />
                 ) : (
-                  <div className="flex h-20 w-28 shrink-0 items-center justify-center rounded-2xl border border-[#2F2F2F] bg-[linear-gradient(135deg,#1B1B1B,#080808)] text-[10px] font-semibold uppercase tracking-[0.16em] text-[#BDBDBD]">
-                    Course
+                  <div className="relative flex h-20 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#2F2F2F] bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.18),transparent_34%),linear-gradient(135deg,#1F1F1F,#070707)]">
+                    <div className="absolute inset-x-0 bottom-0 h-10 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.72))]" />
+                    <div className="relative flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/12 text-xs text-white">
+                      Play
+                    </div>
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
@@ -504,10 +506,11 @@ export default function CoursePlayerPage() {
                   </span>
                 </div>
                 <div className="divide-y divide-[#252525]">
-                  {(section.lectures || []).map((lecture) => {
+                  {(section.lectures || []).map((lecture, lectureIndex) => {
                     const isActive = selectedLecture?.id === lecture.id;
                     const lectureProgress = lecture.progress;
                     const percentComplete = lectureProgress?.percent_complete || 0;
+                    const lessonNumber = lecture.order || lectureIndex + 1;
                     return (
                       <button
                         key={lecture.id}
@@ -519,23 +522,36 @@ export default function CoursePlayerPage() {
                             : "bg-[#0C0C0C] text-[#D9D9D9] hover:bg-[#151515]"
                         }`}
                       >
-                        {course?.thumbnail ? (
+                        {courseThumbnail ? (
                           <img
-                            src={course.thumbnail}
+                            src={courseThumbnail}
                             alt=""
+                            onError={() => setThumbnailFailed(true)}
                             className={`h-14 w-20 shrink-0 rounded-xl object-cover ${
                               isActive ? "border border-[#BDBDBD]" : "border border-[#2A2A2A]"
                             }`}
                           />
                         ) : (
                           <div
-                            className={`flex h-14 w-20 shrink-0 items-center justify-center rounded-xl border text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                            className={`relative flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border ${
                               isActive
-                                ? "border-[#BDBDBD] bg-white/50 text-[#1D1D1D]"
-                                : "border-[#2A2A2A] bg-[#171717] text-[#A1A1A1]"
+                                ? "border-[#BDBDBD] bg-[linear-gradient(135deg,#D8D8D8,#8C8C8C)]"
+                                : "border-[#2A2A2A] bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.16),transparent_34%),linear-gradient(135deg,#1E1E1E,#070707)]"
                             }`}
                           >
-                            Video
+                            <div className="absolute inset-x-0 bottom-0 h-8 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.72))]" />
+                            <div className="absolute left-2 top-2 rounded-full border border-white/15 bg-black/40 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] text-white/80">
+                              {lessonNumber}
+                            </div>
+                            <div
+                              className={`relative flex h-6 w-6 items-center justify-center rounded-full border text-[9px] font-semibold ${
+                                isActive
+                                  ? "border-black/20 bg-black/18 text-black"
+                                  : "border-white/20 bg-white/12 text-white"
+                              }`}
+                            >
+                              Play
+                            </div>
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
