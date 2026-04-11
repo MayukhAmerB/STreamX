@@ -40,6 +40,7 @@ function flattenCourseLectures(course) {
     (section.lectures || []).map((lecture) => ({
       ...lecture,
       section_title: section.title,
+      section_description: section.description,
     }))
   );
 }
@@ -88,6 +89,10 @@ function formatFileSize(totalBytes) {
   if (normalized < 1024) return `${normalized} B`;
   if (normalized < 1024 * 1024) return `${(normalized / 1024).toFixed(1)} KB`;
   return `${(normalized / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function normalizeDisplayText(value) {
+  return String(value || "").replace(/\r\n/g, "\n").trim();
 }
 
 function formatDateTime(value) {
@@ -180,6 +185,13 @@ export default function CoursePlayerPage() {
   const activeProgress = selectedLecture?.progress || null;
   const selectedResources = selectedLecture?.resources || [];
   const courseThumbnail = !thumbnailFailed && course?.thumbnail ? course.thumbnail : "";
+  const lectureDescription = useMemo(
+    () =>
+      normalizeDisplayText(selectedLecture?.description)
+      || normalizeDisplayText(selectedLecture?.section_description)
+      || normalizeDisplayText(course?.description),
+    [course?.description, selectedLecture?.description, selectedLecture?.section_description]
+  );
 
   useEffect(() => {
     setThumbnailFailed(false);
@@ -586,6 +598,7 @@ export default function CoursePlayerPage() {
     setSelectedLecture({
       ...lecture,
       section_title: sectionTitle,
+      section_description: lecture.section_description || "",
     });
   };
 
@@ -828,22 +841,28 @@ export default function CoursePlayerPage() {
               </ProtectedPlaybackSurface>
             </div>
 
-            <div className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="space-y-4">
+            <div className="mt-5 grid items-stretch gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="flex h-full flex-col gap-4">
                 <div className="rounded-2xl border border-black panel-gradient p-4">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
                     Lecture Brief
                   </div>
-                  <p className="mt-3 text-sm leading-7 text-[#D7D7D7]">
-                    {selectedLecture?.description || "Lecture description will appear here."}
-                  </p>
+                  {lectureDescription ? (
+                    <p className="mt-3 whitespace-pre-line text-sm leading-7 text-[#D7D7D7]">
+                      {lectureDescription}
+                    </p>
+                  ) : (
+                    <p className="mt-3 text-sm leading-7 text-[#8F8F8F]">
+                      Lecture description will appear here once it is added in the lecture details.
+                    </p>
+                  )}
                   {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
                   {progressState.error ? (
                     <p className="mt-3 text-sm text-amber-300">{progressState.error}</p>
                   ) : null}
                 </div>
 
-                <div className="rounded-2xl border border-[#2D2D2D] bg-[linear-gradient(145deg,#101010,#050505)] p-4 shadow-[0_16px_44px_rgba(0,0,0,0.24)]">
+                <div className="flex flex-1 flex-col rounded-2xl border border-[#2D2D2D] bg-[linear-gradient(145deg,#101010,#050505)] p-4 shadow-[0_16px_44px_rgba(0,0,0,0.24)]">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
@@ -876,7 +895,7 @@ export default function CoursePlayerPage() {
                         ? "Write key commands, reminders, timestamps, or important takeaways..."
                         : "Select a lecture to start writing notes."
                     }
-                    className="mt-4 min-h-[220px] w-full resize-y rounded-2xl border border-[#303030] bg-black/60 px-4 py-3 text-sm leading-7 text-white outline-none transition placeholder:text-[#6F6F6F] focus:border-[#D8D8D8]/70"
+                    className="mt-4 min-h-[220px] w-full flex-1 resize-y rounded-2xl border border-[#303030] bg-black/60 px-4 py-3 text-sm leading-7 text-white outline-none transition placeholder:text-[#6F6F6F] focus:border-[#D8D8D8]/70"
                   />
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                     <p className="text-xs text-[#8F8F8F]">
@@ -895,7 +914,7 @@ export default function CoursePlayerPage() {
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="flex h-full flex-col gap-4">
                 <div className="rounded-2xl border border-black panel-gradient p-4">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
                     Progress Snapshot
@@ -960,7 +979,7 @@ export default function CoursePlayerPage() {
                   )}
                 </div>
 
-                <div className="rounded-2xl border border-[#2D2D2D] bg-[linear-gradient(145deg,#111111,#060606)] p-4 shadow-[0_16px_44px_rgba(0,0,0,0.22)]">
+                <div className="flex flex-1 flex-col rounded-2xl border border-[#2D2D2D] bg-[linear-gradient(145deg,#111111,#060606)] p-4 shadow-[0_16px_44px_rgba(0,0,0,0.22)]">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
                     Ask a Question
                   </div>
@@ -1004,7 +1023,7 @@ export default function CoursePlayerPage() {
                     <p className="mt-3 text-sm text-emerald-300">{questionState.success}</p>
                   ) : null}
 
-                  <div className="mt-5 border-t border-[#242424] pt-4">
+                  <div className="mt-5 flex-1 border-t border-[#242424] pt-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
                       Your Questions
                     </div>
