@@ -554,9 +554,11 @@ export default function ProtectedPlaybackSurface({
     lastTapRef.current = { timestamp: now, side };
     resetTouchGesture();
     if (isImmersiveFullscreen) {
+      event.preventDefault();
       scheduleControlsToggle();
       return;
     }
+    event.preventDefault();
     schedulePlaybackToggle();
   };
 
