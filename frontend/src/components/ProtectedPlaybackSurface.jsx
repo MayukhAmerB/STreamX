@@ -494,9 +494,9 @@ export default function ProtectedPlaybackSurface({
                 {formatPlaybackTime(videoCurrentTime)}
               </span>
               <div className="relative flex-1">
-                <div className="absolute inset-y-1/2 left-0 right-0 -translate-y-1/2 rounded-full bg-white/12">
+                <div className="absolute left-0 right-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-white/12">
                   <div
-                    className="h-1.5 rounded-full bg-[linear-gradient(90deg,#8b5cf6,#ec4899,#f59e0b)]"
+                    className="h-full rounded-full bg-[linear-gradient(90deg,#8b5cf6,#ec4899,#f59e0b)]"
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
