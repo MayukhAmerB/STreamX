@@ -10,6 +10,7 @@ const DOUBLE_TAP_WINDOW_MS = 320;
 const SINGLE_CLICK_DELAY_MS = DOUBLE_TAP_WINDOW_MS + 40;
 const TAP_MOVEMENT_THRESHOLD_PX = 14;
 const VIDEO_REPLAY_THRESHOLD_SECONDS = 0.25;
+const FULLSCREEN_CONTROLS_HIDE_DELAY_MS = 2600;
 
 function getScreenOrientationController() {
   if (typeof screen === "undefined") return null;
@@ -52,8 +53,17 @@ function canFullscreen(element) {
   );
 }
 
-function canNativeVideoFullscreen(videoElement) {
-  return Boolean(videoElement?.webkitEnterFullscreen || videoElement?.webkitEnterFullScreen);
+function shouldUseAppFullscreen() {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  const platform = navigator.platform || "";
+  const userAgent = navigator.userAgent || "";
+  return (
+    /iPad|iPhone|iPod/i.test(userAgent) ||
+    (platform === "MacIntel" && Number(navigator.maxTouchPoints) > 1)
+  );
 }
 
 async function requestElementFullscreen(element) {
@@ -72,17 +82,6 @@ async function requestElementFullscreen(element) {
   }
   if (typeof element.msRequestFullscreen === "function") {
     element.msRequestFullscreen();
-  }
-}
-
-async function requestVideoFullscreen(videoElement) {
-  if (!videoElement) return;
-  if (typeof videoElement.webkitEnterFullscreen === "function") {
-    videoElement.webkitEnterFullscreen();
-    return;
-  }
-  if (typeof videoElement.webkitEnterFullScreen === "function") {
-    videoElement.webkitEnterFullScreen();
   }
 }
 
@@ -150,9 +149,12 @@ export default function ProtectedPlaybackSurface({
   const orientationLockedRef = useRef(false);
   const lastTapRef = useRef({ timestamp: 0, side: "" });
   const singleToggleTimerRef = useRef(null);
+  const controlsHideTimerRef = useRef(null);
   const suppressClickUntilRef = useRef(0);
   const touchGestureRef = useRef({ x: 0, y: 0, moved: false });
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isAppFullscreen, setIsAppFullscreen] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
   const [fullscreenSupported, setFullscreenSupported] = useState(false);
   const [videoDuration, setVideoDuration] = useState(0);
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
@@ -160,7 +162,7 @@ export default function ProtectedPlaybackSurface({
   const [videoMuted, setVideoMuted] = useState(false);
 
   useEffect(() => {
-    setFullscreenSupported(canFullscreen(containerRef.current) || canNativeVideoFullscreen(videoRef?.current));
+    setFullscreenSupported(canFullscreen(containerRef.current));
 
     const syncFullscreenState = () => {
       const fullscreenElement = getFullscreenElement();
@@ -168,6 +170,7 @@ export default function ProtectedPlaybackSurface({
 
       if (isNestedFullscreenTarget(container, fullscreenElement)) {
         setIsFullscreen(false);
+        setIsAppFullscreen(false);
         if (orientationLockedRef.current) {
           unlockOrientation();
           orientationLockedRef.current = false;
@@ -177,6 +180,9 @@ export default function ProtectedPlaybackSurface({
       }
 
       setIsFullscreen(fullscreenElement === container);
+      if (fullscreenElement === container) {
+        setIsAppFullscreen(false);
+      }
       if (!fullscreenElement && orientationLockedRef.current) {
         unlockOrientation();
         orientationLockedRef.current = false;
@@ -194,7 +200,7 @@ export default function ProtectedPlaybackSurface({
       document.removeEventListener("mozfullscreenchange", syncFullscreenState);
       document.removeEventListener("MSFullscreenChange", syncFullscreenState);
     };
-  }, [videoRef, videoSessionKey]);
+  }, [videoSessionKey]);
 
   useEffect(() => {
     setVideoCurrentTime(0);
@@ -208,6 +214,22 @@ export default function ProtectedPlaybackSurface({
       window.clearTimeout(singleToggleTimerRef.current);
     }
     singleToggleTimerRef.current = null;
+  }
+
+  function clearControlsHideTimer() {
+    if (controlsHideTimerRef.current && typeof window !== "undefined") {
+      window.clearTimeout(controlsHideTimerRef.current);
+    }
+    controlsHideTimerRef.current = null;
+  }
+
+  function releaseOrientationLock() {
+    if (!orientationLockedRef.current) {
+      return;
+    }
+
+    unlockOrientation();
+    orientationLockedRef.current = false;
   }
 
   function resetTouchGesture() {
@@ -228,18 +250,7 @@ export default function ProtectedPlaybackSurface({
     };
 
     syncVideoState();
-    setFullscreenSupported(canFullscreen(containerRef.current) || canNativeVideoFullscreen(videoElement));
-
-    const handleNativeVideoFullscreenBegin = () => {
-      setIsFullscreen(true);
-    };
-    const handleNativeVideoFullscreenEnd = () => {
-      setIsFullscreen(false);
-      if (orientationLockedRef.current) {
-        unlockOrientation();
-        orientationLockedRef.current = false;
-      }
-    };
+    setFullscreenSupported(canFullscreen(containerRef.current));
 
     const events = [
       "loadedmetadata",
@@ -257,41 +268,152 @@ export default function ProtectedPlaybackSurface({
     events.forEach((eventName) => {
       videoElement.addEventListener(eventName, syncVideoState);
     });
-    videoElement.addEventListener("webkitbeginfullscreen", handleNativeVideoFullscreenBegin);
-    videoElement.addEventListener("webkitendfullscreen", handleNativeVideoFullscreenEnd);
 
     return () => {
       events.forEach((eventName) => {
         videoElement.removeEventListener(eventName, syncVideoState);
       });
-      videoElement.removeEventListener("webkitbeginfullscreen", handleNativeVideoFullscreenBegin);
-      videoElement.removeEventListener("webkitendfullscreen", handleNativeVideoFullscreenEnd);
     };
   }, [videoRef, videoSessionKey]);
 
-  useEffect(() => () => clearSingleToggleTimer(), []);
+  useEffect(() => () => {
+    clearSingleToggleTimer();
+    clearControlsHideTimer();
+    releaseOrientationLock();
+  }, []);
+
+  const hasVideoControls = Boolean(videoRef);
+  const isImmersiveFullscreen = isFullscreen || isAppFullscreen;
+  const canUseFullscreenControl = showFullscreenButton && (fullscreenSupported || hasVideoControls);
+
+  const revealControls = ({ autoHide = true } = {}) => {
+    clearControlsHideTimer();
+    setControlsVisible(true);
+
+    if (!isImmersiveFullscreen || !autoHide || videoPaused || typeof window === "undefined") {
+      return;
+    }
+
+    controlsHideTimerRef.current = window.setTimeout(() => {
+      controlsHideTimerRef.current = null;
+      setControlsVisible(false);
+    }, FULLSCREEN_CONTROLS_HIDE_DELAY_MS);
+  };
+
+  const scheduleControlsToggle = () => {
+    if (typeof window === "undefined") {
+      setControlsVisible((current) => !current);
+      return;
+    }
+
+    clearSingleToggleTimer();
+    singleToggleTimerRef.current = window.setTimeout(() => {
+      singleToggleTimerRef.current = null;
+      setControlsVisible((current) => {
+        const nextVisible = !current;
+        if (nextVisible) {
+          clearControlsHideTimer();
+          if (isImmersiveFullscreen && !videoPaused) {
+            controlsHideTimerRef.current = window.setTimeout(() => {
+              controlsHideTimerRef.current = null;
+              setControlsVisible(false);
+            }, FULLSCREEN_CONTROLS_HIDE_DELAY_MS);
+          }
+        } else {
+          clearControlsHideTimer();
+        }
+        return nextVisible;
+      });
+    }, SINGLE_CLICK_DELAY_MS);
+  };
+
+  useEffect(() => {
+    if (!isAppFullscreen || typeof document === "undefined") {
+      return undefined;
+    }
+
+    const root = document.documentElement;
+    const body = document.body;
+    const previousRootOverflow = root.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyTouchAction = body.style.touchAction;
+    const previousSiteZoom = root.style.getPropertyValue("--site-zoom");
+
+    root.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    body.style.touchAction = "none";
+    root.style.setProperty("--site-zoom", "1");
+
+    return () => {
+      root.style.overflow = previousRootOverflow;
+      body.style.overflow = previousBodyOverflow;
+      body.style.touchAction = previousBodyTouchAction;
+      if (previousSiteZoom) {
+        root.style.setProperty("--site-zoom", previousSiteZoom);
+      } else {
+        root.style.removeProperty("--site-zoom");
+      }
+    };
+  }, [isAppFullscreen]);
+
+  useEffect(() => {
+    if (!isAppFullscreen || typeof window === "undefined") {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setIsAppFullscreen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isAppFullscreen]);
+
+  useEffect(() => {
+    if (!isImmersiveFullscreen) {
+      clearControlsHideTimer();
+      setControlsVisible(true);
+      releaseOrientationLock();
+      return;
+    }
+
+    revealControls({ autoHide: !videoPaused });
+  }, [isImmersiveFullscreen, videoPaused, videoSessionKey]);
 
   const buttonLabel = useMemo(() => {
-    if (isFullscreen) {
+    if (isImmersiveFullscreen) {
       return "Exit Fullscreen";
     }
     return fullscreenLabel;
-  }, [fullscreenLabel, isFullscreen]);
+  }, [fullscreenLabel, isImmersiveFullscreen]);
 
   const surfaceClassName = useMemo(() => {
-    return `relative isolate bg-black ${isFullscreen ? "h-full w-full overflow-hidden" : ""}`.trim();
-  }, [isFullscreen]);
+    if (isAppFullscreen) {
+      return "fixed inset-0 z-[9999] flex h-[100dvh] w-screen flex-col overflow-hidden bg-black";
+    }
+    return `relative isolate bg-black ${isImmersiveFullscreen ? "flex h-full w-full flex-col overflow-hidden" : ""}`.trim();
+  }, [isAppFullscreen, isImmersiveFullscreen]);
 
   const stageClassName = useMemo(() => {
-    const normalizedClassName = normalizeProtectedPlaybackClassName(className, isFullscreen);
-    return `relative overflow-hidden bg-black ${isFullscreen ? "flex h-full w-full items-center justify-center" : ""} ${normalizedClassName}`.trim();
-  }, [className, isFullscreen]);
+    const normalizedClassName = normalizeProtectedPlaybackClassName(className, isImmersiveFullscreen);
+    return `relative overflow-hidden bg-black ${isImmersiveFullscreen ? "flex min-h-0 flex-1 items-center justify-center" : ""} ${normalizedClassName}`.trim();
+  }, [className, isImmersiveFullscreen]);
 
-  const hasVideoControls = Boolean(videoRef);
   const hasSeekableVideo = hasVideoControls && videoDuration > 0;
   const progressPercent = hasSeekableVideo ? Math.min(100, (videoCurrentTime / videoDuration) * 100) : 0;
   const playPauseLabel = videoPaused ? "Play" : "Pause";
   const muteLabel = videoMuted ? "Unmute" : "Mute";
+  const shouldShowControls = !isImmersiveFullscreen || controlsVisible || videoPaused;
+  const controlsDockClassName = isImmersiveFullscreen
+    ? `pointer-events-none absolute inset-x-3 bottom-3 z-20 px-[env(safe-area-inset-left)] pb-[env(safe-area-inset-bottom)] transition duration-200 ${
+        shouldShowControls ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
+      }`
+    : "relative z-20 mt-2";
+  const controlsPanelClassName = `${shouldShowControls ? "pointer-events-auto" : "pointer-events-none"} rounded-[24px] border border-white/12 bg-[linear-gradient(180deg,rgba(15,18,26,0.88),rgba(8,10,16,0.74))] px-3 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.34)] backdrop-blur-xl`;
 
   const seekBySeconds = (deltaSeconds) => {
     const videoElement = videoRef?.current;
@@ -389,6 +511,11 @@ export default function ProtectedPlaybackSurface({
     if (Date.now() < suppressClickUntilRef.current) return;
     if (event.detail !== 1) return;
 
+    if (isImmersiveFullscreen) {
+      scheduleControlsToggle();
+      return;
+    }
+
     schedulePlaybackToggle();
   };
 
@@ -396,6 +523,7 @@ export default function ProtectedPlaybackSurface({
     if (!hasVideoControls || shouldIgnoreGestureTarget(event.target)) return;
 
     clearSingleToggleTimer();
+    revealControls();
     handleDirectionalSeek(event.clientX);
     event.preventDefault();
   };
@@ -421,6 +549,7 @@ export default function ProtectedPlaybackSurface({
     const previousTap = lastTapRef.current;
     if (previousTap.side === side && now - previousTap.timestamp <= DOUBLE_TAP_WINDOW_MS) {
       clearSingleToggleTimer();
+      revealControls();
       handleDirectionalSeek(touchPoint.clientX);
       lastTapRef.current = { timestamp: 0, side: "" };
       resetTouchGesture();
@@ -430,6 +559,10 @@ export default function ProtectedPlaybackSurface({
 
     lastTapRef.current = { timestamp: now, side };
     resetTouchGesture();
+    if (isImmersiveFullscreen) {
+      scheduleControlsToggle();
+      return;
+    }
     schedulePlaybackToggle();
   };
 
@@ -465,14 +598,23 @@ export default function ProtectedPlaybackSurface({
   const handleToggleFullscreen = async () => {
     try {
       const containerElement = containerRef.current;
-      const videoElement = videoRef?.current;
 
+      if (isAppFullscreen) {
+        setIsAppFullscreen(false);
+        clearControlsHideTimer();
+        setControlsVisible(true);
+        releaseOrientationLock();
+        return;
+      }
       if (getFullscreenElement() === containerElement) {
         await exitAnyFullscreen();
-        if (orientationLockedRef.current) {
-          unlockOrientation();
-          orientationLockedRef.current = false;
-        }
+        releaseOrientationLock();
+        return;
+      }
+      if (hasVideoControls && shouldUseAppFullscreen()) {
+        setIsAppFullscreen(true);
+        setControlsVisible(true);
+        orientationLockedRef.current = await lockLandscapeOrientation();
         return;
       }
       if (canFullscreen(containerElement)) {
@@ -480,8 +622,9 @@ export default function ProtectedPlaybackSurface({
         orientationLockedRef.current = await lockLandscapeOrientation();
         return;
       }
-      if (canNativeVideoFullscreen(videoElement)) {
-        await requestVideoFullscreen(videoElement);
+      if (hasVideoControls) {
+        setIsAppFullscreen(true);
+        setControlsVisible(true);
         orientationLockedRef.current = await lockLandscapeOrientation();
       }
     } catch {
@@ -493,11 +636,17 @@ export default function ProtectedPlaybackSurface({
     <div
       ref={containerRef}
       data-protected-playback-surface="true"
-      data-fullscreen={isFullscreen ? "true" : "false"}
+      data-fullscreen={isImmersiveFullscreen ? "true" : "false"}
+      data-app-fullscreen={isAppFullscreen ? "true" : "false"}
       className={surfaceClassName}
       style={{ touchAction: hasVideoControls ? "manipulation" : undefined }}
       onClickCapture={handleSurfaceClickCapture}
       onDoubleClickCapture={handleSurfaceDoubleClickCapture}
+      onMouseMoveCapture={() => {
+        if (isImmersiveFullscreen) {
+          revealControls();
+        }
+      }}
       onTouchStartCapture={handleSurfaceTouchStartCapture}
       onTouchMoveCapture={handleSurfaceTouchMoveCapture}
       onTouchEndCapture={handleSurfaceTouchEndCapture}
@@ -506,7 +655,11 @@ export default function ProtectedPlaybackSurface({
       <div data-protected-playback-content="true" className={stageClassName}>
         {children}
         {hasVideoControls ? (
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,10,0.22)_0%,rgba(5,6,10,0)_38%,rgba(5,6,10,0.14)_62%,rgba(5,6,10,0.48)_100%)]" />
+          <div
+            className={`pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,10,0.22)_0%,rgba(5,6,10,0)_38%,rgba(5,6,10,0.14)_62%,rgba(5,6,10,0.48)_100%)] transition-opacity duration-200 ${
+              shouldShowControls ? "opacity-100" : "opacity-0"
+            }`}
+          />
         ) : null}
         <PlaybackWatermark enabled={watermarkEnabled} className={watermarkClassName} />
         {hasVideoControls && videoPaused ? (
@@ -524,7 +677,7 @@ export default function ProtectedPlaybackSurface({
             </button>
           </div>
         ) : null}
-        {!hasVideoControls && showFullscreenButton && fullscreenSupported ? (
+        {!hasVideoControls && canUseFullscreenControl ? (
           <div
             data-playback-gesture-ignore="true"
             className="pointer-events-none absolute right-3 top-3 z-30"
@@ -540,10 +693,14 @@ export default function ProtectedPlaybackSurface({
         ) : null}
       </div>
       {hasVideoControls ? (
-        <div className={isFullscreen ? "pointer-events-none absolute inset-x-3 bottom-3 z-20" : "relative z-20 mt-2"}>
+        <div
+          className={controlsDockClassName}
+          onPointerMove={() => revealControls()}
+          onFocusCapture={() => revealControls({ autoHide: false })}
+        >
           <div
             data-playback-gesture-ignore="true"
-            className="pointer-events-auto rounded-[24px] border border-white/12 bg-[linear-gradient(180deg,rgba(15,18,26,0.88),rgba(8,10,16,0.74))] px-3 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.34)] backdrop-blur-xl"
+            className={controlsPanelClassName}
           >
             <div className="mb-2 flex items-center gap-3">
               <span className="w-11 shrink-0 text-right text-[11px] font-semibold tabular-nums text-white/70 sm:w-14 sm:text-xs">
@@ -599,13 +756,13 @@ export default function ProtectedPlaybackSurface({
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                {showFullscreenButton && fullscreenSupported ? (
+                {canUseFullscreenControl ? (
                   <button
                     type="button"
                     onClick={handleToggleFullscreen}
                     className="shrink-0 rounded-full border border-white/12 bg-white/8 px-3 py-1.5 transition hover:bg-white/16"
                   >
-                    <span className="sm:hidden">{isFullscreen ? "Exit" : "Full"}</span>
+                    <span className="sm:hidden">{isImmersiveFullscreen ? "Exit" : "Full"}</span>
                     <span className="hidden sm:inline">{buttonLabel}</span>
                   </button>
                 ) : null}
