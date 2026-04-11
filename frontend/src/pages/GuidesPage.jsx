@@ -77,10 +77,9 @@ export function GuidesPageContent({
                   key={videoUrl}
                   ref={videoRef}
                   src={videoUrl}
-                  controls
-                  controlsList="nodownload nofullscreen noplaybackrate"
                   disablePictureInPicture
                   disableRemotePlayback
+                  preload="metadata"
                   playsInline
                   className="h-full w-full bg-black object-contain"
                   onDoubleClick={(event) => event.preventDefault()}

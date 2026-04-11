@@ -970,13 +970,14 @@ class LectureProgressView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        progress, _ = LectureProgress.objects.get_or_create(user=request.user, lecture=lecture)
-        progress.mark_progress(
+        progress, created = LectureProgress.objects.get_or_create(user=request.user, lecture=lecture)
+        changed = progress.mark_progress(
             position_seconds=serializer.validated_data["position_seconds"],
             duration_seconds=serializer.validated_data.get("duration_seconds") or lecture.stream_duration_seconds,
             completed=serializer.validated_data.get("completed"),
         )
-        progress.save()
+        if created or changed:
+            progress.save()
         return api_response(
             success=True,
             message="Lecture progress updated.",

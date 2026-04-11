@@ -2061,6 +2061,42 @@ class LectureProgressTests(BaseAPITestCase):
         self.assertTrue(progress.completed)
         self.assertEqual(progress.resume_position_seconds(), 0)
 
+    def test_identical_progress_update_is_a_noop_for_persistence(self):
+        Enrollment.objects.create(
+            user=self.student,
+            course=self.course,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        self.login(self.student.email)
+
+        first = self.client.put(
+            reverse("lecture-progress", kwargs={"pk": self.lecture.id}),
+            {
+                "position_seconds": 147,
+                "duration_seconds": 600,
+            },
+            format="json",
+        )
+        self.assertEqual(first.status_code, 200)
+
+        progress = LectureProgress.objects.get(user=self.student, lecture=self.lecture)
+        first_updated_at = progress.updated_at
+
+        second = self.client.put(
+            reverse("lecture-progress", kwargs={"pk": self.lecture.id}),
+            {
+                "position_seconds": 147,
+                "duration_seconds": 600,
+            },
+            format="json",
+        )
+        self.assertEqual(second.status_code, 200)
+
+        progress.refresh_from_db()
+        self.assertEqual(progress.last_position_seconds, 147)
+        self.assertEqual(progress.duration_seconds, 600)
+        self.assertEqual(progress.updated_at, first_updated_at)
+
 
 class AdaptiveHLSTranscodeTests(BaseAPITestCase):
     @patch("apps.courses.services.subprocess.run")

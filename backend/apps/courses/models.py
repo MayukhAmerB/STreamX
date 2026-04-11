@@ -480,6 +480,13 @@ class LectureProgress(models.Model):
         ]
 
     def mark_progress(self, *, position_seconds, duration_seconds=None, completed=None):
+        original_state = (
+            self.last_position_seconds,
+            self.max_position_seconds,
+            self.duration_seconds,
+            self.completed,
+            self.completed_at,
+        )
         normalized_position = max(0, int(position_seconds or 0))
         normalized_duration = None
         if duration_seconds is not None:
@@ -506,6 +513,14 @@ class LectureProgress(models.Model):
         elif completed is False:
             self.completed = False
             self.completed_at = None
+
+        return (
+            self.last_position_seconds,
+            self.max_position_seconds,
+            self.duration_seconds,
+            self.completed,
+            self.completed_at,
+        ) != original_state
 
     def completion_percent(self):
         duration = int(self.duration_seconds or 0)
