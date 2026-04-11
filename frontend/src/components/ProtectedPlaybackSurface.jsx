@@ -52,6 +52,10 @@ function canFullscreen(element) {
   );
 }
 
+function canNativeVideoFullscreen(videoElement) {
+  return Boolean(videoElement?.webkitEnterFullscreen || videoElement?.webkitEnterFullScreen);
+}
+
 async function requestElementFullscreen(element) {
   if (!element) return;
   if (typeof element.requestFullscreen === "function") {
@@ -68,6 +72,17 @@ async function requestElementFullscreen(element) {
   }
   if (typeof element.msRequestFullscreen === "function") {
     element.msRequestFullscreen();
+  }
+}
+
+async function requestVideoFullscreen(videoElement) {
+  if (!videoElement) return;
+  if (typeof videoElement.webkitEnterFullscreen === "function") {
+    videoElement.webkitEnterFullscreen();
+    return;
+  }
+  if (typeof videoElement.webkitEnterFullScreen === "function") {
+    videoElement.webkitEnterFullScreen();
   }
 }
 
@@ -145,7 +160,7 @@ export default function ProtectedPlaybackSurface({
   const [videoMuted, setVideoMuted] = useState(false);
 
   useEffect(() => {
-    setFullscreenSupported(canFullscreen(containerRef.current));
+    setFullscreenSupported(canFullscreen(containerRef.current) || canNativeVideoFullscreen(videoRef?.current));
 
     const syncFullscreenState = () => {
       const fullscreenElement = getFullscreenElement();
@@ -179,7 +194,7 @@ export default function ProtectedPlaybackSurface({
       document.removeEventListener("mozfullscreenchange", syncFullscreenState);
       document.removeEventListener("MSFullscreenChange", syncFullscreenState);
     };
-  }, []);
+  }, [videoRef, videoSessionKey]);
 
   useEffect(() => {
     setVideoCurrentTime(0);
@@ -213,6 +228,18 @@ export default function ProtectedPlaybackSurface({
     };
 
     syncVideoState();
+    setFullscreenSupported(canFullscreen(containerRef.current) || canNativeVideoFullscreen(videoElement));
+
+    const handleNativeVideoFullscreenBegin = () => {
+      setIsFullscreen(true);
+    };
+    const handleNativeVideoFullscreenEnd = () => {
+      setIsFullscreen(false);
+      if (orientationLockedRef.current) {
+        unlockOrientation();
+        orientationLockedRef.current = false;
+      }
+    };
 
     const events = [
       "loadedmetadata",
@@ -230,11 +257,15 @@ export default function ProtectedPlaybackSurface({
     events.forEach((eventName) => {
       videoElement.addEventListener(eventName, syncVideoState);
     });
+    videoElement.addEventListener("webkitbeginfullscreen", handleNativeVideoFullscreenBegin);
+    videoElement.addEventListener("webkitendfullscreen", handleNativeVideoFullscreenEnd);
 
     return () => {
       events.forEach((eventName) => {
         videoElement.removeEventListener(eventName, syncVideoState);
       });
+      videoElement.removeEventListener("webkitbeginfullscreen", handleNativeVideoFullscreenBegin);
+      videoElement.removeEventListener("webkitendfullscreen", handleNativeVideoFullscreenEnd);
     };
   }, [videoRef, videoSessionKey]);
 
@@ -248,8 +279,12 @@ export default function ProtectedPlaybackSurface({
   }, [fullscreenLabel, isFullscreen]);
 
   const surfaceClassName = useMemo(() => {
+    return `relative isolate bg-black ${isFullscreen ? "h-full w-full overflow-hidden" : ""}`.trim();
+  }, [isFullscreen]);
+
+  const stageClassName = useMemo(() => {
     const normalizedClassName = normalizeProtectedPlaybackClassName(className, isFullscreen);
-    return `relative isolate overflow-hidden bg-black ${isFullscreen ? "h-full w-full" : ""} ${normalizedClassName}`.trim();
+    return `relative overflow-hidden bg-black ${isFullscreen ? "flex h-full w-full items-center justify-center" : ""} ${normalizedClassName}`.trim();
   }, [className, isFullscreen]);
 
   const hasVideoControls = Boolean(videoRef);
@@ -429,7 +464,10 @@ export default function ProtectedPlaybackSurface({
 
   const handleToggleFullscreen = async () => {
     try {
-      if (getFullscreenElement() === containerRef.current) {
+      const containerElement = containerRef.current;
+      const videoElement = videoRef?.current;
+
+      if (getFullscreenElement() === containerElement) {
         await exitAnyFullscreen();
         if (orientationLockedRef.current) {
           unlockOrientation();
@@ -437,8 +475,15 @@ export default function ProtectedPlaybackSurface({
         }
         return;
       }
-      await requestElementFullscreen(containerRef.current);
-      orientationLockedRef.current = await lockLandscapeOrientation();
+      if (canFullscreen(containerElement)) {
+        await requestElementFullscreen(containerElement);
+        orientationLockedRef.current = await lockLandscapeOrientation();
+        return;
+      }
+      if (canNativeVideoFullscreen(videoElement)) {
+        await requestVideoFullscreen(videoElement);
+        orientationLockedRef.current = await lockLandscapeOrientation();
+      }
     } catch {
       // Best-effort enhancement only. Playback must remain usable if fullscreen fails.
     }
@@ -458,33 +503,44 @@ export default function ProtectedPlaybackSurface({
       onTouchEndCapture={handleSurfaceTouchEndCapture}
       onTouchCancelCapture={resetTouchGesture}
     >
-      <div
-        data-protected-playback-content="true"
-        className={`h-full w-full ${isFullscreen ? "flex items-center justify-center bg-black" : ""}`.trim()}
-      >
+      <div data-protected-playback-content="true" className={stageClassName}>
         {children}
+        {hasVideoControls ? (
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,10,0.22)_0%,rgba(5,6,10,0)_38%,rgba(5,6,10,0.14)_62%,rgba(5,6,10,0.48)_100%)]" />
+        ) : null}
+        <PlaybackWatermark enabled={watermarkEnabled} className={watermarkClassName} />
+        {hasVideoControls && videoPaused ? (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+            <button
+              type="button"
+              data-playback-gesture-ignore="true"
+              onClick={() => {
+                clearSingleToggleTimer();
+                void handleTogglePlayback();
+              }}
+              className="pointer-events-auto inline-flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/12 text-sm font-semibold text-white shadow-[0_18px_55px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:bg-white/18 sm:h-20 sm:w-20 sm:text-base"
+            >
+              Play
+            </button>
+          </div>
+        ) : null}
+        {!hasVideoControls && showFullscreenButton && fullscreenSupported ? (
+          <div
+            data-playback-gesture-ignore="true"
+            className="pointer-events-none absolute right-3 top-3 z-30"
+          >
+            <button
+              type="button"
+              onClick={handleToggleFullscreen}
+              className="pointer-events-auto rounded-full border border-white/12 bg-black/55 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/92 shadow-[0_12px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm transition hover:bg-black/70"
+            >
+              {buttonLabel}
+            </button>
+          </div>
+        ) : null}
       </div>
       {hasVideoControls ? (
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,10,0.22)_0%,rgba(5,6,10,0)_38%,rgba(5,6,10,0.14)_62%,rgba(5,6,10,0.72)_100%)]" />
-      ) : null}
-      <PlaybackWatermark enabled={watermarkEnabled} className={watermarkClassName} />
-      {hasVideoControls && videoPaused ? (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-          <button
-            type="button"
-            data-playback-gesture-ignore="true"
-            onClick={() => {
-              clearSingleToggleTimer();
-              void handleTogglePlayback();
-            }}
-            className="pointer-events-auto inline-flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/12 text-sm font-semibold text-white shadow-[0_18px_55px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:bg-white/18 sm:h-20 sm:w-20 sm:text-base"
-          >
-            Play
-          </button>
-        </div>
-      ) : null}
-      {hasVideoControls ? (
-        <div className="pointer-events-none absolute inset-x-3 bottom-3 z-20">
+        <div className={isFullscreen ? "pointer-events-none absolute inset-x-3 bottom-3 z-20" : "relative z-20 mt-2"}>
           <div
             data-playback-gesture-ignore="true"
             className="pointer-events-auto rounded-[24px] border border-white/12 bg-[linear-gradient(180deg,rgba(15,18,26,0.88),rgba(8,10,16,0.74))] px-3 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.34)] backdrop-blur-xl"
@@ -516,7 +572,7 @@ export default function ProtectedPlaybackSurface({
                 {formatPlaybackTime(videoDuration)}
               </span>
             </div>
-            <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-white/90 sm:text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-white/90 sm:text-xs">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -543,6 +599,16 @@ export default function ProtectedPlaybackSurface({
                 </button>
               </div>
               <div className="flex items-center gap-2">
+                {showFullscreenButton && fullscreenSupported ? (
+                  <button
+                    type="button"
+                    onClick={handleToggleFullscreen}
+                    className="shrink-0 rounded-full border border-white/12 bg-white/8 px-3 py-1.5 transition hover:bg-white/16"
+                  >
+                    <span className="sm:hidden">{isFullscreen ? "Exit" : "Full"}</span>
+                    <span className="hidden sm:inline">{buttonLabel}</span>
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={handleToggleMute}
@@ -553,20 +619,6 @@ export default function ProtectedPlaybackSurface({
               </div>
             </div>
           </div>
-        </div>
-      ) : null}
-      {showFullscreenButton && fullscreenSupported ? (
-        <div
-          data-playback-gesture-ignore="true"
-          className="pointer-events-none absolute right-3 top-3 z-30"
-        >
-          <button
-            type="button"
-            onClick={handleToggleFullscreen}
-            className="pointer-events-auto rounded-full border border-white/12 bg-black/55 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/92 shadow-[0_12px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm transition hover:bg-black/70"
-          >
-            {buttonLabel}
-          </button>
         </div>
       ) : null}
     </div>
