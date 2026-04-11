@@ -31,13 +31,23 @@ class ProtectedMediaError(Exception):
 PROTECTED_LECTURE_MEDIA_SIGNING_SALT = "courses.protected-lecture-media"
 PROTECTED_LECTURE_MEDIA_CACHE_PREFIX = "courses:protected-media-token"
 PROTECTED_GUIDE_MEDIA_SIGNING_SALT = "courses.protected-guide-media"
+HLS_SEGMENT_DURATION_SECONDS = 4
 ADAPTIVE_HLS_PROFILES = [
+    {
+        "name": "240p",
+        "width": 426,
+        "height": 240,
+        "video_bitrate": "400k",
+        "maxrate": "428k",
+        "bufsize": "600k",
+        "audio_bitrate": "64k",
+    },
     {
         "name": "360p",
         "width": 640,
         "height": 360,
-        "video_bitrate": "800k",
-        "maxrate": "856k",
+        "video_bitrate": "750k",
+        "maxrate": "803k",
         "bufsize": "1200k",
         "audio_bitrate": "96k",
     },
@@ -45,18 +55,18 @@ ADAPTIVE_HLS_PROFILES = [
         "name": "540p",
         "width": 960,
         "height": 540,
-        "video_bitrate": "1600k",
-        "maxrate": "1712k",
-        "bufsize": "2400k",
+        "video_bitrate": "1400k",
+        "maxrate": "1498k",
+        "bufsize": "2100k",
         "audio_bitrate": "128k",
     },
     {
         "name": "720p",
         "width": 1280,
         "height": 720,
-        "video_bitrate": "2800k",
-        "maxrate": "2996k",
-        "bufsize": "4200k",
+        "video_bitrate": "2400k",
+        "maxrate": "2568k",
+        "bufsize": "3600k",
         "audio_bitrate": "128k",
     },
 ]
@@ -593,7 +603,7 @@ def _build_profile_transcode_command(
         "-bufsize",
         profile["bufsize"],
         "-hls_time",
-        "6",
+        str(HLS_SEGMENT_DURATION_SECONDS),
         "-hls_playlist_type",
         "vod",
         "-hls_flags",

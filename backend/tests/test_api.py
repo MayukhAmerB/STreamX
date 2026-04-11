@@ -2112,6 +2112,7 @@ class AdaptiveHLSTranscodeTests(BaseAPITestCase):
             self.assertTrue(os.path.exists(master_playlist_path))
             with open(master_playlist_path, "r", encoding="utf-8") as handle:
                 master_playlist = handle.read()
+            self.assertIn("240p/index.m3u8", master_playlist)
             self.assertIn("360p/index.m3u8", master_playlist)
             self.assertIn("540p/index.m3u8", master_playlist)
             self.assertIn("720p/index.m3u8", master_playlist)

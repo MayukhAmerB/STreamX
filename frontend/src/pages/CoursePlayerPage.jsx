@@ -321,7 +321,16 @@ export default function CoursePlayerPage() {
       } else if (Hls.isSupported()) {
         hls = new Hls({
           enableWorker: true,
-          backBufferLength: 90,
+          backBufferLength: 30,
+          maxBufferLength: 30,
+          maxMaxBufferLength: 60,
+          maxBufferHole: 0.5,
+          capLevelToPlayerSize: true,
+          startLevel: 0,
+          testBandwidth: true,
+          abrEwmaDefaultEstimate: 600000,
+          abrBandWidthFactor: 0.8,
+          abrBandWidthUpFactor: 0.6,
         });
         hls.loadSource(videoUrl);
         hls.attachMedia(videoElement);
