@@ -128,6 +128,12 @@ export default function Navbar() {
                     Profile
                   </Link>
                   <Link
+                    to="/id-card"
+                    className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
+                  >
+                    ID Card
+                  </Link>
+                  <Link
                     to="/join-live"
                     className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
                   >
@@ -288,6 +294,9 @@ export default function Navbar() {
                   </Link>
                   <Link to="/profile" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                     Profile
+                  </Link>
+                  <Link to="/id-card" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+                    ID Card
                   </Link>
                   {isInstructor ? (
                     <Link to="/instructor/dashboard" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
