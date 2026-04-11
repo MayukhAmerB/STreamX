@@ -146,6 +146,7 @@ export default function ProtectedPlaybackSurface({
   videoSessionKey = "",
 }) {
   const containerRef = useRef(null);
+  const gestureSurfaceRef = useRef(null);
   const orientationLockedRef = useRef(false);
   const lastTapRef = useRef({ timestamp: 0, side: "" });
   const singleToggleTimerRef = useRef(null);
@@ -302,6 +303,7 @@ export default function ProtectedPlaybackSurface({
 
   const scheduleControlsToggle = () => {
     if (typeof window === "undefined") {
+      clearControlsHideTimer();
       setControlsVisible((current) => !current);
       return;
     }
@@ -309,19 +311,9 @@ export default function ProtectedPlaybackSurface({
     clearSingleToggleTimer();
     singleToggleTimerRef.current = window.setTimeout(() => {
       singleToggleTimerRef.current = null;
+      clearControlsHideTimer();
       setControlsVisible((current) => {
         const nextVisible = !current;
-        if (nextVisible) {
-          clearControlsHideTimer();
-          if (isImmersiveFullscreen && !videoPaused) {
-            controlsHideTimerRef.current = window.setTimeout(() => {
-              controlsHideTimerRef.current = null;
-              setControlsVisible(false);
-            }, FULLSCREEN_CONTROLS_HIDE_DELAY_MS);
-          }
-        } else {
-          clearControlsHideTimer();
-        }
         return nextVisible;
       });
     }, SINGLE_CLICK_DELAY_MS);
@@ -409,11 +401,11 @@ export default function ProtectedPlaybackSurface({
   const muteLabel = videoMuted ? "Unmute" : "Mute";
   const shouldShowControls = !isImmersiveFullscreen || controlsVisible || videoPaused;
   const controlsDockClassName = isImmersiveFullscreen
-    ? `pointer-events-none absolute inset-x-3 bottom-3 z-20 px-[env(safe-area-inset-left)] pb-[env(safe-area-inset-bottom)] transition duration-200 ${
+    ? `pointer-events-none absolute left-3 right-3 bottom-3 z-20 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] transition duration-200 ${
         shouldShowControls ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
       }`
     : "relative z-20 mt-2";
-  const controlsPanelClassName = `${shouldShowControls ? "pointer-events-auto" : "pointer-events-none"} rounded-[24px] border border-white/12 bg-[linear-gradient(180deg,rgba(15,18,26,0.88),rgba(8,10,16,0.74))] px-3 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.34)] backdrop-blur-xl`;
+  const controlsPanelClassName = `${shouldShowControls ? "pointer-events-auto" : "pointer-events-none"} w-full max-w-full rounded-[24px] border border-white/12 bg-[linear-gradient(180deg,rgba(15,18,26,0.88),rgba(8,10,16,0.74))] px-2.5 py-2.5 shadow-[0_18px_40px_rgba(0,0,0,0.34)] backdrop-blur-xl sm:px-3 sm:py-3`;
 
   const seekBySeconds = (deltaSeconds) => {
     const videoElement = videoRef?.current;
@@ -431,15 +423,15 @@ export default function ProtectedPlaybackSurface({
     setVideoCurrentTime(nextTime);
   };
 
-  const resolveTapSide = (clientX) => {
-    const bounds = containerRef.current?.getBoundingClientRect();
+  const resolveTapSide = (clientX, boundsSource = gestureSurfaceRef.current || containerRef.current) => {
+    const bounds = boundsSource?.getBoundingClientRect?.();
     if (!bounds || bounds.width <= 0) return "";
 
     return clientX < bounds.left + bounds.width / 2 ? "left" : "right";
   };
 
-  const handleDirectionalSeek = (clientX) => {
-    const side = resolveTapSide(clientX);
+  const handleDirectionalSeek = (clientX, boundsSource = gestureSurfaceRef.current || containerRef.current) => {
+    const side = resolveTapSide(clientX, boundsSource);
     if (side === "left") {
       seekBySeconds(-VIDEO_SKIP_SECONDS);
     } else if (side === "right") {
@@ -520,16 +512,16 @@ export default function ProtectedPlaybackSurface({
   };
 
   const handleSurfaceDoubleClickCapture = (event) => {
-    if (!hasVideoControls || shouldIgnoreGestureTarget(event.target)) return;
+    if (!hasVideoControls) return;
 
     clearSingleToggleTimer();
     revealControls();
-    handleDirectionalSeek(event.clientX);
+    handleDirectionalSeek(event.clientX, event.currentTarget);
     event.preventDefault();
   };
 
   const handleSurfaceTouchEndCapture = (event) => {
-    if (!hasVideoControls || shouldIgnoreGestureTarget(event.target)) return;
+    if (!hasVideoControls) return;
 
     const touchPoint = event.changedTouches?.[0];
     if (!touchPoint) return;
@@ -550,7 +542,7 @@ export default function ProtectedPlaybackSurface({
     if (previousTap.side === side && now - previousTap.timestamp <= DOUBLE_TAP_WINDOW_MS) {
       clearSingleToggleTimer();
       revealControls();
-      handleDirectionalSeek(touchPoint.clientX);
+      handleDirectionalSeek(touchPoint.clientX, event.currentTarget);
       lastTapRef.current = { timestamp: 0, side: "" };
       resetTouchGesture();
       event.preventDefault();
@@ -567,7 +559,7 @@ export default function ProtectedPlaybackSurface({
   };
 
   const handleSurfaceTouchStartCapture = (event) => {
-    if (!hasVideoControls || shouldIgnoreGestureTarget(event.target)) return;
+    if (!hasVideoControls) return;
 
     const touchPoint = event.touches?.[0];
     if (!touchPoint) {
@@ -583,7 +575,7 @@ export default function ProtectedPlaybackSurface({
   };
 
   const handleSurfaceTouchMoveCapture = (event) => {
-    if (!hasVideoControls || shouldIgnoreGestureTarget(event.target)) return;
+    if (!hasVideoControls) return;
 
     const touchPoint = event.touches?.[0];
     if (!touchPoint) return;
@@ -640,20 +632,28 @@ export default function ProtectedPlaybackSurface({
       data-app-fullscreen={isAppFullscreen ? "true" : "false"}
       className={surfaceClassName}
       style={{ touchAction: hasVideoControls ? "manipulation" : undefined }}
-      onClickCapture={handleSurfaceClickCapture}
-      onDoubleClickCapture={handleSurfaceDoubleClickCapture}
       onMouseMoveCapture={() => {
         if (isImmersiveFullscreen) {
           revealControls();
         }
       }}
-      onTouchStartCapture={handleSurfaceTouchStartCapture}
-      onTouchMoveCapture={handleSurfaceTouchMoveCapture}
-      onTouchEndCapture={handleSurfaceTouchEndCapture}
-      onTouchCancelCapture={resetTouchGesture}
     >
       <div data-protected-playback-content="true" className={stageClassName}>
         {children}
+        {hasVideoControls ? (
+          <div
+            ref={gestureSurfaceRef}
+            data-playback-gesture-surface="true"
+            className="absolute inset-0 z-[5]"
+            onClickCapture={handleSurfaceClickCapture}
+            onDoubleClickCapture={handleSurfaceDoubleClickCapture}
+            onTouchStartCapture={handleSurfaceTouchStartCapture}
+            onTouchMoveCapture={handleSurfaceTouchMoveCapture}
+            onTouchEndCapture={handleSurfaceTouchEndCapture}
+            onTouchCancelCapture={resetTouchGesture}
+            aria-hidden="true"
+          />
+        ) : null}
         {hasVideoControls ? (
           <div
             className={`pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,10,0.22)_0%,rgba(5,6,10,0)_38%,rgba(5,6,10,0.14)_62%,rgba(5,6,10,0.48)_100%)] transition-opacity duration-200 ${
@@ -702,11 +702,11 @@ export default function ProtectedPlaybackSurface({
             data-playback-gesture-ignore="true"
             className={controlsPanelClassName}
           >
-            <div className="mb-2 flex items-center gap-3">
-              <span className="w-11 shrink-0 text-right text-[11px] font-semibold tabular-nums text-white/70 sm:w-14 sm:text-xs">
+            <div className="mb-2 grid grid-cols-[auto,minmax(0,1fr),auto] items-center gap-2 sm:gap-3">
+              <span className="min-w-[2.75rem] shrink-0 text-right text-[10px] font-semibold tabular-nums text-white/70 sm:min-w-[3.5rem] sm:text-xs">
                 {formatPlaybackTime(videoCurrentTime)}
               </span>
-              <div className="relative flex-1">
+              <div className="relative min-w-0 flex-1">
                 <div className="absolute left-0 right-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-white/12">
                   <div
                     className="h-full rounded-full bg-[linear-gradient(90deg,#8b5cf6,#ec4899,#f59e0b)]"
@@ -725,12 +725,12 @@ export default function ProtectedPlaybackSurface({
                   className="playback-slider relative h-6 w-full cursor-pointer appearance-none bg-transparent disabled:cursor-not-allowed disabled:opacity-45"
                 />
               </div>
-              <span className="w-11 shrink-0 text-[11px] font-semibold tabular-nums text-white/70 sm:w-14 sm:text-xs">
+              <span className="min-w-[2.75rem] shrink-0 text-right text-[10px] font-semibold tabular-nums text-white/70 sm:min-w-[3.5rem] sm:text-xs">
                 {formatPlaybackTime(videoDuration)}
               </span>
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-white/90 sm:text-xs">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2 text-[10px] font-semibold text-white/90 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:text-xs">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={handleSkipBackward}
@@ -755,7 +755,7 @@ export default function ProtectedPlaybackSurface({
                   +10s
                 </button>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 {canUseFullscreenControl ? (
                   <button
                     type="button"
