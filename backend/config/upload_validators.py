@@ -5,8 +5,27 @@ from django.core.exceptions import ValidationError
 from PIL import Image, UnidentifiedImageError
 
 
-ALLOWED_PROFILE_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
-ALLOWED_PROFILE_IMAGE_FORMATS = {"JPEG", "PNG", "WEBP"}
+ALLOWED_PROFILE_IMAGE_EXTENSIONS = {"jpg", "png"}
+ALLOWED_PROFILE_IMAGE_FORMATS = {"JPEG", "PNG"}
+DISALLOWED_EMBEDDED_EXTENSIONS = {
+    "php",
+    "phtml",
+    "phar",
+    "jsp",
+    "asp",
+    "aspx",
+    "cgi",
+    "pl",
+    "py",
+    "rb",
+    "sh",
+    "bash",
+    "exe",
+    "dll",
+    "js",
+    "html",
+    "htm",
+}
 
 ALLOWED_VIDEO_EXTENSIONS = {"mp4", "m4v", "mov", "webm"}
 ALLOWED_VIDEO_CONTENT_TYPES = {"video/mp4", "video/quicktime", "video/webm", "application/octet-stream"}
@@ -86,6 +105,24 @@ def _validate_filename(file_obj, field_name):
         raise ValidationError({field_name: "Uploaded file name contains control characters."})
 
 
+def _validate_no_dangerous_double_extension(file_obj, field_name):
+    raw_name = str(getattr(file_obj, "name", "") or "")
+    name = raw_name.replace("\\", "/").split("/")[-1]
+    parts = [segment.strip().lower() for segment in name.split(".") if segment.strip()]
+    if len(parts) < 3:
+        return
+
+    embedded_extensions = parts[1:-1]
+    if any(extension in DISALLOWED_EMBEDDED_EXTENSIONS for extension in embedded_extensions):
+        raise ValidationError(
+            {
+                field_name: (
+                    "File names with embedded executable or script extensions are not allowed."
+                )
+            }
+        )
+
+
 def _validate_profile_image_binary(file_obj, field_name):
     cursor = _safe_tell(file_obj)
     try:
@@ -140,9 +177,10 @@ def validate_profile_image_upload(file_obj, field_name="profile_image"):
     if not file_obj:
         return
     _validate_filename(file_obj, field_name)
+    _validate_no_dangerous_double_extension(file_obj, field_name)
     ext = _extension(file_obj)
     if ext not in ALLOWED_PROFILE_IMAGE_EXTENSIONS:
-        raise ValidationError({field_name: "Only JPG, PNG, or WEBP profile images are allowed."})
+        raise ValidationError({field_name: "Only JPG or PNG profile images are allowed."})
     size = getattr(file_obj, "size", None)
     if size and size > MAX_PROFILE_IMAGE_BYTES:
         raise ValidationError({field_name: "Profile image must be 5 MB or smaller."})

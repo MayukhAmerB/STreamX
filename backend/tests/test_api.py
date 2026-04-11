@@ -29,6 +29,7 @@ from apps.courses.models import (
     Enrollment,
     GuideVideo,
     Lecture,
+    LectureQuestion,
     LectureProgress,
     LectureResource,
     LiveClass,
@@ -676,6 +677,12 @@ class RateLimitTests(APITestCase):
 
 
 class UploadValidationTests(APITestCase):
+    @staticmethod
+    def _make_profile_image(name="avatar.jpg", image_format="JPEG", content_type="image/jpeg"):
+        buffer = BytesIO()
+        Image.new("RGB", (16, 16), color="white").save(buffer, format=image_format)
+        return SimpleUploadedFile(name, buffer.getvalue(), content_type=content_type)
+
     def test_lecture_serializer_rejects_invalid_video_extension(self):
         instructor = User.objects.create_user(
             email="vid@test.com",
@@ -733,6 +740,55 @@ class UploadValidationTests(APITestCase):
         serializer = ProfileUpdateSerializer(
             user,
             data={"full_name": "Profile User Binary", "profile_image": fake_jpg},
+            partial=True,
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("profile_image", serializer.errors)
+
+    def test_profile_serializer_rejects_dangerous_double_extension_image_name(self):
+        user = User.objects.create_user(
+            email="profile-double-ext@test.com",
+            password="StrongPass@123",
+            full_name="Profile User Double Extension",
+            role=User.ROLE_STUDENT,
+        )
+        disguised_image = self._make_profile_image(name="avatar.php.jpg")
+        serializer = ProfileUpdateSerializer(
+            user,
+            data={"full_name": "Profile User Double Extension", "profile_image": disguised_image},
+            partial=True,
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("profile_image", serializer.errors)
+        self.assertIn("embedded executable or script extensions", str(serializer.errors["profile_image"][0]))
+
+    def test_profile_serializer_rejects_jpeg_extension_even_for_valid_image_binary(self):
+        user = User.objects.create_user(
+            email="profile-jpeg@test.com",
+            password="StrongPass@123",
+            full_name="Profile User Jpeg",
+            role=User.ROLE_STUDENT,
+        )
+        jpeg_image = self._make_profile_image(name="avatar.jpeg")
+        serializer = ProfileUpdateSerializer(
+            user,
+            data={"full_name": "Profile User Jpeg", "profile_image": jpeg_image},
+            partial=True,
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("profile_image", serializer.errors)
+        self.assertIn("Only JPG or PNG profile images are allowed.", str(serializer.errors["profile_image"][0]))
+
+    def test_profile_serializer_rejects_profile_image_url_value(self):
+        user = User.objects.create_user(
+            email="profile-url@test.com",
+            password="StrongPass@123",
+            full_name="Profile User Url",
+            role=User.ROLE_STUDENT,
+        )
+        serializer = ProfileUpdateSerializer(
+            user,
+            data={"full_name": "Profile User Url", "profile_image": "https://evil.example/avatar.jpg"},
             partial=True,
         )
         self.assertFalse(serializer.is_valid())
@@ -2096,6 +2152,48 @@ class LectureProgressTests(BaseAPITestCase):
         self.assertEqual(progress.last_position_seconds, 147)
         self.assertEqual(progress.duration_seconds, 600)
         self.assertEqual(progress.updated_at, first_updated_at)
+
+
+class LectureQuestionSecurityTests(BaseAPITestCase):
+    def setUp(self):
+        super().setUp()
+        Enrollment.objects.create(
+            user=self.student,
+            course=self.course,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        self.login(self.student.email)
+
+    def test_lecture_question_rejects_sqli_payload(self):
+        response = self.client.post(
+            reverse("lecture-questions", kwargs={"pk": self.lecture.id}),
+            {"question": "' OR 1=1 --"},
+            format="json",
+        )
+        payload = response.json()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(payload["errors"]["detail"], "Suspicious input detected.")
+        self.assertEqual(LectureQuestion.objects.count(), 0)
+
+    def test_lecture_question_rejects_active_content_payload(self):
+        response = self.client.post(
+            reverse("lecture-questions", kwargs={"pk": self.lecture.id}),
+            {"question": "<script>alert('xss')</script>"},
+            format="json",
+        )
+        payload = response.json()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(payload["errors"]["detail"], "Suspicious input detected.")
+        self.assertEqual(LectureQuestion.objects.count(), 0)
+
+    def test_lecture_question_accepts_plain_text_question(self):
+        response = self.client.post(
+            reverse("lecture-questions", kwargs={"pk": self.lecture.id}),
+            {"question": "Can you explain the difference between passive and active OSINT?"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(LectureQuestion.objects.count(), 1)
 
 
 class AdaptiveHLSTranscodeTests(BaseAPITestCase):

@@ -3,7 +3,7 @@ import re
 from rest_framework import serializers
 from django.urls import reverse
 
-from config.request_security import contains_active_content, is_safe_public_http_url
+from config.request_security import contains_active_content, contains_suspicious_sqli, is_safe_public_http_url
 from config.upload_validators import validate_profile_image_upload, validate_video_upload
 from config.url_utils import build_public_url, get_media_public_url
 
@@ -622,6 +622,8 @@ class LectureQuestionCreateSerializer(serializers.Serializer):
         normalized = str(value or "").strip()
         if contains_active_content(normalized):
             raise serializers.ValidationError("Suspicious script or active-content payload detected.")
+        if contains_suspicious_sqli(normalized):
+            raise serializers.ValidationError("Suspicious SQL-style payload detected.")
         return normalized
 
 

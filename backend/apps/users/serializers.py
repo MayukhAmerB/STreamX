@@ -189,6 +189,11 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
     def validate_profile_image(self, value):
         if value in (None, ""):
             return value
+        if isinstance(value, str):
+            normalized = value.strip()
+            if normalized:
+                raise serializers.ValidationError("Profile image must be an uploaded JPG or PNG file, not a URL.")
+            return value
         try:
             validate_profile_image_upload(value, "profile_image")
         except DjangoValidationError as exc:
