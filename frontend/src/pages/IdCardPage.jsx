@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { getMyCourses, listLiveClasses } from "../api/courses";
+import defaultIdCardProfileImage from "../assets/id-card-default-profile.jpg";
 import BrandLogo from "../components/BrandLogo";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 import { useAuth } from "../hooks/useAuth";
 import { apiData } from "../utils/api";
 
-const DEFAULT_ID_CARD_PROFILE_IMAGE =
-  "https://i.pinimg.com/736x/43/7a/79/437a79e87c5dde8694de6d8c787543f4.jpg";
+const DEFAULT_ID_CARD_PROFILE_IMAGE = defaultIdCardProfileImage;
 
 function formatDateLabel(value) {
   if (!value) {
@@ -107,6 +107,7 @@ export default function IdCardPage() {
   const [dataNotice, setDataNotice] = useState("");
   const [shieldActive, setShieldActive] = useState(false);
   const [timestamp, setTimestamp] = useState(() => new Date());
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const matrixCanvasRef = useRef(null);
   const matrixShellRef = useRef(null);
 
@@ -250,6 +251,10 @@ export default function IdCardPage() {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [user?.profile_image_url]);
+
   const userInitials = useMemo(() => {
     const source = String(user?.full_name || user?.email || "U").trim();
     const parts = source.split(/\s+/).filter(Boolean);
@@ -283,7 +288,11 @@ export default function IdCardPage() {
     [memberId, timestamp, user?.email]
   );
   const watermarkLines = useMemo(() => buildWatermarkLines(watermarkLabel), [watermarkLabel]);
-  const profileImageUrl = user?.profile_image_url || DEFAULT_ID_CARD_PROFILE_IMAGE;
+  const normalizedProfileImageUrl = String(user?.profile_image_url || "").trim();
+  const profileImageUrl =
+    !avatarLoadFailed && normalizedProfileImageUrl
+      ? normalizedProfileImageUrl
+      : DEFAULT_ID_CARD_PROFILE_IMAGE;
   const hasProfileName = Boolean(String(user?.full_name || "").trim());
   const hasProfilePhone = Boolean(String(user?.phone_number || "").trim());
   const hasProfileImage = Boolean(user?.profile_image_url);
@@ -405,9 +414,9 @@ export default function IdCardPage() {
         .asi-id-card-shell {
           position: relative;
           overflow: hidden;
-          border-radius: 34px;
+          border-radius: 38px;
           border: 1px solid #000;
-          padding: 22px;
+          padding: 28px;
           box-shadow: 0 28px 80px rgba(0,0,0,0.34);
           background:
             radial-gradient(circle at 18% 6%, rgba(255,255,255,0.06), transparent 28%),
@@ -465,7 +474,7 @@ export default function IdCardPage() {
           position: relative;
           z-index: 4;
           overflow: hidden;
-          border-radius: 14px;
+          border-radius: 18px;
           border: 1px solid rgba(255,255,255,.08);
           background: linear-gradient(165deg,#161616 0%,#0c0c0c 40%,#080808 100%);
           box-shadow:
@@ -485,7 +494,7 @@ export default function IdCardPage() {
           z-index: 2;
           pointer-events: none;
           background: linear-gradient(180deg, rgba(255,255,255,.035) 0%, transparent 100%);
-          border-radius: 14px 14px 0 0;
+          border-radius: 18px 18px 0 0;
         }
 
         .asi-id-card-card::after {
@@ -549,8 +558,8 @@ export default function IdCardPage() {
           z-index: 4;
           display: flex;
           flex-direction: column;
-          gap: 8px;
-          padding: 16px 20px 12px;
+          gap: 12px;
+          padding: 22px 26px 18px;
         }
 
         .asi-id-card-org-label,
@@ -575,15 +584,15 @@ export default function IdCardPage() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 12px;
+          gap: 16px;
         }
 
         .asi-id-card-org-label {
           white-space: nowrap;
           border-radius: 4px;
           border: 1px solid rgba(255,255,255,.07);
-          padding: 3px 8px;
-          font-size: 7px;
+          padding: 5px 10px;
+          font-size: 8px;
           font-weight: 600;
           letter-spacing: .18em;
           text-transform: uppercase;
@@ -594,7 +603,7 @@ export default function IdCardPage() {
         .asi-id-card-id-badge {
           text-align: right;
           white-space: nowrap;
-          font-size: 7px;
+          font-size: 8px;
           line-height: 1.4;
           letter-spacing: .1em;
           color: rgba(255,255,255,.12);
@@ -607,19 +616,19 @@ export default function IdCardPage() {
         .asi-id-card-identity-row {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 18px;
         }
 
         .asi-id-card-avatar {
           position: relative;
           display: flex;
-          width: 52px;
-          height: 52px;
+          width: 84px;
+          height: 84px;
           flex-shrink: 0;
           align-items: center;
           justify-content: center;
           overflow: hidden;
-          border-radius: 10px;
+          border-radius: 14px;
           border: 1px solid rgba(255,255,255,.09);
           background: linear-gradient(145deg,#141414,#0a0a0a);
           box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
@@ -643,11 +652,11 @@ export default function IdCardPage() {
 
         .asi-id-card-avatar-status {
           position: absolute;
-          right: 2px;
-          bottom: 2px;
+          right: 4px;
+          bottom: 4px;
           z-index: 2;
-          width: 6px;
-          height: 6px;
+          width: 8px;
+          height: 8px;
           border-radius: 999px;
           border: 1.5px solid #0c0c0c;
           background: #fff;
@@ -656,12 +665,12 @@ export default function IdCardPage() {
         }
 
         .asi-id-card-handle {
-          font-size: 8px;
+          font-size: 10px;
           color: rgba(255,255,255,.25);
         }
 
         .asi-id-card-display-name {
-          font-size: 18px;
+          font-size: 28px;
           font-weight: 400;
           line-height: 1.1;
           letter-spacing: -.01em;
@@ -673,7 +682,7 @@ export default function IdCardPage() {
         }
 
         .asi-id-card-username {
-          font-size: 8px;
+          font-size: 10px;
           color: rgba(255,255,255,.12);
         }
 
@@ -691,7 +700,7 @@ export default function IdCardPage() {
           display: flex;
           flex-wrap: wrap;
           align-items: center;
-          gap: 16px;
+          gap: 20px;
         }
 
         .asi-id-card-info-item {
@@ -701,7 +710,7 @@ export default function IdCardPage() {
         }
 
         .asi-id-card-info-label {
-          font-size: 6.5px;
+          font-size: 7.5px;
           font-weight: 600;
           letter-spacing: .14em;
           text-transform: uppercase;
@@ -710,9 +719,40 @@ export default function IdCardPage() {
 
         .asi-id-card-info-value {
           font-family: "JetBrains Mono", monospace;
-          font-size: 9px;
+          font-size: 11px;
           font-weight: 500;
           color: rgba(255,255,255,.55);
+        }
+
+        .asi-id-card-facts-grid {
+          display: grid;
+          gap: 12px;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .asi-id-card-fact {
+          border-radius: 10px;
+          border: 1px solid rgba(255,255,255,.04);
+          padding: 10px 12px;
+          background: rgba(255,255,255,.015);
+        }
+
+        .asi-id-card-fact-label {
+          font-family: "JetBrains Mono", monospace;
+          font-size: 7px;
+          font-weight: 600;
+          letter-spacing: .16em;
+          text-transform: uppercase;
+          color: rgba(255,255,255,.22);
+        }
+
+        .asi-id-card-fact-value {
+          margin-top: 6px;
+          font-family: "JetBrains Mono", monospace;
+          font-size: 11px;
+          line-height: 1.5;
+          color: rgba(255,255,255,.82);
+          word-break: break-word;
         }
 
         .asi-id-card-live-badge {
@@ -743,13 +783,14 @@ export default function IdCardPage() {
           display: grid;
           gap: 8px;
           grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
         }
 
         .asi-id-card-section-header {
           display: flex;
           align-items: center;
           gap: 4px;
-          margin-bottom: 3px;
+          margin-bottom: 6px;
         }
 
         .asi-id-card-section-dot {
@@ -776,7 +817,7 @@ export default function IdCardPage() {
         }
 
         .asi-id-card-section-title {
-          font-size: 6.5px;
+          font-size: 7.5px;
           font-weight: 600;
           letter-spacing: .14em;
           text-transform: uppercase;
@@ -790,7 +831,7 @@ export default function IdCardPage() {
           gap: 6px;
           border-radius: 5px;
           border: 1px solid rgba(255,255,255,.025);
-          padding: 5px 8px;
+          padding: 9px 12px;
           background: rgba(255,255,255,.01);
           transition: all .3s ease;
         }
@@ -822,7 +863,7 @@ export default function IdCardPage() {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          font-size: 8px;
+          font-size: 10px;
           color: rgba(255,255,255,.45);
         }
 
@@ -830,9 +871,9 @@ export default function IdCardPage() {
           flex-shrink: 0;
           white-space: nowrap;
           border-radius: 3px;
-          padding: 1px 4px;
+          padding: 2px 6px;
           font-family: "JetBrains Mono", monospace;
-          font-size: 6px;
+          font-size: 7px;
           font-weight: 600;
           letter-spacing: .08em;
           text-transform: uppercase;
@@ -854,8 +895,8 @@ export default function IdCardPage() {
         .asi-id-card-rank-icon {
           position: relative;
           display: flex;
-          width: 14px;
-          height: 14px;
+          width: 18px;
+          height: 18px;
           flex-shrink: 0;
           align-items: center;
           justify-content: center;
@@ -871,7 +912,7 @@ export default function IdCardPage() {
         .asi-id-card-cross-icon::after {
           content: "";
           position: absolute;
-          width: 7px;
+          width: 9px;
           height: 1px;
           border-radius: 1px;
           background: rgba(200,80,80,.6);
@@ -888,12 +929,12 @@ export default function IdCardPage() {
         .asi-id-card-rank-icon {
           border: 1px solid rgba(200,180,100,.15);
           background: rgba(200,180,100,.08);
-          font-size: 8px;
+          font-size: 10px;
           color: rgba(200,180,100,.7);
         }
 
         .asi-id-card-status-text {
-          font-size: 8px;
+          font-size: 10px;
           flex: 1;
         }
 
@@ -907,7 +948,7 @@ export default function IdCardPage() {
 
         .asi-id-card-status-sub {
           margin-top: 0;
-          font-size: 6.5px;
+          font-size: 7.5px;
           color: rgba(255,255,255,.12);
         }
 
@@ -915,7 +956,7 @@ export default function IdCardPage() {
           display: flex;
           align-items: flex-end;
           justify-content: space-between;
-          gap: 10px;
+          gap: 16px;
           margin-top: auto;
           padding-top: 2px;
         }
@@ -989,6 +1030,10 @@ export default function IdCardPage() {
         }
 
         @media (max-width: 639px) {
+          .asi-id-card-facts-grid {
+            grid-template-columns: 1fr;
+          }
+
           .asi-id-card-course-name {
             white-space: normal;
             line-height: 1.3;
@@ -1006,6 +1051,10 @@ export default function IdCardPage() {
 
         @media (min-width: 640px) {
           .asi-id-card-courses-row {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+          }
+
+          .asi-id-card-facts-grid {
             grid-template-columns: repeat(4, minmax(0, 1fr));
           }
         }
@@ -1041,7 +1090,7 @@ export default function IdCardPage() {
         Printing and static export of this protected credential are disabled.
       </div>
 
-      <div className="space-y-6">
+      <div className="mx-auto w-full max-w-[1420px] space-y-6">
         <section
           ref={matrixShellRef}
           className="id-card-protected-root asi-id-card-shell"
@@ -1105,6 +1154,7 @@ export default function IdCardPage() {
                     src={profileImageUrl}
                     alt={`${user?.full_name || "User"} profile`}
                     draggable="false"
+                    onError={() => setAvatarLoadFailed(true)}
                   />
                   <div className="asi-id-card-avatar-status" />
                 </div>
@@ -1140,6 +1190,27 @@ export default function IdCardPage() {
                 <div className="asi-id-card-info-item">
                   <div className="asi-id-card-info-label">Member Since</div>
                   <div className="asi-id-card-info-value">{joinedLabel}</div>
+                </div>
+              </div>
+
+              <div className="asi-id-card-divider" />
+
+              <div className="asi-id-card-facts-grid">
+                <div className="asi-id-card-fact">
+                  <div className="asi-id-card-fact-label">Email</div>
+                  <div className="asi-id-card-fact-value">{user?.email || "Not available"}</div>
+                </div>
+                <div className="asi-id-card-fact">
+                  <div className="asi-id-card-fact-label">Phone</div>
+                  <div className="asi-id-card-fact-value">{user?.phone_number || "Not provided"}</div>
+                </div>
+                <div className="asi-id-card-fact">
+                  <div className="asi-id-card-fact-label">Access Class</div>
+                  <div className="asi-id-card-fact-value">{roleLabel}</div>
+                </div>
+                <div className="asi-id-card-fact">
+                  <div className="asi-id-card-fact-label">Member Since</div>
+                  <div className="asi-id-card-fact-value">{joinedLabel}</div>
                 </div>
               </div>
 
