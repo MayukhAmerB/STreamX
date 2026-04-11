@@ -436,66 +436,138 @@ export default function CoursePlayerPage() {
       title={course?.title || "Course"}
       subtitle={`${course?.sections?.length || 0} sections - ${lectureCount} lectures`}
     >
-      <div className="space-y-6">
-        <div className="grid gap-5 xl:grid-cols-[340px_1fr]">
-          <aside className="overflow-hidden rounded-[28px] border border-black panel-gradient shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
-            <div className="border-b border-[#222222] bg-[radial-gradient(circle_at_top,rgba(192,192,192,0.12),transparent_48%)] p-5">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#949494]">
-                Course Overview
+      <div className="grid gap-5 xl:grid-cols-[340px_1fr]">
+        <aside className="overflow-hidden rounded-[28px] border border-black panel-gradient shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
+          <div className="border-b border-[#222222] bg-[radial-gradient(circle_at_top,rgba(192,192,192,0.12),transparent_48%)] p-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#949494]">
+              Your Progress
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+              <div className="rounded-2xl border border-black panel-gradient p-3">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">Completed</div>
+                <div className="mt-1 text-2xl font-semibold text-white">{lectureStats.completedCount}</div>
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                <div className="rounded-2xl border border-black panel-gradient p-3">
-                  <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">Completed</div>
-                  <div className="mt-1 text-2xl font-semibold text-white">{lectureStats.completedCount}</div>
-                </div>
-                <div className="rounded-2xl border border-black panel-gradient p-3">
-                  <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">In Progress</div>
-                  <div className="mt-1 text-2xl font-semibold text-white">{lectureStats.startedCount}</div>
-                </div>
-                <div className="rounded-2xl border border-black panel-gradient p-3">
-                  <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">Modules</div>
-                  <div className="mt-1 text-2xl font-semibold text-white">{course?.sections?.length || 0}</div>
-                </div>
+              <div className="rounded-2xl border border-black panel-gradient p-3">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">In Progress</div>
+                <div className="mt-1 text-2xl font-semibold text-white">{lectureStats.startedCount}</div>
+              </div>
+              <div className="rounded-2xl border border-black panel-gradient p-3">
+                <div className="text-[11px] uppercase tracking-[0.16em] text-[#949494]">Lessons</div>
+                <div className="mt-1 text-2xl font-semibold text-white">{lectureStats.total}</div>
               </div>
             </div>
+          </div>
 
-            <div className="space-y-4 p-4">
-              <div className="rounded-2xl border border-black panel-gradient p-4">
+          <div className="max-h-[72vh] space-y-4 overflow-auto p-4">
+            <div className="overflow-hidden rounded-[24px] border border-black bg-[#0C0C0C]">
+              <div className="relative aspect-[16/10] border-b border-[#222222] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.14),transparent_32%),linear-gradient(135deg,#151515,#090909)]">
+                {course?.thumbnail ? (
+                  <img
+                    src={course.thumbnail}
+                    alt={course?.title || "Course cover"}
+                    className="h-full w-full object-cover"
+                  />
+                ) : null}
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.1),rgba(0,0,0,0.72))]" />
+                <div className="absolute inset-x-0 bottom-0 p-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">
+                    {course?.sections?.length || 0} modules | {lectureCount} lessons
+                  </div>
+                  <div className="mt-2 line-clamp-2 text-lg font-semibold text-white">
+                    {course?.title || "Course library"}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1 px-4 py-3">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
                   Now Watching
                 </div>
-                <div className="mt-3 text-lg font-semibold text-white">
+                <div className="line-clamp-2 text-sm font-semibold text-white">
                   {selectedLecture?.title || "Select a lecture to begin"}
                 </div>
-                <p className="mt-2 text-sm leading-6 text-[#A7A7B7]">
+                <div className="text-xs text-[#A7A7B7]">
                   {selectedLecture?.section_title
                     ? `${selectedLecture.section_title} | ${formatSeconds(
                         selectedLecture.stream_duration_seconds || activeProgress?.duration_seconds || 0
                       )}`
-                    : "Browse the module shelves below to jump into any lesson instantly."}
-                </p>
-                {activeProgress?.resume_position_seconds ? (
-                  <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-[#E0E0E0]">
-                    Resume from {formatSeconds(activeProgress.resume_position_seconds)}
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="rounded-2xl border border-black panel-gradient p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
-                  Browse Layout
-                </div>
-                <div className="mt-3 space-y-3 text-sm leading-6 text-[#B9B9C7]">
-                  <p>Every lecture is grouped below by module, so learners can explore the course like a video library.</p>
-                  <p>
-                    Total catalog: <span className="font-semibold text-white">{lectureCount} videos</span>
-                  </p>
+                    : "Choose any lesson below to start watching."}
                 </div>
               </div>
             </div>
-          </aside>
 
-          <section className="overflow-hidden rounded-[28px] border border-black panel-gradient shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
+            {(course?.sections || []).map((section) => (
+              <div key={section.id} className="rounded-2xl border border-black bg-[#121212] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-sm font-semibold text-white">{section.title}</h2>
+                  <span className="rounded-full border border-black bg-[#171717] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#BBBBBB]">
+                    {(section.lectures || []).length} lessons
+                  </span>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {(section.lectures || []).map((lecture) => {
+                    const isActive = selectedLecture?.id === lecture.id;
+                    const lectureProgress = lecture.progress;
+                    const percentComplete = lectureProgress?.percent_complete || 0;
+                    return (
+                      <button
+                        key={lecture.id}
+                        type="button"
+                        onClick={() => handleSelectLecture(lecture, section.title)}
+                        className={`w-full rounded-2xl border px-3 py-3 text-left transition ${
+                          isActive
+                            ? "border-[#C0C0C0] bg-[#DFDFDF] text-[#1D1D1D]"
+                            : "border-black bg-[#0C0C0C] text-[#D9D9D9] hover:border-black hover:bg-[#141414]"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold">{lecture.title}</div>
+                            <div
+                              className={`mt-1 text-xs ${
+                                isActive ? "text-[#3A3A3A]" : "text-[#949494]"
+                              }`}
+                            >
+                              {lectureProgress?.completed
+                                ? "Completed"
+                                : percentComplete > 0
+                                  ? `Resume from ${formatSeconds(
+                                      lectureProgress.resume_position_seconds || lectureProgress.last_position_seconds
+                                    )}`
+                                  : lecture.is_preview
+                                    ? "Preview lesson"
+                                    : "Not started"}
+                            </div>
+                          </div>
+                          <span
+                            className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                              lectureProgress?.completed
+                                ? "border border-zinc-300/80 bg-zinc-100 text-zinc-900"
+                                : percentComplete > 0
+                                  ? "border border-[#DADADA]/20 bg-white/10 text-[#E7E7E7]"
+                                  : "border border-black bg-[#171717] text-[#A1A1A1]"
+                            }`}
+                          >
+                            {lectureProgress?.completed ? "Done" : `${percentComplete}%`}
+                          </span>
+                        </div>
+                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-black/25">
+                          <div
+                            className={`h-full rounded-full ${
+                              lectureProgress?.completed ? "bg-zinc-300" : "bg-[#C0C0C0]"
+                            }`}
+                            style={{ width: `${Math.max(0, Math.min(100, percentComplete))}%` }}
+                          />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        <section className="overflow-hidden rounded-[28px] border border-black panel-gradient shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
           <div className="border-b border-[#222222] bg-[radial-gradient(circle_at_top_right,rgba(192,192,192,0.15),transparent_36%)] p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
@@ -639,105 +711,6 @@ export default function CoursePlayerPage() {
               </div>
             </div>
           </div>
-          </section>
-        </div>
-
-        <section className="space-y-5">
-          {(course?.sections || []).map((section, sectionIndex) => (
-            <div
-              key={section.id}
-              className="overflow-hidden rounded-[28px] border border-black panel-gradient shadow-[0_18px_50px_rgba(0,0,0,0.24)]"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3 p-5">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
-                    Module {sectionIndex + 1}
-                  </div>
-                  <h2 className="mt-1 text-xl font-semibold text-white">{section.title}</h2>
-                </div>
-                <span className="rounded-full border border-white/10 bg-white/6 px-3 py-1 text-xs font-semibold text-[#D8D8E5]">
-                  {(section.lectures || []).length} videos
-                </span>
-              </div>
-
-              <div className="grid gap-4 border-t border-[#222222] p-5 sm:grid-cols-2 2xl:grid-cols-3">
-                {(section.lectures || []).map((lecture, lectureIndex) => {
-                  const isActive = selectedLecture?.id === lecture.id;
-                  const lectureProgress = lecture.progress;
-                  const percentComplete = lectureProgress?.percent_complete || 0;
-                  const statusLabel = lectureProgress?.completed
-                    ? "Completed"
-                    : percentComplete > 0
-                      ? `Resume ${formatSeconds(
-                          lectureProgress.resume_position_seconds || lectureProgress.last_position_seconds
-                        )}`
-                      : lecture.is_preview
-                        ? "Preview"
-                        : "Start watching";
-
-                  return (
-                    <button
-                      key={lecture.id}
-                      type="button"
-                      onClick={() => handleSelectLecture(lecture, section.title)}
-                      className={`group overflow-hidden rounded-[24px] border text-left transition ${
-                        isActive
-                          ? "border-[#E8B3FF]/45 bg-[#17111E] shadow-[0_18px_50px_rgba(236,72,153,0.14)]"
-                          : "border-white/8 bg-[#0B0D13] hover:border-white/14 hover:bg-[#10131D]"
-                      }`}
-                    >
-                      <div className="relative aspect-video overflow-hidden border-b border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(244,114,182,0.24),transparent_26%),radial-gradient(circle_at_bottom_right,rgba(99,102,241,0.2),transparent_32%),linear-gradient(135deg,#191d2a,#090b10)]">
-                        <div className="absolute left-3 top-3 rounded-full border border-white/12 bg-black/35 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/80">
-                          {section.title}
-                        </div>
-                        <div className="absolute right-3 top-3 rounded-full border border-white/12 bg-black/35 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/80">
-                          {lectureProgress?.completed ? "Done" : `${percentComplete}%`}
-                        </div>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div
-                            className={`rounded-full border px-4 py-2 text-sm font-semibold shadow-[0_14px_36px_rgba(0,0,0,0.38)] transition ${
-                              isActive
-                                ? "border-fuchsia-300/40 bg-fuchsia-300/18 text-white"
-                                : "border-white/12 bg-white/10 text-white/90 group-hover:bg-white/14"
-                            }`}
-                          >
-                            {isActive ? "Watching" : `Lesson ${lecture.order || lectureIndex + 1}`}
-                          </div>
-                        </div>
-                        <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,transparent,rgba(6,7,10,0.9))] px-3 pb-3 pt-10">
-                          <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-white/70">
-                            <span>{lecture.is_preview ? "Preview available" : "Members access"}</span>
-                            <span>{formatSeconds(lecture.stream_duration_seconds || 0)}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3 p-4">
-                        <div>
-                          <div className="line-clamp-2 text-sm font-semibold text-white">
-                            {lecture.title}
-                          </div>
-                          <p className="mt-1 line-clamp-2 text-xs leading-6 text-[#9B9BB2]">{statusLabel}</p>
-                        </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
-                          <div
-                            className={`h-full rounded-full ${
-                              lectureProgress?.completed
-                                ? "bg-emerald-300"
-                                : isActive
-                                  ? "bg-[linear-gradient(90deg,#8b5cf6,#ec4899,#f59e0b)]"
-                                  : "bg-white/70"
-                            }`}
-                            style={{ width: `${Math.max(0, Math.min(100, percentComplete))}%` }}
-                          />
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
         </section>
       </div>
     </PageShell>

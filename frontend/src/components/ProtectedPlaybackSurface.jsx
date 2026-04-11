@@ -509,7 +509,7 @@ export default function ProtectedPlaybackSurface({
                   onChange={handleSeekChange}
                   disabled={!hasSeekableVideo}
                   aria-label="Seek through video"
-                  className="relative h-6 w-full cursor-pointer appearance-none bg-transparent accent-fuchsia-400 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="playback-slider relative h-6 w-full cursor-pointer appearance-none bg-transparent disabled:cursor-not-allowed disabled:opacity-45"
                 />
               </div>
               <span className="w-11 shrink-0 text-[11px] font-semibold tabular-nums text-white/70 sm:w-14 sm:text-xs">
