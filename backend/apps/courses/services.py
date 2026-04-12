@@ -36,28 +36,37 @@ ADAPTIVE_HLS_PROFILES = [
         "name": "360p",
         "width": 640,
         "height": 360,
-        "video_bitrate": "800k",
-        "maxrate": "856k",
-        "bufsize": "1200k",
+        "video_bitrate": "1000k",
+        "maxrate": "1070k",
+        "bufsize": "1500k",
         "audio_bitrate": "96k",
     },
     {
         "name": "540p",
         "width": 960,
         "height": 540,
-        "video_bitrate": "1600k",
-        "maxrate": "1712k",
-        "bufsize": "2400k",
+        "video_bitrate": "2200k",
+        "maxrate": "2354k",
+        "bufsize": "3300k",
         "audio_bitrate": "128k",
     },
     {
         "name": "720p",
         "width": 1280,
         "height": 720,
-        "video_bitrate": "2800k",
-        "maxrate": "2996k",
-        "bufsize": "4200k",
-        "audio_bitrate": "128k",
+        "video_bitrate": "4200k",
+        "maxrate": "4494k",
+        "bufsize": "6300k",
+        "audio_bitrate": "160k",
+    },
+    {
+        "name": "1080p",
+        "width": 1920,
+        "height": 1080,
+        "video_bitrate": "6800k",
+        "maxrate": "7276k",
+        "bufsize": "10200k",
+        "audio_bitrate": "192k",
     },
 ]
 
@@ -76,11 +85,11 @@ def resolve_hls_keyframe_interval_seconds():
 
 
 def resolve_hls_crf_value():
-    return max(16, min(30, int(getattr(settings, "COURSE_HLS_CRF", 21) or 21)))
+    return max(16, min(30, int(getattr(settings, "COURSE_HLS_CRF", 18) or 18)))
 
 
 def resolve_hls_x264_preset():
-    preset = str(getattr(settings, "COURSE_HLS_X264_PRESET", "medium") or "medium").strip().lower()
+    preset = str(getattr(settings, "COURSE_HLS_X264_PRESET", "slow") or "slow").strip().lower()
     if preset in {"ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"}:
         return preset
     return "medium"

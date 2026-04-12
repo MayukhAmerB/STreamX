@@ -1695,6 +1695,13 @@ class PublicEnrollmentLeadTests(BaseAPITestCase):
         self.assertIn("message", response.data["errors"])
 
 class LectureVideoAccessTests(BaseAPITestCase):
+    def _prepare_media_root(self):
+        temp_dir = os.path.join(settings.BASE_DIR, ".codex-temp-tests", self._testMethodName)
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        os.makedirs(temp_dir, exist_ok=True)
+        self.addCleanup(lambda: shutil.rmtree(temp_dir, ignore_errors=True))
+        return temp_dir
+
     @patch("apps.courses.views.generate_signed_video_url")
     def test_enrolled_student_can_get_signed_url_and_unenrolled_cannot(self, mock_signed):
         mock_signed.return_value = "https://signed.example.com/video"
@@ -1712,7 +1719,8 @@ class LectureVideoAccessTests(BaseAPITestCase):
         self.assertEqual(allowed.data["data"]["signed_url"], "https://signed.example.com/video")
 
     def test_local_uploaded_lecture_returns_protected_playback_url(self):
-        with tempfile.TemporaryDirectory() as temp_dir, override_settings(
+        temp_dir = self._prepare_media_root()
+        with override_settings(
             MEDIA_ROOT=temp_dir,
             COURSE_PROTECTED_MEDIA_USE_ACCEL_REDIRECT=True,
         ):
@@ -1745,7 +1753,8 @@ class LectureVideoAccessTests(BaseAPITestCase):
             )
 
     def test_legacy_local_video_key_uses_expected_upload_directory(self):
-        with tempfile.TemporaryDirectory() as temp_dir, override_settings(
+        temp_dir = self._prepare_media_root()
+        with override_settings(
             MEDIA_ROOT=temp_dir,
             COURSE_PROTECTED_MEDIA_USE_ACCEL_REDIRECT=True,
         ):
@@ -1788,7 +1797,8 @@ class LectureVideoAccessTests(BaseAPITestCase):
             )
 
     def test_local_hls_manifest_returns_protected_playback_url(self):
-        with tempfile.TemporaryDirectory() as temp_dir, override_settings(
+        temp_dir = self._prepare_media_root()
+        with override_settings(
             MEDIA_ROOT=temp_dir,
             COURSE_PROTECTED_MEDIA_USE_ACCEL_REDIRECT=True,
         ):
@@ -1831,7 +1841,8 @@ class LectureVideoAccessTests(BaseAPITestCase):
             )
 
     def test_hls_protected_token_cannot_access_assets_outside_signed_root(self):
-        with tempfile.TemporaryDirectory() as temp_dir, override_settings(
+        temp_dir = self._prepare_media_root()
+        with override_settings(
             MEDIA_ROOT=temp_dir,
             COURSE_PROTECTED_MEDIA_USE_ACCEL_REDIRECT=True,
         ):
@@ -1900,7 +1911,8 @@ class LectureVideoAccessTests(BaseAPITestCase):
             self.assertEqual(denied_segment_response.status_code, 404)
 
     def test_protected_playback_token_is_user_bound(self):
-        with tempfile.TemporaryDirectory() as temp_dir, override_settings(
+        temp_dir = self._prepare_media_root()
+        with override_settings(
             MEDIA_ROOT=temp_dir,
             COURSE_PROTECTED_MEDIA_USE_ACCEL_REDIRECT=True,
         ):
@@ -1940,7 +1952,8 @@ class LectureVideoAccessTests(BaseAPITestCase):
             self.assertEqual(shared_attempt.status_code, 404)
 
     def test_course_detail_hides_uploaded_video_paths(self):
-        with tempfile.TemporaryDirectory() as temp_dir, override_settings(MEDIA_ROOT=temp_dir):
+        temp_dir = self._prepare_media_root()
+        with override_settings(MEDIA_ROOT=temp_dir):
             lecture = Lecture.objects.create(
                 section=self.section,
                 title="Uploaded Lecture",
@@ -2197,14 +2210,22 @@ class LectureQuestionSecurityTests(BaseAPITestCase):
 
 
 class AdaptiveHLSTranscodeTests(BaseAPITestCase):
+    def _prepare_media_root(self):
+        temp_dir = os.path.join(settings.BASE_DIR, ".codex-temp-tests", self._testMethodName)
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        os.makedirs(temp_dir, exist_ok=True)
+        self.addCleanup(lambda: shutil.rmtree(temp_dir, ignore_errors=True))
+        return temp_dir
+
     @patch("apps.courses.services.subprocess.run")
     def test_transcode_lecture_to_hls_generates_master_playlist_and_duration(self, mock_run):
-        with tempfile.TemporaryDirectory() as temp_dir, override_settings(
+        temp_dir = self._prepare_media_root()
+        with override_settings(
             MEDIA_ROOT=temp_dir,
             COURSE_HLS_SEGMENT_DURATION_SECONDS=4,
             COURSE_HLS_KEYFRAME_INTERVAL_SECONDS=4,
-            COURSE_HLS_X264_PRESET="medium",
-            COURSE_HLS_CRF=21,
+            COURSE_HLS_X264_PRESET="slow",
+            COURSE_HLS_CRF=18,
         ):
             lecture = Lecture.objects.create(
                 section=self.section,
@@ -2262,11 +2283,12 @@ class AdaptiveHLSTranscodeTests(BaseAPITestCase):
             self.assertIn("360p/index.m3u8", master_playlist)
             self.assertIn("540p/index.m3u8", master_playlist)
             self.assertIn("720p/index.m3u8", master_playlist)
+            self.assertNotIn("1080p/index.m3u8", master_playlist)
             self.assertEqual(len(ffmpeg_commands), 3)
 
             for cmd in ffmpeg_commands:
-                self.assertEqual(cmd[cmd.index("-preset") + 1], "medium")
-                self.assertEqual(cmd[cmd.index("-crf") + 1], "21")
+                self.assertEqual(cmd[cmd.index("-preset") + 1], "slow")
+                self.assertEqual(cmd[cmd.index("-crf") + 1], "18")
                 self.assertEqual(cmd[cmd.index("-hls_time") + 1], "4")
                 self.assertEqual(cmd[cmd.index("-g") + 1], "120")
                 self.assertEqual(cmd[cmd.index("-keyint_min") + 1], "120")
@@ -2274,6 +2296,75 @@ class AdaptiveHLSTranscodeTests(BaseAPITestCase):
                     cmd[cmd.index("-force_key_frames") + 1],
                     "expr:gte(t,n_forced*4)",
                 )
+
+    @patch("apps.courses.services.subprocess.run")
+    def test_transcode_lecture_to_hls_includes_1080p_variant_when_source_supports_it(self, mock_run):
+        temp_dir = self._prepare_media_root()
+        with override_settings(
+            MEDIA_ROOT=temp_dir,
+            COURSE_HLS_SEGMENT_DURATION_SECONDS=4,
+            COURSE_HLS_KEYFRAME_INTERVAL_SECONDS=4,
+            COURSE_HLS_X264_PRESET="slow",
+            COURSE_HLS_CRF=18,
+        ):
+            lecture = Lecture.objects.create(
+                section=self.section,
+                title="Full HD Lecture",
+                description="1080p adaptive stream generation",
+                video_file=SimpleUploadedFile("full-hd.mp4", b"source-bytes", content_type="video/mp4"),
+                order=3,
+            )
+            ffmpeg_commands = []
+
+            def fake_run(cmd, check=False, capture_output=False, text=False):
+                executable = os.path.basename(str(cmd[0]))
+                if executable == "ffprobe":
+                    return SimpleNamespace(
+                        returncode=0,
+                        stdout=json.dumps(
+                            {
+                                "streams": [
+                                    {
+                                        "codec_type": "video",
+                                        "width": 1920,
+                                        "height": 1080,
+                                        "avg_frame_rate": "30/1",
+                                    },
+                                    {"codec_type": "audio"},
+                                ],
+                                "format": {"duration": "845.0"},
+                            }
+                        ),
+                        stderr="",
+                    )
+
+                ffmpeg_commands.append(cmd)
+                output_path = cmd[-1]
+                segment_pattern = cmd[cmd.index("-hls_segment_filename") + 1]
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                with open(output_path, "w", encoding="utf-8") as handle:
+                    handle.write("#EXTM3U\n#EXTINF:6.0,\nsegment_000.ts\n")
+                with open(segment_pattern.replace("%03d", "000"), "wb") as handle:
+                    handle.write(b"segment")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+            mock_run.side_effect = fake_run
+            transcode_lecture_to_hls(lecture)
+            lecture.refresh_from_db()
+
+            self.assertEqual(lecture.stream_status, Lecture.STREAM_READY)
+            self.assertEqual(lecture.stream_duration_seconds, 845)
+            self.assertTrue(lecture.stream_manifest_key.endswith("master.m3u8"))
+
+            master_playlist_path = os.path.join(temp_dir, lecture.stream_manifest_key)
+            with open(master_playlist_path, "r", encoding="utf-8") as handle:
+                master_playlist = handle.read()
+
+            self.assertIn("360p/index.m3u8", master_playlist)
+            self.assertIn("540p/index.m3u8", master_playlist)
+            self.assertIn("720p/index.m3u8", master_playlist)
+            self.assertIn("1080p/index.m3u8", master_playlist)
+            self.assertEqual(len(ffmpeg_commands), 4)
 
 
 class RealtimeSessionTests(APITestCase):

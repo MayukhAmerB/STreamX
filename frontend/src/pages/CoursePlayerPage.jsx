@@ -111,12 +111,43 @@ function formatDateTime(value) {
   });
 }
 
+function formatHlsQualityLabel(level) {
+  const height = Math.max(0, Number(level?.height) || 0);
+  if (height > 0) return `${height}p`;
+  const width = Math.max(0, Number(level?.width) || 0);
+  if (width > 0) return `${width}w`;
+  return "Auto";
+}
+
+function normalizeHlsQualityOptions(levels) {
+  const seen = new Set();
+  return (Array.isArray(levels) ? levels : [])
+    .map((level, index) => ({
+      index,
+      height: Math.max(0, Number(level?.height) || 0),
+      bitrate: Math.max(0, Number(level?.bitrate) || 0),
+      label: formatHlsQualityLabel(level),
+      value: Number(level?.height) > 0 ? String(level.height) : `level-${index}`,
+    }))
+    .sort((left, right) => right.height - left.height || right.bitrate - left.bitrate || right.index - left.index)
+    .filter((option) => {
+      const dedupeKey = option.height > 0 ? `height-${option.height}` : option.value;
+      if (seen.has(dedupeKey)) return false;
+      seen.add(dedupeKey);
+      return true;
+    });
+}
+
 export default function CoursePlayerPage() {
   const { courseId } = useParams();
   const [course, setCourse] = useState(null);
   const [selectedLecture, setSelectedLecture] = useState(null);
   const [videoUrl, setVideoUrl] = useState("");
   const [playbackType, setPlaybackType] = useState("file");
+  const [qualityOptions, setQualityOptions] = useState([]);
+  const [selectedQuality, setSelectedQuality] = useState("auto");
+  const [activeQualityLabel, setActiveQualityLabel] = useState("");
+  const [qualityControlMessage, setQualityControlMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [retried, setRetried] = useState(false);
@@ -133,6 +164,7 @@ export default function CoursePlayerPage() {
     success: "",
   });
   const videoRef = useRef(null);
+  const hlsRef = useRef(null);
   const selectedLectureIdRef = useRef(null);
   const resumeAppliedRef = useRef(false);
   const progressInFlightRef = useRef(false);
@@ -208,6 +240,13 @@ export default function CoursePlayerPage() {
 
   useEffect(() => {
     selectedLectureIdRef.current = selectedLecture?.id || null;
+  }, [selectedLecture?.id]);
+
+  useEffect(() => {
+    setSelectedQuality("auto");
+    setQualityOptions([]);
+    setActiveQualityLabel("");
+    setQualityControlMessage("");
   }, [selectedLecture?.id]);
 
   useEffect(() => {
@@ -505,9 +544,14 @@ export default function CoursePlayerPage() {
     const videoElement = videoRef.current;
     if (!videoElement || !videoUrl) return undefined;
 
+    let isActive = true;
     let hls;
+    hlsRef.current = null;
     if (playbackType === "hls") {
       if (videoElement.canPlayType("application/vnd.apple.mpegurl")) {
+        setQualityOptions([]);
+        setActiveQualityLabel("Auto");
+        setQualityControlMessage("Quality selection is handled automatically by this browser.");
         videoElement.src = videoUrl;
       } else if (Hls.isSupported()) {
         hls = new Hls({
@@ -516,21 +560,71 @@ export default function CoursePlayerPage() {
           maxBufferLength: 30,
           maxMaxBufferLength: 60,
           maxBufferHole: 0.5,
-          capLevelToPlayerSize: true,
+          capLevelToPlayerSize: false,
+        });
+        hlsRef.current = hls;
+        hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+          if (!isActive) return;
+          const nextOptions = normalizeHlsQualityOptions(data?.levels || hls.levels);
+          setQualityOptions(nextOptions);
+          setQualityControlMessage(
+            nextOptions.length > 1 ? "" : "This lecture currently exposes a single playback quality."
+          );
+          if (nextOptions.length) {
+            const currentLevel = hls.levels?.[Math.max(hls.currentLevel, 0)] || data?.levels?.[0];
+            setActiveQualityLabel(formatHlsQualityLabel(currentLevel || nextOptions[0]));
+          } else {
+            setActiveQualityLabel("Auto");
+          }
+        });
+        hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
+          if (!isActive) return;
+          const currentLevel = hls.levels?.[data.level];
+          if (currentLevel) {
+            setActiveQualityLabel(formatHlsQualityLabel(currentLevel));
+          }
         });
         hls.loadSource(videoUrl);
         hls.attachMedia(videoElement);
       } else {
+        setQualityOptions([]);
+        setActiveQualityLabel("");
+        setQualityControlMessage("");
         setError("This browser does not support HLS playback.");
       }
     } else {
+      setQualityOptions([]);
+      setActiveQualityLabel("");
+      setQualityControlMessage("");
       videoElement.src = videoUrl;
     }
 
     return () => {
+      isActive = false;
       if (hls) hls.destroy();
+      if (hlsRef.current === hls) {
+        hlsRef.current = null;
+      }
     };
   }, [videoUrl, playbackType]);
+
+  useEffect(() => {
+    const hls = hlsRef.current;
+    if (!hls || playbackType !== "hls" || !qualityOptions.length) return;
+
+    if (selectedQuality === "auto") {
+      hls.currentLevel = -1;
+      return;
+    }
+
+    const nextQuality = qualityOptions.find((option) => option.value === selectedQuality);
+    if (!nextQuality) return;
+
+    hls.loadLevel = nextQuality.index;
+    hls.nextLevel = nextQuality.index;
+    hls.currentLevel = nextQuality.index;
+    setActiveQualityLabel(nextQuality.label);
+  }, [playbackType, qualityOptions, selectedQuality]);
 
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -845,6 +939,46 @@ export default function CoursePlayerPage() {
                 )}
               </ProtectedPlaybackSurface>
             </div>
+
+            {playbackType === "hls" ? (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#2A2A2A] bg-[linear-gradient(145deg,#111111,#070707)] px-4 py-3">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
+                    Playback Quality
+                  </div>
+                  <p className="mt-1 text-xs text-[#BDBDBD]">
+                    {qualityControlMessage
+                      || (qualityOptions.length
+                        ? "Choose the lecture output quality you want to watch."
+                        : "Loading available playback qualities...")}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  {activeQualityLabel ? (
+                    <span className="rounded-full border border-[#DADADA]/15 bg-white/5 px-3 py-1 text-xs font-semibold text-[#E0E0E0]">
+                      Playing {activeQualityLabel}
+                    </span>
+                  ) : null}
+                  {qualityOptions.length > 1 ? (
+                    <label className="flex items-center gap-2 rounded-full border border-[#DADADA]/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white">
+                      <span className="text-[#BDBDBD]">Output</span>
+                      <select
+                        value={selectedQuality}
+                        onChange={(event) => setSelectedQuality(event.target.value)}
+                        className="rounded-full border border-[#2F2F2F] bg-[#0F0F0F] px-3 py-1 text-xs font-semibold text-white outline-none transition focus:border-[#D8D8D8]/70"
+                      >
+                        <option value="auto">Auto</option>
+                        {qualityOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
 
             <div className="mt-5 grid items-stretch gap-4 lg:grid-cols-[1.2fr_0.8fr]">
               <div className="flex h-full flex-col gap-4">

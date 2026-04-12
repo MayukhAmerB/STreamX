@@ -335,8 +335,8 @@ COURSE_HLS_KEYFRAME_INTERVAL_SECONDS = max(
     1,
     env_int("COURSE_HLS_KEYFRAME_INTERVAL_SECONDS", COURSE_HLS_SEGMENT_DURATION_SECONDS),
 )
-COURSE_HLS_CRF = env_int("COURSE_HLS_CRF", 21)
-_course_hls_x264_preset = env("COURSE_HLS_X264_PRESET", "medium").strip().lower()
+COURSE_HLS_CRF = env_int("COURSE_HLS_CRF", 18)
+_course_hls_x264_preset = env("COURSE_HLS_X264_PRESET", "slow").strip().lower()
 COURSE_HLS_X264_PRESET = (
     _course_hls_x264_preset
     if _course_hls_x264_preset in {"ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"}
