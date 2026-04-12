@@ -2366,6 +2366,75 @@ class AdaptiveHLSTranscodeTests(BaseAPITestCase):
             self.assertIn("1080p/index.m3u8", master_playlist)
             self.assertEqual(len(ffmpeg_commands), 4)
 
+    @patch("apps.courses.services.subprocess.run")
+    def test_transcode_lecture_to_hls_omits_1080p_when_source_lacks_full_hd_width(self, mock_run):
+        temp_dir = self._prepare_media_root()
+        with override_settings(
+            MEDIA_ROOT=temp_dir,
+            COURSE_HLS_SEGMENT_DURATION_SECONDS=4,
+            COURSE_HLS_KEYFRAME_INTERVAL_SECONDS=4,
+            COURSE_HLS_X264_PRESET="slow",
+            COURSE_HLS_CRF=18,
+        ):
+            lecture = Lecture.objects.create(
+                section=self.section,
+                title="Width Constrained Lecture",
+                description="1080-high source without full HD width",
+                video_file=SimpleUploadedFile("width-constrained.mp4", b"source-bytes", content_type="video/mp4"),
+                order=4,
+            )
+            ffmpeg_commands = []
+
+            def fake_run(cmd, check=False, capture_output=False, text=False):
+                executable = os.path.basename(str(cmd[0]))
+                if executable == "ffprobe":
+                    return SimpleNamespace(
+                        returncode=0,
+                        stdout=json.dumps(
+                            {
+                                "streams": [
+                                    {
+                                        "codec_type": "video",
+                                        "width": 1440,
+                                        "height": 1080,
+                                        "avg_frame_rate": "30/1",
+                                    },
+                                    {"codec_type": "audio"},
+                                ],
+                                "format": {"duration": "720.0"},
+                            }
+                        ),
+                        stderr="",
+                    )
+
+                ffmpeg_commands.append(cmd)
+                output_path = cmd[-1]
+                segment_pattern = cmd[cmd.index("-hls_segment_filename") + 1]
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                with open(output_path, "w", encoding="utf-8") as handle:
+                    handle.write("#EXTM3U\n#EXTINF:6.0,\nsegment_000.ts\n")
+                with open(segment_pattern.replace("%03d", "000"), "wb") as handle:
+                    handle.write(b"segment")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+            mock_run.side_effect = fake_run
+            transcode_lecture_to_hls(lecture)
+            lecture.refresh_from_db()
+
+            self.assertEqual(lecture.stream_status, Lecture.STREAM_READY)
+            self.assertEqual(lecture.stream_duration_seconds, 720)
+            self.assertTrue(lecture.stream_manifest_key.endswith("master.m3u8"))
+
+            master_playlist_path = os.path.join(temp_dir, lecture.stream_manifest_key)
+            with open(master_playlist_path, "r", encoding="utf-8") as handle:
+                master_playlist = handle.read()
+
+            self.assertIn("360p/index.m3u8", master_playlist)
+            self.assertIn("540p/index.m3u8", master_playlist)
+            self.assertIn("720p/index.m3u8", master_playlist)
+            self.assertNotIn("1080p/index.m3u8", master_playlist)
+            self.assertEqual(len(ffmpeg_commands), 3)
+
 
 class RealtimeSessionTests(APITestCase):
     def setUp(self):

@@ -573,7 +573,10 @@ def _select_hls_profiles(source_width, source_height):
     selected = [
         profile.copy()
         for profile in ADAPTIVE_HLS_PROFILES
-        if source_height <= 0 or profile["height"] <= source_height
+        if (
+            (source_width <= 0 or profile["width"] <= source_width)
+            and (source_height <= 0 or profile["height"] <= source_height)
+        )
     ]
     if not selected:
         fallback = ADAPTIVE_HLS_PROFILES[0].copy()
