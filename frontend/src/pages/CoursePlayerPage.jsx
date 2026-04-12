@@ -614,9 +614,10 @@ export default function CoursePlayerPage() {
     if (!hls || playbackType !== "hls" || !qualityOptions.length) return;
 
     if (selectedQuality === "auto") {
+      setActiveQualityLabel("Auto");
       hls.loadLevel = -1;
-      hls.nextLevel = -1;
       hls.currentLevel = -1;
+      hls.nextLoadLevel = -1;
       return;
     }
 
