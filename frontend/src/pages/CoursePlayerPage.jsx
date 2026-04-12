@@ -145,7 +145,7 @@ export default function CoursePlayerPage() {
   const [videoUrl, setVideoUrl] = useState("");
   const [playbackType, setPlaybackType] = useState("file");
   const [qualityOptions, setQualityOptions] = useState([]);
-  const [selectedQuality, setSelectedQuality] = useState("auto");
+  const [selectedQuality, setSelectedQuality] = useState("");
   const [activeQualityLabel, setActiveQualityLabel] = useState("");
   const [qualityControlMessage, setQualityControlMessage] = useState("");
   const [error, setError] = useState("");
@@ -233,6 +233,10 @@ export default function CoursePlayerPage() {
       || normalizeDisplayText(course?.description),
     [activeLectureDetails?.description, activeLectureDetails?.section_description, course?.description]
   );
+  const visibleQualityOptions = useMemo(() => {
+    const hdOptions = qualityOptions.filter((option) => option.height === 1080 || option.height === 720);
+    return hdOptions.length ? hdOptions : qualityOptions;
+  }, [qualityOptions]);
 
   useEffect(() => {
     setThumbnailFailed(false);
@@ -243,7 +247,7 @@ export default function CoursePlayerPage() {
   }, [selectedLecture?.id]);
 
   useEffect(() => {
-    setSelectedQuality("auto");
+    setSelectedQuality("");
     setQualityOptions([]);
     setActiveQualityLabel("");
     setQualityControlMessage("");
@@ -550,7 +554,7 @@ export default function CoursePlayerPage() {
     if (playbackType === "hls") {
       if (videoElement.canPlayType("application/vnd.apple.mpegurl")) {
         setQualityOptions([]);
-        setActiveQualityLabel("Auto");
+        setActiveQualityLabel("Browser");
         setQualityControlMessage("Quality selection is handled automatically by this browser.");
         videoElement.src = videoUrl;
       } else if (Hls.isSupported()) {
@@ -568,14 +572,14 @@ export default function CoursePlayerPage() {
           const nextOptions = normalizeHlsQualityOptions(data?.levels || hls.levels);
           setQualityOptions(nextOptions);
           setQualityControlMessage(
-            nextOptions.length > 1 ? "" : "This lecture currently exposes a single playback quality."
+            nextOptions.length > 1 ? "Choose the lecture quality from settings." : "This lecture currently exposes a single playback quality."
           );
           if (nextOptions.length) {
             const preferredQuality = nextOptions[0];
             setSelectedQuality(preferredQuality.value);
             setActiveQualityLabel(preferredQuality.label);
           } else {
-            setActiveQualityLabel("Auto");
+            setActiveQualityLabel("");
           }
         });
         hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
@@ -613,11 +617,11 @@ export default function CoursePlayerPage() {
     const hls = hlsRef.current;
     if (!hls || playbackType !== "hls" || !qualityOptions.length) return;
 
-    if (selectedQuality === "auto") {
-      setActiveQualityLabel("Auto");
-      hls.loadLevel = -1;
-      hls.currentLevel = -1;
-      hls.nextLoadLevel = -1;
+    if (!selectedQuality) {
+      const defaultQuality = qualityOptions[0];
+      if (defaultQuality) {
+        setSelectedQuality(defaultQuality.value);
+      }
       return;
     }
 
@@ -627,6 +631,7 @@ export default function CoursePlayerPage() {
     hls.loadLevel = nextQuality.index;
     hls.nextLevel = nextQuality.index;
     hls.currentLevel = nextQuality.index;
+    hls.nextLoadLevel = nextQuality.index;
     setActiveQualityLabel(nextQuality.label);
   }, [playbackType, qualityOptions, selectedQuality]);
 
@@ -923,7 +928,7 @@ export default function CoursePlayerPage() {
                 showFullscreenButton={Boolean(videoUrl)}
                 videoRef={videoUrl ? videoRef : null}
                 videoSessionKey={videoUrl ? `${playbackType}:${videoUrl}` : ""}
-                qualityOptions={qualityOptions}
+                qualityOptions={visibleQualityOptions}
                 selectedQuality={selectedQuality}
                 onQualityChange={setSelectedQuality}
                 activeQualityLabel={activeQualityLabel}

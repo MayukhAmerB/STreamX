@@ -155,6 +155,7 @@ export default function ProtectedPlaybackSurface({
 }) {
   const containerRef = useRef(null);
   const gestureSurfaceRef = useRef(null);
+  const qualityMenuRef = useRef(null);
   const orientationLockedRef = useRef(false);
   const lastTapRef = useRef({ timestamp: 0, side: "" });
   const singleToggleTimerRef = useRef(null);
@@ -169,6 +170,7 @@ export default function ProtectedPlaybackSurface({
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
   const [videoPaused, setVideoPaused] = useState(true);
   const [videoMuted, setVideoMuted] = useState(false);
+  const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
 
   useEffect(() => {
     setFullscreenSupported(canFullscreen(containerRef.current));
@@ -297,6 +299,10 @@ export default function ProtectedPlaybackSurface({
   const canSelectQuality =
     showQualityControl && Array.isArray(qualityOptions) && qualityOptions.length > 1 && typeof onQualityChange === "function";
   const shouldShowQualityBadge = showQualityControl && !canSelectQuality && Boolean(activeQualityLabel);
+  const qualityButtonLabel =
+    activeQualityLabel
+    || qualityOptions.find((option) => option.value === selectedQuality)?.label
+    || "HD";
 
   const revealControls = ({ autoHide = true } = {}) => {
     clearControlsHideTimer();
@@ -411,6 +417,43 @@ export default function ProtectedPlaybackSurface({
   const playPauseLabel = videoPaused ? "Play" : "Pause";
   const muteLabel = videoMuted ? "Unmute" : "Mute";
   const shouldShowControls = !isImmersiveFullscreen || controlsVisible || videoPaused;
+
+  useEffect(() => {
+    if (!canSelectQuality) {
+      setQualityMenuOpen(false);
+    }
+  }, [canSelectQuality]);
+
+  useEffect(() => {
+    if (shouldShowControls) return;
+    setQualityMenuOpen(false);
+  }, [shouldShowControls]);
+
+  useEffect(() => {
+    if (!qualityMenuOpen || typeof document === "undefined") {
+      return undefined;
+    }
+
+    const handlePointerDown = (event) => {
+      if (qualityMenuRef.current && !qualityMenuRef.current.contains(event.target)) {
+        setQualityMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setQualityMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [qualityMenuOpen]);
+
   const controlsDockClassName = isImmersiveFullscreen
     ? `pointer-events-none absolute left-3 right-3 bottom-3 z-20 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] transition duration-200 ${
         shouldShowControls ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
@@ -776,38 +819,64 @@ export default function ProtectedPlaybackSurface({
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 {canSelectQuality ? (
                   <div
+                    ref={qualityMenuRef}
                     data-playback-gesture-ignore="true"
-                    className="flex flex-wrap items-center gap-1.5"
-                    title={qualityControlMessage || "Choose playback quality"}
+                    className="relative shrink-0"
                   >
                     <button
                       type="button"
-                      onClick={() => onQualityChange("auto")}
-                      className={`shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-semibold transition sm:text-xs ${
-                        selectedQuality === "auto"
-                          ? "border-white bg-white text-[#14161d]"
-                          : "border-white/12 bg-white/8 text-white/90 hover:bg-white/16"
-                      }`}
+                      onClick={() => setQualityMenuOpen((current) => !current)}
+                      aria-haspopup="menu"
+                      aria-expanded={qualityMenuOpen ? "true" : "false"}
+                      title={qualityControlMessage || "Choose playback quality"}
+                      className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/8 px-3 py-1.5 text-[10px] font-semibold text-white/90 transition hover:bg-white/16 sm:text-xs"
                     >
-                      Auto
+                      <svg
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        className="h-3.5 w-3.5 shrink-0 fill-none stroke-current"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="3.2" />
+                        <path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a1.7 1.7 0 0 1 0 2.4 1.7 1.7 0 0 1-2.4 0l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V19a1.7 1.7 0 0 1-1.7 1.7h-.2A1.7 1.7 0 0 1 12 19v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a1.7 1.7 0 0 1-2.4 0 1.7 1.7 0 0 1 0-2.4l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H7a1.7 1.7 0 0 1-1.7-1.7v-.2A1.7 1.7 0 0 1 7 10h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a1.7 1.7 0 0 1 0-2.4 1.7 1.7 0 0 1 2.4 0l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V5A1.7 1.7 0 0 1 13.7 3.3h.2A1.7 1.7 0 0 1 15.6 5v.2a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a1.7 1.7 0 0 1 2.4 0 1.7 1.7 0 0 1 0 2.4l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6h.2A1.7 1.7 0 0 1 22.3 11v.2A1.7 1.7 0 0 1 20.6 13h-.2a1 1 0 0 0-.9.6Z" />
+                      </svg>
+                      <span>{qualityButtonLabel}</span>
                     </button>
-                    {qualityOptions.map((option) => {
-                      const isActive = selectedQuality === option.value;
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => onQualityChange(option.value)}
-                          className={`shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-semibold transition sm:text-xs ${
-                            isActive
-                              ? "border-white bg-white text-[#14161d]"
-                              : "border-white/12 bg-white/8 text-white/90 hover:bg-white/16"
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      );
-                    })}
+                    {qualityMenuOpen ? (
+                      <div
+                        role="menu"
+                        className="absolute bottom-full right-0 z-30 mb-2 min-w-[8.5rem] overflow-hidden rounded-2xl border border-white/12 bg-[linear-gradient(180deg,rgba(15,18,26,0.97),rgba(8,10,16,0.96))] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.4)] backdrop-blur-xl"
+                      >
+                        <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">
+                          Quality
+                        </div>
+                        {qualityOptions.map((option) => {
+                          const isActive = selectedQuality === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              role="menuitemradio"
+                              aria-checked={isActive ? "true" : "false"}
+                              onClick={() => {
+                                onQualityChange(option.value);
+                                setQualityMenuOpen(false);
+                              }}
+                              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[11px] font-semibold transition sm:text-xs ${
+                                isActive
+                                  ? "bg-white text-[#14161d]"
+                                  : "text-white/88 hover:bg-white/10"
+                              }`}
+                            >
+                              <span>{option.label}</span>
+                              {isActive ? <span className="text-[10px] uppercase tracking-[0.12em]">On</span> : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
                   </div>
                 ) : shouldShowQualityBadge ? (
                   <span

@@ -101,11 +101,13 @@ class Command(BaseCommand):
     def _run_batch(self, options):
         force = bool(options.get("force"))
         queryset = self._select_queryset(options)
+        lecture_ids = list(queryset.values_list("pk", flat=True))
         processed = 0
         skipped = 0
         failed = 0
 
-        for lecture in queryset.iterator():
+        for lecture_id in lecture_ids:
+            lecture = Lecture.objects.select_related("section__course").get(pk=lecture_id)
             if not lecture.video_file:
                 skipped += 1
                 self.stdout.write(f"SKIP lecture {lecture.pk}: no uploaded video file")
