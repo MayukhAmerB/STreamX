@@ -552,12 +552,7 @@ export default function CoursePlayerPage() {
     let hls;
     hlsRef.current = null;
     if (playbackType === "hls") {
-      if (videoElement.canPlayType("application/vnd.apple.mpegurl")) {
-        setQualityOptions([]);
-        setActiveQualityLabel("Browser");
-        setQualityControlMessage("Quality selection is handled automatically by this browser.");
-        videoElement.src = videoUrl;
-      } else if (Hls.isSupported()) {
+      if (Hls.isSupported()) {
         hls = new Hls({
           enableWorker: true,
           backBufferLength: 30,
@@ -591,6 +586,11 @@ export default function CoursePlayerPage() {
         });
         hls.loadSource(videoUrl);
         hls.attachMedia(videoElement);
+      } else if (videoElement.canPlayType("application/vnd.apple.mpegurl")) {
+        setQualityOptions([]);
+        setActiveQualityLabel("Browser");
+        setQualityControlMessage("Quality selection is handled automatically by this browser.");
+        videoElement.src = videoUrl;
       } else {
         setQualityOptions([]);
         setActiveQualityLabel("");
