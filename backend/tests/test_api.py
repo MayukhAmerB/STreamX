@@ -2111,6 +2111,37 @@ class LectureResourceAccessTests(BaseAPITestCase):
         self.assertEqual(allowed_response.status_code, 302)
         self.assertEqual(allowed_response["Location"], "https://example.com/osint-reference")
 
+    def test_course_detail_serializes_url_based_lecture_resource_without_file_errors(self):
+        LectureResource.objects.create(
+            lecture=self.lecture,
+            title="Reference Link",
+            resource_url="https://example.com/osint-reference",
+            order=1,
+        )
+
+        Enrollment.objects.create(
+            user=self.student,
+            course=self.course,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        self.login(self.student.email)
+        response = self.client.get(reverse("course-detail", kwargs={"pk": self.course.id}))
+
+        self.assertEqual(response.status_code, 200)
+        lecture_payload = response.data["data"]["sections"][0]["lectures"][0]
+        self.assertEqual(len(lecture_payload["resources"]), 1)
+        resource_payload = lecture_payload["resources"][0]
+        self.assertEqual(resource_payload["title"], "Reference Link")
+        self.assertEqual(resource_payload["resource_kind"], "url")
+        self.assertEqual(resource_payload["file_size"], 0)
+        self.assertIn(
+            reverse(
+                "lecture-resource-download",
+                kwargs={"lecture_pk": self.lecture.id, "pk": resource_payload["id"]},
+            ),
+            resource_payload["download_url"],
+        )
+
 
 class LectureProgressTests(BaseAPITestCase):
     def test_enrolled_student_can_save_and_fetch_lecture_progress(self):

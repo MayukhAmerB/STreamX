@@ -169,7 +169,13 @@ class LectureResourceSerializer(serializers.ModelSerializer):
 
     def get_file_size(self, obj):
         resource_file = getattr(obj, "resource_file", None)
-        return int(getattr(resource_file, "size", 0) or 0)
+        file_name = str(getattr(resource_file, "name", "") or "").strip()
+        if not resource_file or not file_name:
+            return 0
+        try:
+            return int(resource_file.size or 0)
+        except Exception:
+            return 0
 
     def get_download_url(self, obj):
         request = self.context.get("request")
