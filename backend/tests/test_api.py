@@ -2134,13 +2134,7 @@ class LectureResourceAccessTests(BaseAPITestCase):
         self.assertEqual(resource_payload["title"], "Reference Link")
         self.assertEqual(resource_payload["resource_kind"], "url")
         self.assertEqual(resource_payload["file_size"], 0)
-        self.assertIn(
-            reverse(
-                "lecture-resource-download",
-                kwargs={"lecture_pk": self.lecture.id, "pk": resource_payload["id"]},
-            ),
-            resource_payload["download_url"],
-        )
+        self.assertEqual(resource_payload["download_url"], "https://example.com/osint-reference")
 
 
 class LectureProgressTests(BaseAPITestCase):

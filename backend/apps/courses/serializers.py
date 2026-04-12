@@ -178,6 +178,9 @@ class LectureResourceSerializer(serializers.ModelSerializer):
             return 0
 
     def get_download_url(self, obj):
+        resource_url = str(getattr(obj, "resource_url", "") or "").strip()
+        if resource_url:
+            return resource_url
         request = self.context.get("request")
         path = reverse(
             "lecture-resource-download",
