@@ -1,6 +1,7 @@
 import os
 from decimal import Decimal
 from io import BytesIO
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -413,6 +414,14 @@ class LectureResource(models.Model):
     resource_file = models.FileField(
         upload_to=lecture_resource_upload_path,
         help_text="Upload TXT, PDF, PPT, PPTX, DOC, or DOCX files.",
+        blank=True,
+        null=True,
+    )
+    resource_url = models.URLField(
+        max_length=1000,
+        blank=True,
+        default="",
+        help_text="Optional public http/https URL for an external lecture resource.",
     )
     order = models.PositiveIntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -430,11 +439,20 @@ class LectureResource(models.Model):
     def clean(self):
         super().clean()
         validate_no_active_content(self.title, "title")
-        validate_resource_upload(
-            self.resource_file,
-            "resource_file",
-            max_bytes=MAX_LECTURE_RESOURCE_UPLOAD_BYTES,
-        )
+        has_file = bool(getattr(self, "resource_file", None))
+        has_url = bool(str(self.resource_url or "").strip())
+        if has_file == has_url:
+            raise ValidationError(
+                {"resource_file": "Provide exactly one resource source: an uploaded file or a public URL."}
+            )
+        if has_file:
+            validate_resource_upload(
+                self.resource_file,
+                "resource_file",
+                max_bytes=MAX_LECTURE_RESOURCE_UPLOAD_BYTES,
+            )
+        if has_url:
+            validate_safe_public_url(self.resource_url, "resource_url")
 
     @property
     def display_title(self):
@@ -443,7 +461,22 @@ class LectureResource(models.Model):
             return text
         filename = os.path.basename(getattr(self.resource_file, "name", "") or "")
         stem, _ = os.path.splitext(filename)
-        return stem or "Resource file"
+        if stem:
+            return stem
+        parsed = urlparse(str(self.resource_url or "").strip())
+        url_name = os.path.basename(parsed.path or "").strip()
+        if url_name:
+            url_stem, _ = os.path.splitext(url_name)
+            return url_stem or url_name
+        return "Resource link"
+
+    @property
+    def resource_filename(self):
+        resource_file = getattr(self, "resource_file", None)
+        if resource_file:
+            return str(getattr(resource_file, "name", "") or "").replace("\\", "/").split("/")[-1]
+        parsed = urlparse(str(self.resource_url or "").strip())
+        return os.path.basename(parsed.path or "").strip()
 
     def __str__(self):
         return self.display_title

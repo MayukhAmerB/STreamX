@@ -571,8 +571,9 @@ export default function CoursePlayerPage() {
             nextOptions.length > 1 ? "" : "This lecture currently exposes a single playback quality."
           );
           if (nextOptions.length) {
-            const currentLevel = hls.levels?.[Math.max(hls.currentLevel, 0)] || data?.levels?.[0];
-            setActiveQualityLabel(formatHlsQualityLabel(currentLevel || nextOptions[0]));
+            const preferredQuality = nextOptions[0];
+            setSelectedQuality(preferredQuality.value);
+            setActiveQualityLabel(preferredQuality.label);
           } else {
             setActiveQualityLabel("Auto");
           }
@@ -951,7 +952,7 @@ export default function CoursePlayerPage() {
                   <p className="mt-1 text-xs text-[#BDBDBD]">
                     {qualityControlMessage
                       || (qualityOptions.length
-                        ? "Choose the lecture output quality you want to watch."
+                        ? "Choose the lecture output quality you want to watch. Highest quality is selected by default."
                         : "Loading available playback qualities...")}
                   </p>
                 </div>

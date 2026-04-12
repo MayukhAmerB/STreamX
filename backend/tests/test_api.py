@@ -1991,8 +1991,16 @@ class LectureVideoAccessTests(BaseAPITestCase):
 
 
 class LectureResourceAccessTests(BaseAPITestCase):
+    def _prepare_media_root(self):
+        temp_dir = os.path.join(settings.BASE_DIR, ".codex-temp-tests", self._testMethodName)
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        os.makedirs(temp_dir, exist_ok=True)
+        self.addCleanup(lambda: shutil.rmtree(temp_dir, ignore_errors=True))
+        return temp_dir
+
     def test_course_detail_only_includes_resources_for_accessible_lectures(self):
-        with tempfile.TemporaryDirectory() as temp_dir, override_settings(MEDIA_ROOT=temp_dir):
+        temp_dir = self._prepare_media_root()
+        with override_settings(MEDIA_ROOT=temp_dir):
             resource = LectureResource.objects.create(
                 lecture=self.lecture,
                 title="Investigation Worksheet",
@@ -2035,7 +2043,8 @@ class LectureResourceAccessTests(BaseAPITestCase):
             self.assertNotIn("resource_file", lecture_payload["resources"][0])
 
     def test_enrolled_student_can_download_lecture_resource_and_unenrolled_cannot(self):
-        with tempfile.TemporaryDirectory() as temp_dir, override_settings(MEDIA_ROOT=temp_dir):
+        temp_dir = self._prepare_media_root()
+        with override_settings(MEDIA_ROOT=temp_dir):
             resource = LectureResource.objects.create(
                 lecture=self.lecture,
                 title="Cheat Sheet",
@@ -2070,6 +2079,37 @@ class LectureResourceAccessTests(BaseAPITestCase):
             self.assertEqual(allowed_response.status_code, 200)
             self.assertIn("attachment;", allowed_response["Content-Disposition"])
             self.assertGreater(sum(len(chunk) for chunk in allowed_response.streaming_content), 0)
+
+    def test_enrolled_student_can_access_url_based_lecture_resource(self):
+        resource = LectureResource.objects.create(
+            lecture=self.lecture,
+            title="Reference Link",
+            resource_url="https://example.com/osint-reference",
+            order=1,
+        )
+
+        self.login(self.student.email)
+        denied_response = self.client.get(
+            reverse(
+                "lecture-resource-download",
+                kwargs={"lecture_pk": self.lecture.id, "pk": resource.id},
+            )
+        )
+        self.assertEqual(denied_response.status_code, 403)
+
+        Enrollment.objects.create(
+            user=self.student,
+            course=self.course,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        allowed_response = self.client.get(
+            reverse(
+                "lecture-resource-download",
+                kwargs={"lecture_pk": self.lecture.id, "pk": resource.id},
+            )
+        )
+        self.assertEqual(allowed_response.status_code, 302)
+        self.assertEqual(allowed_response["Location"], "https://example.com/osint-reference")
 
 
 class LectureProgressTests(BaseAPITestCase):

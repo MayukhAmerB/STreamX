@@ -5,6 +5,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Count, Prefetch, Q
 from django.http import FileResponse, HttpResponse, HttpResponseNotFound
+from django.shortcuts import redirect
 from rest_framework import generics, permissions, status
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
@@ -897,6 +898,10 @@ class LectureResourceDownloadView(APIView):
                 errors={"detail": "You do not have access to this lecture resource."},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
+
+        resource_url = str(getattr(resource, "resource_url", "") or "").strip()
+        if resource_url:
+            return redirect(resource_url)
 
         resource_file = getattr(resource, "resource_file", None)
         file_name = str(getattr(resource_file, "name", "") or "").strip()

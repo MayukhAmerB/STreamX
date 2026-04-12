@@ -138,6 +138,7 @@ class LectureResourceSerializer(serializers.ModelSerializer):
     file_extension = serializers.SerializerMethodField()
     file_size = serializers.SerializerMethodField()
     download_url = serializers.SerializerMethodField()
+    resource_kind = serializers.SerializerMethodField()
 
     class Meta:
         model = LectureResource
@@ -148,6 +149,7 @@ class LectureResourceSerializer(serializers.ModelSerializer):
             "file_extension",
             "file_size",
             "download_url",
+            "resource_kind",
             "order",
             "created_at",
             "updated_at",
@@ -157,10 +159,7 @@ class LectureResourceSerializer(serializers.ModelSerializer):
         return obj.display_title
 
     def get_filename(self, obj):
-        resource_file = getattr(obj, "resource_file", None)
-        if not resource_file:
-            return ""
-        return str(getattr(resource_file, "name", "") or "").replace("\\", "/").split("/")[-1]
+        return obj.resource_filename
 
     def get_file_extension(self, obj):
         filename = self.get_filename(obj)
@@ -179,6 +178,9 @@ class LectureResourceSerializer(serializers.ModelSerializer):
             kwargs={"lecture_pk": obj.lecture_id, "pk": obj.pk},
         )
         return build_public_url(path, request=request)
+
+    def get_resource_kind(self, obj):
+        return "url" if str(getattr(obj, "resource_url", "") or "").strip() else "file"
 
 
 class LectureNestedSerializer(serializers.ModelSerializer):

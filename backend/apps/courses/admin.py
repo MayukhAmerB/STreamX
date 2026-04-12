@@ -245,10 +245,10 @@ class LectureInline(admin.TabularInline):
 class LectureResourceInline(admin.TabularInline):
     model = LectureResource
     extra = 1
-    fields = ("order", "title", "resource_file")
+    fields = ("order", "title", "resource_file", "resource_url")
     ordering = ("order", "id")
     verbose_name = "Resource File"
-    verbose_name_plural = "Resource Files (optional downloads for this lecture)"
+    verbose_name_plural = "Resource Files or Links (optional downloads for this lecture)"
 
 
 class GuideVideoAdminForm(forms.ModelForm):
