@@ -146,6 +146,12 @@ export default function ProtectedPlaybackSurface({
   fullscreenLabel = "Fullscreen",
   videoRef = null,
   videoSessionKey = "",
+  qualityOptions = [],
+  selectedQuality = "auto",
+  onQualityChange = null,
+  activeQualityLabel = "",
+  qualityControlMessage = "",
+  showQualityControl = false,
 }) {
   const containerRef = useRef(null);
   const gestureSurfaceRef = useRef(null);
@@ -288,6 +294,9 @@ export default function ProtectedPlaybackSurface({
   const hasVideoControls = Boolean(videoRef);
   const isImmersiveFullscreen = isFullscreen || isAppFullscreen;
   const canUseFullscreenControl = showFullscreenButton && (fullscreenSupported || hasVideoControls);
+  const canSelectQuality =
+    showQualityControl && Array.isArray(qualityOptions) && qualityOptions.length > 1 && typeof onQualityChange === "function";
+  const shouldShowQualityBadge = showQualityControl && !canSelectQuality && Boolean(activeQualityLabel);
 
   const revealControls = ({ autoHide = true } = {}) => {
     clearControlsHideTimer();
@@ -765,6 +774,35 @@ export default function ProtectedPlaybackSurface({
                 </button>
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                {canSelectQuality ? (
+                  <label
+                    data-playback-gesture-ignore="true"
+                    className="flex shrink-0 items-center gap-2 rounded-full border border-white/12 bg-white/8 px-3 py-1.5 transition hover:bg-white/16"
+                    title={qualityControlMessage || "Choose playback quality"}
+                  >
+                    <span className="hidden text-white/60 sm:inline">Quality</span>
+                    <select
+                      value={selectedQuality}
+                      onChange={(event) => onQualityChange(event.target.value)}
+                      className="min-w-[4.75rem] rounded-full border border-white/10 bg-[#0F1118] px-3 py-1 text-[10px] font-semibold text-white outline-none transition focus:border-white/30 sm:text-xs"
+                    >
+                      <option value="auto">Auto</option>
+                      {qualityOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : shouldShowQualityBadge ? (
+                  <span
+                    data-playback-gesture-ignore="true"
+                    title={qualityControlMessage || `Playback quality: ${activeQualityLabel}`}
+                    className="shrink-0 rounded-full border border-white/12 bg-white/8 px-3 py-1.5 text-[10px] font-semibold text-white/90 sm:text-xs"
+                  >
+                    {activeQualityLabel}
+                  </span>
+                ) : null}
                 {canUseFullscreenControl ? (
                   <button
                     type="button"
