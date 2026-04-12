@@ -775,25 +775,40 @@ export default function ProtectedPlaybackSurface({
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 {canSelectQuality ? (
-                  <label
+                  <div
                     data-playback-gesture-ignore="true"
-                    className="flex shrink-0 items-center gap-2 rounded-full border border-white/12 bg-white/8 px-3 py-1.5 transition hover:bg-white/16"
+                    className="flex flex-wrap items-center gap-1.5"
                     title={qualityControlMessage || "Choose playback quality"}
                   >
-                    <span className="hidden text-white/60 sm:inline">Quality</span>
-                    <select
-                      value={selectedQuality}
-                      onChange={(event) => onQualityChange(event.target.value)}
-                      className="min-w-[4.75rem] rounded-full border border-white/10 bg-[#0F1118] px-3 py-1 text-[10px] font-semibold text-white outline-none transition focus:border-white/30 sm:text-xs"
+                    <button
+                      type="button"
+                      onClick={() => onQualityChange("auto")}
+                      className={`shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-semibold transition sm:text-xs ${
+                        selectedQuality === "auto"
+                          ? "border-white bg-white text-[#14161d]"
+                          : "border-white/12 bg-white/8 text-white/90 hover:bg-white/16"
+                      }`}
                     >
-                      <option value="auto">Auto</option>
-                      {qualityOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
+                      Auto
+                    </button>
+                    {qualityOptions.map((option) => {
+                      const isActive = selectedQuality === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => onQualityChange(option.value)}
+                          className={`shrink-0 rounded-full border px-3 py-1.5 text-[10px] font-semibold transition sm:text-xs ${
+                            isActive
+                              ? "border-white bg-white text-[#14161d]"
+                              : "border-white/12 bg-white/8 text-white/90 hover:bg-white/16"
+                          }`}
+                        >
                           {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                        </button>
+                      );
+                    })}
+                  </div>
                 ) : shouldShowQualityBadge ? (
                   <span
                     data-playback-gesture-ignore="true"
