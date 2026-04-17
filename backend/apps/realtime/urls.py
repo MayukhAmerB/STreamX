@@ -19,6 +19,7 @@ from .views import (
     RealtimeSessionStreamStopView,
     RealtimeSessionStreamRotateKeyView,
     RealtimeSessionOwncastChatLaunchView,
+    RealtimeSessionOwncastChatModerationView,
 )
 
 urlpatterns = [
@@ -29,6 +30,11 @@ urlpatterns = [
         "sessions/<int:pk>/broadcast-chat/launch/",
         RealtimeSessionOwncastChatLaunchView.as_view(),
         name="realtime-session-owncast-chat-launch",
+    ),
+    path(
+        "sessions/<int:pk>/broadcast-chat/moderation/",
+        RealtimeSessionOwncastChatModerationView.as_view(),
+        name="realtime-session-owncast-chat-moderation",
     ),
     path("sessions/<int:pk>/host-token/", RealtimeSessionHostTokenView.as_view(), name="realtime-session-host-token"),
     path(

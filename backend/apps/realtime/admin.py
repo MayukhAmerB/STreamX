@@ -1,14 +1,25 @@
 from django import forms
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.http import HttpResponseRedirect
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import format_html
+from datetime import timedelta
 from urllib.parse import urlparse
 
 from config.url_utils import get_media_public_url
 
 from .models import OwncastChatIdentity, RealtimeConfiguration, RealtimeSession, RealtimeSessionRecording
-from .services import delete_recording_assets, resolve_obs_stream_server_url
+from .services import (
+    OwncastAdminError,
+    OwncastConfigError,
+    delete_recording_assets,
+    owncast_set_chat_user_enabled,
+    owncast_set_chat_user_moderator,
+    release_expired_owncast_chat_timeouts,
+    resolve_obs_stream_server_url,
+    sync_owncast_chat_identities_from_recent_messages,
+)
 
 
 class RealtimeConfigurationAdminForm(forms.ModelForm):
@@ -316,12 +327,35 @@ class OwncastChatIdentityAdmin(admin.ModelAdmin):
         "platform_email",
         "platform_full_name",
         "platform_role",
-        "session",
+        "last_session",
+        "owncast_is_moderator",
+        "owncast_disabled_at",
+        "owncast_timeout_until",
         "bridge_used_at",
         "launch_ip",
         "created_at",
     )
-    list_filter = ("platform_role", "owncast_authenticated", "bridge_used_at", "created_at", "session")
+    actions = (
+        "sync_recent_owncast_chat_handles",
+        "ban_selected_owncast_chat_users",
+        "unban_selected_owncast_chat_users",
+        "timeout_selected_owncast_chat_users_10m",
+        "grant_selected_owncast_moderators",
+        "revoke_selected_owncast_moderators",
+        "release_expired_owncast_timeouts",
+    )
+    exclude = ("access_token_secret",)
+    list_filter = (
+        "platform_role",
+        "owncast_authenticated",
+        "owncast_is_moderator",
+        "owncast_disabled_at",
+        "owncast_timeout_until",
+        "bridge_used_at",
+        "created_at",
+        "session",
+    )
+    list_select_related = ("session", "user")
     search_fields = (
         "owncast_display_name",
         "owncast_user_id",
@@ -344,6 +378,9 @@ class OwncastChatIdentityAdmin(admin.ModelAdmin):
         "owncast_display_name",
         "owncast_display_color",
         "owncast_authenticated",
+        "owncast_is_moderator",
+        "owncast_disabled_at",
+        "owncast_timeout_until",
         "access_token_hash",
         "launch_ip",
         "user_agent",
@@ -356,6 +393,125 @@ class OwncastChatIdentityAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+    @admin.display(description="Last session")
+    def last_session(self, obj):
+        return obj.session or "-"
+
+    @admin.action(permissions=["change"], description="Sync recent Owncast chat handles")
+    def sync_recent_owncast_chat_handles(self, request, queryset):
+        try:
+            result = sync_owncast_chat_identities_from_recent_messages()
+        except (OwncastConfigError, OwncastAdminError) as exc:
+            self.message_user(
+                request,
+                f"Owncast handle sync failed: {exc}",
+                level=messages.ERROR,
+            )
+            return
+
+        self.message_user(
+            request,
+            (
+                "Owncast handle sync complete: "
+                f"{result['updated_identities']} updated, "
+                f"{result['matched_identities']} matched, "
+                f"{result['scanned_users']} Owncast users scanned."
+            ),
+            level=messages.SUCCESS,
+        )
+
+    def _moderate_selected_users(self, request, queryset, *, actor, success_message):
+        eligible_rows = [row for row in queryset if str(row.owncast_user_id or "").strip()]
+        updated = 0
+        errors = []
+        for identity in eligible_rows:
+            try:
+                actor(identity)
+                updated += 1
+            except (OwncastConfigError, OwncastAdminError) as exc:
+                errors.append(f"{identity.owncast_display_name}: {exc}")
+
+        if errors:
+            self.message_user(
+                request,
+                f"{success_message}: {updated} updated, {len(errors)} failed. First error: {errors[0]}",
+                level=messages.ERROR,
+            )
+            return
+        self.message_user(request, f"{success_message}: {updated} updated.", level=messages.SUCCESS)
+
+    @admin.action(permissions=["change"], description="Ban selected Owncast chat users")
+    def ban_selected_owncast_chat_users(self, request, queryset):
+        now = timezone.now()
+
+        def actor(identity):
+            owncast_set_chat_user_enabled(owncast_user_id=identity.owncast_user_id, enabled=False)
+            identity.owncast_disabled_at = now
+            identity.owncast_timeout_until = None
+            identity.save(update_fields=["owncast_disabled_at", "owncast_timeout_until", "updated_at"])
+
+        self._moderate_selected_users(request, queryset, actor=actor, success_message="Owncast ban applied")
+
+    @admin.action(permissions=["change"], description="Unban selected Owncast chat users")
+    def unban_selected_owncast_chat_users(self, request, queryset):
+        def actor(identity):
+            owncast_set_chat_user_enabled(owncast_user_id=identity.owncast_user_id, enabled=True)
+            identity.owncast_disabled_at = None
+            identity.owncast_timeout_until = None
+            identity.save(update_fields=["owncast_disabled_at", "owncast_timeout_until", "updated_at"])
+
+        self._moderate_selected_users(request, queryset, actor=actor, success_message="Owncast unban applied")
+
+    @admin.action(permissions=["change"], description="Timeout selected Owncast chat users for 10 minutes")
+    def timeout_selected_owncast_chat_users_10m(self, request, queryset):
+        now = timezone.now()
+        timeout_until = now + timedelta(minutes=10)
+
+        def actor(identity):
+            owncast_set_chat_user_enabled(owncast_user_id=identity.owncast_user_id, enabled=False)
+            identity.owncast_disabled_at = now
+            identity.owncast_timeout_until = timeout_until
+            identity.save(update_fields=["owncast_disabled_at", "owncast_timeout_until", "updated_at"])
+
+        self._moderate_selected_users(request, queryset, actor=actor, success_message="Owncast timeout applied")
+
+    @admin.action(permissions=["change"], description="Grant Owncast moderator status")
+    def grant_selected_owncast_moderators(self, request, queryset):
+        def actor(identity):
+            owncast_set_chat_user_moderator(owncast_user_id=identity.owncast_user_id, is_moderator=True)
+            identity.owncast_is_moderator = True
+            identity.save(update_fields=["owncast_is_moderator", "updated_at"])
+
+        self._moderate_selected_users(request, queryset, actor=actor, success_message="Owncast moderator granted")
+
+    @admin.action(permissions=["change"], description="Revoke Owncast moderator status")
+    def revoke_selected_owncast_moderators(self, request, queryset):
+        def actor(identity):
+            owncast_set_chat_user_moderator(owncast_user_id=identity.owncast_user_id, is_moderator=False)
+            identity.owncast_is_moderator = False
+            identity.save(update_fields=["owncast_is_moderator", "updated_at"])
+
+        self._moderate_selected_users(request, queryset, actor=actor, success_message="Owncast moderator revoked")
+
+    @admin.action(permissions=["change"], description="Release expired Owncast chat timeouts")
+    def release_expired_owncast_timeouts(self, request, queryset):
+        try:
+            result = release_expired_owncast_chat_timeouts()
+        except (OwncastConfigError, OwncastAdminError) as exc:
+            self.message_user(request, f"Owncast timeout release failed: {exc}", level=messages.ERROR)
+            return
+        level = messages.ERROR if result["errors"] else messages.SUCCESS
+        self.message_user(
+            request,
+            (
+                "Owncast timeout release complete: "
+                f"{result['released']} released, "
+                f"{len(result['errors'])} failed, "
+                f"{result['checked']} checked."
+            ),
+            level=level,
+        )
 
     def has_view_permission(self, request, obj=None):
         return request.user.has_perm("realtime.view_owncastchatidentity")

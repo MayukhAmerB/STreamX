@@ -282,6 +282,65 @@ class RealtimeSessionCreateSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class RealtimeOwncastChatModerationActionSerializer(serializers.Serializer):
+    ACTION_BAN_USER = "ban_user"
+    ACTION_UNBAN_USER = "unban_user"
+    ACTION_TIMEOUT_USER = "timeout_user"
+    ACTION_GRANT_MODERATOR = "grant_moderator"
+    ACTION_REVOKE_MODERATOR = "revoke_moderator"
+    ACTION_HIDE_MESSAGES = "hide_messages"
+    ACTION_SHOW_MESSAGES = "show_messages"
+    ACTION_BAN_IP = "ban_ip"
+    ACTION_UNBAN_IP = "unban_ip"
+    ACTION_SYNC_HANDLES = "sync_handles"
+
+    USER_ACTIONS = {
+        ACTION_BAN_USER,
+        ACTION_UNBAN_USER,
+        ACTION_TIMEOUT_USER,
+        ACTION_GRANT_MODERATOR,
+        ACTION_REVOKE_MODERATOR,
+    }
+    MESSAGE_ACTIONS = {ACTION_HIDE_MESSAGES, ACTION_SHOW_MESSAGES}
+    IP_ACTIONS = {ACTION_BAN_IP, ACTION_UNBAN_IP}
+
+    action = serializers.ChoiceField(
+        choices=(
+            ACTION_BAN_USER,
+            ACTION_UNBAN_USER,
+            ACTION_TIMEOUT_USER,
+            ACTION_GRANT_MODERATOR,
+            ACTION_REVOKE_MODERATOR,
+            ACTION_HIDE_MESSAGES,
+            ACTION_SHOW_MESSAGES,
+            ACTION_BAN_IP,
+            ACTION_UNBAN_IP,
+            ACTION_SYNC_HANDLES,
+        )
+    )
+    owncast_user_id = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    message_ids = serializers.ListField(
+        child=serializers.CharField(max_length=120),
+        required=False,
+        allow_empty=False,
+        max_length=50,
+    )
+    ip_address = serializers.IPAddressField(required=False, protocol="both")
+    duration_seconds = serializers.IntegerField(required=False, min_value=60, max_value=86400)
+
+    def validate(self, attrs):
+        action = attrs.get("action")
+        if action in self.USER_ACTIONS and not str(attrs.get("owncast_user_id") or "").strip():
+            raise serializers.ValidationError({"owncast_user_id": "Owncast user ID is required."})
+        if action == self.ACTION_TIMEOUT_USER and not attrs.get("duration_seconds"):
+            raise serializers.ValidationError({"duration_seconds": "Timeout duration is required."})
+        if action in self.MESSAGE_ACTIONS and not attrs.get("message_ids"):
+            raise serializers.ValidationError({"message_ids": "At least one message ID is required."})
+        if action in self.IP_ACTIONS and not attrs.get("ip_address"):
+            raise serializers.ValidationError({"ip_address": "IP address is required."})
+        return attrs
+
+
 class RealtimeSessionJoinSerializer(serializers.Serializer):
     display_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
     prefer_broadcast = serializers.BooleanField(required=False, default=False)

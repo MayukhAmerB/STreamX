@@ -6,10 +6,12 @@ import PageShell from "../components/PageShell";
 import BroadcastViewerTheater from "../components/realtime/BroadcastViewerTheater";
 import { listLiveClasses } from "../api/courses";
 import {
+  applyRealtimeOwncastChatModeration,
   createRealtimeOwncastChatLaunch,
   createRealtimeSession,
   deleteRealtimeRecording,
   endRealtimeSession,
+  getRealtimeOwncastChatModeration,
   getRealtimeSession,
   getRealtimeHostToken,
   joinRealtimeSession,
@@ -104,6 +106,30 @@ function resolveRecordingPlaybackUrl(recording) {
   return String(recording?.playback_url || recording?.output_download_url || "").trim();
 }
 
+function owncastMessagePreview(body) {
+  return String(body || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim() || "No message body";
+}
+
+function formatModerationTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString();
+}
+
+function owncastIdentityLabel(identity) {
+  return (
+    identity?.owncast_display_name ||
+    identity?.platform_full_name ||
+    identity?.platform_email ||
+    identity?.owncast_user_id ||
+    "Unknown user"
+  );
+}
+
 const broadcastMarketingCards = [
   {
     title: "Cybersecurity Townhalls",
@@ -169,6 +195,15 @@ export default function BroadcastingPage() {
     info: "",
   });
   const [shareState, setShareState] = useState({ error: "", info: "" });
+  const [chatModerationState, setChatModerationState] = useState({
+    sessionId: null,
+    loading: false,
+    actionLoading: "",
+    error: "",
+    info: "",
+    data: null,
+  });
+  const [ipBanInput, setIpBanInput] = useState("");
   const [isStudioObsKeyVisible, setIsStudioObsKeyVisible] = useState(false);
 
   const [studioSession, setStudioSession] = useState(null);
@@ -437,6 +472,118 @@ export default function BroadcastingPage() {
         ? "OBS mode selected. Configure OBS with server URL + stream key, then click Start Live."
         : "Host studio selected.",
     }));
+  };
+
+  const loadChatModeration = async (sessionId = studioSession?.id) => {
+    if (!sessionId) return;
+    setChatModerationState((prev) => ({
+      ...prev,
+      sessionId,
+      loading: true,
+      error: "",
+      info: "",
+    }));
+    try {
+      const response = await getRealtimeOwncastChatModeration(sessionId);
+      const data = apiData(response, {});
+      setChatModerationState((prev) => ({
+        ...prev,
+        sessionId,
+        loading: false,
+        data,
+        error: "",
+        info: "Chat control state refreshed.",
+      }));
+    } catch (err) {
+      setChatModerationState((prev) => ({
+        ...prev,
+        sessionId,
+        loading: false,
+        error: apiMessage(err, "Unable to load Owncast chat controls."),
+        info: "",
+      }));
+    }
+  };
+
+  const handleOpenChatControl = async (session) => {
+    handleOpenStudio(session);
+    await loadChatModeration(session.id);
+  };
+
+  const applyChatModerationAction = async (action, payload = {}, successMessage = "Chat action applied.") => {
+    const sessionId = chatModerationState.sessionId || studioSession?.id;
+    if (!sessionId) return;
+    setChatModerationState((prev) => ({
+      ...prev,
+      sessionId,
+      actionLoading: action,
+      error: "",
+      info: "",
+    }));
+    try {
+      const response = await applyRealtimeOwncastChatModeration(sessionId, { action, ...payload });
+      const data = apiData(response, {});
+      setChatModerationState((prev) => ({
+        ...prev,
+        sessionId,
+        actionLoading: "",
+        data,
+        error: "",
+        info: successMessage,
+      }));
+    } catch (err) {
+      setChatModerationState((prev) => ({
+        ...prev,
+        sessionId,
+        actionLoading: "",
+        error: apiMessage(err, "Unable to apply Owncast chat moderation action."),
+        info: "",
+      }));
+    }
+  };
+
+  const handleTimeoutOwncastUser = async (identity) => {
+    const minutesInput = window.prompt(
+      `Timeout ${owncastIdentityLabel(identity)} for how many minutes?`,
+      "10"
+    );
+    if (minutesInput === null) return;
+    const minutes = Number(minutesInput);
+    if (!Number.isFinite(minutes) || minutes < 1 || minutes > 1440) {
+      setChatModerationState((prev) => ({
+        ...prev,
+        error: "Timeout must be between 1 and 1440 minutes.",
+        info: "",
+      }));
+      return;
+    }
+    await applyChatModerationAction(
+      "timeout_user",
+      {
+        owncast_user_id: identity.owncast_user_id,
+        duration_seconds: Math.round(minutes * 60),
+      },
+      `Timed out ${owncastIdentityLabel(identity)} for ${minutes} minute${minutes === 1 ? "" : "s"}.`
+    );
+  };
+
+  const handleBanOwncastUser = async (identity) => {
+    if (!window.confirm(`Ban ${owncastIdentityLabel(identity)} from Owncast chat?`)) return;
+    await applyChatModerationAction(
+      "ban_user",
+      { owncast_user_id: identity.owncast_user_id },
+      `${owncastIdentityLabel(identity)} was banned from chat.`
+    );
+  };
+
+  const handleBanOwncastIp = async () => {
+    const ipAddress = String(ipBanInput || "").trim();
+    if (!ipAddress) {
+      setChatModerationState((prev) => ({ ...prev, error: "Enter an IP address to ban.", info: "" }));
+      return;
+    }
+    await applyChatModerationAction("ban_ip", { ip_address: ipAddress }, `IP ${ipAddress} was banned.`);
+    setIpBanInput("");
   };
 
   const getSessionStreamUrl = (session) => {
@@ -1210,6 +1357,17 @@ export default function BroadcastingPage() {
       : "Start Live";
   const obsStartInfoMessage =
     "OBS stream is ready. If OBS warned that the connection dropped, start streaming again in OBS using the same server URL and key. Viewers stay in the same session.";
+  const chatModerationData =
+    chatModerationState.sessionId === studioSession?.id ? chatModerationState.data || {} : {};
+  const chatModerationIdentities = Array.isArray(chatModerationData.identities)
+    ? chatModerationData.identities
+    : [];
+  const chatModerationMessages = Array.isArray(chatModerationData.recent_messages)
+    ? chatModerationData.recent_messages
+    : [];
+  const chatModerationIpBans = Array.isArray(chatModerationData.ip_bans)
+    ? chatModerationData.ip_bans
+    : [];
 
   return (
     <PageShell title="" subtitle="" containerClassName="xl:max-w-[86rem] 2xl:max-w-[92rem]">
@@ -1380,7 +1538,7 @@ export default function BroadcastingPage() {
         </div>
       </section>
 
-      {studioSession?.is_host ? (
+      {canManageSession(studioSession, user) ? (
         <section className="mb-6 rounded-[26px] border border-black panel-gradient p-4 sm:p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -1672,6 +1830,272 @@ export default function BroadcastingPage() {
               ) : null}
             </div>
           </div>
+
+          <div className="mt-4 rounded-2xl border border-black panel-gradient p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.14em] text-[#949494]">Owncast Chat Control</div>
+                <p className="mt-1 text-xs leading-5 text-[#BEBEBE]">
+                  Ban or timeout chat users, grant moderator status, hide messages, and manage IP bans from the verified handle map.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  className="px-3 py-1.5 text-xs"
+                  onClick={() => loadChatModeration(studioSession.id)}
+                  loading={chatModerationState.loading}
+                >
+                  Refresh
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="px-3 py-1.5 text-xs"
+                  onClick={() => applyChatModerationAction("sync_handles", {}, "Owncast handles synced.")}
+                  loading={chatModerationState.actionLoading === "sync_handles"}
+                >
+                  Sync Handles
+                </Button>
+              </div>
+            </div>
+
+            {chatModerationState.error ? (
+              <p className="mt-3 rounded-xl border border-red-300/30 bg-red-200/10 px-3 py-2 text-xs text-red-200">
+                {chatModerationState.error}
+              </p>
+            ) : null}
+            {chatModerationState.info ? (
+              <p className="mt-3 rounded-xl border border-black bg-[#121212] px-3 py-2 text-xs text-[#D9D9D9]">
+                {chatModerationState.info}
+              </p>
+            ) : null}
+
+            {chatModerationState.sessionId === studioSession?.id && chatModerationState.data ? (
+              <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_1fr_0.8fr]">
+                <div className="rounded-xl border border-black bg-[#0D0D0D]/80 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="text-[10px] uppercase tracking-[0.14em] text-[#949494]">Mapped Handles</div>
+                    <span className="text-[11px] text-[#A7A7A7]">{chatModerationIdentities.length} users</span>
+                  </div>
+                  <div className="max-h-[320px] space-y-2 overflow-y-auto pr-1">
+                    {chatModerationIdentities.length > 0 ? (
+                      chatModerationIdentities.map((identity) => (
+                        <article key={identity.id || identity.owncast_user_id} className="rounded-lg border border-black bg-[#151515] p-3">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <div className="text-sm font-semibold text-white">{owncastIdentityLabel(identity)}</div>
+                              <div className="mt-1 text-[11px] text-[#A8A8A8]">
+                                {identity.platform_email || "No platform email"} | {identity.platform_role || "role unknown"}
+                              </div>
+                              <div className="mt-1 text-[11px] text-[#7F7F7F]">Owncast ID: {identity.owncast_user_id || "-"}</div>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {identity.is_moderator ? (
+                                <span className="rounded-full border border-black bg-[#242424] px-2 py-1 text-[10px] uppercase tracking-[0.1em] text-[#E7E7E7]">
+                                  Moderator
+                                </span>
+                              ) : null}
+                              {identity.is_disabled ? (
+                                <span className="rounded-full border border-red-300/30 bg-red-200/10 px-2 py-1 text-[10px] uppercase tracking-[0.1em] text-red-200">
+                                  Disabled
+                                </span>
+                              ) : null}
+                              {identity.is_timeout_active ? (
+                                <span className="rounded-full border border-amber-300/30 bg-amber-200/10 px-2 py-1 text-[10px] uppercase tracking-[0.1em] text-amber-200">
+                                  Timeout
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                          {identity.timeout_until ? (
+                            <div className="mt-2 text-[11px] text-[#A8A8A8]">
+                              Timeout until: {formatModerationTime(identity.timeout_until)}
+                            </div>
+                          ) : null}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {identity.is_disabled ? (
+                              <Button
+                                variant="secondary"
+                                className="px-2.5 py-1 text-[11px]"
+                                onClick={() =>
+                                  applyChatModerationAction(
+                                    "unban_user",
+                                    { owncast_user_id: identity.owncast_user_id },
+                                    `${owncastIdentityLabel(identity)} was unbanned.`
+                                  )
+                                }
+                                loading={chatModerationState.actionLoading === "unban_user"}
+                              >
+                                Unban
+                              </Button>
+                            ) : (
+                              <>
+                                <Button
+                                  variant="danger"
+                                  className="px-2.5 py-1 text-[11px]"
+                                  onClick={() => handleBanOwncastUser(identity)}
+                                  loading={chatModerationState.actionLoading === "ban_user"}
+                                >
+                                  Ban
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  className="px-2.5 py-1 text-[11px]"
+                                  onClick={() => handleTimeoutOwncastUser(identity)}
+                                  loading={chatModerationState.actionLoading === "timeout_user"}
+                                >
+                                  Timeout
+                                </Button>
+                              </>
+                            )}
+                            <Button
+                              variant="secondary"
+                              className="px-2.5 py-1 text-[11px]"
+                              onClick={() =>
+                                applyChatModerationAction(
+                                  identity.is_moderator ? "revoke_moderator" : "grant_moderator",
+                                  { owncast_user_id: identity.owncast_user_id },
+                                  identity.is_moderator ? "Owncast moderator removed." : "Owncast moderator granted."
+                                )
+                              }
+                              loading={
+                                chatModerationState.actionLoading === "grant_moderator" ||
+                                chatModerationState.actionLoading === "revoke_moderator"
+                              }
+                            >
+                              {identity.is_moderator ? "Remove Mod" : "Make Mod"}
+                            </Button>
+                          </div>
+                        </article>
+                      ))
+                    ) : (
+                      <p className="rounded-lg border border-black bg-[#151515] px-3 py-2 text-xs text-[#AFAFAF]">
+                        No mapped Owncast handles yet. Ask viewers to join chat through the verified chat link, then sync handles.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-black bg-[#0D0D0D]/80 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="text-[10px] uppercase tracking-[0.14em] text-[#949494]">Recent Messages</div>
+                    <span className="text-[11px] text-[#A7A7A7]">{chatModerationMessages.length} latest</span>
+                  </div>
+                  <div className="max-h-[320px] space-y-2 overflow-y-auto pr-1">
+                    {chatModerationMessages.length > 0 ? (
+                      chatModerationMessages.map((message) => {
+                        const messageUser = message.user || {};
+                        const isHidden = Boolean(message.hidden_at);
+                        return (
+                          <article key={message.id} className="rounded-lg border border-black bg-[#151515] p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="text-xs font-semibold text-white">
+                                {messageUser.display_name || "Owncast user"}
+                              </div>
+                              <span className="text-[10px] text-[#888888]">{formatModerationTime(message.timestamp)}</span>
+                            </div>
+                            <p className="mt-2 text-xs leading-5 text-[#CFCFCF]">{owncastMessagePreview(message.body)}</p>
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <span className="text-[11px] text-[#8F8F8F]">Message ID: {message.id}</span>
+                              {isHidden ? (
+                                <span className="rounded-full border border-amber-300/30 bg-amber-200/10 px-2 py-1 text-[10px] uppercase tracking-[0.1em] text-amber-200">
+                                  Hidden
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <Button
+                                variant={isHidden ? "secondary" : "danger"}
+                                className="px-2.5 py-1 text-[11px]"
+                                onClick={() =>
+                                  applyChatModerationAction(
+                                    isHidden ? "show_messages" : "hide_messages",
+                                    { message_ids: [message.id] },
+                                    isHidden ? "Message restored." : "Message hidden."
+                                  )
+                                }
+                                loading={
+                                  chatModerationState.actionLoading === "hide_messages" ||
+                                  chatModerationState.actionLoading === "show_messages"
+                                }
+                              >
+                                {isHidden ? "Show Message" : "Hide Message"}
+                              </Button>
+                            </div>
+                          </article>
+                        );
+                      })
+                    ) : (
+                      <p className="rounded-lg border border-black bg-[#151515] px-3 py-2 text-xs text-[#AFAFAF]">
+                        No recent Owncast messages returned yet.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-black bg-[#0D0D0D]/80 p-3">
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-[#949494]">IP Bans</div>
+                  <p className="mt-2 text-xs leading-5 text-[#BEBEBE]">
+                    Use IP bans only for abuse. Owncast also blocks known IPs automatically when a user is banned.
+                  </p>
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      className="min-w-0 flex-1 rounded-xl border border-black bg-[#101010] px-3 py-2 text-xs text-white outline-none focus:border-[#999999]"
+                      placeholder="IP address"
+                      value={ipBanInput}
+                      onChange={(event) => setIpBanInput(event.target.value)}
+                    />
+                    <Button
+                      variant="danger"
+                      className="px-3 py-1.5 text-xs"
+                      onClick={handleBanOwncastIp}
+                      loading={chatModerationState.actionLoading === "ban_ip"}
+                    >
+                      Ban
+                    </Button>
+                  </div>
+                  <div className="mt-3 max-h-[250px] space-y-2 overflow-y-auto pr-1">
+                    {chatModerationIpBans.length > 0 ? (
+                      chatModerationIpBans.map((row) => {
+                        const ipAddress = String(row.ipAddress || row.ip_address || row.value || "").trim();
+                        return (
+                          <article key={`${ipAddress}-${row.createdAt || row.created_at || ""}`} className="rounded-lg border border-black bg-[#151515] p-3">
+                            <div className="text-xs font-semibold text-white">{ipAddress || "Unknown IP"}</div>
+                            <div className="mt-1 text-[11px] text-[#8F8F8F]">
+                              Added: {formatModerationTime(row.createdAt || row.created_at)}
+                            </div>
+                            <Button
+                              variant="secondary"
+                              className="mt-3 px-2.5 py-1 text-[11px]"
+                              onClick={() =>
+                                applyChatModerationAction(
+                                  "unban_ip",
+                                  { ip_address: ipAddress },
+                                  `IP ${ipAddress} was unbanned.`
+                                )
+                              }
+                              disabled={!ipAddress}
+                              loading={chatModerationState.actionLoading === "unban_ip"}
+                            >
+                              Unban IP
+                            </Button>
+                          </article>
+                        );
+                      })
+                    ) : (
+                      <p className="rounded-lg border border-black bg-[#151515] px-3 py-2 text-xs text-[#AFAFAF]">
+                        No Owncast IP bans returned.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-4 rounded-xl border border-black bg-[#121212] px-3 py-2 text-xs text-[#BEBEBE]">
+                Open Chat Control or refresh to load current Owncast moderation state.
+              </p>
+            )}
+          </div>
         </section>
       ) : null}
 
@@ -1826,6 +2250,14 @@ export default function BroadcastingPage() {
                           </Link>
                           <Button variant="secondary" className="w-full" onClick={() => handleOpenStudio(session)}>
                             Open Host Studio
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            className="w-full"
+                            onClick={() => handleOpenChatControl(session)}
+                            loading={chatModerationState.loading && chatModerationState.sessionId === session.id}
+                          >
+                            Open Chat Control
                           </Button>
                           <Button
                             variant="danger"

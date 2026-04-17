@@ -2,6 +2,7 @@ import logging
 import mimetypes
 import time
 import json
+from datetime import timedelta
 from urllib.parse import quote, urlparse
 
 from django.conf import settings
@@ -9,6 +10,8 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core import signing
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError
+from django.db.models import Q
 from django.http import FileResponse, HttpResponse
 from django.http.response import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -35,6 +38,7 @@ from .domain import (
 )
 from .models import OwncastChatIdentity, RealtimeConfiguration, RealtimeSession, RealtimeSessionRecording
 from .serializers import (
+    RealtimeOwncastChatModerationActionSerializer,
     RealtimeSessionBrowserRecordingUploadSerializer,
     RealtimeSessionCreateSerializer,
     RealtimeSessionJoinSerializer,
@@ -58,14 +62,25 @@ from .services import (
     build_meet_embed_url,
     build_participant_token,
     extract_recording_output,
+    fetch_owncast_chat_messages_admin,
+    fetch_owncast_disabled_chat_users,
+    fetch_owncast_ip_bans,
+    fetch_owncast_moderator_chat_users,
     get_room_participant_count,
     is_livekit_configured,
+    owncast_ban_ip_address,
+    owncast_remove_ip_ban,
+    owncast_set_chat_message_visibility,
+    owncast_set_chat_user_enabled,
+    owncast_set_chat_user_moderator,
     resolve_recording_local_path,
     resolve_livekit_client_url,
     resolve_obs_stream_server_url,
     resolve_broadcast_urls,
     refresh_obs_session_stream_health,
     register_owncast_chat_user,
+    release_expired_owncast_chat_timeouts,
+    sync_owncast_chat_identities_from_recent_messages,
     sync_owncast_chat_settings,
     start_room_recording_egress,
     start_room_broadcast_egress,
@@ -689,6 +704,10 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
                 errors={"detail": "Enable OWNCAST_CHAT_BRIDGE_ENABLED to use personalized Owncast chat launch."},
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
+        try:
+            release_expired_owncast_chat_timeouts(timeout=4)
+        except (OwncastConfigError, OwncastAdminError) as exc:
+            realtime_ops_logger.warning("Owncast chat timeout release skipped during launch: %s", exc)
 
         urls = resolve_broadcast_urls(session, request=request)
         chat_embed_url = str(urls.get("chat_embed_url") or "").strip()
@@ -702,39 +721,131 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
             )
 
         display_name = _resolve_owncast_display_name(request.user)
-        try:
-            chat_user = register_owncast_chat_user(display_name=display_name)
-        except (OwncastConfigError, OwncastAdminError) as exc:
+        platform_user_id = int(request.user.id)
+        chat_identity = (
+            OwncastChatIdentity.objects.filter(platform_user_id=platform_user_id)
+            .order_by("-updated_at", "-id")
+            .first()
+        )
+        access_token = chat_identity.reveal_access_token() if chat_identity else ""
+        chat_user = {}
+
+        if not access_token:
+            try:
+                chat_user = register_owncast_chat_user(display_name=display_name)
+            except (OwncastConfigError, OwncastAdminError) as exc:
+                return api_response(
+                    success=False,
+                    message="Unable to prepare broadcast chat session.",
+                    errors={"detail": str(exc)},
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+            access_token = str(chat_user.get("access_token") or "").strip()
+
+        if not access_token:
             return api_response(
                 success=False,
                 message="Unable to prepare broadcast chat session.",
-                errors={"detail": str(exc)},
+                errors={"detail": "Owncast did not return a chat access token."},
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        access_token = str(chat_user.get("access_token") or "").strip()
-        resolved_display_name = str(chat_user.get("display_name") or display_name).strip() or display_name
-        token_hash = OwncastChatIdentity.hash_access_token(access_token)
-        identity_defaults = {
-            "user": request.user,
-            "platform_user_id": int(request.user.id),
-            "platform_email": str(getattr(request.user, "email", "") or "")[:254],
-            "platform_full_name": str(getattr(request.user, "full_name", "") or "")[:255],
-            "platform_role": str(getattr(request.user, "role", "") or "")[:40],
-            "platform_display_name": display_name[:120],
-            "owncast_display_name": resolved_display_name[:120],
-            "owncast_display_color": str(chat_user.get("display_color") or "")[:32],
-            "owncast_authenticated": bool(chat_user.get("authenticated", False)),
-            "launch_ip": str(resolve_client_ip(request) or "")[:64],
-            "user_agent": str(request.META.get("HTTP_USER_AGENT", "") or "")[:255],
-        }
-        owncast_user_id = str(chat_user.get("owncast_user_id") or "").strip()[:120]
-        chat_identity = OwncastChatIdentity.objects.create(
-            session=session,
-            owncast_user_id=owncast_user_id,
-            access_token_hash=token_hash,
-            **identity_defaults,
-        )
+        def persist_chat_identity(identity, *, token, owncast_user):
+            if owncast_user:
+                resolved_name = str(owncast_user.get("display_name") or display_name).strip() or display_name
+                owncast_user_id = str(owncast_user.get("owncast_user_id") or "").strip()[:120]
+            else:
+                resolved_name = str(
+                    getattr(identity, "owncast_display_name", "")
+                    or display_name
+                ).strip() or display_name
+                owncast_user_id = str(getattr(identity, "owncast_user_id", "") or "").strip()[:120]
+
+            token_hash = OwncastChatIdentity.hash_access_token(token)
+            access_token_secret = (
+                OwncastChatIdentity.seal_access_token(token)
+                if owncast_user
+                else getattr(identity, "access_token_secret", "")
+                or ""
+            )
+            identity_defaults = {
+                "user": request.user,
+                "platform_user_id": platform_user_id,
+                "platform_email": str(getattr(request.user, "email", "") or "")[:254],
+                "platform_full_name": str(getattr(request.user, "full_name", "") or "")[:255],
+                "platform_role": str(getattr(request.user, "role", "") or "")[:40],
+                "platform_display_name": display_name[:120],
+                "owncast_display_name": resolved_name[:120],
+                "owncast_display_color": str(
+                    owncast_user.get("display_color")
+                    if owncast_user
+                    else getattr(identity, "owncast_display_color", "")
+                    or ""
+                )[:32],
+                "owncast_authenticated": bool(
+                    owncast_user.get("authenticated")
+                    if owncast_user
+                    else getattr(identity, "owncast_authenticated", False)
+                ),
+                "launch_ip": str(resolve_client_ip(request) or "")[:64],
+                "user_agent": str(request.META.get("HTTP_USER_AGENT", "") or "")[:255],
+            }
+
+            if identity:
+                for field, value in identity_defaults.items():
+                    setattr(identity, field, value)
+                identity.session = session
+                identity.owncast_user_id = owncast_user_id
+                identity.access_token_hash = token_hash
+                identity.access_token_secret = access_token_secret
+                identity.save(
+                    update_fields=[
+                        "session",
+                        "user",
+                        "platform_user_id",
+                        "platform_email",
+                        "platform_full_name",
+                        "platform_role",
+                        "platform_display_name",
+                        "owncast_user_id",
+                        "owncast_display_name",
+                        "owncast_display_color",
+                        "owncast_authenticated",
+                        "access_token_hash",
+                        "access_token_secret",
+                        "launch_ip",
+                        "user_agent",
+                        "updated_at",
+                    ]
+                )
+                return identity, resolved_name
+
+            created_identity = OwncastChatIdentity.objects.create(
+                session=session,
+                owncast_user_id=owncast_user_id,
+                access_token_hash=token_hash,
+                access_token_secret=access_token_secret,
+                **identity_defaults,
+            )
+            return created_identity, resolved_name
+
+        try:
+            chat_identity, resolved_display_name = persist_chat_identity(
+                chat_identity,
+                token=access_token,
+                owncast_user=chat_user,
+            )
+        except IntegrityError:
+            chat_identity = OwncastChatIdentity.objects.get(platform_user_id=platform_user_id)
+            persisted_access_token = chat_identity.reveal_access_token()
+            if persisted_access_token:
+                access_token = persisted_access_token
+                chat_user = {}
+            chat_identity, resolved_display_name = persist_chat_identity(
+                chat_identity,
+                token=access_token,
+                owncast_user=chat_user,
+            )
 
         bridge_payload = signing.dumps(
             {
@@ -759,6 +870,210 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
                 "expires_in_seconds": _owncast_chat_bridge_ttl_seconds(),
             },
         )
+
+
+def _serialize_owncast_identity(identity, *, disabled_ids, moderator_ids):
+    is_timeout_active = bool(
+        identity.owncast_timeout_until
+        and identity.owncast_timeout_until > timezone.now()
+        and identity.owncast_disabled_at
+    )
+    return {
+        "id": identity.id,
+        "owncast_user_id": identity.owncast_user_id,
+        "owncast_display_name": identity.owncast_display_name,
+        "platform_user_id": identity.platform_user_id,
+        "platform_email": identity.platform_email,
+        "platform_full_name": identity.platform_full_name,
+        "platform_role": identity.platform_role,
+        "last_session_id": identity.session_id,
+        "last_session_title": str(identity.session or "") if identity.session_id else "",
+        "bridge_used_at": identity.bridge_used_at,
+        "launch_ip": identity.launch_ip,
+        "is_disabled": bool(identity.owncast_user_id in disabled_ids or identity.owncast_disabled_at),
+        "is_timeout_active": is_timeout_active,
+        "timeout_until": identity.owncast_timeout_until,
+        "is_moderator": bool(identity.owncast_user_id in moderator_ids or identity.owncast_is_moderator),
+        "updated_at": identity.updated_at,
+    }
+
+
+def _build_owncast_chat_moderation_payload(*, session, request):
+    release_expired_owncast_chat_timeouts()
+    sync_result = sync_owncast_chat_identities_from_recent_messages(limit=500, timeout=5)
+    messages = fetch_owncast_chat_messages_admin(limit=100, timeout=5)
+    disabled_users = fetch_owncast_disabled_chat_users(timeout=5)
+    moderator_users = fetch_owncast_moderator_chat_users(timeout=5)
+    ip_bans = fetch_owncast_ip_bans(timeout=5)
+
+    disabled_ids = {str(user.get("id") or "").strip() for user in disabled_users if user.get("id")}
+    moderator_ids = {str(user.get("id") or "").strip() for user in moderator_users if user.get("id")}
+    message_user_ids = {
+        str(message.get("user", {}).get("id") or "").strip()
+        for message in messages
+        if message.get("user", {}).get("id")
+    }
+    relevant_user_ids = disabled_ids | moderator_ids | message_user_ids
+
+    identities = OwncastChatIdentity.objects.select_related("session", "user")
+    if relevant_user_ids:
+        identities = identities.filter(Q(owncast_user_id__in=relevant_user_ids) | Q(session=session))
+    else:
+        identities = identities.filter(session=session)
+    identities = identities.exclude(owncast_user_id="").order_by("-updated_at", "-id")[:200]
+
+    return {
+        "session": RealtimeSessionListSerializer(session, context={"request": request}).data,
+        "sync": sync_result,
+        "identities": [
+            _serialize_owncast_identity(
+                identity,
+                disabled_ids=disabled_ids,
+                moderator_ids=moderator_ids,
+            )
+            for identity in identities
+        ],
+        "recent_messages": messages,
+        "disabled_users": disabled_users,
+        "moderator_users": moderator_users,
+        "ip_bans": ip_bans,
+        "available_actions": [
+            "ban_user",
+            "unban_user",
+            "timeout_user",
+            "grant_moderator",
+            "revoke_moderator",
+            "hide_messages",
+            "show_messages",
+            "ban_ip",
+            "unban_ip",
+            "sync_handles",
+        ],
+    }
+
+
+class RealtimeSessionOwncastChatModerationView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _get_session(self, request, pk):
+        session = get_object_or_404(RealtimeSession.objects.with_related(), pk=pk)
+        if not _can_manage_session(request.user, session):
+            return session, api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "Only host, assigned instructor, or admin can moderate broadcast chat."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        if session.session_type != RealtimeSession.TYPE_BROADCASTING:
+            return session, api_response(
+                success=False,
+                message="Broadcast chat moderation unavailable.",
+                errors={"detail": "Chat moderation is available only for broadcasting sessions."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        return session, None
+
+    def get(self, request, pk):
+        session, error_response = self._get_session(request, pk)
+        if error_response:
+            return error_response
+        try:
+            data = _build_owncast_chat_moderation_payload(session=session, request=request)
+        except (OwncastConfigError, OwncastAdminError) as exc:
+            return api_response(
+                success=False,
+                message="Unable to load Owncast chat moderation state.",
+                errors={"detail": str(exc)},
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return api_response(success=True, message="Owncast chat moderation state fetched.", data=data)
+
+    def post(self, request, pk):
+        session, error_response = self._get_session(request, pk)
+        if error_response:
+            return error_response
+
+        serializer = RealtimeOwncastChatModerationActionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return api_response(
+                success=False,
+                message="Owncast chat moderation action failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        action = serializer.validated_data["action"]
+        owncast_user_id = str(serializer.validated_data.get("owncast_user_id") or "").strip()
+        message_ids = serializer.validated_data.get("message_ids") or []
+        ip_address = str(serializer.validated_data.get("ip_address") or "").strip()
+        duration_seconds = int(serializer.validated_data.get("duration_seconds") or 0)
+        now = timezone.now()
+        owncast_result = {}
+
+        try:
+            if action == RealtimeOwncastChatModerationActionSerializer.ACTION_SYNC_HANDLES:
+                sync_owncast_chat_identities_from_recent_messages(limit=500, timeout=5)
+            elif action == RealtimeOwncastChatModerationActionSerializer.ACTION_BAN_USER:
+                owncast_result = owncast_set_chat_user_enabled(owncast_user_id=owncast_user_id, enabled=False)
+                OwncastChatIdentity.objects.filter(owncast_user_id=owncast_user_id).update(
+                    owncast_disabled_at=now,
+                    owncast_timeout_until=None,
+                    updated_at=now,
+                )
+            elif action == RealtimeOwncastChatModerationActionSerializer.ACTION_UNBAN_USER:
+                owncast_result = owncast_set_chat_user_enabled(owncast_user_id=owncast_user_id, enabled=True)
+                OwncastChatIdentity.objects.filter(owncast_user_id=owncast_user_id).update(
+                    owncast_disabled_at=None,
+                    owncast_timeout_until=None,
+                    updated_at=now,
+                )
+            elif action == RealtimeOwncastChatModerationActionSerializer.ACTION_TIMEOUT_USER:
+                timeout_until = now + timedelta(seconds=duration_seconds)
+                owncast_result = owncast_set_chat_user_enabled(owncast_user_id=owncast_user_id, enabled=False)
+                OwncastChatIdentity.objects.filter(owncast_user_id=owncast_user_id).update(
+                    owncast_disabled_at=now,
+                    owncast_timeout_until=timeout_until,
+                    updated_at=now,
+                )
+            elif action == RealtimeOwncastChatModerationActionSerializer.ACTION_GRANT_MODERATOR:
+                owncast_result = owncast_set_chat_user_moderator(
+                    owncast_user_id=owncast_user_id,
+                    is_moderator=True,
+                )
+                OwncastChatIdentity.objects.filter(owncast_user_id=owncast_user_id).update(
+                    owncast_is_moderator=True,
+                    updated_at=now,
+                )
+            elif action == RealtimeOwncastChatModerationActionSerializer.ACTION_REVOKE_MODERATOR:
+                owncast_result = owncast_set_chat_user_moderator(
+                    owncast_user_id=owncast_user_id,
+                    is_moderator=False,
+                )
+                OwncastChatIdentity.objects.filter(owncast_user_id=owncast_user_id).update(
+                    owncast_is_moderator=False,
+                    updated_at=now,
+                )
+            elif action == RealtimeOwncastChatModerationActionSerializer.ACTION_HIDE_MESSAGES:
+                owncast_result = owncast_set_chat_message_visibility(message_ids=message_ids, visible=False)
+            elif action == RealtimeOwncastChatModerationActionSerializer.ACTION_SHOW_MESSAGES:
+                owncast_result = owncast_set_chat_message_visibility(message_ids=message_ids, visible=True)
+            elif action == RealtimeOwncastChatModerationActionSerializer.ACTION_BAN_IP:
+                owncast_result = owncast_ban_ip_address(ip_address=ip_address)
+            elif action == RealtimeOwncastChatModerationActionSerializer.ACTION_UNBAN_IP:
+                owncast_result = owncast_remove_ip_ban(ip_address=ip_address)
+        except (OwncastConfigError, OwncastAdminError) as exc:
+            return api_response(
+                success=False,
+                message="Owncast chat moderation action failed.",
+                errors={"detail": str(exc)},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            data = _build_owncast_chat_moderation_payload(session=session, request=request)
+        except (OwncastConfigError, OwncastAdminError):
+            data = {"owncast_result": owncast_result}
+        return api_response(success=True, message="Owncast chat moderation action applied.", data=data)
 
 
 class RealtimeOwncastChatBridgeView(APIView):

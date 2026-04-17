@@ -5,6 +5,7 @@ import secrets
 from urllib.parse import urlparse
 
 from django.conf import settings
+from django.core import signing
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
@@ -449,6 +450,8 @@ class RealtimeSession(models.Model):
 
 
 class OwncastChatIdentity(models.Model):
+    ACCESS_TOKEN_SIGNING_SALT = "realtime.owncast-chat-identity-token"
+
     session = models.ForeignKey(
         RealtimeSession,
         on_delete=models.SET_NULL,
@@ -463,7 +466,7 @@ class OwncastChatIdentity(models.Model):
         blank=True,
         related_name="owncast_chat_identities",
     )
-    platform_user_id = models.PositiveBigIntegerField(db_index=True)
+    platform_user_id = models.PositiveBigIntegerField(unique=True)
     platform_email = models.EmailField(blank=True, default="")
     platform_full_name = models.CharField(max_length=255, blank=True, default="")
     platform_role = models.CharField(max_length=40, blank=True, default="")
@@ -472,10 +475,14 @@ class OwncastChatIdentity(models.Model):
     owncast_display_name = models.CharField(max_length=120)
     owncast_display_color = models.CharField(max_length=32, blank=True, default="")
     owncast_authenticated = models.BooleanField(default=False)
+    owncast_is_moderator = models.BooleanField(default=False)
     access_token_hash = models.CharField(max_length=64, blank=True, default="")
+    access_token_secret = models.TextField(blank=True, default="")
     launch_ip = models.CharField(max_length=64, blank=True, default="")
     user_agent = models.CharField(max_length=255, blank=True, default="")
     bridge_used_at = models.DateTimeField(null=True, blank=True)
+    owncast_disabled_at = models.DateTimeField(null=True, blank=True)
+    owncast_timeout_until = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -487,8 +494,8 @@ class OwncastChatIdentity(models.Model):
             models.Index(fields=["owncast_display_name", "created_at"]),
             models.Index(fields=["owncast_user_id"]),
             models.Index(fields=["session", "created_at"]),
-            models.Index(fields=["platform_user_id", "created_at"]),
             models.Index(fields=["access_token_hash"]),
+            models.Index(fields=["owncast_timeout_until"]),
         ]
 
     @staticmethod
@@ -497,6 +504,31 @@ class OwncastChatIdentity(models.Model):
         if not normalized:
             return ""
         return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    @classmethod
+    def seal_access_token(cls, access_token):
+        normalized = str(access_token or "").strip()
+        if not normalized:
+            return ""
+        return signing.dumps(
+            {"access_token": normalized},
+            salt=cls.ACCESS_TOKEN_SIGNING_SALT,
+            compress=True,
+        )
+
+    def reveal_access_token(self):
+        if not self.access_token_secret:
+            return ""
+        try:
+            payload = signing.loads(
+                self.access_token_secret,
+                salt=self.ACCESS_TOKEN_SIGNING_SALT,
+            )
+        except signing.BadSignature:
+            return ""
+        if not isinstance(payload, dict):
+            return ""
+        return str(payload.get("access_token") or "").strip()
 
     def __str__(self):
         return f"{self.owncast_display_name} -> {self.platform_email or self.platform_user_id}"

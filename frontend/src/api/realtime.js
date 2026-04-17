@@ -9,6 +9,10 @@ export const createRealtimeSession = (payload) => apiClient.post("/realtime/sess
 export const joinRealtimeSession = (id, payload = {}) => apiClient.post(`/realtime/sessions/${id}/join/`, payload);
 export const createRealtimeOwncastChatLaunch = (id) =>
   apiClient.post(`/realtime/sessions/${id}/broadcast-chat/launch/`);
+export const getRealtimeOwncastChatModeration = (id) =>
+  apiClient.get(`/realtime/sessions/${id}/broadcast-chat/moderation/`);
+export const applyRealtimeOwncastChatModeration = (id, payload) =>
+  apiClient.post(`/realtime/sessions/${id}/broadcast-chat/moderation/`, payload);
 export const endRealtimeSession = (id) => apiClient.post(`/realtime/sessions/${id}/end/`);
 export const getRealtimeHostToken = (id) => apiClient.post(`/realtime/sessions/${id}/host-token/`);
 export const startRealtimeStream = (id) => apiClient.post(`/realtime/sessions/${id}/stream/start/`);

@@ -486,6 +486,33 @@ def _owncast_admin_post_json(*, base_url, endpoint_path, payload, headers, timeo
         raise OwncastAdminError(f"Owncast admin API unknown error: {exc}") from exc
 
 
+def _owncast_admin_get_json(*, base_url, endpoint_path, headers, timeout=5):
+    endpoint = f"{str(base_url).rstrip('/')}/{str(endpoint_path).lstrip('/')}"
+    request_headers = dict(headers)
+    request_headers["Accept"] = "application/json"
+    request = Request(endpoint, method="GET", headers=request_headers)
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            raw_payload = response.read().decode("utf-8") or "{}"
+        try:
+            return json.loads(raw_payload)
+        except json.JSONDecodeError as exc:
+            raise OwncastAdminError("Owncast admin API returned invalid JSON.") from exc
+    except HTTPError as exc:
+        response_body = ""
+        try:
+            response_body = exc.read().decode("utf-8")
+        except Exception:
+            response_body = str(exc)
+        raise OwncastAdminError(f"Owncast admin API HTTP {exc.code}: {response_body}") from exc
+    except URLError as exc:
+        raise OwncastAdminError(f"Owncast admin API network error: {exc}") from exc
+    except OwncastAdminError:
+        raise
+    except Exception as exc:
+        raise OwncastAdminError(f"Owncast admin API unknown error: {exc}") from exc
+
+
 def _is_owncast_404_error(error_message):
     return "HTTP 404" in str(error_message or "")
 
@@ -724,6 +751,297 @@ def register_owncast_chat_user(*, display_name):
             continue
 
     raise OwncastAdminError(last_error or "Unable to register Owncast chat user.")
+
+
+def _extract_owncast_chat_messages(payload):
+    if isinstance(payload, list):
+        return payload
+    if not isinstance(payload, dict):
+        return []
+
+    for key in ("messages", "results", "data", "items"):
+        nested_payload = payload.get(key)
+        if isinstance(nested_payload, list):
+            return nested_payload
+        nested_messages = _extract_owncast_chat_messages(nested_payload)
+        if nested_messages:
+            return nested_messages
+    return []
+
+
+def _normalize_owncast_chat_user(user_payload):
+    if not isinstance(user_payload, dict):
+        user_payload = {}
+    return {
+        "id": str(user_payload.get("id") or "").strip(),
+        "display_name": str(user_payload.get("displayName") or user_payload.get("name") or "").strip(),
+        "previous_names": [
+            str(name).strip()
+            for name in (user_payload.get("previousNames") or [])
+            if str(name).strip()
+        ],
+        "authenticated": bool(user_payload.get("authenticated", False)),
+        "is_bot": bool(user_payload.get("isBot", False)),
+        "display_color": user_payload.get("displayColor"),
+        "scopes": user_payload.get("scopes") if isinstance(user_payload.get("scopes"), list) else [],
+        "created_at": str(user_payload.get("createdAt") or "").strip(),
+        "disabled_at": str(user_payload.get("disabledAt") or "").strip(),
+        "name_changed_at": str(user_payload.get("nameChangedAt") or "").strip(),
+    }
+
+
+def _normalize_owncast_chat_message(message):
+    if not isinstance(message, dict):
+        return {}
+    user_payload = message.get("user")
+    normalized_user = _normalize_owncast_chat_user(user_payload)
+    return {
+        "id": str(message.get("id") or "").strip(),
+        "timestamp": str(message.get("timestamp") or "").strip(),
+        "type": str(message.get("type") or "").strip(),
+        "body": str(message.get("body") or "").strip(),
+        "hidden_at": str(message.get("hiddenAt") or "").strip(),
+        "client_id": message.get("clientId"),
+        "user": normalized_user,
+    }
+
+
+def fetch_owncast_chat_messages_admin(*, limit=200, timeout=5):
+    base_url, headers = _resolve_owncast_admin_request_context()
+    payload = _owncast_admin_get_json(
+        base_url=base_url,
+        endpoint_path="/api/admin/chat/messages",
+        headers=headers,
+        timeout=timeout,
+    )
+    messages = _extract_owncast_chat_messages(payload)
+    try:
+        bounded_limit = max(0, int(limit or 0))
+    except (TypeError, ValueError):
+        bounded_limit = 200
+    if bounded_limit:
+        messages = messages[:bounded_limit]
+    return [
+        normalized
+        for normalized in (_normalize_owncast_chat_message(message) for message in messages)
+        if normalized.get("id") or normalized.get("user", {}).get("id")
+    ]
+
+
+def fetch_recent_owncast_chat_user_snapshots(*, limit=500, timeout=4):
+    """
+    Fetch recent Owncast chat users keyed by Owncast user ID.
+
+    Owncast can let users rename their chat handle after the platform registers
+    their verified chat token. The stable field is the Owncast user ID, so this
+    snapshot lets admin tooling update our display label without creating a new
+    platform mapping row.
+    """
+    messages = fetch_owncast_chat_messages_admin(limit=limit, timeout=timeout)
+
+    snapshots = {}
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        user_payload = message.get("user") if isinstance(message.get("user"), dict) else {}
+
+        owncast_user_id = str(
+            user_payload.get("id")
+            or message.get("userId")
+            or message.get("userID")
+            or ""
+        ).strip()
+        if not owncast_user_id:
+            continue
+
+        display_name = str(
+            user_payload.get("display_name")
+            or user_payload.get("displayName")
+            or user_payload.get("name")
+            or message.get("displayName")
+            or ""
+        ).strip()
+        previous_names = user_payload.get("previous_names") or user_payload.get("previousNames")
+        if not isinstance(previous_names, list):
+            previous_names = []
+
+        snapshots[owncast_user_id] = {
+            "display_name": display_name[:120],
+            "timestamp": str(message.get("timestamp") or "").strip(),
+            "previous_names": [str(name).strip() for name in previous_names if str(name).strip()],
+        }
+    return snapshots
+
+
+def sync_owncast_chat_identities_from_recent_messages(*, limit=500, timeout=4):
+    from .models import OwncastChatIdentity
+
+    snapshots = fetch_recent_owncast_chat_user_snapshots(limit=limit, timeout=timeout)
+    matched_identities = 0
+    updated_identities = 0
+    now = timezone.now()
+
+    for owncast_user_id, snapshot in snapshots.items():
+        display_name = str(snapshot.get("display_name") or "").strip()
+        if not display_name:
+            continue
+
+        queryset = OwncastChatIdentity.objects.filter(owncast_user_id=owncast_user_id)
+        matched_identities += queryset.count()
+        updated_identities += queryset.exclude(owncast_display_name=display_name).update(
+            owncast_display_name=display_name,
+            updated_at=now,
+        )
+
+    return {
+        "scanned_users": len(snapshots),
+        "matched_identities": matched_identities,
+        "updated_identities": updated_identities,
+    }
+
+
+def _owncast_admin_post_value(endpoint_path, value, *, timeout=10):
+    base_url, headers = _resolve_owncast_admin_request_context()
+    return _owncast_admin_post_json(
+        base_url=base_url,
+        endpoint_path=endpoint_path,
+        payload={"value": value},
+        headers=headers,
+        timeout=timeout,
+    )
+
+
+def owncast_set_chat_user_enabled(*, owncast_user_id, enabled, timeout=10):
+    user_id = str(owncast_user_id or "").strip()
+    if not user_id:
+        raise OwncastAdminError("Owncast user ID is required.")
+    base_url, headers = _resolve_owncast_admin_request_context()
+    return _owncast_admin_post_json(
+        base_url=base_url,
+        endpoint_path="/api/admin/chat/users/setenabled",
+        payload={"userId": user_id, "enabled": bool(enabled)},
+        headers=headers,
+        timeout=timeout,
+    )
+
+
+def owncast_set_chat_user_moderator(*, owncast_user_id, is_moderator, timeout=10):
+    user_id = str(owncast_user_id or "").strip()
+    if not user_id:
+        raise OwncastAdminError("Owncast user ID is required.")
+    base_url, headers = _resolve_owncast_admin_request_context()
+    return _owncast_admin_post_json(
+        base_url=base_url,
+        endpoint_path="/api/admin/chat/users/setmoderator",
+        payload={"userId": user_id, "isModerator": bool(is_moderator)},
+        headers=headers,
+        timeout=timeout,
+    )
+
+
+def owncast_set_chat_message_visibility(*, message_ids, visible, timeout=10):
+    ids = [str(message_id).strip() for message_id in (message_ids or []) if str(message_id).strip()]
+    if not ids:
+        raise OwncastAdminError("At least one Owncast chat message ID is required.")
+    base_url, headers = _resolve_owncast_admin_request_context()
+    return _owncast_admin_post_json(
+        base_url=base_url,
+        endpoint_path="/api/admin/chat/messagevisibility",
+        payload={"idArray": ids, "visible": bool(visible)},
+        headers=headers,
+        timeout=timeout,
+    )
+
+
+def owncast_ban_ip_address(*, ip_address, timeout=10):
+    ip_value = str(ip_address or "").strip()
+    if not ip_value:
+        raise OwncastAdminError("IP address is required.")
+    return _owncast_admin_post_value("/api/admin/chat/users/ipbans/create", ip_value, timeout=timeout)
+
+
+def owncast_remove_ip_ban(*, ip_address, timeout=10):
+    ip_value = str(ip_address or "").strip()
+    if not ip_value:
+        raise OwncastAdminError("IP address is required.")
+    return _owncast_admin_post_value("/api/admin/chat/users/ipbans/remove", ip_value, timeout=timeout)
+
+
+def fetch_owncast_disabled_chat_users(*, timeout=5):
+    base_url, headers = _resolve_owncast_admin_request_context()
+    payload = _owncast_admin_get_json(
+        base_url=base_url,
+        endpoint_path="/api/admin/chat/users/disabled",
+        headers=headers,
+        timeout=timeout,
+    )
+    users = payload if isinstance(payload, list) else []
+    return [_normalize_owncast_chat_user(user) for user in users]
+
+
+def fetch_owncast_moderator_chat_users(*, timeout=5):
+    base_url, headers = _resolve_owncast_admin_request_context()
+    payload = _owncast_admin_get_json(
+        base_url=base_url,
+        endpoint_path="/api/admin/chat/users/moderators",
+        headers=headers,
+        timeout=timeout,
+    )
+    users = payload if isinstance(payload, list) else []
+    return [_normalize_owncast_chat_user(user) for user in users]
+
+
+def fetch_owncast_ip_bans(*, timeout=5):
+    base_url, headers = _resolve_owncast_admin_request_context()
+    payload = _owncast_admin_get_json(
+        base_url=base_url,
+        endpoint_path="/api/admin/chat/users/ipbans",
+        headers=headers,
+        timeout=timeout,
+    )
+    return payload if isinstance(payload, list) else []
+
+
+def release_expired_owncast_chat_timeouts(*, timeout=10):
+    from .models import OwncastChatIdentity
+
+    now = timezone.now()
+    candidates = OwncastChatIdentity.objects.filter(
+        owncast_timeout_until__isnull=False,
+        owncast_timeout_until__lte=now,
+        owncast_disabled_at__isnull=False,
+    ).exclude(owncast_user_id="")
+    checked = candidates.count()
+    released = 0
+    errors = []
+
+    for identity in candidates:
+        try:
+            owncast_set_chat_user_enabled(
+                owncast_user_id=identity.owncast_user_id,
+                enabled=True,
+                timeout=timeout,
+            )
+        except (OwncastConfigError, OwncastAdminError) as exc:
+            errors.append(
+                {
+                    "identity_id": identity.id,
+                    "owncast_user_id": identity.owncast_user_id,
+                    "error": str(exc),
+                }
+            )
+            continue
+
+        identity.owncast_disabled_at = None
+        identity.owncast_timeout_until = None
+        identity.save(update_fields=["owncast_disabled_at", "owncast_timeout_until", "updated_at"])
+        released += 1
+
+    return {
+        "released": released,
+        "errors": errors,
+        "checked": checked,
+    }
 
 
 def build_session_join_url(session_id, request=None):
