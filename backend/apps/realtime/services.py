@@ -534,10 +534,11 @@ def sync_owncast_chat_settings():
         else:
             raise OwncastAdminError(f"Unable to sync Owncast chat disabled setting: {disable_error}")
 
+    require_authentication = bool(getattr(settings, "OWNCAST_CHAT_REQUIRE_AUTHENTICATION", False))
     require_auth_payload_candidates = (
-        {"value": False},
-        {"requireauthentication": False},
-        {"required": False},
+        {"value": require_authentication},
+        {"requireauthentication": require_authentication},
+        {"required": require_authentication},
     )
     require_auth_error = ""
     for payload in require_auth_payload_candidates:
@@ -666,6 +667,10 @@ def register_owncast_chat_user(*, display_name):
             if not isinstance(parsed_payload, dict):
                 raise OwncastAdminError("Owncast register API returned an invalid response payload.")
 
+            user_payload = parsed_payload.get("user")
+            if not isinstance(user_payload, dict):
+                user_payload = {}
+
             access_token = str(parsed_payload.get("accessToken") or "").strip()
             if not access_token:
                 error_message = str(
@@ -675,11 +680,30 @@ def register_owncast_chat_user(*, display_name):
                 ).strip()
                 raise OwncastAdminError(error_message)
 
-            resolved_display_name = str(parsed_payload.get("displayName") or preferred_display_name).strip()
+            resolved_display_name = str(
+                parsed_payload.get("displayName")
+                or user_payload.get("displayName")
+                or preferred_display_name
+            ).strip()
+            owncast_user_id = str(
+                parsed_payload.get("userId")
+                or parsed_payload.get("userID")
+                or parsed_payload.get("id")
+                or user_payload.get("id")
+                or ""
+            ).strip()
+            display_color = str(
+                parsed_payload.get("displayColor")
+                or user_payload.get("displayColor")
+                or ""
+            ).strip()
+            authenticated_value = parsed_payload.get("authenticated", user_payload.get("authenticated", False))
             return {
                 "access_token": access_token,
+                "owncast_user_id": owncast_user_id,
                 "display_name": resolved_display_name or preferred_display_name,
-                "display_color": str(parsed_payload.get("displayColor") or "").strip(),
+                "display_color": display_color,
+                "authenticated": bool(authenticated_value),
             }
         except HTTPError as exc:
             body = ""

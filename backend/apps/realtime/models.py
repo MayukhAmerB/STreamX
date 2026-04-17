@@ -1,5 +1,6 @@
 import os
 import re
+import hashlib
 import secrets
 from urllib.parse import urlparse
 
@@ -445,6 +446,60 @@ class RealtimeSession(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class OwncastChatIdentity(models.Model):
+    session = models.ForeignKey(
+        RealtimeSession,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="owncast_chat_identities",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="owncast_chat_identities",
+    )
+    platform_user_id = models.PositiveBigIntegerField(db_index=True)
+    platform_email = models.EmailField(blank=True, default="")
+    platform_full_name = models.CharField(max_length=255, blank=True, default="")
+    platform_role = models.CharField(max_length=40, blank=True, default="")
+    platform_display_name = models.CharField(max_length=120, blank=True, default="")
+    owncast_user_id = models.CharField(max_length=120, blank=True, default="")
+    owncast_display_name = models.CharField(max_length=120)
+    owncast_display_color = models.CharField(max_length=32, blank=True, default="")
+    owncast_authenticated = models.BooleanField(default=False)
+    access_token_hash = models.CharField(max_length=64, blank=True, default="")
+    launch_ip = models.CharField(max_length=64, blank=True, default="")
+    user_agent = models.CharField(max_length=255, blank=True, default="")
+    bridge_used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Handle"
+        verbose_name_plural = "Handles"
+        indexes = [
+            models.Index(fields=["owncast_display_name", "created_at"]),
+            models.Index(fields=["owncast_user_id"]),
+            models.Index(fields=["session", "created_at"]),
+            models.Index(fields=["platform_user_id", "created_at"]),
+            models.Index(fields=["access_token_hash"]),
+        ]
+
+    @staticmethod
+    def hash_access_token(access_token):
+        normalized = str(access_token or "").strip()
+        if not normalized:
+            return ""
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    def __str__(self):
+        return f"{self.owncast_display_name} -> {self.platform_email or self.platform_user_id}"
 
 
 def realtime_recording_upload_path(instance, filename):

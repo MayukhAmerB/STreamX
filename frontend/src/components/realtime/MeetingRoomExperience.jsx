@@ -1765,16 +1765,30 @@ export default function MeetingRoomExperience({
     }
   };
 
+  const preparePersonalizedBroadcastChatUrl = async () => {
+    if (!session?.id) {
+      throw new Error("Broadcast session is not ready yet.");
+    }
+    const launchResponse = await createRealtimeOwncastChatLaunch(session.id);
+    const launchData = apiData(launchResponse, {});
+    const launchUrl = String(launchData?.launch_url || "").trim();
+    if (!launchUrl) {
+      throw new Error("Personalized chat launch URL was not returned.");
+    }
+    return launchUrl;
+  };
+
   const handleCopyBroadcastChatLink = async () => {
     if (!broadcastChatUrl) {
       setMeetingError("Broadcast chat URL is not configured for this session.");
       return;
     }
     try {
-      await navigator.clipboard.writeText(broadcastChatUrl);
-      setMeetingInfo("Broadcast chat link copied.");
-    } catch {
-      setMeetingError("Unable to copy broadcast chat link.");
+      const launchUrl = await preparePersonalizedBroadcastChatUrl();
+      await navigator.clipboard.writeText(launchUrl);
+      setMeetingInfo("Verified broadcast chat link copied.");
+    } catch (err) {
+      setMeetingError(apiMessage(err, "Unable to prepare verified broadcast chat link."));
     }
   };
 
@@ -1783,7 +1797,7 @@ export default function MeetingRoomExperience({
       setMeetingError("Broadcast chat URL is not configured for this session.");
       return;
     }
-    const popup = window.open(broadcastChatUrl, "_blank");
+    const popup = window.open("about:blank", "_blank");
     if (!popup) {
       setMeetingError("Popup blocked by browser. Allow popups and use 'Copy Chat' if needed.");
       return;
@@ -1791,32 +1805,24 @@ export default function MeetingRoomExperience({
     try {
       popup.opener = null;
     } catch {
-      // Best effort only; keep the working direct chat tab even if opener cannot be cleared.
+      // Best effort only; keep the verified chat popup isolated from this window.
     }
-    setMeetingInfo("Broadcast chat opened in a new tab.");
+    setMeetingInfo("Preparing verified broadcast chat...");
 
     (async () => {
-      let launchUrl = broadcastChatUrl;
-      if (session?.id) {
-        try {
-          const launchResponse = await createRealtimeOwncastChatLaunch(session.id);
-          const launchData = apiData(launchResponse, {});
-          const candidate = String(launchData?.launch_url || "").trim();
-          if (candidate) {
-            launchUrl = candidate;
-          }
-        } catch (err) {
-          setMeetingError(
-            `${apiMessage(err, "Unable to prepare personalized chat launch.")} Opened default chat link instead.`
-          );
-        }
-      }
-      if (launchUrl && launchUrl !== broadcastChatUrl && !popup.closed) {
-        try {
+      try {
+        const launchUrl = await preparePersonalizedBroadcastChatUrl();
+        if (!popup.closed) {
           popup.location.replace(launchUrl);
-        } catch {
-          // The direct chat tab is already open, so failing to upgrade it is non-fatal.
         }
+        setMeetingInfo("Verified broadcast chat opened in a new tab.");
+      } catch (err) {
+        try {
+          popup.close();
+        } catch {
+          // Best effort only; the blank popup may already be closed.
+        }
+        setMeetingError(apiMessage(err, "Unable to prepare verified broadcast chat launch."));
       }
     })();
   };

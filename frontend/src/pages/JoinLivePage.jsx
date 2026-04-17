@@ -4,7 +4,7 @@ import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 import BroadcastViewerTheater from "../components/realtime/BroadcastViewerTheater";
 import MeetingRoomExperience from "../components/realtime/MeetingRoomExperience";
-import { joinRealtimeSession, listRealtimeSessions } from "../api/realtime";
+import { createRealtimeOwncastChatLaunch, joinRealtimeSession, listRealtimeSessions } from "../api/realtime";
 import { useAuth } from "../hooks/useAuth";
 import useAdaptiveRealtimeSessionPolling from "../hooks/useAdaptiveRealtimeSessionPolling";
 import {
@@ -103,6 +103,12 @@ export default function JoinLivePage() {
   const [error, setError] = useState("");
   const [joinState, setJoinState] = useState({ loadingId: null, error: "", info: "" });
   const [activeSession, setActiveSession] = useState(() => readPersistedBroadcastPayload());
+  const [broadcastChatLaunch, setBroadcastChatLaunch] = useState({
+    sessionId: null,
+    sourceUrl: "",
+    url: "",
+    loading: false,
+  });
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState("all");
   const [autoJoinConsumed, setAutoJoinConsumed] = useState(false);
@@ -342,6 +348,21 @@ export default function JoinLivePage() {
   const activeBroadcastStreamUrl = activeBroadcastUrls.streamEmbedUrl;
   const activeBroadcastChatUrl =
     activeBroadcastUrls.writableChatEmbedUrl || activeBroadcastUrls.chatEmbedUrl;
+  const shouldUsePersonalizedBroadcastChat =
+    activeSession?.mode === "broadcast" && Boolean(activeSession?.session?.id) && Boolean(activeBroadcastChatUrl);
+  const activeBroadcastResolvedChatUrl =
+    shouldUsePersonalizedBroadcastChat &&
+    broadcastChatLaunch.sessionId === activeSession?.session?.id &&
+    broadcastChatLaunch.sourceUrl === activeBroadcastChatUrl
+      ? broadcastChatLaunch.url
+      : shouldUsePersonalizedBroadcastChat
+        ? ""
+        : activeBroadcastChatUrl;
+  const activeBroadcastChatFallbackMessage = shouldUsePersonalizedBroadcastChat
+    ? broadcastChatLaunch.loading
+      ? "Preparing your verified chat session..."
+      : "Verified chat could not be prepared. Refresh the page or sign in again."
+    : "Chat URL not configured for this session.";
   const activeBroadcastStatusMessage =
     activeSession?.mode === "broadcast"
       ? activeSession?.session?.status === "ended"
@@ -353,6 +374,53 @@ export default function JoinLivePage() {
           ? "The video stream is temporarily offline. Keep chat open while the host reconnects OBS."
           : ""
       : "";
+
+  useEffect(() => {
+    if (!shouldUsePersonalizedBroadcastChat) {
+      setBroadcastChatLaunch({ sessionId: null, sourceUrl: "", url: "", loading: false });
+      return undefined;
+    }
+
+    const sessionId = activeSession.session.id;
+    if (authLoading) {
+      setBroadcastChatLaunch({ sessionId, sourceUrl: activeBroadcastChatUrl, url: "", loading: true });
+      return undefined;
+    }
+    if (!isAuthenticated) {
+      setBroadcastChatLaunch({ sessionId, sourceUrl: activeBroadcastChatUrl, url: "", loading: false });
+      return undefined;
+    }
+
+    let cancelled = false;
+    setBroadcastChatLaunch({ sessionId, sourceUrl: activeBroadcastChatUrl, url: "", loading: true });
+    createRealtimeOwncastChatLaunch(sessionId)
+      .then((response) => {
+        if (cancelled) return;
+        const data = apiData(response, {});
+        const launchUrl = String(data?.launch_url || "").trim();
+        setBroadcastChatLaunch({
+          sessionId,
+          sourceUrl: activeBroadcastChatUrl,
+          url: launchUrl,
+          loading: false,
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setBroadcastChatLaunch({ sessionId, sourceUrl: activeBroadcastChatUrl, url: "", loading: false });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeBroadcastChatUrl,
+    activeSession?.mode,
+    activeSession?.session?.id,
+    authLoading,
+    isAuthenticated,
+    shouldUsePersonalizedBroadcastChat,
+  ]);
 
   return (
     <PageShell
@@ -457,7 +525,8 @@ export default function JoinLivePage() {
         <BroadcastViewerTheater
           title={activeSession.session?.title}
           streamUrl={activeBroadcastStreamUrl}
-          chatUrl={activeBroadcastChatUrl}
+          chatUrl={activeBroadcastResolvedChatUrl}
+          chatFallbackMessage={activeBroadcastChatFallbackMessage}
           streamStatus={activeSession.broadcast?.stream_status}
           sessionStatus={activeSession.session?.status}
           badgeLabel="Live Broadcast"

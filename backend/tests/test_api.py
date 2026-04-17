@@ -42,7 +42,12 @@ from apps.courses.services import transcode_lecture_to_hls
 from apps.payments.models import Payment
 from apps.realtime import domain as realtime_domain
 from apps.realtime import services as realtime_services
-from apps.realtime.models import RealtimeConfiguration, RealtimeSession, RealtimeSessionRecording
+from apps.realtime.models import (
+    OwncastChatIdentity,
+    RealtimeConfiguration,
+    RealtimeSession,
+    RealtimeSessionRecording,
+)
 from apps.users.models import AuthConfiguration, User
 from apps.users.serializers import ProfileUpdateSerializer
 
@@ -3267,8 +3272,10 @@ class RealtimeSessionTests(APITestCase):
     def test_broadcast_chat_launch_returns_stream_bridge_url(self, mock_register_chat_user):
         mock_register_chat_user.return_value = {
             "access_token": "bridge-access-token-123",
+            "owncast_user_id": "owncast-user-123",
             "display_name": "Viewer User",
             "display_color": "#ffffff",
+            "authenticated": False,
         }
         session = RealtimeSession.objects.create(
             title="Broadcast Chat Launch Session",
@@ -3306,6 +3313,19 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(signed_payload["display_name"], "Viewer User")
         self.assertEqual(signed_payload["session_id"], session.id)
         self.assertEqual(signed_payload["user_id"], self.viewer.id)
+        identity = OwncastChatIdentity.objects.get()
+        self.assertEqual(signed_payload["identity_id"], identity.id)
+        self.assertEqual(identity.session, session)
+        self.assertEqual(identity.user, self.viewer)
+        self.assertEqual(identity.platform_user_id, self.viewer.id)
+        self.assertEqual(identity.platform_email, self.viewer.email)
+        self.assertEqual(identity.platform_full_name, "Viewer User")
+        self.assertEqual(identity.platform_display_name, "Viewer User")
+        self.assertEqual(identity.owncast_user_id, "owncast-user-123")
+        self.assertEqual(identity.owncast_display_name, "Viewer User")
+        self.assertEqual(identity.owncast_display_color, "#ffffff")
+        self.assertNotEqual(identity.access_token_hash, "bridge-access-token-123")
+        self.assertEqual(identity.access_token_hash, OwncastChatIdentity.hash_access_token("bridge-access-token-123"))
 
     @override_settings(OWNCAST_CHAT_BRIDGE_ENABLED=True)
     @patch("apps.realtime.views.register_owncast_chat_user")
@@ -3331,6 +3351,29 @@ class RealtimeSessionTests(APITestCase):
         mock_register_chat_user.assert_not_called()
 
     def test_owncast_chat_bridge_renders_local_storage_bootstrap_html(self):
+        session = RealtimeSession.objects.create(
+            title="Bridge Tracking Session",
+            description="Bridge should mark the handle as used.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+            chat_embed_url="https://stream.example.com/embed/chat/readwrite",
+        )
+        identity = OwncastChatIdentity.objects.create(
+            session=session,
+            user=self.viewer,
+            platform_user_id=self.viewer.id,
+            platform_email=self.viewer.email,
+            platform_full_name=self.viewer.full_name,
+            platform_role=self.viewer.role,
+            platform_display_name="Viewer User",
+            owncast_user_id="owncast-user-bridge",
+            owncast_display_name="Viewer User",
+            access_token_hash=OwncastChatIdentity.hash_access_token("bridge-access-token-123"),
+        )
         signed_token = signing.dumps(
             {
                 "access_token": "bridge-access-token-123",
@@ -3338,6 +3381,7 @@ class RealtimeSessionTests(APITestCase):
                 "next_path": "/embed/chat/readwrite/",
                 "session_id": 99,
                 "user_id": self.viewer.id,
+                "identity_id": identity.id,
             },
             salt="realtime.owncast-chat-bridge",
             compress=True,
@@ -3353,6 +3397,8 @@ class RealtimeSessionTests(APITestCase):
         self.assertIn("bridge-access-token-123", html)
         self.assertIn("/embed/chat/readwrite/", html)
         self.assertEqual(response["Cache-Control"], "no-store, max-age=0")
+        identity.refresh_from_db()
+        self.assertIsNotNone(identity.bridge_used_at)
 
     def test_owncast_chat_bridge_rejects_invalid_signature(self):
         response = self.client.get(
@@ -3362,6 +3408,25 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data["message"], "Invalid chat bridge request.")
         self.assertIn("invalid or expired", response.data["errors"]["detail"])
+
+    @override_settings(
+        OWNCAST_ADMIN_API_BASE_URL="http://owncast:8080",
+        OWNCAST_ADMIN_PASSWORD="secret",
+        OWNCAST_CHAT_REQUIRE_AUTHENTICATION=True,
+    )
+    @patch("apps.realtime.services._owncast_admin_post_json")
+    def test_owncast_chat_sync_respects_require_authentication_setting(self, mock_admin_post):
+        mock_admin_post.return_value = {"success": True}
+
+        realtime_services.sync_owncast_chat_settings()
+
+        require_auth_calls = [
+            call
+            for call in mock_admin_post.call_args_list
+            if call.kwargs.get("endpoint_path") == "/api/admin/config/chat/requireauthentication"
+        ]
+        self.assertTrue(require_auth_calls)
+        self.assertEqual(require_auth_calls[0].kwargs["payload"], {"value": True})
 
     @override_settings(
         LIVEKIT_URL="ws://livekit.test",

@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 from config.url_utils import get_media_public_url
 
-from .models import RealtimeConfiguration, RealtimeSession, RealtimeSessionRecording
+from .models import OwncastChatIdentity, RealtimeConfiguration, RealtimeSession, RealtimeSessionRecording
 from .services import delete_recording_assets, resolve_obs_stream_server_url
 
 
@@ -305,6 +305,66 @@ class RealtimeSessionAdmin(admin.ModelAdmin):
         if obj.stream_service != RealtimeSession.STREAM_SERVICE_OBS:
             return "-"
         return obj.resolve_stream_target_url()
+
+
+@admin.register(OwncastChatIdentity)
+class OwncastChatIdentityAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "owncast_display_name",
+        "owncast_user_id",
+        "platform_email",
+        "platform_full_name",
+        "platform_role",
+        "session",
+        "bridge_used_at",
+        "launch_ip",
+        "created_at",
+    )
+    list_filter = ("platform_role", "owncast_authenticated", "bridge_used_at", "created_at", "session")
+    search_fields = (
+        "owncast_display_name",
+        "owncast_user_id",
+        "platform_email",
+        "platform_full_name",
+        "platform_display_name",
+        "platform_user_id",
+        "session__title",
+        "launch_ip",
+    )
+    readonly_fields = (
+        "session",
+        "user",
+        "platform_user_id",
+        "platform_email",
+        "platform_full_name",
+        "platform_role",
+        "platform_display_name",
+        "owncast_user_id",
+        "owncast_display_name",
+        "owncast_display_color",
+        "owncast_authenticated",
+        "access_token_hash",
+        "launch_ip",
+        "user_agent",
+        "bridge_used_at",
+        "created_at",
+        "updated_at",
+    )
+    autocomplete_fields = ("session", "user")
+    date_hierarchy = "created_at"
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.has_perm("realtime.view_owncastchatidentity")
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(RealtimeConfiguration)

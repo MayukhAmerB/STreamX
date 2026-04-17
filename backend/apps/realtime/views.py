@@ -20,6 +20,7 @@ from rest_framework.views import APIView
 
 from config.audit import log_security_event
 from config.authentication import CookieJWTAuthentication
+from config.client_ip import resolve_client_ip
 from config.metrics import record_realtime_join, record_realtime_recording_operation
 from config.pagination import apply_optional_pagination
 from config.request_security import find_disallowed_query_params
@@ -32,7 +33,7 @@ from .domain import (
     resolve_participant_state,
     session_payload_for_create,
 )
-from .models import RealtimeConfiguration, RealtimeSession, RealtimeSessionRecording
+from .models import OwncastChatIdentity, RealtimeConfiguration, RealtimeSession, RealtimeSessionRecording
 from .serializers import (
     RealtimeSessionBrowserRecordingUploadSerializer,
     RealtimeSessionCreateSerializer,
@@ -711,13 +712,38 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
+        access_token = str(chat_user.get("access_token") or "").strip()
+        resolved_display_name = str(chat_user.get("display_name") or display_name).strip() or display_name
+        token_hash = OwncastChatIdentity.hash_access_token(access_token)
+        identity_defaults = {
+            "user": request.user,
+            "platform_user_id": int(request.user.id),
+            "platform_email": str(getattr(request.user, "email", "") or "")[:254],
+            "platform_full_name": str(getattr(request.user, "full_name", "") or "")[:255],
+            "platform_role": str(getattr(request.user, "role", "") or "")[:40],
+            "platform_display_name": display_name[:120],
+            "owncast_display_name": resolved_display_name[:120],
+            "owncast_display_color": str(chat_user.get("display_color") or "")[:32],
+            "owncast_authenticated": bool(chat_user.get("authenticated", False)),
+            "launch_ip": str(resolve_client_ip(request) or "")[:64],
+            "user_agent": str(request.META.get("HTTP_USER_AGENT", "") or "")[:255],
+        }
+        owncast_user_id = str(chat_user.get("owncast_user_id") or "").strip()[:120]
+        chat_identity = OwncastChatIdentity.objects.create(
+            session=session,
+            owncast_user_id=owncast_user_id,
+            access_token_hash=token_hash,
+            **identity_defaults,
+        )
+
         bridge_payload = signing.dumps(
             {
-                "access_token": str(chat_user.get("access_token") or "").strip(),
-                "display_name": str(chat_user.get("display_name") or display_name).strip(),
+                "access_token": access_token,
+                "display_name": resolved_display_name,
                 "next_path": _OWNCAST_CHAT_BRIDGE_NEXT_PATH,
                 "session_id": int(session.id),
                 "user_id": int(request.user.id),
+                "identity_id": int(chat_identity.id),
             },
             salt=_OWNCAST_CHAT_BRIDGE_SIGNING_SALT,
             compress=True,
@@ -729,7 +755,7 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
             data={
                 "launch_url": launch_url,
                 "chat_embed_url": chat_embed_url,
-                "display_name": str(chat_user.get("display_name") or display_name).strip() or display_name,
+                "display_name": resolved_display_name,
                 "expires_in_seconds": _owncast_chat_bridge_ttl_seconds(),
             },
         )
@@ -774,6 +800,17 @@ class RealtimeOwncastChatBridgeView(APIView):
             )
 
         display_name = str(payload.get("display_name") or "").strip()[:80]
+        try:
+            identity_id = int(payload.get("identity_id") or 0)
+        except (TypeError, ValueError):
+            identity_id = 0
+        if identity_id > 0:
+            now = timezone.now()
+            OwncastChatIdentity.objects.filter(pk=identity_id).update(
+                bridge_used_at=now,
+                updated_at=now,
+            )
+
         return _render_owncast_chat_bridge_html(
             access_token=access_token,
             display_name=display_name,

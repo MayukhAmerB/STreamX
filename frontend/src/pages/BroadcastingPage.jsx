@@ -155,6 +155,12 @@ export default function BroadcastingPage() {
 
   const [joinState, setJoinState] = useState({ loadingId: null, error: "", info: "" });
   const [activeBroadcast, setActiveBroadcast] = useState(() => location.state?.autoJoinPayload || null);
+  const [activeBroadcastChatLaunch, setActiveBroadcastChatLaunch] = useState({
+    sessionId: null,
+    sourceUrl: "",
+    url: "",
+    loading: false,
+  });
   const [deleteState, setDeleteState] = useState({ loadingId: null, error: "", info: "" });
   const [streamControlState, setStreamControlState] = useState({
     loadingId: null,
@@ -496,28 +502,47 @@ export default function BroadcastingPage() {
     await copyText(streamUrl, "Stream URL copied.", "Unable to copy stream URL.");
   };
 
+  const preparePersonalizedChatUrl = async (session) => {
+    if (!session?.id) {
+      throw new Error("Broadcast session is not ready yet.");
+    }
+    const launchResponse = await createRealtimeOwncastChatLaunch(session.id);
+    const launchData = apiData(launchResponse, {});
+    const launchUrl = String(launchData?.launch_url || "").trim();
+    if (!launchUrl) {
+      throw new Error("Personalized chat launch URL was not returned.");
+    }
+    return launchUrl;
+  };
+
   const handleCopyChatLink = async (session) => {
-    const chatUrl = getSessionChatUrl(session);
-    if (!chatUrl) {
+    if (!getSessionChatUrl(session)) {
       setShareState({
         error: "Broadcast chat URL is not configured for this session.",
         info: "",
       });
       return;
     }
-    await copyText(chatUrl, "Chat link copied.", "Unable to copy chat link.");
+    try {
+      const launchUrl = await preparePersonalizedChatUrl(session);
+      await copyText(launchUrl, "Verified chat link copied.", "Unable to copy verified chat link.");
+    } catch (err) {
+      setShareState({
+        error: apiMessage(err, "Unable to prepare verified chat link."),
+        info: "",
+      });
+    }
   };
 
   const handleOpenBroadcastChat = (session) => {
-    const chatUrl = getSessionChatUrl(session);
-    if (!chatUrl) {
+    if (!getSessionChatUrl(session)) {
       setShareState({
         error: "Broadcast chat URL is not configured for this session.",
         info: "",
       });
       return;
     }
-    const popup = window.open(chatUrl, "_blank");
+    const popup = window.open("about:blank", "_blank");
     if (!popup) {
       setShareState({
         error: "Popup blocked by browser. Allow popups and use 'Copy Chat Link' if needed.",
@@ -528,33 +553,27 @@ export default function BroadcastingPage() {
     try {
       popup.opener = null;
     } catch {
-      // Best effort only; keep the working direct chat tab even if opener cannot be cleared.
+      // Best effort only; keep the verified chat popup isolated from this window.
     }
-    setShareState({ error: "", info: "Broadcast chat opened in a new tab." });
+    setShareState({ error: "", info: "Preparing verified broadcast chat..." });
 
     (async () => {
-      let launchUrl = chatUrl;
-      if (session?.id) {
-        try {
-          const launchResponse = await createRealtimeOwncastChatLaunch(session.id);
-          const launchData = apiData(launchResponse, {});
-          const candidate = String(launchData?.launch_url || "").trim();
-          if (candidate) {
-            launchUrl = candidate;
-          }
-        } catch (err) {
-          setShareState({
-            error: `${apiMessage(err, "Unable to prepare personalized chat launch.")} Opened default chat link instead.`,
-            info: "",
-          });
-        }
-      }
-      if (launchUrl && launchUrl !== chatUrl && !popup.closed) {
-        try {
+      try {
+        const launchUrl = await preparePersonalizedChatUrl(session);
+        if (!popup.closed) {
           popup.location.replace(launchUrl);
-        } catch {
-          // The direct chat tab is already open, so failing to upgrade it is non-fatal.
         }
+        setShareState({ error: "", info: "Verified broadcast chat opened in a new tab." });
+      } catch (err) {
+        try {
+          popup.close();
+        } catch {
+          // Best effort only; the blank popup may already be closed.
+        }
+        setShareState({
+          error: apiMessage(err, "Unable to prepare verified chat launch."),
+          info: "",
+        });
       }
     })();
   };
@@ -1122,6 +1141,21 @@ export default function BroadcastingPage() {
   const activeStreamUrl = activeBroadcastUrls.streamEmbedUrl;
   const activeChatUrl =
     activeBroadcastUrls.writableChatEmbedUrl || activeBroadcastUrls.chatEmbedUrl;
+  const shouldUsePersonalizedActiveChat =
+    Boolean(activeBroadcast?.session?.id) && Boolean(activeChatUrl);
+  const resolvedActiveChatUrl =
+    shouldUsePersonalizedActiveChat &&
+    activeBroadcastChatLaunch.sessionId === activeBroadcast?.session?.id &&
+    activeBroadcastChatLaunch.sourceUrl === activeChatUrl
+      ? activeBroadcastChatLaunch.url
+      : shouldUsePersonalizedActiveChat
+        ? ""
+        : activeChatUrl;
+  const activeChatFallbackMessage = shouldUsePersonalizedActiveChat
+    ? activeBroadcastChatLaunch.loading
+      ? "Preparing your verified chat session..."
+      : "Verified chat could not be prepared. Refresh the page or sign in again."
+    : "Chat URL not configured for this session.";
   const activeBroadcastStatusMessage =
     activeBroadcast?.session?.status === "ended"
       ? "This broadcast session has ended."
@@ -1131,6 +1165,42 @@ export default function BroadcastingPage() {
           String(activeBroadcast.broadcast.stream_status).trim().toLowerCase() !== "live"
         ? "The video stream is temporarily offline. Keep chat open while the host reconnects OBS."
         : "";
+
+  useEffect(() => {
+    if (!shouldUsePersonalizedActiveChat) {
+      setActiveBroadcastChatLaunch({ sessionId: null, sourceUrl: "", url: "", loading: false });
+      return undefined;
+    }
+
+    const sessionId = activeBroadcast.session.id;
+    if (!isAuthenticated) {
+      setActiveBroadcastChatLaunch({ sessionId, sourceUrl: activeChatUrl, url: "", loading: false });
+      return undefined;
+    }
+
+    let cancelled = false;
+    setActiveBroadcastChatLaunch({ sessionId, sourceUrl: activeChatUrl, url: "", loading: true });
+    createRealtimeOwncastChatLaunch(sessionId)
+      .then((response) => {
+        if (cancelled) return;
+        const data = apiData(response, {});
+        const launchUrl = String(data?.launch_url || "").trim();
+        setActiveBroadcastChatLaunch({
+          sessionId,
+          sourceUrl: activeChatUrl,
+          url: launchUrl,
+          loading: false,
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setActiveBroadcastChatLaunch({ sessionId, sourceUrl: activeChatUrl, url: "", loading: false });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBroadcast?.session?.id, activeChatUrl, isAuthenticated, shouldUsePersonalizedActiveChat]);
 
   const normalizedStudioStreamStatus = String(studioSession?.stream_status || "").trim().toLowerCase();
   const obsStartActionLabel =
@@ -1681,7 +1751,8 @@ export default function BroadcastingPage() {
           <BroadcastViewerTheater
             title={activeBroadcast.session?.title}
             streamUrl={activeStreamUrl}
-            chatUrl={activeChatUrl}
+            chatUrl={resolvedActiveChatUrl}
+            chatFallbackMessage={activeChatFallbackMessage}
             streamStatus={activeBroadcast.broadcast?.stream_status}
             sessionStatus={activeBroadcast.session?.status}
             showHeaderMeta={false}
