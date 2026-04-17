@@ -26,6 +26,7 @@ import useAdaptiveRealtimeSessionPolling from "../hooks/useAdaptiveRealtimeSessi
 import { ScreenityFallbackRecorder } from "../services/recording/ScreenityFallbackRecorder";
 import { resolveBroadcastEmbedUrls } from "../utils/broadcastUrls";
 import { apiData, apiMessage } from "../utils/api";
+import { copyTextToClipboard } from "../utils/clipboard";
 
 const pageBackgroundImage =
   "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
@@ -479,10 +480,10 @@ export default function BroadcastingPage() {
 
   const copyText = async (value, successMessage, errorMessage) => {
     try {
-      await navigator.clipboard.writeText(value);
+      await copyTextToClipboard(value);
       setShareState({ error: "", info: successMessage });
-    } catch {
-      setShareState({ error: errorMessage, info: "" });
+    } catch (err) {
+      setShareState({ error: apiMessage(err, errorMessage), info: "" });
     }
   };
 

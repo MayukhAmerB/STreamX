@@ -18,6 +18,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { ScreenityFallbackRecorder } from "../../services/recording/ScreenityFallbackRecorder";
 import { resolveBroadcastEmbedUrls } from "../../utils/broadcastUrls";
 import { apiData, apiMessage } from "../../utils/api";
+import { copyTextToClipboard } from "../../utils/clipboard";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -1758,10 +1759,10 @@ export default function MeetingRoomExperience({
       return;
     }
     try {
-      await navigator.clipboard.writeText(shareableJoinLink);
+      await copyTextToClipboard(shareableJoinLink);
       setMeetingInfo("Join link copied.");
-    } catch {
-      setMeetingError("Unable to copy join link.");
+    } catch (err) {
+      setMeetingError(apiMessage(err, "Unable to copy join link."));
     }
   };
 
@@ -1785,7 +1786,7 @@ export default function MeetingRoomExperience({
     }
     try {
       const launchUrl = await preparePersonalizedBroadcastChatUrl();
-      await navigator.clipboard.writeText(launchUrl);
+      await copyTextToClipboard(launchUrl);
       setMeetingInfo("Verified broadcast chat link copied.");
     } catch (err) {
       setMeetingError(apiMessage(err, "Unable to prepare verified broadcast chat link."));
