@@ -3844,6 +3844,11 @@ class RealtimeSessionTests(APITestCase):
         self.assertIn("agitated-rush", html)
         self.assertIn("/embed/chat/readwrite/", html)
         self.assertEqual(response["Cache-Control"], "no-store, max-age=0")
+        self.assertNotIn("X-Frame-Options", response)
+        self.assertIn("script-src 'unsafe-inline'", response["Content-Security-Policy"])
+        self.assertIn("frame-ancestors", response["Content-Security-Policy"])
+        self.assertIn("https://alsyedinitiative.com", response["Content-Security-Policy"])
+        self.assertEqual(response["Cross-Origin-Resource-Policy"], "cross-origin")
         identity.refresh_from_db()
         self.assertIsNotNone(identity.bridge_used_at)
 

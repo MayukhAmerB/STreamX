@@ -155,6 +155,24 @@ def _decode_owncast_chat_bridge_payload(token):
     )
 
 
+def _owncast_chat_bridge_frame_ancestors():
+    ancestors = ["'self'", "https://alsyedinitiative.com", "https://www.alsyedinitiative.com"]
+    configured_sources = [
+        getattr(settings, "FRONTEND_URL", ""),
+        getattr(settings, "FRONTEND_PUBLIC_ORIGIN", ""),
+        *getattr(settings, "CORS_ALLOWED_ORIGINS", []),
+        *getattr(settings, "CSRF_TRUSTED_ORIGINS", []),
+    ]
+    for source in configured_sources:
+        parsed = urlparse(str(source or "").strip())
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+            continue
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        if origin not in ancestors:
+            ancestors.append(origin)
+    return " ".join(ancestors)
+
+
 def _render_owncast_chat_bridge_html(*, bridge_token, access_token, display_name, platform_display_name, next_path):
     html = f"""<!doctype html>
 <html lang="en">
@@ -251,6 +269,19 @@ def _render_owncast_chat_bridge_html(*, bridge_token, access_token, display_name
 """
     response = HttpResponse(html, content_type="text/html; charset=utf-8")
     response["Cache-Control"] = "no-store, max-age=0"
+    response["Content-Security-Policy"] = (
+        "default-src 'none'; "
+        "script-src 'unsafe-inline'; "
+        "style-src 'unsafe-inline'; "
+        "connect-src 'self'; "
+        "base-uri 'none'; "
+        "form-action 'none'; "
+        f"frame-ancestors {_owncast_chat_bridge_frame_ancestors()}"
+    )
+    response["Cross-Origin-Embedder-Policy"] = "unsafe-none"
+    response["Cross-Origin-Opener-Policy"] = "unsafe-none"
+    response["Cross-Origin-Resource-Policy"] = "cross-origin"
+    response.xframe_options_exempt = True
     return response
 
 

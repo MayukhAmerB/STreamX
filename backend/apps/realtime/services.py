@@ -1525,7 +1525,7 @@ def resolve_broadcast_urls(session, request=None):
                 str(getattr(settings, "OWNCAST_STREAM_PUBLIC_BASE_URL", "") or "").strip(),
                 str(getattr(settings, "OWNCAST_CHAT_PUBLIC_BASE_URL", "") or "").strip(),
                 str(getattr(settings, "OWNCAST_BASE_URL", "") or "").strip(),
-                str(getattr(settings, "OWNCAST_DEFAULT_STREAM_PATH", "/embed/video") or "").strip(),
+                str(getattr(settings, "OWNCAST_DEFAULT_STREAM_PATH", "/embed/video/") or "").strip(),
                 str(getattr(settings, "OWNCAST_DEFAULT_CHAT_PATH", "/embed/chat/readwrite") or "").strip(),
                 request_host,
             ]
@@ -1548,6 +1548,8 @@ def resolve_broadcast_urls(session, request=None):
             path = fallback
         if not path.startswith("/"):
             path = f"/{path}"
+        if path == "/embed/video":
+            path = "/embed/video/"
         return path
 
     def _derive_embed_url(base_embed_url, target_path):
@@ -1576,7 +1578,7 @@ def resolve_broadcast_urls(session, request=None):
     )
 
     if stream_base_url and not stream_embed_url:
-        stream_embed_url = f"{stream_base_url}{_normalized_embed_path(settings.OWNCAST_DEFAULT_STREAM_PATH, '/embed/video')}"
+        stream_embed_url = f"{stream_base_url}{_normalized_embed_path(settings.OWNCAST_DEFAULT_STREAM_PATH, '/embed/video/')}"
     if chat_base_url and not chat_embed_url:
         chat_embed_url = f"{chat_base_url}{_normalized_embed_path(settings.OWNCAST_DEFAULT_CHAT_PATH, '/embed/chat/readwrite')}"
 
@@ -1590,7 +1592,7 @@ def resolve_broadcast_urls(session, request=None):
     if chat_embed_url and not stream_embed_url:
         stream_embed_url = _derive_embed_url(
             chat_embed_url,
-            _normalized_embed_path(settings.OWNCAST_DEFAULT_STREAM_PATH, "/embed/video"),
+            _normalized_embed_path(settings.OWNCAST_DEFAULT_STREAM_PATH, "/embed/video/"),
         )
 
     payload = {

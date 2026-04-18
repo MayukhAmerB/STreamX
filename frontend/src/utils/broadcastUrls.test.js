@@ -9,7 +9,7 @@ describe("resolveBroadcastEmbedUrls", () => {
       chatEmbedUrl: "https://stream.example.com/embed/chat/readwrite",
     });
 
-    expect(urls.streamEmbedUrl).toBe("https://stream.example.com/embed/video");
+    expect(urls.streamEmbedUrl).toBe("https://stream.example.com/embed/video/");
     expect(urls.chatEmbedUrl).toBe("https://stream.example.com/embed/chat/readwrite");
     expect(urls.writableChatEmbedUrl).toBe("https://stream.example.com/embed/chat/readwrite");
   });
@@ -19,7 +19,7 @@ describe("resolveBroadcastEmbedUrls", () => {
       chatEmbedUrl: "https://stream.example.com/embed/chat/readwrite",
     });
 
-    expect(urls.streamEmbedUrl).toBe("https://stream.example.com/embed/video");
+    expect(urls.streamEmbedUrl).toBe("https://stream.example.com/embed/video/");
     expect(urls.chatEmbedUrl).toBe("https://stream.example.com/embed/chat/readwrite");
     expect(urls.writableChatEmbedUrl).toBe("https://stream.example.com/embed/chat/readwrite");
   });
@@ -30,6 +30,7 @@ describe("resolveBroadcastEmbedUrls", () => {
       chatEmbedUrl: "https://stream.example.com/embed/chat/readonly",
     });
 
+    expect(urls.streamEmbedUrl).toBe("https://stream.example.com/embed/video/");
     expect(urls.chatEmbedUrl).toBe("https://stream.example.com/embed/chat/readonly");
     expect(urls.writableChatEmbedUrl).toBe("https://stream.example.com/embed/chat/readwrite");
   });
