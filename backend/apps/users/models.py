@@ -100,6 +100,15 @@ class TermsAcceptance(models.Model):
         return f"{self.user_id}:{self.terms_version}:{self.accepted_at:%Y-%m-%d %H:%M:%S}"
 
 
+class UserTermsStatus(User):
+    """Proxy model used solely for the 'Terms Acceptances' admin view."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "Terms Acceptance"
+        verbose_name_plural = "Terms Acceptances"
+
+
 class AsyncJob(models.Model):
     TYPE_EMAIL_SEND = "email_send"
     TYPE_PAYMENT_WEBHOOK_RETRY = "payment_webhook_retry"

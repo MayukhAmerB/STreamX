@@ -15,7 +15,7 @@ from rest_framework.authtoken.models import Token
 from apps.courses.models import Enrollment, LiveClassEnrollment
 from config.audit import log_security_event
 
-from .models import AsyncJob, AuthConfiguration, TermsAcceptance, User
+from .models import AsyncJob, AuthConfiguration, TermsAcceptance, User, UserTermsStatus
 
 admin.site.enable_nav_sidebar = False
 
@@ -100,10 +100,18 @@ class UserAdmin(DjangoUserAdmin):
         "pending_course_requests",
         "pending_live_class_requests",
         "terms_accepted_version",
+        "notifications_consent_version",
         "is_staff",
         "is_active",
     )
-    list_filter = ("role", "terms_accepted_version", "two_factor_enabled", "is_staff", "is_active")
+    list_filter = (
+        "role",
+        "terms_accepted_version",
+        "notifications_consent_version",
+        "two_factor_enabled",
+        "is_staff",
+        "is_active",
+    )
     ordering = ("-created_at",)
     search_fields = ("email", "full_name", "phone_number")
     inlines = (CourseEnrollmentInline, LiveClassEnrollmentInline)
@@ -142,6 +150,8 @@ class UserAdmin(DjangoUserAdmin):
                     "terms_accepted_at",
                     "terms_accepted_ip",
                     "terms_accepted_user_agent",
+                    "notifications_consent_version",
+                    "notifications_consented_at",
                 )
             },
         ),
@@ -154,6 +164,8 @@ class UserAdmin(DjangoUserAdmin):
         "terms_accepted_at",
         "terms_accepted_ip",
         "terms_accepted_user_agent",
+        "notifications_consent_version",
+        "notifications_consented_at",
         "created_at",
         "updated_at",
     )
@@ -261,14 +273,36 @@ class AuthConfigurationAdmin(admin.ModelAdmin):
         return False
 
 
-@admin.register(TermsAcceptance)
-class TermsAcceptanceAdmin(admin.ModelAdmin):
-    list_display = ("user", "terms_version", "accepted_at", "ip_address")
-    list_filter = ("terms_version", "accepted_at")
-    search_fields = ("user__email", "user__full_name", "terms_version", "ip_address")
-    readonly_fields = ("user", "terms_version", "accepted_at", "ip_address", "user_agent")
+@admin.register(UserTermsStatus)
+class UserTermsStatusAdmin(admin.ModelAdmin):
+    list_display = (
+        "email",
+        "full_name",
+        "terms_accepted_version",
+        "terms_accepted_at",
+        "terms_accepted_ip",
+        "notifications_consent_version",
+        "is_active",
+    )
+    list_filter = ("terms_accepted_version", "notifications_consent_version", "is_active", "role")
+    search_fields = ("email", "full_name")
+    ordering = ("-terms_accepted_at", "-id")
+    readonly_fields = (
+        "email",
+        "full_name",
+        "role",
+        "terms_accepted_version",
+        "terms_accepted_at",
+        "terms_accepted_ip",
+        "terms_accepted_user_agent",
+        "notifications_consent_version",
+        "notifications_consented_at",
+        "created_at",
+    )
     fields = readonly_fields
-    ordering = ("-accepted_at", "-id")
+
+    def get_queryset(self, request):
+        return User.objects.all()
 
     def has_add_permission(self, request):
         return False
