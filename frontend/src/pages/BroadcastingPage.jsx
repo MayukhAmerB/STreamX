@@ -130,6 +130,16 @@ function owncastIdentityLabel(identity) {
   );
 }
 
+function owncastIdentityKey(identity) {
+  return String(
+    identity?.id ||
+      identity?.owncast_user_id ||
+      identity?.platform_user_id ||
+      identity?.platform_email ||
+      owncastIdentityLabel(identity)
+  ).trim();
+}
+
 const broadcastMarketingCards = [
   {
     title: "Cybersecurity Townhalls",
@@ -203,6 +213,7 @@ export default function BroadcastingPage() {
     info: "",
     data: null,
   });
+  const [selectedChatIdentityKey, setSelectedChatIdentityKey] = useState("");
   const [ipBanInput, setIpBanInput] = useState("");
   const [isStudioObsKeyVisible, setIsStudioObsKeyVisible] = useState(false);
 
@@ -1368,6 +1379,11 @@ export default function BroadcastingPage() {
   const chatModerationIpBans = Array.isArray(chatModerationData.ip_bans)
     ? chatModerationData.ip_bans
     : [];
+  const selectedChatIdentity = chatModerationIdentities.length
+    ? chatModerationIdentities.find((identity) => owncastIdentityKey(identity) === selectedChatIdentityKey) ||
+      chatModerationIdentities[0]
+    : null;
+  const selectedChatIdentityValue = selectedChatIdentity ? owncastIdentityKey(selectedChatIdentity) : "";
 
   return (
     <PageShell title="" subtitle="" containerClassName="xl:max-w-[86rem] 2xl:max-w-[92rem]">
@@ -1874,54 +1890,85 @@ export default function BroadcastingPage() {
               <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_1fr_0.8fr]">
                 <div className="rounded-xl border border-black bg-[#0D0D0D]/80 p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <div className="text-[10px] uppercase tracking-[0.14em] text-[#949494]">Mapped Handles</div>
+                    <div className="text-[10px] uppercase tracking-[0.14em] text-[#949494]">User Actions</div>
                     <span className="text-[11px] text-[#A7A7A7]">{chatModerationIdentities.length} users</span>
                   </div>
-                  <div className="max-h-[320px] space-y-2 overflow-y-auto pr-1">
-                    {chatModerationIdentities.length > 0 ? (
-                      chatModerationIdentities.map((identity) => (
-                        <article key={identity.id || identity.owncast_user_id} className="rounded-lg border border-black bg-[#151515] p-3">
+                  {chatModerationIdentities.length > 0 ? (
+                    <div className="space-y-3">
+                      <label className="block text-[10px] uppercase tracking-[0.14em] text-[#8F8F8F]">
+                        Choose Owncast handle
+                      </label>
+                      <select
+                        className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
+                        value={selectedChatIdentityValue}
+                        onChange={(event) => setSelectedChatIdentityKey(event.target.value)}
+                      >
+                        {chatModerationIdentities.map((identity) => {
+                          const key = owncastIdentityKey(identity);
+                          const label = owncastIdentityLabel(identity);
+                          const statusText = identity.is_disabled
+                            ? "banned"
+                            : identity.is_timeout_active
+                              ? "timeout"
+                              : identity.is_moderator
+                                ? "moderator"
+                                : "viewer";
+                          return (
+                            <option key={key} value={key}>
+                              {label} | {identity.platform_email || "no email"} | {statusText}
+                            </option>
+                          );
+                        })}
+                      </select>
+
+                      {selectedChatIdentity ? (
+                        <article className="rounded-lg border border-black bg-[#151515] p-3">
                           <div className="flex flex-wrap items-start justify-between gap-2">
                             <div>
-                              <div className="text-sm font-semibold text-white">{owncastIdentityLabel(identity)}</div>
-                              <div className="mt-1 text-[11px] text-[#A8A8A8]">
-                                {identity.platform_email || "No platform email"} | {identity.platform_role || "role unknown"}
+                              <div className="text-sm font-semibold text-white">
+                                {owncastIdentityLabel(selectedChatIdentity)}
                               </div>
-                              <div className="mt-1 text-[11px] text-[#7F7F7F]">Owncast ID: {identity.owncast_user_id || "-"}</div>
+                              <div className="mt-1 text-[11px] text-[#A8A8A8]">
+                                {selectedChatIdentity.platform_email || "No platform email"} |{" "}
+                                {selectedChatIdentity.platform_role || "role unknown"}
+                              </div>
+                              <div className="mt-1 text-[11px] text-[#7F7F7F]">
+                                Owncast ID: {selectedChatIdentity.owncast_user_id || "-"}
+                              </div>
                             </div>
                             <div className="flex flex-wrap gap-1">
-                              {identity.is_moderator ? (
+                              {selectedChatIdentity.is_moderator ? (
                                 <span className="rounded-full border border-black bg-[#242424] px-2 py-1 text-[10px] uppercase tracking-[0.1em] text-[#E7E7E7]">
                                   Moderator
                                 </span>
                               ) : null}
-                              {identity.is_disabled ? (
+                              {selectedChatIdentity.is_disabled ? (
                                 <span className="rounded-full border border-red-300/30 bg-red-200/10 px-2 py-1 text-[10px] uppercase tracking-[0.1em] text-red-200">
                                   Disabled
                                 </span>
                               ) : null}
-                              {identity.is_timeout_active ? (
+                              {selectedChatIdentity.is_timeout_active ? (
                                 <span className="rounded-full border border-amber-300/30 bg-amber-200/10 px-2 py-1 text-[10px] uppercase tracking-[0.1em] text-amber-200">
                                   Timeout
                                 </span>
                               ) : null}
                             </div>
                           </div>
-                          {identity.timeout_until ? (
+                          {selectedChatIdentity.timeout_until ? (
                             <div className="mt-2 text-[11px] text-[#A8A8A8]">
-                              Timeout until: {formatModerationTime(identity.timeout_until)}
+                              Timeout until: {formatModerationTime(selectedChatIdentity.timeout_until)}
                             </div>
                           ) : null}
                           <div className="mt-3 flex flex-wrap gap-2">
-                            {identity.is_disabled ? (
+                            {selectedChatIdentity.is_disabled ? (
                               <Button
                                 variant="secondary"
                                 className="px-2.5 py-1 text-[11px]"
                                 onClick={() =>
                                   applyChatModerationAction(
                                     "unban_user",
-                                    { owncast_user_id: identity.owncast_user_id },
-                                    `${owncastIdentityLabel(identity)} was unbanned.`
+                                    { owncast_user_id: selectedChatIdentity.owncast_user_id },
+                                    `${owncastIdentityLabel(selectedChatIdentity)} was unbanned.`
                                   )
                                 }
                                 loading={chatModerationState.actionLoading === "unban_user"}
@@ -1933,7 +1980,7 @@ export default function BroadcastingPage() {
                                 <Button
                                   variant="danger"
                                   className="px-2.5 py-1 text-[11px]"
-                                  onClick={() => handleBanOwncastUser(identity)}
+                                  onClick={() => handleBanOwncastUser(selectedChatIdentity)}
                                   loading={chatModerationState.actionLoading === "ban_user"}
                                 >
                                   Ban
@@ -1941,7 +1988,7 @@ export default function BroadcastingPage() {
                                 <Button
                                   variant="secondary"
                                   className="px-2.5 py-1 text-[11px]"
-                                  onClick={() => handleTimeoutOwncastUser(identity)}
+                                  onClick={() => handleTimeoutOwncastUser(selectedChatIdentity)}
                                   loading={chatModerationState.actionLoading === "timeout_user"}
                                 >
                                   Timeout
@@ -1953,9 +2000,11 @@ export default function BroadcastingPage() {
                               className="px-2.5 py-1 text-[11px]"
                               onClick={() =>
                                 applyChatModerationAction(
-                                  identity.is_moderator ? "revoke_moderator" : "grant_moderator",
-                                  { owncast_user_id: identity.owncast_user_id },
-                                  identity.is_moderator ? "Owncast moderator removed." : "Owncast moderator granted."
+                                  selectedChatIdentity.is_moderator ? "revoke_moderator" : "grant_moderator",
+                                  { owncast_user_id: selectedChatIdentity.owncast_user_id },
+                                  selectedChatIdentity.is_moderator
+                                    ? "Owncast moderator removed."
+                                    : "Owncast moderator granted."
                                 )
                               }
                               loading={
@@ -1963,17 +2012,17 @@ export default function BroadcastingPage() {
                                 chatModerationState.actionLoading === "revoke_moderator"
                               }
                             >
-                              {identity.is_moderator ? "Remove Mod" : "Make Mod"}
+                              {selectedChatIdentity.is_moderator ? "Remove Mod" : "Make Mod"}
                             </Button>
                           </div>
                         </article>
-                      ))
-                    ) : (
-                      <p className="rounded-lg border border-black bg-[#151515] px-3 py-2 text-xs text-[#AFAFAF]">
-                        No mapped Owncast handles yet. Ask viewers to join chat through the verified chat link, then sync handles.
-                      </p>
-                    )}
-                  </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="rounded-lg border border-black bg-[#151515] px-3 py-2 text-xs text-[#AFAFAF]">
+                      No mapped Owncast handles yet. Ask viewers to join chat through the verified chat link, then sync handles.
+                    </p>
+                  )}
                 </div>
 
                 <div className="rounded-xl border border-black bg-[#0D0D0D]/80 p-3">
