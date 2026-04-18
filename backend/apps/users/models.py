@@ -31,6 +31,8 @@ class User(AbstractUser):
     terms_accepted_at = models.DateTimeField(null=True, blank=True)
     terms_accepted_ip = models.CharField(max_length=64, blank=True, default="")
     terms_accepted_user_agent = models.CharField(max_length=255, blank=True, default="")
+    notifications_consent_version = models.CharField(max_length=40, blank=True, default="")
+    notifications_consented_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -101,9 +103,11 @@ class TermsAcceptance(models.Model):
 class AsyncJob(models.Model):
     TYPE_EMAIL_SEND = "email_send"
     TYPE_PAYMENT_WEBHOOK_RETRY = "payment_webhook_retry"
+    TYPE_WEB_PUSH_SEND = "web_push_send"
     TYPE_CHOICES = [
         (TYPE_EMAIL_SEND, "Email Send"),
         (TYPE_PAYMENT_WEBHOOK_RETRY, "Payment Webhook Retry"),
+        (TYPE_WEB_PUSH_SEND, "Web Push Send"),
     ]
 
     STATUS_PENDING = "pending"

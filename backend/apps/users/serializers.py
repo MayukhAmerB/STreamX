@@ -48,6 +48,8 @@ class UserSerializer(serializers.ModelSerializer):
             "two_factor_enabled",
             "terms_accepted_version",
             "terms_accepted_at",
+            "notifications_consent_version",
+            "notifications_consented_at",
             "terms_required_version",
             "terms_acceptance_required",
             "created_at",

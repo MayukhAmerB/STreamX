@@ -1,4 +1,4 @@
-TERMS_VERSION = "2026-04-18"
+TERMS_VERSION = "2026-04-18-notifications"
 TERMS_LAST_UPDATED = "April 18, 2026"
 TERMS_TITLE = "Terms and Conditions"
 
@@ -130,6 +130,16 @@ We implement reasonable security measures but cannot guarantee absolute security
 
 We do NOT sell user data to third parties.
 
+9.5 Platform Notifications and Browser Push
+
+We may send account-related and educational notifications, including live class alerts, newly uploaded course video alerts, security notices, and important platform updates.
+
+By selecting "I Agree", you consent to receiving in-platform bell notifications and browser push notification prompts from AlsyedInitiative where supported by your browser and device.
+
+Browser push notifications require browser-level permission. If your browser asks for notification permission, you may allow or deny that permission. Denying browser push does not cancel your Terms acceptance, but in-platform bell notifications may still appear while you use the Platform.
+
+You are responsible for keeping your device and browser notification settings secure.
+
 10. LEGAL COMPLIANCE
 
 Users must comply with:
@@ -168,6 +178,7 @@ By selecting "I Agree" or by continuing to access or use the Platform, you:
 
 Enter into a legally binding agreement with AlsyedInitiative
 Confirm that you have read and understood these Terms in full
+Consent to platform notifications, including browser push notification prompts where supported
 Waive any claim of ignorance or misunderstanding of these Terms
 
 Electronic acceptance (including checkbox selection, button click, or continued usage) shall have the same legal effect as a handwritten signature under applicable electronic transaction laws.
@@ -186,4 +197,3 @@ ANY misuse of the knowledge provided, including illegal hacking, surveillance, o
 
 The Platform and its creators disclaim all liability arising from such misuse.
 """
-

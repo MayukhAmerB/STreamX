@@ -1,0 +1,15 @@
+from django.urls import path
+
+from .views import (
+    NotificationListView,
+    NotificationReadAllView,
+    NotificationReadView,
+    WebPushSubscriptionView,
+)
+
+urlpatterns = [
+    path("", NotificationListView.as_view(), name="notification-list"),
+    path("read-all/", NotificationReadAllView.as_view(), name="notification-read-all"),
+    path("<int:pk>/read/", NotificationReadView.as_view(), name="notification-read"),
+    path("push-subscriptions/", WebPushSubscriptionView.as_view(), name="notification-push-subscriptions"),
+]

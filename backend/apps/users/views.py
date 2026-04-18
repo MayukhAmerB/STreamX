@@ -395,6 +395,11 @@ class AuthConfigView(APIView):
                 "google_login_enabled": bool(getattr(settings, "GOOGLE_CLIENT_ID", "").strip()),
                 "terms_version": TERMS_VERSION,
                 "terms_last_updated": TERMS_LAST_UPDATED,
+                "web_push_enabled": bool(
+                    getattr(settings, "WEB_PUSH_ENABLED", False)
+                    and str(getattr(settings, "WEB_PUSH_VAPID_PUBLIC_KEY", "") or "").strip()
+                ),
+                "web_push_public_key": str(getattr(settings, "WEB_PUSH_VAPID_PUBLIC_KEY", "") or "").strip(),
             },
         )
 
@@ -444,12 +449,16 @@ class TermsAcceptView(APIView):
             user.terms_accepted_at = acceptance.accepted_at
             user.terms_accepted_ip = acceptance.ip_address
             user.terms_accepted_user_agent = acceptance.user_agent
+            user.notifications_consent_version = TERMS_VERSION
+            user.notifications_consented_at = accepted_at
             user.save(
                 update_fields=[
                     "terms_accepted_version",
                     "terms_accepted_at",
                     "terms_accepted_ip",
                     "terms_accepted_user_agent",
+                    "notifications_consent_version",
+                    "notifications_consented_at",
                     "updated_at",
                 ]
             )

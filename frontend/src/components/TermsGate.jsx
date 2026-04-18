@@ -1,19 +1,21 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { fetchTerms } from "../api/auth";
+import { registerPushSubscription } from "../api/notifications";
 import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
+import { requestNotificationPermission, subscribeToBrowserPush } from "../utils/pushNotifications";
 import Button from "./Button";
 
 const fallbackTerms = {
   title: "Terms and Conditions",
-  version: "2026-04-18",
+  version: "2026-04-18-notifications",
   last_updated: "April 18, 2026",
   body: "Terms and Conditions must be accepted before continuing.",
 };
 
 export default function TermsGate() {
-  const { user, loading, acceptTerms, logout } = useAuth();
+  const { user, loading, acceptTerms, logout, webPushEnabled, webPushPublicKey } = useAuth();
   const location = useLocation();
   const [terms, setTerms] = useState(fallbackTerms);
   const [checked, setChecked] = useState(false);
@@ -55,8 +57,22 @@ export default function TermsGate() {
     }
     setSubmitting(true);
     setError("");
+    let pushPermission = "";
     try {
+      if (webPushEnabled && webPushPublicKey) {
+        pushPermission = await requestNotificationPermission();
+      }
       await acceptTerms({ accepted: true, terms_version: terms.version });
+      if (pushPermission === "granted") {
+        try {
+          const subscription = await subscribeToBrowserPush(webPushPublicKey);
+          if (subscription) {
+            await registerPushSubscription(subscription);
+          }
+        } catch {
+          // Terms acceptance must not be blocked by a browser push failure.
+        }
+      }
     } catch (err) {
       setError(apiMessage(err, "Unable to save Terms acceptance."));
     } finally {
@@ -99,7 +115,10 @@ export default function TermsGate() {
               Agreement
             </h3>
             <p className="mt-3 text-sm leading-6 text-[#BFBFBF]">
-              By clicking I Agree, your account, timestamp, IP address, browser details, and Terms version will be stored as a consent record.
+              By clicking I Agree, your account, timestamp, IP address, browser details, Terms version, and notification consent will be stored as a consent record.
+            </p>
+            <p className="mt-3 text-xs leading-5 text-[#9F9F9F]">
+              Your browser may ask permission for push notifications. Bell notifications still work inside the platform even if browser push is denied.
             </p>
             <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-black/30 p-3 text-sm leading-6 text-[#E3E3E3]">
               <input
@@ -108,7 +127,7 @@ export default function TermsGate() {
                 checked={checked}
                 onChange={(event) => setChecked(event.target.checked)}
               />
-              <span>I have read, understood, and agree to the Terms and Conditions.</span>
+              <span>I have read, understood, and agree to the Terms and Conditions, including platform and browser push notifications.</span>
             </label>
             {error ? (
               <div className="mt-3 rounded-xl border border-red-300/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">
@@ -139,4 +158,3 @@ export default function TermsGate() {
     </div>
   );
 }
-

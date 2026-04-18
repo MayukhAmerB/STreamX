@@ -16,6 +16,7 @@ urlpatterns = [
     path("readyz", readiness_view, name="readyz"),
     path("metrics", metrics_view, name="metrics"),
     path("api/auth/", include("apps.users.urls")),
+    path("api/notifications/", include("apps.notifications.urls")),
     path("api/realtime/", include("apps.realtime.urls")),
     path("api/", include("apps.courses.urls")),
     path("api/payment/", include("apps.payments.urls")),

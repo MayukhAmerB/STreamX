@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { fetchTerms } from "../api/auth";
+import { registerPushSubscription } from "../api/notifications";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
+import { requestNotificationPermission, subscribeToBrowserPush } from "../utils/pushNotifications";
 
 const fallbackTerms = {
   title: "Terms and Conditions",
-  version: "2026-04-18",
+  version: "2026-04-18-notifications",
   last_updated: "April 18, 2026",
   body: "Terms and Conditions are temporarily unavailable. Please try again.",
 };
@@ -16,7 +18,7 @@ const fallbackTerms = {
 export default function TermsPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, acceptTerms } = useAuth();
+  const { user, acceptTerms, webPushEnabled, webPushPublicKey } = useAuth();
   const [terms, setTerms] = useState(fallbackTerms);
   const [loading, setLoading] = useState(true);
   const [checked, setChecked] = useState(false);
@@ -55,8 +57,22 @@ export default function TermsPage() {
     }
     setSubmitting(true);
     setStatus({ error: "", success: "" });
+    let pushPermission = "";
     try {
+      if (webPushEnabled && webPushPublicKey) {
+        pushPermission = await requestNotificationPermission();
+      }
       await acceptTerms({ accepted: true, terms_version: terms.version });
+      if (pushPermission === "granted") {
+        try {
+          const subscription = await subscribeToBrowserPush(webPushPublicKey);
+          if (subscription) {
+            await registerPushSubscription(subscription);
+          }
+        } catch {
+          // Browser push is best-effort; in-app notifications remain active.
+        }
+      }
       setStatus({ error: "", success: "Terms accepted. You can continue using the platform." });
       navigate(location.state?.from || "/", { replace: true });
     } catch (err) {
@@ -113,7 +129,7 @@ export default function TermsPage() {
                         checked={checked}
                         onChange={(event) => setChecked(event.target.checked)}
                       />
-                      <span>I have read, understood, and agree to these Terms and Conditions.</span>
+                      <span>I have read, understood, and agree to these Terms and Conditions, including platform and browser push notifications.</span>
                     </label>
                     <Button
                       type="button"
@@ -130,6 +146,9 @@ export default function TermsPage() {
                     Your account has accepted the current Terms version.
                   </div>
                 )}
+                <p className="mt-3 text-xs leading-5 text-[#9F9F9F]">
+                  If browser push is enabled, your browser may ask for notification permission when you accept. Bell notifications remain available inside the platform.
+                </p>
               </>
             ) : (
               <div className="mt-3 space-y-3 text-sm leading-6 text-[#BFBFBF]">

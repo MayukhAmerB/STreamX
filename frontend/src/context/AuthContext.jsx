@@ -19,6 +19,8 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [registrationEnabled, setRegistrationEnabled] = useState(false);
   const [googleLoginEnabled, setGoogleLoginEnabled] = useState(false);
+  const [webPushEnabled, setWebPushEnabled] = useState(false);
+  const [webPushPublicKey, setWebPushPublicKey] = useState("");
   const hasBootstrappedRef = useRef(false);
 
   async function refreshUser() {
@@ -38,9 +40,13 @@ export function AuthProvider({ children }) {
       const data = apiData(response, {});
       setRegistrationEnabled(Boolean(data?.registration_enabled));
       setGoogleLoginEnabled(Boolean(data?.google_login_enabled));
+      setWebPushEnabled(Boolean(data?.web_push_enabled));
+      setWebPushPublicKey(String(data?.web_push_public_key || ""));
     } catch {
       setRegistrationEnabled(false);
       setGoogleLoginEnabled(false);
+      setWebPushEnabled(false);
+      setWebPushPublicKey("");
     }
   }
 
@@ -119,6 +125,8 @@ export function AuthProvider({ children }) {
       isAdmin: Boolean(user?.is_admin),
       registrationEnabled,
       googleLoginEnabled,
+      webPushEnabled,
+      webPushPublicKey,
       login,
       register,
       googleLogin,
@@ -128,7 +136,7 @@ export function AuthProvider({ children }) {
       refreshAuthConfig,
       apiMessage,
     }),
-    [user, loading, registrationEnabled, googleLoginEnabled]
+    [user, loading, registrationEnabled, googleLoginEnabled, webPushEnabled, webPushPublicKey]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

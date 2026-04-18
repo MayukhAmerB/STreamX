@@ -51,6 +51,7 @@ from apps.realtime.models import (
     RealtimeSession,
     RealtimeSessionRecording,
 )
+from apps.notifications.models import Notification, NotificationRecipient, WebPushSubscription
 from apps.users.models import AuthConfiguration, User
 from apps.users.serializers import ProfileUpdateSerializer
 from apps.users.terms import TERMS_BODY, TERMS_VERSION
@@ -63,12 +64,16 @@ def mark_terms_accepted(*users):
         user.terms_accepted_at = accepted_at
         user.terms_accepted_ip = "127.0.0.1"
         user.terms_accepted_user_agent = "test-client"
+        user.notifications_consent_version = TERMS_VERSION
+        user.notifications_consented_at = accepted_at
         user.save(
             update_fields=[
                 "terms_accepted_version",
                 "terms_accepted_at",
                 "terms_accepted_ip",
                 "terms_accepted_user_agent",
+                "notifications_consent_version",
+                "notifications_consented_at",
                 "updated_at",
             ]
         )
@@ -116,6 +121,102 @@ class BaseAPITestCase(APITestCase):
         )
         self.assertEqual(response.status_code, 200)
         return response
+
+
+class NotificationTests(BaseAPITestCase):
+    def test_course_video_upload_creates_bell_notification_for_paid_students(self):
+        Enrollment.objects.create(
+            user=self.student,
+            course=self.course,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+
+        Lecture.objects.create(
+            section=self.section,
+            title="Fresh Lecture",
+            description="Fresh upload",
+            video_key="videos/fresh-lecture.mp4",
+            order=2,
+        )
+
+        notification = Notification.objects.get(kind=Notification.KIND_COURSE_VIDEO_UPLOADED)
+        self.assertEqual(notification.course, self.course)
+        self.assertIn("Fresh Lecture", notification.body)
+        self.assertTrue(
+            NotificationRecipient.objects.filter(
+                notification=notification,
+                user=self.student,
+                read_at__isnull=True,
+            ).exists()
+        )
+
+        self.login(self.student.email)
+        response = self.client.get(reverse("notification-list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["unread_count"], 1)
+        self.assertEqual(response.data["data"]["results"][0]["notification"]["kind"], "course_video_uploaded")
+
+    def test_live_class_start_creates_notification_for_approved_students(self):
+        live_class = LiveClass.objects.create(
+            title="Friday Live",
+            description="Live session",
+            price=Decimal("0.00"),
+            linked_course=self.course,
+        )
+        LiveClassEnrollment.objects.create(
+            user=self.student,
+            live_class=live_class,
+            status=LiveClassEnrollment.STATUS_APPROVED,
+        )
+
+        RealtimeSession.objects.create(
+            title="Friday Live Room",
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            status=RealtimeSession.STATUS_LIVE,
+            host=self.instructor,
+            linked_live_class=live_class,
+        )
+
+        notification = Notification.objects.get(kind=Notification.KIND_LIVE_CLASS_STARTED)
+        self.assertEqual(notification.live_class, live_class)
+        self.assertTrue(
+            NotificationRecipient.objects.filter(
+                notification=notification,
+                user=self.student,
+            ).exists()
+        )
+
+    def test_notification_read_and_push_subscription_endpoints(self):
+        notification = Notification.objects.create(
+            kind=Notification.KIND_ANNOUNCEMENT,
+            title="Platform update",
+            body="A new update is ready.",
+            event_key="test-announcement",
+        )
+        recipient = NotificationRecipient.objects.create(
+            user=self.student,
+            notification=notification,
+        )
+        self.login(self.student.email)
+
+        read_response = self.client.post(reverse("notification-read", args=[recipient.pk]))
+        self.assertEqual(read_response.status_code, 200)
+        recipient.refresh_from_db()
+        self.assertIsNotNone(recipient.read_at)
+
+        subscription_response = self.client.post(
+            reverse("notification-push-subscriptions"),
+            {
+                "endpoint": "https://push.example.test/subscription/1",
+                "keys": {"p256dh": "p256dh-key", "auth": "auth-key"},
+            },
+            format="json",
+            HTTP_USER_AGENT="push-test-agent",
+        )
+        self.assertEqual(subscription_response.status_code, 200)
+        subscription = WebPushSubscription.objects.get(user=self.student)
+        self.assertEqual(subscription.endpoint, "https://push.example.test/subscription/1")
+        self.assertTrue(subscription.is_active)
 
 
 class AuthTests(APITestCase):
@@ -177,7 +278,9 @@ class AuthTests(APITestCase):
         self.assertFalse(accept_resp.data["data"]["terms_acceptance_required"])
         user.refresh_from_db()
         self.assertEqual(user.terms_accepted_version, TERMS_VERSION)
+        self.assertEqual(user.notifications_consent_version, TERMS_VERSION)
         self.assertIsNotNone(user.terms_accepted_at)
+        self.assertIsNotNone(user.notifications_consented_at)
         self.assertEqual(user.terms_acceptances.count(), 1)
 
         allowed_profile = self.client.get(reverse("auth-profile"))
@@ -2695,7 +2798,7 @@ class RealtimeSessionTests(APITestCase):
             second = realtime_services.resolve_broadcast_urls(session)
 
         self.assertEqual(first, second)
-        self.assertEqual(first["stream_embed_url"], "https://stream.example.com/embed/video")
+        self.assertEqual(first["stream_embed_url"], "https://stream.example.com/embed/video/")
         self.assertEqual(first["chat_embed_url"], "https://stream.example.com/embed/chat/readwrite")
         self.assertNotIn(":8080", first["stream_embed_url"])
         self.assertNotIn(":8080", first["chat_embed_url"])

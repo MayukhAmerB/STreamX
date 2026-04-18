@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { resolveDjangoAdminUrl } from "../utils/backendUrl";
 import Button from "./Button";
 import BrandLogo from "./BrandLogo";
+import NotificationBell from "./NotificationBell";
 
 const navClass = ({ isActive }) =>
   `text-sm ${
@@ -97,6 +98,7 @@ export default function Navbar() {
           </NavLink>
         </nav>
         <div className="flex shrink-0 items-center gap-2">
+          {isAuthenticated ? <NotificationBell /> : null}
           {isAuthenticated ? (
             <div className="relative hidden sm:block">
               <button

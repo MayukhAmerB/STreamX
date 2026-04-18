@@ -44,6 +44,19 @@ def enqueue_payment_webhook_retry_job(*, payload, signature, max_attempts=6):
     )
 
 
+def enqueue_web_push_job(*, notification_id, user_ids, max_attempts=3):
+    return AsyncJob.objects.create(
+        job_type=AsyncJob.TYPE_WEB_PUSH_SEND,
+        status=AsyncJob.STATUS_PENDING,
+        payload={
+            "notification_id": int(notification_id),
+            "user_ids": [int(user_id) for user_id in user_ids or []],
+        },
+        max_attempts=max(1, int(max_attempts or 1)),
+        run_after=timezone.now(),
+    )
+
+
 def _claim_due_jobs(limit):
     now = timezone.now()
     with transaction.atomic():
@@ -122,11 +135,28 @@ def _run_payment_webhook_retry_job(job):
     return result
 
 
+def _run_web_push_job(job):
+    payload = job.payload or {}
+    notification_id = payload.get("notification_id")
+    user_ids = payload.get("user_ids") or []
+    if not notification_id:
+        raise ValueError("Web push job has no notification_id.")
+
+    from apps.notifications.models import Notification
+    from apps.notifications.services import send_push_for_notification
+
+    notification = Notification.objects.get(pk=notification_id)
+    sent = send_push_for_notification(notification, user_ids)
+    return {"sent": sent, "notification_id": notification.id}
+
+
 def _run_job(job):
     if job.job_type == AsyncJob.TYPE_EMAIL_SEND:
         return _run_email_job(job)
     if job.job_type == AsyncJob.TYPE_PAYMENT_WEBHOOK_RETRY:
         return _run_payment_webhook_retry_job(job)
+    if job.job_type == AsyncJob.TYPE_WEB_PUSH_SEND:
+        return _run_web_push_job(job)
     raise ValueError(f"Unsupported async job type: {job.job_type}")
 
 
