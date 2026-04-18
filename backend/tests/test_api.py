@@ -3276,7 +3276,7 @@ class RealtimeSessionTests(APITestCase):
         mock_register_chat_user.return_value = {
             "access_token": "bridge-access-token-123",
             "owncast_user_id": "owncast-user-123",
-            "display_name": "Viewer User",
+            "display_name": "agitated-rush",
             "display_color": "#ffffff",
             "authenticated": False,
         }
@@ -3313,7 +3313,8 @@ class RealtimeSessionTests(APITestCase):
             salt="realtime.owncast-chat-bridge",
         )
         self.assertEqual(signed_payload["access_token"], "bridge-access-token-123")
-        self.assertEqual(signed_payload["display_name"], "Viewer User")
+        self.assertEqual(signed_payload["display_name"], "agitated-rush")
+        self.assertEqual(signed_payload["platform_display_name"], "Viewer User")
         self.assertEqual(signed_payload["session_id"], session.id)
         self.assertEqual(signed_payload["user_id"], self.viewer.id)
         identity = OwncastChatIdentity.objects.get()
@@ -3325,12 +3326,57 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(identity.platform_full_name, "Viewer User")
         self.assertEqual(identity.platform_display_name, "Viewer User")
         self.assertEqual(identity.owncast_user_id, "owncast-user-123")
-        self.assertEqual(identity.owncast_display_name, "Viewer User")
+        self.assertEqual(identity.owncast_display_name, "agitated-rush")
         self.assertEqual(identity.owncast_display_color, "#ffffff")
         self.assertNotEqual(identity.access_token_hash, "bridge-access-token-123")
         self.assertEqual(identity.access_token_hash, OwncastChatIdentity.hash_access_token("bridge-access-token-123"))
         self.assertNotIn("bridge-access-token-123", identity.access_token_secret)
         self.assertEqual(identity.reveal_access_token(), "bridge-access-token-123")
+        mock_register_chat_user.assert_called_once_with(display_name="")
+
+    @override_settings(OWNCAST_CHAT_BRIDGE_ENABLED=True)
+    @patch("apps.realtime.views.register_owncast_chat_user")
+    def test_broadcast_chat_launch_does_not_store_platform_name_as_owncast_fallback(self, mock_register_chat_user):
+        mock_register_chat_user.return_value = {
+            "access_token": "pending-handle-token",
+            "owncast_user_id": "owncast-user-pending-handle",
+            "display_name": "",
+            "display_color": "#ffffff",
+            "authenticated": False,
+        }
+        session = RealtimeSession.objects.create(
+            title="Broadcast Pending Handle Session",
+            description="Platform name should not be stored as the Owncast handle.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+            chat_embed_url="https://stream.example.com/embed/chat/readwrite",
+        )
+
+        self.login(self.viewer.email)
+        response = self.client.post(
+            reverse("realtime-session-owncast-chat-launch", kwargs={"pk": session.id}),
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        identity = OwncastChatIdentity.objects.get()
+        self.assertEqual(identity.platform_display_name, "Viewer User")
+        self.assertEqual(identity.owncast_display_name, "Pending Owncast handle")
+        launch_url = response.data["data"]["launch_url"]
+        token = parse_qs(urlparse(launch_url).query)["token"][0]
+        signed_payload = signing.loads(
+            token,
+            max_age=120,
+            salt="realtime.owncast-chat-bridge",
+        )
+        self.assertEqual(signed_payload["display_name"], "")
+        self.assertEqual(signed_payload["platform_display_name"], "Viewer User")
+        mock_register_chat_user.assert_called_once_with(display_name="")
 
     @override_settings(OWNCAST_CHAT_BRIDGE_ENABLED=True)
     @patch("apps.realtime.views.register_owncast_chat_user")
@@ -3338,7 +3384,7 @@ class RealtimeSessionTests(APITestCase):
         mock_register_chat_user.return_value = {
             "access_token": "permanent-access-token",
             "owncast_user_id": "stable-owncast-user",
-            "display_name": "Viewer User",
+            "display_name": "steady-hawk",
             "display_color": "#ffffff",
             "authenticated": False,
         }
@@ -3383,7 +3429,7 @@ class RealtimeSessionTests(APITestCase):
         )
         self.assertEqual(second_response.status_code, 200)
 
-        mock_register_chat_user.assert_called_once_with(display_name="Viewer User")
+        mock_register_chat_user.assert_called_once_with(display_name="")
         self.assertEqual(OwncastChatIdentity.objects.count(), 1)
         identity = OwncastChatIdentity.objects.get()
         self.assertEqual(identity.session, second_session)
@@ -3579,13 +3625,14 @@ class RealtimeSessionTests(APITestCase):
             platform_role=self.viewer.role,
             platform_display_name="Viewer User",
             owncast_user_id="owncast-user-bridge",
-            owncast_display_name="Viewer User",
+            owncast_display_name="agitated-rush",
             access_token_hash=OwncastChatIdentity.hash_access_token("bridge-access-token-123"),
         )
         signed_token = signing.dumps(
             {
                 "access_token": "bridge-access-token-123",
-                "display_name": "Viewer User",
+                "display_name": "agitated-rush",
+                "platform_display_name": "Viewer User",
                 "next_path": "/embed/chat/readwrite/",
                 "session_id": 99,
                 "user_id": self.viewer.id,
@@ -3602,11 +3649,99 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         html = response.content.decode("utf-8")
         self.assertIn('localStorage.setItem("accessToken"', html)
+        self.assertIn('localStorage.removeItem("username")', html)
+        self.assertIn("navigator.sendBeacon", html)
         self.assertIn("bridge-access-token-123", html)
+        self.assertIn("agitated-rush", html)
         self.assertIn("/embed/chat/readwrite/", html)
         self.assertEqual(response["Cache-Control"], "no-store, max-age=0")
         identity.refresh_from_db()
         self.assertIsNotNone(identity.bridge_used_at)
+
+    def test_owncast_chat_bridge_syncs_preserved_browser_username(self):
+        session = RealtimeSession.objects.create(
+            title="Bridge Sync Session",
+            description="Bridge should sync the real browser Owncast handle.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+            chat_embed_url="https://stream.example.com/embed/chat/readwrite",
+        )
+        identity = OwncastChatIdentity.objects.create(
+            session=session,
+            user=self.viewer,
+            platform_user_id=self.viewer.id,
+            platform_email=self.viewer.email,
+            platform_full_name=self.viewer.full_name,
+            platform_role=self.viewer.role,
+            platform_display_name="Viewer User",
+            owncast_user_id="owncast-user-bridge-sync",
+            owncast_display_name="Pending Owncast handle",
+            access_token_hash=OwncastChatIdentity.hash_access_token("bridge-access-token-123"),
+        )
+        signed_token = signing.dumps(
+            {
+                "access_token": "bridge-access-token-123",
+                "display_name": "",
+                "platform_display_name": "Viewer User",
+                "next_path": "/embed/chat/readwrite/",
+                "session_id": session.id,
+                "user_id": self.viewer.id,
+                "identity_id": identity.id,
+            },
+            salt="realtime.owncast-chat-bridge",
+            compress=True,
+        )
+
+        response = self.client.post(
+            reverse("realtime-owncast-chat-bridge"),
+            {"token": signed_token, "display_name": "<b>agitated-rush</b>"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        identity.refresh_from_db()
+        self.assertEqual(identity.owncast_display_name, "agitated-rush")
+
+    def test_owncast_chat_bridge_rejects_platform_name_as_synced_handle(self):
+        identity = OwncastChatIdentity.objects.create(
+            session=None,
+            user=self.viewer,
+            platform_user_id=self.viewer.id,
+            platform_email=self.viewer.email,
+            platform_full_name=self.viewer.full_name,
+            platform_role=self.viewer.role,
+            platform_display_name="Viewer User",
+            owncast_user_id="owncast-user-bridge-reject-platform",
+            owncast_display_name="Pending Owncast handle",
+            access_token_hash=OwncastChatIdentity.hash_access_token("bridge-access-token-123"),
+        )
+        signed_token = signing.dumps(
+            {
+                "access_token": "bridge-access-token-123",
+                "display_name": "",
+                "platform_display_name": "Viewer User",
+                "next_path": "/embed/chat/readwrite/",
+                "session_id": 99,
+                "user_id": self.viewer.id,
+                "identity_id": identity.id,
+            },
+            salt="realtime.owncast-chat-bridge",
+            compress=True,
+        )
+
+        response = self.client.post(
+            reverse("realtime-owncast-chat-bridge"),
+            {"token": signed_token, "display_name": "Viewer User"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        identity.refresh_from_db()
+        self.assertEqual(identity.owncast_display_name, "Pending Owncast handle")
 
     def test_owncast_chat_bridge_rejects_invalid_signature(self):
         response = self.client.get(

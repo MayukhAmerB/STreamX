@@ -652,10 +652,8 @@ def register_owncast_chat_user(*, display_name):
     authenticated platform usernames to Owncast chat identities.
     """
     preferred_display_name = str(display_name or "").strip()
-    if not preferred_display_name:
-        preferred_display_name = "Viewer"
     if len(preferred_display_name) > 80:
-        preferred_display_name = preferred_display_name[:80].strip() or "Viewer"
+        preferred_display_name = preferred_display_name[:80].strip()
 
     base_candidates = []
     for raw_base in (
@@ -669,19 +667,24 @@ def register_owncast_chat_user(*, display_name):
     if not base_candidates:
         raise OwncastConfigError("OWNCAST_ADMIN_API_BASE_URL or OWNCAST_BASE_URL is required.")
 
-    payload = {"displayName": preferred_display_name}
+    payload = {}
+    if preferred_display_name:
+        payload["displayName"] = preferred_display_name
     last_error = ""
 
     for base_url in base_candidates:
         endpoint = f"{base_url}/api/chat/register"
+        headers = {
+            "Content-Type": "application/json",
+        }
+        if preferred_display_name:
+            headers["X-Forwarded-User"] = preferred_display_name
+
         request = Request(
             endpoint,
             data=json.dumps(payload).encode("utf-8"),
             method="POST",
-            headers={
-                "Content-Type": "application/json",
-                "X-Forwarded-User": preferred_display_name,
-            },
+            headers=headers,
         )
         try:
             with urlopen(request, timeout=10) as response:

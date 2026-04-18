@@ -15,6 +15,7 @@ from django.db.models import Q
 from django.http import FileResponse, HttpResponse
 from django.http.response import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
+from django.utils.html import strip_tags
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.authentication import SessionAuthentication
@@ -93,6 +94,7 @@ User = get_user_model()
 realtime_ops_logger = logging.getLogger("ops.realtime")
 _OWNCAST_CHAT_BRIDGE_SIGNING_SALT = "realtime.owncast-chat-bridge"
 _OWNCAST_CHAT_BRIDGE_NEXT_PATH = "/embed/chat/readwrite/"
+_OWNCAST_PENDING_DISPLAY_NAME = "Pending Owncast handle"
 
 
 def _owncast_chat_bridge_ttl_seconds():
@@ -123,7 +125,37 @@ def _resolve_owncast_display_name(user):
     return "Viewer"
 
 
-def _render_owncast_chat_bridge_html(*, access_token, display_name, next_path):
+def _clean_owncast_display_name(value, *, max_length=80):
+    return " ".join(strip_tags(str(value or "")).split())[:max_length]
+
+
+def _same_owncast_display_name(left, right):
+    return _clean_owncast_display_name(left).casefold() == _clean_owncast_display_name(right).casefold()
+
+
+def _is_placeholder_owncast_display_name(value):
+    normalized = _clean_owncast_display_name(value).casefold()
+    return normalized in {"", "owncast viewer", _OWNCAST_PENDING_DISPLAY_NAME.casefold()}
+
+
+def _owncast_display_name_for_storage(value, *, platform_display_name):
+    cleaned = _clean_owncast_display_name(value, max_length=120)
+    if _is_placeholder_owncast_display_name(cleaned):
+        return ""
+    if platform_display_name and _same_owncast_display_name(cleaned, platform_display_name):
+        return ""
+    return cleaned
+
+
+def _decode_owncast_chat_bridge_payload(token):
+    return signing.loads(
+        token,
+        max_age=_owncast_chat_bridge_ttl_seconds(),
+        salt=_OWNCAST_CHAT_BRIDGE_SIGNING_SALT,
+    )
+
+
+def _render_owncast_chat_bridge_html(*, bridge_token, access_token, display_name, platform_display_name, next_path):
     html = f"""<!doctype html>
 <html lang="en">
   <head>
@@ -160,14 +192,56 @@ def _render_owncast_chat_bridge_html(*, access_token, display_name, next_path):
       (() => {{
         const accessToken = {json.dumps(access_token)};
         const displayName = {json.dumps(display_name)};
+        const platformDisplayName = {json.dumps(platform_display_name)};
         const nextPath = {json.dumps(next_path)};
+        const bridgeToken = {json.dumps(bridge_token)};
+        const syncPath = "/api/realtime/owncast/chat-bridge/";
+        const normalizeName = (value) => String(value || "").replace(/\\s+/g, " ").trim().slice(0, 80);
+        const sameName = (left, right) => normalizeName(left).toLocaleLowerCase() === normalizeName(right).toLocaleLowerCase();
+        let storedUsername = "";
+        try {{
+          storedUsername = normalizeName(localStorage.getItem("username"));
+        }} catch (error) {{
+          storedUsername = "";
+        }}
+        const normalizedDisplayName = normalizeName(displayName);
+        const normalizedPlatformName = normalizeName(platformDisplayName);
+        if (storedUsername && normalizedPlatformName && sameName(storedUsername, normalizedPlatformName)) {{
+          storedUsername = "";
+          try {{
+            localStorage.removeItem("username");
+          }} catch (error) {{
+            // best effort only
+          }}
+        }}
+        const displayNameLooksLikePlatformName =
+          normalizedDisplayName && normalizedPlatformName && sameName(normalizedDisplayName, normalizedPlatformName);
+        const effectiveDisplayName = storedUsername || (displayNameLooksLikePlatformName ? "" : normalizedDisplayName);
         try {{
           localStorage.setItem("accessToken", accessToken);
-          if (displayName) {{
-            localStorage.setItem("username", displayName);
+          if (effectiveDisplayName) {{
+            localStorage.setItem("username", effectiveDisplayName);
           }}
         }} catch (error) {{
           // best effort only
+        }}
+        if (effectiveDisplayName && effectiveDisplayName !== normalizeName(displayName)) {{
+          const payload = JSON.stringify({{ token: bridgeToken, display_name: effectiveDisplayName }});
+          try {{
+            if (navigator.sendBeacon) {{
+              navigator.sendBeacon(syncPath, new Blob([payload], {{ type: "application/json" }}));
+            }} else {{
+              fetch(syncPath, {{
+                method: "POST",
+                headers: {{ "Content-Type": "application/json" }},
+                body: payload,
+                credentials: "omit",
+                keepalive: true,
+              }}).catch(() => {{}});
+            }}
+          }} catch (error) {{
+            // best effort only
+          }}
         }}
         window.location.replace(nextPath);
       }})();
@@ -720,7 +794,7 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        display_name = _resolve_owncast_display_name(request.user)
+        platform_display_name = _resolve_owncast_display_name(request.user)
         platform_user_id = int(request.user.id)
         chat_identity = (
             OwncastChatIdentity.objects.filter(platform_user_id=platform_user_id)
@@ -732,7 +806,7 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
 
         if not access_token:
             try:
-                chat_user = register_owncast_chat_user(display_name=display_name)
+                chat_user = register_owncast_chat_user(display_name="")
             except (OwncastConfigError, OwncastAdminError) as exc:
                 return api_response(
                     success=False,
@@ -752,15 +826,23 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
 
         def persist_chat_identity(identity, *, token, owncast_user):
             if owncast_user:
-                resolved_name = str(owncast_user.get("display_name") or display_name).strip() or display_name
+                resolved_name = _owncast_display_name_for_storage(
+                    owncast_user.get("display_name"),
+                    platform_display_name=platform_display_name,
+                ) or _owncast_display_name_for_storage(
+                    getattr(identity, "owncast_display_name", ""),
+                    platform_display_name=platform_display_name,
+                )
                 owncast_user_id = str(owncast_user.get("owncast_user_id") or "").strip()[:120]
             else:
-                resolved_name = str(
-                    getattr(identity, "owncast_display_name", "")
-                    or display_name
-                ).strip() or display_name
+                resolved_name = _owncast_display_name_for_storage(
+                    getattr(identity, "owncast_display_name", ""),
+                    platform_display_name=platform_display_name,
+                )
                 owncast_user_id = str(getattr(identity, "owncast_user_id", "") or "").strip()[:120]
 
+            bridge_display_name = resolved_name
+            resolved_name = resolved_name or _OWNCAST_PENDING_DISPLAY_NAME
             token_hash = OwncastChatIdentity.hash_access_token(token)
             access_token_secret = (
                 OwncastChatIdentity.seal_access_token(token)
@@ -774,7 +856,7 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
                 "platform_email": str(getattr(request.user, "email", "") or "")[:254],
                 "platform_full_name": str(getattr(request.user, "full_name", "") or "")[:255],
                 "platform_role": str(getattr(request.user, "role", "") or "")[:40],
-                "platform_display_name": display_name[:120],
+                "platform_display_name": platform_display_name[:120],
                 "owncast_display_name": resolved_name[:120],
                 "owncast_display_color": str(
                     owncast_user.get("display_color")
@@ -818,7 +900,7 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
                         "updated_at",
                     ]
                 )
-                return identity, resolved_name
+                return identity, resolved_name, bridge_display_name
 
             created_identity = OwncastChatIdentity.objects.create(
                 session=session,
@@ -827,10 +909,10 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
                 access_token_secret=access_token_secret,
                 **identity_defaults,
             )
-            return created_identity, resolved_name
+            return created_identity, resolved_name, bridge_display_name
 
         try:
-            chat_identity, resolved_display_name = persist_chat_identity(
+            chat_identity, resolved_display_name, bridge_display_name = persist_chat_identity(
                 chat_identity,
                 token=access_token,
                 owncast_user=chat_user,
@@ -841,7 +923,7 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
             if persisted_access_token:
                 access_token = persisted_access_token
                 chat_user = {}
-            chat_identity, resolved_display_name = persist_chat_identity(
+            chat_identity, resolved_display_name, bridge_display_name = persist_chat_identity(
                 chat_identity,
                 token=access_token,
                 owncast_user=chat_user,
@@ -850,7 +932,8 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
         bridge_payload = signing.dumps(
             {
                 "access_token": access_token,
-                "display_name": resolved_display_name,
+                "display_name": bridge_display_name,
+                "platform_display_name": platform_display_name,
                 "next_path": _OWNCAST_CHAT_BRIDGE_NEXT_PATH,
                 "session_id": int(session.id),
                 "user_id": int(request.user.id),
@@ -1092,11 +1175,7 @@ class RealtimeOwncastChatBridgeView(APIView):
             )
 
         try:
-            payload = signing.loads(
-                token,
-                salt=_OWNCAST_CHAT_BRIDGE_SIGNING_SALT,
-                max_age=_owncast_chat_bridge_ttl_seconds(),
-            )
+            payload = _decode_owncast_chat_bridge_payload(token)
         except signing.BadSignature:
             return api_response(
                 success=False,
@@ -1127,9 +1206,80 @@ class RealtimeOwncastChatBridgeView(APIView):
             )
 
         return _render_owncast_chat_bridge_html(
+            bridge_token=token,
             access_token=access_token,
             display_name=display_name,
+            platform_display_name=str(payload.get("platform_display_name") or "").strip()[:80],
             next_path=_OWNCAST_CHAT_BRIDGE_NEXT_PATH,
+        )
+
+    def post(self, request):
+        token = str(request.data.get("token") or "").strip()
+        display_name = _clean_owncast_display_name(request.data.get("display_name"))
+        if not token or not display_name:
+            return api_response(
+                success=False,
+                message="Invalid chat bridge request.",
+                errors={"detail": "Chat bridge token and Owncast display name are required."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            payload = _decode_owncast_chat_bridge_payload(token)
+        except signing.BadSignature:
+            return api_response(
+                success=False,
+                message="Invalid chat bridge request.",
+                errors={"detail": "Chat bridge token is invalid or expired."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            identity_id = int(payload.get("identity_id") or 0)
+            platform_user_id = int(payload.get("user_id") or 0)
+        except (TypeError, ValueError):
+            identity_id = 0
+            platform_user_id = 0
+
+        access_token = str(payload.get("access_token") or "").strip()
+        display_name = _owncast_display_name_for_storage(
+            display_name,
+            platform_display_name=str(payload.get("platform_display_name") or ""),
+        )
+        if not display_name:
+            return api_response(
+                success=False,
+                message="Invalid chat bridge request.",
+                errors={"detail": "Owncast display name could not be verified as a chat handle."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        token_hash = OwncastChatIdentity.hash_access_token(access_token)
+        identity = (
+            OwncastChatIdentity.objects.filter(
+                pk=identity_id,
+                platform_user_id=platform_user_id,
+            )
+            .exclude(access_token_hash="")
+            .first()
+        )
+        if not identity or identity.access_token_hash != token_hash:
+            return api_response(
+                success=False,
+                message="Invalid chat bridge request.",
+                errors={"detail": "Chat bridge identity could not be verified."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if identity.owncast_display_name != display_name:
+            identity.owncast_display_name = display_name
+            identity.updated_at = timezone.now()
+            identity.save(update_fields=["owncast_display_name", "updated_at"])
+
+        return api_response(
+            success=True,
+            message="Owncast display name synced.",
+            data={"display_name": display_name},
         )
 
 
