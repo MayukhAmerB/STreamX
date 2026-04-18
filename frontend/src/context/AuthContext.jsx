@@ -4,6 +4,7 @@ import {
   fetchAuthConfig,
   fetchCsrfToken,
   fetchCurrentUser,
+  acceptTerms as acceptTermsRequest,
   googleLoginUser,
   loginUser,
   logoutUser,
@@ -102,6 +103,13 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const acceptTerms = async ({ accepted = true, terms_version } = {}) => {
+    const response = await acceptTermsRequest({ accepted, terms_version });
+    const data = apiData(response);
+    setUser(data);
+    return data;
+  };
+
   const value = useMemo(
     () => ({
       user,
@@ -115,6 +123,7 @@ export function AuthProvider({ children }) {
       register,
       googleLogin,
       logout,
+      acceptTerms,
       refreshUser,
       refreshAuthConfig,
       apiMessage,

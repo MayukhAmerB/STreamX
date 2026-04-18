@@ -6,6 +6,7 @@ const quickLinks = [
   { label: "Courses", to: "/courses" },
   { label: "Live Classes", to: "/live-classes" },
   { label: "Join Live", to: "/join-live" },
+  { label: "Terms and Conditions", to: "/terms" },
 ];
 
 const programLinks = [
@@ -152,6 +153,12 @@ export default function AppFooter() {
                 className="inline-flex w-full items-center justify-center rounded-full border border-black bg-[#161616] px-4 py-2 text-sm font-semibold text-[#DBDBDB] transition hover:bg-[#1D1D1D]"
               >
                 Platform Overview
+              </Link>
+              <Link
+                to="/terms"
+                className="inline-flex w-full items-center justify-center rounded-full border border-black bg-[#161616] px-4 py-2 text-sm font-semibold text-[#DBDBDB] transition hover:bg-[#1D1D1D]"
+              >
+                Terms and Conditions
               </Link>
             </div>
           </section>

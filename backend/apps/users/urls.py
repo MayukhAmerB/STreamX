@@ -14,6 +14,8 @@ from .views import (
     ProfileView,
     RefreshTokenView,
     RegisterView,
+    TermsAcceptView,
+    TermsView,
     TwoFactorDisableView,
     TwoFactorEnableView,
     TwoFactorSetupView,
@@ -22,6 +24,8 @@ from .views import (
 urlpatterns = [
     path("config/", AuthConfigView.as_view(), name="auth-config"),
     path("csrf/", CsrfTokenView.as_view(), name="auth-csrf"),
+    path("terms/", TermsView.as_view(), name="auth-terms"),
+    path("terms/accept/", TermsAcceptView.as_view(), name="auth-terms-accept"),
     path("register/", RegisterView.as_view(), name="auth-register"),
     path("login/", LoginView.as_view(), name="auth-login"),
     path("logout/", LogoutView.as_view(), name="auth-logout"),

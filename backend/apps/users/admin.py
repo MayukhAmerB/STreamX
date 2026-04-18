@@ -15,7 +15,7 @@ from rest_framework.authtoken.models import Token
 from apps.courses.models import Enrollment, LiveClassEnrollment
 from config.audit import log_security_event
 
-from .models import AsyncJob, AuthConfiguration, User
+from .models import AsyncJob, AuthConfiguration, TermsAcceptance, User
 
 admin.site.enable_nav_sidebar = False
 
@@ -99,10 +99,11 @@ class UserAdmin(DjangoUserAdmin):
         "role",
         "pending_course_requests",
         "pending_live_class_requests",
+        "terms_accepted_version",
         "is_staff",
         "is_active",
     )
-    list_filter = ("role", "two_factor_enabled", "is_staff", "is_active")
+    list_filter = ("role", "terms_accepted_version", "two_factor_enabled", "is_staff", "is_active")
     ordering = ("-created_at",)
     search_fields = ("email", "full_name", "phone_number")
     inlines = (CourseEnrollmentInline, LiveClassEnrollmentInline)
@@ -133,11 +134,29 @@ class UserAdmin(DjangoUserAdmin):
         (None, {"fields": ("email", "password")}),
         ("Personal info", {"fields": ("full_name", "phone_number", "profile_image", "role")}),
         ("Security", {"fields": ("two_factor_enabled", "two_factor_secret")}),
+        (
+            "Terms and Conditions",
+            {
+                "fields": (
+                    "terms_accepted_version",
+                    "terms_accepted_at",
+                    "terms_accepted_ip",
+                    "terms_accepted_user_agent",
+                )
+            },
+        ),
         ("OAuth", {"fields": ("oauth_provider", "oauth_provider_uid")}),
         ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser")}),
         ("Important dates", {"fields": ("last_login", "created_at", "updated_at")}),
     )
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = (
+        "terms_accepted_version",
+        "terms_accepted_at",
+        "terms_accepted_ip",
+        "terms_accepted_user_agent",
+        "created_at",
+        "updated_at",
+    )
     add_fieldsets = (
         (
             None,
@@ -237,6 +256,25 @@ class AuthConfigurationAdmin(admin.ModelAdmin):
         if AuthConfiguration.objects.exists():
             return False
         return super().has_add_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(TermsAcceptance)
+class TermsAcceptanceAdmin(admin.ModelAdmin):
+    list_display = ("user", "terms_version", "accepted_at", "ip_address")
+    list_filter = ("terms_version", "accepted_at")
+    search_fields = ("user__email", "user__full_name", "terms_version", "ip_address")
+    readonly_fields = ("user", "terms_version", "accepted_at", "ip_address", "user_agent")
+    fields = readonly_fields
+    ordering = ("-accepted_at", "-id")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
     def has_delete_permission(self, request, obj=None):
         return False

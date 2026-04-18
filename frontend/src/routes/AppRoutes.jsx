@@ -27,6 +27,7 @@ const MeetingPage = lazy(() => import("../pages/MeetingPage"));
 const MyCoursesPage = lazy(() => import("../pages/MyCoursesPage"));
 const ProfilePage = lazy(() => import("../pages/ProfilePage"));
 const RegisterPage = lazy(() => import("../pages/RegisterPage"));
+const TermsPage = lazy(() => import("../pages/TermsPage"));
 
 export default function AppRoutes() {
   return (
@@ -43,6 +44,7 @@ export default function AppRoutes() {
           <Route path="/courses/:id" element={<CourseDetailPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/terms" element={<TermsPage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/guides" element={<GuidesPage />} />
             <Route path="/my-courses" element={<MyCoursesPage />} />

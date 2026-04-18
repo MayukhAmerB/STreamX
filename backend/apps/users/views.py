@@ -7,6 +7,7 @@ from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 import pyotp
 from rest_framework import permissions, status
@@ -18,6 +19,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
 from config.audit import log_security_event
+from config.client_ip import resolve_client_ip
 from config.cookies import REFRESH_COOKIE, clear_auth_cookies, set_auth_cookies
 from config.response import api_response
 from config.throttling import LoginRateThrottle
@@ -32,11 +34,12 @@ from .serializers import (
     ContactMessageSerializer,
     ChangePasswordSerializer,
     ProfileUpdateSerializer,
+    TermsAcceptSerializer,
     TwoFactorCodeSerializer,
     TwoFactorDisableSerializer,
     UserSerializer,
 )
-from .models import AuthConfiguration
+from .models import AuthConfiguration, TermsAcceptance
 from .security import clear_failed_login, get_lockout_state, register_failed_login
 from .session_policy import (
     SESSION_VERSION_CLAIM,
@@ -45,6 +48,7 @@ from .session_policy import (
     token_matches_active_session,
 )
 from .services import GoogleAuthError, verify_google_credential
+from .terms import TERMS_BODY, TERMS_LAST_UPDATED, TERMS_TITLE, TERMS_VERSION
 
 User = get_user_model()
 
@@ -107,6 +111,15 @@ def _revoke_all_refresh_tokens_for_user(user):
 
 def _serialize_user(user, request=None):
     return UserSerializer(user, context={"request": request} if request else {}).data
+
+
+def _serialize_terms():
+    return {
+        "title": TERMS_TITLE,
+        "version": TERMS_VERSION,
+        "last_updated": TERMS_LAST_UPDATED,
+        "body": TERMS_BODY,
+    }
 
 
 def _attach_csrf_token(response, request):
@@ -380,7 +393,78 @@ class AuthConfigView(APIView):
             data={
                 "registration_enabled": _registration_enabled(),
                 "google_login_enabled": bool(getattr(settings, "GOOGLE_CLIENT_ID", "").strip()),
+                "terms_version": TERMS_VERSION,
+                "terms_last_updated": TERMS_LAST_UPDATED,
             },
+        )
+
+
+class TermsView(APIView):
+    permission_classes = [permissions.AllowAny]
+    parser_classes = [JSONParser]
+
+    def get(self, request):
+        return api_response(
+            success=True,
+            message="Terms and Conditions fetched.",
+            data=_serialize_terms(),
+        )
+
+
+class TermsAcceptView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        serializer = TermsAcceptSerializer(data=request.data)
+        if not serializer.is_valid():
+            return api_response(
+                success=False,
+                message="Terms acceptance failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        accepted_at = timezone.now()
+        ip_address = str(resolve_client_ip(request) or "")[:64]
+        user_agent = str(request.META.get("HTTP_USER_AGENT", "") or "")[:255]
+
+        with transaction.atomic():
+            user = User.objects.select_for_update().get(pk=request.user.pk)
+            acceptance, _created = TermsAcceptance.objects.get_or_create(
+                user=user,
+                terms_version=TERMS_VERSION,
+                defaults={
+                    "accepted_at": accepted_at,
+                    "ip_address": ip_address,
+                    "user_agent": user_agent,
+                },
+            )
+            user.terms_accepted_version = TERMS_VERSION
+            user.terms_accepted_at = acceptance.accepted_at
+            user.terms_accepted_ip = acceptance.ip_address
+            user.terms_accepted_user_agent = acceptance.user_agent
+            user.save(
+                update_fields=[
+                    "terms_accepted_version",
+                    "terms_accepted_at",
+                    "terms_accepted_ip",
+                    "terms_accepted_user_agent",
+                    "updated_at",
+                ]
+            )
+
+        log_security_event(
+            "auth.terms_accepted",
+            request=request,
+            target_user_id=user.id,
+            target_email=user.email,
+            terms_version=TERMS_VERSION,
+        )
+        return api_response(
+            success=True,
+            message="Terms accepted.",
+            data=_serialize_user(user, request=request),
         )
 
 

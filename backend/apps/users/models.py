@@ -27,6 +27,10 @@ class User(AbstractUser):
     oauth_provider = models.CharField(max_length=50, blank=True, default="")
     oauth_provider_uid = models.CharField(max_length=255, blank=True, default="")
     active_session_version = models.PositiveIntegerField(default=0)
+    terms_accepted_version = models.CharField(max_length=40, blank=True, default="")
+    terms_accepted_at = models.DateTimeField(null=True, blank=True)
+    terms_accepted_ip = models.CharField(max_length=64, blank=True, default="")
+    terms_accepted_user_agent = models.CharField(max_length=255, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -64,6 +68,34 @@ class AuthConfiguration(models.Model):
 
     def __str__(self):
         return "Auth Configuration"
+
+
+class TermsAcceptance(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="terms_acceptances",
+    )
+    terms_version = models.CharField(max_length=40)
+    accepted_at = models.DateTimeField(default=timezone.now)
+    ip_address = models.CharField(max_length=64, blank=True, default="")
+    user_agent = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        ordering = ["-accepted_at", "-id"]
+        indexes = [
+            models.Index(fields=["terms_version", "accepted_at"]),
+            models.Index(fields=["user", "terms_version"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "terms_version"],
+                name="users_terms_acceptance_user_version_unique",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user_id}:{self.terms_version}:{self.accepted_at:%Y-%m-%d %H:%M:%S}"
 
 
 class AsyncJob(models.Model):

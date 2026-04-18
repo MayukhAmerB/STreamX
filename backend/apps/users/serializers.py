@@ -11,6 +11,7 @@ from config.upload_validators import validate_profile_image_upload
 from config.url_utils import get_media_public_url
 
 from .models import User
+from .terms import TERMS_LAST_UPDATED, TERMS_TITLE, TERMS_VERSION
 
 PHONE_PATTERN = re.compile(r"^\+?[0-9][0-9()\-\s]{6,22}$")
 
@@ -31,6 +32,8 @@ def validate_phone_number_value(value):
 class UserSerializer(serializers.ModelSerializer):
     profile_image_url = serializers.SerializerMethodField()
     is_admin = serializers.SerializerMethodField()
+    terms_required_version = serializers.SerializerMethodField()
+    terms_acceptance_required = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -43,6 +46,10 @@ class UserSerializer(serializers.ModelSerializer):
             "is_admin",
             "profile_image_url",
             "two_factor_enabled",
+            "terms_accepted_version",
+            "terms_accepted_at",
+            "terms_required_version",
+            "terms_acceptance_required",
             "created_at",
             "updated_at",
         )
@@ -55,6 +62,35 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_is_admin(self, obj):
         return bool(getattr(obj, "is_staff", False) or getattr(obj, "is_superuser", False))
+
+    def get_terms_required_version(self, obj):
+        return TERMS_VERSION
+
+    def get_terms_acceptance_required(self, obj):
+        return str(getattr(obj, "terms_accepted_version", "") or "") != TERMS_VERSION
+
+
+class TermsSerializer(serializers.Serializer):
+    title = serializers.CharField(default=TERMS_TITLE)
+    version = serializers.CharField(default=TERMS_VERSION)
+    last_updated = serializers.CharField(default=TERMS_LAST_UPDATED)
+    body = serializers.CharField()
+
+
+class TermsAcceptSerializer(serializers.Serializer):
+    accepted = serializers.BooleanField()
+    terms_version = serializers.CharField(max_length=40, required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if not attrs.get("accepted"):
+            raise serializers.ValidationError({"accepted": "You must explicitly agree to continue."})
+        requested_version = str(attrs.get("terms_version") or TERMS_VERSION).strip()
+        if requested_version != TERMS_VERSION:
+            raise serializers.ValidationError(
+                {"terms_version": f"Terms version must be the active version: {TERMS_VERSION}."}
+            )
+        attrs["terms_version"] = TERMS_VERSION
+        return attrs
 
 
 class RegisterSerializer(serializers.ModelSerializer):

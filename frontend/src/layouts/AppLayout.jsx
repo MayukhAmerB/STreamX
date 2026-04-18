@@ -3,6 +3,7 @@ import AppFooter from "../components/AppFooter";
 import GlobalPageBackground from "../components/GlobalPageBackground";
 import Navbar from "../components/Navbar";
 import SafeRender from "../components/SafeRender";
+import TermsGate from "../components/TermsGate";
 
 export default function AppLayout() {
   return (
@@ -16,6 +17,7 @@ export default function AppLayout() {
           <Outlet />
         </main>
         <AppFooter />
+        <TermsGate />
       </div>
     </div>
   );

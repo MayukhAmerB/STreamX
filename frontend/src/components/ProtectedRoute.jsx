@@ -6,7 +6,7 @@ export default function ProtectedRoute({
   requireAdmin = false,
   requireModerator = false,
 }) {
-  const { loading, isAuthenticated, isInstructor, isAdmin } = useAuth();
+  const { loading, isAuthenticated, isInstructor, isAdmin, user } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -14,6 +14,9 @@ export default function ProtectedRoute({
   }
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+  if (user?.terms_acceptance_required) {
+    return <Navigate to="/terms" replace state={{ from: location.pathname }} />;
   }
   if (requireInstructor && !isInstructor) {
     return <Navigate to="/" replace />;

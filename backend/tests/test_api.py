@@ -53,6 +53,25 @@ from apps.realtime.models import (
 )
 from apps.users.models import AuthConfiguration, User
 from apps.users.serializers import ProfileUpdateSerializer
+from apps.users.terms import TERMS_BODY, TERMS_VERSION
+
+
+def mark_terms_accepted(*users):
+    accepted_at = timezone.now()
+    for user in users:
+        user.terms_accepted_version = TERMS_VERSION
+        user.terms_accepted_at = accepted_at
+        user.terms_accepted_ip = "127.0.0.1"
+        user.terms_accepted_user_agent = "test-client"
+        user.save(
+            update_fields=[
+                "terms_accepted_version",
+                "terms_accepted_at",
+                "terms_accepted_ip",
+                "terms_accepted_user_agent",
+                "updated_at",
+            ]
+        )
 
 
 class BaseAPITestCase(APITestCase):
@@ -71,6 +90,7 @@ class BaseAPITestCase(APITestCase):
             full_name="Student Test",
             role=User.ROLE_STUDENT,
         )
+        mark_terms_accepted(self.instructor, self.student)
         self.course = Course.objects.create(
             title="Test Course",
             description="Course description",
@@ -119,6 +139,70 @@ class AuthTests(APITestCase):
         response = self.client.get(reverse("auth-config"))
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.data["data"]["registration_enabled"])
+        self.assertEqual(response.data["data"]["terms_version"], TERMS_VERSION)
+
+    def test_terms_endpoint_returns_current_document(self):
+        response = self.client.get(reverse("auth-terms"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["version"], TERMS_VERSION)
+        self.assertIn("AFFIRMATIVE CONSENT", response.data["data"]["body"])
+        self.assertEqual(response.data["data"]["body"], TERMS_BODY)
+
+    def test_terms_acceptance_records_user_consent_and_unblocks_profile(self):
+        user = User.objects.create_user(
+            email="terms-user@test.com",
+            password="StrongPass@123",
+            full_name="Terms User",
+            role=User.ROLE_STUDENT,
+        )
+        login_resp = self.client.post(
+            reverse("auth-login"),
+            {"email": user.email, "password": "StrongPass@123"},
+            format="json",
+        )
+        self.assertEqual(login_resp.status_code, 200)
+        self.assertTrue(login_resp.data["data"]["terms_acceptance_required"])
+
+        blocked_profile = self.client.get(reverse("auth-profile"))
+        self.assertEqual(blocked_profile.status_code, 403)
+
+        accept_resp = self.client.post(
+            reverse("auth-terms-accept"),
+            {"accepted": True, "terms_version": TERMS_VERSION},
+            format="json",
+            HTTP_USER_AGENT="terms-test-agent",
+            REMOTE_ADDR="203.0.113.5",
+        )
+        self.assertEqual(accept_resp.status_code, 200)
+        self.assertFalse(accept_resp.data["data"]["terms_acceptance_required"])
+        user.refresh_from_db()
+        self.assertEqual(user.terms_accepted_version, TERMS_VERSION)
+        self.assertIsNotNone(user.terms_accepted_at)
+        self.assertEqual(user.terms_acceptances.count(), 1)
+
+        allowed_profile = self.client.get(reverse("auth-profile"))
+        self.assertEqual(allowed_profile.status_code, 200)
+
+    def test_terms_acceptance_requires_explicit_agreement(self):
+        user = User.objects.create_user(
+            email="terms-reject@test.com",
+            password="StrongPass@123",
+            full_name="Terms Reject",
+            role=User.ROLE_STUDENT,
+        )
+        self.client.post(
+            reverse("auth-login"),
+            {"email": user.email, "password": "StrongPass@123"},
+            format="json",
+        )
+        response = self.client.post(
+            reverse("auth-terms-accept"),
+            {"accepted": False, "terms_version": TERMS_VERSION},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        user.refresh_from_db()
+        self.assertEqual(user.terms_accepted_version, "")
 
     def test_register_and_login_sets_jwt_cookies(self):
         config = AuthConfiguration.get_solo()
@@ -340,6 +424,7 @@ class AuthTests(APITestCase):
             full_name="Change Password User",
             role=User.ROLE_STUDENT,
         )
+        mark_terms_accepted(user)
         login_resp = self.client.post(
             reverse("auth-login"),
             {"email": user.email, "password": "StrongPass@123"},
@@ -2525,6 +2610,7 @@ class RealtimeSessionTests(APITestCase):
             full_name="Viewer User",
             role=User.ROLE_STUDENT,
         )
+        mark_terms_accepted(self.host, self.viewer)
         self.meeting_course = Course.objects.create(
             title="Realtime Meeting Course",
             description="Course used to gate realtime meetings in tests.",
