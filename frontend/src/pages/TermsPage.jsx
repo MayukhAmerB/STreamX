@@ -57,20 +57,19 @@ export default function TermsPage() {
     }
     setSubmitting(true);
     setStatus({ error: "", success: "" });
-    let pushPermission = "";
     try {
-      if (webPushEnabled && webPushPublicKey) {
-        pushPermission = await requestNotificationPermission();
-      }
       await acceptTerms({ accepted: true, terms_version: terms.version });
-      if (pushPermission === "granted") {
+      if (webPushEnabled && webPushPublicKey) {
         try {
-          const subscription = await subscribeToBrowserPush(webPushPublicKey);
-          if (subscription) {
-            await registerPushSubscription(subscription);
+          const pushPermission = await requestNotificationPermission();
+          if (pushPermission === "granted") {
+            const subscription = await subscribeToBrowserPush(webPushPublicKey);
+            if (subscription) {
+              await registerPushSubscription(subscription);
+            }
           }
         } catch {
-          // Browser push is best-effort; in-app notifications remain active.
+          // Browser push is best-effort; Terms acceptance and in-app notifications remain active.
         }
       }
       setStatus({ error: "", success: "Terms accepted. You can continue using the platform." });
@@ -129,7 +128,7 @@ export default function TermsPage() {
                         checked={checked}
                         onChange={(event) => setChecked(event.target.checked)}
                       />
-                      <span>I have read, understood, and agree to these Terms and Conditions, including platform and browser push notifications.</span>
+                      <span>I have read, understood, and agree to these Terms and Conditions. I understand browser push notifications are optional.</span>
                     </label>
                     <Button
                       type="button"
@@ -147,7 +146,7 @@ export default function TermsPage() {
                   </div>
                 )}
                 <p className="mt-3 text-xs leading-5 text-[#9F9F9F]">
-                  If browser push is enabled, your browser may ask for notification permission when you accept. Bell notifications remain available inside the platform.
+                  Browser push permission is optional. You can deny the prompt and still continue; bell notifications remain available inside the platform.
                 </p>
               </>
             ) : (

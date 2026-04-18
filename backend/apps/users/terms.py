@@ -134,9 +134,9 @@ We do NOT sell user data to third parties.
 
 We may send account-related and educational notifications, including live class alerts, newly uploaded course video alerts, security notices, and important platform updates.
 
-By selecting "I Agree", you consent to receiving in-platform bell notifications and browser push notification prompts from AlsyedInitiative where supported by your browser and device.
+By selecting "I Agree", you consent to receiving in-platform bell notifications and may be offered optional browser push notification prompts from AlsyedInitiative where supported by your browser and device.
 
-Browser push notifications require browser-level permission. If your browser asks for notification permission, you may allow or deny that permission. Denying browser push does not cancel your Terms acceptance, but in-platform bell notifications may still appear while you use the Platform.
+Browser push notifications require separate browser-level permission. If your browser asks for notification permission, you may allow or deny that permission. Denying browser push does not cancel your Terms acceptance, does not block your account access, and does not prevent you from continuing to use the Platform. In-platform bell notifications may still appear while you use the Platform.
 
 You are responsible for keeping your device and browser notification settings secure.
 
@@ -178,7 +178,7 @@ By selecting "I Agree" or by continuing to access or use the Platform, you:
 
 Enter into a legally binding agreement with AlsyedInitiative
 Confirm that you have read and understood these Terms in full
-Consent to platform notifications, including browser push notification prompts where supported
+Consent to in-platform bell notifications and acknowledge that browser push notification permission is optional where supported
 Waive any claim of ignorance or misunderstanding of these Terms
 
 Electronic acceptance (including checkbox selection, button click, or continued usage) shall have the same legal effect as a handwritten signature under applicable electronic transaction laws.

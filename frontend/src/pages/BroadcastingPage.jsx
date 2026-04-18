@@ -196,8 +196,10 @@ export default function BroadcastingPage() {
     sessionId: null,
     sourceUrl: "",
     url: "",
+    expiresAt: 0,
     loading: false,
   });
+  const [activeBroadcastChatRefreshKey, setActiveBroadcastChatRefreshKey] = useState(0);
   const [deleteState, setDeleteState] = useState({ loadingId: null, error: "", info: "" });
   const [streamControlState, setStreamControlState] = useState({
     loadingId: null,
@@ -1305,7 +1307,8 @@ export default function BroadcastingPage() {
   const resolvedActiveChatUrl =
     shouldUsePersonalizedActiveChat &&
     activeBroadcastChatLaunch.sessionId === activeBroadcast?.session?.id &&
-    activeBroadcastChatLaunch.sourceUrl === activeChatUrl
+    activeBroadcastChatLaunch.sourceUrl === activeChatUrl &&
+    (!activeBroadcastChatLaunch.expiresAt || activeBroadcastChatLaunch.expiresAt > Date.now() + 5000)
       ? activeBroadcastChatLaunch.url
       : shouldUsePersonalizedActiveChat
         ? ""
@@ -1327,39 +1330,85 @@ export default function BroadcastingPage() {
 
   useEffect(() => {
     if (!shouldUsePersonalizedActiveChat) {
-      setActiveBroadcastChatLaunch({ sessionId: null, sourceUrl: "", url: "", loading: false });
+      setActiveBroadcastChatLaunch({ sessionId: null, sourceUrl: "", url: "", expiresAt: 0, loading: false });
       return undefined;
     }
 
     const sessionId = activeBroadcast.session.id;
     if (!isAuthenticated) {
-      setActiveBroadcastChatLaunch({ sessionId, sourceUrl: activeChatUrl, url: "", loading: false });
+      setActiveBroadcastChatLaunch({ sessionId, sourceUrl: activeChatUrl, url: "", expiresAt: 0, loading: false });
       return undefined;
     }
 
     let cancelled = false;
-    setActiveBroadcastChatLaunch({ sessionId, sourceUrl: activeChatUrl, url: "", loading: true });
+    setActiveBroadcastChatLaunch((previous) => ({
+      sessionId,
+      sourceUrl: activeChatUrl,
+      url:
+        previous.sessionId === sessionId && previous.sourceUrl === activeChatUrl
+          ? previous.url
+          : "",
+      expiresAt:
+        previous.sessionId === sessionId && previous.sourceUrl === activeChatUrl
+          ? previous.expiresAt
+          : 0,
+      loading: true,
+    }));
     createRealtimeOwncastChatLaunch(sessionId)
       .then((response) => {
         if (cancelled) return;
         const data = apiData(response, {});
         const launchUrl = String(data?.launch_url || "").trim();
+        const expiresInSeconds = Math.max(30, Number(data?.expires_in_seconds || 0) || 0);
         setActiveBroadcastChatLaunch({
           sessionId,
           sourceUrl: activeChatUrl,
           url: launchUrl,
+          expiresAt: launchUrl ? Date.now() + expiresInSeconds * 1000 : 0,
           loading: false,
         });
       })
       .catch(() => {
         if (cancelled) return;
-        setActiveBroadcastChatLaunch({ sessionId, sourceUrl: activeChatUrl, url: "", loading: false });
+        setActiveBroadcastChatLaunch({ sessionId, sourceUrl: activeChatUrl, url: "", expiresAt: 0, loading: false });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [activeBroadcast?.session?.id, activeChatUrl, isAuthenticated, shouldUsePersonalizedActiveChat]);
+  }, [
+    activeBroadcast?.session?.id,
+    activeBroadcastChatRefreshKey,
+    activeChatUrl,
+    isAuthenticated,
+    shouldUsePersonalizedActiveChat,
+  ]);
+
+  useEffect(() => {
+    if (
+      !shouldUsePersonalizedActiveChat ||
+      !activeBroadcastChatLaunch.url ||
+      !activeBroadcastChatLaunch.expiresAt ||
+      activeBroadcastChatLaunch.sessionId !== activeBroadcast?.session?.id ||
+      activeBroadcastChatLaunch.sourceUrl !== activeChatUrl
+    ) {
+      return undefined;
+    }
+
+    const refreshDelay = Math.max(30_000, activeBroadcastChatLaunch.expiresAt - Date.now() - 30_000);
+    const timeoutId = window.setTimeout(() => {
+      setActiveBroadcastChatRefreshKey((previous) => previous + 1);
+    }, refreshDelay);
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    activeBroadcast?.session?.id,
+    activeBroadcastChatLaunch.expiresAt,
+    activeBroadcastChatLaunch.sessionId,
+    activeBroadcastChatLaunch.sourceUrl,
+    activeBroadcastChatLaunch.url,
+    activeChatUrl,
+    shouldUsePersonalizedActiveChat,
+  ]);
 
   const normalizedStudioStreamStatus = String(studioSession?.stream_status || "").trim().toLowerCase();
   const obsStartActionLabel =
@@ -2233,6 +2282,7 @@ export default function BroadcastingPage() {
             withContainer={false}
             statusMessage={activeBroadcastStatusMessage}
             onRefreshStream={handleRefreshActiveBroadcast}
+            onRefreshChat={() => setActiveBroadcastChatRefreshKey((previous) => previous + 1)}
           />
         </section>
       ) : null}

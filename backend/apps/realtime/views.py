@@ -98,7 +98,7 @@ _OWNCAST_PENDING_DISPLAY_NAME = "Pending Owncast handle"
 
 
 def _owncast_chat_bridge_ttl_seconds():
-    configured = int(getattr(settings, "OWNCAST_CHAT_BRIDGE_TTL_SECONDS", 120) or 120)
+    configured = int(getattr(settings, "OWNCAST_CHAT_BRIDGE_TTL_SECONDS", 9000) or 9000)
     return max(30, configured)
 
 

@@ -57,17 +57,16 @@ export default function TermsGate() {
     }
     setSubmitting(true);
     setError("");
-    let pushPermission = "";
     try {
-      if (webPushEnabled && webPushPublicKey) {
-        pushPermission = await requestNotificationPermission();
-      }
       await acceptTerms({ accepted: true, terms_version: terms.version });
-      if (pushPermission === "granted") {
+      if (webPushEnabled && webPushPublicKey) {
         try {
-          const subscription = await subscribeToBrowserPush(webPushPublicKey);
-          if (subscription) {
-            await registerPushSubscription(subscription);
+          const pushPermission = await requestNotificationPermission();
+          if (pushPermission === "granted") {
+            const subscription = await subscribeToBrowserPush(webPushPublicKey);
+            if (subscription) {
+              await registerPushSubscription(subscription);
+            }
           }
         } catch {
           // Terms acceptance must not be blocked by a browser push failure.
@@ -115,10 +114,10 @@ export default function TermsGate() {
               Agreement
             </h3>
             <p className="mt-3 text-sm leading-6 text-[#BFBFBF]">
-              By clicking I Agree, your account, timestamp, IP address, browser details, Terms version, and notification consent will be stored as a consent record.
+              By clicking I Agree, your account, timestamp, IP address, browser details, Terms version, and platform notification consent will be stored as a consent record.
             </p>
             <p className="mt-3 text-xs leading-5 text-[#9F9F9F]">
-              Your browser may ask permission for push notifications. Bell notifications still work inside the platform even if browser push is denied.
+              Browser push permission is optional. You can deny the browser prompt and still continue using the platform.
             </p>
             <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-black/30 p-3 text-sm leading-6 text-[#E3E3E3]">
               <input
@@ -127,7 +126,7 @@ export default function TermsGate() {
                 checked={checked}
                 onChange={(event) => setChecked(event.target.checked)}
               />
-              <span>I have read, understood, and agree to the Terms and Conditions, including platform and browser push notifications.</span>
+              <span>I have read, understood, and agree to the Terms and Conditions. I understand browser push notifications are optional.</span>
             </label>
             {error ? (
               <div className="mt-3 rounded-xl border border-red-300/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">

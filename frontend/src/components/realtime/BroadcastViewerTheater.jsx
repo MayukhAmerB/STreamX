@@ -23,6 +23,7 @@ export default function BroadcastViewerTheater({
   chatFallbackMessage = "Chat URL not configured for this session.",
   statusMessage = "",
   onRefreshStream = null,
+  onRefreshChat = null,
   showHeaderMeta = true,
   withContainer = true,
   className = "",
@@ -56,6 +57,16 @@ export default function BroadcastViewerTheater({
     if (typeof onRefreshStream === "function") {
       onRefreshStream();
     }
+  };
+
+  const handleMobileChatToggle = () => {
+    setMobileChatOpen((previous) => {
+      const next = !previous;
+      if (next && typeof onRefreshChat === "function") {
+        onRefreshChat();
+      }
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -144,7 +155,7 @@ export default function BroadcastViewerTheater({
       <div className="mt-3 lg:hidden">
         <button
           type="button"
-          onClick={() => setMobileChatOpen((prev) => !prev)}
+          onClick={handleMobileChatToggle}
           className="sticky bottom-3 z-20 w-full rounded-xl border border-black bg-[#151515]/96 px-4 py-2.5 text-sm font-semibold text-[#E2E2E2] shadow-[0_16px_34px_rgba(0,0,0,0.3)] backdrop-blur transition hover:bg-[#1C1C1C]"
         >
           {mobileChatOpen ? "Hide Chat" : "Open Chat"}

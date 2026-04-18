@@ -3498,7 +3498,7 @@ class RealtimeSessionTests(APITestCase):
         self.assertTrue(token_values)
         signed_payload = signing.loads(
             token_values[0],
-            max_age=120,
+            max_age=9000,
             salt="realtime.owncast-chat-bridge",
         )
         self.assertEqual(signed_payload["access_token"], "bridge-access-token-123")
@@ -3560,7 +3560,7 @@ class RealtimeSessionTests(APITestCase):
         token = parse_qs(urlparse(launch_url).query)["token"][0]
         signed_payload = signing.loads(
             token,
-            max_age=120,
+            max_age=9000,
             salt="realtime.owncast-chat-bridge",
         )
         self.assertEqual(signed_payload["display_name"], "")
@@ -3630,7 +3630,7 @@ class RealtimeSessionTests(APITestCase):
         token = parse_qs(urlparse(second_launch_url).query)["token"][0]
         signed_payload = signing.loads(
             token,
-            max_age=120,
+            max_age=9000,
             salt="realtime.owncast-chat-bridge",
         )
         self.assertEqual(signed_payload["access_token"], "permanent-access-token")

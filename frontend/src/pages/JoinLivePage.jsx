@@ -107,8 +107,10 @@ export default function JoinLivePage() {
     sessionId: null,
     sourceUrl: "",
     url: "",
+    expiresAt: 0,
     loading: false,
   });
+  const [broadcastChatLaunchRefreshKey, setBroadcastChatLaunchRefreshKey] = useState(0);
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState("all");
   const [autoJoinConsumed, setAutoJoinConsumed] = useState(false);
@@ -353,7 +355,8 @@ export default function JoinLivePage() {
   const activeBroadcastResolvedChatUrl =
     shouldUsePersonalizedBroadcastChat &&
     broadcastChatLaunch.sessionId === activeSession?.session?.id &&
-    broadcastChatLaunch.sourceUrl === activeBroadcastChatUrl
+    broadcastChatLaunch.sourceUrl === activeBroadcastChatUrl &&
+    (!broadcastChatLaunch.expiresAt || broadcastChatLaunch.expiresAt > Date.now() + 5000)
       ? broadcastChatLaunch.url
       : shouldUsePersonalizedBroadcastChat
         ? ""
@@ -377,37 +380,51 @@ export default function JoinLivePage() {
 
   useEffect(() => {
     if (!shouldUsePersonalizedBroadcastChat) {
-      setBroadcastChatLaunch({ sessionId: null, sourceUrl: "", url: "", loading: false });
+      setBroadcastChatLaunch({ sessionId: null, sourceUrl: "", url: "", expiresAt: 0, loading: false });
       return undefined;
     }
 
     const sessionId = activeSession.session.id;
     if (authLoading) {
-      setBroadcastChatLaunch({ sessionId, sourceUrl: activeBroadcastChatUrl, url: "", loading: true });
+      setBroadcastChatLaunch({ sessionId, sourceUrl: activeBroadcastChatUrl, url: "", expiresAt: 0, loading: true });
       return undefined;
     }
     if (!isAuthenticated) {
-      setBroadcastChatLaunch({ sessionId, sourceUrl: activeBroadcastChatUrl, url: "", loading: false });
+      setBroadcastChatLaunch({ sessionId, sourceUrl: activeBroadcastChatUrl, url: "", expiresAt: 0, loading: false });
       return undefined;
     }
 
     let cancelled = false;
-    setBroadcastChatLaunch({ sessionId, sourceUrl: activeBroadcastChatUrl, url: "", loading: true });
+    setBroadcastChatLaunch((previous) => ({
+      sessionId,
+      sourceUrl: activeBroadcastChatUrl,
+      url:
+        previous.sessionId === sessionId && previous.sourceUrl === activeBroadcastChatUrl
+          ? previous.url
+          : "",
+      expiresAt:
+        previous.sessionId === sessionId && previous.sourceUrl === activeBroadcastChatUrl
+          ? previous.expiresAt
+          : 0,
+      loading: true,
+    }));
     createRealtimeOwncastChatLaunch(sessionId)
       .then((response) => {
         if (cancelled) return;
         const data = apiData(response, {});
         const launchUrl = String(data?.launch_url || "").trim();
+        const expiresInSeconds = Math.max(30, Number(data?.expires_in_seconds || 0) || 0);
         setBroadcastChatLaunch({
           sessionId,
           sourceUrl: activeBroadcastChatUrl,
           url: launchUrl,
+          expiresAt: launchUrl ? Date.now() + expiresInSeconds * 1000 : 0,
           loading: false,
         });
       })
       .catch(() => {
         if (cancelled) return;
-        setBroadcastChatLaunch({ sessionId, sourceUrl: activeBroadcastChatUrl, url: "", loading: false });
+        setBroadcastChatLaunch({ sessionId, sourceUrl: activeBroadcastChatUrl, url: "", expiresAt: 0, loading: false });
       });
 
     return () => {
@@ -418,7 +435,34 @@ export default function JoinLivePage() {
     activeSession?.mode,
     activeSession?.session?.id,
     authLoading,
+    broadcastChatLaunchRefreshKey,
     isAuthenticated,
+    shouldUsePersonalizedBroadcastChat,
+  ]);
+
+  useEffect(() => {
+    if (
+      !shouldUsePersonalizedBroadcastChat ||
+      !broadcastChatLaunch.url ||
+      !broadcastChatLaunch.expiresAt ||
+      broadcastChatLaunch.sessionId !== activeSession?.session?.id ||
+      broadcastChatLaunch.sourceUrl !== activeBroadcastChatUrl
+    ) {
+      return undefined;
+    }
+
+    const refreshDelay = Math.max(30_000, broadcastChatLaunch.expiresAt - Date.now() - 30_000);
+    const timeoutId = window.setTimeout(() => {
+      setBroadcastChatLaunchRefreshKey((previous) => previous + 1);
+    }, refreshDelay);
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    activeBroadcastChatUrl,
+    activeSession?.session?.id,
+    broadcastChatLaunch.expiresAt,
+    broadcastChatLaunch.sessionId,
+    broadcastChatLaunch.sourceUrl,
+    broadcastChatLaunch.url,
     shouldUsePersonalizedBroadcastChat,
   ]);
 
@@ -532,6 +576,7 @@ export default function JoinLivePage() {
           badgeLabel="Live Broadcast"
           statusMessage={activeBroadcastStatusMessage}
           onRefreshStream={handleRefreshActiveBroadcast}
+          onRefreshChat={() => setBroadcastChatLaunchRefreshKey((previous) => previous + 1)}
         />
       ) : null}
 
