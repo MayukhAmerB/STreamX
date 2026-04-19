@@ -2,6 +2,8 @@ from django.urls import path
 
 from .views import (
     RealtimeOwncastChatBridgeView,
+    RealtimeOwncastStreamAccessView,
+    RealtimeOwncastStreamBridgeView,
     RealtimeSessionBrowserRecordingUploadView,
     RealtimeSessionDetailView,
     RealtimeSessionEndView,
@@ -20,6 +22,7 @@ from .views import (
     RealtimeSessionStreamRotateKeyView,
     RealtimeSessionOwncastChatLaunchView,
     RealtimeSessionOwncastChatModerationView,
+    RealtimeSessionOwncastStreamLaunchView,
 )
 
 urlpatterns = [
@@ -32,6 +35,11 @@ urlpatterns = [
         name="realtime-session-owncast-chat-launch",
     ),
     path(
+        "sessions/<int:pk>/broadcast-stream/launch/",
+        RealtimeSessionOwncastStreamLaunchView.as_view(),
+        name="realtime-session-owncast-stream-launch",
+    ),
+    path(
         "sessions/<int:pk>/broadcast-chat/moderation/",
         RealtimeSessionOwncastChatModerationView.as_view(),
         name="realtime-session-owncast-chat-moderation",
@@ -41,6 +49,16 @@ urlpatterns = [
         "owncast/chat-bridge/",
         RealtimeOwncastChatBridgeView.as_view(),
         name="realtime-owncast-chat-bridge",
+    ),
+    path(
+        "owncast/stream-bridge/",
+        RealtimeOwncastStreamBridgeView.as_view(),
+        name="realtime-owncast-stream-bridge",
+    ),
+    path(
+        "owncast/stream-access/",
+        RealtimeOwncastStreamAccessView.as_view(),
+        name="realtime-owncast-stream-access",
     ),
     path("sessions/<int:pk>/stream/start/", RealtimeSessionStreamStartView.as_view(), name="realtime-session-stream-start"),
     path("sessions/<int:pk>/stream/stop/", RealtimeSessionStreamStopView.as_view(), name="realtime-session-stream-stop"),

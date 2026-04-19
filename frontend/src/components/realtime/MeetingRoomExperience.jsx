@@ -15,6 +15,7 @@ import {
   uploadRealtimeBrowserRecording,
 } from "../../api/realtime";
 import { useAuth } from "../../hooks/useAuth";
+import useOwncastStreamLaunch from "../../hooks/useOwncastStreamLaunch";
 import { ScreenityFallbackRecorder } from "../../services/recording/ScreenityFallbackRecorder";
 import { resolveBroadcastEmbedUrls } from "../../utils/broadcastUrls";
 import { apiData, apiMessage } from "../../utils/api";
@@ -732,6 +733,14 @@ export default function MeetingRoomExperience({
     });
   }, [isBroadcastControlSession, session?.stream_embed_url, session?.chat_embed_url]);
   const broadcastMonitorUrl = broadcastEmbedUrls.streamEmbedUrl;
+  const [broadcastMonitorRefreshKey, setBroadcastMonitorRefreshKey] = useState(0);
+  const secureBroadcastMonitor = useOwncastStreamLaunch({
+    sessionId: session?.id,
+    streamUrl: broadcastMonitorUrl,
+    refreshKey: broadcastMonitorRefreshKey,
+    enabled: Boolean(isBroadcastControlSession && broadcastMonitorUrl),
+  });
+  const resolvedBroadcastMonitorUrl = secureBroadcastMonitor.streamUrl;
   const broadcastChatUrl =
     broadcastEmbedUrls.writableChatEmbedUrl || broadcastEmbedUrls.chatEmbedUrl;
   const canPresentFromPayload = Boolean(meeting?.permissions?.can_present);
@@ -2389,12 +2398,24 @@ export default function MeetingRoomExperience({
                     </div>
                   </div>
                   {broadcastMonitorUrl ? (
-                    <iframe
-                      title="Broadcast Live Output"
-                      src={broadcastMonitorUrl}
-                      className="h-[170px] w-full sm:h-[210px]"
-                      allow="autoplay; fullscreen"
-                    />
+                    resolvedBroadcastMonitorUrl ? (
+                      <iframe
+                        title="Broadcast Live Output"
+                        src={resolvedBroadcastMonitorUrl}
+                        className="h-[170px] w-full sm:h-[210px]"
+                        allow="autoplay; fullscreen"
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setBroadcastMonitorRefreshKey((previous) => previous + 1)}
+                        className="flex h-[170px] w-full items-center justify-center px-4 text-center text-xs text-[#BBBBBB] transition hover:text-white sm:h-[210px]"
+                      >
+                        {secureBroadcastMonitor.loading
+                          ? "Preparing secure broadcast output..."
+                          : "Secure broadcast output could not be prepared. Tap to retry."}
+                      </button>
+                    )
                   ) : (
                     <div className="flex h-[170px] items-center justify-center px-4 text-center text-xs text-[#BBBBBB] sm:h-[210px]">
                       Live broadcast output appears here once stream publishing starts.

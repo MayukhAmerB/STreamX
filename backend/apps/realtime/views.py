@@ -2,6 +2,7 @@ import logging
 import mimetypes
 import time
 import json
+import hashlib
 from datetime import timedelta
 from urllib.parse import quote, urlparse
 
@@ -94,12 +95,31 @@ User = get_user_model()
 realtime_ops_logger = logging.getLogger("ops.realtime")
 _OWNCAST_CHAT_BRIDGE_SIGNING_SALT = "realtime.owncast-chat-bridge"
 _OWNCAST_CHAT_BRIDGE_NEXT_PATH = "/embed/chat/readwrite/"
+_OWNCAST_STREAM_BRIDGE_SIGNING_SALT = "realtime.owncast-stream-bridge"
+_OWNCAST_STREAM_ACCESS_SIGNING_SALT = "realtime.owncast-stream-access"
+_OWNCAST_STREAM_BRIDGE_NEXT_PATH = "/embed/video/"
 _OWNCAST_PENDING_DISPLAY_NAME = "Pending Owncast handle"
 
 
 def _owncast_chat_bridge_ttl_seconds():
     configured = int(getattr(settings, "OWNCAST_CHAT_BRIDGE_TTL_SECONDS", 9000) or 9000)
     return max(30, configured)
+
+
+def _owncast_stream_access_ttl_seconds():
+    configured = int(
+        getattr(
+            settings,
+            "OWNCAST_STREAM_ACCESS_TTL_SECONDS",
+            _owncast_chat_bridge_ttl_seconds(),
+        )
+        or _owncast_chat_bridge_ttl_seconds()
+    )
+    return max(60, configured)
+
+
+def _owncast_stream_access_cookie_name():
+    return str(getattr(settings, "OWNCAST_STREAM_ACCESS_COOKIE_NAME", "") or "").strip() or "owncast_stream_access"
 
 
 def _resolve_owncast_chat_origin(chat_embed_url):
@@ -109,6 +129,51 @@ def _resolve_owncast_chat_origin(chat_embed_url):
     if not parsed.netloc:
         return ""
     return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _resolve_owncast_stream_next_path(stream_embed_url):
+    parsed = urlparse(str(stream_embed_url or "").strip())
+    path = parsed.path or _OWNCAST_STREAM_BRIDGE_NEXT_PATH
+    if path == "/embed/video":
+        path = "/embed/video/"
+    if not path.startswith("/") or path.startswith("//"):
+        return _OWNCAST_STREAM_BRIDGE_NEXT_PATH
+    if parsed.query:
+        return f"{path}?{parsed.query}"
+    return path
+
+
+def _request_user_agent_hash(request):
+    user_agent = str(request.META.get("HTTP_USER_AGENT", "") or "")
+    if not user_agent:
+        return ""
+    return hashlib.sha256(user_agent.encode("utf-8")).hexdigest()
+
+
+def _is_secure_request(request):
+    return bool(
+        request.is_secure()
+        or str(request.META.get("HTTP_X_FORWARDED_PROTO", "") or "").split(",", 1)[0].strip().lower() == "https"
+    )
+
+
+def _build_owncast_stream_launch_url(*, session, user, request, stream_embed_url):
+    stream_origin = _resolve_owncast_chat_origin(stream_embed_url)
+    if not stream_origin:
+        return ""
+
+    bridge_payload = signing.dumps(
+        {
+            "session_id": int(session.id),
+            "user_id": int(user.id),
+            "next_path": _resolve_owncast_stream_next_path(stream_embed_url),
+            "client_ip": str(resolve_client_ip(request) or "")[:64],
+            "user_agent_hash": _request_user_agent_hash(request),
+        },
+        salt=_OWNCAST_STREAM_BRIDGE_SIGNING_SALT,
+        compress=True,
+    )
+    return f"{stream_origin}/api/realtime/owncast/stream-bridge/?token={quote(bridge_payload, safe='')}"
 
 
 def _resolve_owncast_display_name(user):
@@ -698,6 +763,13 @@ class RealtimeSessionJoinView(APIView):
                 "session": RealtimeSessionListSerializer(session, context={"request": request}).data,
                 "broadcast": {
                     "stream_embed_url": urls["stream_embed_url"],
+                    "stream_launch_url": _build_owncast_stream_launch_url(
+                        session=session,
+                        user=request.user,
+                        request=request,
+                        stream_embed_url=urls["stream_embed_url"],
+                    ),
+                    "stream_access_expires_in_seconds": _owncast_stream_access_ttl_seconds(),
                     "chat_embed_url": urls["chat_embed_url"],
                     "max_audience": session.max_audience,
                     "stream_status": session.stream_status,
@@ -780,6 +852,69 @@ class RealtimeSessionJoinView(APIView):
         cache_room_participant_count(room_name, participant_state.participant_count + 1)
         _record_join_metric(result="success", mode="meeting", reason="ok")
         return api_response(success=True, message="Meeting join payload created.", data=data)
+
+
+class RealtimeSessionOwncastStreamLaunchView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        session = get_object_or_404(RealtimeSession.objects.with_related(), pk=pk)
+        access_decision = get_access_decision(session, request.user)
+        if not access_decision.allowed:
+            return api_response(
+                success=False,
+                message=access_decision.message,
+                errors={"detail": access_decision.detail},
+                status_code=access_decision.status_code,
+            )
+        if session.session_type != RealtimeSession.TYPE_BROADCASTING and not session.allow_overflow_broadcast:
+            return api_response(
+                success=False,
+                message="Broadcast stream launch unavailable.",
+                errors={"detail": "This endpoint is available only for broadcast-enabled sessions."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        if session.status == RealtimeSession.STATUS_ENDED:
+            return api_response(
+                success=False,
+                message="Broadcast stream launch unavailable.",
+                errors={"detail": "This live session has ended."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        urls = resolve_broadcast_urls(session, request=request)
+        stream_embed_url = str(urls.get("stream_embed_url") or "").strip()
+        if not stream_embed_url:
+            return api_response(
+                success=False,
+                message="Broadcast stream launch unavailable.",
+                errors={"detail": "Broadcast stream URL is not configured for this session."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        launch_url = _build_owncast_stream_launch_url(
+            session=session,
+            user=request.user,
+            request=request,
+            stream_embed_url=stream_embed_url,
+        )
+        if not launch_url:
+            return api_response(
+                success=False,
+                message="Broadcast stream launch unavailable.",
+                errors={"detail": "Broadcast stream URL must be a public http/https URL."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return api_response(
+            success=True,
+            message="Owncast stream launch URL prepared.",
+            data={
+                "launch_url": launch_url,
+                "stream_embed_url": stream_embed_url,
+                "expires_in_seconds": _owncast_stream_access_ttl_seconds(),
+            },
+        )
 
 
 class RealtimeSessionOwncastChatLaunchView(APIView):
@@ -1312,6 +1447,137 @@ class RealtimeOwncastChatBridgeView(APIView):
             message="Owncast display name synced.",
             data={"display_name": display_name},
         )
+
+
+class RealtimeOwncastStreamBridgeView(APIView):
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = []
+
+    def get(self, request):
+        token = str(request.query_params.get("token") or "").strip()
+        if not token:
+            return api_response(
+                success=False,
+                message="Invalid stream bridge request.",
+                errors={"detail": "Missing stream bridge token."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            payload = signing.loads(
+                token,
+                max_age=_owncast_stream_access_ttl_seconds(),
+                salt=_OWNCAST_STREAM_BRIDGE_SIGNING_SALT,
+            )
+        except signing.BadSignature:
+            return api_response(
+                success=False,
+                message="Invalid stream bridge request.",
+                errors={"detail": "Stream bridge token is invalid or expired."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        expected_user_agent_hash = str(payload.get("user_agent_hash") or "").strip()
+        if expected_user_agent_hash and expected_user_agent_hash != _request_user_agent_hash(request):
+            return api_response(
+                success=False,
+                message="Invalid stream bridge request.",
+                errors={"detail": "Stream bridge token does not match this browser."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        expected_client_ip = str(payload.get("client_ip") or "").strip()
+        current_client_ip = str(resolve_client_ip(request) or "").strip()
+        if expected_client_ip and current_client_ip and expected_client_ip != current_client_ip:
+            return api_response(
+                success=False,
+                message="Invalid stream bridge request.",
+                errors={"detail": "Stream bridge token does not match this network."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            session_id = int(payload.get("session_id") or 0)
+            user_id = int(payload.get("user_id") or 0)
+        except (TypeError, ValueError):
+            session_id = 0
+            user_id = 0
+        if session_id <= 0 or user_id <= 0:
+            return api_response(
+                success=False,
+                message="Invalid stream bridge request.",
+                errors={"detail": "Stream bridge token is missing session details."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        cookie_payload = signing.dumps(
+            {
+                "session_id": session_id,
+                "user_id": user_id,
+                "issued_at": int(time.time()),
+            },
+            salt=_OWNCAST_STREAM_ACCESS_SIGNING_SALT,
+            compress=True,
+        )
+        next_path = str(payload.get("next_path") or _OWNCAST_STREAM_BRIDGE_NEXT_PATH)
+        if not next_path.startswith("/") or next_path.startswith("//"):
+            next_path = _OWNCAST_STREAM_BRIDGE_NEXT_PATH
+
+        response = HttpResponseRedirect(next_path)
+        response["Cache-Control"] = "no-store, max-age=0"
+        response["Cross-Origin-Resource-Policy"] = "cross-origin"
+        response["Cross-Origin-Embedder-Policy"] = "unsafe-none"
+        response["Cross-Origin-Opener-Policy"] = "unsafe-none"
+        response.xframe_options_exempt = True
+        secure_cookie = _is_secure_request(request)
+        response.set_cookie(
+            _owncast_stream_access_cookie_name(),
+            cookie_payload,
+            max_age=_owncast_stream_access_ttl_seconds(),
+            path="/",
+            secure=secure_cookie,
+            httponly=True,
+            samesite="None" if secure_cookie else "Lax",
+        )
+        return response
+
+
+class RealtimeOwncastStreamAccessView(APIView):
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    throttle_classes = []
+
+    def get(self, request):
+        cookie_value = str(request.COOKIES.get(_owncast_stream_access_cookie_name()) or "").strip()
+        if not cookie_value:
+            return HttpResponse(status=401)
+
+        try:
+            payload = signing.loads(
+                cookie_value,
+                max_age=_owncast_stream_access_ttl_seconds(),
+                salt=_OWNCAST_STREAM_ACCESS_SIGNING_SALT,
+            )
+            session_id = int(payload.get("session_id") or 0)
+            user_id = int(payload.get("user_id") or 0)
+        except (signing.BadSignature, TypeError, ValueError):
+            return HttpResponse(status=401)
+
+        session = RealtimeSession.objects.with_related().filter(pk=session_id).first()
+        user = User.objects.filter(pk=user_id, is_active=True).first()
+        if not session or not user or session.status == RealtimeSession.STATUS_ENDED:
+            return HttpResponse(status=401)
+        if session.session_type != RealtimeSession.TYPE_BROADCASTING and not session.allow_overflow_broadcast:
+            return HttpResponse(status=401)
+
+        access_decision = get_access_decision(session, user)
+        if not access_decision.allowed:
+            return HttpResponse(status=403)
+
+        response = HttpResponse(status=204)
+        response["Cache-Control"] = "no-store, max-age=0"
+        return response
 
 
 class RealtimeSessionEndView(APIView):

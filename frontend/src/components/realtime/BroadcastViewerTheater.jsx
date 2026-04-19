@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import ProtectedPlaybackSurface from "../ProtectedPlaybackSurface";
+import useOwncastStreamLaunch from "../../hooks/useOwncastStreamLaunch";
 
 function EmptyPanel({ className, message }) {
   return (
@@ -11,6 +12,7 @@ function EmptyPanel({ className, message }) {
 
 export default function BroadcastViewerTheater({
   title = "",
+  sessionId = null,
   streamUrl = "",
   chatUrl = "",
   streamStatus = "",
@@ -31,17 +33,29 @@ export default function BroadcastViewerTheater({
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const [streamFrameVersion, setStreamFrameVersion] = useState(0);
   const previousStreamStatusRef = useRef(streamStatus);
+  const secureStream = useOwncastStreamLaunch({
+    sessionId,
+    streamUrl,
+    refreshKey: streamFrameVersion,
+    enabled: Boolean(streamUrl),
+  });
+  const resolvedStreamUrl = secureStream.streamUrl;
   const layoutClassName = showHeaderMeta
     ? "mt-3 grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:items-stretch"
     : "grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:items-stretch";
   const normalizedStreamStatus = String(streamStatus || "").trim().toLowerCase();
   const normalizedSessionStatus = String(sessionStatus || "").trim().toLowerCase();
   const isStreamStarting = Boolean(
-    streamUrl && normalizedSessionStatus !== "ended" && normalizedStreamStatus === "starting"
+    resolvedStreamUrl && normalizedSessionStatus !== "ended" && normalizedStreamStatus === "starting"
   );
   const isStreamUnavailable = Boolean(
-    streamUrl && normalizedSessionStatus !== "ended" && normalizedStreamStatus && normalizedStreamStatus !== "live"
+    resolvedStreamUrl && normalizedSessionStatus !== "ended" && normalizedStreamStatus && normalizedStreamStatus !== "live"
   );
+  const resolvedStreamFallbackMessage = secureStream.requiresLaunch
+    ? secureStream.loading
+      ? "Preparing secure video session..."
+      : "Secure video could not be prepared. Refresh the page or sign in again."
+    : streamFallbackMessage;
   const resolvedStatusMessage =
     String(statusMessage || "").trim() ||
     (normalizedSessionStatus === "ended"
@@ -117,20 +131,24 @@ export default function BroadcastViewerTheater({
           {streamUrl ? (
             <ProtectedPlaybackSurface
               className="aspect-video w-full min-h-[260px] sm:min-h-[360px] lg:min-h-[520px] lg:max-h-[calc(100vh-220px)]"
-              watermarkEnabled={Boolean(streamUrl)}
+              watermarkEnabled={Boolean(resolvedStreamUrl)}
             >
-              <iframe
-                key={`${streamUrl}|${streamFrameVersion}`}
-                title={streamTitle}
-                src={streamUrl}
-                className="block h-full w-full"
-                allow="autoplay"
-              />
+              {resolvedStreamUrl ? (
+                <iframe
+                  key={`${resolvedStreamUrl}|${streamFrameVersion}`}
+                  title={streamTitle}
+                  src={resolvedStreamUrl}
+                  className="block h-full w-full"
+                  allow="autoplay"
+                />
+              ) : (
+                <EmptyPanel className="h-full min-h-[260px] sm:min-h-[360px]" message={resolvedStreamFallbackMessage} />
+              )}
             </ProtectedPlaybackSurface>
           ) : (
             <EmptyPanel
               className="h-[260px] sm:h-[360px] lg:h-[520px] lg:max-h-[calc(100vh-220px)]"
-              message={streamFallbackMessage}
+              message={resolvedStreamFallbackMessage}
             />
           )}
         </div>

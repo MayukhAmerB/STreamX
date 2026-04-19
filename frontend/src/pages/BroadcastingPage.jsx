@@ -25,6 +25,7 @@ import {
 } from "../api/realtime";
 import { useAuth } from "../hooks/useAuth";
 import useAdaptiveRealtimeSessionPolling from "../hooks/useAdaptiveRealtimeSessionPolling";
+import useOwncastStreamLaunch from "../hooks/useOwncastStreamLaunch";
 import { ScreenityFallbackRecorder } from "../services/recording/ScreenityFallbackRecorder";
 import { resolveBroadcastEmbedUrls } from "../utils/broadcastUrls";
 import { apiData, apiMessage } from "../utils/api";
@@ -652,15 +653,15 @@ export default function BroadcastingPage() {
   };
 
   const handleCopyStreamLink = async (session) => {
-    const streamUrl = getSessionStreamUrl(session);
-    if (!streamUrl) {
+    const joinLink = buildJoinLink(session);
+    if (!joinLink) {
       setShareState({
-        error: "Stream URL is not ready yet. Start live or configure a custom stream URL.",
+        error: "Secure viewer link is not ready yet.",
         info: "",
       });
       return;
     }
-    await copyText(streamUrl, "Stream URL copied.", "Unable to copy stream URL.");
+    await copyText(joinLink, "Secure viewer link copied.", "Unable to copy secure viewer link.");
   };
 
   const preparePersonalizedChatUrl = async (session) => {
@@ -1287,6 +1288,14 @@ export default function BroadcastingPage() {
   });
 
   const studioStreamUrl = getSessionStreamUrl(studioSession);
+  const [studioStreamRefreshKey, setStudioStreamRefreshKey] = useState(0);
+  const secureStudioStream = useOwncastStreamLaunch({
+    sessionId: studioSession?.id,
+    streamUrl: studioStreamUrl,
+    refreshKey: studioStreamRefreshKey,
+    enabled: Boolean(isObsStreamMode(studioSession) && studioStreamUrl),
+  });
+  const resolvedStudioStreamUrl = secureStudioStream.streamUrl;
   const studioChatUrl = getSessionChatUrl(studioSession);
   const studioObsServerUrl = getObsStreamServerUrl(studioSession);
   const studioObsStreamKey = getObsStreamKey(studioSession);
@@ -1731,12 +1740,24 @@ export default function BroadcastingPage() {
             <div className="overflow-hidden rounded-2xl border border-black bg-black">
               {isObsStudioMode ? (
                 studioStreamUrl ? (
-                  <iframe
-                    title="OBS Broadcast Monitor"
-                    src={studioStreamUrl}
-                    className="h-[220px] w-full sm:h-[280px] lg:h-[320px]"
-                    allow="autoplay; fullscreen"
-                  />
+                  resolvedStudioStreamUrl ? (
+                    <iframe
+                      title="OBS Broadcast Monitor"
+                      src={resolvedStudioStreamUrl}
+                      className="h-[220px] w-full sm:h-[280px] lg:h-[320px]"
+                      allow="autoplay; fullscreen"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setStudioStreamRefreshKey((previous) => previous + 1)}
+                      className="flex h-[220px] w-full items-center justify-center px-6 text-center text-sm text-[#BBBBBB] transition hover:text-white sm:h-[280px] lg:h-[320px]"
+                    >
+                      {secureStudioStream.loading
+                        ? "Preparing secure OBS monitor..."
+                        : "Secure OBS monitor could not be prepared. Tap to retry."}
+                    </button>
+                  )
                 ) : (
                   <div className="flex h-[220px] items-center justify-center px-6 text-center text-sm text-[#BBBBBB] sm:h-[280px] lg:h-[320px]">
                     Stream preview appears here after OBS starts publishing.
@@ -2255,24 +2276,25 @@ export default function BroadcastingPage() {
           </div>
 
           <div className="mb-4 rounded-xl border border-black panel-gradient px-4 py-3">
-            <div className="text-[11px] uppercase tracking-[0.12em] text-[#949494]">Stream URL</div>
+            <div className="text-[11px] uppercase tracking-[0.12em] text-[#949494]">Protected Video Access</div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <code className="max-w-full truncate rounded-md bg-[#0E0E0E] px-2 py-1 text-xs text-[#DFDFDF]">
-                {activeStreamUrl || "Stream URL not configured for this session."}
+                {activeBroadcast?.session ? buildJoinLink(activeBroadcast.session) : "Viewer link not configured."}
               </code>
               <Button
                 variant="secondary"
                 className="px-3 py-1.5 text-xs"
                 onClick={() => handleCopyStreamLink(activeBroadcast?.session)}
-                disabled={!activeStreamUrl}
+                disabled={!activeBroadcast?.session}
               >
-                Copy
+                Copy Secure Link
               </Button>
             </div>
           </div>
 
           <BroadcastViewerTheater
             title={activeBroadcast.session?.title}
+            sessionId={activeBroadcast.session?.id}
             streamUrl={activeStreamUrl}
             chatUrl={resolvedActiveChatUrl}
             chatFallbackMessage={activeChatFallbackMessage}

@@ -3458,6 +3458,112 @@ class RealtimeSessionTests(APITestCase):
             join_response.data["data"]["broadcast"]["stream_embed_url"],
             "https://stream.example.com/embed/video",
         )
+        stream_launch_url = join_response.data["data"]["broadcast"]["stream_launch_url"]
+        parsed_stream_launch_url = urlparse(stream_launch_url)
+        self.assertEqual(parsed_stream_launch_url.scheme, "https")
+        self.assertEqual(parsed_stream_launch_url.netloc, "stream.example.com")
+        self.assertEqual(parsed_stream_launch_url.path, "/api/realtime/owncast/stream-bridge/")
+
+    def test_broadcast_stream_launch_returns_stream_bridge_url(self):
+        session = RealtimeSession.objects.create(
+            title="Broadcast Stream Launch Session",
+            description="Stream launch URL should be signed and scoped to the viewer.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+            chat_embed_url="https://stream.example.com/embed/chat/readwrite",
+        )
+
+        self.login(self.viewer.email)
+        response = self.client.post(
+            reverse("realtime-session-owncast-stream-launch", kwargs={"pk": session.id}),
+            {},
+            format="json",
+            HTTP_USER_AGENT="viewer-browser",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        launch_url = response.data["data"]["launch_url"]
+        parsed_launch_url = urlparse(launch_url)
+        self.assertEqual(parsed_launch_url.scheme, "https")
+        self.assertEqual(parsed_launch_url.netloc, "stream.example.com")
+        self.assertEqual(parsed_launch_url.path, "/api/realtime/owncast/stream-bridge/")
+        token = parse_qs(parsed_launch_url.query)["token"][0]
+        signed_payload = signing.loads(
+            token,
+            max_age=9000,
+            salt="realtime.owncast-stream-bridge",
+        )
+        self.assertEqual(signed_payload["session_id"], session.id)
+        self.assertEqual(signed_payload["user_id"], self.viewer.id)
+        self.assertEqual(signed_payload["next_path"], "/embed/video/")
+        self.assertEqual(response.data["data"]["stream_embed_url"], "https://stream.example.com/embed/video")
+
+    def test_owncast_stream_bridge_sets_access_cookie_and_redirects(self):
+        session = RealtimeSession.objects.create(
+            title="Stream Cookie Session",
+            description="Bridge should set the protected stream cookie.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+        )
+        token = signing.dumps(
+            {
+                "session_id": session.id,
+                "user_id": self.viewer.id,
+                "next_path": "/embed/video/",
+            },
+            salt="realtime.owncast-stream-bridge",
+            compress=True,
+        )
+
+        response = self.client.get(
+            reverse("realtime-owncast-stream-bridge"),
+            {"token": token},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/embed/video/")
+        self.assertIn("owncast_stream_access", response.cookies)
+        cookie = response.cookies["owncast_stream_access"]
+        self.assertIn("HttpOnly", cookie.OutputString())
+        self.assertEqual(cookie["path"], "/")
+
+    def test_owncast_stream_access_rejects_missing_cookie(self):
+        response = self.client.get(reverse("realtime-owncast-stream-access"))
+        self.assertEqual(response.status_code, 401)
+
+    def test_owncast_stream_access_allows_valid_cookie(self):
+        session = RealtimeSession.objects.create(
+            title="Stream Access Session",
+            description="Valid stream cookie should pass nginx auth_request.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+        )
+        cookie_value = signing.dumps(
+            {
+                "session_id": session.id,
+                "user_id": self.viewer.id,
+                "issued_at": int(timezone.now().timestamp()),
+            },
+            salt="realtime.owncast-stream-access",
+            compress=True,
+        )
+        self.client.cookies["owncast_stream_access"] = cookie_value
+
+        response = self.client.get(reverse("realtime-owncast-stream-access"))
+
+        self.assertEqual(response.status_code, 204)
 
     @override_settings(OWNCAST_CHAT_BRIDGE_ENABLED=True)
     @patch("apps.realtime.views.register_owncast_chat_user")

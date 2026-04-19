@@ -568,6 +568,7 @@ export default function JoinLivePage() {
       {activeSession?.mode === "broadcast" ? (
         <BroadcastViewerTheater
           title={activeSession.session?.title}
+          sessionId={activeSession.session?.id}
           streamUrl={activeBroadcastStreamUrl}
           chatUrl={activeBroadcastResolvedChatUrl}
           chatFallbackMessage={activeBroadcastChatFallbackMessage}
