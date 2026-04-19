@@ -167,7 +167,6 @@ def _build_owncast_stream_launch_url(*, session, user, request, stream_embed_url
             "session_id": int(session.id),
             "user_id": int(user.id),
             "next_path": _resolve_owncast_stream_next_path(stream_embed_url),
-            "client_ip": str(resolve_client_ip(request) or "")[:64],
             "user_agent_hash": _request_user_agent_hash(request),
         },
         salt=_OWNCAST_STREAM_BRIDGE_SIGNING_SALT,
@@ -1484,16 +1483,6 @@ class RealtimeOwncastStreamBridgeView(APIView):
                 success=False,
                 message="Invalid stream bridge request.",
                 errors={"detail": "Stream bridge token does not match this browser."},
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-
-        expected_client_ip = str(payload.get("client_ip") or "").strip()
-        current_client_ip = str(resolve_client_ip(request) or "").strip()
-        if expected_client_ip and current_client_ip and expected_client_ip != current_client_ip:
-            return api_response(
-                success=False,
-                message="Invalid stream bridge request.",
-                errors={"detail": "Stream bridge token does not match this network."},
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 

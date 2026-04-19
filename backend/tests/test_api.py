@@ -3500,6 +3500,7 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(signed_payload["session_id"], session.id)
         self.assertEqual(signed_payload["user_id"], self.viewer.id)
         self.assertEqual(signed_payload["next_path"], "/embed/video/")
+        self.assertNotIn("client_ip", signed_payload)
         self.assertEqual(response.data["data"]["stream_embed_url"], "https://stream.example.com/embed/video")
 
     def test_owncast_stream_bridge_sets_access_cookie_and_redirects(self):
@@ -3534,6 +3535,38 @@ class RealtimeSessionTests(APITestCase):
         cookie = response.cookies["owncast_stream_access"]
         self.assertIn("HttpOnly", cookie.OutputString())
         self.assertEqual(cookie["path"], "/")
+
+    def test_owncast_stream_bridge_allows_network_change_between_api_and_stream_hosts(self):
+        session = RealtimeSession.objects.create(
+            title="Stream Network Change Session",
+            description="Cloudflare or mobile networks may present different IPs across subdomains.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+        )
+        token = signing.dumps(
+            {
+                "session_id": session.id,
+                "user_id": self.viewer.id,
+                "next_path": "/embed/video/",
+                "client_ip": "203.0.113.10",
+            },
+            salt="realtime.owncast-stream-bridge",
+            compress=True,
+        )
+
+        response = self.client.get(
+            reverse("realtime-owncast-stream-bridge"),
+            {"token": token},
+            REMOTE_ADDR="198.51.100.25",
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/embed/video/")
+        self.assertIn("owncast_stream_access", response.cookies)
 
     def test_owncast_stream_access_rejects_missing_cookie(self):
         response = self.client.get(reverse("realtime-owncast-stream-access"))
