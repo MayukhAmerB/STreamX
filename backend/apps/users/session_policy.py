@@ -1,8 +1,24 @@
+from django.conf import settings
+
+
 SESSION_VERSION_CLAIM = "session_version"
 
 
+def _normalized_email(value):
+    return str(value or "").strip().lower()
+
+
 def allows_concurrent_sessions(user):
-    return bool(user and (getattr(user, "is_staff", False) or getattr(user, "is_superuser", False)))
+    if not user:
+        return False
+    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+        return True
+
+    allowed_emails = {
+        _normalized_email(email)
+        for email in getattr(settings, "AUTH_CONCURRENT_SESSION_EMAILS", [])
+    }
+    return bool(_normalized_email(getattr(user, "email", "")) in allowed_emails)
 
 
 def should_enforce_single_session(user):
