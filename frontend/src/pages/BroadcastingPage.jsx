@@ -218,7 +218,10 @@ export default function BroadcastingPage() {
   });
   const [selectedChatIdentityKey, setSelectedChatIdentityKey] = useState("");
   const [ipBanInput, setIpBanInput] = useState("");
+  const [isStudioStreamUrlVisible, setIsStudioStreamUrlVisible] = useState(false);
+  const [isStudioObsServerUrlVisible, setIsStudioObsServerUrlVisible] = useState(false);
   const [isStudioObsKeyVisible, setIsStudioObsKeyVisible] = useState(false);
+  const [isActiveBroadcastAccessVisible, setIsActiveBroadcastAccessVisible] = useState(false);
 
   const [studioSession, setStudioSession] = useState(null);
   const [studioProfile, setStudioProfile] = useState(defaultBroadcastProfile);
@@ -277,6 +280,16 @@ export default function BroadcastingPage() {
   useEffect(() => {
     loadSessions();
   }, []);
+
+  useEffect(() => {
+    setIsStudioStreamUrlVisible(false);
+    setIsStudioObsServerUrlVisible(false);
+    setIsStudioObsKeyVisible(false);
+  }, [studioSession?.id]);
+
+  useEffect(() => {
+    setIsActiveBroadcastAccessVisible(false);
+  }, [activeBroadcast?.session?.id]);
 
   useEffect(() => {
     let active = true;
@@ -1649,8 +1662,21 @@ export default function BroadcastingPage() {
                 <div className="text-[10px] uppercase tracking-[0.12em] text-[#949494]">Stream URL</div>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <code className="max-w-full truncate rounded-md bg-[#0E0E0E] px-2 py-1 text-xs text-[#DFDFDF]">
-                    {studioStreamUrl || "Stream URL becomes available after joining the broadcast or setting custom URL."}
+                    {studioStreamUrl
+                      ? isStudioStreamUrlVisible
+                        ? studioStreamUrl
+                        : maskSecretValue(studioStreamUrl)
+                      : "Stream URL becomes available after joining the broadcast or setting custom URL."}
                   </code>
+                  <Button
+                    variant="secondary"
+                    className="px-3 py-1.5 text-xs"
+                    onClick={() => setIsStudioStreamUrlVisible((prev) => !prev)}
+                    disabled={!studioStreamUrl}
+                    aria-label={isStudioStreamUrlVisible ? "Hide stream URL" : "Show stream URL"}
+                  >
+                    {isStudioStreamUrlVisible ? "Hide" : "Show"}
+                  </Button>
                   <Button
                     variant="secondary"
                     className="px-3 py-1.5 text-xs"
@@ -1691,8 +1717,21 @@ export default function BroadcastingPage() {
                     <div className="text-[10px] uppercase tracking-[0.12em] text-[#949494]">OBS Server URL</div>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       <code className="max-w-full truncate rounded-md bg-[#0E0E0E] px-2 py-1 text-xs text-[#DFDFDF]">
-                        {studioObsServerUrl || "OBS server URL unavailable"}
+                        {studioObsServerUrl
+                          ? isStudioObsServerUrlVisible
+                            ? studioObsServerUrl
+                            : maskSecretValue(studioObsServerUrl)
+                          : "OBS server URL unavailable"}
                       </code>
+                      <Button
+                        variant="secondary"
+                        className="px-3 py-1.5 text-xs"
+                        onClick={() => setIsStudioObsServerUrlVisible((prev) => !prev)}
+                        disabled={!studioObsServerUrl}
+                        aria-label={isStudioObsServerUrlVisible ? "Hide OBS server URL" : "Show OBS server URL"}
+                      >
+                        {isStudioObsServerUrlVisible ? "Hide" : "Show"}
+                      </Button>
                       <Button
                         variant="secondary"
                         className="px-3 py-1.5 text-xs"
@@ -1719,7 +1758,7 @@ export default function BroadcastingPage() {
                         onClick={() => setIsStudioObsKeyVisible((prev) => !prev)}
                         disabled={!studioObsStreamKey}
                       >
-                        {isStudioObsKeyVisible ? "Hide" : "View"}
+                        {isStudioObsKeyVisible ? "Hide" : "Show"}
                       </Button>
                       <Button
                         variant="secondary"
@@ -1857,7 +1896,7 @@ export default function BroadcastingPage() {
                     onClick={() => setIsStudioObsKeyVisible((prev) => !prev)}
                     disabled={!studioObsStreamKey}
                   >
-                    {isStudioObsKeyVisible ? "Hide OBS Key" : "View OBS Key"}
+                    {isStudioObsKeyVisible ? "Hide OBS Key" : "Show OBS Key"}
                   </Button>
                 </div>
               )}
@@ -2279,8 +2318,21 @@ export default function BroadcastingPage() {
             <div className="text-[11px] uppercase tracking-[0.12em] text-[#949494]">Protected Video Access</div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <code className="max-w-full truncate rounded-md bg-[#0E0E0E] px-2 py-1 text-xs text-[#DFDFDF]">
-                {activeBroadcast?.session ? buildJoinLink(activeBroadcast.session) : "Viewer link not configured."}
+                {activeBroadcast?.session
+                  ? isActiveBroadcastAccessVisible
+                    ? buildJoinLink(activeBroadcast.session)
+                    : maskSecretValue(buildJoinLink(activeBroadcast.session))
+                  : "Viewer link not configured."}
               </code>
+              <Button
+                variant="secondary"
+                className="px-3 py-1.5 text-xs"
+                onClick={() => setIsActiveBroadcastAccessVisible((prev) => !prev)}
+                disabled={!activeBroadcast?.session}
+                aria-label={isActiveBroadcastAccessVisible ? "Hide protected video access link" : "Show protected video access link"}
+              >
+                {isActiveBroadcastAccessVisible ? "Hide" : "Show"}
+              </Button>
               <Button
                 variant="secondary"
                 className="px-3 py-1.5 text-xs"
