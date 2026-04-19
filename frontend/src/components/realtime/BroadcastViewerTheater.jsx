@@ -33,32 +33,39 @@ export default function BroadcastViewerTheater({
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const [streamFrameVersion, setStreamFrameVersion] = useState(0);
   const previousStreamStatusRef = useRef(streamStatus);
+  const normalizedStreamStatus = String(streamStatus || "").trim().toLowerCase();
+  const normalizedSessionStatus = String(sessionStatus || "").trim().toLowerCase();
+  const isSessionEnded = normalizedSessionStatus === "ended";
+  const canRenderLiveFrames = !isSessionEnded;
   const secureStream = useOwncastStreamLaunch({
     sessionId,
     streamUrl,
     refreshKey: streamFrameVersion,
-    enabled: Boolean(streamUrl),
+    enabled: Boolean(streamUrl && canRenderLiveFrames),
   });
   const resolvedStreamUrl = secureStream.streamUrl;
   const layoutClassName = showHeaderMeta
     ? "mt-3 grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:items-stretch"
     : "grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:items-stretch";
-  const normalizedStreamStatus = String(streamStatus || "").trim().toLowerCase();
-  const normalizedSessionStatus = String(sessionStatus || "").trim().toLowerCase();
   const isStreamStarting = Boolean(
     resolvedStreamUrl && normalizedSessionStatus !== "ended" && normalizedStreamStatus === "starting"
   );
   const isStreamUnavailable = Boolean(
     resolvedStreamUrl && normalizedSessionStatus !== "ended" && normalizedStreamStatus && normalizedStreamStatus !== "live"
   );
-  const resolvedStreamFallbackMessage = secureStream.requiresLaunch
-    ? secureStream.loading
-      ? "Preparing secure video session..."
-      : "Secure video could not be prepared. Refresh the page or sign in again."
-    : streamFallbackMessage;
+  const resolvedStreamFallbackMessage = isSessionEnded
+    ? "This broadcast session has ended."
+    : secureStream.requiresLaunch
+      ? secureStream.loading
+        ? "Preparing secure video session..."
+        : "Secure video could not be prepared. Refresh the page or sign in again."
+      : streamFallbackMessage;
+  const resolvedChatFallbackMessage = isSessionEnded
+    ? "Chat is closed because this broadcast has ended."
+    : chatFallbackMessage;
   const resolvedStatusMessage =
     String(statusMessage || "").trim() ||
-    (normalizedSessionStatus === "ended"
+    (isSessionEnded
       ? "This broadcast session has ended."
       : isStreamStarting
         ? "The host is reconnecting OBS. Keep chat open and the video will resume here when the stream is back."
@@ -114,7 +121,7 @@ export default function BroadcastViewerTheater({
       {resolvedStatusMessage ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-black bg-[#141414] px-4 py-3 text-sm text-[#D7D7D7]">
           <span>{resolvedStatusMessage}</span>
-          {streamUrl ? (
+          {streamUrl && canRenderLiveFrames ? (
             <button
               type="button"
               onClick={refreshStreamFrame}
@@ -128,7 +135,7 @@ export default function BroadcastViewerTheater({
 
       <div className={layoutClassName}>
         <div className="overflow-hidden rounded-2xl border border-black bg-black shadow-[0_14px_34px_rgba(0,0,0,0.24)]">
-          {streamUrl ? (
+          {streamUrl && canRenderLiveFrames ? (
             <ProtectedPlaybackSurface
               className="aspect-video w-full min-h-[260px] sm:min-h-[360px] lg:min-h-[520px] lg:max-h-[calc(100vh-220px)]"
               watermarkEnabled={Boolean(resolvedStreamUrl)}
@@ -154,7 +161,7 @@ export default function BroadcastViewerTheater({
         </div>
 
         <div className="hidden overflow-hidden rounded-2xl border border-black panel-gradient lg:block lg:h-full lg:min-h-0">
-          {chatUrl ? (
+          {chatUrl && canRenderLiveFrames ? (
             <iframe
               title={chatTitle}
               src={chatUrl}
@@ -164,7 +171,7 @@ export default function BroadcastViewerTheater({
           ) : (
             <EmptyPanel
               className="h-[260px] sm:h-[360px] lg:h-full lg:min-h-[520px] lg:max-h-[calc(100vh-220px)]"
-              message={chatFallbackMessage}
+              message={resolvedChatFallbackMessage}
             />
           )}
         </div>
@@ -186,7 +193,7 @@ export default function BroadcastViewerTheater({
         }`}
       >
         {mobileChatOpen ? (
-          chatUrl ? (
+          chatUrl && canRenderLiveFrames ? (
             <iframe
               title={`${chatTitle} (Mobile)`}
               src={chatUrl}
@@ -194,7 +201,7 @@ export default function BroadcastViewerTheater({
               allow="clipboard-read; clipboard-write"
             />
           ) : (
-            <EmptyPanel className="h-[280px]" message={chatFallbackMessage} />
+            <EmptyPanel className="h-[280px]" message={resolvedChatFallbackMessage} />
           )
         ) : null}
       </div>

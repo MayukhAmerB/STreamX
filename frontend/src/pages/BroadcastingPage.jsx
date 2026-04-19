@@ -1321,11 +1321,13 @@ export default function BroadcastingPage() {
       }),
     [activeBroadcast]
   );
+  const activeBroadcastSessionStatus = String(activeBroadcast?.session?.status || "").trim().toLowerCase();
+  const isActiveBroadcastEnded = activeBroadcastSessionStatus === "ended";
   const activeStreamUrl = activeBroadcastUrls.streamEmbedUrl;
   const activeChatUrl =
     activeBroadcastUrls.writableChatEmbedUrl || activeBroadcastUrls.chatEmbedUrl;
   const shouldUsePersonalizedActiveChat =
-    Boolean(activeBroadcast?.session?.id) && Boolean(activeChatUrl);
+    Boolean(activeBroadcast?.session?.id) && Boolean(activeChatUrl) && !isActiveBroadcastEnded;
   const resolvedActiveChatUrl =
     shouldUsePersonalizedActiveChat &&
     activeBroadcastChatLaunch.sessionId === activeBroadcast?.session?.id &&
@@ -1341,7 +1343,7 @@ export default function BroadcastingPage() {
       : "Verified chat could not be prepared. Refresh the page or sign in again."
     : "Chat URL not configured for this session.";
   const activeBroadcastStatusMessage =
-    activeBroadcast?.session?.status === "ended"
+    isActiveBroadcastEnded
       ? "This broadcast session has ended."
       : String(activeBroadcast?.broadcast?.stream_status || "").trim().toLowerCase() === "starting"
         ? "The host is reconnecting OBS. Keep chat open and the video will resume here when the stream is back."
@@ -2310,39 +2312,41 @@ export default function BroadcastingPage() {
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <span className="text-sm text-[#DFDFDF]">Viewing: {activeBroadcast.session?.title}</span>
             <span className="rounded-full border border-black bg-[#171717] px-3 py-1 text-xs uppercase tracking-[0.12em] text-[#CDCDCD]">
-              Live Broadcast
+              {isActiveBroadcastEnded ? "Ended Broadcast" : "Live Broadcast"}
             </span>
           </div>
 
-          <div className="mb-4 rounded-xl border border-black panel-gradient px-4 py-3">
-            <div className="text-[11px] uppercase tracking-[0.12em] text-[#949494]">Protected Video Access</div>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <code className="max-w-full truncate rounded-md bg-[#0E0E0E] px-2 py-1 text-xs text-[#DFDFDF]">
-                {activeBroadcast?.session
-                  ? isActiveBroadcastAccessVisible
-                    ? buildJoinLink(activeBroadcast.session)
-                    : maskSecretValue(buildJoinLink(activeBroadcast.session))
-                  : "Viewer link not configured."}
-              </code>
-              <Button
-                variant="secondary"
-                className="px-3 py-1.5 text-xs"
-                onClick={() => setIsActiveBroadcastAccessVisible((prev) => !prev)}
-                disabled={!activeBroadcast?.session}
-                aria-label={isActiveBroadcastAccessVisible ? "Hide protected video access link" : "Show protected video access link"}
-              >
-                {isActiveBroadcastAccessVisible ? "Hide" : "Show"}
-              </Button>
-              <Button
-                variant="secondary"
-                className="px-3 py-1.5 text-xs"
-                onClick={() => handleCopyStreamLink(activeBroadcast?.session)}
-                disabled={!activeBroadcast?.session}
-              >
-                Copy Secure Link
-              </Button>
+          {!isActiveBroadcastEnded ? (
+            <div className="mb-4 rounded-xl border border-black panel-gradient px-4 py-3">
+              <div className="text-[11px] uppercase tracking-[0.12em] text-[#949494]">Protected Video Access</div>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <code className="max-w-full truncate rounded-md bg-[#0E0E0E] px-2 py-1 text-xs text-[#DFDFDF]">
+                  {activeBroadcast?.session
+                    ? isActiveBroadcastAccessVisible
+                      ? buildJoinLink(activeBroadcast.session)
+                      : maskSecretValue(buildJoinLink(activeBroadcast.session))
+                    : "Viewer link not configured."}
+                </code>
+                <Button
+                  variant="secondary"
+                  className="px-3 py-1.5 text-xs"
+                  onClick={() => setIsActiveBroadcastAccessVisible((prev) => !prev)}
+                  disabled={!activeBroadcast?.session}
+                  aria-label={isActiveBroadcastAccessVisible ? "Hide protected video access link" : "Show protected video access link"}
+                >
+                  {isActiveBroadcastAccessVisible ? "Hide" : "Show"}
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="px-3 py-1.5 text-xs"
+                  onClick={() => handleCopyStreamLink(activeBroadcast?.session)}
+                  disabled={!activeBroadcast?.session}
+                >
+                  Copy Secure Link
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : null}
 
           <BroadcastViewerTheater
             title={activeBroadcast.session?.title}
