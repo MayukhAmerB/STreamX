@@ -3,12 +3,15 @@ import { Link, useNavigate } from "react-router-dom";
 import Button from "../components/Button";
 import FormInput from "../components/FormInput";
 import PageShell from "../components/PageShell";
+import TurnstileWidget from "../components/TurnstileWidget";
+import { useTurnstileChallenge } from "../hooks/useTurnstileChallenge";
 import { useAuth } from "../hooks/useAuth";
 import { apiMessage } from "../utils/api";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const { register, registrationEnabled } = useAuth();
+  const { register, registrationEnabled, turnstileEnabled, turnstileSiteKey } = useAuth();
+  const turnstile = useTurnstileChallenge(turnstileEnabled);
   const [form, setForm] = useState({
     full_name: "",
     email: "",
@@ -21,13 +24,19 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const securityError = turnstile.requireToken();
+    if (securityError) {
+      setError(securityError);
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      await register(form);
+      await register({ ...form, ...turnstile.payload });
       navigate("/");
     } catch (err) {
       setError(apiMessage(err, "Registration failed."));
+      turnstile.reset();
     } finally {
       setLoading(false);
     }
@@ -78,8 +87,22 @@ export default function RegisterPage() {
                   <option value="instructor">Instructor</option>
                 </select>
               </label>
+              {turnstileEnabled ? (
+                <TurnstileWidget
+                  siteKey={turnstileSiteKey}
+                  action="register"
+                  onToken={turnstile.setToken}
+                  onExpire={turnstile.expire}
+                  onError={() => {
+                    turnstile.expire();
+                    setError("Security check failed to load. Refresh the page and try again.");
+                  }}
+                  resetSignal={turnstile.resetSignal}
+                  className="rounded-xl border border-black bg-[#101010] p-3"
+                />
+              ) : null}
               {error ? <p className="text-sm text-red-400">{error}</p> : null}
-              <Button className="w-full" type="submit" loading={loading}>
+              <Button className="w-full" type="submit" loading={loading} disabled={turnstileEnabled && !turnstile.token}>
                 Create Account
               </Button>
             </form>

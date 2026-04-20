@@ -23,6 +23,7 @@ from config.client_ip import resolve_client_ip
 from config.cookies import REFRESH_COOKIE, clear_auth_cookies, set_auth_cookies
 from config.response import api_response
 from config.throttling import LoginRateThrottle
+from config.turnstile import enforce_turnstile, turnstile_public_config
 
 from .async_jobs import async_jobs_enabled, enqueue_email_job
 from .serializers import (
@@ -167,6 +168,9 @@ class RegisterView(APIView):
                 errors={"detail": "Only admin-created accounts can log in right now."},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
+        turnstile_response = enforce_turnstile(request, action="register")
+        if turnstile_response is not None:
+            return turnstile_response
         serializer = RegisterSerializer(data=request.data)
         if not serializer.is_valid():
             return api_response(
@@ -218,6 +222,10 @@ class LoginView(APIView):
                 },
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             )
+
+        turnstile_response = enforce_turnstile(request, action="auth")
+        if turnstile_response is not None:
+            return turnstile_response
 
         serializer = LoginSerializer(data=request.data, context={"request": request})
         if not serializer.is_valid():
@@ -400,6 +408,7 @@ class AuthConfigView(APIView):
                     and str(getattr(settings, "WEB_PUSH_VAPID_PUBLIC_KEY", "") or "").strip()
                 ),
                 "web_push_public_key": str(getattr(settings, "WEB_PUSH_VAPID_PUBLIC_KEY", "") or "").strip(),
+                **turnstile_public_config(),
             },
         )
 
@@ -497,6 +506,10 @@ class PasswordResetRequestView(APIView):
     throttle_scope = "password_reset_request"
 
     def post(self, request):
+        turnstile_response = enforce_turnstile(request, action="auth")
+        if turnstile_response is not None:
+            return turnstile_response
+
         serializer = PasswordResetRequestSerializer(data=request.data)
         if not serializer.is_valid():
             return api_response(
@@ -610,6 +623,10 @@ class ContactMessageView(APIView):
     throttle_scope = "contact"
 
     def post(self, request):
+        turnstile_response = enforce_turnstile(request, action="contact")
+        if turnstile_response is not None:
+            return turnstile_response
+
         serializer = ContactMessageSerializer(data=request.data)
         if not serializer.is_valid():
             log_security_event("contact.submit_invalid", request=request, errors=serializer.errors)

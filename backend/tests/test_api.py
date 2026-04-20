@@ -220,6 +220,9 @@ class NotificationTests(BaseAPITestCase):
 
 
 class AuthTests(APITestCase):
+    def setUp(self):
+        cache.clear()
+
     def test_csrf_endpoint_returns_token_payload_and_cookie(self):
         response = self.client.get(reverse("auth-csrf"))
         self.assertEqual(response.status_code, 200)
@@ -241,6 +244,19 @@ class AuthTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.data["data"]["registration_enabled"])
         self.assertEqual(response.data["data"]["terms_version"], TERMS_VERSION)
+
+    @override_settings(
+        TURNSTILE_ENABLED=True,
+        TURNSTILE_SITE_KEY="test-site-key",
+        TURNSTILE_SECRET_KEY="test-secret-key",
+    )
+    def test_auth_config_exposes_turnstile_public_site_key_only(self):
+        response = self.client.get(reverse("auth-config"))
+        self.assertEqual(response.status_code, 200)
+        data = response.data["data"]
+        self.assertTrue(data["turnstile_enabled"])
+        self.assertEqual(data["turnstile_site_key"], "test-site-key")
+        self.assertNotIn("test-secret-key", json.dumps(data))
 
     def test_terms_endpoint_returns_current_document(self):
         response = self.client.get(reverse("auth-terms"))
@@ -640,6 +656,57 @@ class AuthTests(APITestCase):
         self.assertFalse(payload["success"])
 
     @override_settings(
+        TURNSTILE_ENABLED=True,
+        TURNSTILE_SITE_KEY="test-site-key",
+        TURNSTILE_SECRET_KEY="test-secret-key",
+    )
+    def test_login_requires_turnstile_token_when_enabled(self):
+        user = User.objects.create_user(
+            email="turnstile-login@test.com",
+            password="StrongPass@123",
+            full_name="Turnstile Login",
+            role=User.ROLE_STUDENT,
+        )
+        response = self.client.post(
+            reverse("auth-login"),
+            {"email": user.email, "password": "StrongPass@123"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["errors"]["code"], "turnstile_required")
+
+    @override_settings(
+        TURNSTILE_ENABLED=True,
+        TURNSTILE_SITE_KEY="test-site-key",
+        TURNSTILE_SECRET_KEY="test-secret-key",
+    )
+    @patch("config.turnstile._call_siteverify")
+    def test_login_accepts_valid_turnstile_token(self, mock_siteverify):
+        mock_siteverify.return_value = {
+            "success": True,
+            "hostname": "alsyedinitiative.com",
+            "action": "auth",
+        }
+        user = User.objects.create_user(
+            email="turnstile-valid@test.com",
+            password="StrongPass@123",
+            full_name="Turnstile Valid",
+            role=User.ROLE_STUDENT,
+        )
+        response = self.client.post(
+            reverse("auth-login"),
+            {
+                "email": user.email,
+                "password": "StrongPass@123",
+                "turnstile_token": "valid-token",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["success"])
+        mock_siteverify.assert_called_once()
+
+    @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="noreply@test.com",
         CONTACT_RECEIVER_EMAIL="contact@test.com",
@@ -660,6 +727,25 @@ class AuthTests(APITestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("[Contact] Need help", mail.outbox[0].subject)
         self.assertEqual(mail.outbox[0].to, ["contact@test.com"])
+
+    @override_settings(
+        TURNSTILE_ENABLED=True,
+        TURNSTILE_SITE_KEY="test-site-key",
+        TURNSTILE_SECRET_KEY="test-secret-key",
+    )
+    def test_contact_endpoint_requires_turnstile_when_enabled(self):
+        response = self.client.post(
+            reverse("auth-contact"),
+            {
+                "name": "Visitor",
+                "email": "visitor@test.com",
+                "subject": "Need help",
+                "message": "I want to know more about your courses and pricing.",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["errors"]["code"], "turnstile_required")
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
@@ -1860,6 +1946,26 @@ class EnrollmentApprovalFlowTests(BaseAPITestCase):
 
 
 class PublicEnrollmentLeadTests(BaseAPITestCase):
+    @override_settings(
+        TURNSTILE_ENABLED=True,
+        TURNSTILE_SITE_KEY="test-site-key",
+        TURNSTILE_SECRET_KEY="test-secret-key",
+    )
+    def test_guest_enrollment_lead_requires_turnstile_when_enabled(self):
+        response = self.client.post(
+            reverse("public-enrollment-lead-create"),
+            {
+                "course_id": self.course.id,
+                "email": "guest@test.com",
+                "whatsapp_number": "+91 98765 43210",
+                "phone_number": "+91 98765 43210",
+                "message": "I want enrollment details.",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["errors"]["code"], "turnstile_required")
+
     def test_guest_can_submit_course_enrollment_lead(self):
         response = self.client.post(
             reverse("public-enrollment-lead-create"),

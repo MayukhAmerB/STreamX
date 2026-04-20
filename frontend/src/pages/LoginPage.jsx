@@ -6,6 +6,8 @@ import Button from "../components/Button";
 import BrandLogo from "../components/BrandLogo";
 import FormInput from "../components/FormInput";
 import PageShell from "../components/PageShell";
+import TurnstileWidget from "../components/TurnstileWidget";
+import { useTurnstileChallenge } from "../hooks/useTurnstileChallenge";
 import { useAuth } from "../hooks/useAuth";
 import { apiMessage } from "../utils/api";
 
@@ -18,10 +20,11 @@ function hasEdgeWhitespace(value) {
 }
 
 export default function LoginPage() {
-  const { login, googleLogin, registrationEnabled, googleLoginEnabled } = useAuth();
+  const { login, googleLogin, registrationEnabled, googleLoginEnabled, turnstileEnabled, turnstileSiteKey } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTo = location.state?.from || "/";
+  const turnstile = useTurnstileChallenge(turnstileEnabled);
   const [form, setForm] = useState({ email: "", password: "", otp_code: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -52,6 +55,12 @@ export default function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const securityError = turnstile.requireToken();
+    if (securityError) {
+      setError(securityError);
+      setInfo("");
+      return;
+    }
     setLoading(true);
     setError("");
     setInfo("");
@@ -64,6 +73,7 @@ export default function LoginPage() {
         email: normalizedEmail,
         password: form.password,
         ...(needs2FA ? { otp_code: form.otp_code } : {}),
+        ...turnstile.payload,
       });
       navigate(redirectTo, { replace: true });
     } catch (err) {
@@ -74,6 +84,7 @@ export default function LoginPage() {
         setInfo("Enter the 2FA code from your authenticator app to complete login.");
       }
       setError(detail || apiMessage(err, "Login failed."));
+      turnstile.reset();
     } finally {
       setLoading(false);
     }
@@ -95,16 +106,24 @@ export default function LoginPage() {
       setError("Enter your email first.");
       return;
     }
+    const securityError = turnstile.requireToken();
+    if (securityError) {
+      setError(securityError);
+      setInfo("");
+      return;
+    }
     setError("");
     setInfo("");
     try {
       if (normalizedEmail !== form.email) {
         setNormalizedEmail(normalizedEmail);
       }
-      await requestPasswordReset({ email: normalizedEmail });
+      await requestPasswordReset({ email: normalizedEmail, ...turnstile.payload });
       setInfo("Password reset request sent (or stubbed if email provider is not configured).");
+      turnstile.reset();
     } catch (err) {
       setError(apiMessage(err, "Unable to request password reset."));
+      turnstile.reset();
     }
   };
 
@@ -257,6 +276,21 @@ export default function LoginPage() {
                 </div>
               ) : null}
 
+              {turnstileEnabled ? (
+                <TurnstileWidget
+                  siteKey={turnstileSiteKey}
+                  action="auth"
+                  onToken={turnstile.setToken}
+                  onExpire={turnstile.expire}
+                  onError={() => {
+                    turnstile.expire();
+                    setError("Security check failed to load. Refresh the page and try again.");
+                  }}
+                  resetSignal={turnstile.resetSignal}
+                  className="rounded-xl border border-black bg-[#101010] p-3"
+                />
+              ) : null}
+
               <div className="flex items-center justify-between gap-3">
                 <button
                   type="button"
@@ -270,7 +304,12 @@ export default function LoginPage() {
                 </span>
               </div>
 
-              <Button className="w-full rounded-xl py-2.5" type="submit" loading={loading}>
+              <Button
+                className="w-full rounded-xl py-2.5"
+                type="submit"
+                loading={loading}
+                disabled={turnstileEnabled && !turnstile.token}
+              >
                 {needs2FA ? "Verify & Login" : "Login"}
               </Button>
             </form>

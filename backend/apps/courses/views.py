@@ -14,6 +14,7 @@ from config.audit import log_security_event
 from config.pagination import apply_optional_pagination
 from config.request_security import find_disallowed_query_params
 from config.response import api_response
+from config.turnstile import enforce_turnstile
 
 from apps.payments.models import Payment
 
@@ -1454,6 +1455,10 @@ class PublicEnrollmentLeadCreateView(APIView):
     throttle_scope = "public_enrollment_lead"
 
     def post(self, request):
+        turnstile_response = enforce_turnstile(request, action="public_enrollment")
+        if turnstile_response is not None:
+            return turnstile_response
+
         serializer = PublicEnrollmentLeadCreateSerializer(data=request.data)
         if not serializer.is_valid():
             log_security_event("public_enrollment_lead.invalid", request=request, errors=serializer.errors)

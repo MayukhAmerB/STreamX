@@ -3,6 +3,9 @@ import { sendContactMessage } from "../api/auth";
 import Button from "../components/Button";
 import FormInput from "../components/FormInput";
 import PageShell from "../components/PageShell";
+import TurnstileWidget from "../components/TurnstileWidget";
+import { useTurnstileChallenge } from "../hooks/useTurnstileChallenge";
+import { useAuth } from "../hooks/useAuth";
 import { apiMessage } from "../utils/api";
 
 const pageBackgroundImage =
@@ -75,6 +78,8 @@ function ContactChannelIcon({ name }) {
 }
 
 export default function ContactPage() {
+  const { turnstileEnabled, turnstileSiteKey } = useAuth();
+  const turnstile = useTurnstileChallenge(turnstileEnabled);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -91,15 +96,23 @@ export default function ContactPage() {
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    const securityError = turnstile.requireToken();
+    if (securityError) {
+      setError(securityError);
+      setSuccess("");
+      return;
+    }
     setLoading(true);
     setError("");
     setSuccess("");
     try {
-      await sendContactMessage(form);
+      await sendContactMessage({ ...form, ...turnstile.payload });
       setSuccess("Message sent. We will get back to you soon.");
       setForm({ name: "", email: "", subject: "", message: "" });
+      turnstile.reset();
     } catch (err) {
       setError(apiMessage(err, "Unable to send your message right now."));
+      turnstile.reset();
     } finally {
       setLoading(false);
     }
@@ -216,7 +229,22 @@ export default function ContactPage() {
                   </div>
                 ) : null}
 
-                <Button type="submit" loading={loading} className="w-full">
+                {turnstileEnabled ? (
+                  <TurnstileWidget
+                    siteKey={turnstileSiteKey}
+                    action="contact"
+                    onToken={turnstile.setToken}
+                    onExpire={turnstile.expire}
+                    onError={() => {
+                      turnstile.expire();
+                      setError("Security check failed to load. Refresh the page and try again.");
+                    }}
+                    resetSignal={turnstile.resetSignal}
+                    className="rounded-xl border border-black bg-[#101010] p-3"
+                  />
+                ) : null}
+
+                <Button type="submit" loading={loading} className="w-full" disabled={turnstileEnabled && !turnstile.token}>
                   Send Message
                 </Button>
               </form>

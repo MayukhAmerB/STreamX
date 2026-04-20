@@ -14,6 +14,8 @@ import { apiData, apiMessage } from "../utils/api";
 
 export const AuthContext = createContext(null);
 
+const buildTimeTurnstileSiteKey = String(import.meta.env.VITE_TURNSTILE_SITE_KEY || "").trim();
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -21,6 +23,8 @@ export function AuthProvider({ children }) {
   const [googleLoginEnabled, setGoogleLoginEnabled] = useState(false);
   const [webPushEnabled, setWebPushEnabled] = useState(false);
   const [webPushPublicKey, setWebPushPublicKey] = useState("");
+  const [turnstileEnabled, setTurnstileEnabled] = useState(Boolean(buildTimeTurnstileSiteKey));
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState(buildTimeTurnstileSiteKey);
   const hasBootstrappedRef = useRef(false);
 
   async function refreshUser() {
@@ -42,11 +46,17 @@ export function AuthProvider({ children }) {
       setGoogleLoginEnabled(Boolean(data?.google_login_enabled));
       setWebPushEnabled(Boolean(data?.web_push_enabled));
       setWebPushPublicKey(String(data?.web_push_public_key || ""));
+      const runtimeTurnstileSiteKey = String(data?.turnstile_site_key || "").trim();
+      const resolvedTurnstileSiteKey = runtimeTurnstileSiteKey || buildTimeTurnstileSiteKey;
+      setTurnstileEnabled(Boolean(data?.turnstile_enabled && resolvedTurnstileSiteKey));
+      setTurnstileSiteKey(resolvedTurnstileSiteKey);
     } catch {
       setRegistrationEnabled(false);
       setGoogleLoginEnabled(false);
       setWebPushEnabled(false);
       setWebPushPublicKey("");
+      setTurnstileEnabled(Boolean(buildTimeTurnstileSiteKey));
+      setTurnstileSiteKey(buildTimeTurnstileSiteKey);
     }
   }
 
@@ -127,6 +137,8 @@ export function AuthProvider({ children }) {
       googleLoginEnabled,
       webPushEnabled,
       webPushPublicKey,
+      turnstileEnabled,
+      turnstileSiteKey,
       login,
       register,
       googleLogin,
@@ -136,7 +148,16 @@ export function AuthProvider({ children }) {
       refreshAuthConfig,
       apiMessage,
     }),
-    [user, loading, registrationEnabled, googleLoginEnabled, webPushEnabled, webPushPublicKey]
+    [
+      user,
+      loading,
+      registrationEnabled,
+      googleLoginEnabled,
+      webPushEnabled,
+      webPushPublicKey,
+      turnstileEnabled,
+      turnstileSiteKey,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

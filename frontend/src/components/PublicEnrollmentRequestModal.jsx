@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { submitPublicEnrollmentLead } from "../api/courses";
 import { apiMessage } from "../utils/api";
+import { useTurnstileChallenge } from "../hooks/useTurnstileChallenge";
+import { useAuth } from "../hooks/useAuth";
 import Button from "./Button";
 import FormInput from "./FormInput";
+import TurnstileWidget from "./TurnstileWidget";
 
 const EMPTY_FORM = {
   email: "",
@@ -21,6 +24,8 @@ export default function PublicEnrollmentRequestModal({
   sourcePath = "",
   loginPath = "/login",
 }) {
+  const { turnstileEnabled, turnstileSiteKey } = useAuth();
+  const turnstile = useTurnstileChallenge(turnstileEnabled);
   const [form, setForm] = useState(EMPTY_FORM);
   const [state, setState] = useState({ loading: false, error: "", success: "" });
 
@@ -33,6 +38,7 @@ export default function PublicEnrollmentRequestModal({
     if (!isOpen) return;
     setForm(EMPTY_FORM);
     setState({ loading: false, error: "", success: "" });
+    turnstile.reset();
   }, [isOpen, targetType, targetId]);
 
   if (!isOpen) return null;
@@ -61,6 +67,11 @@ export default function PublicEnrollmentRequestModal({
       });
       return;
     }
+    const securityError = turnstile.requireToken();
+    if (securityError) {
+      setState({ loading: false, error: securityError, success: "" });
+      return;
+    }
     setState({ loading: true, error: "", success: "" });
     try {
       const payload = {
@@ -69,6 +80,7 @@ export default function PublicEnrollmentRequestModal({
         phone_number: form.phone_number.trim(),
         message: form.message.trim(),
         source_path: sourcePath || window.location.pathname || "",
+        ...turnstile.payload,
       };
       if (targetType === "live_class") {
         payload.live_class_id = numericTargetId;
@@ -82,6 +94,7 @@ export default function PublicEnrollmentRequestModal({
         success: response?.data?.message || "Request submitted successfully.",
       });
       setForm(EMPTY_FORM);
+      turnstile.reset();
     } catch (err) {
       const errors = err?.response?.data?.errors;
       const firstFieldError = errors
@@ -92,6 +105,7 @@ export default function PublicEnrollmentRequestModal({
         error: firstFieldError || apiMessage(err, "Unable to submit request. Please try again."),
         success: "",
       });
+      turnstile.reset();
     }
   };
 
@@ -171,8 +185,26 @@ export default function PublicEnrollmentRequestModal({
           {state.error ? <p className="text-xs text-red-300">{state.error}</p> : null}
           {state.success ? <p className="text-xs text-zinc-300">{state.success}</p> : null}
 
+          {turnstileEnabled ? (
+            <TurnstileWidget
+              siteKey={turnstileSiteKey}
+              action="public_enrollment"
+              onToken={turnstile.setToken}
+              onExpire={turnstile.expire}
+              onError={() => {
+                turnstile.expire();
+                setState((prev) => ({
+                  ...prev,
+                  error: "Security check failed to load. Refresh the page and try again.",
+                }));
+              }}
+              resetSignal={turnstile.resetSignal}
+              className="rounded-xl border border-black bg-[#101010] p-3"
+            />
+          ) : null}
+
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <Button type="submit" loading={state.loading}>
+            <Button type="submit" loading={state.loading} disabled={turnstileEnabled && !turnstile.token}>
               Submit Request
             </Button>
             <Link to={loginPath} onClick={onClose} className="inline-flex">

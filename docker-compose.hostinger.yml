@@ -71,6 +71,7 @@ services:
         VITE_BACKEND_ORIGIN: ${VITE_BACKEND_ORIGIN:-}
         VITE_ENABLE_PAYMENTS: ${VITE_ENABLE_PAYMENTS:-0}
         VITE_RAZORPAY_KEY_ID: ${VITE_RAZORPAY_KEY_ID:-}
+        VITE_TURNSTILE_SITE_KEY: ${VITE_TURNSTILE_SITE_KEY:-}
     restart: always
     depends_on:
       backend:
