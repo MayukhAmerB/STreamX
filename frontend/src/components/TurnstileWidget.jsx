@@ -80,11 +80,7 @@ export default function TurnstileWidget({
           });
         };
 
-        if (typeof turnstile.ready === "function") {
-          turnstile.ready(renderWidget);
-        } else {
-          renderWidget();
-        }
+        renderWidget();
       })
       .catch(() => {
         if (cancelled) {
