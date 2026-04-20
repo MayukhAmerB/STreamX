@@ -1811,6 +1811,7 @@ class GuideVideoAccessTests(BaseAPITestCase):
                 full_name="Guide Other User",
                 role=User.ROLE_STUDENT,
             )
+            mark_terms_accepted(other_user)
             other_client = self.client_class()
             other_login = other_client.post(
                 reverse("auth-login"),
@@ -2144,6 +2145,70 @@ class LectureVideoAccessTests(BaseAPITestCase):
             )
             self.assertEqual(denied_segment_response.status_code, 404)
 
+    def test_hls_protected_assets_are_not_blocked_by_global_request_throttle(self):
+        temp_dir = self._prepare_media_root()
+        throttled_rest_framework = {
+            **settings.REST_FRAMEWORK,
+            "DEFAULT_THROTTLE_RATES": {
+                **settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"],
+                "anon": "1/minute",
+                "user": "1/minute",
+                "lecture_playback": "20/minute",
+            },
+        }
+        with override_settings(
+            MEDIA_ROOT=temp_dir,
+            COURSE_PROTECTED_MEDIA_USE_ACCEL_REDIRECT=True,
+            REST_FRAMEWORK=throttled_rest_framework,
+        ):
+            cache.clear()
+            stream_root = os.path.join("streams", "test-course", "lecture_101")
+            manifest_path = os.path.join(stream_root, "master.m3u8")
+            segment_path = os.path.join(stream_root, "segment_001.ts")
+
+            os.makedirs(os.path.dirname(os.path.join(temp_dir, manifest_path)), exist_ok=True)
+            with open(os.path.join(temp_dir, manifest_path), "w", encoding="utf-8") as handle:
+                handle.write("#EXTM3U\n#EXTINF:6.0,\nsegment_001.ts\n")
+            with open(os.path.join(temp_dir, segment_path), "wb") as handle:
+                handle.write(b"segment-bytes")
+
+            lecture = Lecture.objects.create(
+                section=self.section,
+                title="HLS Throttle Safe Lecture",
+                description="Segment delivery should bypass global request throttles.",
+                video_key="videos/source.mp4",
+                stream_status=Lecture.STREAM_READY,
+                stream_manifest_key=manifest_path.replace("\\", "/"),
+                order=5,
+                is_preview=False,
+            )
+            Enrollment.objects.create(
+                user=self.student,
+                course=self.course,
+                payment_status=Enrollment.STATUS_PAID,
+            )
+
+            self.login(self.student.email)
+            response = self.client.get(reverse("lecture-video", kwargs={"pk": lecture.id}))
+            self.assertEqual(response.status_code, 200)
+            playback_path = urlparse(response.data["data"]["playback_url"]).path
+            token = playback_path.split("/playback/", 1)[1].split("/", 1)[0]
+
+            manifest_response = self.client.get(playback_path)
+            self.assertEqual(manifest_response.status_code, 200)
+
+            segment_response = self.client.get(
+                reverse(
+                    "lecture-playback-asset",
+                    kwargs={
+                        "pk": lecture.id,
+                        "token": token,
+                        "asset_path": segment_path.replace("\\", "/"),
+                    },
+                )
+            )
+            self.assertEqual(segment_response.status_code, 200)
+
     def test_protected_playback_token_is_user_bound(self):
         temp_dir = self._prepare_media_root()
         with override_settings(
@@ -2169,6 +2234,7 @@ class LectureVideoAccessTests(BaseAPITestCase):
                 full_name="Token Other Student",
                 role=User.ROLE_STUDENT,
             )
+            mark_terms_accepted(other_student)
             Enrollment.objects.create(
                 user=other_student,
                 course=self.course,

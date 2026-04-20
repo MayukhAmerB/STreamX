@@ -541,6 +541,7 @@ class GuideVideoView(APIView):
 
 class GuideProtectedMediaView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes = []
 
     def get(self, request, pk, token, asset_path):
         generics.get_object_or_404(GuideVideo.objects.filter(is_published=True), pk=pk)
@@ -863,6 +864,7 @@ class LectureVideoView(APIView):
 
 class LectureProtectedMediaView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes = []
 
     def get(self, request, pk, token, asset_path):
         try:
