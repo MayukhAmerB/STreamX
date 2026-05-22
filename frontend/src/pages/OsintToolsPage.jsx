@@ -19,6 +19,12 @@ const toolCategories = [
         url: "https://osintframework.com/",
       },
       {
+        name: "Bellingcat Online Investigation Toolkit",
+        type: "Toolkit",
+        use: "Curated open-source research toolkit organized by maps, geolocation, media verification, people, websites, transport, archiving, and analysis workflows.",
+        url: "https://bellingcat.gitbook.io/toolkit",
+      },
+      {
         name: "Intelligence X",
         type: "Search",
         use: "Selector-based search across indexed public-web, paste, darknet, and leak-oriented buckets.",
