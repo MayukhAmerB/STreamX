@@ -105,6 +105,26 @@ export default function MyCoursesPage() {
             </div>
           </section>
 
+          <section className="mb-6 overflow-hidden rounded-[28px] border border-black panel-gradient p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)] sm:p-6">
+            <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
+              <div>
+                <div className="inline-flex rounded-full border border-black bg-white/[0.06] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#DBDBDB]">
+                  Student Reference
+                </div>
+                <h2 className="mt-3 font-reference text-2xl font-semibold text-white">
+                  OSINT Tools Library
+                </h2>
+                <p className="mt-2 max-w-3xl text-sm leading-7 text-[#BBBBBB]">
+                  Open the categorized toolkit to understand which research tool fits a username,
+                  email, metadata, archive, image, or behavior-analysis clue.
+                </p>
+              </div>
+              <Link to="/osint-tools" className="inline-flex">
+                <Button className="w-full sm:w-auto">Open Tools Library</Button>
+              </Link>
+            </div>
+          </section>
+
           {courses.length === 0 ? (
             <div className="rounded-[28px] border border-black panel-gradient p-6 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
               <h2 className="font-reference text-xl font-semibold text-white">No courses unlocked yet</h2>

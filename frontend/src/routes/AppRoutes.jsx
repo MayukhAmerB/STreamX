@@ -25,6 +25,7 @@ const LiveClassesPage = lazy(() => import("../pages/LiveClassesPage"));
 const LoginPage = lazy(() => import("../pages/LoginPage"));
 const MeetingPage = lazy(() => import("../pages/MeetingPage"));
 const MyCoursesPage = lazy(() => import("../pages/MyCoursesPage"));
+const OsintToolsPage = lazy(() => import("../pages/OsintToolsPage"));
 const ProfilePage = lazy(() => import("../pages/ProfilePage"));
 const RegisterPage = lazy(() => import("../pages/RegisterPage"));
 const TermsPage = lazy(() => import("../pages/TermsPage"));
@@ -48,6 +49,7 @@ export default function AppRoutes() {
           <Route element={<ProtectedRoute />}>
             <Route path="/guides" element={<GuidesPage />} />
             <Route path="/my-courses" element={<MyCoursesPage />} />
+            <Route path="/osint-tools" element={<OsintToolsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/id-card" element={<IdCardPage />} />
             <Route path="/learn/:courseId" element={<CoursePlayerPage />} />
