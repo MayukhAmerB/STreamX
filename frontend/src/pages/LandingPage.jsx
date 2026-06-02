@@ -12,6 +12,10 @@ import { readCachedCourseCatalog, writeCachedCourseCatalog } from "../utils/cour
 import { formatINR } from "../utils/currency";
 import { featuredCourse } from "../utils/featuredCourse";
 import { isKnownRegisteredVisitor } from "../utils/knownRegisteredVisitor";
+import {
+  LANDING_PUBLIC_ENROLLMENT_PROMPT_EVENT,
+  requestLandingPublicEnrollmentPrompt,
+} from "../utils/publicEnrollmentPrompt";
 
 const heroCardImage =
   "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
@@ -20,7 +24,7 @@ const heroGlitchBase =
 const heroGlitchLine = `${heroGlitchBase}${heroGlitchBase}${heroGlitchBase}${heroGlitchBase}`;
 const HERO_LIVE_BROADCAST_VISIBLE_POLL_MS = 45000;
 const HERO_LIVE_BROADCAST_HIDDEN_POLL_MS = 180000;
-const GUEST_ENROLLMENT_PROMPT_SESSION_KEY = "asi:guest-enrollment-prompt-shown:v1";
+const GUEST_ENROLLMENT_PROMPT_SESSION_KEY = "asi:guest-enrollment-prompt-shown:v2";
 
 export function reserveGuestEnrollmentPrompt({
   authLoading,
@@ -40,6 +44,13 @@ export function reserveGuestEnrollmentPrompt({
   }
 
   return true;
+}
+
+export function hasReachedGuestPromptScrollPoint({ heroBottom, viewportHeight }) {
+  const safeHeroBottom = Number(heroBottom);
+  const safeViewportHeight = Number(viewportHeight);
+  if (!Number.isFinite(safeHeroBottom) || !Number.isFinite(safeViewportHeight)) return false;
+  return safeHeroBottom <= safeViewportHeight * 0.45;
 }
 
 const stats = [
@@ -237,6 +248,12 @@ function toValidLiveClassId(value) {
   return parsed;
 }
 
+function toValidCourseId(value) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
 function IconBadge({ type }) {
   if (type === "target") {
     return (
@@ -316,7 +333,12 @@ export default function LandingPage() {
     if (hasScrolledPastHero) return undefined;
 
     const updateHeroScrollBoundary = () => {
-      if (heroRef.current?.getBoundingClientRect().bottom <= 0) {
+      if (
+        hasReachedGuestPromptScrollPoint({
+          heroBottom: heroRef.current?.getBoundingClientRect().bottom,
+          viewportHeight: window.innerHeight,
+        })
+      ) {
         setHasScrolledPastHero(true);
       }
     };
@@ -330,6 +352,20 @@ export default function LandingPage() {
       window.removeEventListener("resize", updateHeroScrollBoundary);
     };
   }, [hasScrolledPastHero]);
+
+  useEffect(() => {
+    const openRequestedEnrollmentPrompt = (event) => {
+      setLandingPublicLeadTarget(event.detail || { type: "general" });
+    };
+
+    window.addEventListener(LANDING_PUBLIC_ENROLLMENT_PROMPT_EVENT, openRequestedEnrollmentPrompt);
+    return () => {
+      window.removeEventListener(
+        LANDING_PUBLIC_ENROLLMENT_PROMPT_EVENT,
+        openRequestedEnrollmentPrompt
+      );
+    };
+  }, []);
 
   useEffect(() => {
     if (
@@ -478,6 +514,16 @@ export default function LandingPage() {
   const featuredLiveCourseLink = featuredLiveCourse?._fallbackLink || `/courses/${featuredLiveCourse.id}`;
   const heroLiveBroadcastJoinPath = heroLiveBroadcast ? `/join-live?session=${heroLiveBroadcast.id}` : "/join-live";
 
+  const landingLiveCourses = useMemo(() => {
+    return catalogCourses.filter((course) => getCourseLaunchStatus(course).isLive);
+  }, [catalogCourses]);
+
+  const openGuestEnrollment = (event, target = { type: "general" }) => {
+    if (isAuthenticated) return;
+    event.preventDefault();
+    requestLandingPublicEnrollmentPrompt(target);
+  };
+
   const landingPrograms = useMemo(() => {
     return [...landingLiveClasses].sort((a, b) => {
       const aLevel = levelOrder[String(a?.level || "").toLowerCase()] || a?.month_number || 99;
@@ -611,12 +657,26 @@ export default function LandingPage() {
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link to={featuredLiveCourseLink}>
+                <Link
+                  to={featuredLiveCourseLink}
+                  onClick={(event) =>
+                    openGuestEnrollment(event, {
+                      type: toValidCourseId(featuredLiveCourse?.id) ? "course" : "general",
+                      id: toValidCourseId(featuredLiveCourse?.id),
+                      title: featuredLiveCourse?.title || "Flagship Course",
+                    })
+                  }
+                >
                   <Button className="rounded-full bg-gradient-to-r from-[#CFCFCF] to-[#989898] px-5 text-[#121212] hover:from-[#DBDBDB] hover:to-[#A6A6A6]">
                     View Flagship Course
                   </Button>
                 </Link>
-                <Link to="/courses">
+                <Link
+                  to="/courses"
+                  onClick={(event) =>
+                    openGuestEnrollment(event, { type: "general", title: "Courses" })
+                  }
+                >
                   <Button
                     variant="indigoSoft"
                     className="glossy rounded-full !border-[#F4F4F4] !bg-[linear-gradient(135deg,#FEFEFE_0%,#F7F7F7_52%,#E2E2E2_100%)] px-5 !text-[#121212] shadow-[0_14px_28px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.95)] hover:!bg-[linear-gradient(135deg,#FFFFFF_0%,#F9F9F9_52%,#E6E6E6_100%)]"
@@ -789,7 +849,104 @@ export default function LandingPage() {
 
           <SectionCard className="p-5 sm:p-6">
             <SectionTitle
-              title="Popular programs"
+              title="Live courses"
+              subtitle="Explore courses that are currently open for enrollment."
+            />
+
+            {landingLiveCourses.length ? (
+              <div className="mt-6 grid auto-rows-fr gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {landingLiveCourses.map((course, idx) => {
+                  const courseId = toValidCourseId(course.id);
+                  return (
+                    <article
+                      key={course.id}
+                      className={`hover-lift reveal-up ${
+                        idx % 3 === 0
+                          ? "reveal-delay-1"
+                          : idx % 3 === 1
+                            ? "reveal-delay-2"
+                            : "reveal-delay-3"
+                      } flex h-full flex-col rounded-2xl border border-black ${cornerGlowCardBg} p-4 shadow-[0_10px_24px_rgba(0,0,0,0.25)]`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="rounded-full border border-black bg-[#111111] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#D6D6D6]">
+                          {formatLevel(course.level)}
+                        </span>
+                        <span className="rounded-full border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-2.5 py-1 text-[11px] font-semibold text-[#1A1A1A]">
+                          Live
+                        </span>
+                      </div>
+
+                      <h3 className="mt-4 font-reference text-2xl font-semibold leading-tight text-white">
+                        {course.title}
+                      </h3>
+                      <p className="mt-3 line-clamp-4 text-sm leading-6 text-[#BBBBBB]">
+                        {course.description || "Structured cybersecurity course with guided progression."}
+                      </p>
+
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <div className="rounded-xl border border-black bg-[#121212] px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">
+                            Modules
+                          </div>
+                          <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
+                            {course.section_count ?? 0}
+                          </div>
+                        </div>
+                        <div className="rounded-xl border border-black bg-[#121212] px-3 py-2">
+                          <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">
+                            Price
+                          </div>
+                          <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
+                            {formatINR(course.price)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-auto grid grid-cols-2 gap-2 pt-5">
+                        <Link
+                          to={course?._fallbackLink || `/courses/${course.id}`}
+                          className="inline-flex items-center justify-center rounded-full border border-black bg-[#141414] px-3 py-2.5 text-sm font-semibold text-[#DBDBDB] transition hover:bg-[#1B1B1B]"
+                        >
+                          View Details
+                        </Link>
+                        {isAuthenticated ? (
+                          <Link
+                            to={course?._fallbackLink || `/courses/${course.id}`}
+                            className="glossy inline-flex items-center justify-center rounded-full border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-3 py-2.5 text-sm font-semibold text-[#1A1A1A]"
+                          >
+                            Open Course
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            className="glossy inline-flex items-center justify-center rounded-full border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-3 py-2.5 text-sm font-semibold text-[#1A1A1A]"
+                            onClick={(event) =>
+                              openGuestEnrollment(event, {
+                                type: courseId ? "course" : "general",
+                                id: courseId,
+                                title: course.title,
+                              })
+                            }
+                          >
+                            Enroll
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="mt-6 rounded-xl border border-black bg-[#111111] px-4 py-3 text-sm text-[#BBBBBB]">
+                Live courses are being updated. Submit an enrollment enquiry and our team will contact you.
+              </p>
+            )}
+          </SectionCard>
+
+          <SectionCard className="p-5 sm:p-6">
+            <SectionTitle
+              title="Live classes"
               subtitle="Browse our current live OSINT classes and enroll directly from the landing page."
             />
 
@@ -940,12 +1097,26 @@ export default function LandingPage() {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Link to="/courses">
+                  <Link
+                    to="/courses"
+                    onClick={(event) =>
+                      openGuestEnrollment(event, { type: "general", title: "Courses" })
+                    }
+                  >
                     <button className="rounded-full border border-white/65 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">
                       Explore
                     </button>
                   </Link>
-                  <Link to={featuredLiveCourseLink}>
+                  <Link
+                    to={featuredLiveCourseLink}
+                    onClick={(event) =>
+                      openGuestEnrollment(event, {
+                        type: toValidCourseId(featuredLiveCourse?.id) ? "course" : "general",
+                        id: toValidCourseId(featuredLiveCourse?.id),
+                        title: featuredLiveCourse?.title || "Flagship Course",
+                      })
+                    }
+                  >
                     <button className="rounded-full bg-[#F4F4F4] px-4 py-2 text-sm font-semibold text-[#272727] hover:bg-white">
                       Join Now
                     </button>

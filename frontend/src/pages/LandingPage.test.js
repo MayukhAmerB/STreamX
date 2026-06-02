@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { reserveGuestEnrollmentPrompt } from "./LandingPage";
+import { hasReachedGuestPromptScrollPoint, reserveGuestEnrollmentPrompt } from "./LandingPage";
 
 function createStorage() {
   const values = new Map();
@@ -15,6 +15,14 @@ function createStorage() {
 }
 
 describe("landing guest enrollment prompt", () => {
+  it("opens once most of the hero has scrolled away", () => {
+    expect(hasReachedGuestPromptScrollPoint({ heroBottom: 500, viewportHeight: 1000 })).toBe(false);
+    expect(hasReachedGuestPromptScrollPoint({ heroBottom: 450, viewportHeight: 1000 })).toBe(true);
+    expect(hasReachedGuestPromptScrollPoint({ heroBottom: undefined, viewportHeight: 1000 })).toBe(
+      false
+    );
+  });
+
   it("reserves the prompt once per guest browsing session", () => {
     const storage = createStorage();
     const getStorage = () => storage;

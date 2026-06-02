@@ -5,6 +5,7 @@ import { resolveDjangoAdminUrl } from "../utils/backendUrl";
 import Button from "./Button";
 import BrandLogo from "./BrandLogo";
 import NotificationBell from "./NotificationBell";
+import { requestLandingPublicEnrollmentPrompt } from "../utils/publicEnrollmentPrompt";
 
 const navClass = ({ isActive }) =>
   `text-sm ${
@@ -23,6 +24,13 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const djangoAdminUrl = resolveDjangoAdminUrl();
+
+  const openLandingGuestEnrollment = (event, title) => {
+    if (!isHome || isAuthenticated) return;
+    event.preventDefault();
+    requestLandingPublicEnrollmentPrompt({ type: "general", title });
+    setMobileMenuOpen(false);
+  };
 
   useEffect(() => {
     setMenuOpen(false);
@@ -71,10 +79,18 @@ export default function Navbar() {
       >
         <BrandLogo className="min-w-0 flex-1 lg:flex-none" />
         <nav className="hidden items-center gap-5 lg:flex">
-          <NavLink to="/live-classes" className={navClass}>
+          <NavLink
+            to="/live-classes"
+            className={navClass}
+            onClick={(event) => openLandingGuestEnrollment(event, "Live Classes")}
+          >
             Live Classes
           </NavLink>
-          <NavLink to="/courses" className={navClass}>
+          <NavLink
+            to="/courses"
+            className={navClass}
+            onClick={(event) => openLandingGuestEnrollment(event, "Courses")}
+          >
             Courses
           </NavLink>
           {isAuthenticated ? (
@@ -253,10 +269,18 @@ export default function Navbar() {
       {mobileMenuOpen ? (
         <div className="mx-auto mt-2 max-w-7xl overflow-hidden rounded-2xl border border-black panel-gradient p-3 shadow-[0_18px_34px_rgba(0,0,0,0.34)] backdrop-blur lg:hidden">
           <nav className="grid gap-1">
-            <NavLink to="/live-classes" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+            <NavLink
+              to="/live-classes"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]"
+              onClick={(event) => openLandingGuestEnrollment(event, "Live Classes")}
+            >
               Live Classes
             </NavLink>
-            <NavLink to="/courses" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+            <NavLink
+              to="/courses"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]"
+              onClick={(event) => openLandingGuestEnrollment(event, "Courses")}
+            >
               Courses
             </NavLink>
             {isAuthenticated ? (
