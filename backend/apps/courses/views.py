@@ -1471,7 +1471,7 @@ class PublicEnrollmentLeadCreateView(APIView):
 
         lead = serializer.save()
         target_id = lead.course_id or lead.live_class_id
-        target_type = "course" if lead.course_id else "live_class"
+        target_type = "course" if lead.course_id else "live_class" if lead.live_class_id else "general"
         log_security_event(
             "public_enrollment_lead.created",
             request=request,

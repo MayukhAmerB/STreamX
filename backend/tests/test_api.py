@@ -2018,22 +2018,53 @@ class PublicEnrollmentLeadTests(BaseAPITestCase):
             ).exists()
         )
 
-    def test_guest_enrollment_lead_requires_single_target_and_message(self):
+    def test_guest_can_submit_general_enrollment_lead(self):
+        response = self.client.post(
+            reverse("public-enrollment-lead-create"),
+            {
+                "email": "guest.general@example.com",
+                "phone_number": "+91 96666 11111",
+                "whatsapp_number": "+91 96666 22222",
+                "message": "I want to understand which cybersecurity course is right for me.",
+                "source_path": "/",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["data"]["target_type"], "general")
+        self.assertIsNone(response.data["data"]["target_id"])
+        self.assertTrue(
+            PublicEnrollmentLead.objects.filter(
+                course__isnull=True,
+                live_class__isnull=True,
+                email="guest.general@example.com",
+                source_path="/",
+            ).exists()
+        )
+
+    def test_guest_enrollment_lead_rejects_multiple_targets(self):
+        live_class = LiveClass.objects.create(
+            title="Second Guest Lead Live Class",
+            description="Live class for multiple-target validation.",
+            level=LiveClass.LEVEL_BEGINNER,
+            month_number=1,
+            is_active=True,
+        )
         response = self.client.post(
             reverse("public-enrollment-lead-create"),
             {
                 "course_id": self.course.id,
-                "live_class_id": 1,
+                "live_class_id": live_class.id,
                 "email": "invalid@example.com",
                 "phone_number": "+91 90000 11111",
                 "whatsapp_number": "+91 90000 22222",
-                "message": "",
+                "message": "I should not be able to select two targets.",
             },
             format="json",
         )
         self.assertEqual(response.status_code, 400)
         self.assertFalse(response.data["success"])
-        self.assertIn("message", response.data["errors"])
+        self.assertIn("detail", response.data["errors"])
 
 class LectureVideoAccessTests(BaseAPITestCase):
     def _prepare_media_root(self):
@@ -4045,6 +4076,46 @@ class RealtimeSessionTests(APITestCase):
 
     @override_settings(OWNCAST_CHAT_BRIDGE_ENABLED=True)
     @patch("apps.realtime.views.register_owncast_chat_user")
+    def test_broadcast_chat_launch_rejects_banned_identity(self, mock_register_chat_user):
+        session = RealtimeSession.objects.create(
+            title="Banned Viewer Broadcast",
+            description="A banned viewer must not receive another Owncast chat bridge.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+            chat_embed_url="https://stream.example.com/embed/chat/readwrite",
+        )
+        OwncastChatIdentity.objects.create(
+            session=session,
+            user=self.viewer,
+            platform_user_id=self.viewer.id,
+            platform_email=self.viewer.email,
+            platform_full_name=self.viewer.full_name,
+            platform_role=self.viewer.role,
+            platform_display_name="Viewer User",
+            owncast_user_id="banned-owncast-user",
+            owncast_display_name="agitated-rush",
+            access_token_hash=OwncastChatIdentity.hash_access_token("banned-access-token"),
+            access_token_secret=OwncastChatIdentity.seal_access_token("banned-access-token"),
+            owncast_disabled_at=timezone.now(),
+        )
+
+        self.login(self.viewer.email)
+        response = self.client.post(
+            reverse("realtime-session-owncast-chat-launch", kwargs={"pk": session.id}),
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["message"], "Broadcast chat access is disabled.")
+        mock_register_chat_user.assert_not_called()
+
+    @override_settings(OWNCAST_CHAT_BRIDGE_ENABLED=True)
+    @patch("apps.realtime.views.register_owncast_chat_user")
     def test_broadcast_chat_launch_recovers_from_permanent_mapping_create_race(self, mock_register_chat_user):
         mock_register_chat_user.return_value = {
             "access_token": "race-access-token",
@@ -4201,6 +4272,44 @@ class RealtimeSessionTests(APITestCase):
         identity.refresh_from_db()
         self.assertIsNotNone(identity.bridge_used_at)
 
+    def test_owncast_chat_bridge_rejects_banned_identity(self):
+        identity = OwncastChatIdentity.objects.create(
+            session=None,
+            user=self.viewer,
+            platform_user_id=self.viewer.id,
+            platform_email=self.viewer.email,
+            platform_full_name=self.viewer.full_name,
+            platform_role=self.viewer.role,
+            platform_display_name="Viewer User",
+            owncast_user_id="banned-owncast-user",
+            owncast_display_name="agitated-rush",
+            access_token_hash=OwncastChatIdentity.hash_access_token("banned-access-token"),
+            owncast_disabled_at=timezone.now(),
+        )
+        signed_token = signing.dumps(
+            {
+                "access_token": "banned-access-token",
+                "display_name": "agitated-rush",
+                "platform_display_name": "Viewer User",
+                "next_path": "/embed/chat/readwrite/",
+                "session_id": 99,
+                "user_id": self.viewer.id,
+                "identity_id": identity.id,
+            },
+            salt="realtime.owncast-chat-bridge",
+            compress=True,
+        )
+
+        response = self.client.get(
+            reverse("realtime-owncast-chat-bridge"),
+            {"token": signed_token},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["message"], "Broadcast chat access is disabled.")
+        identity.refresh_from_db()
+        self.assertIsNone(identity.bridge_used_at)
+
     def test_owncast_chat_bridge_syncs_preserved_browser_username(self):
         session = RealtimeSession.objects.create(
             title="Bridge Sync Session",
@@ -4246,6 +4355,45 @@ class RealtimeSessionTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        identity.refresh_from_db()
+        self.assertEqual(identity.owncast_display_name, "agitated-rush")
+
+    def test_owncast_chat_bridge_rejects_banned_identity_sync(self):
+        identity = OwncastChatIdentity.objects.create(
+            session=None,
+            user=self.viewer,
+            platform_user_id=self.viewer.id,
+            platform_email=self.viewer.email,
+            platform_full_name=self.viewer.full_name,
+            platform_role=self.viewer.role,
+            platform_display_name="Viewer User",
+            owncast_user_id="banned-owncast-user",
+            owncast_display_name="agitated-rush",
+            access_token_hash=OwncastChatIdentity.hash_access_token("banned-access-token"),
+            owncast_disabled_at=timezone.now(),
+        )
+        signed_token = signing.dumps(
+            {
+                "access_token": "banned-access-token",
+                "display_name": "agitated-rush",
+                "platform_display_name": "Viewer User",
+                "next_path": "/embed/chat/readwrite/",
+                "session_id": 99,
+                "user_id": self.viewer.id,
+                "identity_id": identity.id,
+            },
+            salt="realtime.owncast-chat-bridge",
+            compress=True,
+        )
+
+        response = self.client.post(
+            reverse("realtime-owncast-chat-bridge"),
+            {"token": signed_token, "display_name": "different-handle"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["message"], "Broadcast chat access is disabled.")
         identity.refresh_from_db()
         self.assertEqual(identity.owncast_display_name, "agitated-rush")
 

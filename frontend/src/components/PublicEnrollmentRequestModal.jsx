@@ -31,7 +31,8 @@ export default function PublicEnrollmentRequestModal({
 
   const heading = useMemo(() => {
     if (targetType === "live_class") return "Live Class Enrollment Request";
-    return "Course Enrollment Request";
+    if (targetType === "course") return "Course Enrollment Request";
+    return "Enrollment Enquiry";
   }, [targetType]);
 
   useEffect(() => {
@@ -51,7 +52,8 @@ export default function PublicEnrollmentRequestModal({
   const handleSubmit = async (event) => {
     event.preventDefault();
     const numericTargetId = Number(targetId);
-    if (!Number.isInteger(numericTargetId) || numericTargetId <= 0) {
+    const hasSelectedTarget = targetType === "course" || targetType === "live_class";
+    if (hasSelectedTarget && (!Number.isInteger(numericTargetId) || numericTargetId <= 0)) {
       setState({
         loading: false,
         error: "Enrollment request is unavailable for this preview item.",
@@ -84,7 +86,7 @@ export default function PublicEnrollmentRequestModal({
       };
       if (targetType === "live_class") {
         payload.live_class_id = numericTargetId;
-      } else {
+      } else if (targetType === "course") {
         payload.course_id = numericTargetId;
       }
       const response = await submitPublicEnrollmentLead(payload);
@@ -126,7 +128,9 @@ export default function PublicEnrollmentRequestModal({
             </div>
             <h3 className="mt-1 font-reference text-2xl font-semibold text-white">{heading}</h3>
             <p className="mt-2 text-sm text-[#BBBBBB]">
-              {targetName ? `Target: ${targetName}` : "Share your details and we will contact you for enrollment."}
+              {targetName
+                ? `Target: ${targetName}`
+                : "Share your details and the courses you are interested in. Our team will contact you for enrollment."}
             </p>
           </div>
           <button

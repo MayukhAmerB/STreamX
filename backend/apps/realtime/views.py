@@ -219,6 +219,19 @@ def _decode_owncast_chat_bridge_payload(token):
     )
 
 
+def _is_owncast_chat_identity_disabled(identity):
+    return bool(identity and identity.owncast_disabled_at)
+
+
+def _owncast_chat_disabled_response():
+    return api_response(
+        success=False,
+        message="Broadcast chat access is disabled.",
+        errors={"detail": "A moderator disabled chat access for this account."},
+        status_code=status.HTTP_403_FORBIDDEN,
+    )
+
+
 def _owncast_chat_bridge_frame_ancestors():
     ancestors = ["'self'", "https://alsyedinitiative.com", "https://www.alsyedinitiative.com"]
     configured_sources = [
@@ -966,6 +979,9 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
             .order_by("-updated_at", "-id")
             .first()
         )
+        if _is_owncast_chat_identity_disabled(chat_identity):
+            return _owncast_chat_disabled_response()
+
         access_token = chat_identity.reveal_access_token() if chat_identity else ""
         chat_user = {}
 
@@ -1364,6 +1380,9 @@ class RealtimeOwncastChatBridgeView(APIView):
         except (TypeError, ValueError):
             identity_id = 0
         if identity_id > 0:
+            identity = OwncastChatIdentity.objects.filter(pk=identity_id).first()
+            if _is_owncast_chat_identity_disabled(identity):
+                return _owncast_chat_disabled_response()
             now = timezone.now()
             OwncastChatIdentity.objects.filter(pk=identity_id).update(
                 bridge_used_at=now,
@@ -1435,6 +1454,8 @@ class RealtimeOwncastChatBridgeView(APIView):
                 errors={"detail": "Chat bridge identity could not be verified."},
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
+        if _is_owncast_chat_identity_disabled(identity):
+            return _owncast_chat_disabled_response()
 
         if identity.owncast_display_name != display_name:
             identity.owncast_display_name = display_name

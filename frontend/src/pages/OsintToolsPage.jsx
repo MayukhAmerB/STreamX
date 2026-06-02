@@ -166,6 +166,46 @@ const toolCategories = [
     ],
   },
   {
+    title: "Phishing Simulation And Awareness",
+    focus: "Use only for authorized awareness training, lab exercises, and defensive review.",
+    useCase:
+      "These references help students understand phishing campaign workflows, adversary-in-the-middle risk, reverse-proxy abuse, and the controls that reduce credential and session theft.",
+    caution:
+      "Do not target real users, credentials, sessions, domains, or brands without explicit written authorization. Keep simulations scoped, logged, and approved.",
+    tools: [
+      {
+        name: "Gophish",
+        type: "Awareness simulation",
+        use: "Open-source framework reference for controlled phishing-awareness campaigns, templates, and result review.",
+        url: "https://getgophish.com/",
+      },
+      {
+        name: "Zphisher",
+        type: "Training reference",
+        use: "Template-driven phishing demonstration reference for discussing social-engineering risk in isolated training.",
+        url: "https://github.com/htr-tech/zphisher",
+      },
+      {
+        name: "Evilginx2",
+        type: "AiTM risk reference",
+        use: "Adversary-in-the-middle reference for understanding token and session theft risk and the defenses around it.",
+        url: "https://github.com/kgretzky/evilginx2",
+      },
+      {
+        name: "Modlishka",
+        type: "Reverse proxy reference",
+        use: "Reverse-proxy phishing research reference for controlled authentication and MFA-resilience discussion.",
+        url: "https://github.com/drk1wi/Modlishka",
+      },
+      {
+        name: "Muraena",
+        type: "Reverse proxy reference",
+        use: "Reverse-proxy research reference for studying post-phishing risk and defensive controls in approved labs.",
+        url: "https://github.com/muraenateam/muraena",
+      },
+    ],
+  },
+  {
     title: "Phone And Vehicle Lookups",
     focus: "Use when a phone-number clue or Indian vehicle-registration clue needs a lawful lookup path.",
     useCase:
@@ -458,6 +498,63 @@ const toolCategories = [
 const allToolCount = toolCategories.reduce((total, category) => total + category.tools.length, 0);
 const categoryByTitle = new Map(toolCategories.map((category) => [category.title, category]));
 
+const beginnerPaths = [
+  {
+    title: "Username Or Email",
+    prompt: "I have a handle, email, or account clue.",
+    categoryTitle: "Username, Email And Identity Correlation",
+    start: "Check public account presence first, then verify every identity pivot manually.",
+  },
+  {
+    title: "Domain Or URL",
+    prompt: "I have a domain, IP, service, or suspicious URL.",
+    categoryTitle: "Domain, Email And Internet Infrastructure",
+    start: "Start with passive domain, DNS, URL, and service context before any active interaction.",
+  },
+  {
+    title: "Phone Or Vehicle",
+    prompt: "I have a number or Indian registration clue.",
+    categoryTitle: "Phone And Vehicle Lookups",
+    start: "Prefer official or clearly scoped lookups and treat personal details as sensitive.",
+  },
+  {
+    title: "Image Or Screenshot",
+    prompt: "I need clues from a photo, frame, or screenshot.",
+    categoryTitle: "Image And Screenshot Analysis",
+    start: "Inspect visible clues and provenance before treating reverse-search matches as evidence.",
+  },
+  {
+    title: "File Or Metadata",
+    prompt: "I have a PDF, image, document, archive, or media file.",
+    categoryTitle: "Metadata Analysis",
+    start: "Preserve the original file and record what metadata method produced each clue.",
+  },
+  {
+    title: "Older Web Evidence",
+    prompt: "I need to compare a page with its history.",
+    categoryTitle: "Archive And Historical Capture",
+    start: "Compare captures, current pages, and collection times before concluding what changed.",
+  },
+  {
+    title: "Writing Or Behavior",
+    prompt: "I see repeated phrasing, timing, or interaction patterns.",
+    categoryTitle: "Writing Style, Timing And Behavioral Patterns",
+    start: "Use patterns to support a hypothesis, not to claim identity without corroboration.",
+  },
+  {
+    title: "Authorized Phishing Lab",
+    prompt: "I am studying awareness simulations and phishing defenses.",
+    categoryTitle: "Phishing Simulation And Awareness",
+    start: "Stay in an approved lab or written simulation scope and focus on controls and lessons.",
+  },
+  {
+    title: "I Am Not Sure Yet",
+    prompt: "I need a directory or toolkit to choose the right lane.",
+    categoryTitle: "Directories And Search Starting Points",
+    start: "Use broad toolkits to choose the clue type, then move into a focused category.",
+  },
+];
+
 const clueTree = [
   {
     title: "Person And Identity Clues",
@@ -489,9 +586,11 @@ const clueTree = [
     forks: [
       {
         title: "Infrastructure Signals",
-        description: "Map domains, DNS, internet assets, and professional intel platforms.",
+        description:
+          "Map domains, DNS, internet assets, simulation references, and professional intel platforms.",
         categories: [
           "Domain, Email And Internet Infrastructure",
+          "Phishing Simulation And Awareness",
           "Enterprise OSINT And Threat Platforms",
         ],
       },
@@ -599,9 +698,122 @@ function TreeFork({ fork, selectedTitle, onSelect }) {
   );
 }
 
+function BeginnerFinder({ selectedTitle, onSelect }) {
+  const selectedPath =
+    beginnerPaths.find((path) => path.categoryTitle === selectedTitle) || beginnerPaths[0];
+  const selectedCategory = categoryByTitle.get(selectedPath.categoryTitle);
+  const starterTools = selectedCategory?.tools.slice(0, 3) || [];
+
+  return (
+    <section
+      id="beginner-tool-finder"
+      className="relative mt-5 scroll-mt-24 overflow-hidden rounded-[32px] border border-black bg-[#070707] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.34)] sm:p-6"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_4%_8%,rgba(255,255,255,0.15),transparent_24%),radial-gradient(circle_at_98%_82%,rgba(174,174,174,0.1),transparent_32%)]" />
+      <div className="relative">
+        <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+          <div>
+            <div className="inline-flex rounded-full border border-[#484848] bg-[#ECECEC] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#161616]">
+              Beginner Tool Finder
+            </div>
+            <h2 className="mt-3 font-reference text-3xl font-semibold text-white">
+              Start with what you have
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm leading-7 text-[#C6C6C6]">
+              Choose the clue in front of you. The finder shows the safest first lane and a few
+              starter tools before the full investigation tree below.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-black panel-gradient px-4 py-3">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9B9B9B]">
+              Beginner Lanes
+            </div>
+            <div className="mt-1 text-3xl font-semibold text-white">{beginnerPaths.length}</div>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {beginnerPaths.map((path) => {
+              const isSelected = selectedPath.title === path.title;
+
+              return (
+                <button
+                  key={path.title}
+                  type="button"
+                  className={`rounded-[22px] border p-4 text-left transition ${
+                    isSelected
+                      ? "border-[#E6E6E6] bg-[#EAEAEA] text-[#171717] shadow-[0_16px_42px_rgba(232,232,232,0.14)]"
+                      : "border-black panel-gradient text-[#E7E7E7] hover:border-[#474747] hover:bg-[#171717]"
+                  }`}
+                  onClick={() => onSelect(path.categoryTitle)}
+                  aria-pressed={isSelected}
+                >
+                  <span
+                    className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${
+                      isSelected
+                        ? "border-[#C7C7C7] bg-white text-[#303030]"
+                        : "border-black bg-white/[0.06] text-[#AAAAAA]"
+                    }`}
+                  >
+                    Pick This
+                  </span>
+                  <span className="mt-3 block font-reference text-lg font-semibold">
+                    {path.title}
+                  </span>
+                  <span
+                    className={`mt-2 block text-sm leading-6 ${
+                      isSelected ? "text-[#424242]" : "text-[#BDBDBD]"
+                    }`}
+                  >
+                    {path.prompt}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <article className="rounded-[26px] border border-[#4B4B4B] bg-[linear-gradient(145deg,rgba(237,237,237,0.11),rgba(10,10,10,0.96)_34%)] p-4 shadow-[0_20px_58px_rgba(0,0,0,0.34)] sm:p-5">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#BEBEBE]">
+              Recommended First Lane
+            </div>
+            <h3 className="mt-3 font-reference text-2xl font-semibold text-white">
+              {selectedCategory?.title}
+            </h3>
+            <p className="mt-3 rounded-2xl border border-black bg-white/[0.06] p-4 text-sm leading-7 text-[#E0E0E0]">
+              {selectedPath.start}
+            </p>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#A4A4A4]">
+                Try These First
+              </div>
+              <a
+                href="#selected-tool-category"
+                className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-[#EFEFEF] transition hover:bg-white/15"
+              >
+                Open Full Category
+              </a>
+            </div>
+
+            <div className="mt-3 grid gap-3">
+              {starterTools.map((tool) => (
+                <ToolCard key={tool.name} tool={tool} />
+              ))}
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function CategoryDetailPanel({ category }) {
   return (
-    <section className="relative mt-5 overflow-hidden rounded-[30px] border border-black bg-[#090909] p-5 shadow-[0_24px_68px_rgba(0,0,0,0.3)] sm:p-6">
+    <section
+      id="selected-tool-category"
+      className="relative mt-5 scroll-mt-24 overflow-hidden rounded-[30px] border border-black bg-[#090909] p-5 shadow-[0_24px_68px_rgba(0,0,0,0.3)] sm:p-6"
+    >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(221,221,221,0.13),transparent_30%),radial-gradient(circle_at_100%_100%,rgba(117,117,117,0.14),transparent_34%)]" />
       <div className="relative">
         <div className="grid gap-4 xl:grid-cols-[1fr_auto] xl:items-end">
@@ -678,8 +890,11 @@ export default function OsintToolsPage() {
               lead that needs verification. This library is for authorized learning, defensive
               research, and lawful OSINT work.
             </p>
+            <a href="#beginner-tool-finder" className="mt-5 inline-flex">
+              <Button>Beginner Tool Finder</Button>
+            </a>
             <div className="mt-5 flex flex-wrap gap-2">
-              {["Username", "Email", "Metadata", "Archives", "Images", "Behavior"].map((item) => (
+              {["Username", "Email", "Metadata", "Archives", "Images", "Simulation"].map((item) => (
                 <span
                   key={item}
                   className="rounded-full border border-black bg-white/[0.05] px-3 py-1.5 text-xs font-semibold tracking-wide text-[#D8D8D8]"
@@ -717,6 +932,8 @@ export default function OsintToolsPage() {
           </div>
         </div>
       </section>
+
+      <BeginnerFinder selectedTitle={selectedCategoryTitle} onSelect={setSelectedCategoryTitle} />
 
       <section className="relative mt-5 overflow-hidden rounded-[32px] border border-black bg-[#070707] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.34)] sm:p-6">
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.07)_0,transparent_25%),radial-gradient(circle_at_50%_4%,rgba(188,188,188,0.18),transparent_22%)]" />

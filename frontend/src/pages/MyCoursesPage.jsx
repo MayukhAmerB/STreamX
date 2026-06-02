@@ -119,9 +119,16 @@ export default function MyCoursesPage() {
                   email, metadata, archive, image, or behavior-analysis clue.
                 </p>
               </div>
-              <Link to="/osint-tools" className="inline-flex">
-                <Button className="w-full sm:w-auto">Open Tools Library</Button>
-              </Link>
+              <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
+                <Link to="/osint-tools#beginner-tool-finder" className="inline-flex">
+                  <Button className="w-full sm:w-auto">Beginner Tool Finder</Button>
+                </Link>
+                <Link to="/osint-tools" className="inline-flex">
+                  <Button variant="secondary" className="w-full sm:w-auto">
+                    Open Tools Library
+                  </Button>
+                </Link>
+              </div>
             </div>
           </section>
 

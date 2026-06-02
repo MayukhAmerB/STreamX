@@ -869,5 +869,5 @@ class PublicEnrollmentLead(models.Model):
         elif self.live_class_id:
             target = self.live_class.title
         else:
-            target = "Unknown target"
+            target = "General enquiry"
         return f"{self.email} -> {target}"

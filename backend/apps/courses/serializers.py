@@ -716,9 +716,9 @@ class PublicEnrollmentLeadCreateSerializer(serializers.Serializer):
         course_id = attrs.get("course_id")
         live_class_id = attrs.get("live_class_id")
 
-        if bool(course_id) == bool(live_class_id):
+        if course_id and live_class_id:
             raise serializers.ValidationError(
-                {"detail": "Provide exactly one target: either course_id or live_class_id."}
+                {"detail": "Provide at most one target: either course_id or live_class_id."}
             )
 
         if course_id:

@@ -1076,7 +1076,7 @@ class PublicEnrollmentLeadAdmin(admin.ModelAdmin):
             return "Course"
         if obj.live_class_id:
             return "Live Class"
-        return "-"
+        return "General"
 
     @admin.display(description="Target")
     def target_name(self, obj):
@@ -1084,7 +1084,7 @@ class PublicEnrollmentLeadAdmin(admin.ModelAdmin):
             return obj.course.title
         if obj.live_class_id:
             return obj.live_class.title
-        return "Target removed"
+        return "General enquiry"
 
     @admin.display(description="Message")
     def message_preview(self, obj):

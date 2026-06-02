@@ -19,6 +19,21 @@ const heroGlitchBase =
 const heroGlitchLine = `${heroGlitchBase}${heroGlitchBase}${heroGlitchBase}${heroGlitchBase}`;
 const HERO_LIVE_BROADCAST_VISIBLE_POLL_MS = 45000;
 const HERO_LIVE_BROADCAST_HIDDEN_POLL_MS = 180000;
+const GUEST_ENROLLMENT_PROMPT_SESSION_KEY = "asi:guest-enrollment-prompt-shown:v1";
+
+export function reserveGuestEnrollmentPrompt({ authLoading, isAuthenticated, getStorage }) {
+  if (authLoading || isAuthenticated) return false;
+
+  try {
+    const storage = getStorage();
+    if (storage.getItem(GUEST_ENROLLMENT_PROMPT_SESSION_KEY)) return false;
+    storage.setItem(GUEST_ENROLLMENT_PROMPT_SESSION_KEY, "1");
+  } catch {
+    // The prompt should still work when browser storage is unavailable.
+  }
+
+  return true;
+}
 
 const stats = [
   { value: "1000+", label: "Students trained" },
@@ -280,13 +295,24 @@ function SectionTitle({ title, subtitle, titleClassName = "" }) {
 }
 
 export default function LandingPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [catalogCourses, setCatalogCourses] = useState([]);
   const [landingLiveClasses, setLandingLiveClasses] = useState([]);
   const [landingLiveClassesError, setLandingLiveClassesError] = useState("");
   const [landingActionState, setLandingActionState] = useState({});
   const [landingPublicLeadTarget, setLandingPublicLeadTarget] = useState(null);
   const [heroLiveBroadcast, setHeroLiveBroadcast] = useState(null);
+
+  useEffect(() => {
+    if (
+      !reserveGuestEnrollmentPrompt({
+        authLoading,
+        isAuthenticated,
+        getStorage: () => window.sessionStorage,
+      })
+    ) return;
+    setLandingPublicLeadTarget({ type: "general" });
+  }, [authLoading, isAuthenticated]);
 
   useEffect(() => {
     let active = true;
@@ -847,6 +873,7 @@ export default function LandingPage() {
                             return;
                           }
                           setLandingPublicLeadTarget({
+                            type: "live_class",
                             id: targetId,
                             title: program.title,
                           });
@@ -900,7 +927,7 @@ export default function LandingPage() {
       <PublicEnrollmentRequestModal
         isOpen={Boolean(landingPublicLeadTarget)}
         onClose={() => setLandingPublicLeadTarget(null)}
-        targetType="live_class"
+        targetType={landingPublicLeadTarget?.type}
         targetId={landingPublicLeadTarget?.id}
         targetName={landingPublicLeadTarget?.title}
         sourcePath="/"
