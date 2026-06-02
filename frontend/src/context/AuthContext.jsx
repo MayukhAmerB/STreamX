@@ -11,6 +11,7 @@ import {
   registerUser,
 } from "../api/auth";
 import { apiData, apiMessage } from "../utils/api";
+import { markKnownRegisteredVisitor } from "../utils/knownRegisteredVisitor";
 
 export const AuthContext = createContext(null);
 
@@ -27,10 +28,17 @@ export function AuthProvider({ children }) {
   const [turnstileSiteKey, setTurnstileSiteKey] = useState(buildTimeTurnstileSiteKey);
   const hasBootstrappedRef = useRef(false);
 
+  function setAuthenticatedUser(data) {
+    if (data) {
+      markKnownRegisteredVisitor();
+    }
+    setUser(data);
+  }
+
   async function refreshUser() {
     try {
       const response = await fetchCurrentUser();
-      setUser(apiData(response));
+      setAuthenticatedUser(apiData(response));
     } catch {
       setUser(null);
     } finally {
@@ -93,21 +101,21 @@ export function AuthProvider({ children }) {
   const login = async (payload) => {
     const response = await loginUser(payload);
     const data = apiData(response);
-    setUser(data);
+    setAuthenticatedUser(data);
     return data;
   };
 
   const register = async (payload) => {
     const response = await registerUser(payload);
     const data = apiData(response);
-    setUser(data);
+    setAuthenticatedUser(data);
     return data;
   };
 
   const googleLogin = async (credential) => {
     const response = await googleLoginUser({ credential });
     const data = apiData(response);
-    setUser(data);
+    setAuthenticatedUser(data);
     return data;
   };
 
@@ -122,7 +130,7 @@ export function AuthProvider({ children }) {
   const acceptTerms = async ({ accepted = true, terms_version } = {}) => {
     const response = await acceptTermsRequest({ accepted, terms_version });
     const data = apiData(response);
-    setUser(data);
+    setAuthenticatedUser(data);
     return data;
   };
 

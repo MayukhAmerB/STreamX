@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { enrollInLiveClass, listCourses, listLiveClasses } from "../api/courses";
 import { listRealtimeSessions } from "../api/realtime";
@@ -11,6 +11,7 @@ import { apiData, apiMessage } from "../utils/api";
 import { readCachedCourseCatalog, writeCachedCourseCatalog } from "../utils/courseCatalog";
 import { formatINR } from "../utils/currency";
 import { featuredCourse } from "../utils/featuredCourse";
+import { isKnownRegisteredVisitor } from "../utils/knownRegisteredVisitor";
 
 const heroCardImage =
   "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
@@ -21,8 +22,14 @@ const HERO_LIVE_BROADCAST_VISIBLE_POLL_MS = 45000;
 const HERO_LIVE_BROADCAST_HIDDEN_POLL_MS = 180000;
 const GUEST_ENROLLMENT_PROMPT_SESSION_KEY = "asi:guest-enrollment-prompt-shown:v1";
 
-export function reserveGuestEnrollmentPrompt({ authLoading, isAuthenticated, getStorage }) {
-  if (authLoading || isAuthenticated) return false;
+export function reserveGuestEnrollmentPrompt({
+  authLoading,
+  isAuthenticated,
+  hasScrolledPastHero,
+  isKnownRegistered,
+  getStorage,
+}) {
+  if (authLoading || isAuthenticated || !hasScrolledPastHero || isKnownRegistered) return false;
 
   try {
     const storage = getStorage();
@@ -302,17 +309,40 @@ export default function LandingPage() {
   const [landingActionState, setLandingActionState] = useState({});
   const [landingPublicLeadTarget, setLandingPublicLeadTarget] = useState(null);
   const [heroLiveBroadcast, setHeroLiveBroadcast] = useState(null);
+  const [hasScrolledPastHero, setHasScrolledPastHero] = useState(false);
+  const heroRef = useRef(null);
+
+  useEffect(() => {
+    if (hasScrolledPastHero) return undefined;
+
+    const updateHeroScrollBoundary = () => {
+      if (heroRef.current?.getBoundingClientRect().bottom <= 0) {
+        setHasScrolledPastHero(true);
+      }
+    };
+
+    updateHeroScrollBoundary();
+    window.addEventListener("scroll", updateHeroScrollBoundary, { passive: true });
+    window.addEventListener("resize", updateHeroScrollBoundary);
+
+    return () => {
+      window.removeEventListener("scroll", updateHeroScrollBoundary);
+      window.removeEventListener("resize", updateHeroScrollBoundary);
+    };
+  }, [hasScrolledPastHero]);
 
   useEffect(() => {
     if (
       !reserveGuestEnrollmentPrompt({
         authLoading,
         isAuthenticated,
+        hasScrolledPastHero,
+        isKnownRegistered: isKnownRegisteredVisitor(),
         getStorage: () => window.sessionStorage,
       })
     ) return;
     setLandingPublicLeadTarget({ type: "general" });
-  }, [authLoading, isAuthenticated]);
+  }, [authLoading, hasScrolledPastHero, isAuthenticated]);
 
   useEffect(() => {
     let active = true;
@@ -530,7 +560,10 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(0,0,0,0)_58%,rgba(255,255,255,0.02)_76%,rgba(255,255,255,0.07)_100%)]" />
       </div>
 
-      <section className="landing-hero relative z-10 overflow-hidden px-4 pb-8 pt-6 sm:pt-10">
+      <section
+        ref={heroRef}
+        className="landing-hero relative z-10 overflow-hidden px-4 pb-8 pt-6 sm:pt-10"
+      >
         <div
           aria-hidden="true"
           className="hero-glitch-ribbon absolute left-1/2 top-3 z-20 hidden w-[min(96%,1040px)] -translate-x-1/2 overflow-hidden rounded-full px-4 py-1 sm:block"

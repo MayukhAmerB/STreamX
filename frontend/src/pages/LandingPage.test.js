@@ -20,10 +20,22 @@ describe("landing guest enrollment prompt", () => {
     const getStorage = () => storage;
 
     expect(
-      reserveGuestEnrollmentPrompt({ authLoading: false, isAuthenticated: false, getStorage })
+      reserveGuestEnrollmentPrompt({
+        authLoading: false,
+        isAuthenticated: false,
+        hasScrolledPastHero: true,
+        isKnownRegistered: false,
+        getStorage,
+      })
     ).toBe(true);
     expect(
-      reserveGuestEnrollmentPrompt({ authLoading: false, isAuthenticated: false, getStorage })
+      reserveGuestEnrollmentPrompt({
+        authLoading: false,
+        isAuthenticated: false,
+        hasScrolledPastHero: true,
+        isKnownRegistered: false,
+        getStorage,
+      })
     ).toBe(false);
   });
 
@@ -32,14 +44,56 @@ describe("landing guest enrollment prompt", () => {
     const getStorage = () => storage;
 
     expect(
-      reserveGuestEnrollmentPrompt({ authLoading: true, isAuthenticated: false, getStorage })
+      reserveGuestEnrollmentPrompt({
+        authLoading: true,
+        isAuthenticated: false,
+        hasScrolledPastHero: true,
+        isKnownRegistered: false,
+        getStorage,
+      })
     ).toBe(false);
     expect(
-      reserveGuestEnrollmentPrompt({ authLoading: false, isAuthenticated: true, getStorage })
+      reserveGuestEnrollmentPrompt({
+        authLoading: false,
+        isAuthenticated: true,
+        hasScrolledPastHero: true,
+        isKnownRegistered: false,
+        getStorage,
+      })
     ).toBe(false);
     expect(
-      reserveGuestEnrollmentPrompt({ authLoading: false, isAuthenticated: false, getStorage })
+      reserveGuestEnrollmentPrompt({
+        authLoading: false,
+        isAuthenticated: false,
+        hasScrolledPastHero: true,
+        isKnownRegistered: false,
+        getStorage,
+      })
     ).toBe(true);
+  });
+
+  it("waits for the visitor to scroll past the hero and skips known registered visitors", () => {
+    const storage = createStorage();
+    const getStorage = () => storage;
+
+    expect(
+      reserveGuestEnrollmentPrompt({
+        authLoading: false,
+        isAuthenticated: false,
+        hasScrolledPastHero: false,
+        isKnownRegistered: false,
+        getStorage,
+      })
+    ).toBe(false);
+    expect(
+      reserveGuestEnrollmentPrompt({
+        authLoading: false,
+        isAuthenticated: false,
+        hasScrolledPastHero: true,
+        isKnownRegistered: true,
+        getStorage,
+      })
+    ).toBe(false);
   });
 
   it("still opens the prompt when browser session storage is unavailable", () => {
@@ -47,6 +101,8 @@ describe("landing guest enrollment prompt", () => {
       reserveGuestEnrollmentPrompt({
         authLoading: false,
         isAuthenticated: false,
+        hasScrolledPastHero: true,
+        isKnownRegistered: false,
         getStorage: () => {
           throw new Error("storage unavailable");
         },
