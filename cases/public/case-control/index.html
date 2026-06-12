@@ -27,6 +27,8 @@
 
 * { box-sizing: border-box; }
 
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -38,6 +40,124 @@ body {
 }
 
 a { color: inherit; }
+
+.login-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background:
+    radial-gradient(circle at 18% 14%, rgba(208, 47, 47, 0.2), transparent 28rem),
+    radial-gradient(circle at 82% 70%, rgba(255, 255, 255, 0.08), transparent 26rem),
+    linear-gradient(145deg, #030303 0%, #101010 56%, #050505 100%);
+}
+
+.login-card {
+  width: min(100%, 1040px);
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(360px, 0.75fr);
+  gap: 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 34px;
+  background: rgba(9, 9, 9, 0.86);
+  box-shadow: 0 34px 120px rgba(0, 0, 0, 0.58);
+  overflow: hidden;
+}
+
+.login-panel,
+.login-form-panel {
+  padding: clamp(28px, 5vw, 54px);
+}
+
+.login-panel {
+  min-height: 560px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-right: 1px solid var(--line);
+  background:
+    linear-gradient(135deg, rgba(208, 47, 47, 0.1), transparent 42%),
+    radial-gradient(circle at 80% 12%, rgba(255, 255, 255, 0.08), transparent 18rem);
+}
+
+.login-eyebrow,
+.login-pill {
+  width: fit-content;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 7px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.login-panel h1,
+.login-form-panel h2 {
+  margin: 18px 0 14px;
+  font-size: clamp(34px, 6vw, 70px);
+  line-height: 0.92;
+  letter-spacing: -0.07em;
+}
+
+.login-panel p,
+.login-form-panel p {
+  margin: 0;
+  color: #c8c8c8;
+  line-height: 1.8;
+  max-width: 560px;
+}
+
+.login-points {
+  display: grid;
+  gap: 12px;
+  margin-top: 34px;
+}
+
+.login-point {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #dedede;
+  font-weight: 700;
+}
+
+.login-form-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.login-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.login-form .btn {
+  width: 100%;
+  padding: 14px 18px;
+}
+
+.login-error {
+  min-height: 22px;
+  color: #ffb0b0;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.login-note {
+  margin-top: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
 
 .shell {
   max-width: 1480px;
@@ -350,6 +470,12 @@ textarea:focus {
 }
 
 @media (max-width: 980px) {
+  .login-card { grid-template-columns: 1fr; }
+  .login-panel {
+    min-height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
   .shell { padding: 16px; }
   .header { position: static; align-items: flex-start; flex-direction: column; }
   .header-actions { justify-content: flex-start; }
@@ -360,6 +486,9 @@ textarea:focus {
 }
 
 @media (max-width: 560px) {
+  .login-screen { padding: 14px; }
+  .login-panel,
+  .login-form-panel { padding: 24px; }
   .case-row { grid-template-columns: 1fr; }
   .case-cover { width: 100%; height: 170px; }
   .btn { width: 100%; }
@@ -367,7 +496,42 @@ textarea:focus {
 </style>
 </head>
 <body>
-<main class="shell">
+<section class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-panel">
+      <div>
+        <div class="login-eyebrow">AL SYED Cases</div>
+        <h1>Case Control</h1>
+        <p>Manage published case studies, drafts, cover images, summaries, and bilingual article content from a protected control room.</p>
+      </div>
+      <div class="login-points">
+        <div class="login-point">Signed admin session, no browser Basic Auth prompt</div>
+        <div class="login-point">Public cases index rebuilds after every save</div>
+        <div class="login-point">Draft and published states remain under admin control</div>
+      </div>
+    </div>
+    <div class="login-form-panel">
+      <div class="login-pill">Secure entry</div>
+      <h2>Welcome back</h2>
+      <p>Use the configured Case Control credentials to continue.</p>
+      <form class="login-form" id="login-form">
+        <div class="field">
+          <label for="login-username">Username</label>
+          <input id="login-username" name="username" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="login-password">Password</label>
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        <button class="btn" id="login-btn" type="submit">Enter Case Control</button>
+        <div class="login-error" id="login-error" role="status" aria-live="polite"></div>
+      </form>
+      <div class="login-note">This login creates a short-lived signed session cookie for the cases subdomain only.</div>
+    </div>
+  </div>
+</section>
+
+<main class="shell" id="app-shell" hidden>
   <header class="header">
     <div class="brand">
       <div class="brand-mark">AL SYED Cases</div>
@@ -376,6 +540,7 @@ textarea:focus {
     <div class="header-actions">
       <a class="btn secondary" href="/" target="_blank" rel="noopener">View public site</a>
       <button class="btn secondary" id="reload-btn" type="button">Reload cases</button>
+      <button class="btn secondary" id="logout-btn" type="button">Logout</button>
       <button class="btn" id="new-btn" type="button">New case</button>
     </div>
   </header>
@@ -488,6 +653,10 @@ textarea:focus {
 
 <script>
 const state = { cases: [], coverDataUrl: "" };
+const loginScreen = document.getElementById("login-screen");
+const appShell = document.getElementById("app-shell");
+const loginForm = document.getElementById("login-form");
+const loginError = document.getElementById("login-error");
 const form = document.getElementById("case-form");
 const list = document.getElementById("cases-list");
 const message = document.getElementById("message");
@@ -512,6 +681,18 @@ function clearMessage() {
   message.textContent = "";
 }
 
+function showLogin(text = "") {
+  appShell.hidden = true;
+  loginScreen.hidden = false;
+  loginError.textContent = text;
+}
+
+function showApp() {
+  loginError.textContent = "";
+  loginScreen.hidden = true;
+  appShell.hidden = false;
+}
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     credentials: "same-origin",
@@ -520,6 +701,9 @@ async function api(path, options = {}) {
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (response.status === 401 && !path.endsWith("/login") && !path.endsWith("/session")) {
+      showLogin("Your Case Control session expired. Sign in again.");
+    }
     throw new Error(data.error || `Request failed with HTTP ${response.status}`);
   }
   return data;
@@ -635,6 +819,20 @@ async function loadCases() {
   renderCases();
 }
 
+async function checkSession() {
+  try {
+    const data = await api("/api/case-control/session");
+    if (!data.authenticated) {
+      showLogin();
+      return;
+    }
+    showApp();
+    await loadCases();
+  } catch (error) {
+    showLogin(error.message);
+  }
+}
+
 async function deleteCase(slug) {
   const item = state.cases.find((entry) => entry.slug === slug);
   if (!item) return;
@@ -644,6 +842,27 @@ async function deleteCase(slug) {
   showMessage("Case deleted and public index rebuilt.", "success");
   await loadCases();
 }
+
+loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  loginError.textContent = "";
+  const loginButton = document.getElementById("login-btn");
+  loginButton.disabled = true;
+  try {
+    const payload = {
+      username: document.getElementById("login-username").value,
+      password: document.getElementById("login-password").value,
+    };
+    await api("/api/case-control/login", { method: "POST", body: JSON.stringify(payload) });
+    loginForm.reset();
+    showApp();
+    await loadCases();
+  } catch (error) {
+    showLogin(error.message);
+  } finally {
+    loginButton.disabled = false;
+  }
+});
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -702,10 +921,16 @@ list.addEventListener("click", async (event) => {
 document.getElementById("reload-btn").addEventListener("click", () => {
   loadCases().catch((error) => showMessage(error.message));
 });
+document.getElementById("logout-btn").addEventListener("click", async () => {
+  await api("/api/case-control/logout", { method: "POST" }).catch(() => {});
+  state.cases = [];
+  resetForm();
+  showLogin("Signed out.");
+});
 document.getElementById("new-btn").addEventListener("click", resetForm);
 document.getElementById("clear-btn").addEventListener("click", resetForm);
 
-loadCases().catch((error) => showMessage(error.message));
+checkSession();
 </script>
 </body>
 </html>

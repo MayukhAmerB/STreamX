@@ -15,6 +15,12 @@ const PORT = Number(process.env.PORT || 8080);
 const CONTROL_USERNAME = process.env.CASE_CONTROL_USERNAME || "admin";
 const CONTROL_PASSWORD = process.env.CASE_CONTROL_PASSWORD || "";
 const MAX_JSON_BYTES = 12 * 1024 * 1024;
+const SESSION_COOKIE_NAME = "case_control_session";
+const REQUESTED_SESSION_TTL_SECONDS = Number(process.env.CASE_CONTROL_SESSION_TTL_SECONDS || 12 * 60 * 60);
+const SESSION_TTL_SECONDS = Number.isFinite(REQUESTED_SESSION_TTL_SECONDS) && REQUESTED_SESSION_TTL_SECONDS > 0
+  ? REQUESTED_SESSION_TTL_SECONDS
+  : 12 * 60 * 60;
+const COOKIE_SECURE = process.env.CASE_CONTROL_COOKIE_SECURE !== "0";
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -34,10 +40,11 @@ function send(res, status, body, headers = {}) {
   res.end(body);
 }
 
-function sendJson(res, status, payload) {
+function sendJson(res, status, payload, headers = {}) {
   send(res, status, JSON.stringify(payload), {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
+    ...headers,
   });
 }
 
@@ -57,22 +64,65 @@ function safeEquals(left, right) {
   return crypto.timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-function requireControlAuth(req, res) {
-  if (!CONTROL_PASSWORD) {
-    sendJson(res, 503, {
-      error: "Case Control is disabled until CASE_CONTROL_PASSWORD is configured.",
-    });
-    return false;
+function parseCookies(req) {
+  const header = req.headers.cookie || "";
+  const cookies = {};
+  for (const part of header.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator < 0) continue;
+    const key = part.slice(0, separator).trim();
+    const value = part.slice(separator + 1).trim();
+    if (!key) continue;
+    cookies[key] = value;
   }
+  return cookies;
+}
 
-  const header = req.headers.authorization || "";
-  if (!header.startsWith("Basic ")) {
-    send(res, 401, "Authentication required", {
-      "www-authenticate": 'Basic realm="AL SYED Case Control"',
-      "cache-control": "no-store",
-    });
-    return false;
+function base64url(value) {
+  return Buffer.from(value).toString("base64url");
+}
+
+function signSessionPayload(payload) {
+  return crypto.createHmac("sha256", CONTROL_PASSWORD).update(payload).digest("base64url");
+}
+
+function createSessionToken(username) {
+  const payload = base64url(JSON.stringify({
+    u: username,
+    exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
+  }));
+  return `${payload}.${signSessionPayload(payload)}`;
+}
+
+function verifySessionToken(token) {
+  if (!CONTROL_PASSWORD || !token || !token.includes(".")) return "";
+  const [payload, signature] = token.split(".", 2);
+  if (!payload || !signature || !safeEquals(signature, signSessionPayload(payload))) return "";
+
+  try {
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    const expiresAt = Number(data.exp || 0);
+    const username = String(data.u || "");
+    if (!expiresAt || expiresAt < Math.floor(Date.now() / 1000)) return "";
+    return safeEquals(username, CONTROL_USERNAME) ? username : "";
+  } catch {
+    return "";
   }
+}
+
+function sessionCookieHeader(username) {
+  const secure = COOKIE_SECURE ? "; Secure" : "";
+  return `${SESSION_COOKIE_NAME}=${createSessionToken(username)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}${secure}`;
+}
+
+function clearSessionCookieHeader() {
+  const secure = COOKIE_SECURE ? "; Secure" : "";
+  return `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+}
+
+function getBasicAuthUser(req) {
+  const header = req.headers.authorization || "";
+  if (!header.startsWith("Basic ")) return "";
 
   let decoded = "";
   try {
@@ -86,14 +136,37 @@ function requireControlAuth(req, res) {
   const password = separator >= 0 ? decoded.slice(separator + 1) : "";
 
   if (!safeEquals(username, CONTROL_USERNAME) || !safeEquals(password, CONTROL_PASSWORD)) {
-    send(res, 401, "Authentication required", {
-      "www-authenticate": 'Basic realm="AL SYED Case Control"',
-      "cache-control": "no-store",
-    });
-    return false;
+    return "";
   }
 
-  return true;
+  return username;
+}
+
+function getSessionUser(req) {
+  const cookies = parseCookies(req);
+  return verifySessionToken(cookies[SESSION_COOKIE_NAME] || "");
+}
+
+function getControlUser(req) {
+  if (!CONTROL_PASSWORD) return "";
+  return getSessionUser(req) || getBasicAuthUser(req);
+}
+
+function requireControlAuth(req, res) {
+  if (!CONTROL_PASSWORD) {
+    sendJson(res, 503, {
+      error: "Case Control is disabled until CASE_CONTROL_PASSWORD is configured.",
+    });
+    return "";
+  }
+
+  const username = getControlUser(req);
+  if (!username) {
+    sendJson(res, 401, { error: "Sign in required." });
+    return "";
+  }
+
+  return username;
 }
 
 async function copyDirIfExists(source, destination) {
@@ -286,6 +359,48 @@ async function saveCase(data) {
 }
 
 async function handleControlApi(req, res, pathname) {
+  if (pathname === "/api/case-control/session" && req.method === "GET") {
+    if (!CONTROL_PASSWORD) {
+      sendJson(res, 503, {
+        authenticated: false,
+        error: "Case Control is disabled until CASE_CONTROL_PASSWORD is configured.",
+      });
+      return;
+    }
+    const username = getControlUser(req);
+    sendJson(res, 200, { authenticated: Boolean(username), username });
+    return;
+  }
+
+  if (pathname === "/api/case-control/login" && req.method === "POST") {
+    if (!CONTROL_PASSWORD) {
+      sendJson(res, 503, {
+        authenticated: false,
+        error: "Case Control is disabled until CASE_CONTROL_PASSWORD is configured.",
+      });
+      return;
+    }
+    const payload = await readJsonBody(req);
+    const username = String(payload.username || "");
+    const password = String(payload.password || "");
+    if (!safeEquals(username, CONTROL_USERNAME) || !safeEquals(password, CONTROL_PASSWORD)) {
+      sendJson(res, 401, { authenticated: false, error: "Invalid username or password." });
+      return;
+    }
+    sendJson(
+      res,
+      200,
+      { authenticated: true, username: CONTROL_USERNAME },
+      { "set-cookie": sessionCookieHeader(CONTROL_USERNAME) },
+    );
+    return;
+  }
+
+  if (pathname === "/api/case-control/logout" && req.method === "POST") {
+    sendJson(res, 200, { ok: true }, { "set-cookie": clearSessionCookieHeader() });
+    return;
+  }
+
   if (!requireControlAuth(req, res)) return;
 
   if (pathname === "/api/case-control/cases" && req.method === "GET") {
@@ -334,7 +449,6 @@ async function handleControlApi(req, res, pathname) {
 }
 
 async function serveCaseControl(req, res) {
-  if (!requireControlAuth(req, res)) return;
   const file = path.join(PUBLIC_DIR, "case-control", "index.html");
   const html = await fsp.readFile(file, "utf8");
   send(res, 200, html, {
