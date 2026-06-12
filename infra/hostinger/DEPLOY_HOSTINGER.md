@@ -33,10 +33,14 @@ Set all placeholder values before first boot:
 - `OWNCAST_STREAM_KEY`
 - email credentials
 - domain values if not `alsyedinitiative.com`
+- `CASE_CONTROL_USERNAME`
+- `CASE_CONTROL_PASSWORD`
 
 Important:
 
 - Hostinger deployment uses the local Docker media volume plus `/media/` reverse proxying. No GCP or GCS values are required.
+- The cases subdomain is a standalone service. The main `alsyedinitiative.com` frontend does not link to it.
+- `CASE_CONTROL_USERNAME` and `CASE_CONTROL_PASSWORD` protect `https://cases.alsyedinitiative.com/case-control/`. Set them to the same username/password you use for your normal admin panel if you want matching credentials; without `CASE_CONTROL_PASSWORD`, Case Control is intentionally disabled.
 - Keep LiveKit keys in sync in all three files:
   - `backend/.env.hostinger.production`
   - `infra/hostinger/livekit.yaml`
@@ -69,11 +73,13 @@ docker compose --env-file backend/.env.hostinger.production -f docker-compose.ho
 
 ## 6) Nginx reverse proxy + TLS
 
-Copy provided host-nginx config. It proxies host loopback ports exposed by Docker (`127.0.0.1:3000`, `8000`, `8080`, `8090`, `7880`):
+Copy provided host-nginx configs. They proxy host loopback ports exposed by Docker (`127.0.0.1:3000`, `8000`, `8080`, `8090`, `8091`, `7880`):
 
 ```bash
 cp infra/hostinger/nginx/alsyedinitiative.conf /etc/nginx/sites-available/alsyedinitiative
 ln -sf /etc/nginx/sites-available/alsyedinitiative /etc/nginx/sites-enabled/alsyedinitiative
+cp infra/hostinger/nginx/cases-subdomain.conf /etc/nginx/sites-available/cases.alsyedinitiative
+ln -sf /etc/nginx/sites-available/cases.alsyedinitiative /etc/nginx/sites-enabled/cases.alsyedinitiative
 nginx -t
 systemctl reload nginx
 ```
@@ -81,17 +87,17 @@ systemctl reload nginx
 Issue certificates:
 
 ```bash
-certbot --nginx -d alsyedinitiative.com -d www.alsyedinitiative.com -d api.alsyedinitiative.com -d livekit.alsyedinitiative.com -d stream.alsyedinitiative.com
+certbot --nginx -d alsyedinitiative.com -d www.alsyedinitiative.com -d api.alsyedinitiative.com -d livekit.alsyedinitiative.com -d stream.alsyedinitiative.com -d cases.alsyedinitiative.com
 ```
 
 ## 7) DNS + firewall
 
-Create A records to VPS IP: `@`, `www`, `api`, `livekit`, `stream`.
+Create A records to VPS IP: `@`, `www`, `api`, `livekit`, `stream`, `cases`.
 
 Recommended proxy split:
 
 - Proxy ON: `@`, `www`
-- DNS only: `api`, `livekit`, `stream`, `monitor`
+- DNS only: `api`, `livekit`, `stream`, `monitor`, `cases`
 
 Allow inbound:
 
@@ -131,7 +137,15 @@ docker compose --env-file backend/.env.hostinger.production -f docker-compose.ho
 docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml logs -f livekit
 docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml logs -f owncast
 docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml logs -f media
+docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml logs -f cases
 ```
+
+Case Control:
+
+- Public cases site: `https://cases.alsyedinitiative.com/`
+- Admin/control panel: `https://cases.alsyedinitiative.com/case-control/`
+- It uses browser Basic Auth from `CASE_CONTROL_USERNAME` and `CASE_CONTROL_PASSWORD`.
+- Case JSON and cover uploads are stored in Docker volumes `streamx_cases_content` and `streamx_cases_uploads`; do not run `docker compose down -v` in production.
 
 Optional lecture streaming optimization after direct uploads:
 

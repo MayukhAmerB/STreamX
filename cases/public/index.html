@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AL SYED — Documented Cases</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0a; --bg2: #131313; --bg3: #1a1a1a; --border: #2a2a2a;
+    --red: #8B0000; --red-bright: #c0392b;
+    --text: #f0ede8; --text-muted: #888; --text-dim: #555;
+    --font-en: 'DM Sans', sans-serif; --font-ur: 'Noto Nastaliq Urdu', serif;
+  }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-en); font-size: 16px; line-height: 1.6; min-height: 100vh; }
+  #lang-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.97); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 40px; }
+  .lang-logo { font-size: 13px; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; color: var(--text-muted); }
+  .lang-logo span { color: var(--red-bright); }
+  .lang-title { text-align: center; }
+  .lang-title h1 { font-size: clamp(28px,5vw,48px); font-weight: 700; letter-spacing: -1px; margin-bottom: 8px; }
+  .lang-title p { color: var(--text-muted); font-size: 14px; letter-spacing: 2px; text-transform: uppercase; }
+  .lang-buttons { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; align-items: center; }
+  .lang-btn { padding: 16px 40px; border: 1px solid var(--border); background: transparent; color: var(--text); font-family: var(--font-en); font-size: 15px; font-weight: 600; letter-spacing: 1px; cursor: pointer; transition: all 0.2s; text-transform: uppercase; }
+  .lang-btn:hover { background: var(--red); border-color: var(--red); }
+  .lang-btn.urdu { font-family: var(--font-ur); font-size: 22px; letter-spacing: 0; text-transform: none; }
+  .lang-divider { width: 1px; height: 50px; background: var(--border); }
+  header { border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; background: var(--bg); }
+  .header-top { display: flex; align-items: center; justify-content: space-between; padding: 0 40px; height: 64px; max-width: 1200px; margin: 0 auto; }
+  .site-logo { font-size: 13px; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; text-decoration: none; color: var(--text); cursor: pointer; }
+  .site-logo span { color: var(--red-bright); }
+  nav { display: flex; gap: 32px; align-items: center; }
+  nav a { color: var(--text-muted); text-decoration: none; font-size: 13px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; transition: color 0.2s; cursor: pointer; }
+  nav a:hover { color: var(--text); }
+  .lang-toggle { background: var(--bg3); border: 1px solid var(--border); color: var(--text-muted); font-size: 12px; font-weight: 600; letter-spacing: 1px; padding: 6px 14px; cursor: pointer; transition: all 0.2s; text-transform: uppercase; }
+  .lang-toggle:hover { color: var(--text); border-color: var(--text-muted); }
+  .hero { max-width: 1200px; margin: 0 auto; padding: 80px 40px 60px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
+  .hero-label { font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--red-bright); margin-bottom: 20px; }
+  .hero h1 { font-size: clamp(36px,4vw,60px); font-weight: 700; line-height: 1.1; letter-spacing: -2px; margin-bottom: 24px; }
+  .hero h1 em { font-style: normal; color: var(--text-muted); }
+  .hero-desc { color: var(--text-muted); font-size: 16px; line-height: 1.7; }
+  .hero-right { display: flex; flex-direction: column; gap: 1px; border: 1px solid var(--border); }
+  .hero-stat { padding: 24px 28px; background: var(--bg2); border-bottom: 1px solid var(--border); }
+  .hero-stat:last-child { border-bottom: none; }
+  .stat-num { font-size: 40px; font-weight: 700; letter-spacing: -2px; }
+  .stat-num span { color: var(--red-bright); }
+  .stat-label { font-size: 12px; color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; }
+  .filter-bar { max-width: 1200px; margin: 0 auto; padding: 24px 40px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .filter-label { font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); margin-right: 8px; }
+  .filter-btn { padding: 6px 16px; background: transparent; border: 1px solid var(--border); color: var(--text-muted); font-family: var(--font-en); font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; transition: all 0.2s; }
+  .filter-btn:hover, .filter-btn.active { background: var(--red); border-color: var(--red); color: var(--text); }
+  .articles-section { max-width: 1200px; margin: 0 auto; padding: 60px 40px; }
+  .section-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 40px; }
+  .section-title { font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--text-muted); }
+  .articles-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); }
+  .article-card { background: var(--bg); padding: 32px; cursor: pointer; transition: background 0.2s; display: flex; flex-direction: column; gap: 16px; text-decoration: none; color: inherit; }
+  .article-card:hover { background: var(--bg2); }
+  .card-meta { display: flex; align-items: center; gap: 12px; }
+  .card-category { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--red-bright); }
+  .card-date { font-size: 11px; color: var(--text-dim); }
+  .card-img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
+  .card-img-placeholder { width: 100%; aspect-ratio: 16/9; background: var(--bg3); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; }
+  .card-img-placeholder span { font-size: 11px; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; }
+  .card-title { font-size: 18px; font-weight: 700; line-height: 1.3; letter-spacing: -0.3px; }
+  .card-title-ur { font-family: var(--font-ur); font-size: 20px; direction: rtl; text-align: right; line-height: 1.8; }
+  .card-summary { font-size: 14px; color: var(--text-muted); line-height: 1.6; flex: 1; }
+  .card-summary-ur { font-family: var(--font-ur); direction: rtl; text-align: right; line-height: 2; font-size: 14px; color: var(--text-muted); flex: 1; }
+  .card-outcome { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 6px 12px; border: 1px solid var(--border); color: var(--text-muted); align-self: flex-start; }
+  .card-outcome.resolved { border-color: #2d6a2d; color: #5cb85c; }
+  .card-outcome.ongoing { border-color: #8B6000; color: #f0a500; }
+  .card-outcome.closed { border-color: var(--border); color: var(--text-dim); }
+  .card-outcome-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .article-card.featured { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; padding: 40px; }
+  .featured-img { width: 100%; height: 100%; min-height: 260px; object-fit: cover; }
+  .featured-img-placeholder { width: 100%; min-height: 260px; background: var(--bg3); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; }
+  .featured-content { display: flex; flex-direction: column; gap: 16px; justify-content: center; }
+  .featured-label { font-size: 10px; font-weight: 700; letter-spacing: 3px; color: var(--red-bright); text-transform: uppercase; }
+  .featured-title { font-size: clamp(22px,3vw,32px); font-weight: 700; line-height: 1.2; letter-spacing: -0.5px; }
+  .featured-title-ur { font-family: var(--font-ur); font-size: clamp(22px,3vw,32px); direction: rtl; text-align: right; line-height: 1.8; font-weight: 700; }
+  .featured-summary { font-size: 15px; color: var(--text-muted); line-height: 1.7; }
+  .featured-summary-ur { font-family: var(--font-ur); direction: rtl; text-align: right; line-height: 2; font-size: 15px; color: var(--text-muted); }
+  .loading { grid-column: 1 / -1; padding: 80px; text-align: center; color: var(--text-dim); font-size: 13px; letter-spacing: 2px; text-transform: uppercase; }
+  #article-detail { display: none; max-width: 800px; margin: 0 auto; padding: 60px 40px; }
+  #article-detail.active { display: block; }
+  .detail-back { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); text-decoration: none; margin-bottom: 48px; cursor: pointer; transition: color 0.2s; }
+  .detail-back:hover { color: var(--text); }
+  .detail-category { font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--red-bright); margin-bottom: 16px; }
+  .detail-title-en { font-size: clamp(28px,4vw,48px); font-weight: 700; line-height: 1.1; letter-spacing: -1.5px; margin-bottom: 24px; }
+  .detail-title-ur { font-family: var(--font-ur); font-size: clamp(28px,4vw,48px); font-weight: 700; direction: rtl; text-align: right; letter-spacing: 0; line-height: 1.8; margin-bottom: 24px; }
+  .detail-meta { display: flex; align-items: center; gap: 20px; padding: 20px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin-bottom: 40px; flex-wrap: wrap; }
+  .detail-meta span { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; }
+  .detail-meta .sep { color: var(--border); }
+  .detail-cover { width: 100%; max-height: 400px; object-fit: cover; display: block; margin-bottom: 40px; }
+  .detail-summary-en { font-size: 18px; font-weight: 700; line-height: 1.5; margin-bottom: 32px; padding-bottom: 32px; border-bottom: 1px solid var(--border); }
+  .detail-summary-ur { font-family: var(--font-ur); font-size: 18px; font-weight: 700; direction: rtl; text-align: right; line-height: 2; margin-bottom: 32px; padding-bottom: 32px; border-bottom: 1px solid var(--border); }
+  .detail-body-en { font-size: 16px; line-height: 1.85; color: #d0cdc8; }
+  .detail-body-ur { font-family: var(--font-ur); font-size: 18px; direction: rtl; text-align: right; line-height: 2.2; color: #d0cdc8; }
+  .detail-body-en p, .detail-body-ur p { margin-bottom: 24px; }
+  .detail-body-en h2, .detail-body-ur h2 { font-size: 22px; font-weight: 700; margin: 40px 0 16px; color: var(--text); }
+  .detail-outcome { margin-top: 48px; padding: 24px; border: 1px solid var(--border); background: var(--bg2); }
+  .detail-outcome-label { font-size: 10px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 12px; }
+  .detail-outcome-text { font-size: 16px; font-weight: 600; }
+  footer { border-top: 1px solid var(--border); padding: 40px; max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+  .footer-logo { font-size: 12px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--text-muted); }
+  .footer-logo span { color: var(--red-bright); }
+  .footer-copy { font-size: 12px; color: var(--text-dim); }
+  .hidden { display: none !important; }
+  @media (max-width: 768px) {
+    .header-top { padding: 0 20px; } nav { display: none; }
+    .hero { grid-template-columns: 1fr; padding: 40px 20px; gap: 40px; }
+    .filter-bar { padding: 20px; }
+    .articles-section { padding: 40px 20px; }
+    .articles-grid { grid-template-columns: 1fr; }
+    .article-card.featured { grid-template-columns: 1fr; }
+    #article-detail { padding: 40px 20px; }
+    footer { padding: 30px 20px; flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div id="lang-overlay">
+  <div class="lang-logo"><span>AL</span> SYED</div>
+  <div class="lang-title">
+    <h1>Documented Cases</h1>
+    <p>Select your language — زبان منتخب کریں</p>
+  </div>
+  <div class="lang-buttons">
+    <button class="lang-btn" onclick="setLang('en')">English</button>
+    <div class="lang-divider"></div>
+    <button class="lang-btn urdu" onclick="setLang('ur')">اردو</button>
+  </div>
+</div>
+
+<header>
+  <div class="header-top">
+    <span class="site-logo" onclick="showHome()"><span>AL</span> SYED — Cases</span>
+    <nav>
+      <a onclick="filterNav('all')">All Cases</a>
+      <a onclick="filterNav('OSINT')">OSINT</a>
+      <a onclick="filterNav('Legal')">Legal</a>
+      <a onclick="filterNav('Media')">Media</a>
+    </nav>
+    <button class="lang-toggle" onclick="toggleLang()">EN / اردو</button>
+  </div>
+</header>
+
+<div id="main-content">
+  <section class="hero">
+    <div class="hero-left">
+      <div class="hero-label">Documented Intelligence</div>
+      <h1>Cases <em>that</em><br>demand<br>accountability.</h1>
+      <p class="hero-desc">AL SYED investigates, documents, and publishes cases of injustice, misinformation, and violations — using OSINT and legal intelligence.</p>
+    </div>
+    <div class="hero-right">
+      <div class="hero-stat"><div class="stat-num" id="stat-total">0<span>+</span></div><div class="stat-label">Cases Documented</div></div>
+      <div class="hero-stat"><div class="stat-num" id="stat-resolved">0<span>+</span></div><div class="stat-label">Resolved Cases</div></div>
+      <div class="hero-stat"><div class="stat-num" id="stat-ongoing">0<span>+</span></div><div class="stat-label">Ongoing Investigations</div></div>
+    </div>
+  </section>
+
+  <div class="filter-bar">
+    <span class="filter-label">Filter:</span>
+    <button class="filter-btn active" onclick="filterCards('all',this)">All</button>
+    <button class="filter-btn" onclick="filterCards('OSINT',this)">OSINT</button>
+    <button class="filter-btn" onclick="filterCards('Legal',this)">Legal</button>
+    <button class="filter-btn" onclick="filterCards('Media',this)">Media</button>
+    <button class="filter-btn" onclick="filterCards('Community',this)">Community</button>
+  </div>
+
+  <section class="articles-section">
+    <div class="section-header"><span class="section-title">Latest Cases</span></div>
+    <div class="articles-grid" id="articles-grid"><div class="loading">Loading cases...</div></div>
+  </section>
+</div>
+
+<div id="article-detail">
+  <span class="detail-back" onclick="showHome()">← Back to Cases</span>
+  <div class="detail-category" id="d-category"></div>
+  <h1 class="detail-title-en" id="d-title-en"></h1>
+  <h1 class="detail-title-ur hidden" id="d-title-ur"></h1>
+  <div class="detail-meta">
+    <span id="d-date"></span><span class="sep">|</span><span id="d-author"></span>
+  </div>
+  <img class="detail-cover" id="d-cover" src="" alt="" style="display:none">
+  <div class="detail-summary-en" id="d-summary-en"></div>
+  <div class="detail-summary-ur hidden" id="d-summary-ur"></div>
+  <div class="detail-body-en" id="d-body-en"></div>
+  <div class="detail-body-ur hidden" id="d-body-ur"></div>
+  <div class="detail-outcome">
+    <div class="detail-outcome-label">Case Outcome</div>
+    <div class="detail-outcome-text" id="d-outcome"></div>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-logo"><span>AL</span> SYED Initiative</div>
+  <div class="footer-copy">© 2025 AL SYED. All rights reserved.</div>
+</footer>
+
+<script>
+let currentLang = 'en';
+let allCases = [];
+let currentFilter = 'all';
+
+async function loadCases() {
+  try {
+    const res = await fetch('/cases-index.json');
+    allCases = res.ok ? await res.json() : getSampleCases();
+  } catch(e) { allCases = getSampleCases(); }
+  updateStats(); renderCards();
+}
+
+function getSampleCases() {
+  return [{
+    slug:'hamare-baarah', title_en:'Hamare Baarah: The Film That Faced a Nation',
+    title_ur:'ہمارے بارہ: وہ فلم جس نے قوم کو ہلا دیا',
+    category:'Media', outcome:'resolved',
+    outcome_detail_en:'Film modified following sustained legal and community pressure',
+    outcome_detail_ur:'قانونی اور کمیونٹی دباؤ کے بعد فلم میں ترمیم کی گئی',
+    date:'June 2024', author:'AL SYED Team', cover:'', featured:true,
+    summary_en:'In 2024, the Hindi film Hamare Baarah became one of the most debated and controversial film releases in India. The movie attracted criticism from various sections of the Muslim community.',
+    summary_ur:'۲۰۲۴ میں، ہندی فلم ہمارے بارہ ہندوستان میں سب سے زیادہ زیر بحث اور متنازعہ فلمی ریلیز میں سے ایک بن گئی۔',
+    body_en:'<p>As public opposition grew, legal proceedings were initiated and the film\'s release became the subject of court scrutiny.</p><p>During the course of the controversy, AL SYED became actively involved in documentation, legal efforts, community outreach, and discussions surrounding the film.</p><p>The investigation covered court filings, media statements, and first-hand accounts from affected community members. Our team documented over 40 individual cases of reported grievances.</p><p>Following sustained legal and community pressure, the film was subject to modifications before its wider release.</p>',
+    body_ur:'<p>عوامی مخالفت بڑھنے کے ساتھ، قانونی کارروائیاں شروع کی گئیں اور فلم کی ریلیز عدالتی جانچ پڑتال کا موضوع بن گئی۔</p><p>AL SYED نے فلم سے متعلق دستاویزات، قانونی کوششوں اور کمیونٹی آؤٹ ریچ میں سرگرم کردار ادا کیا۔</p>'
+  }];
+}
+
+function updateStats() {
+  document.getElementById('stat-total').innerHTML = allCases.length + '<span>+</span>';
+  document.getElementById('stat-resolved').innerHTML = allCases.filter(c=>c.outcome==='resolved').length + '<span>+</span>';
+  document.getElementById('stat-ongoing').innerHTML = allCases.filter(c=>c.outcome==='ongoing').length + '<span>+</span>';
+}
+
+function renderCards() {
+  const grid = document.getElementById('articles-grid');
+  const filtered = currentFilter==='all' ? allCases : allCases.filter(c=>c.category===currentFilter);
+  if (!filtered.length) { grid.innerHTML='<div class="loading">No cases found.</div>'; return; }
+  const isEn = currentLang==='en';
+  grid.innerHTML = filtered.map((c,i) => {
+    const title = isEn ? c.title_en : c.title_ur;
+    const summary = isEn ? c.summary_en : c.summary_ur;
+    const titleCls = isEn ? 'card-title' : 'card-title-ur';
+    const sumCls = isEn ? 'card-summary' : 'card-summary-ur';
+    const oLabel = c.outcome==='resolved'?'Resolved':c.outcome==='ongoing'?'Ongoing':'Closed';
+    const img = c.cover ? `<img class="card-img" src="${c.cover}" alt="">` : `<div class="card-img-placeholder"><span>No Cover</span></div>`;
+    if (c.featured && i===0) {
+      const ftitle = isEn ? 'featured-title' : 'featured-title-ur';
+      const fsum = isEn ? 'featured-summary' : 'featured-summary-ur';
+      return `<div class="article-card featured" data-category="${c.category}" onclick="showArticle('${c.slug}')">
+        ${c.cover?`<img class="featured-img" src="${c.cover}" alt="">`: '<div class="featured-img-placeholder"><span>Cover Photo</span></div>'}
+        <div class="featured-content">
+          <div class="featured-label">Featured Case — ${c.category}</div>
+          <div class="${ftitle}">${title}</div>
+          <div class="${fsum}">${summary}</div>
+          <div class="card-outcome ${c.outcome}"><span class="card-outcome-dot"></span>${oLabel}</div>
+        </div></div>`;
+    }
+    return `<div class="article-card" data-category="${c.category}" onclick="showArticle('${c.slug}')">
+      <div class="card-meta"><span class="card-category">${c.category}</span><span class="card-date">${c.date}</span></div>
+      ${img}
+      <div class="${titleCls}">${title}</div>
+      <div class="${sumCls}">${summary}</div>
+      <div class="card-outcome ${c.outcome}"><span class="card-outcome-dot"></span>${oLabel}</div>
+    </div>`;
+  }).join('');
+}
+
+function showArticle(slug) {
+  const c = allCases.find(x=>x.slug===slug); if(!c) return;
+  const isEn = currentLang==='en';
+  document.getElementById('d-category').textContent = c.category;
+  document.getElementById('d-title-en').textContent = c.title_en;
+  document.getElementById('d-title-ur').textContent = c.title_ur;
+  document.getElementById('d-date').textContent = c.date;
+  document.getElementById('d-author').textContent = c.author;
+  document.getElementById('d-summary-en').textContent = c.summary_en;
+  document.getElementById('d-summary-ur').textContent = c.summary_ur;
+  document.getElementById('d-body-en').innerHTML = c.body_en;
+  document.getElementById('d-body-ur').innerHTML = c.body_ur;
+  document.getElementById('d-outcome').textContent = isEn ? c.outcome_detail_en : c.outcome_detail_ur;
+  const cover = document.getElementById('d-cover');
+  if(c.cover){cover.src=c.cover;cover.style.display='block';}else{cover.style.display='none';}
+  document.getElementById('main-content').style.display='none';
+  document.getElementById('article-detail').classList.add('active');
+  applyLang(); window.scrollTo(0,0);
+}
+
+function showHome() {
+  document.getElementById('main-content').style.display='block';
+  document.getElementById('article-detail').classList.remove('active');
+  window.scrollTo(0,0);
+}
+
+function filterCards(cat, btn) {
+  currentFilter=cat;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderCards();
+}
+
+function filterNav(cat){ showHome(); filterCards(cat,null); }
+
+function setLang(lang) {
+  currentLang=lang;
+  document.getElementById('lang-overlay').style.display='none';
+  applyLang(); renderCards();
+}
+
+function toggleLang() {
+  currentLang = currentLang==='en'?'ur':'en';
+  applyLang(); renderCards();
+}
+
+function applyLang() {
+  const isUr = currentLang==='ur';
+  ['d-title-en','d-summary-en','d-body-en'].forEach(id=>document.getElementById(id).classList.toggle('hidden',isUr));
+  ['d-title-ur','d-summary-ur','d-body-ur'].forEach(id=>document.getElementById(id).classList.toggle('hidden',!isUr));
+  document.documentElement.setAttribute('dir', isUr?'rtl':'ltr');
+}
+
+loadCases();
+</script>
+</body>
+</html>

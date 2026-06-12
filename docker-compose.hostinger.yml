@@ -81,6 +81,21 @@ services:
     networks:
       - appnet
 
+  cases:
+    build:
+      context: ./cases
+    restart: always
+    environment:
+      CASE_CONTROL_USERNAME: ${CASE_CONTROL_USERNAME:-admin}
+      CASE_CONTROL_PASSWORD: ${CASE_CONTROL_PASSWORD:-}
+    volumes:
+      - cases_content:/app/content/cases
+      - cases_uploads:/app/public/uploads
+    ports:
+      - "127.0.0.1:8091:8080"
+    networks:
+      - appnet
+
   media:
     image: nginx:1.27-alpine
     restart: always
@@ -221,6 +236,10 @@ volumes:
     name: streamx_backend_media
   recordings_data:
     name: streamx_recordings_data
+  cases_content:
+    name: streamx_cases_content
+  cases_uploads:
+    name: streamx_cases_uploads
 
 networks:
   appnet:

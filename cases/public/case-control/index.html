@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AL SYED - Case Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #070707;
+  --bg-soft: #0d0d0d;
+  --panel: #121212;
+  --panel-2: #181818;
+  --text: #f5f5f5;
+  --muted: #9a9a9a;
+  --dim: #646464;
+  --line: #2d2d2d;
+  --line-strong: #3d3d3d;
+  --red: #d02f2f;
+  --red-soft: rgba(208, 47, 47, 0.14);
+  --green: #4dbf73;
+  --yellow: #d7aa45;
+  --radius: 22px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(208, 47, 47, 0.14), transparent 34rem),
+    linear-gradient(145deg, #050505 0%, #101010 48%, #060606 100%);
+  color: var(--text);
+  font-family: "DM Sans", sans-serif;
+}
+
+a { color: inherit; }
+
+.shell {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 28px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border: 1px solid var(--line);
+  background: rgba(12, 12, 12, 0.82);
+  backdrop-filter: blur(22px);
+  border-radius: 28px;
+  padding: 22px 24px;
+  position: sticky;
+  top: 18px;
+  z-index: 20;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.brand-mark {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: clamp(24px, 3vw, 42px);
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.btn {
+  border: 1px solid var(--line-strong);
+  background: #efefef;
+  color: #070707;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.18s, border-color 0.18s, background 0.18s, color 0.18s;
+}
+
+.btn:hover { transform: translateY(-1px); }
+.btn.secondary { background: transparent; color: var(--text); }
+.btn.danger { background: var(--red-soft); color: #ffb0b0; border-color: rgba(208, 47, 47, 0.45); }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+  gap: 22px;
+  margin-top: 24px;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  background: rgba(13, 13, 13, 0.9);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.38);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.panel-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.panel-title h2 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: -0.03em;
+}
+
+.panel-title span,
+.meta {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px 22px 0;
+}
+
+.stat {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 14px;
+  background: var(--bg-soft);
+}
+
+.stat strong {
+  display: block;
+  font-size: 28px;
+  letter-spacing: -0.05em;
+}
+
+.stat span {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+}
+
+.form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 22px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field.full { grid-column: 1 / -1; }
+
+label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #0a0a0a;
+  color: var(--text);
+  border-radius: 16px;
+  padding: 13px 14px;
+  font: inherit;
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+
+textarea {
+  min-height: 120px;
+  resize: vertical;
+  line-height: 1.55;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(208, 47, 47, 0.7);
+  box-shadow: 0 0 0 4px rgba(208, 47, 47, 0.1);
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--red);
+}
+
+.form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+
+.cases-list {
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+  max-height: 76vh;
+  overflow: auto;
+}
+
+.case-row {
+  border: 1px solid var(--line);
+  background: #0a0a0a;
+  border-radius: 18px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 14px;
+}
+
+.case-cover {
+  width: 88px;
+  height: 88px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #151515;
+  object-fit: cover;
+}
+
+.case-copy {
+  min-width: 0;
+}
+
+.case-copy h3 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.case-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+
+.tag {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.tag.live { color: #b7ffd0; border-color: rgba(77, 191, 115, 0.45); background: rgba(77, 191, 115, 0.1); }
+.tag.draft { color: #ffd58a; border-color: rgba(215, 170, 69, 0.5); background: rgba(215, 170, 69, 0.1); }
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.row-actions .btn {
+  padding: 9px 12px;
+  font-size: 12px;
+}
+
+.notice {
+  margin: 18px 22px 0;
+  border: 1px solid rgba(208, 47, 47, 0.35);
+  background: rgba(208, 47, 47, 0.08);
+  color: #ffc2c2;
+  border-radius: 16px;
+  padding: 14px;
+  display: none;
+}
+
+.notice.show { display: block; }
+.notice.success { border-color: rgba(77, 191, 115, 0.35); background: rgba(77, 191, 115, 0.09); color: #c9ffdb; }
+
+.empty {
+  border: 1px dashed var(--line-strong);
+  color: var(--muted);
+  border-radius: 18px;
+  padding: 24px;
+  text-align: center;
+}
+
+@media (max-width: 980px) {
+  .shell { padding: 16px; }
+  .header { position: static; align-items: flex-start; flex-direction: column; }
+  .header-actions { justify-content: flex-start; }
+  .grid { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: 1fr; }
+  .form { grid-template-columns: 1fr; }
+  .cases-list { max-height: none; }
+}
+
+@media (max-width: 560px) {
+  .case-row { grid-template-columns: 1fr; }
+  .case-cover { width: 100%; height: 170px; }
+  .btn { width: 100%; }
+}
+</style>
+</head>
+<body>
+<main class="shell">
+  <header class="header">
+    <div class="brand">
+      <div class="brand-mark">AL SYED Cases</div>
+      <h1>Case Control</h1>
+    </div>
+    <div class="header-actions">
+      <a class="btn secondary" href="/" target="_blank" rel="noopener">View public site</a>
+      <button class="btn secondary" id="reload-btn" type="button">Reload cases</button>
+      <button class="btn" id="new-btn" type="button">New case</button>
+    </div>
+  </header>
+
+  <section class="grid">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <h2 id="form-title">Add case article</h2>
+          <span>Changes update the public cases index immediately after save.</span>
+        </div>
+      </div>
+      <div class="notice" id="message"></div>
+      <div class="stats">
+        <div class="stat"><strong id="total-count">0</strong><span>Total</span></div>
+        <div class="stat"><strong id="published-count">0</strong><span>Published</span></div>
+        <div class="stat"><strong id="draft-count">0</strong><span>Drafts</span></div>
+      </div>
+      <form class="form" id="case-form">
+        <input type="hidden" name="editing_slug" id="editing-slug">
+        <div class="field">
+          <label for="title_en">English title</label>
+          <input id="title_en" name="title_en" required autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="slug">Slug</label>
+          <input id="slug" name="slug" autocomplete="off" placeholder="auto-generated for new cases">
+        </div>
+        <div class="field">
+          <label for="title_ur">Urdu title</label>
+          <input id="title_ur" name="title_ur" dir="auto">
+        </div>
+        <div class="field">
+          <label for="date">Date label</label>
+          <input id="date" name="date" placeholder="June 2026">
+        </div>
+        <div class="field">
+          <label for="category">Category</label>
+          <input id="category" name="category" value="OSINT">
+        </div>
+        <div class="field">
+          <label for="outcome">Outcome</label>
+          <select id="outcome" name="outcome">
+            <option value="resolved">Resolved</option>
+            <option value="in-progress">In progress</option>
+            <option value="documented">Documented</option>
+            <option value="legal-action">Legal action</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="author">Author</label>
+          <input id="author" name="author" value="AL SYED Team">
+        </div>
+        <div class="field">
+          <label for="cover_file">Cover image</label>
+          <input id="cover_file" name="cover_file" type="file" accept="image/png,image/jpeg,image/webp">
+        </div>
+        <div class="field full">
+          <label for="cover">Cover URL</label>
+          <input id="cover" name="cover" placeholder="/uploads/example.png">
+        </div>
+        <div class="field full">
+          <label for="summary_en">English summary</label>
+          <textarea id="summary_en" name="summary_en" required></textarea>
+        </div>
+        <div class="field full">
+          <label for="summary_ur">Urdu summary</label>
+          <textarea id="summary_ur" name="summary_ur" dir="auto"></textarea>
+        </div>
+        <div class="field full">
+          <label for="outcome_detail_en">English outcome detail</label>
+          <textarea id="outcome_detail_en" name="outcome_detail_en"></textarea>
+        </div>
+        <div class="field full">
+          <label for="outcome_detail_ur">Urdu outcome detail</label>
+          <textarea id="outcome_detail_ur" name="outcome_detail_ur" dir="auto"></textarea>
+        </div>
+        <div class="field full">
+          <label for="body_en">English article body</label>
+          <textarea id="body_en" name="body_en" required placeholder="Plain text is accepted. Existing HTML can also be pasted."></textarea>
+        </div>
+        <div class="field full">
+          <label for="body_ur">Urdu article body</label>
+          <textarea id="body_ur" name="body_ur" dir="auto"></textarea>
+        </div>
+        <div class="field full check-row">
+          <label class="check"><input type="checkbox" id="published" name="published" checked> Published</label>
+          <label class="check"><input type="checkbox" id="featured" name="featured"> Featured</label>
+        </div>
+        <div class="form-actions">
+          <button class="btn secondary" id="clear-btn" type="button">Clear</button>
+          <button class="btn" id="save-btn" type="submit">Save case</button>
+        </div>
+      </form>
+    </div>
+
+    <aside class="panel">
+      <div class="panel-head">
+        <div class="panel-title">
+          <h2>Published and draft cases</h2>
+          <span>Select a case to edit, or delete a draft/article.</span>
+        </div>
+      </div>
+      <div class="cases-list" id="cases-list">
+        <div class="empty">Loading cases...</div>
+      </div>
+    </aside>
+  </section>
+</main>
+
+<script>
+const state = { cases: [], coverDataUrl: "" };
+const form = document.getElementById("case-form");
+const list = document.getElementById("cases-list");
+const message = document.getElementById("message");
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function showMessage(text, type = "error") {
+  message.textContent = text;
+  message.className = `notice show ${type === "success" ? "success" : ""}`;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function clearMessage() {
+  message.className = "notice";
+  message.textContent = "";
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    credentials: "same-origin",
+    headers: { "content-type": "application/json", ...(options.headers || {}) },
+    ...options,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || `Request failed with HTTP ${response.status}`);
+  }
+  return data;
+}
+
+function setStats() {
+  const total = state.cases.length;
+  const published = state.cases.filter((item) => item.published !== false).length;
+  document.getElementById("total-count").textContent = total;
+  document.getElementById("published-count").textContent = published;
+  document.getElementById("draft-count").textContent = total - published;
+}
+
+function renderCases() {
+  setStats();
+  if (!state.cases.length) {
+    list.innerHTML = '<div class="empty">No cases yet. Add the first article from the form.</div>';
+    return;
+  }
+
+  list.innerHTML = state.cases.map((item) => {
+    const cover = item.cover || "";
+    const statusTag = item.published === false
+      ? '<span class="tag draft">Draft</span>'
+      : '<span class="tag live">Published</span>';
+    return `
+      <article class="case-row">
+        ${cover
+          ? `<img class="case-cover" src="${escapeHtml(cover)}" alt="">`
+          : '<div class="case-cover"></div>'}
+        <div class="case-copy">
+          <h3>${escapeHtml(item.title_en)}</h3>
+          <div class="meta">${escapeHtml(item.slug)} · ${escapeHtml(item.date || "")}</div>
+          <div class="case-tags">
+            ${statusTag}
+            ${item.featured ? '<span class="tag">Featured</span>' : ""}
+            <span class="tag">${escapeHtml(item.category || "Case")}</span>
+          </div>
+          <div class="row-actions">
+            <button class="btn secondary" type="button" data-edit="${escapeHtml(item.slug)}">Edit</button>
+            <button class="btn danger" type="button" data-delete="${escapeHtml(item.slug)}">Delete</button>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function field(name) {
+  return form.elements[name];
+}
+
+function resetForm() {
+  form.reset();
+  field("editing_slug").value = "";
+  field("slug").disabled = false;
+  field("category").value = "OSINT";
+  field("author").value = "AL SYED Team";
+  field("published").checked = true;
+  field("featured").checked = false;
+  state.coverDataUrl = "";
+  document.getElementById("form-title").textContent = "Add case article";
+  clearMessage();
+}
+
+function editCase(slug) {
+  const item = state.cases.find((entry) => entry.slug === slug);
+  if (!item) return;
+  resetForm();
+  for (const [key, value] of Object.entries(item)) {
+    if (!field(key)) continue;
+    if (field(key).type === "checkbox") {
+      field(key).checked = value === true;
+    } else {
+      field(key).value = value || "";
+    }
+  }
+  field("editing_slug").value = item.slug;
+  field("slug").value = item.slug;
+  field("slug").disabled = true;
+  document.getElementById("form-title").textContent = "Edit case article";
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function collectPayload() {
+  const payload = {
+    slug: field("slug").value,
+    title_en: field("title_en").value,
+    title_ur: field("title_ur").value,
+    category: field("category").value,
+    outcome: field("outcome").value,
+    outcome_detail_en: field("outcome_detail_en").value,
+    outcome_detail_ur: field("outcome_detail_ur").value,
+    date: field("date").value,
+    author: field("author").value,
+    cover: field("cover").value,
+    summary_en: field("summary_en").value,
+    summary_ur: field("summary_ur").value,
+    body_en: field("body_en").value,
+    body_ur: field("body_ur").value,
+    featured: field("featured").checked,
+    published: field("published").checked,
+  };
+  if (state.coverDataUrl) payload.cover_data_url = state.coverDataUrl;
+  return payload;
+}
+
+async function loadCases() {
+  clearMessage();
+  list.innerHTML = '<div class="empty">Loading cases...</div>';
+  const data = await api("/api/case-control/cases");
+  state.cases = data.cases || [];
+  renderCases();
+}
+
+async function deleteCase(slug) {
+  const item = state.cases.find((entry) => entry.slug === slug);
+  if (!item) return;
+  const confirmed = window.confirm(`Delete "${item.title_en}"? This removes the case JSON immediately.`);
+  if (!confirmed) return;
+  await api(`/api/case-control/cases/${encodeURIComponent(slug)}`, { method: "DELETE" });
+  showMessage("Case deleted and public index rebuilt.", "success");
+  await loadCases();
+}
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  clearMessage();
+  const saveButton = document.getElementById("save-btn");
+  saveButton.disabled = true;
+  try {
+    const editingSlug = field("editing_slug").value;
+    const payload = collectPayload();
+    const url = editingSlug
+      ? `/api/case-control/cases/${encodeURIComponent(editingSlug)}`
+      : "/api/case-control/cases";
+    const method = editingSlug ? "PUT" : "POST";
+    await api(url, { method, body: JSON.stringify(payload) });
+    showMessage("Case saved and public index rebuilt.", "success");
+    state.coverDataUrl = "";
+    await loadCases();
+    if (!editingSlug) resetForm();
+  } catch (error) {
+    showMessage(error.message);
+  } finally {
+    saveButton.disabled = false;
+  }
+});
+
+document.getElementById("cover_file").addEventListener("change", async (event) => {
+  const file = event.target.files && event.target.files[0];
+  state.coverDataUrl = "";
+  if (!file) return;
+  if (file.size > 6 * 1024 * 1024) {
+    showMessage("Cover image must be 6 MB or smaller.");
+    event.target.value = "";
+    return;
+  }
+  state.coverDataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Could not read cover image."));
+    reader.readAsDataURL(file);
+  });
+});
+
+list.addEventListener("click", async (event) => {
+  const editSlug = event.target.getAttribute("data-edit");
+  const deleteSlug = event.target.getAttribute("data-delete");
+  if (editSlug) editCase(editSlug);
+  if (deleteSlug) {
+    try {
+      await deleteCase(deleteSlug);
+    } catch (error) {
+      showMessage(error.message);
+    }
+  }
+});
+
+document.getElementById("reload-btn").addEventListener("click", () => {
+  loadCases().catch((error) => showMessage(error.message));
+});
+document.getElementById("new-btn").addEventListener("click", resetForm);
+document.getElementById("clear-btn").addEventListener("click", resetForm);
+
+loadCases().catch((error) => showMessage(error.message));
+</script>
+</body>
+</html>

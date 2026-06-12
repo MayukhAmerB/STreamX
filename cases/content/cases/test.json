@@ -1,0 +1,18 @@
+{
+  "slug": "test",
+  "title_en": "test",
+  "title_ur": "hgdty",
+  "category": "OSINT",
+  "outcome": "resolved",
+  "outcome_detail_en": "testis",
+  "outcome_detail_ur": "jhhfhf",
+  "date": "February 2025",
+  "author": "AL SYED Team",
+  "cover": "/uploads/test-1781122012227.png",
+  "summary_en": "ffhfhgjgjh",
+  "summary_ur": "summary",
+  "body_en": "<p>al syed is very bad boy</p>",
+  "body_ur": "<p>ghcggf</p>",
+  "featured": true,
+  "published": true
+}

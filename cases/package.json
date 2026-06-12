@@ -1,0 +1,13 @@
+{
+  "name": "alsyed-cases",
+  "version": "1.0.0",
+  "description": "AL SYED Documented Cases Website",
+  "scripts": {
+    "build": "node scripts/build-cases.js",
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}
