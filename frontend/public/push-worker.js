@@ -22,8 +22,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "AlsyedInitiative";
   const options = {
     body: payload.body || "You have a new notification.",
-    icon: "/favicon.svg",
-    badge: "/favicon.svg",
+    icon: "/favicon-192x192.png",
+    badge: "/favicon-32x32.png",
     data: {
       url: payload.url || "/",
       notification_id: payload.notification_id || null,
