@@ -51,15 +51,15 @@ document.addEventListener("DOMContentLoaded", () => {
             hubHeading: 'Labs that<br><span class="text-demand">demand</span><br>excellence.',
             hubDescTitle: "The Zenith Footprint",
             hubDescP1: "Welcome, Investigator. We need your live OSINT skills to identify an unknown operator and trace their digital footprint.",
-            hubDescP2: "This is a live, expert-level Open Source Intelligence training ground. To succeed, you must conduct active queries across the target's Instagram profile (<code>@xcfwjoo310</code>) and correlate it with associated public code repositories.",
+            hubDescP2: "This is a live, expert-level Open Source Intelligence investigation. Begin with the target's public profile (<code>@xcfwjoo310</code>), discover the operator's wider footprint, and build the evidence chain yourself.",
             hubRulesTitle: "🔑 Scoring Rules",
             hubRulePoints: "<strong>Max Points per Question:</strong> 1.0 point.",
             hubRuleScore: "<strong>Overall Score:</strong> Your total score is calculated dynamically based on solved questions (Max total: 10.0 points).",
             hubInstructionsTitle: "🚀 Instructions",
-            hubInstructionsDesc: "Select the <strong>OSINT LABS</strong> tab in the sidebar to view the questions. Locate the clues in the live Instagram bio, feed images, and GitHub repository branches/logs to crack the secure database vault and retrieve the final flag.",
+            hubInstructionsDesc: "Select <strong>OSINT LABS</strong> to receive investigative objectives. Prompts intentionally omit file paths, repository names, branches, encodings, and tools. Pivot between public identities and artifacts until the evidence supports an exact answer.",
             labSubheading: "ACTIVE INVESTIGATION",
             labTitle: "The Zenith Footprint",
-            labDesc: "Conduct live queries on the target's Instagram profile (@xcfwjoo310) and correlate it with associated public GitHub repositories.",
+            labDesc: "Start with @xcfwjoo310. Discover the operator's identities, infrastructure, historical mistakes, and protected artifacts without being given the investigation path.",
             labStatSolved: "SOLVED:",
             labStatScore: "SCORE:",
             qHeaderPrefix: "Question",
@@ -83,15 +83,15 @@ document.addEventListener("DOMContentLoaded", () => {
             hubHeading: 'لیبز جو<br><span class="text-demand">مطالبہ کرتی ہیں</span><br>عمدگی کا۔',
             hubDescTitle: "زینتھ فٹ پرنٹ",
             hubDescP1: "خوش آمدید، تفتیش کار۔ ایک نامعلوم آپریٹر کی شناخت اور اس کے ڈیجیٹل فٹ پرنٹ کو ٹریس کرنے کے لیے ہمیں آپ کی لائیو OSINT صلاحیتوں کی ضرورت ہے۔",
-            hubDescP2: "یہ ایک لائیو، ماہر سطح کا اوپن سورس انٹیلیجنس ٹریننگ گراؤنڈ ہے۔ کامیابی کے لیے ٹارگٹ کے انسٹاگرام پروفائل (<code>@xcfwjoo310</code>) پر تحقیق کریں اور اسے متعلقہ عوامی گٹ ہب ریپوزٹریز سے جوڑیں۔",
+            hubDescP2: "یہ ایک لائیو، ماہر سطح کی اوپن سورس انٹیلیجنس تفتیش ہے۔ ٹارگٹ کے عوامی پروفائل (<code>@xcfwjoo310</code>) سے آغاز کریں، آپریٹر کا وسیع ڈیجیٹل نقش دریافت کریں، اور شواہد کی مکمل زنجیر خود بنائیں۔",
             hubRulesTitle: "🔑 اسکورنگ کے قواعد",
             hubRulePoints: "<strong>ہر سوال کے لیے زیادہ سے زیادہ پوائنٹس:</strong> 1.0 پوائنٹ۔",
             hubRuleScore: "<strong>مجموعی اسکور:</strong> آپ کے کل اسکور کا حساب متحرک طور پر حل شدہ سوالات کی بنیاد پر کیا جاتا ہے (کل زیادہ سے زیادہ: 10.0 پوائنٹس)۔",
             hubInstructionsTitle: "🚀 ہدایات",
-            hubInstructionsDesc: "سوالات دیکھنے کے لیے سائڈبار میں <strong>او ایس آئی این ٹی لیبز</strong> ٹیب کو منتخب کریں۔ سیکیور والٹ کو توڑنے اور حتمی فلیگ حاصل کرنے کے لیے انسٹاگرام بائیو، فیڈ تصاویر، اور گٹ ہب لاگز میں سراغ تلاش کریں۔",
+            hubInstructionsDesc: "تحقیقی مقاصد دیکھنے کے لیے <strong>او ایس آئی این ٹی لیبز</strong> منتخب کریں۔ سوالات جان بوجھ کر فائل پاتھ، ریپوزٹری نام، برانچ، انکوڈنگ اور مطلوبہ ٹول ظاہر نہیں کرتے۔ درست جواب تک پہنچنے کے لیے عوامی شناختوں اور شواہد کے درمیان خود روابط قائم کریں۔",
             labSubheading: "سرگرم تحقیقات",
             labTitle: "زینتھ فٹ پرنٹ",
-            labDesc: "ٹارگٹ کے انسٹاگرام پروفائل (@xcfwjoo310) پر لائیو تحقیق کریں اور اسے متعلقہ عوامی گٹ ہب ریپوزٹریز سے جوڑیں۔",
+            labDesc: "@xcfwjoo310 سے آغاز کریں۔ آپریٹر کی شناختیں، انفراسٹرکچر، تاریخی غلطیاں اور محفوظ شواہد خود دریافت کریں؛ تفتیش کا راستہ فراہم نہیں کیا جائے گا۔",
             labStatSolved: "حل شدہ:",
             labStatScore: "اسکور:",
             qHeaderPrefix: "سوال",
@@ -109,66 +109,66 @@ document.addEventListener("DOMContentLoaded", () => {
     const questionsData = {
         en: [
             {
-                q: "The target's Instagram bio (@xcfwjoo310) contains an encrypted string representing the target's username. Decrypt the Vigenère cipher 'lmxixzswujhymi' using the startup's name in lowercase as the key to find the target's public username."
+                q: "The profile is not the identity; it is only a pointer. Recover the lowercase public username the operator reused elsewhere. Submit the username only."
             },
             {
-                q: "In the posted terminal screenshot on Instagram @xcfwjoo310, the target has obfuscated the vault passphrase as a raw hex string under the key 'SEC_SYS_RAW'. What is the decoded system access passphrase?"
+                q: "A visual diagnostic leak contains material intended to unlock a restricted system. Recover the exact access phrase, preserving capitalization and separators."
             },
             {
-                q: "In the 'public-archive' repository, look at the commit history logs of the secondary branch 'archived-config'. Locate the commit where configuration secrets were redacted. What was the exact value of the 'salt' key string before it was deleted in that commit's diff?"
+                q: "A cleanup commit removed a development secret, but version control retained the evidence. Recover the exact salt value that existed immediately before the redaction."
             },
             {
-                q: "In the 'CRBV' repository, look at the legacy database setup file under 'legacy/db_v1.sql'. What is the exact data type and precision defined for the 'multiplier' column? (Format: TYPE(X,Y))"
+                q: "An abandoned valuation schema reveals the storage constraint used for fractional multipliers. Submit the complete SQL type declaration exactly as defined."
             },
             {
-                q: "According to the registry file 'data/corporate_registry.json' in the 'CRBV' repository, what is the SHA-256 hash (in lowercase hex representation) of the company number listed for 'VIRGIN HOLDINGS LIMITED'?"
+                q: "Within the operator's corporate-research footprint, identify the registration number of the prominent British holding company and return its standard 256-bit digest as lowercase hexadecimal."
             },
             {
-                q: "In the 'PGP' repository, inspect the public key file 'public_keys/apex_public_key.asc'. What is the subkey ID (with '0x' prefix in lowercase) that is configured for encryption only?"
+                q: "The operator's cryptographic material separates identity from message protection. Submit the lowercase short identifier, prefixed with 0x, of the key component that can encrypt but not sign."
             },
             {
-                q: "In the 'PGP' repository, look at the script 'src/pgp_wrapper.sh'. What is the full recipient email address configured in the encryption command?"
+                q: "An automation artifact reveals where protected output was intended to travel. Recover the complete recipient address, including its non-clearnet domain."
             },
             {
-                q: "In the 'Madsonrepo' repository, audit the syslog logs under 'logs/system_2026-05-10.log'. What is the Process ID (PID) associated with the 'cron' daemon process when it starts?"
+                q: "One captured boot sequence records the scheduler coming online. Submit the numeric process identifier assigned at startup."
             },
             {
-                q: "According to the flight history logs ('flight_history_may_2026.csv' in 'Madsonrepo' under 'logs/'), what is the recorded weather temperature (including the minus sign, degree symbol, and C, e.g. -3°C) at Reykjavik (KEF) airport for flight SK-901?"
+                q: "A travel record ties SK-901 to a cold northern stop. Recover the signed Celsius observation recorded for that leg, including the degree symbol and unit."
             },
             {
-                q: "What is the final decrypted flag for the challenge (retrieved by decrypting secure-vault's flag.enc payload using decrypt.py)?"
+                q: "The evidence recovered earlier forms the credential pair for a protected payload. Use the operator's own tooling and submit the final flag exactly as emitted."
             }
         ],
         ur: [
             {
-                q: "ٹارگٹ کے انسٹاگرام بائیو (@xcfwjoo310) میں ایک خفیہ کردہ سٹرنگ ہے جو ٹارگٹ کے صارف نام کی نمائندگی کرتی ہے۔ ٹارگٹ کا عوامی گٹ ہب صارف نام معلوم کرنے کے لیے اسٹارٹ اپ کے نام کو چھوٹے حروف میں بطور کلید استعمال کرتے ہوئے ویجینیر سائفر 'lmxixzswujhymi' کو ڈکرپٹ کریں۔"
+                q: "پروفائل اصل شناخت نہیں بلکہ صرف ایک اشارہ ہے۔ وہ عوامی صارف نام تلاش کریں جسے آپریٹر نے کسی دوسری جگہ دوبارہ استعمال کیا ہے۔ صرف چھوٹے حروف میں صارف نام جمع کریں۔"
             },
             {
-                q: "انسٹاگرام @xcfwjoo310 پر پوسٹ کیے گئے ٹرمینل اسکرین شاٹ میں، ٹارگٹ نے والٹ پاس فریز کو 'SEC_SYS_RAW' کلید کے تحت ایک خام ہیکس سٹرنگ کے طور پر مبہم کیا ہے۔ ڈیکوڈ شدہ سسٹم تک رسائی کا پاس فریز کیا ہے؟"
+                q: "ایک بصری تشخیصی لیک میں محدود سسٹم تک رسائی کے لیے استعمال ہونے والا مواد موجود ہے۔ بڑے اور چھوٹے حروف اور جدا کرنے والی علامتیں برقرار رکھتے ہوئے مکمل رسائی فقرہ بازیافت کریں۔"
             },
             {
-                q: "'public-archive' ریپوزٹری میں، سیکنڈری برانچ 'archived-config' کے کمٹ ہسٹری لاگز کو دیکھیں۔ وہ کمٹ تلاش کریں جہاں ترتیب کے رازوں کو حذف کیا گیا تھا۔ اس کمٹ کے فرق (diff) میں حذف ہونے سے پہلے 'salt' کی قدر کیا تھی؟"
+                q: "ایک صفائی والے کمٹ نے ترقیاتی راز حذف کیے، لیکن ورژن کنٹرول نے پرانا ثبوت محفوظ رکھا۔ ریڈیکشن سے فوراً پہلے موجود مکمل سالٹ قدر بازیافت کریں۔"
             },
             {
-                q: "'CRBV' ریپوزٹری میں، 'legacy/db_v1.sql' کے تحت پرانی ڈیٹا بیس سیٹ اپ فائل کو دیکھیں۔ 'multiplier' کالم کے لیے بیان کردہ ڈیٹا ٹائپ اور درستگی کیا ہے؟ (فارمیٹ: TYPE(X,Y))"
+                q: "ایک ترک شدہ ویلیوایشن اسکیمہ بتاتا ہے کہ اعشاری ضرب کار کس اسٹوریج حد کے ساتھ محفوظ تھا۔ مکمل SQL ٹائپ ڈیکلریشن بالکل اسی شکل میں جمع کریں۔"
             },
             {
-                q: "'CRBV' ریپوزٹری میں رجسٹری فائل 'data/corporate_registry.json' کے مطابق، 'VIRGIN HOLDINGS LIMITED' کے لیے درج کمپنی نمبر کا SHA-256 ہیش (چھوٹے حروف ہیکس میں) کیا ہے؟"
+                q: "آپریٹر کی کارپوریٹ تحقیق میں نمایاں برطانوی ہولڈنگ کمپنی کا رجسٹریشن نمبر شناخت کریں اور اس کا معیاری 256 بٹ ڈائجسٹ چھوٹے حروف کی ہیکسا ڈیسیمل شکل میں جمع کریں۔"
             },
             {
-                q: "'PGP' ریپوزٹری میں، پبلک کی فائل 'public_keys/apex_public_key.asc' کا معائنہ کریں۔ سب کی (subkey) آئی ڈی (چھوٹے حروف میں '0x' لاحقے کے ساتھ) کیا ہے جو صرف انکرپشن کے لیے کنفیگر کی گئی ہے؟"
+                q: "آپریٹر کے کرپٹوگرافک مواد میں شناخت اور پیغام کی حفاظت الگ رکھی گئی ہے۔ اس کلیدی جزو کا مختصر شناختی نمبر چھوٹے حروف میں 0x کے ساتھ جمع کریں جو انکرپٹ کر سکتا ہے مگر دستخط نہیں۔"
             },
             {
-                q: "'PGP' ریپوزٹری میں، اسکرپٹ 'src/pgp_wrapper.sh' کو دیکھیں۔ انکرپشن کمانڈ میں کنفیگر کیا گیا وصول کنندہ کا مکمل ای میل ایڈریس کیا ہے؟"
+                q: "ایک خودکار آرٹیفیکٹ ظاہر کرتا ہے کہ محفوظ آؤٹ پٹ کہاں بھیجا جانا تھا۔ نان کلیئرنیٹ ڈومین سمیت مکمل وصول کنندہ پتہ بازیافت کریں۔"
             },
             {
-                q: "'Madsonrepo' ریپوزٹری میں، 'logs/system_2026-05-10.log' کے تحت سسٹم لاگز کا آڈٹ کریں۔ جب 'cron' ڈیمن پروسیس شروع ہوتا ہے تو اس سے وابستہ پروسیس آئی ڈی (PID) کیا ہوتی ہے؟"
+                q: "ایک محفوظ شدہ بوٹ سلسلے میں شیڈیولر کے آن لائن ہونے کا ریکارڈ موجود ہے۔ آغاز کے وقت دیا گیا عددی پروسیس شناختی نمبر جمع کریں۔"
             },
             {
-                q: "فلائٹ ہسٹری لاگز (Madsonrepo میں 'logs/flight_history_may_2026.csv') کے مطابق، فلائٹ SK-901 کے لیے ریکیاوک (KEF) ائیرپورٹ پر ریکارڈ شدہ درجہ حرارت (بشمول منفی نشان، ڈگری علامت، اور C، جیسے -3°C) کیا ہے؟"
+                q: "ایک سفری ریکارڈ SK-901 کو شمال کے ایک سرد پڑاؤ سے جوڑتا ہے۔ اس مرحلے کے لیے درج شدہ علامتی سیلسیس مشاہدہ ڈگری نشان اور اکائی سمیت بازیافت کریں۔"
             },
             {
-                q: "چیلنج کا حتمی ڈکرپٹ شدہ فلیگ (flag) کیا ہے (جو decrypt.py کا استعمال کرتے ہوئے secure-vault کے flag.enc پیلوڈ کو ڈکرپٹ کرکے حاصل کیا گیا ہے)؟"
+                q: "پہلے بازیافت کیے گئے شواہد ایک محفوظ پیلوڈ کے لیے درکار اسناد کا جوڑا بناتے ہیں۔ آپریٹر کے اپنے ٹول استعمال کریں اور حتمی فلیگ بالکل اسی طرح جمع کریں جیسے وہ ظاہر ہو۔"
             }
         ]
     };
