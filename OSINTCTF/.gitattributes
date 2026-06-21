@@ -1,0 +1,18 @@
+*.asc text eol=lf
+*.css text eol=lf
+*.csv text eol=lf
+*.html text eol=lf
+*.js text eol=lf
+*.md text eol=lf
+*.py text eol=lf
+*.txt text eol=lf
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+.gitignore text eol=lf
+
+*.db binary
+*.enc binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.png binary

@@ -96,6 +96,15 @@ services:
     networks:
       - appnet
 
+  osint-labs:
+    build:
+      context: ./OSINTCTF
+    restart: always
+    ports:
+      - "127.0.0.1:8092:8080"
+    networks:
+      - appnet
+
   media:
     image: nginx:1.27-alpine
     restart: always

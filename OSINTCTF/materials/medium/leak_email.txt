@@ -1,0 +1,21 @@
+From: phantom_dev <lucas.vance@zenithdynamics.com>
+To: security@zenithdynamics.com
+Subject: Zenith Dynamics IP Leak
+Date: Tue, 12 May 2026 14:32:10 +0200
+Received: from mail.phantom-files.net (unknown [198.51.100.74])
+    by mx.zenithdynamics.com (Postfix) with ESMTPS id 4NK6z901x
+    for <security@zenithdynamics.com>; Tue, 12 May 2026 14:32:15 +0200 (CEST)
+Received: from localhost (localhost [127.0.0.1])
+	by mail.phantom-files.net (Postfix) with ESMTP id 9H8F23J8D;
+	Tue, 12 May 2026 14:32:08 +0200 (CEST)
+Message-ID: <phantom-leak-992388@mail.phantom-files.net>
+Content-Type: text/plain; charset="utf-8"
+
+Greetings Zenith Dynamics Security,
+
+Just wanted to let you know that your precious "Quantum Neural Processor" source code is no longer secure.
+I've already downloaded everything and am preparing to distribute it.
+If you want to negotiate, you can contact me or check my server.
+
+Have a nice day,
+phantom_dev

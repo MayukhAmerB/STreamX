@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AL SYED — LABS</title>
+    <!-- Google Fonts: Inter and JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 48px;">
+                <div style="display: inline-block;">
+                    <span class="brand-al">AL</span>
+                    <span class="brand-syed">SYED</span>
+                    <span class="brand-sep">—</span>
+                    <span class="brand-cases" id="brand-labs-text">LABS</span>
+                </div>
+                <div class="lang-switcher" id="lang-toggle" style="user-select: none;">EN / اردو</div>
+            </div>
+
+            <nav class="main-nav">
+                <button class="nav-btn active" data-tab="hub" id="nav-hub-btn">
+                    <span class="icon">📁</span> <span id="nav-hub-text">CTF HUB</span>
+                </button>
+                <button class="nav-btn" data-tab="realworld" id="nav-labs-btn">
+                    <span class="icon">🕵️‍♂️</span> <span id="nav-labs-text">OSINT LABS</span> <span class="badge" id="badge-realworld">0/10</span>
+                </button>
+            </nav>
+
+            <div class="progress-section">
+                <h3 id="progress-header-text">Overall Progress</h3>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="overall-progress-bar" style="width: 0%"></div>
+                </div>
+                <div class="progress-metrics">
+                    <div class="metric-item">
+                        <span class="label" id="progress-solved-label">SOLVED:</span>
+                        <span class="val-wrapper">
+                            <span class="val" id="overall-solved">0</span><span class="slash">/</span><span class="total">10</span>
+                        </span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="label" id="progress-score-label">SCORE:</span>
+                        <span class="val-wrapper">
+                            <span class="val" id="overall-score">0.0</span><span class="pts" id="progress-pts-label"> pts</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="content-area">
+            <!-- Tab: Hub -->
+            <section id="tab-hub" class="tab-content active">
+                <div class="hero-left">
+                    <div class="hero-subheading" id="hub-subheading-text">INTELLIGENCE LABS</div>
+                    <h1 class="hero-heading" id="hub-heading-text">
+                        Labs that<br>
+                        <span class="text-demand">demand</span><br>
+                        excellence.
+                    </h1>
+
+                    <div class="desc-card">
+                        <h3 id="hub-desc-title">The Zenith Footprint</h3>
+                        <p id="hub-desc-p1">Welcome, Investigator. We need your live OSINT skills to identify an unknown operator and trace their digital footprint.</p>
+                        <p id="hub-desc-p2">This is a live, expert-level Open Source Intelligence training ground. Investigate the Instagram profile <code>@xcfwjoo310</code> and correlate it with associated public code repositories.</p>
+
+                        <div class="rules-box">
+                            <h4 id="hub-rules-title">🔑 Scoring Rules</h4>
+                            <ul>
+                                <li id="hub-rule-points"><strong>Max Points per Question:</strong> 1.0 point.</li>
+                                <li id="hub-rule-score"><strong>Overall Score:</strong> Your total score is calculated dynamically based on solved questions (Max total: 10.0 points).</li>
+                            </ul>
+                        </div>
+
+                        <div class="guidelines-box">
+                            <h4 id="hub-instructions-title">🚀 Instructions</h4>
+                            <p id="hub-instructions-desc">Select the <strong>OSINT LABS</strong> tab in the sidebar to view the questions. Locate the clues in the live Instagram bio, feed images, and GitHub repository branches/logs to crack the secure database vault and retrieve the final flag.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab: Challenge 1 Lab -->
+            <section id="tab-realworld" class="tab-content">
+                <div class="lab-container">
+                    <div class="lab-main-header">
+                        <div class="lab-info">
+                            <div class="hero-subheading" id="lab-subheading-text">ACTIVE INVESTIGATION</div>
+                            <h2 class="lab-title" id="lab-title-text">The Zenith Footprint</h2>
+                            <p class="lab-description" id="lab-desc-text">Conduct live queries on the target's Instagram profile (@xcfwjoo310) and correlate it with associated public GitHub repositories.</p>
+                        </div>
+                        <div class="lab-stats">
+                            <div class="stat-box">
+                                <div class="stat-label" id="lab-stat-solved-label">SOLVED:</div>
+                                <div class="stat-value" id="solved-realworld">0</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label" id="lab-stat-score-label">SCORE:</div>
+                                <div class="stat-value" id="score-realworld">0.0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="questions-container" id="realworld-questions">
+                        <!-- Loaded dynamically via JS -->
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
