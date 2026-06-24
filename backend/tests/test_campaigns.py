@@ -38,6 +38,7 @@ class CampaignApiTests(TestCase):
             {
                 "campaign_id": self.campaign.id,
                 "full_name": "Volunteer One",
+                "age": 24,
                 "whatsapp_number": "+91 98765 43210",
                 "alternate_number": "",
                 "city": "Mumbai",
@@ -50,6 +51,7 @@ class CampaignApiTests(TestCase):
         self.assertEqual(response.status_code, 201)
         volunteer = CampaignVolunteer.objects.get()
         self.assertEqual(volunteer.full_name, "Volunteer One")
+        self.assertEqual(volunteer.age, 24)
         self.assertEqual(volunteer.campaign, self.campaign)
 
     def test_public_volunteer_submit_rejects_active_content(self):
@@ -58,6 +60,7 @@ class CampaignApiTests(TestCase):
             {
                 "campaign_id": self.campaign.id,
                 "full_name": "<script>alert(1)</script>",
+                "age": 24,
                 "whatsapp_number": "+91 98765 43210",
                 "city": "Mumbai",
                 "state": "Maharashtra",

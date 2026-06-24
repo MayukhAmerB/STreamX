@@ -11,7 +11,7 @@
   --black:#080808;--gray-950:#0f0f0f;--gray-900:#161616;--gray-800:#222;
   --gray-700:#333;--gray-600:#444;--gray-500:#666;--gray-400:#888;
   --gray-300:#aaa;--gray-200:#ccc;--gray-100:#e8e8e8;--white:#f5f5f5;
-  --accent:#e8e8e8;--font-head:'Space Grotesk',sans-serif;--font-body:'Inter',sans-serif;
+  --accent:#e8e8e8;--brand-orange-red:#ff4b2f;--font-head:'Space Grotesk',sans-serif;--font-body:'Inter',sans-serif;
 }
 html{scroll-behavior:smooth;}
 body{background:var(--black);color:var(--white);font-family:var(--font-body);min-height:100vh;overflow-x:hidden;}
@@ -27,7 +27,7 @@ body{background:var(--black);color:var(--white);font-family:var(--font-body);min
 nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--gray-800);}
 .nav-inner{max-width:1280px;margin:0 auto;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;}
 .nav-logo{font-family:var(--font-head);font-size:15px;font-weight:700;letter-spacing:2px;color:var(--white);text-transform:uppercase;}
-.nav-logo em{font-style:normal;color:var(--gray-500);}
+.nav-logo em{font-style:normal;color:var(--brand-orange-red);}
 .nav-right{display:flex;align-items:center;gap:20px;}
 .nav-pill{font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;padding:5px 12px;border:1px solid var(--gray-700);color:var(--gray-400);}
 .pulse-dot{width:6px;height:6px;border-radius:50%;background:var(--white);display:inline-block;animation:blink 1.4s ease-in-out infinite;}
@@ -125,7 +125,7 @@ nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filte
 /* FOOTER */
 .footer{border-top:1px solid var(--gray-800);padding:32px 24px;max-width:1280px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;}
 .f-logo{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--gray-600);}
-.f-logo em{font-style:normal;color:var(--gray-300);}
+.f-logo em{font-style:normal;color:var(--brand-orange-red);}
 .f-copy{font-size:11px;color:var(--gray-700);}
 
 @media(max-width:768px){
@@ -224,6 +224,10 @@ nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filte
         <div class="f-field">
           <label class="f-label">Full Name <span class="f-req">*</span></label>
           <input class="f-input" id="f-name" type="text" placeholder="Your full name">
+        </div>
+        <div class="f-field">
+          <label class="f-label">Age <span class="f-req">*</span></label>
+          <input class="f-input" id="f-age" type="number" min="10" max="120" inputmode="numeric" placeholder="Your age">
         </div>
         <div class="f-field">
           <label class="f-label">WhatsApp Number <span class="f-req">*</span></label>
@@ -390,7 +394,7 @@ function openModal(id) {
   document.getElementById('f-err').style.display = 'none';
   document.getElementById('gb-m').classList.remove('sel');
   document.getElementById('gb-f').classList.remove('sel');
-  ['f-name','f-wa','f-alt','f-city'].forEach(id => document.getElementById(id).value = '');
+  ['f-name','f-age','f-wa','f-alt','f-city'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-state').value = '';
   document.getElementById('f-sub').disabled = false;
   document.getElementById('f-sub').textContent = 'Register as Volunteer â†’';
@@ -410,13 +414,17 @@ function pickGender(g) {
 
 async function submitForm() {
   const name = document.getElementById('f-name').value.trim();
+  const age = Number(document.getElementById('f-age').value);
   const wa = document.getElementById('f-wa').value.trim();
   const alt = document.getElementById('f-alt').value.trim();
   const city = document.getElementById('f-city').value.trim();
   const state = document.getElementById('f-state').value;
   const errEl = document.getElementById('f-err');
-  if (!name || !wa || !city || !state || !gender) {
+  if (!name || !age || !wa || !city || !state || !gender) {
     errEl.textContent = 'Please fill in all required fields.'; errEl.style.display = 'block'; return;
+  }
+  if (age < 10 || age > 120) {
+    errEl.textContent = 'Please enter a valid age.'; errEl.style.display = 'block'; return;
   }
   errEl.style.display = 'none';
   const btn = document.getElementById('f-sub');
@@ -427,6 +435,7 @@ async function submitForm() {
       body: JSON.stringify({
         campaign_id: Number(activeCampaign),
         full_name: name,
+        age,
         whatsapp_number: wa,
         alternate_number: alt,
         city,

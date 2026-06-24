@@ -13,9 +13,8 @@ class CampaignAdmin(admin.ModelAdmin):
 
 @admin.register(CampaignVolunteer)
 class CampaignVolunteerAdmin(admin.ModelAdmin):
-    list_display = ("full_name", "campaign", "whatsapp_number", "city", "state", "gender", "status", "created_at")
+    list_display = ("full_name", "age", "campaign", "whatsapp_number", "city", "state", "gender", "status", "created_at")
     list_filter = ("status", "gender", "state", "campaign", "created_at")
     search_fields = ("full_name", "whatsapp_number", "alternate_number", "city", "state", "campaign__name")
     readonly_fields = ("source_ip", "user_agent", "created_at", "updated_at")
     ordering = ("-created_at",)
-

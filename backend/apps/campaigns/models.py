@@ -57,6 +57,7 @@ class CampaignVolunteer(models.Model):
 
     campaign = models.ForeignKey(Campaign, on_delete=models.PROTECT, related_name="volunteers")
     full_name = models.CharField(max_length=180)
+    age = models.PositiveSmallIntegerField(null=True, blank=True)
     whatsapp_number = models.CharField(max_length=24)
     alternate_number = models.CharField(max_length=24, blank=True, default="")
     city = models.CharField(max_length=120)
@@ -84,4 +85,3 @@ class CampaignVolunteer(models.Model):
 
     def __str__(self):
         return f"{self.full_name} -> {self.campaign.name}"
-

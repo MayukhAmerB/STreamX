@@ -7,13 +7,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-:root{--black:#080808;--g950:#0f0f0f;--g900:#161616;--g800:#222;--g700:#333;--g600:#444;--g500:#666;--g400:#888;--g300:#aaa;--g200:#ccc;--white:#f5f5f5;--font:'Inter',sans-serif;--head:'Space Grotesk',sans-serif;}
+:root{--black:#080808;--g950:#0f0f0f;--g900:#161616;--g800:#222;--g700:#333;--g600:#444;--g500:#666;--g400:#888;--g300:#aaa;--g200:#ccc;--white:#f5f5f5;--brand-orange-red:#ff4b2f;--font:'Inter',sans-serif;--head:'Space Grotesk',sans-serif;}
 body{background:var(--black);color:var(--white);font-family:var(--font);min-height:100vh;}
 
 /* LOGIN */
 #login{position:fixed;inset:0;background:var(--black);z-index:999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:32px;}
 .login-logo{font-family:var(--head);font-size:13px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--g500);}
-.login-logo em{font-style:normal;color:var(--white);}
+.login-logo em{font-style:normal;color:var(--brand-orange-red);}
 .login-box{width:100%;max-width:340px;background:var(--g900);border:1px solid var(--g800);padding:36px;}
 .login-title{font-family:var(--head);font-size:18px;font-weight:700;margin-bottom:6px;}
 .login-sub{font-size:11px;color:var(--g500);letter-spacing:2px;text-transform:uppercase;margin-bottom:28px;}
@@ -28,7 +28,7 @@ body{background:var(--black);color:var(--white);font-family:var(--font);min-heig
 #app{display:none;min-height:100vh;}
 .topbar{background:var(--g950);border-bottom:1px solid var(--g800);display:flex;align-items:center;justify-content:space-between;padding:0 32px;height:56px;position:sticky;top:0;z-index:100;}
 .topbar-logo{font-family:var(--head);font-size:12px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--g400);}
-.topbar-logo em{font-style:normal;color:var(--white);}
+.topbar-logo em{font-style:normal;color:var(--brand-orange-red);}
 .topbar-badge{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;background:var(--white);color:var(--black);padding:3px 10px;margin-left:10px;}
 .logout-btn{background:transparent;border:1px solid var(--g700);color:var(--g500);font-family:var(--font);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:6px 16px;cursor:pointer;transition:all .15s;}
 .logout-btn:hover{border-color:var(--white);color:var(--white);}
@@ -100,7 +100,7 @@ body{background:var(--black);color:var(--white);font-family:var(--font);min-heig
 .sheet-actions input,.sheet-actions select{background:var(--g900);border:1px solid var(--g700);color:var(--white);font-family:var(--font);font-size:12px;padding:10px 12px;outline:none;}
 .sheet-actions input{min-width:260px;}
 .sheet-wrap{overflow:auto;border:1px solid var(--g800);background:var(--g950);}
-.sheet{width:100%;border-collapse:collapse;min-width:1040px;}
+.sheet{width:100%;border-collapse:collapse;min-width:1120px;}
 .sheet th,.sheet td{border-bottom:1px solid var(--g800);padding:12px 14px;text-align:left;vertical-align:top;font-size:12px;}
 .sheet th{position:sticky;top:0;background:var(--g900);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--g500);z-index:1;}
 .sheet td{color:var(--g300);}
@@ -406,12 +406,13 @@ function renderVolunteers() {
   const wrap = document.getElementById('volunteer-sheet-wrap');
   if (!volunteersCache.length) { wrap.innerHTML = '<div class="empty-msg">No volunteer records yet.</div>'; return; }
   wrap.innerHTML = `<table class="sheet">
-    <thead><tr><th>Time</th><th>Campaign</th><th>Name</th><th>WhatsApp</th><th>Alternate</th><th>City</th><th>State</th><th>Gender</th><th>Status</th><th>Notes</th></tr></thead>
+    <thead><tr><th>Time</th><th>Campaign</th><th>Name</th><th>Age</th><th>WhatsApp</th><th>Alternate</th><th>City</th><th>State</th><th>Gender</th><th>Status</th><th>Notes</th></tr></thead>
     <tbody>${volunteersCache.map(v => `
       <tr>
         <td>${escapeHtml(formatDate(v.created_at))}</td>
         <td><strong>${escapeHtml(v.campaign_name)}</strong><br><span class="muted">#${escapeHtml(v.campaign_number || v.campaign)}</span></td>
         <td><strong>${escapeHtml(v.full_name)}</strong></td>
+        <td>${escapeHtml(v.age || '-')}</td>
         <td>${escapeHtml(v.whatsapp_number)}</td>
         <td>${escapeHtml(v.alternate_number || '-')}</td>
         <td>${escapeHtml(v.city)}</td>
@@ -438,7 +439,7 @@ async function updateVolunteer(id, patch) {
 
 function exportVolunteersCsv() {
   if (!volunteersCache.length) { showToast('No records to export.', 'bad'); return; }
-  const headers = ['created_at','campaign','campaign_number','full_name','whatsapp_number','alternate_number','city','state','gender','status','notes'];
+  const headers = ['created_at','campaign','campaign_number','full_name','age','whatsapp_number','alternate_number','city','state','gender','status','notes'];
   const rows = volunteersCache.map(v => headers.map(h => csvCell(h === 'campaign' ? v.campaign_name : (v[h] || ''))).join(','));
   const blob = new Blob([[headers.join(','), ...rows].join('\n')], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);

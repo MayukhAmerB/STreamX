@@ -66,6 +66,7 @@ class CampaignVolunteerCreateSerializer(serializers.ModelSerializer):
         fields = (
             "campaign_id",
             "full_name",
+            "age",
             "whatsapp_number",
             "alternate_number",
             "city",
@@ -93,6 +94,11 @@ class CampaignVolunteerCreateSerializer(serializers.ModelSerializer):
     def validate_alternate_number(self, value):
         return self._validate_phone_number(value, required=False)
 
+    def validate_age(self, value):
+        if value is None or value < 10 or value > 120:
+            raise serializers.ValidationError("Enter a valid age between 10 and 120.")
+        return value
+
     def validate(self, attrs):
         campaign = Campaign.objects.filter(pk=attrs.pop("campaign_id"), is_active=True).first()
         if not campaign:
@@ -119,6 +125,7 @@ class CampaignVolunteerAdminSerializer(serializers.ModelSerializer):
             "campaign_name",
             "campaign_number",
             "full_name",
+            "age",
             "whatsapp_number",
             "alternate_number",
             "city",
@@ -137,6 +144,7 @@ class CampaignVolunteerAdminSerializer(serializers.ModelSerializer):
             "campaign_name",
             "campaign_number",
             "full_name",
+            "age",
             "whatsapp_number",
             "alternate_number",
             "city",
@@ -152,4 +160,3 @@ class CampaignVolunteerAdminSerializer(serializers.ModelSerializer):
         text = str(value or "").strip()
         _reject_active_content(text, "notes")
         return text
-
