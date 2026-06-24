@@ -83,6 +83,8 @@ cp infra/hostinger/nginx/cases-subdomain.conf /etc/nginx/sites-available/cases.a
 ln -sf /etc/nginx/sites-available/cases.alsyedinitiative /etc/nginx/sites-enabled/cases.alsyedinitiative
 cp infra/hostinger/nginx/labs-subdomain.conf /etc/nginx/sites-available/labs.alsyedinitiative
 ln -sf /etc/nginx/sites-available/labs.alsyedinitiative /etc/nginx/sites-enabled/labs.alsyedinitiative
+cp infra/hostinger/nginx/campaigns-subdomain.conf /etc/nginx/sites-available/campaigns.alsyedinitiative
+ln -sf /etc/nginx/sites-available/campaigns.alsyedinitiative /etc/nginx/sites-enabled/campaigns.alsyedinitiative
 nginx -t
 systemctl reload nginx
 ```

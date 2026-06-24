@@ -4,10 +4,13 @@ from django.contrib import admin
 from django.urls import include, path
 
 from config.health import liveness_view, metrics_view, readiness_view
+from apps.campaigns.views import CampaignAdminPageView, CampaignPublicPageView
 
 admin.site.enable_nav_sidebar = False
 
 urlpatterns = [
+    path("admin/admin", CampaignAdminPageView.as_view(), name="campaign-admin-page"),
+    path("campaigns/", CampaignPublicPageView.as_view(), name="campaign-public-page"),
     path("admin/", admin.site.urls),
     path("health/live", liveness_view, name="health-live"),
     path("health/ready", readiness_view, name="health-ready"),
@@ -18,6 +21,7 @@ urlpatterns = [
     path("api/auth/", include("apps.users.urls")),
     path("api/notifications/", include("apps.notifications.urls")),
     path("api/realtime/", include("apps.realtime.urls")),
+    path("api/campaigns/", include("apps.campaigns.urls")),
     path("api/", include("apps.courses.urls")),
     path("api/payment/", include("apps.payments.urls")),
 ]

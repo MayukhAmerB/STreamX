@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "apps.courses",
     "apps.payments",
     "apps.realtime",
+    "apps.campaigns",
     "apps.notifications.apps.NotificationsConfig",
 ]
 
@@ -218,6 +219,7 @@ REST_FRAMEWORK = {
         "login_burst": "10/minute",
         "contact": "5/hour",
         "public_enrollment_lead": "20/hour",
+        "campaign_volunteer": "30/hour",
         "password_reset_request": "5/hour",
         "password_reset_confirm": "20/hour",
         "payment_create": "20/hour",
