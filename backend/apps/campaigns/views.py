@@ -27,6 +27,9 @@ CAMPAIGN_ADMIN_COOKIE_MAX_AGE = 60 * 60 * 12
 
 
 def _campaigns_file(filename):
+    packaged_path = Path(__file__).resolve().parent / "pages" / filename
+    if packaged_path.exists():
+        return packaged_path
     return settings.BASE_DIR.parent / "Campaigns" / filename
 
 
@@ -305,4 +308,3 @@ class CampaignAdminVolunteerDetailView(APIView):
             message="Volunteer updated.",
             data=CampaignVolunteerAdminSerializer(volunteer).data,
         )
-

@@ -1,0 +1,465 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AL SYED â€” Campaigns</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --black:#080808;--gray-950:#0f0f0f;--gray-900:#161616;--gray-800:#222;
+  --gray-700:#333;--gray-600:#444;--gray-500:#666;--gray-400:#888;
+  --gray-300:#aaa;--gray-200:#ccc;--gray-100:#e8e8e8;--white:#f5f5f5;
+  --accent:#e8e8e8;--brand-orange-red:#ff4b2f;--font-head:'Space Grotesk',sans-serif;--font-body:'Inter',sans-serif;
+}
+html{scroll-behavior:smooth;}
+body{background:var(--black);color:var(--white);font-family:var(--font-body);min-height:100vh;overflow-x:hidden;}
+
+/* TICKER */
+.ticker{background:var(--gray-900);border-bottom:1px solid var(--gray-800);padding:10px 0;overflow:hidden;white-space:nowrap;}
+.ticker-inner{display:inline-flex;gap:64px;animation:tick 30s linear infinite;}
+.ticker-item{font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--gray-500);}
+.ticker-item span{color:var(--gray-300);}
+@keyframes tick{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--gray-800);}
+.nav-inner{max-width:1280px;margin:0 auto;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;}
+.nav-logo{font-family:var(--font-head);font-size:15px;font-weight:700;letter-spacing:2px;color:var(--white);text-transform:uppercase;}
+.nav-logo em{font-style:normal;color:var(--brand-orange-red);}
+.nav-right{display:flex;align-items:center;gap:20px;}
+.nav-pill{font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;padding:5px 12px;border:1px solid var(--gray-700);color:var(--gray-400);}
+.pulse-dot{width:6px;height:6px;border-radius:50%;background:var(--white);display:inline-block;animation:blink 1.4s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.2;}}
+
+/* HERO */
+.hero{max-width:1280px;margin:0 auto;padding:80px 24px 64px;display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:end;border-bottom:1px solid var(--gray-800);}
+.hero-left{}
+.hero-kicker{font-size:10px;font-weight:600;letter-spacing:4px;text-transform:uppercase;color:var(--gray-500);margin-bottom:24px;display:flex;align-items:center;gap:10px;}
+.hero-h1{font-family:var(--font-head);font-size:clamp(48px,6vw,88px);font-weight:700;line-height:.95;letter-spacing:-3px;color:var(--white);margin-bottom:32px;}
+.hero-h1 .dim{color:var(--gray-700);}
+.hero-sub{font-size:14px;color:var(--gray-400);line-height:1.8;max-width:400px;}
+.hero-right{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--gray-800);border:1px solid var(--gray-800);}
+.hero-stat{background:var(--gray-950);padding:28px 24px;}
+.stat-n{font-family:var(--font-head);font-size:42px;font-weight:700;letter-spacing:-2px;color:var(--white);}
+.stat-l{font-size:10px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--gray-600);margin-top:4px;}
+
+/* JOINED BAR */
+.joined-bar{background:var(--gray-950);border-bottom:1px solid var(--gray-800);padding:14px 24px;}
+.joined-bar-inner{max-width:1280px;margin:0 auto;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.joined-label{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--gray-600);white-space:nowrap;}
+.joined-chips{display:flex;gap:8px;flex-wrap:wrap;flex:1;}
+.joined-chip{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:4px 12px;border:1px solid var(--gray-700);color:var(--gray-300);}
+.joined-empty{font-size:11px;color:var(--gray-700);}
+
+/* CAMPAIGNS SECTION */
+.campaigns-wrap{max-width:1280px;margin:0 auto;padding:64px 24px;}
+.sec-label{font-size:9px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--gray-600);margin-bottom:40px;display:flex;align-items:center;gap:16px;}
+.sec-label::after{content:'';flex:1;height:1px;background:var(--gray-800);}
+
+/* TOP FEATURED â€” horizontal scroll on mobile, 3-col grid desktop */
+.featured-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:var(--gray-800);margin-bottom:2px;}
+
+.c-card{background:var(--gray-950);position:relative;overflow:hidden;cursor:default;transition:background .15s;}
+.c-card:hover{background:var(--gray-900);}
+.c-card.big{grid-column:span 2;}
+
+.c-img{width:100%;aspect-ratio:3/2;object-fit:cover;object-position:top center;display:block;filter:grayscale(100%) contrast(1.1);transition:filter .3s;}
+.c-card:hover .c-img{filter:grayscale(60%) contrast(1.1);}
+.c-img-placeholder{width:100%;aspect-ratio:3/2;background:var(--gray-900);display:flex;align-items:center;justify-content:center;}
+.c-img-placeholder span{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gray-700);}
+
+.c-body{padding:20px 20px 24px;}
+.c-num{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--gray-600);margin-bottom:8px;}
+.c-name{font-family:var(--font-head);font-size:18px;font-weight:700;letter-spacing:-.3px;color:var(--white);margin-bottom:16px;line-height:1.2;}
+.c-card.big .c-name{font-size:26px;}
+.c-join{width:100%;background:var(--white);border:none;color:var(--black);font-family:var(--font-body);font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;padding:12px;cursor:pointer;transition:background .15s;}
+.c-join:hover{background:var(--gray-100);}
+.c-join.done{background:transparent;border:1px solid var(--gray-700);color:var(--gray-500);cursor:default;}
+
+/* PRIVATE GRID */
+.private-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1px;background:var(--gray-800);border:1px solid var(--gray-800);}
+.p-card{background:var(--gray-950);padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.p-name{font-size:12px;font-weight:500;color:var(--gray-300);}
+.p-badge{font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:3px 8px;border:1px solid var(--gray-800);color:var(--gray-700);}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:999;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
+.overlay.on{opacity:1;pointer-events:all;}
+@media(min-width:600px){.overlay{align-items:center;}}
+.modal{background:var(--gray-900);border:1px solid var(--gray-800);width:100%;max-width:440px;max-height:92vh;overflow-y:auto;transform:translateY(40px);transition:transform .25s;}
+.overlay.on .modal{transform:translateY(0);}
+.modal-top{padding:24px 24px 20px;border-bottom:1px solid var(--gray-800);display:flex;justify-content:space-between;align-items:flex-start;}
+.modal-camp{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--gray-500);margin-bottom:6px;}
+.modal-ttl{font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--white);}
+.x-btn{background:none;border:1px solid var(--gray-700);color:var(--gray-500);width:32px;height:32px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;}
+.x-btn:hover{border-color:var(--white);color:var(--white);}
+.modal-form{padding:24px;display:flex;flex-direction:column;gap:16px;}
+.f-field{display:flex;flex-direction:column;gap:6px;}
+.f-label{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--gray-500);}
+.f-req{color:var(--white);}
+.f-opt{color:var(--gray-700);font-weight:400;letter-spacing:0;text-transform:none;font-size:9px;}
+.f-input,.f-select{background:var(--gray-800);border:1px solid var(--gray-700);color:var(--white);font-family:var(--font-body);font-size:14px;padding:11px 14px;outline:none;transition:border-color .15s;width:100%;}
+.f-input:focus,.f-select:focus{border-color:var(--white);}
+.f-input::placeholder{color:var(--gray-700);}
+.f-select option{background:var(--gray-900);}
+.gender-wrap{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.g-btn{padding:11px;background:var(--gray-800);border:1px solid var(--gray-700);color:var(--gray-400);font-family:var(--font-body);font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all .15s;}
+.g-btn:hover{border-color:var(--gray-400);color:var(--white);}
+.g-btn.sel{background:var(--white);border-color:var(--white);color:var(--black);}
+.f-submit{background:var(--white);border:none;color:var(--black);font-family:var(--font-body);font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;padding:14px;cursor:pointer;transition:background .15s;margin-top:4px;}
+.f-submit:hover{background:var(--gray-100);}
+.f-submit:disabled{opacity:.4;cursor:not-allowed;}
+.f-err{font-size:11px;color:#e74c3c;display:none;}
+
+/* SUCCESS */
+.success{padding:56px 32px;text-align:center;display:none;flex-direction:column;align-items:center;gap:12px;}
+.success.show{display:flex;}
+.s-check{width:48px;height:48px;border:1px solid var(--gray-700);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--white);margin-bottom:8px;}
+.s-title{font-family:var(--font-head);font-size:22px;font-weight:700;}
+.s-msg{font-size:13px;color:var(--gray-500);line-height:1.7;max-width:280px;}
+.s-close{margin-top:12px;background:transparent;border:1px solid var(--gray-700);color:var(--gray-400);font-family:var(--font-body);font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;padding:10px 28px;cursor:pointer;transition:all .15s;}
+.s-close:hover{border-color:var(--white);color:var(--white);}
+
+/* FOOTER */
+.footer{border-top:1px solid var(--gray-800);padding:32px 24px;max-width:1280px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;}
+.f-logo{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--gray-600);}
+.f-logo em{font-style:normal;color:var(--brand-orange-red);}
+.f-copy{font-size:11px;color:var(--gray-700);}
+
+@media(max-width:768px){
+  .hero{grid-template-columns:1fr;gap:40px;padding:48px 20px 40px;}
+  .featured-grid{grid-template-columns:1fr;}
+  .c-card.big{grid-column:span 1;}
+  .private-grid{grid-template-columns:1fr 1fr;}
+  .campaigns-wrap{padding:40px 20px;}
+  .hero-right{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- TICKER -->
+<div class="ticker">
+  <div class="ticker-inner" id="ticker-inner">
+    <span class="ticker-item">AL SYED INITIATIVE</span>
+    <span class="ticker-item"><span>27 ACTIVE CAMPAIGNS</span></span>
+    <span class="ticker-item">DEMAND ACCOUNTABILITY</span>
+    <span class="ticker-item"><span>3 FEATURED ONGOING</span></span>
+    <span class="ticker-item">JOIN THE MOVEMENT</span>
+    <span class="ticker-item"><span>OSINT Â· LEGAL Â· COMMUNITY</span></span>
+    <span class="ticker-item">AL SYED INITIATIVE</span>
+    <span class="ticker-item"><span>27 ACTIVE CAMPAIGNS</span></span>
+    <span class="ticker-item">DEMAND ACCOUNTABILITY</span>
+    <span class="ticker-item"><span>3 FEATURED ONGOING</span></span>
+    <span class="ticker-item">JOIN THE MOVEMENT</span>
+    <span class="ticker-item"><span>OSINT Â· LEGAL Â· COMMUNITY</span></span>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-inner">
+    <div class="nav-logo"><em>AL</em> SYED</div>
+    <div class="nav-right">
+      <span class="nav-pill"><span class="pulse-dot"></span> &nbsp;Live</span>
+    </div>
+  </div>
+</nav>
+
+<!-- JOINED BAR -->
+<div class="joined-bar">
+  <div class="joined-bar-inner">
+    <span class="joined-label">Joined</span>
+    <div class="joined-chips" id="joined-chips"><span class="joined-empty">No campaigns joined yet</span></div>
+  </div>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-left">
+    <div class="hero-kicker"><span class="pulse-dot"></span> Active Operations</div>
+    <h1 class="hero-h1">Hold them<br><span class="dim">accountable.</span></h1>
+    <p class="hero-sub">AL SYED runs documented campaigns against individuals spreading hate and misinformation. Choose a campaign and register as a volunteer.</p>
+  </div>
+  <div class="hero-right">
+    <div class="hero-stat"><div class="stat-n" id="s-total">0</div><div class="stat-l">Total Campaigns</div></div>
+    <div class="hero-stat"><div class="stat-n" id="s-featured">0</div><div class="stat-l">Featured</div></div>
+    <div class="hero-stat"><div class="stat-n" id="s-private">0</div><div class="stat-l">Private</div></div>
+    <div class="hero-stat"><div class="stat-n" id="s-joined">0</div><div class="stat-l">Your Campaigns</div></div>
+  </div>
+</div>
+
+<!-- CAMPAIGNS -->
+<div class="campaigns-wrap">
+  <div class="sec-label">Featured Campaigns</div>
+  <div class="featured-grid" id="featured-grid">
+    <div style="padding:40px;color:var(--gray-700);font-size:12px;letter-spacing:2px;text-transform:uppercase;">Loading campaigns...</div>
+  </div>
+
+  <div style="margin-top:56px;">
+    <div class="sec-label">Private Campaigns</div>
+    <div class="private-grid" id="private-grid"></div>
+  </div>
+</div>
+
+<footer>
+  <div class="f-logo"><em>AL</em> SYED Initiative</div>
+  <div class="f-copy">Â© 2025 AL SYED. All rights reserved.</div>
+</footer>
+
+<!-- MODAL -->
+<div class="overlay" id="overlay" onclick="overlayClick(event)">
+  <div class="modal" id="modal">
+    <div id="form-wrap">
+      <div class="modal-top">
+        <div>
+          <div class="modal-camp" id="m-camp"></div>
+          <div class="modal-ttl">Join Campaign</div>
+        </div>
+        <button class="x-btn" onclick="closeModal()">âœ•</button>
+      </div>
+      <div class="modal-form">
+        <div class="f-field">
+          <label class="f-label">Full Name <span class="f-req">*</span></label>
+          <input class="f-input" id="f-name" type="text" placeholder="Your full name">
+        </div>
+        <div class="f-field">
+          <label class="f-label">Age <span class="f-req">*</span></label>
+          <input class="f-input" id="f-age" type="number" min="10" max="120" inputmode="numeric" placeholder="Your age">
+        </div>
+        <div class="f-field">
+          <label class="f-label">WhatsApp Number <span class="f-req">*</span></label>
+          <input class="f-input" id="f-wa" type="tel" placeholder="+91 98765 43210">
+        </div>
+        <div class="f-field">
+          <label class="f-label">Alternate Number <span class="f-opt">(optional)</span></label>
+          <input class="f-input" id="f-alt" type="tel" placeholder="+91 98765 43210">
+        </div>
+        <div class="f-field">
+          <label class="f-label">City <span class="f-req">*</span></label>
+          <input class="f-input" id="f-city" type="text" placeholder="Your city">
+        </div>
+        <div class="f-field">
+          <label class="f-label">State <span class="f-req">*</span></label>
+          <select class="f-select" id="f-state">
+            <option value="">Select state...</option>
+            <option>Andhra Pradesh</option><option>Arunachal Pradesh</option><option>Assam</option>
+            <option>Bihar</option><option>Chhattisgarh</option><option>Goa</option>
+            <option>Gujarat</option><option>Haryana</option><option>Himachal Pradesh</option>
+            <option>Jharkhand</option><option>Karnataka</option><option>Kerala</option>
+            <option>Madhya Pradesh</option><option>Maharashtra</option><option>Manipur</option>
+            <option>Meghalaya</option><option>Mizoram</option><option>Nagaland</option>
+            <option>Odisha</option><option>Punjab</option><option>Rajasthan</option>
+            <option>Sikkim</option><option>Tamil Nadu</option><option>Telangana</option>
+            <option>Tripura</option><option>Uttar Pradesh</option><option>Uttarakhand</option>
+            <option>West Bengal</option><option>Delhi</option><option>Jammu and Kashmir</option>
+            <option>Ladakh</option><option>Chandigarh</option><option>Puducherry</option>
+            <option>Andaman and Nicobar Islands</option><option>Lakshadweep</option>
+            <option>Dadra and Nagar Haveli and Daman and Diu</option>
+          </select>
+        </div>
+        <div class="f-field">
+          <label class="f-label">Gender <span class="f-req">*</span></label>
+          <div class="gender-wrap">
+            <button class="g-btn" id="gb-m" onclick="pickGender('Male')">Male</button>
+            <button class="g-btn" id="gb-f" onclick="pickGender('Female')">Female</button>
+          </div>
+        </div>
+        <div class="f-err" id="f-err"></div>
+        <button class="f-submit" id="f-sub" onclick="submitForm()">Register as Volunteer â†’</button>
+      </div>
+    </div>
+    <div class="success" id="success-wrap">
+      <div class="s-check">âœ“</div>
+      <div class="s-title">You're registered.</div>
+      <p class="s-msg">Our management team will reach out to you on WhatsApp shortly.</p>
+      <button class="s-close" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = '/api/campaigns';
+const JOINED_KEY = 'as_joined_v2';
+
+let campaigns = [];
+let joined = JSON.parse(localStorage.getItem(JOINED_KEY) || '[]').map(String);
+let activeCampaign = '';
+let gender = '';
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[ch]);
+}
+
+function normalizeCampaign(raw) {
+  return {
+    id: String(raw.id),
+    name: raw.name || 'Untitled Campaign',
+    img: raw.image_data_url || '',
+    featured: Boolean(raw.is_featured),
+    num: raw.campaign_number || String(raw.id).padStart(3, '0'),
+    description: raw.description || ''
+  };
+}
+
+async function apiFetch(path, options = {}) {
+  const response = await fetch(API_BASE + path, {
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    ...options
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.success === false) {
+    const error = new Error(payload.message || 'Request failed. Please try again.');
+    error.payload = payload;
+    throw error;
+  }
+  return payload.data;
+}
+
+async function loadCampaigns() {
+  try {
+    campaigns = (await apiFetch('/')).map(normalizeCampaign);
+  } catch (error) {
+    document.getElementById('featured-grid').innerHTML = '<div style="padding:40px;color:var(--gray-700);font-size:12px;letter-spacing:2px;text-transform:uppercase;grid-column:1/-1;">Campaigns could not be loaded. Please refresh.</div>';
+    document.getElementById('private-grid').innerHTML = '';
+    return;
+  }
+  render();
+}
+
+function render() {
+  const featured = campaigns.filter(c => c.featured);
+  const priv = campaigns.filter(c => !c.featured);
+
+  // Stats
+  document.getElementById('s-total').textContent = campaigns.length;
+  document.getElementById('s-featured').textContent = featured.length;
+  document.getElementById('s-private').textContent = priv.length;
+  document.getElementById('s-joined').textContent = joined.length;
+
+  // Featured grid
+  const fg = document.getElementById('featured-grid');
+  if (!featured.length) { fg.innerHTML = '<div style="padding:40px;color:var(--gray-700);font-size:12px;letter-spacing:2px;text-transform:uppercase;grid-column:1/-1;">No featured campaigns.</div>'; }
+  else {
+    fg.innerHTML = featured.map((c, i) => {
+      const isJoined = joined.includes(c.id);
+      const isBig = i === 0;
+      return `<div class="c-card${isBig ? ' big' : ''}">
+        ${c.img && c.img.startsWith('data:image/')
+          ? `<img class="c-img" src="${c.img}" alt="${escapeHtml(c.name)}">`
+          : `<div class="c-img-placeholder"><span>No Image</span></div>`}
+        <div class="c-body">
+          <div class="c-num">Campaign #${escapeHtml(c.num)}</div>
+          <div class="c-name">${escapeHtml(c.name)}</div>
+          <button class="c-join${isJoined ? ' done' : ''}" ${isJoined ? 'disabled' : `onclick="openModal('${c.id}')"`}>
+            ${isJoined ? 'âœ“ Joined' : 'Join Campaign â†’'}
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Private grid
+  const pg = document.getElementById('private-grid');
+  pg.innerHTML = priv.map(c => {
+    const isJoined = joined.includes(c.id);
+    return `<div class="p-card">
+      <span class="p-name">${escapeHtml(c.name)}</span>
+      <button class="p-badge" ${isJoined ? 'disabled' : `onclick="openModal('${c.id}')"`}>${isJoined ? 'Joined' : 'Join'}</button>
+    </div>`;
+  }).join('');
+
+  // Joined bar
+  const jc = document.getElementById('joined-chips');
+  const joinedCamps = campaigns.filter(c => joined.includes(c.id));
+  jc.innerHTML = joinedCamps.length
+    ? joinedCamps.map(c => `<span class="joined-chip">${escapeHtml(c.name)}</span>`).join('')
+    : '<span class="joined-empty">No campaigns joined yet</span>';
+}
+
+// MODAL
+function openModal(id) {
+  const campaign = campaigns.find(c => c.id === String(id));
+  if (!campaign) return;
+  activeCampaign = String(id);
+  gender = '';
+  document.getElementById('m-camp').textContent = campaign.name;
+  document.getElementById('form-wrap').style.display = 'block';
+  document.getElementById('success-wrap').classList.remove('show');
+  document.getElementById('f-err').style.display = 'none';
+  document.getElementById('gb-m').classList.remove('sel');
+  document.getElementById('gb-f').classList.remove('sel');
+  ['f-name','f-age','f-wa','f-alt','f-city'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-state').value = '';
+  document.getElementById('f-sub').disabled = false;
+  document.getElementById('f-sub').textContent = 'Register as Volunteer â†’';
+  document.getElementById('overlay').classList.add('on');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal() {
+  document.getElementById('overlay').classList.remove('on');
+  document.body.style.overflow = '';
+}
+function overlayClick(e) { if (e.target === document.getElementById('overlay')) closeModal(); }
+function pickGender(g) {
+  gender = g;
+  document.getElementById('gb-m').classList.toggle('sel', g === 'Male');
+  document.getElementById('gb-f').classList.toggle('sel', g === 'Female');
+}
+
+async function submitForm() {
+  const name = document.getElementById('f-name').value.trim();
+  const age = Number(document.getElementById('f-age').value);
+  const wa = document.getElementById('f-wa').value.trim();
+  const alt = document.getElementById('f-alt').value.trim();
+  const city = document.getElementById('f-city').value.trim();
+  const state = document.getElementById('f-state').value;
+  const errEl = document.getElementById('f-err');
+  if (!name || !age || !wa || !city || !state || !gender) {
+    errEl.textContent = 'Please fill in all required fields.'; errEl.style.display = 'block'; return;
+  }
+  if (age < 10 || age > 120) {
+    errEl.textContent = 'Please enter a valid age.'; errEl.style.display = 'block'; return;
+  }
+  errEl.style.display = 'none';
+  const btn = document.getElementById('f-sub');
+  btn.disabled = true; btn.textContent = 'Submitting...';
+  try {
+    await apiFetch('/volunteers/', {
+      method: 'POST',
+      body: JSON.stringify({
+        campaign_id: Number(activeCampaign),
+        full_name: name,
+        age,
+        whatsapp_number: wa,
+        alternate_number: alt,
+        city,
+        state,
+        gender: gender.toLowerCase()
+      })
+    });
+  } catch(error) {
+    const details = error.payload && error.payload.errors;
+    const firstError = details && Object.values(details).flat()[0];
+    errEl.textContent = firstError || error.message || 'Registration failed. Please try again.';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Register as Volunteer';
+    return;
+  }
+  if (!joined.includes(activeCampaign)) { joined.push(activeCampaign); localStorage.setItem(JOINED_KEY, JSON.stringify(joined)); }
+  render();
+  document.getElementById('form-wrap').style.display = 'none';
+  document.getElementById('success-wrap').classList.add('show');
+}
+
+loadCampaigns();
+</script>
+</body>
+</html>
+

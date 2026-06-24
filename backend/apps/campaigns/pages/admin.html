@@ -1,0 +1,478 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AL SYED â€” Campaign Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{--black:#080808;--g950:#0f0f0f;--g900:#161616;--g800:#222;--g700:#333;--g600:#444;--g500:#666;--g400:#888;--g300:#aaa;--g200:#ccc;--white:#f5f5f5;--brand-orange-red:#ff4b2f;--font:'Inter',sans-serif;--head:'Space Grotesk',sans-serif;}
+body{background:var(--black);color:var(--white);font-family:var(--font);min-height:100vh;}
+
+/* LOGIN */
+#login{position:fixed;inset:0;background:var(--black);z-index:999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:32px;}
+.login-logo{font-family:var(--head);font-size:13px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--g500);}
+.login-logo em{font-style:normal;color:var(--brand-orange-red);}
+.login-box{width:100%;max-width:340px;background:var(--g900);border:1px solid var(--g800);padding:36px;}
+.login-title{font-family:var(--head);font-size:18px;font-weight:700;margin-bottom:6px;}
+.login-sub{font-size:11px;color:var(--g500);letter-spacing:2px;text-transform:uppercase;margin-bottom:28px;}
+.l-input{width:100%;background:var(--g800);border:1px solid var(--g700);color:var(--white);font-family:var(--font);font-size:14px;padding:11px 14px;outline:none;margin-bottom:12px;transition:border .15s;}
+.l-input:focus{border-color:var(--white);}
+.l-input::placeholder{color:var(--g700);}
+.l-btn{width:100%;background:var(--white);border:none;color:var(--black);font-family:var(--font);font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;padding:13px;cursor:pointer;transition:background .15s;}
+.l-btn:hover{background:var(--g200);}
+.l-err{font-size:11px;color:#e74c3c;margin-top:10px;display:none;}
+
+/* LAYOUT */
+#app{display:none;min-height:100vh;}
+.topbar{background:var(--g950);border-bottom:1px solid var(--g800);display:flex;align-items:center;justify-content:space-between;padding:0 32px;height:56px;position:sticky;top:0;z-index:100;}
+.topbar-logo{font-family:var(--head);font-size:12px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--g400);}
+.topbar-logo em{font-style:normal;color:var(--brand-orange-red);}
+.topbar-badge{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;background:var(--white);color:var(--black);padding:3px 10px;margin-left:10px;}
+.logout-btn{background:transparent;border:1px solid var(--g700);color:var(--g500);font-family:var(--font);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:6px 16px;cursor:pointer;transition:all .15s;}
+.logout-btn:hover{border-color:var(--white);color:var(--white);}
+
+.layout{display:grid;grid-template-columns:200px 1fr;min-height:calc(100vh - 56px);}
+.sidebar{background:var(--g950);border-right:1px solid var(--g800);padding:28px 0;}
+.sb-label{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--g700);padding:0 20px;margin-bottom:10px;}
+.sb-btn{display:block;width:100%;text-align:left;background:transparent;border:none;border-left:2px solid transparent;color:var(--g500);font-family:var(--font);font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:11px 20px;cursor:pointer;transition:all .15s;}
+.sb-btn:hover{color:var(--white);background:var(--g900);}
+.sb-btn.on{color:var(--white);border-left-color:var(--white);background:var(--g900);}
+.sb-div{border:none;border-top:1px solid var(--g800);margin:16px 0;}
+
+.main{padding:40px 48px;}
+.page{display:none;}
+.page.on{display:block;}
+.page-eyebrow{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--g600);margin-bottom:6px;}
+.page-title{font-family:var(--head);font-size:24px;font-weight:700;letter-spacing:-.5px;margin-bottom:36px;}
+
+/* ADD CAMPAIGN FORM */
+.add-box{background:var(--g900);border:1px solid var(--g800);padding:36px;max-width:520px;}
+.field{display:flex;flex-direction:column;gap:7px;margin-bottom:20px;}
+.field label{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--g500);}
+.field input,.field select{background:var(--g800);border:1px solid var(--g700);color:var(--white);font-family:var(--font);font-size:14px;padding:11px 14px;outline:none;transition:border .15s;width:100%;}
+.field input:focus,.field select:focus{border-color:var(--white);}
+.field input::placeholder{color:var(--g700);}
+.field select option{background:var(--g900);}
+
+/* IMAGE UPLOAD */
+.img-drop{border:1px dashed var(--g700);background:var(--g800);padding:28px;text-align:center;cursor:pointer;position:relative;transition:border .15s;}
+.img-drop:hover{border-color:var(--g400);}
+.img-drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;}
+.img-drop-icon{font-size:28px;color:var(--g700);margin-bottom:8px;}
+.img-drop-text{font-size:12px;color:var(--g500);}
+.img-drop-text span{color:var(--white);}
+.img-prev{max-width:100%;max-height:160px;display:block;margin-top:14px;border:1px solid var(--g700);}
+.toggle-row{display:flex;gap:10px;}
+.toggle-opt{flex:1;padding:10px;background:var(--g800);border:1px solid var(--g700);color:var(--g500);font-family:var(--font);font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;cursor:pointer;text-align:center;transition:all .15s;}
+.toggle-opt:hover{border-color:var(--g400);color:var(--white);}
+.toggle-opt.sel{background:var(--white);border-color:var(--white);color:var(--black);}
+.add-btn{background:var(--white);border:none;color:var(--black);font-family:var(--font);font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;padding:13px 36px;cursor:pointer;transition:background .15s;margin-top:8px;}
+.add-btn:hover{background:var(--g200);}
+
+/* CAMPAIGNS LIST */
+.camp-list{display:flex;flex-direction:column;gap:1px;background:var(--g800);border:1px solid var(--g800);}
+.camp-item{background:var(--g950);display:flex;align-items:center;gap:16px;padding:14px 20px;}
+.camp-item:hover{background:var(--g900);}
+.camp-thumb{width:56px;height:40px;object-fit:cover;display:block;filter:grayscale(100%);flex-shrink:0;border:1px solid var(--g800);}
+.camp-thumb-placeholder{width:56px;height:40px;background:var(--g800);border:1px solid var(--g700);flex-shrink:0;}
+.camp-info{flex:1;}
+.camp-name{font-size:14px;font-weight:600;}
+.camp-meta{font-size:11px;color:var(--g600);margin-top:2px;}
+.camp-badge{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:3px 10px;border:1px solid var(--g700);color:var(--g500);white-space:nowrap;}
+.camp-badge.feat{border-color:var(--g400);color:var(--g300);}
+.del-btn{background:transparent;border:1px solid var(--g700);color:var(--g600);font-family:var(--font);font-size:10px;font-weight:700;letter-spacing:1px;padding:6px 14px;cursor:pointer;transition:all .15s;flex-shrink:0;}
+.del-btn:hover{border-color:#e74c3c;color:#e74c3c;}
+.empty-msg{padding:48px;text-align:center;color:var(--g700);font-size:11px;letter-spacing:2px;text-transform:uppercase;}
+
+/* TOAST */
+#toast{position:fixed;bottom:28px;right:28px;background:var(--g900);border:1px solid var(--g700);padding:14px 22px;font-size:12px;font-weight:600;letter-spacing:1px;display:none;z-index:9999;max-width:320px;}
+#toast.ok{border-color:var(--g400);color:var(--white);}
+#toast.bad{border-color:#e74c3c;color:#e74c3c;}
+
+/* SETTINGS */
+.settings-box{background:var(--g900);border:1px solid var(--g800);padding:32px;max-width:500px;margin-bottom:20px;}
+.settings-box h3{font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--g400);margin-bottom:20px;}
+
+/* VOLUNTEER SHEET */
+.sheet-actions{display:flex;gap:12px;align-items:center;margin-bottom:18px;flex-wrap:wrap;}
+.sheet-actions input,.sheet-actions select{background:var(--g900);border:1px solid var(--g700);color:var(--white);font-family:var(--font);font-size:12px;padding:10px 12px;outline:none;}
+.sheet-actions input{min-width:260px;}
+.sheet-wrap{overflow:auto;border:1px solid var(--g800);background:var(--g950);}
+.sheet{width:100%;border-collapse:collapse;min-width:1120px;}
+.sheet th,.sheet td{border-bottom:1px solid var(--g800);padding:12px 14px;text-align:left;vertical-align:top;font-size:12px;}
+.sheet th{position:sticky;top:0;background:var(--g900);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--g500);z-index:1;}
+.sheet td{color:var(--g300);}
+.sheet strong{color:var(--white);font-weight:700;}
+.sheet-status{background:var(--g800);border:1px solid var(--g700);color:var(--white);font-family:var(--font);font-size:11px;padding:6px 8px;}
+.sheet-notes{width:180px;background:var(--g800);border:1px solid var(--g700);color:var(--white);font-family:var(--font);font-size:12px;padding:7px 8px;}
+.muted{color:var(--g600);}
+
+@media(max-width:768px){
+  .layout{grid-template-columns:1fr;}
+  .sidebar{display:none;}
+  .main{padding:28px 20px;}
+  .topbar{padding:0 20px;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="login-logo"><em>AL</em> SYED</div>
+  <div class="login-box">
+    <div class="login-title">Campaign Admin</div>
+    <div class="login-sub">Authorized Access Only</div>
+    <input class="l-input" type="text" id="l-user" placeholder="Username" autocomplete="off">
+    <input class="l-input" type="password" id="l-pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="l-btn" onclick="doLogin()">Enter</button>
+    <div class="l-err" id="l-err">Invalid credentials.</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;">
+      <span class="topbar-logo"><em>AL</em> SYED</span>
+      <span class="topbar-badge">Admin</span>
+    </div>
+    <button class="logout-btn" onclick="doLogout()">Log Out</button>
+  </div>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sb-label">Campaigns</div>
+      <button class="sb-btn on" onclick="showPage('add',this)">+ Add Campaign</button>
+      <button class="sb-btn" onclick="showPage('list',this)">All Campaigns</button>
+      <button class="sb-btn" onclick="showPage('volunteers',this)">Volunteer Records</button>
+      <hr class="sb-div">
+      <div class="sb-label">System</div>
+      <button class="sb-btn" onclick="showPage('settings',this)">Settings</button>
+    </aside>
+    <main class="main">
+
+      <!-- ADD -->
+      <div class="page on" id="page-add">
+        <div class="page-eyebrow">Campaigns</div>
+        <div class="page-title">Add New Campaign</div>
+        <div class="add-box">
+          <div class="field">
+            <label>Campaign Name *</label>
+            <input type="text" id="a-name" placeholder="e.g. Nazia Ilahi Khan">
+          </div>
+          <div class="field">
+            <label>Campaign Photo</label>
+            <div class="img-drop" id="drop-area">
+              <input type="file" accept="image/*" id="a-img" onchange="previewImg(this)">
+              <div class="img-drop-icon">â†‘</div>
+              <div class="img-drop-text">Tap to upload photo â€” <span>JPG or PNG</span></div>
+              <img class="img-prev" id="img-prev" src="" style="display:none;">
+            </div>
+          </div>
+          <div class="field">
+            <label>Campaign Number</label>
+            <input type="text" id="a-num" placeholder="e.g. 001">
+          </div>
+          <div class="field">
+            <label>Type</label>
+            <div class="toggle-row">
+              <div class="toggle-opt sel" id="t-featured" onclick="setType('featured')">Featured</div>
+              <div class="toggle-opt" id="t-private" onclick="setType('private')">Private</div>
+            </div>
+          </div>
+          <button class="add-btn" onclick="addCampaign()">Add Campaign â†’</button>
+        </div>
+      </div>
+
+      <!-- LIST -->
+      <div class="page" id="page-list">
+        <div class="page-eyebrow">Campaigns</div>
+        <div class="page-title">All Campaigns</div>
+        <div id="camp-list-wrap"></div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="page" id="page-settings">
+        <div class="page-eyebrow">System</div>
+        <div class="page-title">Settings</div>
+        <div class="settings-box">
+          <h3>Backend Controlled</h3>
+          <p class="muted">Campaigns and volunteer records are stored in Postgres through the Django backend. Admin access uses the same staff credentials as the main admin panel.</p>
+        </div>
+      </div>
+
+      <!-- VOLUNTEERS -->
+      <div class="page" id="page-volunteers">
+        <div class="page-eyebrow">Records</div>
+        <div class="page-title">Volunteer Registrations</div>
+        <div class="sheet-actions">
+          <input type="search" id="v-search" placeholder="Search name, WhatsApp, city, state, campaign">
+          <select id="v-status">
+            <option value="">All statuses</option>
+            <option value="new">New</option>
+            <option value="reviewed">Reviewed</option>
+            <option value="contacted">Contacted</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <button class="add-btn" onclick="loadVolunteers()">Refresh</button>
+          <button class="add-btn" onclick="exportVolunteersCsv()">Export CSV</button>
+        </div>
+        <div id="volunteer-sheet-wrap" class="sheet-wrap"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API_BASE = '/api/campaigns';
+let campaignType = 'featured';
+let imgBase64 = '';
+let campaignsCache = [];
+let volunteersCache = [];
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[ch]);
+}
+
+async function apiFetch(path, options = {}) {
+  const response = await fetch(API_BASE + path, {
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    ...options
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload.success === false) {
+    const error = new Error(payload.message || 'Request failed.');
+    error.payload = payload;
+    throw error;
+  }
+  return payload.data;
+}
+
+async function doLogin() {
+  const u = document.getElementById('l-user').value.trim();
+  const p = document.getElementById('l-pass').value;
+  document.getElementById('l-err').style.display = 'none';
+  try {
+    await apiFetch('/admin/login/', {
+      method: 'POST',
+      body: JSON.stringify({ username: u, password: p })
+    });
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    await renderList();
+  } catch (error) {
+    document.getElementById('l-err').textContent = error.message || 'Invalid credentials.';
+    document.getElementById('l-err').style.display = 'block';
+  }
+}
+
+async function doLogout() {
+  try { await apiFetch('/admin/logout/', { method: 'POST', body: '{}' }); } catch (error) {}
+  document.getElementById('login').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('l-user').value = '';
+  document.getElementById('l-pass').value = '';
+}
+
+async function checkSession() {
+  try {
+    await apiFetch('/admin/session/');
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    await renderList();
+  } catch (error) {
+    document.getElementById('login').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+}
+
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.sb-btn').forEach(b => b.classList.remove('on'));
+  document.getElementById('page-' + name).classList.add('on');
+  if (btn) btn.classList.add('on');
+  if (name === 'list') renderList();
+  if (name === 'volunteers') loadVolunteers();
+}
+
+function setType(t) {
+  campaignType = t;
+  document.getElementById('t-featured').classList.toggle('sel', t === 'featured');
+  document.getElementById('t-private').classList.toggle('sel', t === 'private');
+}
+
+function previewImg(input) {
+  const file = input.files[0]; if (!file) return;
+  if (file.size > 1800000) { showToast('Use an image under 1.8 MB.', 'bad'); input.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    imgBase64 = e.target.result;
+    const prev = document.getElementById('img-prev');
+    prev.src = imgBase64; prev.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function addCampaign() {
+  const name = document.getElementById('a-name').value.trim();
+  const num = document.getElementById('a-num').value.trim();
+  if (!name) { showToast('Enter a campaign name.', 'bad'); return; }
+  try {
+    const created = await apiFetch('/admin/campaigns/', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        campaign_number: num,
+        image_data_url: imgBase64 || '',
+        is_featured: campaignType === 'featured',
+        is_active: true,
+        sort_order: campaignsCache.length + 1
+      })
+    });
+    campaignsCache.push(created);
+    document.getElementById('a-name').value = '';
+    document.getElementById('a-num').value = '';
+    document.getElementById('a-img').value = '';
+    document.getElementById('img-prev').style.display = 'none';
+    imgBase64 = '';
+    showToast('Campaign added.', 'ok');
+  } catch (error) {
+    showToast(extractError(error), 'bad');
+  }
+}
+
+async function deleteCampaign(id) {
+  if (!confirm('Archive this campaign? Existing volunteer records stay saved.')) return;
+  try {
+    await apiFetch(`/admin/campaigns/${id}/`, { method: 'DELETE' });
+    await renderList();
+    showToast('Campaign archived.', 'ok');
+  } catch (error) {
+    showToast(extractError(error), 'bad');
+  }
+}
+
+async function renderList() {
+  const wrap = document.getElementById('camp-list-wrap');
+  wrap.innerHTML = '<div class="empty-msg">Loading campaigns...</div>';
+  try {
+    campaignsCache = await apiFetch('/admin/campaigns/');
+  } catch (error) {
+    wrap.innerHTML = '<div class="empty-msg">Could not load campaigns.</div>';
+    return;
+  }
+  const campaigns = campaignsCache;
+  if (!campaigns.length) { wrap.innerHTML = '<div class="empty-msg">No campaigns yet.</div>'; return; }
+  wrap.innerHTML = `<div class="camp-list">${campaigns.map(c => `
+    <div class="camp-item">
+      ${c.image_data_url ? `<img class="camp-thumb" src="${c.image_data_url}" alt="${escapeHtml(c.name)}">` : `<div class="camp-thumb-placeholder"></div>`}
+      <div class="camp-info">
+        <div class="camp-name">${escapeHtml(c.name)}</div>
+        <div class="camp-meta">Campaign #${escapeHtml(c.campaign_number || c.id)} · ${c.volunteer_count || 0} volunteers</div>
+      </div>
+      <span class="camp-badge${c.is_featured ? ' feat' : ''}">${c.is_featured ? 'Featured' : 'Private'}</span>
+      <button class="del-btn" onclick="deleteCampaign('${c.id}')">Archive</button>
+    </div>`).join('')}
+  </div>`;
+}
+
+async function loadVolunteers() {
+  const wrap = document.getElementById('volunteer-sheet-wrap');
+  const search = document.getElementById('v-search').value.trim();
+  const status = document.getElementById('v-status').value;
+  const params = new URLSearchParams();
+  if (search) params.set('search', search);
+  if (status) params.set('status', status);
+  wrap.innerHTML = '<div class="empty-msg">Loading volunteer records...</div>';
+  try {
+    volunteersCache = await apiFetch('/admin/volunteers/' + (params.toString() ? `?${params}` : ''));
+  } catch (error) {
+    wrap.innerHTML = '<div class="empty-msg">Could not load volunteer records.</div>';
+    return;
+  }
+  renderVolunteers();
+}
+
+function renderVolunteers() {
+  const wrap = document.getElementById('volunteer-sheet-wrap');
+  if (!volunteersCache.length) { wrap.innerHTML = '<div class="empty-msg">No volunteer records yet.</div>'; return; }
+  wrap.innerHTML = `<table class="sheet">
+    <thead><tr><th>Time</th><th>Campaign</th><th>Name</th><th>Age</th><th>WhatsApp</th><th>Alternate</th><th>City</th><th>State</th><th>Gender</th><th>Status</th><th>Notes</th></tr></thead>
+    <tbody>${volunteersCache.map(v => `
+      <tr>
+        <td>${escapeHtml(formatDate(v.created_at))}</td>
+        <td><strong>${escapeHtml(v.campaign_name)}</strong><br><span class="muted">#${escapeHtml(v.campaign_number || v.campaign)}</span></td>
+        <td><strong>${escapeHtml(v.full_name)}</strong></td>
+        <td>${escapeHtml(v.age || '-')}</td>
+        <td>${escapeHtml(v.whatsapp_number)}</td>
+        <td>${escapeHtml(v.alternate_number || '-')}</td>
+        <td>${escapeHtml(v.city)}</td>
+        <td>${escapeHtml(v.state)}</td>
+        <td>${escapeHtml(v.gender)}</td>
+        <td><select class="sheet-status" onchange="updateVolunteer('${v.id}', {status:this.value})">
+          ${['new','reviewed','contacted','confirmed','rejected'].map(s => `<option value="${s}" ${v.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+        </select></td>
+        <td><input class="sheet-notes" value="${escapeHtml(v.notes || '')}" onchange="updateVolunteer('${v.id}', {notes:this.value})"></td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+async function updateVolunteer(id, patch) {
+  try {
+    const updated = await apiFetch(`/admin/volunteers/${id}/`, { method: 'PATCH', body: JSON.stringify(patch) });
+    volunteersCache = volunteersCache.map(v => String(v.id) === String(id) ? updated : v);
+    showToast('Volunteer updated.', 'ok');
+  } catch (error) {
+    showToast(extractError(error), 'bad');
+  }
+}
+
+function exportVolunteersCsv() {
+  if (!volunteersCache.length) { showToast('No records to export.', 'bad'); return; }
+  const headers = ['created_at','campaign','campaign_number','full_name','age','whatsapp_number','alternate_number','city','state','gender','status','notes'];
+  const rows = volunteersCache.map(v => headers.map(h => csvCell(h === 'campaign' ? v.campaign_name : (v[h] || ''))).join(','));
+  const blob = new Blob([[headers.join(','), ...rows].join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `campaign-volunteers-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function csvCell(value) {
+  return `"${String(value || '').replace(/"/g, '""')}"`;
+}
+
+function formatDate(value) {
+  if (!value) return '-';
+  return new Date(value).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+}
+
+function extractError(error) {
+  const details = error.payload && error.payload.errors;
+  const firstError = details && Object.values(details).flat()[0];
+  return firstError || error.message || 'Request failed.';
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = type; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3500);
+}
+
+checkSession();
+</script>
+</body>
+</html>
+
