@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AL SYED â€” Campaigns</title>
+<title>AL SYED - Campaigns</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -58,23 +58,23 @@ nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filte
 .sec-label{font-size:9px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--gray-600);margin-bottom:40px;display:flex;align-items:center;gap:16px;}
 .sec-label::after{content:'';flex:1;height:1px;background:var(--gray-800);}
 
-/* TOP FEATURED â€” horizontal scroll on mobile, 3-col grid desktop */
-.featured-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:var(--gray-800);margin-bottom:2px;}
+/* TOP FEATURED - horizontal scroll on mobile, 3-col grid desktop */
+.featured-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:var(--gray-800);margin-bottom:2px;align-items:stretch;}
 
-.c-card{background:var(--gray-950);position:relative;overflow:hidden;cursor:default;transition:background .15s;}
+.c-card{background:var(--gray-950);position:relative;overflow:hidden;cursor:default;transition:background .15s;display:flex;flex-direction:column;min-height:100%;}
 .c-card:hover{background:var(--gray-900);}
 .c-card.big{grid-column:span 2;}
 
-.c-img{width:100%;aspect-ratio:3/2;object-fit:cover;object-position:top center;display:block;filter:grayscale(100%) contrast(1.1);transition:filter .3s;}
+.c-img{width:100%;height:clamp(260px,32vw,420px);object-fit:cover;object-position:top center;display:block;filter:grayscale(100%) contrast(1.1);transition:filter .3s;}
 .c-card:hover .c-img{filter:grayscale(60%) contrast(1.1);}
-.c-img-placeholder{width:100%;aspect-ratio:3/2;background:var(--gray-900);display:flex;align-items:center;justify-content:center;}
+.c-img-placeholder{width:100%;height:clamp(260px,32vw,420px);background:var(--gray-900);display:flex;align-items:center;justify-content:center;}
 .c-img-placeholder span{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--gray-700);}
 
-.c-body{padding:20px 20px 24px;}
+.c-body{padding:20px 20px 24px;display:flex;flex-direction:column;flex:1;}
 .c-num{font-size:9px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--gray-600);margin-bottom:8px;}
-.c-name{font-family:var(--font-head);font-size:18px;font-weight:700;letter-spacing:-.3px;color:var(--white);margin-bottom:16px;line-height:1.2;}
+.c-name{font-family:var(--font-head);font-size:18px;font-weight:700;letter-spacing:-.3px;color:var(--white);margin-bottom:16px;line-height:1.2;min-height:44px;}
 .c-card.big .c-name{font-size:26px;}
-.c-join{width:100%;background:var(--white);border:none;color:var(--black);font-family:var(--font-body);font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;padding:12px;cursor:pointer;transition:background .15s;}
+.c-join{width:100%;background:var(--white);border:none;color:var(--black);font-family:var(--font-body);font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;padding:12px;cursor:pointer;transition:background .15s;margin-top:auto;}
 .c-join:hover{background:var(--gray-100);}
 .c-join.done{background:transparent;border:1px solid var(--gray-700);color:var(--gray-500);cursor:default;}
 
@@ -132,6 +132,7 @@ nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filte
   .hero{grid-template-columns:1fr;gap:40px;padding:48px 20px 40px;}
   .featured-grid{grid-template-columns:1fr;}
   .c-card.big{grid-column:span 1;}
+  .c-img,.c-img-placeholder{height:320px;}
   .private-grid{grid-template-columns:1fr 1fr;}
   .campaigns-wrap{padding:40px 20px;}
   .hero-right{grid-template-columns:1fr 1fr;}
@@ -148,13 +149,13 @@ nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filte
     <span class="ticker-item">DEMAND ACCOUNTABILITY</span>
     <span class="ticker-item"><span>3 FEATURED ONGOING</span></span>
     <span class="ticker-item">JOIN THE MOVEMENT</span>
-    <span class="ticker-item"><span>OSINT Â· LEGAL Â· COMMUNITY</span></span>
+    <span class="ticker-item"><span>OSINT / LEGAL / COMMUNITY</span></span>
     <span class="ticker-item">AL SYED INITIATIVE</span>
     <span class="ticker-item"><span>27 ACTIVE CAMPAIGNS</span></span>
     <span class="ticker-item">DEMAND ACCOUNTABILITY</span>
     <span class="ticker-item"><span>3 FEATURED ONGOING</span></span>
     <span class="ticker-item">JOIN THE MOVEMENT</span>
-    <span class="ticker-item"><span>OSINT Â· LEGAL Â· COMMUNITY</span></span>
+    <span class="ticker-item"><span>OSINT / LEGAL / COMMUNITY</span></span>
   </div>
 </div>
 
@@ -206,7 +207,7 @@ nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filte
 
 <footer>
   <div class="f-logo"><em>AL</em> SYED Initiative</div>
-  <div class="f-copy">Â© 2025 AL SYED. All rights reserved.</div>
+  <div class="f-copy">Copyright 2025 AL SYED. All rights reserved.</div>
 </footer>
 
 <!-- MODAL -->
@@ -218,7 +219,7 @@ nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filte
           <div class="modal-camp" id="m-camp"></div>
           <div class="modal-ttl">Join Campaign</div>
         </div>
-        <button class="x-btn" onclick="closeModal()">âœ•</button>
+        <button class="x-btn" onclick="closeModal()">X</button>
       </div>
       <div class="modal-form">
         <div class="f-field">
@@ -268,11 +269,11 @@ nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filte
           </div>
         </div>
         <div class="f-err" id="f-err"></div>
-        <button class="f-submit" id="f-sub" onclick="submitForm()">Register as Volunteer â†’</button>
+        <button class="f-submit" id="f-sub" onclick="submitForm()">Register as Volunteer -></button>
       </div>
     </div>
     <div class="success" id="success-wrap">
-      <div class="s-check">âœ“</div>
+      <div class="s-check">OK</div>
       <div class="s-title">You're registered.</div>
       <p class="s-msg">Our management team will reach out to you on WhatsApp shortly.</p>
       <button class="s-close" onclick="closeModal()">Close</button>
@@ -357,7 +358,7 @@ function render() {
           <div class="c-num">Campaign #${escapeHtml(c.num)}</div>
           <div class="c-name">${escapeHtml(c.name)}</div>
           <button class="c-join${isJoined ? ' done' : ''}" ${isJoined ? 'disabled' : `onclick="openModal('${c.id}')"`}>
-            ${isJoined ? 'âœ“ Joined' : 'Join Campaign â†’'}
+            ${isJoined ? 'Joined' : 'Join Campaign ->'}
           </button>
         </div>
       </div>`;
@@ -397,7 +398,7 @@ function openModal(id) {
   ['f-name','f-age','f-wa','f-alt','f-city'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-state').value = '';
   document.getElementById('f-sub').disabled = false;
-  document.getElementById('f-sub').textContent = 'Register as Volunteer â†’';
+  document.getElementById('f-sub').textContent = 'Register as Volunteer ->';
   document.getElementById('overlay').classList.add('on');
   document.body.style.overflow = 'hidden';
 }
