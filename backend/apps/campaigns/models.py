@@ -85,3 +85,21 @@ class CampaignVolunteer(models.Model):
 
     def __str__(self):
         return f"{self.full_name} -> {self.campaign.name}"
+
+
+class CampaignSiteVisit(models.Model):
+    visitor_hash = models.CharField(max_length=64, unique=True)
+    visit_count = models.PositiveIntegerField(default=1)
+    source_ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=500, blank=True, default="")
+    first_seen_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-last_seen_at"]
+        indexes = [
+            models.Index(fields=["last_seen_at"]),
+        ]
+
+    def __str__(self):
+        return f"Campaign visitor {self.visitor_hash[:12]}"

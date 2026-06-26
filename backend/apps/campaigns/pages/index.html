@@ -192,7 +192,7 @@ nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filte
     <div class="hero-stat"><div class="stat-n" id="s-total">0</div><div class="stat-l">Total Campaigns</div></div>
     <div class="hero-stat"><div class="stat-n" id="s-featured">0</div><div class="stat-l">Public</div></div>
     <div class="hero-stat"><div class="stat-n" id="s-private">0</div><div class="stat-l">Private</div></div>
-    <div class="hero-stat"><div class="stat-n" id="s-joined">0</div><div class="stat-l">Your Campaigns</div></div>
+    <div class="hero-stat"><div class="stat-n" id="s-visits">0</div><div class="stat-l">Site Visits</div></div>
   </div>
 </div>
 
@@ -288,6 +288,7 @@ nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filte
 <script>
 const API_BASE = '/api/campaigns';
 const JOINED_KEY = 'as_joined_v2';
+const VISITOR_KEY = 'as_campaign_visitor_v1';
 
 let campaigns = [];
 let joined = JSON.parse(localStorage.getItem(JOINED_KEY) || '[]').map(String);
@@ -326,6 +327,46 @@ async function apiFetch(path, options = {}) {
   return payload.data;
 }
 
+function getVisitorKey() {
+  let visitorKey = localStorage.getItem(VISITOR_KEY);
+  if (!visitorKey) {
+    const randomPart = window.crypto && window.crypto.randomUUID
+      ? window.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    visitorKey = `campaign-${randomPart}`;
+    localStorage.setItem(VISITOR_KEY, visitorKey);
+  }
+  return visitorKey;
+}
+
+function updateVisitCounter(value) {
+  const el = document.getElementById('s-visits');
+  if (el && Number.isFinite(Number(value))) {
+    el.textContent = Number(value).toLocaleString('en-IN');
+  }
+}
+
+async function registerSiteVisit() {
+  try {
+    const data = await apiFetch('/visits/', {
+      method: 'POST',
+      body: JSON.stringify({ visitor_key: getVisitorKey() })
+    });
+    updateVisitCounter(data.site_visits);
+  } catch (error) {
+    refreshVisitCounter();
+  }
+}
+
+async function refreshVisitCounter() {
+  try {
+    const data = await apiFetch('/visits/');
+    updateVisitCounter(data.site_visits);
+  } catch (error) {
+    updateVisitCounter(0);
+  }
+}
+
 async function loadCampaigns() {
   try {
     campaigns = (await apiFetch('/')).map(normalizeCampaign);
@@ -345,7 +386,6 @@ function render() {
   document.getElementById('s-total').textContent = campaigns.length;
   document.getElementById('s-featured').textContent = featured.length;
   document.getElementById('s-private').textContent = priv.length;
-  document.getElementById('s-joined').textContent = joined.length;
 
   // Featured grid
   const fg = document.getElementById('featured-grid');
@@ -462,6 +502,8 @@ async function submitForm() {
 }
 
 loadCampaigns();
+registerSiteVisit();
+setInterval(refreshVisitCounter, 30000);
 </script>
 </body>
 </html>

@@ -9,11 +9,13 @@ from .views import (
     CampaignAdminVolunteerDetailView,
     CampaignAdminVolunteerListView,
     CampaignListView,
+    CampaignSiteVisitView,
     CampaignVolunteerCreateView,
 )
 
 urlpatterns = [
     path("", CampaignListView.as_view(), name="campaign-list"),
+    path("visits/", CampaignSiteVisitView.as_view(), name="campaign-site-visits"),
     path("volunteers/", CampaignVolunteerCreateView.as_view(), name="campaign-volunteer-create"),
     path("admin/login/", CampaignAdminLoginView.as_view(), name="campaign-admin-login"),
     path("admin/logout/", CampaignAdminLogoutView.as_view(), name="campaign-admin-logout"),
@@ -23,4 +25,3 @@ urlpatterns = [
     path("admin/volunteers/", CampaignAdminVolunteerListView.as_view(), name="campaign-admin-volunteer-list"),
     path("admin/volunteers/<int:pk>/", CampaignAdminVolunteerDetailView.as_view(), name="campaign-admin-volunteer-detail"),
 ]
-

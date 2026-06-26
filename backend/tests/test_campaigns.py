@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
-from apps.campaigns.models import Campaign, CampaignVolunteer
+from apps.campaigns.models import Campaign, CampaignSiteVisit, CampaignVolunteer
 
 
 @override_settings(
@@ -31,6 +31,31 @@ class CampaignApiTests(TestCase):
         names = [item["name"] for item in response.data["data"]]
         self.assertIn("Test Campaign", names)
         self.assertNotIn("Archived Campaign", names)
+
+    def test_site_visit_counter_counts_unique_browser_keys(self):
+        first_response = self.client.post(
+            "/api/campaigns/visits/",
+            {"visitor_key": "campaign-test-visitor-0001"},
+            format="json",
+        )
+        second_response = self.client.post(
+            "/api/campaigns/visits/",
+            {"visitor_key": "campaign-test-visitor-0001"},
+            format="json",
+        )
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 200)
+        self.assertEqual(first_response.data["data"]["site_visits"], 1)
+        self.assertEqual(second_response.data["data"]["site_visits"], 1)
+        self.assertEqual(CampaignSiteVisit.objects.count(), 1)
+        self.assertEqual(CampaignSiteVisit.objects.get().visit_count, 2)
+
+    def test_site_visit_counter_rejects_invalid_keys(self):
+        response = self.client.post("/api/campaigns/visits/", {"visitor_key": "<script>"}, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(CampaignSiteVisit.objects.count(), 0)
 
     def test_public_volunteer_submit_creates_database_record(self):
         response = self.client.post(

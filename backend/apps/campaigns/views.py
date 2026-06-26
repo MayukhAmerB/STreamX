@@ -1,8 +1,11 @@
+import hashlib
+import re
 from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.core import signing
+from django.db.models import F
 from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.utils import timezone
@@ -14,7 +17,7 @@ from config.audit import log_security_event
 from config.client_ip import resolve_client_ip
 from config.response import api_response
 
-from .models import Campaign, CampaignVolunteer
+from .models import Campaign, CampaignSiteVisit, CampaignVolunteer
 from .serializers import (
     CampaignAdminSerializer,
     CampaignPublicSerializer,
@@ -24,6 +27,7 @@ from .serializers import (
 
 CAMPAIGN_ADMIN_COOKIE = "campaign_admin_session"
 CAMPAIGN_ADMIN_COOKIE_MAX_AGE = 60 * 60 * 12
+VISITOR_KEY_RE = re.compile(r"^[A-Za-z0-9._:-]{16,128}$")
 
 
 def _campaigns_file(filename):
@@ -110,6 +114,54 @@ class CampaignListView(APIView):
         campaigns = Campaign.objects.filter(is_active=True)
         serializer = CampaignPublicSerializer(campaigns, many=True)
         return api_response(success=True, message="Campaigns fetched.", data=serializer.data)
+
+
+class CampaignSiteVisitView(APIView):
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    @staticmethod
+    def _count():
+        return CampaignSiteVisit.objects.count()
+
+    def get(self, request):
+        return api_response(
+            success=True,
+            message="Campaign visit counter fetched.",
+            data={"site_visits": self._count()},
+        )
+
+    def post(self, request):
+        visitor_key = str(request.data.get("visitor_key") or "").strip()
+        if not VISITOR_KEY_RE.fullmatch(visitor_key):
+            return api_response(
+                success=False,
+                message="Invalid visitor key.",
+                errors={"visitor_key": "Invalid visitor key."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        visitor_hash = hashlib.sha256(visitor_key.encode("utf-8")).hexdigest()
+        visit, created = CampaignSiteVisit.objects.get_or_create(
+            visitor_hash=visitor_hash,
+            defaults={
+                "source_ip": resolve_client_ip(request),
+                "user_agent": (request.META.get("HTTP_USER_AGENT", "") or "")[:500],
+            },
+        )
+        if not created:
+            CampaignSiteVisit.objects.filter(pk=visit.pk).update(
+                visit_count=F("visit_count") + 1,
+                source_ip=resolve_client_ip(request),
+                user_agent=(request.META.get("HTTP_USER_AGENT", "") or "")[:500],
+                last_seen_at=timezone.now(),
+            )
+
+        return api_response(
+            success=True,
+            message="Campaign visit counted.",
+            data={"site_visits": self._count(), "counted": created},
+        )
 
 
 class CampaignVolunteerCreateView(APIView):
