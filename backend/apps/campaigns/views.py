@@ -44,7 +44,7 @@ def _campaign_page_response(filename):
         "script-src 'self' 'unsafe-inline'; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com; "
-        "img-src 'self' data: blob:; "
+        "img-src 'self' https://alsyedinitiative.com data: blob:; "
         "connect-src 'self'; "
         "form-action 'self'; "
         "frame-ancestors 'self'; "

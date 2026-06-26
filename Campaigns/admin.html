@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/x-icon" href="https://alsyedinitiative.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="https://alsyedinitiative.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="https://alsyedinitiative.com/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="https://alsyedinitiative.com/favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="192x192" href="https://alsyedinitiative.com/favicon-192x192.png">
+<link rel="shortcut icon" href="https://alsyedinitiative.com/favicon.ico">
+<link rel="apple-touch-icon" href="https://alsyedinitiative.com/apple-touch-icon.png">
 <title>AL SYED - Campaign Admin</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">
 <style>
@@ -178,7 +185,7 @@ body{background:var(--black);color:var(--white);font-family:var(--font);min-heig
           <div class="field">
             <label>Type</label>
             <div class="toggle-row">
-              <div class="toggle-opt sel" id="t-featured" onclick="setType('featured')">Featured</div>
+              <div class="toggle-opt sel" id="t-featured" onclick="setType('featured')">Public</div>
               <div class="toggle-opt" id="t-private" onclick="setType('private')">Private</div>
             </div>
           </div>
@@ -379,7 +386,7 @@ async function renderList() {
         <div class="camp-name">${escapeHtml(c.name)}</div>
         <div class="camp-meta">Campaign #${escapeHtml(c.campaign_number || c.id)} · ${c.volunteer_count || 0} volunteers</div>
       </div>
-      <span class="camp-badge${c.is_featured ? ' feat' : ''}">${c.is_featured ? 'Featured' : 'Private'}</span>
+      <span class="camp-badge${c.is_featured ? ' feat' : ''}">${c.is_featured ? 'Public' : 'Private'}</span>
       <button class="del-btn" onclick="deleteCampaign('${c.id}')">Archive</button>
     </div>`).join('')}
   </div>`;

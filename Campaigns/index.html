@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/x-icon" href="https://alsyedinitiative.com/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="https://alsyedinitiative.com/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="https://alsyedinitiative.com/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="https://alsyedinitiative.com/favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="192x192" href="https://alsyedinitiative.com/favicon-192x192.png">
+<link rel="shortcut icon" href="https://alsyedinitiative.com/favicon.ico">
+<link rel="apple-touch-icon" href="https://alsyedinitiative.com/apple-touch-icon.png">
 <title>AL SYED - Campaigns</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -29,8 +36,8 @@ nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filte
 .nav-logo{font-family:var(--font-head);font-size:15px;font-weight:700;letter-spacing:2px;color:var(--white);text-transform:uppercase;}
 .nav-logo em{font-style:normal;color:var(--brand-orange-red);}
 .nav-right{display:flex;align-items:center;gap:20px;}
-.nav-pill{font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;padding:5px 12px;border:1px solid var(--gray-700);color:var(--gray-400);}
-.pulse-dot{width:6px;height:6px;border-radius:50%;background:var(--white);display:inline-block;animation:blink 1.4s ease-in-out infinite;}
+.nav-pill{font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;padding:5px 12px;border:1px solid rgba(47,255,137,.45);color:#a9ffc9;}
+.pulse-dot{width:6px;height:6px;border-radius:50%;background:#2fff89;display:inline-block;box-shadow:0 0 14px rgba(47,255,137,.7);animation:blink 1.4s ease-in-out infinite;}
 @keyframes blink{0%,100%{opacity:1;}50%{opacity:0.2;}}
 
 /* HERO */
@@ -58,7 +65,7 @@ nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filte
 .sec-label{font-size:9px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--gray-600);margin-bottom:40px;display:flex;align-items:center;gap:16px;}
 .sec-label::after{content:'';flex:1;height:1px;background:var(--gray-800);}
 
-/* TOP FEATURED - uniform poster grid */
+/* PUBLIC CAMPAIGNS - uniform poster grid */
 .featured-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:2px;background:var(--gray-800);margin-bottom:2px;align-items:stretch;}
 
 .c-card{background:var(--gray-950);position:relative;overflow:hidden;cursor:default;transition:background .15s;display:flex;flex-direction:column;min-height:100%;}
@@ -80,7 +87,7 @@ nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filte
 .private-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1px;background:var(--gray-800);border:1px solid var(--gray-800);}
 .p-card{background:var(--gray-950);padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
 .p-name{font-size:12px;font-weight:500;color:var(--gray-300);}
-.p-badge{font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:3px 8px;border:1px solid var(--gray-800);color:var(--gray-700);}
+.p-badge{font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:3px 8px;border:1px solid var(--gray-800);color:var(--gray-700);background:transparent;}
 
 /* MODAL */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:999;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
@@ -183,7 +190,7 @@ nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filte
   </div>
   <div class="hero-right">
     <div class="hero-stat"><div class="stat-n" id="s-total">0</div><div class="stat-l">Total Campaigns</div></div>
-    <div class="hero-stat"><div class="stat-n" id="s-featured">0</div><div class="stat-l">Featured</div></div>
+    <div class="hero-stat"><div class="stat-n" id="s-featured">0</div><div class="stat-l">Public</div></div>
     <div class="hero-stat"><div class="stat-n" id="s-private">0</div><div class="stat-l">Private</div></div>
     <div class="hero-stat"><div class="stat-n" id="s-joined">0</div><div class="stat-l">Your Campaigns</div></div>
   </div>
@@ -191,7 +198,7 @@ nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filte
 
 <!-- CAMPAIGNS -->
 <div class="campaigns-wrap">
-  <div class="sec-label">Featured Campaigns</div>
+  <div class="sec-label">Public Campaigns</div>
   <div class="featured-grid" id="featured-grid">
     <div style="padding:40px;color:var(--gray-700);font-size:12px;letter-spacing:2px;text-transform:uppercase;">Loading campaigns...</div>
   </div>
@@ -342,7 +349,7 @@ function render() {
 
   // Featured grid
   const fg = document.getElementById('featured-grid');
-  if (!featured.length) { fg.innerHTML = '<div style="padding:40px;color:var(--gray-700);font-size:12px;letter-spacing:2px;text-transform:uppercase;grid-column:1/-1;">No featured campaigns.</div>'; }
+  if (!featured.length) { fg.innerHTML = '<div style="padding:40px;color:var(--gray-700);font-size:12px;letter-spacing:2px;text-transform:uppercase;grid-column:1/-1;">No public campaigns.</div>'; }
   else {
     fg.innerHTML = featured.map((c) => {
       const isJoined = joined.includes(c.id);
@@ -364,10 +371,9 @@ function render() {
   // Private grid
   const pg = document.getElementById('private-grid');
   pg.innerHTML = priv.map(c => {
-    const isJoined = joined.includes(c.id);
     return `<div class="p-card">
       <span class="p-name">${escapeHtml(c.name)}</span>
-      <button class="p-badge" ${isJoined ? 'disabled' : `onclick="openModal('${c.id}')"`}>${isJoined ? 'Joined' : 'Join'}</button>
+      <span class="p-badge">Private</span>
     </div>`;
   }).join('');
 
