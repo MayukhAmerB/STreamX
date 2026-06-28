@@ -8,7 +8,13 @@ document.addEventListener("DOMContentLoaded", () => {
         currentLang = "en";
     }
 
-    let solvedQuestions = { realworld: Array(10).fill(false) };
+    const labCategories = ["realworld", "blackmeridian", "certification"];
+    let solvedQuestions = {
+        realworld: Array(10).fill(false),
+        blackmeridian: Array(10).fill(false),
+        certification: Array(10).fill(false)
+    };
+    let certificationUnlockToken = localStorage.getItem("zenith_ctf_certification_token") || "";
     try {
         const storedProgress = JSON.parse(localStorage.getItem("zenith_ctf_solved"));
         if (storedProgress && Array.isArray(storedProgress.realworld)) {
@@ -17,10 +23,12 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch {
         localStorage.removeItem("zenith_ctf_solved");
     }
-    if (!solvedQuestions.realworld || solvedQuestions.realworld.length < 10) {
-        solvedQuestions.realworld = Array(10).fill(false);
-    }
-    solvedQuestions.realworld = solvedQuestions.realworld.slice(0, 10).map(Boolean);
+    labCategories.forEach((category) => {
+        if (!solvedQuestions[category] || solvedQuestions[category].length < 10) {
+            solvedQuestions[category] = Array(10).fill(false);
+        }
+        solvedQuestions[category] = solvedQuestions[category].slice(0, 10).map(Boolean);
+    });
 
     // Helper to save state
     const saveState = () => {
@@ -44,6 +52,8 @@ document.addEventListener("DOMContentLoaded", () => {
             brandLabs: "LABS",
             navHub: "CTF HUB",
             navLabs: "OSINT LABS",
+            navBlackMeridian: "BLACK MERIDIAN",
+            navCertification: "CERTIFICATION CTF",
             progressHeader: "Overall Progress",
             progressSolved: "SOLVED:",
             progressScore: "SCORE:",
@@ -62,6 +72,17 @@ document.addEventListener("DOMContentLoaded", () => {
             labDesc: "Start with @xcfwjoo310. Discover the operator's identities, infrastructure, historical mistakes, and protected artifacts without being given the investigation path.",
             labStatSolved: "SOLVED:",
             labStatScore: "SCORE:",
+            blackSubheading: "ELITE INVESTIGATION",
+            blackTitle: "Black Meridian",
+            blackDesc: "A 10/10 live OSINT correlation lab. Start from @xcfwjoo310, pivot into the controlled GitHub account, and work across black-meridian branches, commit history, metadata, DNS residue, crypto notes, and a protected payload.",
+            certificationSubheading: "CERTIFICATION EXAM",
+            certificationTitle: "Certification CTF",
+            certificationDesc: "A locked 10-question OSINT certification exam. No hints, no walkthroughs, and exact-answer validation.",
+            certificationLockTitle: "Certification CTF Locked",
+            certificationLockDesc: "Enter the exam password to load the Certification CTF questions.",
+            certificationPasswordPlaceholder: "Exam password",
+            certificationUnlockBtn: "Unlock Certification CTF",
+            certificationUnlockError: "Invalid password or unlock service unavailable.",
             qHeaderPrefix: "Question",
             qBadgePotential: "Potential: 1.0 pt",
             qBadgeSolved: "1.0 / 1.0 pt",
@@ -76,6 +97,7 @@ document.addEventListener("DOMContentLoaded", () => {
             brandLabs: "لیبز",
             navHub: "سی ٹی ایف ہب",
             navLabs: "او ایس آئی این ٹی لیبز",
+            navBlackMeridian: "BLACK MERIDIAN",
             progressHeader: "مجموعی پیش رفت",
             progressSolved: "حل شدہ:",
             progressScore: "اسکور:",
@@ -94,6 +116,9 @@ document.addEventListener("DOMContentLoaded", () => {
             labDesc: "@xcfwjoo310 سے آغاز کریں۔ آپریٹر کی شناختیں، انفراسٹرکچر، تاریخی غلطیاں اور محفوظ شواہد خود دریافت کریں؛ تفتیش کا راستہ فراہم نہیں کیا جائے گا۔",
             labStatSolved: "حل شدہ:",
             labStatScore: "اسکور:",
+            blackSubheading: "ELITE INVESTIGATION",
+            blackTitle: "Black Meridian",
+            blackDesc: "A 10/10 live OSINT correlation lab. Start from @xcfwjoo310, pivot into the controlled GitHub account, and work across black-meridian branches, commit history, metadata, DNS residue, crypto notes, and a protected payload.",
             qHeaderPrefix: "سوال",
             qBadgePotential: "امکانی: 1.0 پوائنٹ",
             qBadgeSolved: "1.0 / 1.0 پوائنٹ",
@@ -104,6 +129,109 @@ document.addEventListener("DOMContentLoaded", () => {
             feedbackError: "[-] غلط جواب۔ اپنے سراغ دوبارہ چیک کریں اور کوشش کریں۔",
             ptsSuffix: " پوائنٹس"
         }
+    };
+
+    const blackMeridianQuestions = {
+        en: [
+            {
+                q: "Start from the real Instagram profile and recover the controlled GitHub operator cluster. Across the live branches, several public identities share weak habits, but only one survives device, cadence, and phrasing correlation. Submit the reused handle."
+            },
+            {
+                q: "Inside the live public mirror branch, the same operator buried a contact route in a presentation-layer artifact. Recover the full mailbox that is not written as normal visible text."
+            },
+            {
+                q: "Follow the live repository infrastructure trail until vanity names stop and operational DNS begins. Submit the apex domain that anchors the telemetry cluster."
+            },
+            {
+                q: "The current edge is not the origin. Use historical resolution evidence from the live branch and ignore CDN/proxy records. Submit the original IPv4 address."
+            },
+            {
+                q: "One archived HTTP response in the live evidence surface exposes the storage location used before cleanup. Submit the full storage URI exactly, including the scheme."
+            },
+            {
+                q: "A live repository cleanup removed a value needed later. Version history residue preserves it. Submit the exact salt token."
+            },
+            {
+                q: "A media artifact in the live movement repo leaks a northern coordinate in a non-decimal form. Convert it to signed decimal degrees as latitude,longitude rounded to four decimals."
+            },
+            {
+                q: "Correlate the leaked coordinate with the cold-stop movement ledger and identify the physical asset tied to that stop. Submit the registration/tail code."
+            },
+            {
+                q: "The operator rotated keys, but an automation note still identifies the encryption-only component. Submit the lowercase short key ID with 0x prefix."
+            },
+            {
+                q: "The final payload in the live vault branch is locked behind evidence collected from earlier stages. Use the provided recovery tooling and submit the exact emitted flag."
+            }
+        ],
+        ur: [
+            {
+                q: "Begin from the artifact index. Several public-facing identities share weak operational habits, but only one survives device, cadence, and phrasing correlation. Submit the reused handle."
+            },
+            {
+                q: "The same operator buried a contact route in a presentation-layer artifact. Recover the full mailbox that is not written as normal visible text."
+            },
+            {
+                q: "Follow the infrastructure trail until vanity names stop and operational DNS begins. Submit the apex domain that anchors the telemetry cluster."
+            },
+            {
+                q: "The current edge is not the origin. Use historical resolution evidence and ignore CDN/proxy records. Submit the original IPv4 address."
+            },
+            {
+                q: "One archived HTTP response exposes the storage location used before cleanup. Submit the full storage URI exactly, including the scheme."
+            },
+            {
+                q: "A repository cleanup removed a value needed later. Version history residue preserves it. Submit the exact salt token."
+            },
+            {
+                q: "A media artifact leaks a northern coordinate in a non-decimal form. Convert it to signed decimal degrees as latitude,longitude rounded to four decimals."
+            },
+            {
+                q: "Correlate the leaked coordinate with the cold-stop movement ledger and identify the physical asset tied to that stop. Submit the registration/tail code."
+            },
+            {
+                q: "The operator rotated keys, but an automation note still identifies the encryption-only component. Submit the lowercase short key ID with 0x prefix."
+            },
+            {
+                q: "The final payload is locked behind evidence collected from earlier stages. Use the provided recovery tooling and submit the exact emitted flag."
+            }
+        ]
+    };
+
+    const certificationQuestions = {
+        en: [
+            {
+                q: "A tool name is hidden as ROT13: Ze.Ubyzrf. Use the decoded project to identify the maintainer's public footprint. One reposted verification artifact exposes a six-digit code. Submit only that code."
+            },
+            {
+                q: "A press freedom platform published an onion-only notice about a workstation dependency reaching its terminal lifecycle state. Return the notice URL and publication date in this format: URL | Month DD, YYYY."
+            },
+            {
+                q: "Decode this artifact locator, inspect the photographic metadata at the destination, and submit the original capture timestamp exactly as stored: aHR0cHM6Ly9waXhlbHBlZXBlci5jb20vYXBwLzAxaHFiOGdjcGVmMXk4ZmJwNTYwaHlqYzF4"
+            },
+            {
+                q: "A 2024 disruption of London's public transport network later surfaced in court reporting. Identify the intrusion group, then recover the malware family listed by defensive intelligence as enabling remote access to targeted systems. Submit the malware name only."
+            },
+            {
+                q: "A mid-2024 breach meme leads through a comment trail to a leetspeak cyber handle. A later aviation-tracking screenshot on that related profile shows a military/government aircraft over the eastern Mediterranean. Submit the aircraft type exactly."
+            },
+            {
+                q: "Geolocate the street visible in this image and submit the street name only. Evidence image: /materials/certification/baghdad-street.jpg"
+            },
+            {
+                q: "An indexed IPv4 for an exposed camera points to a Kazakh hosting organization. Do not interact with the device. Use passive OSINT to identify the provider's primary domain and submit the public IPv4 address of that provider domain."
+            },
+            {
+                q: "Use these public search patterns only to locate the educational repository, then ignore the dork lists and inspect the README ending: site:github.com \"Useful Github Dorks for BugBounty\" | site:github.com \"github-dorks\" \"BugBounty\" \"api_key\" | site:github.com \"extension:json\" \"api_key\" \"password\" \"github-dorks\". Decode the final disclaimer represented by: 44 4f 4e 54 20 42 45 20 41 20 4a 45 52 4b 21"
+            },
+            {
+                q: "Search for the public code project that styles itself as a citizen intelligence agency. Pivot from the repository owner to the organization's public site and recover the Fidonet node from the earliest networking entry in the founder timeline."
+            },
+            {
+                q: "OSINT Analysis - White House Correspondents' Dinner - April 25, 2026. 20:36 ET, Washington Hilton, Connecticut Avenue NW. The evacuation is triggered after reported gunshots near the perimeter. The press releases only expose a name and age. Using the listed public reporting set, reconstruct the MPDC-identified suspect's full name, age, and hometown. Authorized sources: @tacticalporn status 2048303261988368630, @ippatel status 2048238523380297812, Secret Service, MPDC, NBC, CBS, Reuters, AP, and BBC press releases. Flag format: OSINT{First_Middle_Last_Age_City}"
+            }
+        ],
+        ur: []
     };
 
     const questionsData = {
@@ -206,6 +334,8 @@ document.addEventListener("DOMContentLoaded", () => {
         setSafeText("brand-labs-text", dict.brandLabs);
         setSafeText("nav-hub-text", dict.navHub);
         setSafeText("nav-labs-text", dict.navLabs);
+        setSafeText("nav-blackmeridian-text", dict.navBlackMeridian || "BLACK MERIDIAN");
+        setSafeText("nav-certification-text", dict.navCertification || "CERTIFICATION CTF");
         setSafeText("progress-header-text", dict.progressHeader);
         setSafeText("progress-solved-label", dict.progressSolved);
         setSafeText("progress-score-label", dict.progressScore);
@@ -229,9 +359,29 @@ document.addEventListener("DOMContentLoaded", () => {
         setSafeText("lab-desc-text", dict.labDesc);
         setSafeText("lab-stat-solved-label", dict.labStatSolved);
         setSafeText("lab-stat-score-label", dict.labStatScore);
+        setSafeText("black-subheading-text", dict.blackSubheading || "ELITE INVESTIGATION");
+        setSafeText("black-title-text", dict.blackTitle || "Black Meridian");
+        setSafeText("black-desc-text", dict.blackDesc || "");
+        setSafeText("black-stat-solved-label", dict.labStatSolved);
+        setSafeText("black-stat-score-label", dict.labStatScore);
+        setSafeText("certification-subheading-text", dict.certificationSubheading || "CERTIFICATION EXAM");
+        setSafeText("certification-title-text", dict.certificationTitle || "Certification CTF");
+        setSafeText("certification-desc-text", dict.certificationDesc || "A locked 10-question OSINT certification exam.");
+        setSafeText("certification-stat-solved-label", dict.labStatSolved);
+        setSafeText("certification-stat-score-label", dict.labStatScore);
+        setSafeText("certification-lock-title", dict.certificationLockTitle || "Certification CTF Locked");
+        setSafeText("certification-lock-desc", dict.certificationLockDesc || "Enter the exam password to load the Certification CTF questions.");
+        setSafeText("certification-unlock-btn", dict.certificationUnlockBtn || "Unlock Certification CTF");
+        const certificationPasswordInput = document.getElementById("certification-password");
+        if (certificationPasswordInput) {
+            certificationPasswordInput.placeholder = dict.certificationPasswordPlaceholder || "Exam password";
+        }
 
         // 4. Render question cards
         renderQuestions("realworld");
+        renderQuestions("blackmeridian");
+        renderQuestions("certification");
+        updateCertificationLockState();
         updateProgressIndicators();
     };
 
@@ -242,7 +392,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const dict = translations[currentLang];
 
-        questionsData[currentLang].forEach((q, idx) => {
+        let questionSet = questionsData[currentLang] || questionsData.en;
+        if (category === "blackmeridian") {
+            questionSet = blackMeridianQuestions[currentLang] || blackMeridianQuestions.en;
+        }
+        if (category === "certification") {
+            questionSet = certificationQuestions[currentLang]?.length
+                ? certificationQuestions[currentLang]
+                : certificationQuestions.en;
+        }
+
+        questionSet.forEach((q, idx) => {
             const isSolved = solvedQuestions[category][idx];
             const safeQuestion = escapeHtml(q.q);
             const safeHeaderPrefix = escapeHtml(dict.qHeaderPrefix);
@@ -302,7 +462,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     const response = await fetch("/api/validate", {
                         method: "POST",
                         headers: { "Content-Type": "application/json; charset=utf-8" },
-                        body: JSON.stringify({ category, question: idx, answer: val })
+                        body: JSON.stringify({
+                            category,
+                            question: idx,
+                            answer: val,
+                            unlockToken: category === "certification" ? certificationUnlockToken : undefined
+                        })
                     });
                     const result = await response.json().catch(() => ({}));
 
@@ -356,6 +521,61 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     };
 
+    const updateCertificationLockState = () => {
+        const lockPanel = document.getElementById("certification-lock-panel");
+        const questionsPanel = document.getElementById("certification-questions");
+        if (!lockPanel || !questionsPanel) return;
+
+        const unlocked = Boolean(certificationUnlockToken);
+        lockPanel.hidden = unlocked;
+        questionsPanel.hidden = !unlocked;
+    };
+
+    const certificationUnlockBtn = document.getElementById("certification-unlock-btn");
+    const certificationPasswordInput = document.getElementById("certification-password");
+    const certificationUnlockFeedback = document.getElementById("certification-unlock-feedback");
+
+    const unlockCertification = async () => {
+        if (!certificationUnlockBtn || !certificationPasswordInput) return;
+        const password = certificationPasswordInput.value.trim();
+        if (!password) return;
+
+        certificationUnlockBtn.disabled = true;
+        certificationUnlockFeedback.textContent = "";
+
+        try {
+            const response = await fetch("/api/unlock-certification", {
+                method: "POST",
+                headers: { "Content-Type": "application/json; charset=utf-8" },
+                body: JSON.stringify({ password })
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || !result.unlockToken) {
+                throw new Error(result.error || "Unlock failed.");
+            }
+            certificationUnlockToken = result.unlockToken;
+            localStorage.setItem("zenith_ctf_certification_token", certificationUnlockToken);
+            certificationPasswordInput.value = "";
+            updateCertificationLockState();
+        } catch {
+            const dict = translations[currentLang];
+            certificationUnlockFeedback.textContent = dict.certificationUnlockError || "Invalid password or unlock service unavailable.";
+            certificationUnlockFeedback.className = "feedback-text error";
+        } finally {
+            certificationUnlockBtn.disabled = false;
+        }
+    };
+
+    if (certificationUnlockBtn && certificationPasswordInput) {
+        certificationUnlockBtn.addEventListener("click", unlockCertification);
+        certificationPasswordInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                unlockCertification();
+            }
+        });
+    }
+
     // ----------------------------------------------------
     // 4. PROGRESS UPDATES
     // ----------------------------------------------------
@@ -363,7 +583,7 @@ document.addEventListener("DOMContentLoaded", () => {
         let totalSolved = 0;
         let totalScore = 0.0;
 
-        ["realworld"].forEach(category => {
+        labCategories.forEach(category => {
             const count = solvedQuestions[category].filter(Boolean).length;
             totalSolved += count;
 
@@ -379,18 +599,22 @@ document.addEventListener("DOMContentLoaded", () => {
             // Update sidebar navigation badges with solved count & separate score
             const badgeEl = document.getElementById(`badge-${category}`);
             const dict = translations[currentLang];
-            if (badgeEl) badgeEl.textContent = `${count}/10 (${catScore.toFixed(1)}${dict.ptsSuffix})`;
+            const totalQuestions = solvedQuestions[category].length;
+            if (badgeEl) badgeEl.textContent = `${count}/${totalQuestions} (${catScore.toFixed(1)}${dict.ptsSuffix})`;
         });
 
         // Overall progress
         const overallSolvedEl = document.getElementById("overall-solved");
         const overallScoreEl = document.getElementById("overall-score");
         const progressBarEl = document.getElementById("overall-progress-bar");
+        const overallTotalEl = document.getElementById("overall-total");
+        const totalQuestions = labCategories.reduce((sum, category) => sum + solvedQuestions[category].length, 0);
 
         if (overallSolvedEl) overallSolvedEl.textContent = totalSolved;
         if (overallScoreEl) overallScoreEl.textContent = totalScore.toFixed(1);
+        if (overallTotalEl) overallTotalEl.textContent = totalQuestions;
         if (progressBarEl) {
-            const pct = (totalSolved / 10) * 100;
+            const pct = totalQuestions ? (totalSolved / totalQuestions) * 100 : 0;
             progressBarEl.style.width = `${pct}%`;
         }
     };

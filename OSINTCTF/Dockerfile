@@ -5,6 +5,7 @@ WORKDIR /app
 COPY server.js ./
 COPY index.html app.js styles.css ./public/
 COPY *.png ./public/
+COPY favicon.ico ./public/
 COPY materials ./public/materials
 
 ENV NODE_ENV=production

@@ -3,8 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AL SYED — LABS</title>
-    <!-- Google Fonts: Inter and JetBrains Mono -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192x192.png">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <title>AL SYED - LABS</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -12,24 +18,29 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar Navigation -->
         <aside class="sidebar">
             <div class="brand" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 48px;">
                 <div style="display: inline-block;">
                     <span class="brand-al">AL</span>
                     <span class="brand-syed">SYED</span>
-                    <span class="brand-sep">—</span>
+                    <span class="brand-sep">-</span>
                     <span class="brand-cases" id="brand-labs-text">LABS</span>
                 </div>
-                <div class="lang-switcher" id="lang-toggle" style="user-select: none;">EN / اردو</div>
+                <div class="lang-switcher" id="lang-toggle" style="user-select: none;">EN / Urdu</div>
             </div>
 
             <nav class="main-nav">
                 <button class="nav-btn active" data-tab="hub" id="nav-hub-btn">
-                    <span class="icon">📁</span> <span id="nav-hub-text">CTF HUB</span>
+                    <span class="icon">01</span> <span id="nav-hub-text">CTF HUB</span>
                 </button>
                 <button class="nav-btn" data-tab="realworld" id="nav-labs-btn">
-                    <span class="icon">🕵️‍♂️</span> <span id="nav-labs-text">OSINT LABS</span> <span class="badge" id="badge-realworld">0/10</span>
+                    <span class="icon">02</span> <span id="nav-labs-text">OSINT LABS</span> <span class="badge" id="badge-realworld">0/10</span>
+                </button>
+                <button class="nav-btn" data-tab="blackmeridian" id="nav-blackmeridian-btn">
+                    <span class="icon">03</span> <span id="nav-blackmeridian-text">BLACK MERIDIAN</span> <span class="badge" id="badge-blackmeridian">0/10</span>
+                </button>
+                <button class="nav-btn" data-tab="certification" id="nav-certification-btn">
+                    <span class="icon">04</span> <span id="nav-certification-text">CERTIFICATION CTF</span> <span class="badge" id="badge-certification">0/10</span>
                 </button>
             </nav>
 
@@ -42,7 +53,7 @@
                     <div class="metric-item">
                         <span class="label" id="progress-solved-label">SOLVED:</span>
                         <span class="val-wrapper">
-                            <span class="val" id="overall-solved">0</span><span class="slash">/</span><span class="total">10</span>
+                            <span class="val" id="overall-solved">0</span><span class="slash">/</span><span class="total" id="overall-total">30</span>
                         </span>
                     </div>
                     <div class="metric-item">
@@ -55,9 +66,7 @@
             </div>
         </aside>
 
-        <!-- Main Content Area -->
         <main class="content-area">
-            <!-- Tab: Hub -->
             <section id="tab-hub" class="tab-content active">
                 <div class="hero-left">
                     <div class="hero-subheading" id="hub-subheading-text">INTELLIGENCE LABS</div>
@@ -73,22 +82,21 @@
                         <p id="hub-desc-p2">This is a live, expert-level Open Source Intelligence investigation. Begin with <code>@xcfwjoo310</code>, discover the operator's wider footprint, and build the evidence chain yourself.</p>
 
                         <div class="rules-box">
-                            <h4 id="hub-rules-title">🔑 Scoring Rules</h4>
+                            <h4 id="hub-rules-title">Scoring Rules</h4>
                             <ul>
                                 <li id="hub-rule-points"><strong>Max Points per Question:</strong> 1.0 point.</li>
-                                <li id="hub-rule-score"><strong>Overall Score:</strong> Your total score is calculated dynamically based on solved questions (Max total: 10.0 points).</li>
+                                <li id="hub-rule-score"><strong>Overall Score:</strong> Your total score is calculated dynamically based on solved questions.</li>
                             </ul>
                         </div>
 
                         <div class="guidelines-box">
-                            <h4 id="hub-instructions-title">🚀 Instructions</h4>
-                            <p id="hub-instructions-desc">Select <strong>OSINT LABS</strong> to receive investigative objectives. File paths, repository names, branches, encodings, and required tools are intentionally omitted.</p>
+                            <h4 id="hub-instructions-title">Instructions</h4>
+                            <p id="hub-instructions-desc">Select a lab to receive investigative objectives. Prompts intentionally omit file paths, repository names, branches, encodings, and tools. Pivot between identities and artifacts until the evidence supports an exact answer.</p>
                         </div>
                     </div>
                 </div>
             </section>
 
-            <!-- Tab: Challenge 1 Lab -->
             <section id="tab-realworld" class="tab-content">
                 <div class="lab-container">
                     <div class="lab-main-header">
@@ -110,6 +118,69 @@
                     </div>
 
                     <div class="questions-container" id="realworld-questions">
+                        <!-- Loaded dynamically via JS -->
+                    </div>
+                </div>
+            </section>
+
+            <section id="tab-blackmeridian" class="tab-content">
+                <div class="lab-container">
+                    <div class="lab-main-header">
+                        <div class="lab-info">
+                            <div class="hero-subheading" id="black-subheading-text">ELITE INVESTIGATION</div>
+                            <h2 class="lab-title" id="black-title-text">Black Meridian</h2>
+                            <p class="lab-description" id="black-desc-text">A 10/10 live OSINT correlation lab. Start from @xcfwjoo310, pivot into the controlled GitHub account, and work across black-meridian branches, commit history, metadata, DNS residue, crypto notes, and a protected payload.</p>
+                            <p class="lab-description lab-materials-note">Live evidence index: <code>/materials/black-meridian/START_HERE.md</code></p>
+                        </div>
+                        <div class="lab-stats">
+                            <div class="stat-box">
+                                <div class="stat-label" id="black-stat-solved-label">SOLVED:</div>
+                                <div class="stat-value" id="solved-blackmeridian">0</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label" id="black-stat-score-label">SCORE:</div>
+                                <div class="stat-value" id="score-blackmeridian">0.0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="questions-container" id="blackmeridian-questions">
+                        <!-- Loaded dynamically via JS -->
+                    </div>
+                </div>
+            </section>
+
+            <section id="tab-certification" class="tab-content">
+                <div class="lab-container">
+                    <div class="lab-main-header">
+                        <div class="lab-info">
+                            <div class="hero-subheading" id="certification-subheading-text">CERTIFICATION EXAM</div>
+                            <h2 class="lab-title" id="certification-title-text">Certification CTF</h2>
+                            <p class="lab-description" id="certification-desc-text">A locked 10-question OSINT certification exam. No hints, no walkthroughs, and exact-answer validation.</p>
+                        </div>
+                        <div class="lab-stats">
+                            <div class="stat-box">
+                                <div class="stat-label" id="certification-stat-solved-label">SOLVED:</div>
+                                <div class="stat-value" id="solved-certification">0</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label" id="certification-stat-score-label">SCORE:</div>
+                                <div class="stat-value" id="score-certification">0.0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="certification-lock-panel" id="certification-lock-panel">
+                        <h3 id="certification-lock-title">Certification CTF Locked</h3>
+                        <p id="certification-lock-desc">Enter the exam password to load the Certification CTF questions.</p>
+                        <div class="answer-row certification-unlock-row">
+                            <input type="password" class="answer-input" id="certification-password" placeholder="Exam password" autocomplete="off">
+                            <button class="btn btn-primary" id="certification-unlock-btn">Unlock Certification CTF</button>
+                        </div>
+                        <div class="feedback-text" id="certification-unlock-feedback"></div>
+                    </div>
+
+                    <div class="questions-container" id="certification-questions" hidden>
                         <!-- Loaded dynamically via JS -->
                     </div>
                 </div>

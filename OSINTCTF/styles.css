@@ -418,6 +418,28 @@ body {
     transition: all 0.3s ease;
 }
 
+.certification-lock-panel {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-medium);
+    padding: 32px;
+    margin-bottom: 32px;
+}
+
+.certification-lock-panel h3 {
+    color: var(--text-white);
+    font-size: 22px;
+    margin-bottom: 10px;
+}
+
+.certification-lock-panel p {
+    color: var(--text-gray);
+    margin-bottom: 24px;
+}
+
+.certification-unlock-row {
+    align-items: stretch;
+}
+
 .question-card.solved {
     border-color: rgba(0, 255, 102, 0.3);
     box-shadow: 0 0 16px rgba(0, 255, 102, 0.03);
