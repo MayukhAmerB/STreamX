@@ -43,6 +43,45 @@ document.addEventListener("DOMContentLoaded", () => {
         "'": "&#039;"
     })[character]);
 
+    const renderQuestionBody = (question) => {
+        if (!question.title && !question.briefing && !question.task && !question.answerFormat && !question.constraints && !question.artifact && !question.searchPatterns) {
+            return `<p class="question-text">${escapeHtml(question.q)}</p>`;
+        }
+
+        const renderParagraphs = (items) => (Array.isArray(items) ? items : [items])
+            .filter(Boolean)
+            .map((item) => `<p>${escapeHtml(item)}</p>`)
+            .join("");
+
+        const sections = [];
+        if (question.title) {
+            sections.push(`<h5 class="question-title">${escapeHtml(question.title)}</h5>`);
+        }
+        if (question.briefing) {
+            sections.push(`<div class="question-section"><span>Briefing</span>${renderParagraphs(question.briefing)}</div>`);
+        }
+        if (question.artifact) {
+            sections.push(`<div class="question-section question-artifact"><span>Artifact</span><code>${escapeHtml(question.artifact)}</code></div>`);
+        }
+        if (question.searchPatterns) {
+            const patterns = question.searchPatterns
+                .map((pattern) => `<li><code>${escapeHtml(pattern)}</code></li>`)
+                .join("");
+            sections.push(`<div class="question-section"><span>Allowed search patterns</span><ul class="question-patterns">${patterns}</ul></div>`);
+        }
+        if (question.task) {
+            sections.push(`<div class="question-section"><span>Task</span>${renderParagraphs(question.task)}</div>`);
+        }
+        if (question.constraints) {
+            sections.push(`<div class="question-section"><span>Constraints</span>${renderParagraphs(question.constraints)}</div>`);
+        }
+        if (question.answerFormat) {
+            sections.push(`<div class="question-section"><span>Answer format</span>${renderParagraphs(question.answerFormat)}</div>`);
+        }
+
+        return `<div class="question-longform">${sections.join("")}</div>`;
+    };
+
     // ----------------------------------------------------
     // 2. QUESTION DEFINITIONS & TRANSLATIONS
     // ----------------------------------------------------
@@ -195,36 +234,114 @@ document.addEventListener("DOMContentLoaded", () => {
     const certificationQuestions = {
         en: [
             {
-                q: "A tool name is hidden as ROT13: Ze.Ubyzrf. Use the decoded project to identify the maintainer's public footprint. One reposted verification artifact exposes a six-digit code. Submit only that code."
+                title: "The Borrowed Lens",
+                briefing: [
+                    "A tool name has been intentionally hidden as ROT13: Ze.Ubyzrf.",
+                    "Decode the project name, identify the public maintainer footprint connected to that project, and follow the maintainer's public social trail. One reposted verification artifact exposes a six-digit code."
+                ],
+                task: "Recover the six-digit verification code visible in the public artifact.",
+                constraints: "Do not submit the tool name, maintainer name, repository name, or profile handle.",
+                answerFormat: "Six digits only."
             },
             {
-                q: "A press freedom platform published an onion-only notice about a workstation dependency reaching its terminal lifecycle state. Return the notice URL and publication date in this format: URL | Month DD, YYYY."
+                title: "The Expired Workstation",
+                briefing: [
+                    "A press-freedom publishing platform maintains a public onion presence. In its news archive, an interest notice describes a workstation dependency reaching the end of its supported lifecycle.",
+                    "The item is not meant to be found through a clearnet headline alone. Treat the onion URL and publication date as the evidence pair."
+                ],
+                task: "Locate the notice and submit the exact onion URL of the article together with the article publication date.",
+                constraints: "Use passive browsing only. Do not submit the software name by itself.",
+                answerFormat: "URL | Month DD, YYYY"
             },
             {
-                q: "Decode this artifact locator, inspect the photographic metadata at the destination, and submit the original capture timestamp exactly as stored: aHR0cHM6Ly9waXhlbHBlZXBlci5jb20vYXBwLzAxaHFiOGdjcGVmMXk4ZmJwNTYwaHlqYzF4"
+                title: "The Camera Clock",
+                briefing: [
+                    "An artifact locator has been encoded before being placed in the case file. Decode the locator, inspect the photographic metadata at the destination, and avoid relying on page titles or surrounding text.",
+                    "The required value is the original capture timestamp stored inside the image metadata."
+                ],
+                artifact: "aHR0cHM6Ly9waXhlbHBlZXBlci5jb20vYXBwLzAxaHFiOGdjcGVmMXk4ZmJwNTYwaHlqYzF4",
+                task: "Submit the exact timestamp shown in the metadata field for when the image was taken.",
+                constraints: "Do not submit camera model, lens model, upload time, or page scrape time.",
+                answerFormat: "YYYY:MM:DD HH:MM:SS"
             },
             {
-                q: "A 2024 disruption of London's public transport network later surfaced in court reporting. Identify the intrusion group, then recover the malware family listed by defensive intelligence as enabling remote access to targeted systems. Submit the malware name only."
+                title: "The Transport Trial",
+                briefing: [
+                    "A 2024 disruption of London's public transport network later surfaced in court reporting, where members of a well-known intrusion community were tied to the incident.",
+                    "After identifying the group, pivot to defensive-intelligence reporting on tools used by that group. One malware entry is explicitly described as enabling remote access to targeted systems."
+                ],
+                task: "Submit the malware family name associated with that remote-access capability.",
+                constraints: "Do not submit the group name, technique ID, victim name, or court article title.",
+                answerFormat: "Malware name only."
             },
             {
-                q: "A mid-2024 breach meme leads through a comment trail to a leetspeak cyber handle. A later aviation-tracking screenshot on that related profile shows a military/government aircraft over the eastern Mediterranean. Submit the aircraft type exactly."
+                title: "The Comment Trail",
+                briefing: [
+                    "A mid-2024 breach meme on a public profile contains a comment trail. One reply leads to a leetspeak cyber handle. A later aviation-tracking screenshot on that related profile shows a military/government aircraft operating over the eastern Mediterranean.",
+                    "The aircraft information is visible in the tracking interface, not in the meme itself."
+                ],
+                task: "Identify the aircraft type shown in the aviation-tracking screenshot.",
+                constraints: "Do not submit the Instagram handle, aircraft registration, airport, or country.",
+                answerFormat: "Aircraft type exactly as displayed."
             },
             {
-                q: "Geolocate the street visible in this image and submit the street name only.",
+                title: "The Lit Artery",
+                briefing: [
+                    "The evidence image shows a night skyline, a distinctive tower, and a brightly lit traffic corridor in the foreground. The task is to identify the street, not the city or the landmark.",
+                    "Use visual geolocation and corroborate the foreground roadway against nearby landmarks."
+                ],
+                task: "Geolocate the foreground street visible in the image and submit the street name only.",
+                constraints: "Do not submit the neighborhood, mall, hotel, city, or country.",
+                answerFormat: "Street name only.",
                 image: "/materials/certification/baghdad-street.jpg",
                 imageAlt: "Night skyline over western Baghdad with a lit roadway in the foreground"
             },
             {
-                q: "An indexed IPv4 for an exposed camera points to a Kazakh hosting organization. Do not interact with the device. Use passive OSINT to identify the provider's primary domain and submit the public IPv4 address of that provider domain."
+                title: "The Passive Host Pivot",
+                briefing: [
+                    "An indexed IPv4 for an exposed camera points to a Kazakh hosting organization. The device is not the target and must not be touched.",
+                    "Use passive OSINT only. Pivot from the indexed service metadata to the provider's primary public domain, then resolve that provider domain."
+                ],
+                task: "Submit the public IPv4 address of the hosting provider's primary domain.",
+                constraints: "Do not interact with the exposed camera or submit the camera IP. Do not submit the provider name or ASN.",
+                answerFormat: "IPv4 address only."
             },
             {
-                q: "Use these public search patterns only to locate the educational repository, then ignore the dork lists and inspect the README ending: site:github.com \"Useful Github Dorks for BugBounty\" | site:github.com \"github-dorks\" \"BugBounty\" \"api_key\" | site:github.com \"extension:json\" \"api_key\" \"password\" \"github-dorks\". The final section label is represented by: 64 69 73 63 6c 61 69 6d 65 72. Submit the exact sentence written under that section."
+                title: "The README Footer",
+                briefing: [
+                    "The target is an educational GitHub repository about search patterns. The dork lists themselves are not the answer; they are only a route to the repository.",
+                    "At the end of the README, a final section label is encoded. Decode the label, locate that section, and read the sentence written beneath it."
+                ],
+                searchPatterns: [
+                    "site:github.com \"Useful Github Dorks for BugBounty\"",
+                    "site:github.com \"github-dorks\" \"BugBounty\" \"api_key\"",
+                    "site:github.com \"extension:json\" \"api_key\" \"password\" \"github-dorks\""
+                ],
+                artifact: "64 69 73 63 6c 61 69 6d 65 72",
+                task: "Submit the exact sentence written under the decoded final section label.",
+                constraints: "Do not submit the decoded label itself. Do not submit any dork pattern.",
+                answerFormat: "Exact sentence, preserving punctuation."
             },
             {
-                q: "Search for the public code project that styles itself as a citizen intelligence agency. Pivot from the repository owner to the organization's public site and recover the Fidonet node from the earliest networking entry in the founder timeline."
+                title: "The Citizen Intelligence Trail",
+                briefing: [
+                    "A public code project styles itself as a citizen intelligence agency. The repository owner maintains a public organization footprint separate from the repository.",
+                    "Pivot from the repository to the organization's public site and inspect the founder timeline. The earliest networking entry contains the required legacy network identifier."
+                ],
+                task: "Recover the Fidonet node from the earliest networking entry in the founder timeline.",
+                constraints: "Do not submit the project name, organization name, website URL, founder name, or job title.",
+                answerFormat: "Fidonet node exactly as written."
             },
             {
-                q: "OSINT Analysis - White House Correspondents' Dinner - April 25, 2026. 20:36 ET, Washington Hilton, Connecticut Avenue NW. The evacuation is triggered after reported gunshots near the perimeter. The press releases only expose a name and age. Using the listed public reporting set, reconstruct the MPDC-identified suspect's full name, age, and hometown. Authorized sources: @tacticalporn status 2048303261988368630, @ippatel status 2048238523380297812, Secret Service, MPDC, NBC, CBS, Reuters, AP, and BBC press releases. Flag format: OSINT{First_Middle_Last_Age_City}"
+                title: "The Dinner Evacuation File",
+                briefing: [
+                    "OSINT Analysis - White House Correspondents' Dinner - April 25, 2026.",
+                    "20:36 ET. Washington Hilton, Connecticut Avenue NW. The annual White House Correspondents' Dinner is in full swing when an evacuation is triggered. Five to eight gunshots are reported in the immediate vicinity of the perimeter. The President is extracted by the Secret Service. A suspect is apprehended on site.",
+                    "You are the OSINT analyst on duty. Two public social posts show seized equipment. Press reporting initially exposes only a name and age. Your task is to reconstruct the MPDC-identified suspect file from the authorized public reporting set."
+                ],
+                task: "Provide the suspect's full name, age, and hometown as identified through the authorized public reporting set.",
+                constraints: "Authorized sources: @tacticalporn status 2048303261988368630, @ippatel status 2048238523380297812, Secret Service, MPDC, NBC, CBS, Reuters, AP, and BBC press releases.",
+                answerFormat: "OSINT{First_Middle_Last_Age_City}"
             }
         ],
         ur: []
@@ -392,7 +509,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         questionSet.forEach((q, idx) => {
             const isSolved = solvedQuestions[category][idx];
-            const safeQuestion = escapeHtml(q.q);
+            const questionBodyHtml = renderQuestionBody(q);
             const safeHeaderPrefix = escapeHtml(dict.qHeaderPrefix);
             const safePotential = escapeHtml(dict.qBadgePotential);
             const safePointsSuffix = escapeHtml(dict.ptsSuffix);
@@ -422,7 +539,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         <span class="q-badge">${category.toUpperCase()} • Q${idx + 1}</span>
                     </div>
                 </div>
-                <p class="question-text">${safeQuestion}</p>
+                ${questionBodyHtml}
                 ${evidenceImageHtml}
                 <div class="answer-row">
                     <input type="text" class="answer-input" id="input-${category}-${idx}"
