@@ -60,8 +60,6 @@ const answerHashes = {
   ],
 };
 
-const CERTIFICATION_PASSWORD_HASH = "f795d217ae4de2ec8875a3b8f8d3a20394f59bd436487b1b1367dbe2524e17dd";
-
 const contentTypes = {
   ".asc": "application/pgp-keys",
   ".b64": "text/plain; charset=utf-8",
@@ -181,13 +179,6 @@ function consumeAttempt(req) {
   return true;
 }
 
-function certificationToken(req) {
-  return crypto
-    .createHmac("sha256", CERTIFICATION_PASSWORD_HASH)
-    .update(`${clientAddress(req)}:certification`)
-    .digest("hex");
-}
-
 function readJson(req) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -239,11 +230,6 @@ async function validateAnswer(req, res) {
     return;
   }
 
-  if (payload.category === "certification" && payload.unlockToken !== certificationToken(req)) {
-    sendJson(res, 403, { error: "Certification CTF is locked." });
-    return;
-  }
-
   const submittedHash = proofAnswer(payload.category, normalizeAnswer(payload.category, question, answer));
   if (!submittedHash) {
     sendJson(res, 503, { error: "Certification validation is not configured." });
@@ -251,31 +237,6 @@ async function validateAnswer(req, res) {
   }
   const correct = answerHashes[payload.category][question].some((expected) => secureHashMatch(submittedHash, expected));
   sendJson(res, 200, { correct });
-}
-
-async function unlockCertification(req, res) {
-  if (!consumeAttempt(req)) {
-    res.setHeader("Retry-After", "60");
-    sendJson(res, 429, { error: "Too many attempts. Try again in one minute." });
-    return;
-  }
-
-  let payload;
-  try {
-    payload = await readJson(req);
-  } catch (error) {
-    sendJson(res, 400, { error: error.message });
-    return;
-  }
-
-  const password = typeof payload.password === "string" ? payload.password : "";
-  const submittedHash = hashAnswer(password);
-  if (!secureHashMatch(submittedHash, CERTIFICATION_PASSWORD_HASH)) {
-    sendJson(res, 403, { error: "Invalid certification password." });
-    return;
-  }
-
-  sendJson(res, 200, { unlocked: true, unlockToken: certificationToken(req) });
 }
 
 function resolvePublicFile(urlPath) {
@@ -337,11 +298,6 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === "/api/validate" && req.method === "POST") {
     await validateAnswer(req, res);
-    return;
-  }
-
-  if (url.pathname === "/api/unlock-certification" && req.method === "POST") {
-    await unlockCertification(req, res);
     return;
   }
 

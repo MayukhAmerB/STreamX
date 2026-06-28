@@ -14,7 +14,6 @@ document.addEventListener("DOMContentLoaded", () => {
         blackmeridian: Array(10).fill(false),
         certification: Array(10).fill(false)
     };
-    let certificationUnlockToken = localStorage.getItem("zenith_ctf_certification_token") || "";
     try {
         const storedProgress = JSON.parse(localStorage.getItem("zenith_ctf_solved"));
         if (storedProgress && Array.isArray(storedProgress.realworld)) {
@@ -77,12 +76,7 @@ document.addEventListener("DOMContentLoaded", () => {
             blackDesc: "A 10/10 live OSINT correlation lab. Start from @xcfwjoo310, pivot into the controlled GitHub account, and work across black-meridian branches, commit history, metadata, DNS residue, crypto notes, and a protected payload.",
             certificationSubheading: "CERTIFICATION EXAM",
             certificationTitle: "Certification CTF",
-            certificationDesc: "A locked 10-question OSINT certification exam. No hints, no walkthroughs, and exact-answer validation.",
-            certificationLockTitle: "Certification CTF Locked",
-            certificationLockDesc: "Enter the exam password to load the Certification CTF questions.",
-            certificationPasswordPlaceholder: "Exam password",
-            certificationUnlockBtn: "Unlock Certification CTF",
-            certificationUnlockError: "Invalid password or unlock service unavailable.",
+            certificationDesc: "A 10-question OSINT certification exam. No hints, no walkthroughs, and exact-answer validation.",
             qHeaderPrefix: "Question",
             qBadgePotential: "Potential: 1.0 pt",
             qBadgeSolved: "1.0 / 1.0 pt",
@@ -366,22 +360,14 @@ document.addEventListener("DOMContentLoaded", () => {
         setSafeText("black-stat-score-label", dict.labStatScore);
         setSafeText("certification-subheading-text", dict.certificationSubheading || "CERTIFICATION EXAM");
         setSafeText("certification-title-text", dict.certificationTitle || "Certification CTF");
-        setSafeText("certification-desc-text", dict.certificationDesc || "A locked 10-question OSINT certification exam.");
+        setSafeText("certification-desc-text", dict.certificationDesc || "A 10-question OSINT certification exam.");
         setSafeText("certification-stat-solved-label", dict.labStatSolved);
         setSafeText("certification-stat-score-label", dict.labStatScore);
-        setSafeText("certification-lock-title", dict.certificationLockTitle || "Certification CTF Locked");
-        setSafeText("certification-lock-desc", dict.certificationLockDesc || "Enter the exam password to load the Certification CTF questions.");
-        setSafeText("certification-unlock-btn", dict.certificationUnlockBtn || "Unlock Certification CTF");
-        const certificationPasswordInput = document.getElementById("certification-password");
-        if (certificationPasswordInput) {
-            certificationPasswordInput.placeholder = dict.certificationPasswordPlaceholder || "Exam password";
-        }
 
         // 4. Render question cards
         renderQuestions("realworld");
         renderQuestions("blackmeridian");
         renderQuestions("certification");
-        updateCertificationLockState();
         updateProgressIndicators();
     };
 
@@ -465,8 +451,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         body: JSON.stringify({
                             category,
                             question: idx,
-                            answer: val,
-                            unlockToken: category === "certification" ? certificationUnlockToken : undefined
+                            answer: val
                         })
                     });
                     const result = await response.json().catch(() => ({}));
@@ -502,11 +487,6 @@ document.addEventListener("DOMContentLoaded", () => {
                         feedback.textContent = dict.feedbackError;
                     }
                 } catch (error) {
-                    if (category === "certification") {
-                        certificationUnlockToken = "";
-                        localStorage.removeItem("zenith_ctf_certification_token");
-                        updateCertificationLockState();
-                    }
                     btn.disabled = false;
                     btn.textContent = dict.btnSubmit;
                     feedback.className = "feedback-text error";
@@ -525,68 +505,6 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
     };
-
-    const updateCertificationLockState = () => {
-        const lockPanel = document.getElementById("certification-lock-panel");
-        const questionsPanel = document.getElementById("certification-questions");
-        if (!lockPanel || !questionsPanel) return;
-
-        const unlocked = Boolean(certificationUnlockToken);
-        lockPanel.hidden = unlocked;
-        questionsPanel.hidden = !unlocked;
-    };
-
-    const certificationUnlockBtn = document.getElementById("certification-unlock-btn");
-    const certificationPasswordInput = document.getElementById("certification-password");
-    const certificationUnlockFeedback = document.getElementById("certification-unlock-feedback");
-
-    const unlockCertification = async () => {
-        if (!certificationUnlockBtn || !certificationPasswordInput) return;
-        const password = certificationPasswordInput.value.trim();
-        if (!password) return;
-
-        certificationUnlockBtn.disabled = true;
-        if (certificationUnlockFeedback) {
-            certificationUnlockFeedback.className = "feedback-text";
-            certificationUnlockFeedback.textContent = "Checking exam password...";
-        }
-
-        try {
-            const response = await fetch("/api/unlock-certification", {
-                method: "POST",
-                headers: { "Content-Type": "application/json; charset=utf-8" },
-                body: JSON.stringify({ password })
-            });
-            const result = await response.json().catch(() => ({}));
-            if (!response.ok || !result.unlockToken) {
-                throw new Error(result.error || `Unlock failed with HTTP ${response.status}.`);
-            }
-            certificationUnlockToken = result.unlockToken;
-            localStorage.setItem("zenith_ctf_certification_token", certificationUnlockToken);
-            certificationPasswordInput.value = "";
-            renderQuestions("certification");
-            updateCertificationLockState();
-            updateProgressIndicators();
-        } catch (error) {
-            const dict = translations[currentLang];
-            if (certificationUnlockFeedback) {
-                certificationUnlockFeedback.textContent = error.message || dict.certificationUnlockError || "Invalid password or unlock service unavailable.";
-                certificationUnlockFeedback.className = "feedback-text error";
-            }
-        } finally {
-            certificationUnlockBtn.disabled = false;
-        }
-    };
-
-    if (certificationUnlockBtn && certificationPasswordInput) {
-        certificationUnlockBtn.addEventListener("click", unlockCertification);
-        certificationPasswordInput.addEventListener("keydown", (event) => {
-            if (event.key === "Enter") {
-                event.preventDefault();
-                unlockCertification();
-            }
-        });
-    }
 
     // ----------------------------------------------------
     // 4. PROGRESS UPDATES
