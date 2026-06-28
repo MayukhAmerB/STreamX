@@ -525,6 +525,16 @@ body {
     margin-bottom: 0;
 }
 
+.question-info-card {
+    border-left: 0;
+    padding: 16px;
+    background:
+        linear-gradient(135deg, rgba(255, 51, 0, 0.08), transparent 42%),
+        rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--border-medium);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.015);
+}
+
 .question-artifact code,
 .question-patterns code {
     white-space: normal;
@@ -534,9 +544,10 @@ body {
 .question-artifact code {
     display: block;
     color: var(--text-white);
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--border-medium);
+    background: rgba(0, 0, 0, 0.36);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     padding: 12px;
+    line-height: 1.7;
 }
 
 .question-patterns {

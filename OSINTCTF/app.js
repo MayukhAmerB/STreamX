@@ -61,13 +61,13 @@ document.addEventListener("DOMContentLoaded", () => {
             sections.push(`<div class="question-section"><span>Briefing</span>${renderParagraphs(question.briefing)}</div>`);
         }
         if (question.artifact) {
-            sections.push(`<div class="question-section question-artifact"><span>Artifact</span><code>${escapeHtml(question.artifact)}</code></div>`);
+            sections.push(`<div class="question-section question-info-card question-artifact"><span>Artifact</span><code>${escapeHtml(question.artifact)}</code></div>`);
         }
         if (question.searchPatterns) {
             const patterns = question.searchPatterns
                 .map((pattern) => `<li><code>${escapeHtml(pattern)}</code></li>`)
                 .join("");
-            sections.push(`<div class="question-section"><span>Allowed search patterns</span><ul class="question-patterns">${patterns}</ul></div>`);
+            sections.push(`<div class="question-section question-info-card"><span>Allowed search patterns</span><ul class="question-patterns">${patterns}</ul></div>`);
         }
         if (question.task) {
             sections.push(`<div class="question-section"><span>Task</span>${renderParagraphs(question.task)}</div>`);
@@ -259,7 +259,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     "An artifact locator has been encoded before being placed in the case file. Decode the locator, inspect the photographic metadata at the destination, and avoid relying on page titles or surrounding text.",
                     "The required value is the original capture timestamp stored inside the image metadata."
                 ],
-                artifact: "aHR0cHM6Ly9waXhlbHBlZXBlci5jb20vYXBwLzAxaHFiOGdjcGVmMXk4ZmJwNTYwaHlqYzF4",
+                artifact: "aHR0cHM6Ly9waXhlbHBlZXBlci5ueWMzLmRpZ2l0YWxvY2VhbnNwYWNlcy5jb20vaW1hZ2VzLzIwMjQvMDIvNDMyeTR6NGJyYjkxbThkM2p5NWV5djAzOWQuanBn",
                 task: "Submit the exact timestamp shown in the metadata field for when the image was taken.",
                 constraints: "Do not submit camera model, lens model, upload time, or page scrape time.",
                 answerFormat: "YYYY:MM:DD HH:MM:SS"
