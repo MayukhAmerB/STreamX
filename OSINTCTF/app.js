@@ -218,7 +218,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 q: "An indexed IPv4 for an exposed camera points to a Kazakh hosting organization. Do not interact with the device. Use passive OSINT to identify the provider's primary domain and submit the public IPv4 address of that provider domain."
             },
             {
-                q: "Use these public search patterns only to locate the educational repository, then ignore the dork lists and inspect the README ending: site:github.com \"Useful Github Dorks for BugBounty\" | site:github.com \"github-dorks\" \"BugBounty\" \"api_key\" | site:github.com \"extension:json\" \"api_key\" \"password\" \"github-dorks\". Decode the final disclaimer represented by: 44 4f 4e 54 20 42 45 20 41 20 4a 45 52 4b 21"
+                q: "Use these public search patterns only to locate the educational repository, then ignore the dork lists and inspect the README ending: site:github.com \"Useful Github Dorks for BugBounty\" | site:github.com \"github-dorks\" \"BugBounty\" \"api_key\" | site:github.com \"extension:json\" \"api_key\" \"password\" \"github-dorks\". The final section label is represented by: 64 69 73 63 6c 61 69 6d 65 72. Submit the exact sentence written under that section."
             },
             {
                 q: "Search for the public code project that styles itself as a citizen intelligence agency. Pivot from the repository owner to the organization's public site and recover the Fidonet node from the earliest networking entry in the founder timeline."
