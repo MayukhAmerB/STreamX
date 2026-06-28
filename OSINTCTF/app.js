@@ -277,7 +277,8 @@ document.addEventListener("DOMContentLoaded", () => {
             {
                 title: "The Comment Trail",
                 briefing: [
-                    "A mid-2024 breach meme on a public profile contains a comment trail. One reply leads to a leetspeak cyber handle. A later aviation-tracking screenshot on that related profile shows a military/government aircraft operating over the eastern Mediterranean.",
+                    "Begin with the public Instagram profile hackwithher. One mid-2024 breach meme on that profile contains a comment trail.",
+                    "A reply from a leetspeak cyber handle leads to a related profile. On that related profile, a later aviation-tracking screenshot shows a military/government aircraft operating over the eastern Mediterranean.",
                     "The aircraft information is visible in the tracking interface, not in the meme itself."
                 ],
                 task: "Identify the aircraft type shown in the aviation-tracking screenshot.",
@@ -299,9 +300,10 @@ document.addEventListener("DOMContentLoaded", () => {
             {
                 title: "The Passive Host Pivot",
                 briefing: [
-                    "An indexed IPv4 for an exposed camera points to a Kazakh hosting organization. The device is not the target and must not be touched.",
+                    "An indexed IPv4 for an exposed camera is encoded in the artifact below. Decode it only to identify the passive OSINT record. The device is not the target and must not be touched.",
                     "Use passive OSINT only. Pivot from the indexed service metadata to the provider's primary public domain, then resolve that provider domain."
                 ],
+                artifact: "ODYuMTA3LjE5OS42OA==",
                 task: "Submit the public IPv4 address of the hosting provider's primary domain.",
                 constraints: "Do not interact with the exposed camera or submit the camera IP. Do not submit the provider name or ASN.",
                 answerFormat: "IPv4 address only."
