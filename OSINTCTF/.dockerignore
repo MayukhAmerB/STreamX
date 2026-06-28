@@ -4,5 +4,6 @@
 !app.js
 !styles.css
 !*.png
+!favicon.ico
 !materials/
 !materials/**
