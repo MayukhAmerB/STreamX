@@ -527,12 +527,32 @@ body {
 
 .question-info-card {
     border-left: 0;
-    padding: 16px;
+    padding: 18px;
     background:
         linear-gradient(135deg, rgba(255, 51, 0, 0.08), transparent 42%),
         rgba(255, 255, 255, 0.035);
     border: 1px solid var(--border-medium);
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.015);
+}
+
+.question-artifact {
+    border-radius: 0;
+    outline: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.question-artifact-note {
+    margin: 0 0 12px;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.question-artifact-value {
+    display: block;
+    width: 100%;
+    background: rgba(0, 0, 0, 0.42);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 14px;
 }
 
 .question-artifact code,
@@ -544,9 +564,9 @@ body {
 .question-artifact code {
     display: block;
     color: var(--text-white);
-    background: rgba(0, 0, 0, 0.36);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 12px;
+    background: transparent;
+    border: 0;
+    padding: 0;
     line-height: 1.7;
 }
 

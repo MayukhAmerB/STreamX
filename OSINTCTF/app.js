@@ -61,7 +61,15 @@ document.addEventListener("DOMContentLoaded", () => {
             sections.push(`<div class="question-section"><span>Briefing</span>${renderParagraphs(question.briefing)}</div>`);
         }
         if (question.artifact) {
-            sections.push(`<div class="question-section question-info-card question-artifact"><span>Artifact</span><code>${escapeHtml(question.artifact)}</code></div>`);
+            sections.push(`
+                <div class="question-section question-info-card question-artifact">
+                    <span>Artifact Card</span>
+                    <p class="question-artifact-note">Use this supplied evidence exactly as part of the investigation.</p>
+                    <div class="question-artifact-value">
+                        <code>${escapeHtml(question.artifact)}</code>
+                    </div>
+                </div>
+            `);
         }
         if (question.searchPatterns) {
             const patterns = question.searchPatterns
