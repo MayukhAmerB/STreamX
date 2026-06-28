@@ -210,7 +210,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 q: "A mid-2024 breach meme leads through a comment trail to a leetspeak cyber handle. A later aviation-tracking screenshot on that related profile shows a military/government aircraft over the eastern Mediterranean. Submit the aircraft type exactly."
             },
             {
-                q: "Geolocate the street visible in this image and submit the street name only. Evidence image: /materials/certification/baghdad-street.jpg"
+                q: "Geolocate the street visible in this image and submit the street name only.",
+                image: "/materials/certification/baghdad-street.jpg",
+                imageAlt: "Night skyline over western Baghdad with a lit roadway in the foreground"
             },
             {
                 q: "An indexed IPv4 for an exposed camera points to a Kazakh hosting organization. Do not interact with the device. Use passive OSINT to identify the provider's primary domain and submit the public IPv4 address of that provider domain."
@@ -397,6 +399,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const safePlaceholder = escapeHtml(dict.inputPlaceholder);
             const safeSolvedLabel = escapeHtml(dict.btnSolved);
             const safeSubmitLabel = escapeHtml(dict.btnSubmit);
+            const evidenceImageHtml = q.image
+                ? `<figure class="question-evidence"><img src="${escapeHtml(q.image)}" alt="${escapeHtml(q.imageAlt || "Question evidence image")}" loading="lazy"></figure>`
+                : "";
 
             let scoreBadgeHtml = "";
             if (isSolved) {
@@ -418,6 +423,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                 </div>
                 <p class="question-text">${safeQuestion}</p>
+                ${evidenceImageHtml}
                 <div class="answer-row">
                     <input type="text" class="answer-input" id="input-${category}-${idx}"
                            placeholder="${safePlaceholder}" ${isSolved ? "disabled" : ""}>
