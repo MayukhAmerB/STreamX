@@ -528,6 +528,10 @@ body {
 .question-info-card {
     border-left: 0;
     padding: 18px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
     background:
         linear-gradient(135deg, rgba(255, 51, 0, 0.08), transparent 42%),
         rgba(255, 255, 255, 0.035);
@@ -537,7 +541,8 @@ body {
 
 .question-artifact {
     border-radius: 0;
-    outline: 1px solid rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 51, 0, 0.42);
+    outline: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .question-artifact-note {
@@ -550,9 +555,15 @@ body {
 .question-artifact-value {
     display: block;
     width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     background: rgba(0, 0, 0, 0.42);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     padding: 14px;
+    overflow: hidden;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .question-artifact code,
@@ -563,11 +574,17 @@ body {
 
 .question-artifact code {
     display: block;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     color: var(--text-white);
     background: transparent;
     border: 0;
     padding: 0;
     line-height: 1.7;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-all;
 }
 
 .question-patterns {
