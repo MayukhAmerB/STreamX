@@ -501,7 +501,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         feedback.className = "feedback-text error";
                         feedback.textContent = dict.feedbackError;
                     }
-                } catch {
+                } catch (error) {
+                    if (category === "certification") {
+                        certificationUnlockToken = "";
+                        localStorage.removeItem("zenith_ctf_certification_token");
+                        updateCertificationLockState();
+                    }
                     btn.disabled = false;
                     btn.textContent = dict.btnSubmit;
                     feedback.className = "feedback-text error";
@@ -541,7 +546,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!password) return;
 
         certificationUnlockBtn.disabled = true;
-        certificationUnlockFeedback.textContent = "";
+        if (certificationUnlockFeedback) {
+            certificationUnlockFeedback.className = "feedback-text";
+            certificationUnlockFeedback.textContent = "Checking exam password...";
+        }
 
         try {
             const response = await fetch("/api/unlock-certification", {
@@ -551,16 +559,20 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             const result = await response.json().catch(() => ({}));
             if (!response.ok || !result.unlockToken) {
-                throw new Error(result.error || "Unlock failed.");
+                throw new Error(result.error || `Unlock failed with HTTP ${response.status}.`);
             }
             certificationUnlockToken = result.unlockToken;
             localStorage.setItem("zenith_ctf_certification_token", certificationUnlockToken);
             certificationPasswordInput.value = "";
+            renderQuestions("certification");
             updateCertificationLockState();
-        } catch {
+            updateProgressIndicators();
+        } catch (error) {
             const dict = translations[currentLang];
-            certificationUnlockFeedback.textContent = dict.certificationUnlockError || "Invalid password or unlock service unavailable.";
-            certificationUnlockFeedback.className = "feedback-text error";
+            if (certificationUnlockFeedback) {
+                certificationUnlockFeedback.textContent = error.message || dict.certificationUnlockError || "Invalid password or unlock service unavailable.";
+                certificationUnlockFeedback.className = "feedback-text error";
+            }
         } finally {
             certificationUnlockBtn.disabled = false;
         }
