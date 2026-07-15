@@ -11,7 +11,6 @@ const ContactPage = lazy(() => import("../pages/ContactPage"));
 const CourseDetailPage = lazy(() => import("../pages/CourseDetailPage"));
 const CourseListPage = lazy(() => import("../pages/CourseListPage"));
 const CoursePlayerPage = lazy(() => import("../pages/CoursePlayerPage"));
-const CoursePaymentPage = lazy(() => import("../pages/CoursePaymentPage"));
 const CreateCoursePage = lazy(() => import("../pages/CreateCoursePage"));
 const EditCoursePage = lazy(() => import("../pages/EditCoursePage"));
 const FaqPage = lazy(() => import("../pages/FaqPage"));
@@ -53,7 +52,7 @@ export default function AppRoutes() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/id-card" element={<IdCardPage />} />
             <Route path="/learn/:courseId" element={<CoursePlayerPage />} />
-            <Route path="/courses/:id/payment" element={<CoursePaymentPage />} />
+            <Route path="/courses/:id/payment" element={<Navigate to=".." replace relative="path" />} />
             <Route path="/join-live" element={<JoinLivePage />} />
           </Route>
           <Route element={<ProtectedRoute requireModerator />}>

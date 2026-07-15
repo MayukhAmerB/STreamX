@@ -40,7 +40,7 @@ function CourseCard({ course }) {
   }, [course?.id, course?.thumbnail]);
 
   return (
-    <article className="hover-lift panel-gradient group relative flex h-full min-h-[560px] self-stretch flex-col overflow-hidden rounded-[22px] border border-black text-white shadow-[0_20px_48px_rgba(0,0,0,0.28)] transition duration-300 hover:border-[#404040] sm:min-h-[620px]">
+    <article className="hover-lift panel-gradient group relative flex h-full min-h-[560px] self-stretch flex-col overflow-hidden rounded-[22px] border border-black text-white shadow-[0_20px_48px_rgba(0,0,0,0.28)] transition duration-300 hover:border-white/35 sm:min-h-[620px]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(192,192,192,0.12),transparent_42%)]" />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#DCDCDC]/30 to-transparent" />
 
@@ -129,7 +129,7 @@ function CourseCard({ course }) {
           <span className="line-clamp-2 min-h-[1.2rem]">
             {status.isComingSoon
               ? "Join waitlist updates when the track launches."
-              : "Enrollment is open for this track."}
+              : "Request admin-approved access for this track."}
           </span>
         </div>
 
@@ -153,7 +153,7 @@ function CourseCard({ course }) {
                 to={detailsLink}
                 className="glossy inline-flex items-center justify-center rounded-full border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-3 py-2.5 text-sm font-semibold text-[#1A1A1A] shadow-[0_8px_18px_rgba(0,0,0,0.14)] transition hover:bg-[linear-gradient(135deg,#FFFDF2_0%,#F9EFD1_55%,#EEDFB4_100%)]"
               >
-                Live
+                Request Access
               </Link>
             ) : (
               <span className="inline-flex items-center justify-center rounded-full border border-[#B7B7B7] bg-gradient-to-r from-[#CFCFCF] to-[#989898] px-3 py-2.5 text-sm font-semibold text-[#121212] shadow-[0_8px_18px_rgba(0,0,0,0.2)]">

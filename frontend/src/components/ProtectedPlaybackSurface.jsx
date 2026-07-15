@@ -152,6 +152,7 @@ export default function ProtectedPlaybackSurface({
   activeQualityLabel = "",
   qualityControlMessage = "",
   showQualityControl = false,
+  playbackRates = [1, 1.5, 2],
 }) {
   const containerRef = useRef(null);
   const gestureSurfaceRef = useRef(null);
@@ -170,6 +171,7 @@ export default function ProtectedPlaybackSurface({
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
   const [videoPaused, setVideoPaused] = useState(true);
   const [videoMuted, setVideoMuted] = useState(false);
+  const [videoPlaybackRate, setVideoPlaybackRate] = useState(1);
   const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -218,6 +220,7 @@ export default function ProtectedPlaybackSurface({
     setVideoDuration(0);
     setVideoPaused(true);
     setVideoMuted(false);
+    setVideoPlaybackRate(1);
   }, [videoSessionKey]);
 
   function clearSingleToggleTimer() {
@@ -258,6 +261,7 @@ export default function ProtectedPlaybackSurface({
       setVideoCurrentTime(Math.min(nextTime, nextDuration || nextTime));
       setVideoPaused(videoElement.paused);
       setVideoMuted(Boolean(videoElement.muted || videoElement.volume === 0));
+      setVideoPlaybackRate(Number(videoElement.playbackRate) || 1);
     };
 
     syncVideoState();
@@ -274,6 +278,7 @@ export default function ProtectedPlaybackSurface({
       "ended",
       "emptied",
       "volumechange",
+      "ratechange",
     ];
 
     events.forEach((eventName) => {
@@ -299,6 +304,9 @@ export default function ProtectedPlaybackSurface({
   const canSelectQuality =
     showQualityControl && Array.isArray(qualityOptions) && qualityOptions.length > 1 && typeof onQualityChange === "function";
   const shouldShowQualityBadge = showQualityControl && !canSelectQuality && Boolean(activeQualityLabel);
+  const availablePlaybackRates = (Array.isArray(playbackRates) ? playbackRates : [1, 1.5, 2])
+    .map((rate) => Number(rate))
+    .filter((rate, index, rates) => Number.isFinite(rate) && rate > 0 && rates.indexOf(rate) === index);
   const qualityButtonLabel =
     activeQualityLabel
     || qualityOptions.find((option) => option.value === selectedQuality)?.label
@@ -459,7 +467,11 @@ export default function ProtectedPlaybackSurface({
         shouldShowControls ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
       }`
     : "relative z-20 mt-2";
-  const controlsPanelClassName = `${shouldShowControls ? "pointer-events-auto" : "pointer-events-none"} w-full max-w-full rounded-[24px] border border-white/12 bg-[linear-gradient(180deg,rgba(15,18,26,0.88),rgba(8,10,16,0.74))] px-2.5 py-2.5 shadow-[0_18px_40px_rgba(0,0,0,0.34)] backdrop-blur-xl sm:px-3 sm:py-3`;
+  const controlsPanelClassName = `${shouldShowControls ? "pointer-events-auto" : "pointer-events-none"} w-full max-w-full px-2.5 py-2.5 sm:px-3 ${
+    isImmersiveFullscreen
+      ? "rounded-[20px] border border-white/12 bg-black/75 shadow-[0_18px_40px_rgba(0,0,0,0.34)] backdrop-blur-xl sm:py-3"
+      : "border-t border-white/10 bg-black sm:py-2.5"
+  }`;
 
   const seekBySeconds = (deltaSeconds) => {
     const videoElement = videoRef?.current;
@@ -537,6 +549,14 @@ export default function ProtectedPlaybackSurface({
 
     videoElement.muted = !videoElement.muted;
     setVideoMuted(videoElement.muted);
+  };
+
+  const handlePlaybackRateChange = (rate) => {
+    const videoElement = videoRef?.current;
+    if (!videoElement) return;
+
+    videoElement.playbackRate = rate;
+    setVideoPlaybackRate(rate);
   };
 
   const schedulePlaybackToggle = () => {
@@ -732,9 +752,12 @@ export default function ProtectedPlaybackSurface({
                 clearSingleToggleTimer();
                 void handleTogglePlayback();
               }}
-              className="pointer-events-auto inline-flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/12 text-sm font-semibold text-white shadow-[0_18px_55px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:bg-white/18 sm:h-20 sm:w-20 sm:text-base"
+              className="pointer-events-auto inline-flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-black/70 text-white shadow-[0_18px_55px_rgba(0,0,0,0.5)] backdrop-blur-md transition hover:scale-105 hover:bg-[#2A2A2A] sm:h-20 sm:w-20"
+              aria-label="Play video"
             >
-              Play
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="ml-1 h-7 w-7 fill-current sm:h-9 sm:w-9">
+                <path d="M8 5.2v13.6L19 12 8 5.2Z" />
+              </svg>
             </button>
           </div>
         ) : null}
@@ -770,7 +793,7 @@ export default function ProtectedPlaybackSurface({
               <div className="relative min-w-0 flex-1">
                 <div className="absolute left-0 right-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-white/12">
                   <div
-                    className="h-full rounded-full bg-[linear-gradient(90deg,#8b5cf6,#ec4899,#f59e0b)]"
+                    className="h-full rounded-full bg-white"
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
@@ -817,6 +840,30 @@ export default function ProtectedPlaybackSurface({
                 </button>
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                <div
+                  data-playback-gesture-ignore="true"
+                  className="flex shrink-0 items-center rounded-full border border-white/12 bg-black/30 p-0.5"
+                  aria-label="Playback speed"
+                >
+                  {availablePlaybackRates.map((rate) => {
+                    const isActive = Math.abs(videoPlaybackRate - rate) < 0.01;
+                    return (
+                      <button
+                        key={rate}
+                        type="button"
+                        onClick={() => handlePlaybackRateChange(rate)}
+                        aria-pressed={isActive ? "true" : "false"}
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-semibold transition sm:text-xs ${
+                          isActive
+                            ? "bg-white text-[#111111]"
+                            : "text-white/72 hover:bg-white/10 hover:text-white"
+                        }`}
+                      >
+                        {rate}x
+                      </button>
+                    );
+                  })}
+                </div>
                 {canSelectQuality ? (
                   <div
                     ref={qualityMenuRef}

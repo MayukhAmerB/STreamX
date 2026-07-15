@@ -40,8 +40,7 @@
         opacity: 1;
         filter: none;
         transform: none;
-        transition:
-          opacity 760ms cubic-bezier(0.2, 0.68, 0.2, 1);
+        transition: opacity 760ms cubic-bezier(0.2, 0.68, 0.2, 1);
       }
 
       #boot-loader {
@@ -51,7 +50,6 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        isolation: isolate;
         background: #000000;
         opacity: 0;
         will-change: opacity;
@@ -62,262 +60,96 @@
         transition: opacity 220ms ease;
       }
 
-      #boot-loader::before,
-      #boot-loader::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-      }
-
-      #boot-loader::before {
-        background:
-          radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.024), transparent 48%),
-          linear-gradient(180deg, rgba(255, 255, 255, 0.008), rgba(0, 0, 0, 0));
-        opacity: 1;
-      }
-
-      #boot-loader::after {
-        background:
-          radial-gradient(circle at center, transparent 18%, rgba(0, 0, 0, 0.78) 100%);
-      }
-
-      #boot-loader .loader-grid {
-        position: absolute;
-        inset: 0;
-        z-index: 0;
-        overflow: hidden;
-        background: #040404;
-      }
-
-      #boot-loader .loader-grid .loader-brand-bg {
-        position: absolute;
-        inset: 0;
-        background-image: url("https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg");
-        background-position: center;
-        background-size: cover;
-        opacity: 0.42;
-        filter: grayscale(0.85) blur(1.2px);
-        transform: scale(1.035);
-      }
-
-      #boot-loader .loader-grid::before,
-      #boot-loader .loader-grid::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-      }
-
-      #boot-loader .loader-grid::before {
-        background:
-          linear-gradient(180deg, rgba(0, 0, 0, 0.46), rgba(0, 0, 0, 0.58) 56%, rgba(0, 0, 0, 0.72)),
-          radial-gradient(circle at 20% 10%, rgba(255, 255, 255, 0.12), transparent 40%);
-        opacity: 1;
-      }
-
-      #boot-loader .loader-grid::after {
-        background:
-          linear-gradient(
-            180deg,
-            rgba(8, 8, 8, 0.08),
-            rgba(6, 6, 6, 0.2) 62%,
-            rgba(3, 3, 3, 0.34)
-          );
-        opacity: 1;
-      }
-
-      #boot-loader .loader-grid canvas {
-        width: 100%;
-        height: 100%;
-        display: block;
-        opacity: 0.84;
-        filter: none;
-        transform: translateZ(0);
-      }
-
       #boot-loader .loader-content {
         position: relative;
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 22px;
+        gap: 24px;
         z-index: 3;
       }
 
       #boot-loader .loader-mark {
         position: relative;
-        width: min(54vw, 290px);
-        aspect-ratio: 1 / 1;
-        overflow: visible;
+        width: 140px;
+        height: 140px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
       #boot-loader .loader-mark::before {
         content: "";
         position: absolute;
-        inset: 8%;
-        border-radius: 9999px;
-        border: 1px solid rgba(210, 210, 210, 0.3);
-        box-shadow:
-          0 0 20px rgba(160, 160, 160, 0.16),
-          inset 0 0 14px rgba(210, 210, 210, 0.1);
-        animation: halo-pulse 3.6s ease-in-out infinite;
+        inset: -12px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
+        animation: logo-pulse 2s ease-in-out infinite;
         z-index: 1;
       }
 
       #boot-loader .loader-logo {
-        width: 100%;
-        height: 100%;
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
         object-fit: cover;
         display: block;
-        clip-path: circle(47% at 50% 50%);
-        mix-blend-mode: normal;
-        filter: brightness(0.98) contrast(1.08) drop-shadow(0 14px 30px rgba(0, 0, 0, 0.64));
+        border: 2px solid rgba(255, 255, 255, 0.12);
         position: relative;
         z-index: 2;
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.9);
       }
 
-      #boot-loader .loader-orbit {
+      #boot-loader .loader-ring {
         position: absolute;
-        inset: 4%;
-        border-radius: 9999px;
-        animation: orbit-spin 5600ms linear infinite;
-        box-shadow:
-          inset 0 0 0 2px rgba(215, 215, 215, 0.28),
-          0 0 16px rgba(190, 190, 190, 0.1);
-        background: conic-gradient(
-          from 0deg,
-          rgba(225, 225, 225, 0.54) 0deg,
-          rgba(225, 225, 225, 0.3) 75deg,
-          rgba(225, 225, 225, 0.12) 190deg,
-          rgba(225, 225, 225, 0.06) 280deg,
-          rgba(225, 225, 225, 0.5) 360deg
-        );
-        -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
-        mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+        inset: -6px;
+        border-radius: 50%;
+        border: 2px solid transparent;
+        border-top-color: rgba(255, 255, 255, 0.45);
+        border-right-color: rgba(255, 255, 255, 0.15);
+        animation: spin 1s linear infinite;
         z-index: 3;
       }
 
-      #boot-loader .loader-orbit::before {
-        content: "";
-        position: absolute;
-        top: 50%;
-        left: 100%;
-        width: 10px;
-        height: 10px;
-        border-radius: 9999px;
-        background: #d6d6d6;
-        transform: translate(-50%, -50%);
-        box-shadow:
-          0 0 10px rgba(214, 214, 214, 0.48),
-          0 0 18px rgba(214, 214, 214, 0.3);
-      }
-
-      #boot-loader .loader-orbit::after {
-        content: none;
-      }
-
-      #boot-loader .loader-console {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
+      #boot-loader .loader-text {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 15px;
+        font-weight: 500;
+        letter-spacing: 0.22em;
+        color: rgba(255, 255, 255, 0.85);
+        text-transform: uppercase;
         margin: 0;
-        padding: 6px 12px;
-        border: 1px solid rgba(222, 222, 222, 0.22);
-        border-radius: 9999px;
-        background: rgba(12, 12, 12, 0.66);
-        font-family: Consolas, "Courier New", monospace;
-        font-size: 14px;
-        font-weight: 600;
-        color: rgba(229, 229, 229, 0.94);
-        letter-spacing: 0.1em;
-        text-transform: none;
-        text-shadow: 0 0 12px rgba(255, 255, 255, 0.14);
+        opacity: 0.9;
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
       }
 
-      #boot-loader .loader-prompt {
-        color: rgba(232, 232, 232, 0.95);
-      }
-
-      #boot-loader .loader-typed {
-        display: inline-block;
-        overflow: hidden;
-        white-space: nowrap;
-        clip-path: inset(0 100% 0 0);
-        letter-spacing: 0.06em;
-        border-right: 2px solid rgba(234, 234, 234, 0.9);
-        animation:
-          type-word 1.8s steps(24, end) 180ms forwards,
-          caret-blink 720ms step-end infinite;
-      }
-
-      @media (max-width: 720px) {
-        #boot-loader .loader-console {
-          font-size: 12px;
-          letter-spacing: 0.08em;
-        }
-      }
-
-      body.app-ready #boot-loader {
-        opacity: 0;
-        filter: none;
-        transform: none;
-        pointer-events: none;
-        transition:
-          opacity 860ms cubic-bezier(0.2, 0.68, 0.2, 1);
-      }
-
-      @keyframes orbit-spin {
-        from {
-          transform: rotate(0deg);
-        }
-
+      @keyframes spin {
         to {
           transform: rotate(360deg);
         }
       }
 
-      @keyframes halo-pulse {
-        0%,
-        100% {
-          transform: scale(0.992);
-          opacity: 0.52;
+      @keyframes logo-pulse {
+        0%, 100% {
+          transform: scale(0.95);
+          opacity: 0.4;
         }
-
         50% {
-          transform: scale(1.014);
-          opacity: 0.78;
+          transform: scale(1.08);
+          opacity: 0.8;
         }
       }
 
-      @keyframes type-word {
-        from {
-          clip-path: inset(0 100% 0 0);
-        }
-
-        to {
-          clip-path: inset(0 0 0 0);
-        }
-      }
-
-      @keyframes caret-blink {
-        0%, 49% {
-          border-color: rgba(234, 234, 234, 0.9);
-        }
-
-        50%, 100% {
-          border-color: transparent;
-        }
+      body.app-ready #boot-loader {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 600ms cubic-bezier(0.2, 0.68, 0.2, 1);
       }
     </style>
     <title>Al syed Initiative</title>
   </head>
   <body class="bg-ink preload-active notranslate" translate="no">
     <div id="boot-loader" role="status" aria-label="Loading Al syed Initiative">
-      <div class="loader-grid" aria-hidden="true">
-        <div class="loader-brand-bg"></div>
-        <canvas id="loader-grid-canvas"></canvas>
-      </div>
       <div class="loader-content">
         <div class="loader-mark">
           <img
@@ -328,12 +160,9 @@
             decoding="sync"
             fetchpriority="high"
           />
-          <span class="loader-orbit" aria-hidden="true"></span>
+          <div class="loader-ring"></div>
         </div>
-        <p class="loader-console" aria-hidden="true">
-          <span class="loader-prompt">&gt;</span>
-          <span class="loader-typed">Al Syed HQ</span>
-        </p>
+        <p class="loader-text">Al syed Initiative</p>
       </div>
     </div>
     <div id="root"></div>
@@ -362,277 +191,6 @@
           logo.addEventListener("error", markReady, { once: true });
           window.setTimeout(markReady, 350);
         }
-
-        var canvas = document.getElementById("loader-grid-canvas");
-        if (!canvas) return;
-        var ctx = canvas.getContext("2d", { alpha: true, desynchronized: true });
-        if (!ctx) return;
-
-        var dpr = 1;
-        var width = 0;
-        var height = 0;
-        var cell = 32;
-        var rafId = 0;
-        var active = true;
-        var glyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        var matrixGlyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        var matrixColumns = [];
-        var matrixSpacing = 20;
-        var matrixCharSize = 12;
-        var gridTextSize = 10;
-        var matrixFont = "12px Consolas, 'Courier New', monospace";
-        var glowAGradient = null;
-        var glowBGradient = null;
-        var pausedForHiddenTab = false;
-        var prefersReducedMotion =
-          window.matchMedia &&
-          window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-        function clamp(value, min, max) {
-          return Math.min(max, Math.max(min, value));
-        }
-
-        function distort(x, y, t) {
-          var waveX = Math.sin(x * 0.012 + t * 0.9) * 4.2;
-          var waveY = Math.cos(y * 0.014 - t * 0.8) * 3.8;
-          var swirl = Math.sin((x + y) * 0.008 - t * 0.55) * 2.8;
-          return [x + waveX + swirl, y + waveY - swirl * 0.45];
-        }
-
-        function createMatrixColumns() {
-          matrixSpacing = clamp(Math.floor(cell * 0.74), 16, 28);
-          matrixCharSize = clamp(Math.floor(cell * 0.44), 11, 18);
-          var count = Math.min(180, Math.ceil(width / matrixSpacing) + 2);
-          matrixColumns = [];
-
-          for (var index = 0; index < count; index += 1) {
-            matrixColumns.push({
-              x: index * matrixSpacing + Math.random() * matrixSpacing * 0.45,
-              speed: 0.72 + Math.random() * 0.68,
-              offset: Math.random() * (height + 320),
-              tail: Math.floor(8 + Math.random() * 10),
-              seed: Math.floor(Math.random() * matrixGlyphs.length),
-              jitter: (Math.random() * 2 - 1) * matrixSpacing * 0.2,
-            });
-          }
-        }
-
-        function updateStaticPaintState() {
-          glowAGradient = ctx.createRadialGradient(
-            width * 0.18,
-            height * 0.12,
-            0,
-            width * 0.18,
-            height * 0.12,
-            width * 0.6
-          );
-          glowAGradient.addColorStop(0, "rgba(255, 255, 255, 0.12)");
-          glowAGradient.addColorStop(1, "rgba(255, 255, 255, 0)");
-
-          glowBGradient = ctx.createRadialGradient(
-            width * 0.82,
-            height * 0.86,
-            0,
-            width * 0.82,
-            height * 0.86,
-            width * 0.54
-          );
-          glowBGradient.addColorStop(0, "rgba(220, 220, 220, 0.1)");
-          glowBGradient.addColorStop(1, "rgba(220, 220, 220, 0)");
-
-          gridTextSize = Math.max(9, Math.floor(cell * 0.34));
-          matrixFont = matrixCharSize + "px Consolas, 'Courier New', monospace";
-        }
-
-        function drawMatrixRain(t) {
-          if (!matrixColumns.length) {
-            return;
-          }
-
-          var rowStep = Math.max(12, Math.floor(matrixCharSize * 1.24));
-          ctx.font = matrixFont;
-          ctx.textBaseline = "middle";
-
-          for (var cIndex = 0; cIndex < matrixColumns.length; cIndex += 1) {
-            var column = matrixColumns[cIndex];
-            var cycleHeight = height + column.tail * rowStep + 120;
-            var head = (t * rowStep * 8.2 * column.speed + column.offset) % cycleHeight - column.tail * rowStep;
-
-            for (var tailStep = 0; tailStep < column.tail; tailStep += 1) {
-              var y = head - tailStep * rowStep;
-              if (y < -rowStep || y > height + rowStep) {
-                continue;
-              }
-
-              var flicker = Math.sin(t * 7 + column.seed * 0.9 + tailStep * 0.38) * 0.5 + 0.5;
-              var alpha = (1 - tailStep / column.tail) * (0.16 + flicker * 0.34);
-              if (alpha < 0.02) {
-                continue;
-              }
-
-              var glyphIndex = Math.abs(
-                Math.floor(t * 34 + column.seed + tailStep * 11 + y * 0.08 + cIndex * 3)
-              ) % matrixGlyphs.length;
-              var glyph = matrixGlyphs[glyphIndex];
-              var x = column.x + Math.sin(t * 0.92 + tailStep * 0.46) * column.jitter;
-
-              if (tailStep === 0) {
-                  ctx.fillStyle = "rgba(255, 255, 255," + Math.min(0.82, 0.58 + flicker * 0.22) + ")";
-                } else {
-                  ctx.fillStyle = "rgba(210, 210, 210," + Math.min(0.7, alpha) + ")";
-                }
-                ctx.fillText(glyph, x, y);
-              }
-            }
-          }
-
-        function drawGrid(t) {
-          ctx.clearRect(0, 0, width, height);
-          ctx.fillStyle = "rgba(4, 4, 4, 0.24)";
-          ctx.fillRect(0, 0, width, height);
-
-          ctx.fillStyle = glowAGradient;
-          ctx.fillRect(0, 0, width, height);
-
-          ctx.fillStyle = glowBGradient;
-          ctx.fillRect(0, 0, width, height);
-
-          var sampleStep = Math.max(8, Math.floor(cell * 0.34));
-          var maxX = width + cell * 2;
-          var maxY = height + cell * 2;
-
-          for (var y = -cell; y <= maxY; y += cell) {
-            ctx.beginPath();
-            var firstInRow = true;
-            for (var x = -cell; x <= maxX; x += sampleStep) {
-              var distortedRow = distort(x, y, t);
-              if (firstInRow) {
-                ctx.moveTo(distortedRow[0], distortedRow[1]);
-                firstInRow = false;
-              } else {
-                ctx.lineTo(distortedRow[0], distortedRow[1]);
-              }
-            }
-            var rowIndex = Math.round((y + cell) / cell);
-            ctx.strokeStyle =
-              rowIndex % 4 === 0 ? "rgba(255, 255, 255, 0.24)" : "rgba(230, 230, 230, 0.16)";
-            ctx.lineWidth = 1;
-            ctx.stroke();
-          }
-
-          for (var gx = -cell; gx <= maxX; gx += cell) {
-            ctx.beginPath();
-            var firstInCol = true;
-            for (var gy = -cell; gy <= maxY; gy += sampleStep) {
-              var distortedCol = distort(gx, gy, t);
-              if (firstInCol) {
-                ctx.moveTo(distortedCol[0], distortedCol[1]);
-                firstInCol = false;
-              } else {
-                ctx.lineTo(distortedCol[0], distortedCol[1]);
-              }
-            }
-            var colIndex = Math.round((gx + cell) / cell);
-            ctx.strokeStyle =
-              colIndex % 5 === 0 ? "rgba(245, 245, 245, 0.22)" : "rgba(215, 215, 215, 0.15)";
-            ctx.lineWidth = 1;
-            ctx.stroke();
-          }
-
-          ctx.font = gridTextSize + "px Consolas, 'Courier New', monospace";
-          ctx.textBaseline = "middle";
-
-          for (var glyphY = -cell; glyphY <= maxY; glyphY += cell * 2) {
-            for (var glyphX = -cell; glyphX <= maxX; glyphX += cell * 2) {
-              var signal = Math.sin(glyphX * 0.018 + glyphY * 0.016 + t * 1.1);
-              if (signal < 0.38) continue;
-              var glyphPos = distort(glyphX, glyphY, t);
-              var idx = Math.abs(Math.floor(glyphX * 7 + glyphY * 11 + t * 28)) % glyphs.length;
-              var glyph = glyphs[idx];
-              ctx.fillStyle =
-                signal > 0.88 ? "rgba(255, 255, 255, 0.52)" : "rgba(228, 228, 228, 0.38)";
-              ctx.fillText(glyph, glyphPos[0], glyphPos[1]);
-              if (signal > 0.7) {
-                ctx.fillStyle = "rgba(206, 206, 206, 0.26)";
-                ctx.fillText(
-                  glyphs[(idx + 17) % glyphs.length],
-                  glyphPos[0] + cell * 0.32,
-                  glyphPos[1] + cell * 0.26
-                );
-              }
-            }
-          }
-
-          drawMatrixRain(t);
-        }
-
-        function stopAnimation() {
-          active = false;
-          window.clearTimeout(forceBootTimeout);
-          if (rafId) {
-            window.cancelAnimationFrame(rafId);
-          }
-          window.removeEventListener("resize", resize);
-          document.removeEventListener("visibilitychange", handleVisibilityChange);
-        }
-
-        function drawFrame(timestamp) {
-          if (!active || !document.body.contains(loader)) {
-            stopAnimation();
-            return;
-          }
-
-          if (document.body.classList.contains("app-ready")) {
-            stopAnimation();
-            return;
-          }
-
-          drawGrid(timestamp * 0.001);
-          rafId = window.requestAnimationFrame(drawFrame);
-        }
-
-        function handleVisibilityChange() {
-          if (!active) return;
-          if (document.visibilityState === "hidden") {
-            pausedForHiddenTab = true;
-            if (rafId) {
-              window.cancelAnimationFrame(rafId);
-              rafId = 0;
-            }
-            return;
-          }
-          if (
-            pausedForHiddenTab &&
-            !prefersReducedMotion &&
-            !document.body.classList.contains("app-ready")
-          ) {
-            pausedForHiddenTab = false;
-            rafId = window.requestAnimationFrame(drawFrame);
-          }
-        }
-
-        function resize() {
-          dpr = Math.min(window.devicePixelRatio || 1, 2);
-          width = Math.max(window.innerWidth, 1);
-          height = Math.max(window.innerHeight, 1);
-          cell = clamp(Math.floor(width / 44), 28, 42);
-          canvas.width = Math.floor(width * dpr);
-          canvas.height = Math.floor(height * dpr);
-          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          createMatrixColumns();
-          updateStaticPaintState();
-          drawGrid(0);
-        }
-
-        resize();
-        if (prefersReducedMotion) {
-          drawGrid(0);
-        } else {
-          rafId = window.requestAnimationFrame(drawFrame);
-        }
-
-        window.addEventListener("resize", resize);
-        document.addEventListener("visibilitychange", handleVisibilityChange);
       })();
     </script>
     <script type="module" src="/src/main.jsx"></script>

@@ -218,6 +218,17 @@ export default function CoursePlayerPage() {
     };
   }, [course]);
 
+  const orderedLectures = useMemo(() => flattenCourseLectures(course), [course]);
+  const selectedLectureIndex = useMemo(
+    () => orderedLectures.findIndex((lecture) => lecture.id === selectedLecture?.id),
+    [orderedLectures, selectedLecture?.id]
+  );
+  const previousLecture = selectedLectureIndex > 0 ? orderedLectures[selectedLectureIndex - 1] : null;
+  const nextLecture =
+    selectedLectureIndex >= 0 && selectedLectureIndex < orderedLectures.length - 1
+      ? orderedLectures[selectedLectureIndex + 1]
+      : null;
+
   const activeLectureDetails = useMemo(() => {
     if (!selectedLecture?.id) return selectedLecture;
     return flattenCourseLectures(course).find((lecture) => lecture.id === selectedLecture.id) || selectedLecture;
@@ -715,12 +726,9 @@ export default function CoursePlayerPage() {
   }
 
   return (
-    <PageShell
-      title={course?.title || "Course"}
-      subtitle={`${course?.sections?.length || 0} sections - ${lectureCount} lectures`}
-    >
-      <div className="grid items-start gap-5 xl:grid-cols-[340px_1fr]">
-        <aside className="self-start overflow-x-hidden rounded-[28px] border border-black panel-gradient shadow-[0_20px_60px_rgba(0,0,0,0.28)] xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto">
+    <PageShell containerClassName="!max-w-[1600px] pt-4">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
+        <aside className="order-2 self-start overflow-x-hidden rounded-2xl border border-[#2A2A2A] bg-[#0F0F0F] shadow-[0_20px_60px_rgba(0,0,0,0.28)] xl:sticky xl:top-6 xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto">
           <div className="border-b border-[#303030] bg-[radial-gradient(circle_at_top,rgba(192,192,192,0.12),transparent_48%)] p-5">
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#949494]">
               Course Videos
@@ -793,9 +801,9 @@ export default function CoursePlayerPage() {
                         key={lecture.id}
                         type="button"
                         onClick={() => handleSelectLecture(lecture, section)}
-                        className={`flex w-full items-start gap-3 px-3 py-3 text-left transition ${
+                        className={`relative flex w-full items-start gap-3 px-3 py-3 text-left transition ${
                           isActive
-                            ? "bg-[#DFDFDF] text-[#1D1D1D]"
+                            ? "bg-[#252525] text-white before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-white/80"
                             : "bg-[#0C0C0C] text-[#D9D9D9] hover:bg-[#151515]"
                         }`}
                       >
@@ -805,14 +813,14 @@ export default function CoursePlayerPage() {
                             alt=""
                             onError={() => setThumbnailFailed(true)}
                             className={`h-14 w-20 shrink-0 rounded-xl object-cover ${
-                              isActive ? "border border-[#BDBDBD]" : "border border-[#2A2A2A]"
+                              isActive ? "border border-[#555555]" : "border border-[#2A2A2A]"
                             }`}
                           />
                         ) : (
                           <div
                             className={`relative flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border ${
                               isActive
-                                ? "border-[#BDBDBD] bg-[linear-gradient(135deg,#D8D8D8,#8C8C8C)]"
+                                ? "border-[#555555] bg-[linear-gradient(135deg,#333333,#111111)]"
                                 : "border-[#2A2A2A] bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.16),transparent_34%),linear-gradient(135deg,#1E1E1E,#070707)]"
                             }`}
                           >
@@ -823,7 +831,7 @@ export default function CoursePlayerPage() {
                             <div
                               className={`relative flex h-6 w-6 items-center justify-center rounded-full border text-[9px] font-semibold ${
                                 isActive
-                                  ? "border-black/20 bg-black/18 text-black"
+                                  ? "border-white/25 bg-white/15 text-white"
                                   : "border-white/20 bg-white/12 text-white"
                               }`}
                             >
@@ -837,7 +845,7 @@ export default function CoursePlayerPage() {
                               <div className="line-clamp-2 text-sm font-semibold">{lecture.title}</div>
                               <div
                                 className={`mt-1 text-xs ${
-                                  isActive ? "text-[#3A3A3A]" : "text-[#949494]"
+                                  isActive ? "text-[#B8B8B8]" : "text-[#949494]"
                                 }`}
                               >
                                 {lectureProgress?.completed
@@ -886,42 +894,9 @@ export default function CoursePlayerPage() {
           </div>
         </aside>
 
-        <section className="overflow-hidden rounded-[28px] border border-black panel-gradient shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
-          <div className="border-b border-[#222222] bg-[radial-gradient(circle_at_top_right,rgba(192,192,192,0.15),transparent_36%)] p-5">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#949494]">
-                  Lesson Workspace
-                </div>
-                <h2 className="mt-2 text-2xl font-semibold text-white">
-                  {selectedLecture?.title || "Select a lecture"}
-                </h2>
-                {selectedLecture?.section_title ? (
-                  <p className="mt-1 text-sm text-[#BBBBBB]">{selectedLecture.section_title}</p>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {activeProgress?.completed ? (
-                  <span className="rounded-full border border-zinc-300/80 bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-900">
-                    Completed
-                  </span>
-                ) : null}
-                {activeProgress?.resume_position_seconds ? (
-                  <span className="rounded-full border border-[#DADADA]/15 bg-white/5 px-3 py-1 text-xs font-semibold text-[#E0E0E0]">
-                    Resume {formatSeconds(activeProgress.resume_position_seconds)}
-                  </span>
-                ) : null}
-                {progressState.saving ? (
-                  <span className="rounded-full border border-[#DADADA]/15 bg-white/5 px-3 py-1 text-xs font-semibold text-[#E0E0E0]">
-                    Saving...
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          <div className="p-5">
-            <div className="overflow-hidden rounded-[24px] border border-black bg-black">
+        <section className="order-1 min-w-0">
+          <div>
+            <div className="overflow-hidden rounded-2xl border border-[#242424] bg-black shadow-[0_22px_70px_rgba(0,0,0,0.42)]">
               <ProtectedPlaybackSurface
                 className="aspect-video"
                 watermarkEnabled={Boolean(videoUrl)}
@@ -953,6 +928,55 @@ export default function CoursePlayerPage() {
                   </div>
                 )}
               </ProtectedPlaybackSurface>
+            </div>
+
+            <div className="border-b border-[#242424] px-1 pb-5 pt-5">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#FF5638]">
+                    {selectedLecture?.section_title || "Course lesson"}
+                  </div>
+                  <h2 className="mt-2 text-2xl font-semibold leading-tight text-white sm:text-3xl">
+                    {selectedLecture?.title || "Select a lecture"}
+                  </h2>
+                  <p className="mt-2 text-sm text-[#9E9E9E]">
+                    {course?.title} - {lectureStats.completedCount} of {lectureStats.total} lessons completed
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {activeProgress?.completed ? (
+                    <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-200">
+                      Completed
+                    </span>
+                  ) : null}
+                  {activeProgress?.resume_position_seconds ? (
+                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-[#E0E0E0]">
+                      Resume {formatSeconds(activeProgress.resume_position_seconds)}
+                    </span>
+                  ) : null}
+                  {progressState.saving ? (
+                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-[#E0E0E0]">
+                      Saving progress...
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => previousLecture && handleSelectLecture(previousLecture)}
+                    disabled={!previousLecture}
+                    className="rounded-full border border-white/10 bg-[#171717] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#242424] disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => nextLecture && handleSelectLecture(nextLecture)}
+                    disabled={!nextLecture}
+                    className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#111111] transition hover:bg-[#E4E4E4] disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    Next lesson
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="mt-5 grid items-stretch gap-4 lg:grid-cols-[1.2fr_0.8fr]">

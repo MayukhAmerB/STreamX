@@ -42,8 +42,8 @@ const faqItems = [
     ],
   },
   {
-    question: "How will I get access after payment?",
-    beforeBullets: "Once your payment is confirmed:",
+    question: "How will I get access after approval?",
+    beforeBullets: "Once admin approves your request:",
     bullets: [
       "You will receive a unique roll number on your provided contact number",
       "Along with your username and password",
@@ -74,8 +74,8 @@ const faqItems = [
     question: "Do you offer refunds?",
     paragraphs: [
       "No, we have a strict no-refund policy.",
-      "Since this is a digital course and access credentials (roll number, username, and password) are issued after enrollment, all purchases are final and non-reversible.",
-      "We strongly recommend reviewing all course details before making a payment.",
+      "Since this is a digital course and access credentials (roll number, username, and password) are issued after approval, all confirmed enrollments are final and non-reversible.",
+      "We strongly recommend reviewing all course details before requesting access.",
     ],
   },
   {

@@ -187,6 +187,15 @@ class CreateOrderView(APIView):
     throttle_scope = "payment_create"
 
     def post(self, request):
+        if not getattr(settings, "DIRECT_COURSE_PAYMENTS_ENABLED", False):
+            log_security_event("payment.create_order_disabled", request=request)
+            return api_response(
+                success=False,
+                message="Direct course payment is disabled.",
+                errors={"detail": "Course access is managed through admin-approved requests."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
         serializer = CreateOrderSerializer(data=request.data)
         if not serializer.is_valid():
             log_security_event("payment.create_order_invalid", request=request, errors=serializer.errors)
@@ -277,6 +286,15 @@ class VerifyPaymentView(APIView):
     throttle_scope = "payment_verify"
 
     def post(self, request):
+        if not getattr(settings, "DIRECT_COURSE_PAYMENTS_ENABLED", False):
+            log_security_event("payment.verify_disabled", request=request)
+            return api_response(
+                success=False,
+                message="Direct course payment is disabled.",
+                errors={"detail": "Course access is managed through admin-approved requests."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
         serializer = VerifyPaymentSerializer(data=request.data)
         if not serializer.is_valid():
             log_security_event("payment.verify_invalid", request=request, errors=serializer.errors)

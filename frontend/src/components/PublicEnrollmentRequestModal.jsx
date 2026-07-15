@@ -56,7 +56,7 @@ export default function PublicEnrollmentRequestModal({
     if (hasSelectedTarget && (!Number.isInteger(numericTargetId) || numericTargetId <= 0)) {
       setState({
         loading: false,
-        error: "Enrollment request is unavailable for this preview item.",
+        error: "Access request is unavailable for this preview item.",
         success: "",
       });
       return;
@@ -124,13 +124,13 @@ export default function PublicEnrollmentRequestModal({
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
-              Guest Enrollment
+              Access Request
             </div>
             <h3 className="mt-1 font-reference text-2xl font-semibold text-white">{heading}</h3>
             <p className="mt-2 text-sm text-[#BBBBBB]">
               {targetName
                 ? `Target: ${targetName}`
-                : "Share your details and the courses you are interested in. Our team will contact you for enrollment."}
+                : "Share your details and the courses or live classes you are interested in. Our team will contact you."}
             </p>
           </div>
           <button
@@ -178,11 +178,11 @@ export default function PublicEnrollmentRequestModal({
           <FormInput
             as="textarea"
             rows={4}
-            label="Why Do You Want To Enroll?"
+            label="What Access Do You Need?"
             name="message"
             value={form.message}
             onChange={handleChange}
-            placeholder="Write your reason for enrolling. This field is required."
+            placeholder="Write the course or live class access you need. This field is required."
             required
           />
 
@@ -213,7 +213,7 @@ export default function PublicEnrollmentRequestModal({
             </Button>
             <Link to={loginPath} onClick={onClose} className="inline-flex">
               <Button type="button" variant="secondary">
-                Login Instead
+                Already Registered? Login
               </Button>
             </Link>
           </div>

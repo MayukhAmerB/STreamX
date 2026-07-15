@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { hasReachedGuestPromptScrollPoint, reserveGuestEnrollmentPrompt } from "./LandingPage";
+import {
+  hasReachedGuestPromptScrollPoint,
+  reserveGuestEnrollmentPrompt,
+} from "../utils/guestEnrollmentPrompt";
 
 function createStorage() {
   const values = new Map();

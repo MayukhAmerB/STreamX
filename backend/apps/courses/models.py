@@ -871,3 +871,70 @@ class PublicEnrollmentLead(models.Model):
         else:
             target = "General enquiry"
         return f"{self.email} -> {target}"
+
+
+class EnrollmentRequestNotification(models.Model):
+    CHANNEL_WHATSAPP = "whatsapp"
+    STATUS_PENDING = "pending"
+    STATUS_SENT = "sent"
+    STATUS_FAILED = "failed"
+    STATUS_SKIPPED = "skipped"
+    CHANNEL_CHOICES = [
+        (CHANNEL_WHATSAPP, "WhatsApp"),
+    ]
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_SENT, "Sent"),
+        (STATUS_FAILED, "Failed"),
+        (STATUS_SKIPPED, "Skipped"),
+    ]
+
+    public_lead = models.ForeignKey(
+        PublicEnrollmentLead,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="request_notifications",
+    )
+    enrollment = models.ForeignKey(
+        Enrollment,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="request_notifications",
+    )
+    live_class_enrollment = models.ForeignKey(
+        LiveClassEnrollment,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="request_notifications",
+    )
+    channel = models.CharField(max_length=20, choices=CHANNEL_CHOICES, default=CHANNEL_WHATSAPP)
+    destination = models.CharField(max_length=32, blank=True, default="")
+    message = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    attempts = models.PositiveIntegerField(default=0)
+    provider_response = models.JSONField(default=dict, blank=True)
+    last_error = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "Enrollment Request Notification"
+        verbose_name_plural = "Enrollment Request Notifications"
+        indexes = [
+            models.Index(fields=["channel", "status", "created_at"]),
+            models.Index(fields=["public_lead", "created_at"]),
+            models.Index(fields=["enrollment", "created_at"]),
+            models.Index(fields=["live_class_enrollment", "created_at"]),
+        ]
+
+    def clean(self):
+        super().clean()
+        validate_no_active_content(self.message, "message")
+
+    def __str__(self):
+        return f"{self.get_channel_display()} request notification #{self.id}"

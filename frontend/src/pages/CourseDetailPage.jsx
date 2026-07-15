@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 import PublicEnrollmentRequestModal from "../components/PublicEnrollmentRequestModal";
@@ -11,7 +11,6 @@ import { formatINR } from "../utils/currency";
 
 const pageBackgroundImage =
   "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
-const ENABLE_DIRECT_PAYMENTS = String(import.meta.env.VITE_ENABLE_PAYMENTS || "").trim() === "1";
 
 function normalizeEnrollmentStatus(value) {
   const raw = String(value || "none").toLowerCase();
@@ -106,7 +105,6 @@ function buildExtendedCourseDescription(course, sections) {
 
 export default function CourseDetailPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -222,9 +220,7 @@ export default function CourseDetailPage() {
     if (configured) return configured;
     return launchStatus.isComingSoon
       ? "This track is not live yet. We will open enrollment once the curriculum release is ready."
-      : ENABLE_DIRECT_PAYMENTS
-        ? "Payment (Card/UPI) works after backend and Razorpay credentials are configured."
-        : "Enrollment requests are reviewed by admin. Course access is enabled after approval.";
+      : "Access requests are reviewed by admin. Course access is enabled only after approval.";
   }, [course?.enrollment_message, launchStatus.isComingSoon]);
   const snapshotCategoryText = useMemo(
     () => String(course?.snapshot_category || "").trim() || formatCategory(course?.category),
@@ -250,15 +246,15 @@ export default function CourseDetailPage() {
         </Button>
       ) : hasApprovedEnrollment ? (
         <Link to={`/learn/${course.id}`} className="block">
-          <Button className={className}>Go to Course</Button>
+          <Button className={className}>Continue Course</Button>
         </Link>
-      ) : normalizedEnrollmentStatus === "pending" && !ENABLE_DIRECT_PAYMENTS ? (
+      ) : normalizedEnrollmentStatus === "pending" ? (
         <Button className={className} disabled>
-          Enrollment Pending
+          Request Pending
         </Button>
       ) : (
         <Button className={className} onClick={handleEnrollNow} loading={enrollmentState.loading}>
-          Buy
+          Request Access
         </Button>
       )}
       {showFeedback && enrollmentState.error ? (
@@ -274,10 +270,6 @@ export default function CourseDetailPage() {
     if (launchStatus.isComingSoon) return;
     if (!isAuthenticated) {
       setShowPublicLeadModal(true);
-      return;
-    }
-    if (ENABLE_DIRECT_PAYMENTS) {
-      navigate(`/courses/${id}/payment`);
       return;
     }
 
@@ -301,13 +293,13 @@ export default function CourseDetailPage() {
         success:
           response?.data?.message ||
           (enrollmentStatus === "approved"
-            ? "Enrollment approved."
-            : "Enrollment request submitted and pending admin approval."),
+            ? "Access approved."
+            : "Access request submitted. Admin will review it and contact you."),
       });
     } catch (err) {
       setEnrollmentState({
         loading: false,
-        error: apiMessage(err, "Unable to submit enrollment request."),
+        error: apiMessage(err, "Unable to submit access request."),
         success: "",
       });
     }
@@ -393,7 +385,7 @@ export default function CourseDetailPage() {
                   {launchStatus.isComingSoon ? "Coming Soon" : formatINR(course.price)}
                 </div>
                 <div className="mt-1 text-xs text-[#BBBBBB]">
-                  {launchStatus.isComingSoon ? "Waitlist release" : "One-time enrollment"}
+                  {launchStatus.isComingSoon ? "Waitlist release" : "Admin-approved access"}
                 </div>
               </div>
             </div>

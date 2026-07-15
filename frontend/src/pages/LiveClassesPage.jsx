@@ -145,7 +145,7 @@ export default function LiveClassesPage() {
         ...prev,
         [liveClassId]: {
           loading: false,
-          error: "Enrollment is unavailable in preview mode.",
+          error: "Access request is unavailable in preview mode.",
           success: "",
         },
       }));
@@ -183,13 +183,13 @@ export default function LiveClassesPage() {
             response?.data?.message ||
             (enrollmentStatus === "approved"
               ? "Already enrolled."
-              : "Enrollment request submitted for admin approval."),
+              : "Access request submitted. Admin will review it and contact you."),
         },
       }));
     } catch (err) {
       setActionState((prev) => ({
         ...prev,
-        [liveClassId]: { loading: false, error: apiMessage(err, "Unable to enroll."), success: "" },
+        [liveClassId]: { loading: false, error: apiMessage(err, "Unable to submit access request."), success: "" },
       }));
     }
   };
@@ -359,11 +359,11 @@ export default function LiveClassesPage() {
                   <div className="mt-auto pt-4">
                     {course.is_enrolled || String(course.enrollment_status || "").toLowerCase() === "approved" ? (
                       <Button className="w-full" disabled>
-                        Enrolled
+                        Access Approved
                       </Button>
                     ) : String(course.enrollment_status || "").toLowerCase() === "pending" ? (
                       <Button className="w-full" disabled>
-                        Pending Approval
+                        Request Pending
                       </Button>
                     ) : isAuthenticated ? (
                       <Button
@@ -371,7 +371,7 @@ export default function LiveClassesPage() {
                         onClick={() => handleEnroll(course.id)}
                         loading={Boolean(actionState[course.id]?.loading)}
                       >
-                        Enroll
+                        Request Access
                       </Button>
                     ) : (
                       <Button
@@ -383,7 +383,7 @@ export default function LiveClassesPage() {
                               ...prev,
                               [course.id]: {
                                 loading: false,
-                                error: "Enrollment is unavailable in preview mode.",
+                                error: "Access request is unavailable in preview mode.",
                                 success: "",
                               },
                             }));
@@ -395,7 +395,7 @@ export default function LiveClassesPage() {
                           });
                         }}
                       >
-                        Enroll
+                        Request Access
                       </Button>
                     )}
                     {actionState[course.id]?.error ? (

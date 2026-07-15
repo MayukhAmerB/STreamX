@@ -10,6 +10,7 @@ from django.utils.translation import ngettext
 from .models import (
     Course,
     Enrollment,
+    EnrollmentRequestNotification,
     GuideVideo,
     Lecture,
     LectureQuestion,
@@ -1140,6 +1141,66 @@ class PublicEnrollmentLeadAdmin(admin.ModelAdmin):
             % updated,
             level=messages.SUCCESS,
         )
+
+
+@admin.register(EnrollmentRequestNotification)
+class EnrollmentRequestNotificationAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "channel",
+        "status",
+        "destination",
+        "request_target",
+        "attempts",
+        "created_at",
+        "sent_at",
+    )
+    list_filter = ("channel", "status", "created_at", "sent_at")
+    search_fields = (
+        "destination",
+        "message",
+        "public_lead__email",
+        "public_lead__whatsapp_number",
+        "enrollment__user__email",
+        "live_class_enrollment__user__email",
+        "enrollment__course__title",
+        "live_class_enrollment__live_class__title",
+    )
+    readonly_fields = (
+        "public_lead",
+        "enrollment",
+        "live_class_enrollment",
+        "channel",
+        "destination",
+        "message",
+        "status",
+        "attempts",
+        "provider_response",
+        "last_error",
+        "created_at",
+        "updated_at",
+        "sent_at",
+    )
+    ordering = ("-created_at",)
+    date_hierarchy = "created_at"
+    list_per_page = 100
+    fieldsets = (
+        ("Request Link", {"fields": ("public_lead", "enrollment", "live_class_enrollment")}),
+        ("Delivery", {"fields": ("channel", "destination", "status", "attempts", "sent_at")}),
+        ("Message", {"fields": ("message",)}),
+        ("Provider", {"fields": ("provider_response", "last_error"), "classes": ("collapse",)}),
+        ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
+    )
+
+    @admin.display(description="Target")
+    def request_target(self, obj):
+        if obj.public_lead_id:
+            return str(obj.public_lead)
+        if obj.enrollment_id:
+            return f"{obj.enrollment.user.email} -> {obj.enrollment.course.title}"
+        if obj.live_class_enrollment_id:
+            return f"{obj.live_class_enrollment.user.email} -> {obj.live_class_enrollment.live_class.title}"
+        return "-"
 
     def has_add_permission(self, request):
         return False

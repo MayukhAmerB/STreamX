@@ -10,7 +10,14 @@ export default function ProtectedRoute({
   const location = useLocation();
 
   if (loading) {
-    return <div className="p-6 text-sm text-[#BBBBBB]">Checking session...</div>;
+    return (
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-black">
+        <div className="relative h-12 w-12">
+          <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-white/50 border-r-white/10 animate-spin" />
+        </div>
+        <p className="mt-4 text-xs uppercase tracking-widest text-white/60">Checking session...</p>
+      </div>
+    );
   }
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;

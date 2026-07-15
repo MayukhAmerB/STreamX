@@ -94,9 +94,9 @@ export default function MyCoursesPage() {
               <p className="mt-2 text-sm text-[#BBBBBB]">Courses currently unlocked for this account.</p>
             </div>
             <div className="rounded-[24px] border border-black panel-gradient p-5 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
-              <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Purchased</div>
+              <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Verified</div>
               <div className="mt-2 text-3xl font-semibold text-white">{libraryStats.purchased}</div>
-              <p className="mt-2 text-sm text-[#BBBBBB]">Courses unlocked through payment verification.</p>
+              <p className="mt-2 text-sm text-[#BBBBBB]">Courses unlocked after admin verification.</p>
             </div>
             <div className="rounded-[24px] border border-black panel-gradient p-5 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
               <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Granted</div>

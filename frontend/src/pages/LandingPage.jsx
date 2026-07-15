@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { enrollInLiveClass, listCourses, listLiveClasses } from "../api/courses";
+import { enrollInLiveClass, getMyCourses, listCourses, listLiveClasses } from "../api/courses";
 import { listRealtimeSessions } from "../api/realtime";
+import BrandLogo from "../components/BrandLogo";
 import Button from "../components/Button";
 import PublicEnrollmentRequestModal from "../components/PublicEnrollmentRequestModal";
 import StoryJourneySection from "../components/StoryJourneySection";
@@ -11,47 +12,18 @@ import { apiData, apiMessage } from "../utils/api";
 import { readCachedCourseCatalog, writeCachedCourseCatalog } from "../utils/courseCatalog";
 import { formatINR } from "../utils/currency";
 import { featuredCourse } from "../utils/featuredCourse";
+import {
+  hasReachedGuestPromptScrollPoint,
+  reserveGuestEnrollmentPrompt,
+} from "../utils/guestEnrollmentPrompt";
 import { isKnownRegisteredVisitor } from "../utils/knownRegisteredVisitor";
 import {
   LANDING_PUBLIC_ENROLLMENT_PROMPT_EVENT,
   requestLandingPublicEnrollmentPrompt,
 } from "../utils/publicEnrollmentPrompt";
 
-const heroCardImage =
-  "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
-const heroGlitchBase =
-  "AL SYED INITIATIVE // CYBERSECURITY // OSINT // WEB PENTESTING // LIVE TRAINING // ";
-const heroGlitchLine = `${heroGlitchBase}${heroGlitchBase}${heroGlitchBase}${heroGlitchBase}`;
 const HERO_LIVE_BROADCAST_VISIBLE_POLL_MS = 45000;
 const HERO_LIVE_BROADCAST_HIDDEN_POLL_MS = 180000;
-const GUEST_ENROLLMENT_PROMPT_SESSION_KEY = "asi:guest-enrollment-prompt-shown:v2";
-
-export function reserveGuestEnrollmentPrompt({
-  authLoading,
-  isAuthenticated,
-  hasScrolledPastHero,
-  isKnownRegistered,
-  getStorage,
-}) {
-  if (authLoading || isAuthenticated || !hasScrolledPastHero || isKnownRegistered) return false;
-
-  try {
-    const storage = getStorage();
-    if (storage.getItem(GUEST_ENROLLMENT_PROMPT_SESSION_KEY)) return false;
-    storage.setItem(GUEST_ENROLLMENT_PROMPT_SESSION_KEY, "1");
-  } catch {
-    // The prompt should still work when browser storage is unavailable.
-  }
-
-  return true;
-}
-
-export function hasReachedGuestPromptScrollPoint({ heroBottom, viewportHeight }) {
-  const safeHeroBottom = Number(heroBottom);
-  const safeViewportHeight = Number(viewportHeight);
-  if (!Number.isFinite(safeHeroBottom) || !Number.isFinite(safeViewportHeight)) return false;
-  return safeHeroBottom <= safeViewportHeight * 0.45;
-}
 
 const stats = [
   { value: "1000+", label: "Students trained" },
@@ -163,10 +135,8 @@ const monthByLevel = {
   intermediate: { month: 2, label: "Month 2", subtitle: "Practical Skills" },
   advanced: { month: 3, label: "Month 3", subtitle: "Investigation & Intelligence" },
 };
-const cornerGlowPanelBg =
-  "bg-[radial-gradient(circle_at_100%_0%,rgba(255,255,255,0.10)_0%,rgba(255,255,255,0.035)_24%,rgba(255,255,255,0)_52%),linear-gradient(130deg,#000000_74%,#111111_100%)]";
-const cornerGlowCardBg =
-  "bg-[radial-gradient(circle_at_100%_0%,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.028)_24%,rgba(255,255,255,0)_52%),linear-gradient(130deg,#000000_76%,#101010_100%)]";
+const cornerGlowPanelBg = "bg-[#070707]";
+const cornerGlowCardBg = "bg-[#0A0A0A]";
 
 function sortCatalogCourses(courses) {
   return [...courses].sort((a, b) => {
@@ -294,7 +264,7 @@ function IconBadge({ type }) {
 function SectionCard({ children, className = "" }) {
   return (
     <section
-      className={`relative mx-auto max-w-6xl overflow-hidden rounded-[24px] border border-black ${cornerGlowPanelBg} p-4 shadow-[0_12px_30px_rgba(0,0,0,0.22)] sm:p-6 ${className}`}
+      className={`relative mx-auto max-w-6xl overflow-hidden rounded-[22px] border border-white/10 ${cornerGlowPanelBg} p-5 shadow-[0_18px_50px_rgba(0,0,0,0.28)] sm:p-7 ${className}`}
     >
       <div className="relative z-10">{children}</div>
     </section>
@@ -303,14 +273,20 @@ function SectionCard({ children, className = "" }) {
 
 function SectionTitle({ title, subtitle, titleClassName = "" }) {
   return (
-    <div className="text-center">
+    <div className="max-w-3xl">
+      <div className="mb-4 flex items-center gap-3" aria-hidden="true">
+        <span className="h-px w-10 bg-white/70" />
+        <span className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#8E8E8E]">
+          Al Syed Initiative
+        </span>
+      </div>
       <h2
         className={`font-reference text-3xl font-semibold tracking-tight text-white sm:text-4xl ${titleClassName}`}
       >
         {title}
       </h2>
       {subtitle ? (
-        <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-[#D3D3D3] sm:text-base">
+        <p className="mt-3 max-w-2xl text-sm leading-7 text-[#A7A7A7] sm:text-base">
           {subtitle}
         </p>
       ) : null}
@@ -318,9 +294,238 @@ function SectionTitle({ title, subtitle, titleClassName = "" }) {
   );
 }
 
+function DashboardArrow({ className = "" }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      className={`h-4 w-4 fill-none stroke-current ${className}`}
+    >
+      <path d="M4 10h11M11 6l4 4-4 4" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function StudentAccessPanel({
+  courses,
+  liveClasses,
+  loading,
+  error,
+}) {
+  const visibleCourses = courses.slice(0, 2);
+  const visibleLiveClasses = liveClasses.slice(0, 2);
+
+  return (
+    <div className="rounded-[24px] border border-white/15 bg-[#242424] p-4 shadow-[0_28px_90px_rgba(0,0,0,0.55)] sm:p-5">
+      <div className="relative overflow-hidden rounded-[16px] border border-white/10 bg-[#141414] p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#7E7E7E]">
+            Your workspace
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-[#BDBDBD]">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#BDBDBD]" />
+            Active
+          </span>
+        </div>
+        <p className="mt-5 text-lg font-semibold text-white">Your approved learning</p>
+        <p className="mt-2 text-sm leading-6 text-[#858585]">
+          {loading
+            ? "Loading your permissions..."
+            : `${courses.length} ${courses.length === 1 ? "course" : "courses"} and ${liveClasses.length} live ${liveClasses.length === 1 ? "class" : "classes"} available.`}
+        </p>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <Link
+          to="/my-courses"
+          className="group min-w-0 rounded-[16px] border border-white/10 bg-[#171717] p-4 transition duration-200 hover:-translate-y-0.5 hover:border-white/30 hover:bg-[#1D1D1D] hover:shadow-[0_14px_30px_rgba(0,0,0,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-white">Courses</span>
+            <div className="flex items-center gap-2 text-[#BDBDBD] transition group-hover:text-white">
+              <span className="font-reference text-xs font-semibold">
+                {loading ? "--" : String(courses.length).padStart(2, "0")}
+              </span>
+              <DashboardArrow />
+            </div>
+          </div>
+          <div className="mt-3 space-y-2">
+            {!loading && visibleCourses.length ? visibleCourses.map((course) => (
+              <p
+                key={course.id}
+                className="truncate text-xs font-medium text-[#D8D8D8]"
+                title={course.title}
+              >
+                {course.title}
+              </p>
+            )) : (
+              <p className="text-[11px] leading-5 text-[#777777]">
+                {loading ? "Checking access..." : "No approved courses yet."}
+              </p>
+            )}
+            {courses.length > visibleCourses.length ? (
+              <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8D8D8D] group-hover:text-[#CFCFCF]">
+                +{courses.length - visibleCourses.length} more
+              </span>
+            ) : null}
+          </div>
+          <span className="mt-4 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8D8D8D] transition group-hover:text-white">
+            Open courses <DashboardArrow />
+          </span>
+        </Link>
+
+        <Link
+          to="/join-live"
+          className="group min-w-0 rounded-[16px] border border-white/10 bg-[#171717] p-4 transition duration-200 hover:-translate-y-0.5 hover:border-white/30 hover:bg-[#1D1D1D] hover:shadow-[0_14px_30px_rgba(0,0,0,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-white">Live classes</span>
+            <div className="flex items-center gap-2 text-[#BDBDBD] transition group-hover:text-white">
+              <span className="font-reference text-xs font-semibold">
+                {String(liveClasses.length).padStart(2, "0")}
+              </span>
+              <DashboardArrow />
+            </div>
+          </div>
+          <div className="mt-3 space-y-2">
+            {visibleLiveClasses.length ? visibleLiveClasses.map((liveClass) => (
+              <p
+                key={liveClass.id}
+                className="truncate text-xs font-medium text-[#D8D8D8]"
+                title={liveClass.title}
+              >
+                {liveClass.title}
+              </p>
+            )) : (
+              <p className="text-[11px] leading-5 text-[#777777]">No approved live classes yet.</p>
+            )}
+            {liveClasses.length > visibleLiveClasses.length ? (
+              <span className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8D8D8D] group-hover:text-[#CFCFCF]">
+                +{liveClasses.length - visibleLiveClasses.length} more
+              </span>
+            ) : null}
+          </div>
+          <span className="mt-4 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8D8D8D] transition group-hover:text-white">
+            Open live classes <DashboardArrow />
+          </span>
+        </Link>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <Link to="/my-courses" className="group inline-flex items-center justify-center gap-2 rounded-[14px] border border-white bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-black transition hover:bg-[#E7E7E7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+          My courses <DashboardArrow className="transition-transform group-hover:translate-x-0.5" />
+        </Link>
+        <Link to="/join-live" className="group inline-flex items-center justify-center gap-2 rounded-[14px] border border-white/15 bg-[#171717] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-white transition hover:border-white/35 hover:bg-[#222222] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+          Live classes <DashboardArrow className="transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      </div>
+
+      {error ? <p className="mt-3 text-xs text-red-300">{error}</p> : null}
+    </div>
+  );
+}
+
+function GuestAccessPanel({ courses, liveClasses, liveClassesError, onRequestAccess }) {
+  const visibleCourses = courses.slice(0, 2);
+  const visibleLiveClasses = liveClasses.slice(0, 2);
+
+  const requestCourse = (event, course) => {
+    const courseId = toValidCourseId(course?.id);
+    onRequestAccess(event, {
+      type: courseId ? "course" : "general",
+      id: courseId,
+      title: course?.title || "Course access",
+    });
+  };
+
+  const requestLiveClass = (event, liveClass) => {
+    const liveClassId = toValidLiveClassId(liveClass?.id);
+    onRequestAccess(event, {
+      type: liveClassId ? "live_class" : "general",
+      id: liveClassId,
+      title: liveClass?.title || "Live class access",
+    });
+  };
+
+  return (
+    <div className="rounded-[24px] border border-white/15 bg-[#242424] p-4 shadow-[0_28px_90px_rgba(0,0,0,0.55)] sm:p-5">
+      <div className="relative overflow-hidden rounded-[16px] border border-white/10 bg-[#141414] p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#7E7E7E]">Available learning</span>
+          <span className="rounded-full border border-white/10 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-[#AFAFAF]">Catalog</span>
+        </div>
+        <p className="mt-5 text-lg font-semibold text-white">Explore current programs</p>
+        <p className="mt-2 text-sm leading-6 text-[#858585]">
+          {courses.length} {courses.length === 1 ? "course" : "courses"} and {liveClasses.length} live {liveClasses.length === 1 ? "class" : "classes"} currently listed.
+        </p>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="min-w-0 rounded-[16px] border border-white/10 bg-[#171717] p-4 transition hover:border-white/30 hover:bg-[#1D1D1D]">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-white">Courses</span>
+            <span className="font-reference text-xs font-semibold text-[#BDBDBD]">{String(courses.length).padStart(2, "0")}</span>
+          </div>
+          <div className="mt-3 space-y-2">
+            {visibleCourses.length ? visibleCourses.map((course) => (
+              <Link
+                key={course.id}
+                to={`/courses/${course.id}`}
+                onClick={(event) => requestCourse(event, course)}
+                className="group flex min-w-0 items-center justify-between gap-2 rounded-lg border border-transparent px-2 py-1.5 text-xs font-medium text-[#D8D8D8] transition hover:border-white/10 hover:bg-white/[0.04] hover:text-white"
+                title={course.title}
+              >
+                <span className="truncate">{course.title}</span>
+                <DashboardArrow className="shrink-0 text-[#777777] transition group-hover:translate-x-0.5 group-hover:text-white" />
+              </Link>
+            )) : <p className="text-[11px] leading-5 text-[#777777]">No courses are currently listed.</p>}
+          </div>
+        </div>
+
+        <div className="min-w-0 rounded-[16px] border border-white/10 bg-[#171717] p-4 transition hover:border-white/30 hover:bg-[#1D1D1D]">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-white">Live classes</span>
+            <span className="font-reference text-xs font-semibold text-[#BDBDBD]">{String(liveClasses.length).padStart(2, "0")}</span>
+          </div>
+          <div className="mt-3 space-y-2">
+            {visibleLiveClasses.length ? visibleLiveClasses.map((liveClass) => (
+              <Link
+                key={liveClass.id}
+                to="/join-live"
+                onClick={(event) => requestLiveClass(event, liveClass)}
+                className="group flex min-w-0 items-center justify-between gap-2 rounded-lg border border-transparent px-2 py-1.5 text-xs font-medium text-[#D8D8D8] transition hover:border-white/10 hover:bg-white/[0.04] hover:text-white"
+                title={liveClass.title}
+              >
+                <span className="truncate">{liveClass.title}</span>
+                <DashboardArrow className="shrink-0 text-[#777777] transition group-hover:translate-x-0.5 group-hover:text-white" />
+              </Link>
+            )) : (
+              <p className="text-[11px] leading-5 text-[#777777]">
+                {liveClassesError ? "Live classes are temporarily unavailable." : "No live classes are currently listed."}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <Link to="/courses" onClick={(event) => onRequestAccess(event, { type: "general", title: "Courses" })} className="group inline-flex items-center justify-center gap-2 rounded-[14px] border border-white bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-black transition hover:bg-[#E7E7E7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+          View courses <DashboardArrow className="transition-transform group-hover:translate-x-0.5" />
+        </Link>
+        <Link to="/join-live" onClick={(event) => onRequestAccess(event, { type: "general", title: "Live classes" })} className="group inline-flex items-center justify-center gap-2 rounded-[14px] border border-white/15 bg-[#171717] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-white transition hover:border-white/35 hover:bg-[#222222] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+          View live <DashboardArrow className="transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function LandingPage() {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [catalogCourses, setCatalogCourses] = useState([]);
+  const [studentCourses, setStudentCourses] = useState([]);
+  const [studentAccessLoading, setStudentAccessLoading] = useState(false);
+  const [studentAccessError, setStudentAccessError] = useState("");
   const [landingLiveClasses, setLandingLiveClasses] = useState([]);
   const [landingLiveClassesError, setLandingLiveClassesError] = useState("");
   const [landingActionState, setLandingActionState] = useState({});
@@ -398,6 +603,41 @@ export default function LandingPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!isAuthenticated) {
+      setStudentCourses([]);
+      setStudentAccessLoading(false);
+      setStudentAccessError("");
+      return () => {
+        active = false;
+      };
+    }
+
+    setStudentAccessLoading(true);
+    setStudentAccessError("");
+
+    (async () => {
+      try {
+        const response = await getMyCourses();
+        if (!active) return;
+        const courses = apiData(response, []);
+        setStudentCourses(Array.isArray(courses) ? courses : []);
+      } catch (err) {
+        if (!active) return;
+        setStudentAccessError(apiMessage(err, "Unable to load your approved access."));
+        setStudentCourses([]);
+      } finally {
+        if (active) setStudentAccessLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     let active = true;
@@ -495,7 +735,7 @@ export default function LandingPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [isAuthenticated]);
 
   const featuredLiveCourse = useMemo(() => {
     const liveCourses = catalogCourses.filter(
@@ -533,6 +773,13 @@ export default function LandingPage() {
     });
   }, [landingLiveClasses]);
 
+  const approvedLiveClasses = useMemo(() => {
+    return landingPrograms.filter((program) => {
+      const status = String(program?.enrollment_status || "").toLowerCase();
+      return Boolean(program?.is_enrolled) || status === "approved";
+    });
+  }, [landingPrograms]);
+
   const handleLandingEnroll = async (liveClassId) => {
     const targetId = toValidLiveClassId(liveClassId);
     if (!targetId) {
@@ -540,7 +787,7 @@ export default function LandingPage() {
         ...prev,
         [liveClassId]: {
           loading: false,
-          error: "Enrollment is unavailable in preview mode.",
+          error: "Access request is unavailable in preview mode.",
           success: "",
         },
       }));
@@ -584,7 +831,7 @@ export default function LandingPage() {
             response?.data?.message ||
             (enrollmentStatus === "approved"
               ? "Already enrolled."
-              : "Enrollment request submitted for admin approval."),
+              : "Access request submitted. Admin will review it and contact you."),
         },
       }));
     } catch (err) {
@@ -592,7 +839,7 @@ export default function LandingPage() {
         ...prev,
         [liveClassId]: {
           loading: false,
-          error: apiMessage(err, "Unable to enroll."),
+          error: apiMessage(err, "Unable to submit access request."),
           success: "",
         },
       }));
@@ -600,208 +847,134 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="relative bg-transparent text-[#F6F6F6]">
+    <div className="relative bg-[#030303] text-[#F6F6F6]">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-[radial-gradient(92%_82%_at_100%_0%,rgba(255,255,255,0.24)_0%,rgba(255,255,255,0.11)_24%,rgba(255,255,255,0.045)_42%,rgba(255,255,255,0)_68%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(0,0,0,0)_58%,rgba(255,255,255,0.02)_76%,rgba(255,255,255,0.07)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,#020202_0%,#050505_52%,#030303_100%)]" />
+        <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] [background-size:72px_72px]" />
       </div>
 
       <section
         ref={heroRef}
-        className="landing-hero relative z-10 overflow-hidden px-4 pb-8 pt-6 sm:pt-10"
+        className="landing-hero relative z-10 overflow-hidden border-b border-white/10 bg-black px-4"
       >
-        <div
-          aria-hidden="true"
-          className="hero-glitch-ribbon absolute left-1/2 top-3 z-20 hidden w-[min(96%,1040px)] -translate-x-1/2 overflow-hidden rounded-full px-4 py-1 sm:block"
-        >
-          <p className="hero-glitch-ribbon-line">{heroGlitchLine}</p>
-        </div>
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-black" />
-          <div aria-hidden="true" className="hero-glitch-overlay absolute inset-0 overflow-hidden">
-            <p className="hero-glitch-line hero-glitch-line-a">{heroGlitchLine}</p>
-            <p className="hero-glitch-line hero-glitch-line-b">{heroGlitchLine}</p>
-            <p className="hero-glitch-line hero-glitch-line-c">{heroGlitchLine}</p>
-          </div>
-          <div className="absolute inset-0 bg-[radial-gradient(88%_78%_at_100%_0%,rgba(255,255,255,0.26)_0%,rgba(255,255,255,0.12)_24%,rgba(255,255,255,0.05)_42%,rgba(255,255,255,0)_68%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(0,0,0,0)_58%,rgba(255,255,255,0.025)_76%,rgba(255,255,255,0.08)_100%)]" />
-        </div>
-        <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[30px] border border-black bg-black shadow-[0_28px_80px_rgba(0,0,0,0.42)]">
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[1]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_22%,rgba(255,255,255,0.10),transparent_44%)]" />
-          </div>
-          <div className="relative z-10 grid items-center gap-8 p-5 sm:p-7 lg:grid-cols-[1.03fr_0.97fr]">
-            <div className="reveal-up">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#A2A2A2]/30 bg-white/5 px-3 py-1 text-xs font-semibold tracking-wide text-[#DBDBDB]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#C0C0C0]" />
-                Al syed Initiative Cybersecurity Platform
-              </div>
+        <div className="relative mx-auto grid min-h-[620px] max-w-6xl items-center gap-12 py-16 sm:py-20 lg:grid-cols-[0.96fr_1.04fr] lg:gap-20 lg:py-24">
+          <div className="reveal-up">
+            <div className="flex items-center gap-4">
+              <span className="h-px w-10 bg-white/70" aria-hidden="true" />
+              <BrandLogo className="shrink-0" />
+            </div>
 
-              {heroLiveBroadcast ? (
-                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-red-400/45 bg-red-500/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-red-100 shadow-[0_0_24px_rgba(220,38,38,0.18)]">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-80" />
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-400" />
-                  </span>
-                  Live Broadcast Running Now
-                </div>
+            {heroLiveBroadcast ? (
+              <div className="ml-2 inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#BDBDBD]">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                Live now
+              </div>
+            ) : null}
+
+            <h1 className="mt-7 max-w-[660px] font-reference text-[clamp(2.75rem,4.5vw,4.25rem)] font-semibold leading-[1.02] tracking-[-0.045em] text-white">
+              Learn practical skills through clean, focused courses.
+            </h1>
+
+            <p className="mt-6 max-w-xl text-sm leading-7 text-[#8E8E8E] sm:text-base">
+              A focused learning platform for OSINT, reconnaissance, web application testing,
+              protected lessons, and instructor-led live classes.
+            </p>
+
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Link
+                to="/courses"
+                onClick={(event) =>
+                  openGuestEnrollment(event, { type: "general", title: "Courses" })
+                }
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-5 text-sm font-semibold text-black transition hover:bg-[#E5E5E5]"
+              >
+                Browse Courses
+              </Link>
+              <Link
+                to={isAuthenticated ? "/my-courses" : "/login"}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/15 bg-[#090909] px-5 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-[#111111]"
+              >
+                {isAuthenticated ? "My Learning" : "Get Started"}
+              </Link>
+              {isAuthenticated && heroLiveBroadcast ? (
+                <Link
+                  to={heroLiveBroadcastJoinPath}
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-red-500/40 bg-red-500/10 px-5 text-sm font-semibold text-red-100 transition hover:bg-red-500/20"
+                >
+                  Join Live
+                </Link>
               ) : null}
-
-              <h1 className="mt-5 max-w-xl font-reference text-4xl font-semibold leading-[1.02] tracking-tight text-white sm:text-5xl lg:text-6xl">
-                Learn Cyber Security with Expert-Led Practical Training
-              </h1>
-
-              <p className="mt-5 max-w-xl text-sm leading-7 text-[#BBBBBB] sm:text-base">
-                We teach cybersecurity through structured OSINT, reconnaissance, and web application
-                penetration testing workflows. Trusted by over 1000 students building practical skills.
-              </p>
-
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link
-                  to={featuredLiveCourseLink}
-                  onClick={(event) =>
-                    openGuestEnrollment(event, {
-                      type: toValidCourseId(featuredLiveCourse?.id) ? "course" : "general",
-                      id: toValidCourseId(featuredLiveCourse?.id),
-                      title: featuredLiveCourse?.title || "Flagship Course",
-                    })
-                  }
-                >
-                  <Button className="rounded-full bg-gradient-to-r from-[#CFCFCF] to-[#989898] px-5 text-[#121212] hover:from-[#DBDBDB] hover:to-[#A6A6A6]">
-                    View Flagship Course
-                  </Button>
-                </Link>
-                <Link
-                  to="/courses"
-                  onClick={(event) =>
-                    openGuestEnrollment(event, { type: "general", title: "Courses" })
-                  }
-                >
-                  <Button
-                    variant="indigoSoft"
-                    className="glossy rounded-full !border-[#F4F4F4] !bg-[linear-gradient(135deg,#FEFEFE_0%,#F7F7F7_52%,#E2E2E2_100%)] px-5 !text-[#121212] shadow-[0_14px_28px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.95)] hover:!bg-[linear-gradient(135deg,#FFFFFF_0%,#F9F9F9_52%,#E6E6E6_100%)]"
-                  >
-                    Explore Programs
-                  </Button>
-                </Link>
-                {isAuthenticated && heroLiveBroadcast ? (
-                  <Link to={heroLiveBroadcastJoinPath}>
-                    <Button
-                      variant="danger"
-                      className="rounded-full border-red-400/60 bg-[linear-gradient(135deg,#ef4444_0%,#b91c1c_100%)] px-5 text-white shadow-[0_16px_34px_rgba(220,38,38,0.28)] hover:bg-[linear-gradient(135deg,#f87171_0%,#dc2626_100%)]"
-                    >
-                      Join Live Now
-                    </Button>
-                  </Link>
-                ) : null}
-              </div>
-
-              <div className="mt-5 rounded-2xl border border-black bg-black/92 p-4 shadow-[0_18px_40px_rgba(0,0,0,0.22)]">
-                <div className="grid gap-2 text-sm text-[#BBBBBB] sm:grid-cols-2">
-                  <div className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#DBDBDB]" />
-                    OSINT and attack surface mapping
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#DBDBDB]" />
-                    Web application pentesting workflow
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#DBDBDB]" />
-                    Practical lessons and structured modules
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#DBDBDB]" />
-                    Ethical and professional methodology
-                  </div>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {["OSINT", "Web App Pentesting", "Recon Workflow"].map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full border border-black bg-[#141414] px-3 py-1 text-xs font-semibold text-[#DBDBDB]"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
             </div>
+          </div>
 
-            <div className="reveal-up reveal-delay-1 relative">
-              <div className="rounded-[28px] border border-black bg-black/92 p-3 shadow-[0_24px_60px_rgba(0,0,0,0.36)]">
-                <div className="relative h-[570px] overflow-hidden rounded-[24px] border border-black bg-black sm:h-[570px]">
-                  <img
-                    src={heroCardImage}
-                    alt="Cybersecurity training visual"
-                    className="h-full w-full object-cover opacity-[0.9]"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/78 via-black/30 to-black/12" />
-                  <div className="absolute left-4 top-4 rounded-2xl border border-black bg-black/86 px-4 py-3 backdrop-blur-sm">
-                    <div className="font-reference text-[10px] tracking-[0.22em] text-[#949494]">
-                      LIVE TRAINING
-                    </div>
-                    <div className="mt-2 text-lg font-semibold text-white">Structured cybersecurity learning</div>
-                    <div className="mt-1 max-w-[220px] text-xs leading-5 text-[#BBBBBB]">
-                      Guided modules, professional instruction, and practical workflow-based training.
-                    </div>
-                  </div>
-
-                  <div className="absolute inset-x-4 bottom-4 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl border border-black bg-black/88 p-3 backdrop-blur-sm">
-                      <div className="text-[10px] uppercase tracking-[0.18em] text-[#949494]">1000+ Students</div>
-                      <div className="mt-2 text-sm font-semibold text-[#E5E5E5]">Active cybersecurity learners</div>
-                    </div>
-                    <div className="rounded-2xl border border-black bg-black/88 p-3 backdrop-blur-sm">
-                      <div className="text-[10px] uppercase tracking-[0.18em] text-[#949494]">Top-Rated Training</div>
-                      <div className="mt-2 text-sm font-semibold text-[#E5E5E5]">Workflow-first progression</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div className="reveal-up reveal-delay-1 relative">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -right-12 -top-8 -z-10 h-72 w-72 rounded-full bg-white/[0.08] blur-[96px] sm:-right-16 sm:h-80 sm:w-80"
+            />
+            {isAuthenticated ? (
+              <StudentAccessPanel
+                courses={studentCourses}
+                liveClasses={approvedLiveClasses}
+                loading={studentAccessLoading}
+                error={studentAccessError}
+              />
+            ) : (
+              <GuestAccessPanel
+                courses={catalogCourses}
+                liveClasses={landingLiveClassesError ? [] : landingPrograms}
+                liveClassesError={landingLiveClassesError}
+                onRequestAccess={openGuestEnrollment}
+              />
+            )}
           </div>
         </div>
       </section>
 
-      <div className="relative z-10 px-4 pb-16">
-        <div className="mx-auto max-w-6xl space-y-7">
-          <div className="grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="relative z-10 px-4 pb-20 pt-2">
+        <div className="mx-auto max-w-6xl space-y-8">
+          <div className="grid overflow-hidden rounded-[20px] border border-white/10 bg-[#070707] sm:grid-cols-2 lg:grid-cols-4">
             {stats.map((item, idx) => (
               <div
                 key={item.label}
                 className={`reveal-up ${
                   idx === 0 ? "reveal-delay-1" : idx === 1 ? "reveal-delay-2" : "reveal-delay-3"
-                } flex h-full flex-col items-center justify-center rounded-2xl border border-black bg-[linear-gradient(135deg,#FFFFFF_0%,#F4F4F4_58%,#E1E1E1_100%)] px-4 py-4 text-center shadow-[0_10px_20px_rgba(0,0,0,0.22)]`}
+                } flex min-h-28 h-full flex-col justify-center border-b border-white/10 px-5 py-5 last:border-b-0 sm:[&:nth-child(odd)]:border-r lg:border-b-0 lg:border-r lg:last:border-r-0`}
               >
-                <div className="font-reference text-3xl font-semibold text-[#111111]">{item.value}</div>
-                <div className="mt-1 text-xs font-medium uppercase tracking-wide text-[#2A2A2A]">
+                <div className="font-reference text-3xl font-semibold text-white">{item.value}</div>
+                <div className="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#777777]">
                   {item.label}
                 </div>
               </div>
             ))}
           </div>
 
-          <div id="about" className="grid auto-rows-fr gap-3 scroll-mt-24 lg:grid-cols-3">
+          <section id="about" className="scroll-mt-24 rounded-[22px] border border-white/10 bg-[#070707] p-5 sm:p-7">
+            <SectionTitle
+              title="Built for disciplined learning"
+              subtitle="A focused cybersecurity education platform for students who value method, evidence, and responsible practice."
+            />
+            <div className="mt-7 grid auto-rows-fr gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 lg:grid-cols-3">
             {infoCards.map((card, idx) => (
               <div
                 key={card.title}
                 className={`reveal-up ${
                   idx === 0 ? "reveal-delay-1" : idx === 1 ? "reveal-delay-2" : "reveal-delay-3"
-                } flex h-full flex-col rounded-2xl border border-black ${cornerGlowCardBg} p-4 shadow-[0_10px_20px_rgba(0,0,0,0.22)]`}
+                } flex h-full flex-col bg-[#090909] p-5 sm:p-6`}
               >
-                <h3 className="font-reference text-xl font-semibold text-white">{card.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">{card.body}</p>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#AFAFAF]">0{idx + 1}</span>
+                <h3 className="mt-4 font-reference text-xl font-semibold text-white">{card.title}</h3>
+                <p className="mt-3 text-sm leading-7 text-[#9E9E9E]">{card.body}</p>
               </div>
             ))}
-          </div>
+            </div>
+          </section>
 
           <StoryJourneySection className="reveal-up reveal-delay-1" />
 
           <SectionCard>
             <SectionTitle
               title="Why learners choose Al syed Initiative"
-              titleClassName="uppercase tracking-[0.04em] sm:tracking-[0.05em]"
               subtitle="Cybersecurity training depth with a modern online learning experience focused on professional execution."
             />
             <div className="mt-6 grid auto-rows-fr gap-4 lg:grid-cols-3">
@@ -810,15 +983,15 @@ export default function LandingPage() {
                   key={item.title}
                   className={`hover-lift reveal-up ${
                     idx === 0 ? "reveal-delay-1" : idx === 1 ? "reveal-delay-2" : "reveal-delay-3"
-                  } flex h-full flex-col rounded-2xl border border-black bg-[linear-gradient(135deg,#FFFFFF_0%,#F4F4F4_58%,#E1E1E1_100%)] p-4 shadow-[0_10px_20px_rgba(0,0,0,0.22)]`}
+                  } flex h-full flex-col rounded-2xl border border-white/10 bg-[#0A0A0A] p-5`}
                 >
-                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-[#CDCDCD] bg-[#F0F0F0] text-[#2A2A2A] shadow-[0_2px_10px_rgba(0,0,0,0.18)]">
+                  <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-[#050505] text-[#CFCFCF]">
                     <IconBadge type={item.icon} />
                   </div>
-                  <h3 className="font-reference text-xl font-semibold leading-tight text-[#111111]">
+                  <h3 className="font-reference text-xl font-semibold leading-tight text-white">
                     {item.title}
                   </h3>
-                  <p className="mt-2 text-sm leading-6 text-[#2E2E2E]">{item.body}</p>
+                  <p className="mt-3 text-sm leading-7 text-[#999999]">{item.body}</p>
                 </div>
               ))}
             </div>
@@ -835,13 +1008,13 @@ export default function LandingPage() {
                   key={step.no}
                   className={`hover-lift reveal-up ${
                     idx === 0 ? "reveal-delay-1" : idx === 1 ? "reveal-delay-2" : "reveal-delay-3"
-                  } flex h-full flex-col rounded-2xl border border-black ${cornerGlowCardBg} p-4 shadow-[0_10px_20px_rgba(0,0,0,0.22)]`}
+                  } flex h-full flex-col border-t border-white/10 px-1 py-5`}
                 >
-                  <div className="mb-4 flex h-7 w-7 items-center justify-center rounded-full bg-[#A2A2A2] text-xs font-bold text-white">
+                  <div className="mb-5 flex h-8 w-8 items-center justify-center rounded-full border border-white/25 bg-white/[0.06] text-xs font-bold text-white">
                     {step.no}
                   </div>
-                  <h3 className="font-reference text-base font-semibold tracking-tight text-white">{step.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">{step.body}</p>
+                  <h3 className="font-reference text-lg font-semibold tracking-tight text-white">{step.title}</h3>
+                  <p className="mt-2 text-sm leading-7 text-[#999999]">{step.body}</p>
                 </div>
               ))}
             </div>
@@ -866,13 +1039,13 @@ export default function LandingPage() {
                           : idx % 3 === 1
                             ? "reveal-delay-2"
                             : "reveal-delay-3"
-                      } flex h-full flex-col rounded-2xl border border-black ${cornerGlowCardBg} p-4 shadow-[0_10px_24px_rgba(0,0,0,0.25)]`}
+                      } flex h-full flex-col rounded-2xl border border-white/10 ${cornerGlowCardBg} p-5 transition-colors hover:border-white/20`}
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <span className="rounded-full border border-black bg-[#111111] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#D6D6D6]">
+                        <span className="rounded-full border border-white/10 bg-[#050505] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A8A8A8]">
                           {formatLevel(course.level)}
                         </span>
-                        <span className="rounded-full border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-2.5 py-1 text-[11px] font-semibold text-[#1A1A1A]">
+                        <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-300">
                           Live
                         </span>
                       </div>
@@ -885,7 +1058,7 @@ export default function LandingPage() {
                       </p>
 
                       <div className="mt-4 grid grid-cols-2 gap-2">
-                        <div className="rounded-xl border border-black bg-[#121212] px-3 py-2">
+                        <div className="rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5">
                           <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">
                             Modules
                           </div>
@@ -893,7 +1066,7 @@ export default function LandingPage() {
                             {course.section_count ?? 0}
                           </div>
                         </div>
-                        <div className="rounded-xl border border-black bg-[#121212] px-3 py-2">
+                        <div className="rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5">
                           <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">
                             Price
                           </div>
@@ -906,21 +1079,21 @@ export default function LandingPage() {
                       <div className="mt-auto grid grid-cols-2 gap-2 pt-5">
                         <Link
                           to={course?._fallbackLink || `/courses/${course.id}`}
-                          className="inline-flex items-center justify-center rounded-full border border-black bg-[#141414] px-3 py-2.5 text-sm font-semibold text-[#DBDBDB] transition hover:bg-[#1B1B1B]"
+                          className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5 text-sm font-semibold text-[#D8D8D8] transition hover:border-white/20 hover:bg-[#101010]"
                         >
                           View Details
                         </Link>
                         {isAuthenticated ? (
                           <Link
                             to={course?._fallbackLink || `/courses/${course.id}`}
-                            className="glossy inline-flex items-center justify-center rounded-full border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-3 py-2.5 text-sm font-semibold text-[#1A1A1A]"
+                            className="inline-flex items-center justify-center rounded-xl border border-white bg-white px-3 py-2.5 text-sm font-semibold text-black transition hover:bg-[#E8E8E8]"
                           >
                             Open Course
                           </Link>
                         ) : (
                           <button
                             type="button"
-                            className="glossy inline-flex items-center justify-center rounded-full border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-3 py-2.5 text-sm font-semibold text-[#1A1A1A]"
+                            className="inline-flex items-center justify-center rounded-xl border border-white bg-white px-3 py-2.5 text-sm font-semibold text-black transition hover:bg-[#E8E8E8]"
                             onClick={(event) =>
                               openGuestEnrollment(event, {
                                 type: courseId ? "course" : "general",
@@ -929,7 +1102,7 @@ export default function LandingPage() {
                               })
                             }
                           >
-                            Enroll
+                            Request Access
                           </button>
                         )}
                       </div>
@@ -938,7 +1111,7 @@ export default function LandingPage() {
                 })}
               </div>
             ) : (
-              <p className="mt-6 rounded-xl border border-black bg-[#111111] px-4 py-3 text-sm text-[#BBBBBB]">
+              <p className="mt-6 rounded-xl border border-white/10 bg-[#090909] px-4 py-3 text-sm text-[#AAAAAA]">
                 Live courses are being updated. Submit an enrollment enquiry and our team will contact you.
               </p>
             )}
@@ -971,13 +1144,13 @@ export default function LandingPage() {
                   key={program.id}
                   className={`hover-lift reveal-up ${
                     idx % 3 === 0 ? "reveal-delay-1" : idx % 3 === 1 ? "reveal-delay-2" : "reveal-delay-3"
-                  } flex h-full flex-col rounded-2xl border border-black ${cornerGlowCardBg} p-4 shadow-[0_10px_24px_rgba(0,0,0,0.25)]`}
+                  } flex h-full flex-col rounded-2xl border border-white/10 ${cornerGlowCardBg} p-5 transition-colors hover:border-white/20`}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="rounded-full border border-black bg-[#111111] px-2.5 py-1 text-[11px] font-semibold text-[#D6D6D6]">
+                    <span className="rounded-full border border-white/10 bg-[#050505] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A8A8A8]">
                       {monthMeta.label || `Live Class ${idx + 1}`}
                     </span>
-                    <span className="rounded-full border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-2.5 py-1 text-[11px] font-semibold text-[#1A1A1A]">
+                    <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-300">
                       Live
                     </span>
                   </div>
@@ -995,13 +1168,13 @@ export default function LandingPage() {
                   </p>
 
                   <div className="mt-4 grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-3">
-                    <div className="h-full rounded-xl border border-black bg-[#121212] px-3 py-2">
+                    <div className="h-full rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Schedule</div>
                       <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
                         {program.schedule_days || "Fri / Sat / Sun"}
                       </div>
                     </div>
-                    <div className="h-full rounded-xl border border-black bg-[#121212] px-3 py-2">
+                    <div className="h-full rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Duration</div>
                       <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
                         {program.class_duration_minutes
@@ -1009,7 +1182,7 @@ export default function LandingPage() {
                           : "1 hour"}
                       </div>
                     </div>
-                    <div className="h-full rounded-xl border border-black bg-[#121212] px-3 py-2">
+                    <div className="h-full rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Price</div>
                       <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
                         {formatLiveClassPrice(program.price)}
@@ -1018,12 +1191,12 @@ export default function LandingPage() {
                   </div>
 
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                    <span className="rounded-full border border-black bg-[#141414] px-3 py-1 text-xs font-semibold text-[#CACACA]">
+                    <span className="rounded-full border border-white/10 bg-[#060606] px-3 py-1 text-xs font-semibold text-[#AAAAAA]">
                       {(program.enrollment_count ?? 0)} enrolled
                     </span>
                     <Link
                       to={detailsLink}
-                      className="inline-flex items-center justify-center rounded-full border border-black bg-[#141414] px-4 py-2 text-sm font-semibold text-[#DBDBDB] transition hover:bg-[#1B1B1B]"
+                      className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-[#060606] px-4 py-2 text-sm font-semibold text-[#D8D8D8] transition hover:border-white/20 hover:bg-[#101010]"
                     >
                       View Details
                     </Link>
@@ -1032,11 +1205,11 @@ export default function LandingPage() {
                   <div className="mt-auto pt-4">
                     {program.is_enrolled || enrollmentStatus === "approved" ? (
                       <Button className="w-full" disabled>
-                        Enrolled
+                        Access Approved
                       </Button>
                     ) : enrollmentStatus === "pending" ? (
                       <Button className="w-full" disabled>
-                        Pending Approval
+                        Request Pending
                       </Button>
                     ) : isAuthenticated ? (
                       <Button
@@ -1044,7 +1217,7 @@ export default function LandingPage() {
                         onClick={() => handleLandingEnroll(program.id)}
                         loading={Boolean(landingActionState[program.id]?.loading)}
                       >
-                        Enroll
+                        Request Access
                       </Button>
                     ) : (
                       <Button
@@ -1056,7 +1229,7 @@ export default function LandingPage() {
                               ...prev,
                               [program.id]: {
                                 loading: false,
-                                error: "Enrollment is unavailable in preview mode.",
+                                error: "Access request is unavailable in preview mode.",
                                 success: "",
                               },
                             }));
@@ -1069,7 +1242,7 @@ export default function LandingPage() {
                           });
                         }}
                       >
-                        Enroll
+                        Request Access
                       </Button>
                     )}
                     {landingActionState[program.id]?.error ? (
@@ -1086,13 +1259,13 @@ export default function LandingPage() {
               })}
             </div>
 
-            <div className="mt-6 rounded-2xl border border-black bg-[linear-gradient(90deg,#121212_0%,#5F5F5F_52%,#D8D8D8_100%)] p-5 text-white shadow-[0_10px_30px_rgba(0,0,0,0.08)]">
+            <div className="mt-7 rounded-2xl border border-white/10 bg-[#090909] p-5 text-white sm:p-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h3 className="font-reference text-2xl font-semibold">
                     Ready to start your cybersecurity journey?
                   </h3>
-                  <p className="mt-2 text-sm text-[#F1F1F1]">
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-[#A8A8A8]">
                     Join our flagship course and learn OSINT plus web application pentesting with a structured workflow.
                   </p>
                 </div>
@@ -1103,7 +1276,7 @@ export default function LandingPage() {
                       openGuestEnrollment(event, { type: "general", title: "Courses" })
                     }
                   >
-                    <button className="rounded-full border border-white/65 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">
+                    <button className="rounded-xl border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/5">
                       Explore
                     </button>
                   </Link>
@@ -1117,7 +1290,7 @@ export default function LandingPage() {
                       })
                     }
                   >
-                    <button className="rounded-full bg-[#F4F4F4] px-4 py-2 text-sm font-semibold text-[#272727] hover:bg-white">
+                    <button className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-[#E8E8E8]">
                       Join Now
                     </button>
                   </Link>

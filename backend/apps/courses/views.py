@@ -69,6 +69,11 @@ from .services import (
     validate_protected_guide_playback_request,
     validate_protected_lecture_playback_request,
 )
+from .request_notifications import (
+    notify_after_commit,
+    queue_course_request_whatsapp_notification,
+    queue_live_class_request_whatsapp_notification,
+)
 
 
 def _local_media_path_exists(storage_key):
@@ -1276,8 +1281,10 @@ class CourseEnrollView(APIView):
             defaults={"payment_status": Enrollment.STATUS_PENDING},
         )
 
+        should_notify = False
         if created:
-            message = "Enrollment request submitted for admin approval."
+            message = "Access request submitted for admin approval. Our team will contact you on WhatsApp."
+            should_notify = True
         elif enrollment.payment_status == Enrollment.STATUS_PAID:
             message = "You are already enrolled in this course."
         elif enrollment.payment_status == Enrollment.STATUS_PENDING:
@@ -1285,7 +1292,11 @@ class CourseEnrollView(APIView):
         else:
             enrollment.payment_status = Enrollment.STATUS_PENDING
             enrollment.save(update_fields=["payment_status"])
-            message = "Enrollment request re-submitted for admin approval."
+            message = "Access request re-submitted for admin approval. Our team will contact you on WhatsApp."
+            should_notify = True
+
+        if should_notify:
+            notify_after_commit(queue_course_request_whatsapp_notification, enrollment.id)
 
         log_security_event(
             "course.enroll_requested" if enrollment.payment_status == Enrollment.STATUS_PENDING else "course.enroll_already_paid",
@@ -1416,8 +1427,10 @@ class LiveClassEnrollView(APIView):
             live_class=live_class,
             defaults={"status": LiveClassEnrollment.STATUS_PENDING},
         )
+        should_notify = False
         if created:
-            response_message = "Enrollment request submitted for admin approval."
+            response_message = "Access request submitted for admin approval. Our team will contact you on WhatsApp."
+            should_notify = True
         elif enrollment.status == LiveClassEnrollment.STATUS_APPROVED:
             response_message = "Already enrolled in live class."
         elif enrollment.status == LiveClassEnrollment.STATUS_PENDING:
@@ -1425,7 +1438,11 @@ class LiveClassEnrollView(APIView):
         else:
             enrollment.status = LiveClassEnrollment.STATUS_PENDING
             enrollment.save(update_fields=["status"])
-            response_message = "Enrollment request re-submitted for admin approval."
+            response_message = "Access request re-submitted for admin approval. Our team will contact you on WhatsApp."
+            should_notify = True
+
+        if should_notify:
+            notify_after_commit(queue_live_class_request_whatsapp_notification, enrollment.id)
 
         log_security_event(
             "live_class.enroll_requested"
@@ -1467,7 +1484,7 @@ class PublicEnrollmentLeadCreateView(APIView):
                 message="Enrollment request submission failed.",
                 errors=serializer.errors,
                 status_code=status.HTTP_400_BAD_REQUEST,
-            )
+        )
 
         lead = serializer.save()
         target_id = lead.course_id or lead.live_class_id
@@ -1482,7 +1499,7 @@ class PublicEnrollmentLeadCreateView(APIView):
         )
         return api_response(
             success=True,
-            message="Enrollment request received. Our team will contact you.",
+            message="Access request received. Our team will contact you.",
             data={
                 "lead_id": lead.id,
                 "status": PublicEnrollmentLead.STATUS_NEW,

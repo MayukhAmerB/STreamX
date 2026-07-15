@@ -7,20 +7,20 @@ export default function Button({
 }) {
   const variants = {
     primary:
-      "border border-[#D7D7D7] bg-gradient-to-r from-[#DADADA] to-[#AFAFAF] text-[#121212] shadow-[0_10px_24px_rgba(62,62,62,0.25)] hover:from-[#E5E5E5] hover:to-[#C0C0C0]",
+      "border border-white bg-white text-black shadow-none hover:border-[#E5E5E5] hover:bg-[#E5E5E5]",
     secondary:
-      "border border-black bg-[#141414] text-[#E0E0E0] backdrop-blur hover:bg-[#1A1A1A]",
+      "border border-white/15 bg-[#0A0A0A] text-white hover:border-white/35 hover:bg-[#111111]",
     indigo:
-      "border border-[#D7D7D7] bg-gradient-to-r from-[#DBDBDB] to-[#B9B9B9] text-[#121212] hover:from-[#E7E7E7] hover:to-[#C5C5C5]",
+      "border border-white bg-white text-black shadow-none hover:border-[#E5E5E5] hover:bg-[#E5E5E5]",
     indigoSoft:
-      "border border-[#D3D3D3] bg-[#F0F0F0] text-[#2B2B2B] hover:bg-[#F7F7F7]",
+      "border border-white/25 bg-white/[0.08] text-white hover:border-white/45 hover:bg-white/[0.12]",
     danger: "border border-red-400/40 bg-red-600 text-white hover:bg-red-500",
     ghost: "border border-white/20 bg-transparent text-white hover:bg-white/10",
   };
 
   return (
     <button
-      className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold tracking-tight transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C0C0C0]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${className}`}
+      className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold tracking-tight transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${className}`}
       disabled={loading || props.disabled}
       {...props}
     >
