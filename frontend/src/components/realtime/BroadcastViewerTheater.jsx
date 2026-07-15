@@ -27,6 +27,7 @@ export default function BroadcastViewerTheater({
   onRefreshStream = null,
   onRefreshChat = null,
   showHeaderMeta = true,
+  showChat = true,
   withContainer = true,
   className = "",
 }) {
@@ -44,9 +45,13 @@ export default function BroadcastViewerTheater({
     enabled: Boolean(streamUrl && canRenderLiveFrames),
   });
   const resolvedStreamUrl = secureStream.streamUrl;
-  const layoutClassName = showHeaderMeta
-    ? "mt-3 grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:items-stretch"
-    : "grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:items-stretch";
+  const layoutClassName = showChat
+    ? showHeaderMeta
+      ? "mt-3 grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:items-stretch"
+      : "grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:items-stretch"
+    : showHeaderMeta
+      ? "mt-3"
+      : "";
   const isStreamStarting = Boolean(
     resolvedStreamUrl && normalizedSessionStatus !== "ended" && normalizedStreamStatus === "starting"
   );
@@ -160,7 +165,7 @@ export default function BroadcastViewerTheater({
           )}
         </div>
 
-        <div className="hidden overflow-hidden rounded-2xl border border-black panel-gradient lg:block lg:h-full lg:min-h-0">
+        {showChat ? <div className="hidden overflow-hidden rounded-2xl border border-black panel-gradient lg:block lg:h-full lg:min-h-0">
           {chatUrl && canRenderLiveFrames ? (
             <iframe
               title={chatTitle}
@@ -174,10 +179,10 @@ export default function BroadcastViewerTheater({
               message={resolvedChatFallbackMessage}
             />
           )}
-        </div>
+        </div> : null}
       </div>
 
-      <div className="mt-3 lg:hidden">
+      {showChat ? <div className="mt-3 lg:hidden">
         <button
           type="button"
           onClick={handleMobileChatToggle}
@@ -185,9 +190,9 @@ export default function BroadcastViewerTheater({
         >
           {mobileChatOpen ? "Hide Chat" : "Open Chat"}
         </button>
-      </div>
+      </div> : null}
 
-      <div
+      {showChat ? <div
         className={`mt-3 overflow-hidden rounded-2xl panel-gradient transition-[max-height,opacity] duration-300 lg:hidden ${
           mobileChatOpen ? "max-h-[70vh] border border-black opacity-100" : "max-h-0 border border-transparent opacity-0"
         }`}
@@ -204,7 +209,7 @@ export default function BroadcastViewerTheater({
             <EmptyPanel className="h-[280px]" message={resolvedChatFallbackMessage} />
           )
         ) : null}
-      </div>
+      </div> : null}
     </>
   );
 

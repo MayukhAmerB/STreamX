@@ -1,16 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import PageShell from "../components/PageShell";
 import Button from "../components/Button";
 import PublicEnrollmentRequestModal from "../components/PublicEnrollmentRequestModal";
-import LiveClassScheduleStatus from "../components/realtime/LiveClassScheduleStatus";
+import LiveClassViewingStage from "../components/realtime/LiveClassViewingStage";
 import { enrollInLiveClass, listLiveClasses } from "../api/courses";
-import { listRealtimeSessions } from "../api/realtime";
+import { joinRealtimeSession, listRealtimeSessions } from "../api/realtime";
 import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
 import { formatINR } from "../utils/currency";
 import {
   findJoinableLiveSession,
+  isJoinableLiveSession,
   resolveLiveClassSchedule,
 } from "../utils/liveClassSchedule";
 
@@ -106,13 +107,16 @@ function toValidLiveClassId(value) {
 }
 
 export default function LiveClassesPage() {
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [tracks, setTracks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionState, setActionState] = useState({});
   const [publicLeadTarget, setPublicLeadTarget] = useState(null);
   const [realtimeSessions, setRealtimeSessions] = useState([]);
+  const [activeLivePayload, setActiveLivePayload] = useState(null);
+  const [liveJoinState, setLiveJoinState] = useState({ loading: false, error: "" });
+  const liveStageRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -169,6 +173,15 @@ export default function LiveClassesPage() {
     () => findJoinableLiveSession(realtimeSessions),
     [realtimeSessions]
   );
+
+  useEffect(() => {
+    const latestActiveSession = realtimeSessions.find(
+      (session) => session.id === activeLivePayload?.session?.id
+    );
+    if (latestActiveSession && !isJoinableLiveSession(latestActiveSession)) {
+      setActiveLivePayload(null);
+    }
+  }, [activeLivePayload?.session?.id, realtimeSessions]);
 
   const orderedTracks = useMemo(() => {
     return [...tracks].sort((a, b) => {
@@ -235,6 +248,28 @@ export default function LiveClassesPage() {
     }
   };
 
+  const handleJoinLiveClass = async (sessionId) => {
+    setLiveJoinState({ loading: true, error: "" });
+    try {
+      const response = await joinRealtimeSession(sessionId, {
+        display_name: user?.full_name || "",
+      });
+      const payload = apiData(response, null);
+      setActiveLivePayload(payload);
+      setLiveJoinState({ loading: false, error: "" });
+      window.requestAnimationFrame(() => {
+        liveStageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      return payload;
+    } catch (err) {
+      setLiveJoinState({
+        loading: false,
+        error: apiMessage(err, "Unable to open the live classroom."),
+      });
+      throw err;
+    }
+  };
+
   return (
     <PageShell
       title="Live Classes"
@@ -282,8 +317,40 @@ export default function LiveClassesPage() {
             </div>
           </div>
 
-          <LiveClassScheduleStatus schedule={liveSchedule} liveSession={activeLiveSession} />
+          <div className="rounded-2xl border border-white/10 bg-[#111111] p-5">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
+              Classroom access
+            </div>
+            <h3 className="mt-3 font-reference text-2xl font-semibold text-white">
+              One page for schedule and playback
+            </h3>
+            <p className="mt-3 text-sm leading-7 text-[#999999]">
+              Approved students watch the active class directly below. When the classroom is
+              offline, the same player shows the next weekend schedule.
+            </p>
+            <div className="mt-5 rounded-xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-semibold text-[#D7D7D7]">
+              Friday, Saturday and Sunday · 7:00 PM to 8:00 PM IST
+            </div>
+          </div>
         </div>
+      </section>
+
+      <section
+        ref={liveStageRef}
+        className="mb-7 scroll-mt-24 rounded-[26px] border border-white/10 bg-[#0D0D0D] p-3 sm:p-5"
+      >
+        <LiveClassViewingStage
+          schedule={liveSchedule}
+          liveSession={activeLiveSession}
+          activePayload={activeLivePayload}
+          joining={liveJoinState.loading}
+          error={liveJoinState.error}
+          onJoin={handleJoinLiveClass}
+          onLeave={() => {
+            setActiveLivePayload(null);
+            setLiveJoinState({ loading: false, error: "" });
+          }}
+        />
       </section>
 
       {error ? (
@@ -382,11 +449,14 @@ export default function LiveClassesPage() {
 
                   <div className="mt-auto pt-4">
                     {hasApprovedAccess && courseLiveSession ? (
-                      <LiveClassScheduleStatus
-                        schedule={liveSchedule}
-                        liveSession={courseLiveSession}
-                        compact
-                      />
+                      <button
+                        type="button"
+                        onClick={() => handleJoinLiveClass(courseLiveSession.id)}
+                        disabled={liveJoinState.loading}
+                        className="w-full rounded-xl bg-red-600 px-5 py-3 text-sm font-extrabold uppercase tracking-[0.1em] text-white transition hover:bg-red-500 disabled:opacity-65"
+                      >
+                        {liveJoinState.loading ? "Connecting..." : "Watch Live Above"}
+                      </button>
                     ) : hasApprovedAccess ? (
                       <div className="rounded-xl border border-white/10 bg-black/35 px-4 py-3 text-center">
                         <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#D7D7D7]">
