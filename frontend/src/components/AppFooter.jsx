@@ -17,11 +17,15 @@ const programLinks = [
 ];
 
 const socialLinks = [
-  { label: "Instagram", href: "https://www.instagram.com/adl.response", kind: "instagram" },
+  {
+    label: "Instagram",
+    href: "https://www.instagram.com/adlfrontofficial?igsh=MTgwN3Z2ZXZ4aGswYg==",
+    kind: "instagram",
+  },
   { label: "X", href: "https://x.com/AdlFront", kind: "x" },
   { label: "WhatsApp +91 99708 75040", href: "https://wa.me/919970875040", kind: "whatsapp" },
   { label: "WhatsApp +91 9800415583", href: "https://wa.me/919800415583", kind: "whatsapp" },
-  { label: "Email", href: "mailto:alsyedinitiative@gmail.com", kind: "email" },
+  { label: "Email", href: "mailto:contact@adlfront.com", kind: "email" },
 ];
 
 function FooterLink({ to, label }) {

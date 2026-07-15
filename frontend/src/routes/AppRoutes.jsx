@@ -15,6 +15,7 @@ const CreateCoursePage = lazy(() => import("../pages/CreateCoursePage"));
 const EditCoursePage = lazy(() => import("../pages/EditCoursePage"));
 const FaqPage = lazy(() => import("../pages/FaqPage"));
 const GuidesPage = lazy(() => import("../pages/GuidesPage"));
+const HallOfFamePage = lazy(() => import("../pages/HallOfFamePage"));
 const IdCardPage = lazy(() => import("../pages/IdCardPage"));
 const InstructorDashboardPage = lazy(() => import("../pages/InstructorDashboardPage"));
 const JoinLivePage = lazy(() => import("../pages/JoinLivePage"));
@@ -40,6 +41,7 @@ export default function AppRoutes() {
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/faqs" element={<FaqPage />} />
+          <Route path="/hall-of-fame" element={<HallOfFamePage />} />
           <Route path="/courses" element={<CourseListPage />} />
           <Route path="/courses/:id" element={<CourseDetailPage />} />
           <Route path="/login" element={<LoginPage />} />

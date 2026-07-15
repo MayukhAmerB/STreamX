@@ -91,6 +91,9 @@ export default function Navbar() {
           <NavLink to="/about" className={navClass}>
             About Us
           </NavLink>
+          <NavLink to="/hall-of-fame" className={navClass}>
+            Hall of Fame
+          </NavLink>
           <NavLink to="/contact" className={navClass}>
             Contact
           </NavLink>
@@ -280,6 +283,9 @@ export default function Navbar() {
             ) : null}
             <NavLink to="/about" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
               About Us
+            </NavLink>
+            <NavLink to="/hall-of-fame" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+              Hall of Fame
             </NavLink>
             <NavLink to="/contact" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
               Contact

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 export default function BrandLogo({ to = "/", className = "" }) {
   return (
     <Link to={to} className={`inline-flex max-w-full items-center gap-2.5 ${className}`}>
-      <span className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full sm:h-11 sm:w-11">
+      <span className="relative inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md sm:h-11 sm:w-11">
         <img
           src="/logo.jpeg"
           alt="Al syed Initiative logo"

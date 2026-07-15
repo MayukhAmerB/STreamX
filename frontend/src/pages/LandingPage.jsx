@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import certificateExcellenceImage from "../assets/certificate-excellence.png";
 import { enrollInLiveClass, getMyCourses, listCourses, listLiveClasses } from "../api/courses";
 import { listRealtimeSessions } from "../api/realtime";
 import BrandLogo from "../components/BrandLogo";
@@ -933,6 +934,54 @@ export default function LandingPage() {
 
       <div className="relative z-10 px-4 pb-20 pt-2">
         <div className="mx-auto max-w-6xl space-y-8">
+          <SectionCard className="!p-0">
+            <div className="grid gap-0 lg:grid-cols-[0.72fr_1.28fr]">
+              <div className="flex flex-col justify-center border-b border-white/10 p-5 sm:p-7 lg:border-b-0 lg:border-r lg:p-8">
+                <span className="w-fit rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#AFAFAF]">
+                  Certificate format
+                </span>
+                <h2 className="mt-5 font-reference text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                  Recognition designed to carry forward
+                </h2>
+                <p className="mt-4 text-sm leading-7 text-[#9E9E9E]">
+                  Successful learners receive an ADL FRONT Certificate of Excellence in this
+                  official format, recording the recipient, completion date, and authorized
+                  recognition of their training achievement.
+                </p>
+
+                <dl className="mt-7 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                  {[
+                    ["Recipient", "Personalized student name"],
+                    ["Recognition", "Training achievement"],
+                    ["Authorization", "Official signature and issue date"],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-xl border border-white/10 bg-[#0A0A0A] px-4 py-3">
+                      <dt className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[#717171]">
+                        {label}
+                      </dt>
+                      <dd className="mt-1.5 text-xs font-semibold text-[#D4D4D4]">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+
+              <figure className="flex min-w-0 items-center bg-[#0B0B0B] p-3 sm:p-5 lg:p-6">
+                <div className="w-full overflow-hidden rounded-xl border border-white/15 bg-[#151515] shadow-[0_24px_70px_rgba(0,0,0,0.5)]">
+                  <img
+                    src={certificateExcellenceImage}
+                    alt="ADL FRONT Certificate of Excellence format"
+                    className="block h-auto w-full object-contain"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+                <figcaption className="sr-only">
+                  Official certificate format presented to successful learners.
+                </figcaption>
+              </figure>
+            </div>
+          </SectionCard>
+
           <div className="grid overflow-hidden rounded-[20px] border border-white/10 bg-[#070707] sm:grid-cols-2 lg:grid-cols-4">
             {stats.map((item, idx) => (
               <div

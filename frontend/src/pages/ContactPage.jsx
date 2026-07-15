@@ -14,8 +14,8 @@ const pageBackgroundImage =
 const contactLinks = [
   {
     name: "Instagram",
-    href: "https://www.instagram.com/adl.response",
-    handle: "@adl.response",
+    href: "https://www.instagram.com/adlfrontofficial?igsh=MTgwN3Z2ZXZ4aGswYg==",
+    handle: "@adlfrontofficial",
     accent: "from-[#DBDBDB] to-[#A9A9A9]",
   },
   {
@@ -38,8 +38,8 @@ const contactLinks = [
   },
   {
     name: "Email",
-    href: "mailto:alsyedinitiative@gmail.com",
-    handle: "alsyedinitiative@gmail.com",
+    href: "mailto:contact@adlfront.com",
+    handle: "contact@adlfront.com",
     accent: "from-[#EAEAEA] to-[#CFCFCF]",
   },
 ];
