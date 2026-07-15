@@ -48,6 +48,7 @@ from .serializers import (
     RealtimeSessionRecordingSerializer,
     RealtimePresenterPermissionSerializer,
 )
+from .schedule import get_live_class_schedule_snapshot
 from .services import (
     apply_live_presenter_permission_update,
     apply_live_speaker_permission_update,
@@ -704,6 +705,28 @@ class RealtimeSessionJoinView(APIView):
                 message=access_decision.message,
                 errors={"detail": access_decision.detail},
                 status_code=access_decision.status_code,
+            )
+        is_session_manager = bool(
+            access_decision.is_host
+            or access_decision.is_admin
+            or access_decision.is_instructor_owner
+        )
+        schedule_snapshot = get_live_class_schedule_snapshot()
+        if not is_session_manager and session.status == RealtimeSession.STATUS_SCHEDULED:
+            _record_join_metric(result="failure", mode="meeting", reason="session_not_live")
+            return api_response(
+                success=False,
+                message="Live class has not started.",
+                errors={"detail": f"Your class schedule is {schedule_snapshot['label']}."},
+                status_code=status.HTTP_409_CONFLICT,
+            )
+        if not is_session_manager and not schedule_snapshot["is_open"]:
+            _record_join_metric(result="failure", mode="meeting", reason="outside_schedule_window")
+            return api_response(
+                success=False,
+                message="Live class is outside its scheduled time.",
+                errors={"detail": f"Your class schedule is {schedule_snapshot['label']}."},
+                status_code=status.HTTP_403_FORBIDDEN,
             )
         refresh_obs_session_stream_health(session, force_refresh=True)
         if session.status == RealtimeSession.STATUS_SCHEDULED:

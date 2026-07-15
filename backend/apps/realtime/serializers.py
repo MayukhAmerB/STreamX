@@ -14,6 +14,7 @@ from config.url_utils import get_media_public_url
 from apps.courses.models import LiveClass
 
 from .models import RealtimeSession, RealtimeSessionRecording
+from .schedule import attendee_can_join_live_session, get_live_class_schedule_snapshot
 from .services import build_session_join_url, resolve_broadcast_urls, resolve_obs_stream_server_url
 
 
@@ -28,6 +29,8 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
     obs_stream_key = serializers.SerializerMethodField()
     stream_embed_url = serializers.SerializerMethodField()
     chat_embed_url = serializers.SerializerMethodField()
+    live_schedule = serializers.SerializerMethodField()
+    viewer_can_join_now = serializers.SerializerMethodField()
 
     class Meta:
         model = RealtimeSession
@@ -56,6 +59,8 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
             "join_url",
             "stream_embed_url",
             "chat_embed_url",
+            "live_schedule",
+            "viewer_can_join_now",
             "stream_status",
             "livekit_egress_error",
             "started_at",
@@ -152,6 +157,22 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
             "level": course.level,
             "instructor_id": course.instructor_id,
         }
+
+    def get_live_schedule(self, obj):
+        cache_key = "live_class_schedule_snapshot"
+        cached = self.context.get(cache_key)
+        if isinstance(cached, dict):
+            return cached
+        snapshot = get_live_class_schedule_snapshot()
+        self.context[cache_key] = snapshot
+        return snapshot
+
+    def get_viewer_can_join_now(self, obj):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if obj.is_moderator_allowed(user):
+            return obj.status in {obj.STATUS_SCHEDULED, obj.STATUS_LIVE}
+        return attendee_can_join_live_session(obj)
 
 
 class RealtimeSessionCreateSerializer(serializers.ModelSerializer):

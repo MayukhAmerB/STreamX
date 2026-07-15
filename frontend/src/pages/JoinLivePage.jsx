@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 import BroadcastViewerTheater from "../components/realtime/BroadcastViewerTheater";
+import LiveClassScheduleStatus from "../components/realtime/LiveClassScheduleStatus";
 import MeetingRoomExperience from "../components/realtime/MeetingRoomExperience";
 import { createRealtimeOwncastChatLaunch, joinRealtimeSession, listRealtimeSessions } from "../api/realtime";
 import { useAuth } from "../hooks/useAuth";
@@ -14,6 +15,11 @@ import {
 } from "../utils/activeMeetingStorage";
 import { resolveBroadcastEmbedUrls } from "../utils/broadcastUrls";
 import { apiData, apiMessage } from "../utils/api";
+import {
+  findJoinableLiveSession,
+  isJoinableLiveSession,
+  resolveLiveClassSchedule,
+} from "../utils/liveClassSchedule";
 
 const pageBackgroundImage =
   "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
@@ -142,6 +148,8 @@ export default function JoinLivePage() {
 
   useEffect(() => {
     loadSessions();
+    const refreshId = window.setInterval(loadSessions, 30_000);
+    return () => window.clearInterval(refreshId);
   }, []);
 
   const orderedSessions = useMemo(() => {
@@ -185,6 +193,12 @@ export default function JoinLivePage() {
     };
   }, [orderedSessions]);
 
+  const liveSchedule = useMemo(() => resolveLiveClassSchedule(orderedSessions), [orderedSessions]);
+  const joinableLiveSession = useMemo(
+    () => findJoinableLiveSession(orderedSessions),
+    [orderedSessions]
+  );
+
   const handleJoin = async (sessionId) => {
     setJoinState({ loadingId: sessionId, error: "", info: "" });
     try {
@@ -217,16 +231,25 @@ export default function JoinLivePage() {
   };
 
   useEffect(() => {
-    if (!highlightedSessionId || autoJoinConsumed) {
+    if (!highlightedSessionId || autoJoinConsumed || loading) {
       return;
     }
     if (activeSession?.session?.id === highlightedSessionId) {
       setAutoJoinConsumed(true);
       return;
     }
+    const highlightedSession = sessions.find((session) => session.id === highlightedSessionId);
     setAutoJoinConsumed(true);
+    if (!isJoinableLiveSession(highlightedSession)) {
+      setJoinState({
+        loadingId: null,
+        error: "",
+        info: "This class is not live yet. Live classes run Friday, Saturday and Sunday from 7:00 PM to 8:00 PM IST.",
+      });
+      return;
+    }
     handleJoin(highlightedSessionId);
-  }, [activeSession?.session?.id, autoJoinConsumed, highlightedSessionId]);
+  }, [activeSession?.session?.id, autoJoinConsumed, highlightedSessionId, loading, sessions]);
 
   useEffect(() => {
     if (authLoading) {
@@ -515,29 +538,7 @@ export default function JoinLivePage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-black panel-gradient p-5 backdrop-blur-sm">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
-              Join Workflow
-            </div>
-            <div className="mt-3 space-y-2">
-              {[
-                "Find a live session or search by title/host.",
-                "Join meeting mode for interactive class participation.",
-                "When overflow triggers, continue in broadcast mode with chat.",
-                "Stay in one page without losing session context.",
-              ].map((item, index) => (
-                <div
-                  key={item}
-                  className="flex items-start gap-3 rounded-xl border border-black panel-gradient px-3 py-3 text-sm text-[#C8C8C8]"
-                >
-                  <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-black bg-[#151515] text-[10px] font-semibold text-[#D9D9D9]">
-                    {index + 1}
-                  </span>
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <LiveClassScheduleStatus schedule={liveSchedule} liveSession={joinableLiveSession} />
         </div>
       </section>
 
@@ -653,20 +654,26 @@ export default function JoinLivePage() {
                     {session.description || "Live session with classroom or broadcast format."}
                   </p>
                 </div>
-                <Button
-                  className="w-full md:w-[160px]"
-                  loading={joinState.loadingId === session.id}
-                  onClick={() => handleJoin(session.id)}
-                >
-                  Join Session
-                </Button>
+                {isJoinableLiveSession(session) ? (
+                  <Button
+                    className="w-full !bg-red-600 !text-white hover:!bg-red-500 md:w-[190px]"
+                    loading={joinState.loadingId === session.id}
+                    onClick={() => handleJoin(session.id)}
+                  >
+                    Join Live
+                  </Button>
+                ) : (
+                  <div className="w-full rounded-xl border border-white/10 bg-black/35 px-4 py-3 text-center md:w-[190px]">
+                    <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#D7D7D7]">Not live</div>
+                    <div className="mt-1 text-[11px] text-[#858585]">Fri / Sat / Sun</div>
+                    <div className="text-[11px] text-[#858585]">7-8 PM IST</div>
+                  </div>
+                )}
               </article>
             ))}
           </div>
         ) : (
-          <div className="rounded-xl border border-black bg-[#161616] px-4 py-3 text-sm text-[#D9D9D9]">
-            No sessions match this filter right now.
-          </div>
+          <LiveClassScheduleStatus schedule={liveSchedule} liveSession={null} compact />
         )}
       </section>
     </PageShell>

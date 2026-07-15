@@ -3,16 +3,23 @@ import { Link } from "react-router-dom";
 import PageShell from "../components/PageShell";
 import Button from "../components/Button";
 import PublicEnrollmentRequestModal from "../components/PublicEnrollmentRequestModal";
+import LiveClassScheduleStatus from "../components/realtime/LiveClassScheduleStatus";
 import { enrollInLiveClass, listLiveClasses } from "../api/courses";
+import { listRealtimeSessions } from "../api/realtime";
 import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
 import { formatINR } from "../utils/currency";
+import {
+  findJoinableLiveSession,
+  resolveLiveClassSchedule,
+} from "../utils/liveClassSchedule";
 
 const pageBackgroundImage =
   "https://i.pinimg.com/1200x/54/57/f0/5457f05bea206d3aeccf6749065d453b.jpg";
 
 const classSchedule = {
   days: ["Friday", "Saturday", "Sunday"],
+  time: "7:00 PM to 8:00 PM IST",
   duration: "1 hour each class",
 };
 
@@ -105,6 +112,7 @@ export default function LiveClassesPage() {
   const [error, setError] = useState("");
   const [actionState, setActionState] = useState({});
   const [publicLeadTarget, setPublicLeadTarget] = useState(null);
+  const [realtimeSessions, setRealtimeSessions] = useState([]);
 
   useEffect(() => {
     let active = true;
@@ -128,6 +136,39 @@ export default function LiveClassesPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setRealtimeSessions([]);
+      return undefined;
+    }
+    let active = true;
+    const loadRealtimeSessions = async () => {
+      try {
+        const response = await listRealtimeSessions({ status: "all" });
+        if (!active) return;
+        const rows = apiData(response, []);
+        setRealtimeSessions(Array.isArray(rows) ? rows.filter((item) => item.status !== "ended") : []);
+      } catch {
+        if (active) setRealtimeSessions([]);
+      }
+    };
+    loadRealtimeSessions();
+    const refreshId = window.setInterval(loadRealtimeSessions, 30_000);
+    return () => {
+      active = false;
+      window.clearInterval(refreshId);
+    };
+  }, [isAuthenticated]);
+
+  const liveSchedule = useMemo(
+    () => resolveLiveClassSchedule(realtimeSessions),
+    [realtimeSessions]
+  );
+  const activeLiveSession = useMemo(
+    () => findJoinableLiveSession(realtimeSessions),
+    [realtimeSessions]
+  );
 
   const orderedTracks = useMemo(() => {
     return [...tracks].sort((a, b) => {
@@ -241,28 +282,7 @@ export default function LiveClassesPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-black panel-gradient p-5 backdrop-blur-sm">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
-              Live Class Format
-            </div>
-            <div className="mt-3 space-y-2">
-              {[
-                "Friday, Saturday, and Sunday schedule",
-                "1 hour per live class session",
-                "Month 1 = OSINT Beginner (Foundation)",
-                "Month 2 = OSINT Intermediate (Practical Skills)",
-                "Month 3 = OSINT Advanced (Investigation & Intelligence)",
-              ].map((item) => (
-                <div
-                  key={item}
-                  className="flex items-start gap-3 rounded-xl border border-black panel-gradient px-3 py-3 text-sm text-[#C8C8C8]"
-                >
-                  <span className="mt-1 inline-flex h-2.5 w-2.5 rounded-full bg-[#C0C0C0]" />
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <LiveClassScheduleStatus schedule={liveSchedule} liveSession={activeLiveSession} />
         </div>
       </section>
 
@@ -293,6 +313,9 @@ export default function LiveClassesPage() {
               label: "Month",
               subtitle: formatLevel(course?.level),
             };
+            const courseLiveSession = findJoinableLiveSession(realtimeSessions, course.id);
+            const hasApprovedAccess =
+              course.is_enrolled || String(course.enrollment_status || "").toLowerCase() === "approved";
             return (
               <article
                 key={course.id}
@@ -323,6 +346,7 @@ export default function LiveClassesPage() {
                     <div className="h-full rounded-xl border border-black panel-gradient px-3 py-2">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Schedule</div>
                       <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">Fri / Sat / Sun</div>
+                      <div className="mt-1 text-[10px] text-[#949494]">7-8 PM IST</div>
                     </div>
                     <div className="h-full rounded-xl border border-black panel-gradient px-3 py-2">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Duration</div>
@@ -357,10 +381,20 @@ export default function LiveClassesPage() {
                   </div>
 
                   <div className="mt-auto pt-4">
-                    {course.is_enrolled || String(course.enrollment_status || "").toLowerCase() === "approved" ? (
-                      <Button className="w-full" disabled>
-                        Access Approved
-                      </Button>
+                    {hasApprovedAccess && courseLiveSession ? (
+                      <LiveClassScheduleStatus
+                        schedule={liveSchedule}
+                        liveSession={courseLiveSession}
+                        compact
+                      />
+                    ) : hasApprovedAccess ? (
+                      <div className="rounded-xl border border-white/10 bg-black/35 px-4 py-3 text-center">
+                        <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#D7D7D7]">
+                          Access approved
+                        </div>
+                        <div className="mt-1 text-xs text-[#8F8F8F]">{classSchedule.time}</div>
+                        <div className="mt-1 text-xs text-[#707070]">Friday, Saturday and Sunday</div>
+                      </div>
                     ) : String(course.enrollment_status || "").toLowerCase() === "pending" ? (
                       <Button className="w-full" disabled>
                         Request Pending
