@@ -8,6 +8,7 @@ import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
 import { formatINR } from "../utils/currency";
+import { normalizeTextList } from "../utils/textList";
 
 const pageBackgroundImage =
   "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
@@ -43,13 +44,11 @@ function formatLevel(level) {
 }
 
 function deriveOutcomes(course, sections, launchStatus) {
-  if (Array.isArray(course?.expected_outcomes) && course.expected_outcomes.length) {
-    return course.expected_outcomes.filter(Boolean).slice(0, 4);
-  }
+  const configuredOutcomes = normalizeTextList(course?.expected_outcomes).slice(0, 4);
+  if (configuredOutcomes.length) return configuredOutcomes;
 
-  if (Array.isArray(course?.learning_points) && course.learning_points.length) {
-    return course.learning_points.filter(Boolean).slice(0, 4);
-  }
+  const legacyLearningPoints = normalizeTextList(course?.learning_points).slice(0, 4);
+  if (legacyLearningPoints.length) return legacyLearningPoints;
 
   const fromSections = (sections || [])
     .slice(0, 4)
@@ -185,9 +184,7 @@ export default function CourseDetailPage() {
   const launchStatus = useMemo(() => getCourseLaunchStatus(course), [course]);
   const highlights = useMemo(() => {
     if (!course) return [];
-    const configuredHighlights = Array.isArray(course.what_you_will_learn)
-      ? course.what_you_will_learn.filter(Boolean).slice(0, 6)
-      : [];
+    const configuredHighlights = normalizeTextList(course.what_you_will_learn).slice(0, 6);
     if (configuredHighlights.length) return configuredHighlights;
 
     const sectionTitles = sections.map((section) => section.title).slice(0, 4);

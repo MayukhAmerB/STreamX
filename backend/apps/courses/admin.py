@@ -1,3 +1,4 @@
+import ast
 import json
 
 from django import forms
@@ -33,7 +34,10 @@ def _parse_admin_list_field(value):
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
-        parsed = None
+        try:
+            parsed = ast.literal_eval(raw)
+        except (SyntaxError, ValueError):
+            parsed = None
 
     if isinstance(parsed, list):
         parsed_items = parsed
