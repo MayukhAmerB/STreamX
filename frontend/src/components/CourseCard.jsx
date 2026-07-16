@@ -40,11 +40,11 @@ function CourseCard({ course }) {
   }, [course?.id, course?.thumbnail]);
 
   return (
-    <article className="hover-lift panel-gradient group relative flex h-full min-h-[560px] self-stretch flex-col overflow-hidden rounded-[22px] border border-black text-white shadow-[0_20px_48px_rgba(0,0,0,0.28)] transition duration-300 hover:border-white/35 sm:min-h-[620px]">
+    <article className="hover-lift panel-gradient group relative flex h-full min-h-0 self-stretch flex-col overflow-hidden rounded-[18px] border border-black text-white shadow-[0_16px_38px_rgba(0,0,0,0.25)] transition duration-300 hover:border-white/35 sm:min-h-[620px] sm:rounded-[22px] sm:shadow-[0_20px_48px_rgba(0,0,0,0.28)]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(192,192,192,0.12),transparent_42%)]" />
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#DCDCDC]/30 to-transparent" />
 
-      <div className="relative h-[200px] bg-[#0A0A0A] sm:h-[230px] lg:h-[260px] xl:h-[280px]">
+      <div className="relative h-[185px] bg-[#0A0A0A] sm:h-[230px] lg:h-[260px] xl:h-[280px]">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_15%,rgba(192,192,192,0.12),transparent_42%)]" />
         {thumbnailSrc ? (
           <img
@@ -69,17 +69,17 @@ function CourseCard({ course }) {
         <div className="absolute inset-0 bg-gradient-to-t from-[#060606]/95 via-black/25 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/72 to-transparent" />
 
-        <div className="absolute left-4 top-4 right-4 flex items-start justify-between gap-2">
+        <div className="absolute left-3 right-3 top-3 flex items-start justify-between gap-2 sm:left-4 sm:right-4 sm:top-4">
           <div className="flex flex-wrap gap-2">
-            <span className="rounded-full border border-black bg-white px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-neutral-900 shadow-sm">
+            <span className="rounded-full border border-black bg-white px-2.5 py-1 text-[9px] font-semibold tracking-[0.1em] text-neutral-900 shadow-sm sm:px-3 sm:text-[10px] sm:tracking-[0.14em]">
               {categoryLabel}
             </span>
-            <span className="rounded-full border border-black bg-[#F1F1F1] px-3 py-1 text-[10px] font-semibold tracking-wide text-[#202020]">
+            <span className="rounded-full border border-black bg-[#F1F1F1] px-2.5 py-1 text-[9px] font-semibold tracking-wide text-[#202020] sm:px-3 sm:text-[10px]">
               {levelLabel}
             </span>
           </div>
           <div
-            className={`shrink-0 rounded-full px-3 py-1 text-[10px] font-semibold tracking-[0.12em] shadow-sm ${
+            className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-semibold tracking-[0.1em] shadow-sm sm:px-3 sm:text-[10px] sm:tracking-[0.12em] ${
               status.isLive
                 ? "border border-[#E5E5E5]/80 bg-[linear-gradient(135deg,#FEFEFE_0%,#F5F5F5_55%,#D4D4D4_100%)] text-[#242424]"
                 : "border border-[#CCCCCC] bg-[#D9D9D9] text-[#131313]"
@@ -89,7 +89,7 @@ function CourseCard({ course }) {
           </div>
         </div>
 
-        <div className="absolute bottom-4 left-4 right-4">
+        <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4">
           <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold tracking-wide text-[#DEDEDE]">
             <span className="inline-flex h-2 w-2 rounded-full bg-[#C0C0C0]" />
             <span>{course.instructor?.full_name || "Instructor"}</span>
@@ -100,8 +100,8 @@ function CourseCard({ course }) {
         </div>
       </div>
 
-      <div className="relative flex flex-1 flex-col p-5">
-        <p className="line-clamp-3 min-h-[4.6rem] max-w-full break-words text-sm leading-6 text-[#B2B2B2]">
+      <div className="relative flex flex-1 flex-col p-4 sm:p-5">
+        <p className="line-clamp-3 max-w-full break-words text-sm leading-6 text-[#B2B2B2] sm:min-h-[4.6rem]">
           {safeDescription}
         </p>
 
@@ -134,29 +134,29 @@ function CourseCard({ course }) {
         </div>
 
         <div className="mt-auto pt-4">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
             <Link
               to={detailsLink}
-              className="inline-flex items-center justify-center rounded-full border border-black bg-[#141414] px-3 py-2.5 text-sm font-semibold text-[#DBDBDB] transition hover:bg-[#1B1B1B]"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-black bg-[#141414] px-3 py-2.5 text-sm font-semibold text-[#DBDBDB] transition hover:bg-[#1B1B1B] sm:rounded-full"
             >
               View Details
             </Link>
             {!status.isComingSoon && hasCourseAccess ? (
               <Link
                 to={`/learn/${course.id}`}
-                className="glossy inline-flex items-center justify-center rounded-full border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-3 py-2.5 text-sm font-semibold text-[#1A1A1A] shadow-[0_8px_18px_rgba(0,0,0,0.14)] transition hover:bg-[linear-gradient(135deg,#FFFDF2_0%,#F9EFD1_55%,#EEDFB4_100%)]"
+                className="glossy inline-flex min-h-11 items-center justify-center rounded-xl border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-3 py-2.5 text-sm font-semibold text-[#1A1A1A] shadow-[0_8px_18px_rgba(0,0,0,0.14)] transition hover:bg-[linear-gradient(135deg,#FFFDF2_0%,#F9EFD1_55%,#EEDFB4_100%)] sm:rounded-full"
               >
                 Go to Course
               </Link>
             ) : status.isLive ? (
               <Link
                 to={detailsLink}
-                className="glossy inline-flex items-center justify-center rounded-full border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-3 py-2.5 text-sm font-semibold text-[#1A1A1A] shadow-[0_8px_18px_rgba(0,0,0,0.14)] transition hover:bg-[linear-gradient(135deg,#FFFDF2_0%,#F9EFD1_55%,#EEDFB4_100%)]"
+                className="glossy inline-flex min-h-11 items-center justify-center rounded-xl border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-3 py-2.5 text-sm font-semibold text-[#1A1A1A] shadow-[0_8px_18px_rgba(0,0,0,0.14)] transition hover:bg-[linear-gradient(135deg,#FFFDF2_0%,#F9EFD1_55%,#EEDFB4_100%)] sm:rounded-full"
               >
                 Request Access
               </Link>
             ) : (
-              <span className="inline-flex items-center justify-center rounded-full border border-[#B7B7B7] bg-gradient-to-r from-[#CFCFCF] to-[#989898] px-3 py-2.5 text-sm font-semibold text-[#121212] shadow-[0_8px_18px_rgba(0,0,0,0.2)]">
+              <span className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#B7B7B7] bg-gradient-to-r from-[#CFCFCF] to-[#989898] px-3 py-2.5 text-sm font-semibold text-[#121212] shadow-[0_8px_18px_rgba(0,0,0,0.2)] sm:rounded-full">
                 Coming Soon
               </span>
             )}

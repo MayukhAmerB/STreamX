@@ -276,7 +276,7 @@ export default function LiveClassesPage() {
       subtitle="Weekend live OSINT classes with a structured month-by-month progression."
       decryptTitle
     >
-      <section className="relative mb-6 overflow-hidden rounded-[30px] border border-black bg-[#080808] shadow-[0_26px_70px_rgba(0,0,0,0.35)]">
+      <section className="relative mb-5 overflow-hidden rounded-[20px] border border-black bg-[#080808] shadow-[0_18px_50px_rgba(0,0,0,0.32)] sm:mb-6 sm:rounded-[30px] sm:shadow-[0_26px_70px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">
           <img
             src={pageBackgroundImage}
@@ -288,7 +288,7 @@ export default function LiveClassesPage() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_12%,rgba(192,192,192,0.12),transparent_36%)]" />
         </div>
 
-        <div className="relative grid gap-5 p-5 sm:p-6 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="relative grid gap-4 p-4 sm:gap-5 sm:p-6 lg:grid-cols-[1.05fr_0.95fr]">
           <div>
             <div className="inline-flex items-center rounded-full border border-black bg-white/5 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#DBDBDB]">
               WEEKEND LIVE CLASSES
@@ -301,7 +301,7 @@ export default function LiveClassesPage() {
               as a progressive 3-month path: Beginner, Intermediate, and Advanced.
             </p>
 
-            <div className="mt-5 grid gap-3 sm:auto-rows-fr sm:grid-cols-3">
+            <div className="mt-5 grid grid-cols-1 gap-2 min-[390px]:grid-cols-3 sm:auto-rows-fr sm:gap-3">
               <div className="h-full rounded-2xl border border-black panel-gradient p-3 backdrop-blur-sm">
                 <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Class Days</div>
                 <div className="mt-1 text-sm font-semibold text-white">{classSchedule.days.join(", ")}</div>
@@ -329,7 +329,7 @@ export default function LiveClassesPage() {
               offline, the same player shows the next weekend schedule.
             </p>
             <div className="mt-5 rounded-xl border border-white/10 bg-black/35 px-4 py-3 text-sm font-semibold text-[#D7D7D7]">
-              Friday, Saturday and Sunday · 7:00 PM to 8:00 PM IST
+              Friday, Saturday and Sunday - 7:00 PM to 8:00 PM IST
             </div>
           </div>
         </div>
@@ -360,7 +360,7 @@ export default function LiveClassesPage() {
       ) : null}
 
       <section className="rounded-[26px] border border-black panel-gradient p-4 sm:p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-4 flex flex-col items-start gap-2 min-[430px]:flex-row min-[430px]:items-end min-[430px]:justify-between">
           <div>
             <h3 className="font-reference text-lg font-semibold text-white">OSINT Month-Wise Live Classes</h3>
             <p className="mt-1 text-xs text-[#949494]">

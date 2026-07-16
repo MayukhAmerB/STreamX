@@ -317,8 +317,8 @@ function StudentAccessPanel({
   const visibleLiveClasses = liveClasses.slice(0, 2);
 
   return (
-    <div className="rounded-[24px] border border-white/15 bg-[#242424] p-4 shadow-[0_28px_90px_rgba(0,0,0,0.55)] sm:p-5">
-      <div className="relative overflow-hidden rounded-[16px] border border-white/10 bg-[#141414] p-5 sm:p-6">
+    <div className="rounded-[20px] border border-white/15 bg-[#242424] p-3 shadow-[0_20px_60px_rgba(0,0,0,0.5)] sm:rounded-[24px] sm:p-5 sm:shadow-[0_28px_90px_rgba(0,0,0,0.55)]">
+      <div className="relative overflow-hidden rounded-[14px] border border-white/10 bg-[#141414] p-4 sm:rounded-[16px] sm:p-6">
         <div className="flex items-center justify-between gap-4">
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#7E7E7E]">
             Your workspace
@@ -328,7 +328,7 @@ function StudentAccessPanel({
             Active
           </span>
         </div>
-        <p className="mt-5 text-lg font-semibold text-white">Your approved learning</p>
+        <p className="mt-4 text-base font-semibold text-white sm:mt-5 sm:text-lg">Your approved learning</p>
         <p className="mt-2 text-sm leading-6 text-[#858585]">
           {loading
             ? "Loading your permissions..."
@@ -336,7 +336,7 @@ function StudentAccessPanel({
         </p>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3">
+      <div className="mt-3 grid grid-cols-1 gap-3 min-[440px]:grid-cols-2">
         <Link
           to="/my-courses"
           className="group min-w-0 rounded-[16px] border border-white/10 bg-[#171717] p-4 transition duration-200 hover:-translate-y-0.5 hover:border-white/30 hover:bg-[#1D1D1D] hover:shadow-[0_14px_30px_rgba(0,0,0,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
@@ -412,7 +412,7 @@ function StudentAccessPanel({
         </Link>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3">
+      <div className="mt-3 grid grid-cols-1 gap-3 min-[440px]:grid-cols-2">
         <Link to="/my-courses" className="group inline-flex items-center justify-center gap-2 rounded-[14px] border border-white bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-black transition hover:bg-[#E7E7E7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
           My courses <DashboardArrow className="transition-transform group-hover:translate-x-0.5" />
         </Link>
@@ -450,7 +450,7 @@ function GuestAccessPanel({ courses, liveClasses, liveClassesError, onRequestAcc
 
   return (
     <div className="rounded-[24px] border border-white/15 bg-[#242424] p-4 shadow-[0_28px_90px_rgba(0,0,0,0.55)] sm:p-5">
-      <div className="relative overflow-hidden rounded-[16px] border border-white/10 bg-[#141414] p-5 sm:p-6">
+      <div className="relative overflow-hidden rounded-[14px] border border-white/10 bg-[#141414] p-4 sm:rounded-[16px] sm:p-6">
         <div className="flex items-center justify-between gap-4">
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#7E7E7E]">Available learning</span>
           <span className="rounded-full border border-white/10 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-[#AFAFAF]">Catalog</span>
@@ -461,7 +461,7 @@ function GuestAccessPanel({ courses, liveClasses, liveClassesError, onRequestAcc
         </p>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3">
+      <div className="mt-3 grid grid-cols-1 gap-3 min-[440px]:grid-cols-2">
         <div className="min-w-0 rounded-[16px] border border-white/10 bg-[#171717] p-4 transition hover:border-white/30 hover:bg-[#1D1D1D]">
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs font-semibold uppercase tracking-[0.12em] text-white">Courses</span>
@@ -509,7 +509,7 @@ function GuestAccessPanel({ courses, liveClasses, liveClassesError, onRequestAcc
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3">
+      <div className="mt-3 grid grid-cols-1 gap-3 min-[440px]:grid-cols-2">
         <Link to="/courses" onClick={(event) => onRequestAccess(event, { type: "general", title: "Courses" })} className="group inline-flex items-center justify-center gap-2 rounded-[14px] border border-white bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-black transition hover:bg-[#E7E7E7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
           View courses <DashboardArrow className="transition-transform group-hover:translate-x-0.5" />
         </Link>
@@ -858,7 +858,7 @@ export default function LandingPage() {
         ref={heroRef}
         className="landing-hero relative z-10 overflow-hidden border-b border-white/10 bg-black px-4"
       >
-        <div className="relative mx-auto grid min-h-[620px] max-w-6xl items-center gap-12 py-16 sm:py-20 lg:grid-cols-[0.96fr_1.04fr] lg:gap-20 lg:py-24">
+        <div className="relative mx-auto grid min-h-[calc(100dvh-4rem)] max-w-6xl items-center gap-10 py-12 sm:min-h-[620px] sm:py-20 lg:grid-cols-[0.96fr_1.04fr] lg:gap-20 lg:py-24">
           <div className="reveal-up">
             <div className="flex items-center gap-4">
               <span className="h-px w-10 bg-white/70" aria-hidden="true" />
@@ -872,7 +872,7 @@ export default function LandingPage() {
               </div>
             ) : null}
 
-            <h1 className="mt-7 max-w-[660px] font-reference text-[clamp(2.75rem,4.5vw,4.25rem)] font-semibold leading-[1.02] tracking-[-0.045em] text-white">
+            <h1 className="mt-6 max-w-[660px] font-reference text-[clamp(2.35rem,11vw,4.25rem)] font-semibold leading-[1.02] tracking-[-0.045em] text-white sm:mt-7 sm:text-[clamp(2.75rem,4.5vw,4.25rem)]">
               Learn practical skills through clean, focused courses.
             </h1>
 

@@ -60,8 +60,8 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-20 border-b border-white/10 bg-black/95 px-3 backdrop-blur-xl" ref={menuRef}>
-      <div className="relative mx-auto flex max-w-7xl items-center justify-between gap-3 px-1 py-3 text-neutral-950 sm:gap-4 sm:px-2 sm:py-4">
+    <header className="sticky top-0 z-20 border-b border-white/10 bg-black/95 px-2 pt-[env(safe-area-inset-top)] backdrop-blur-xl sm:px-3" ref={menuRef}>
+      <div className="relative mx-auto flex max-w-7xl items-center justify-between gap-2 px-1 py-2.5 text-neutral-950 sm:gap-4 sm:px-2 sm:py-4">
         <BrandLogo className="min-w-0 flex-1 lg:flex-none" />
         <nav className="hidden items-center gap-5 lg:flex">
           <NavLink
@@ -226,7 +226,7 @@ export default function Navbar() {
           )}
           <button
             type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15 lg:hidden"
+            className="inline-flex h-11 w-11 touch-manipulation items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15 lg:hidden"
             onClick={() => {
               setMenuOpen(false);
               setMobileMenuOpen((prev) => !prev);
@@ -255,42 +255,42 @@ export default function Navbar() {
         </div>
       </div>
       {mobileMenuOpen ? (
-        <div className="mx-auto mt-2 max-w-7xl overflow-hidden rounded-2xl border border-black panel-gradient p-3 shadow-[0_18px_34px_rgba(0,0,0,0.34)] backdrop-blur lg:hidden">
+        <div className="mx-auto mt-1 max-h-[calc(100dvh-4.75rem-env(safe-area-inset-top))] max-w-7xl overflow-y-auto overscroll-contain rounded-2xl border border-black panel-gradient p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-[0_18px_34px_rgba(0,0,0,0.34)] backdrop-blur lg:hidden">
           <nav className="grid gap-1">
             <NavLink
               to="/live-classes"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]"
+              className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]"
               onClick={(event) => openLandingGuestEnrollment(event, "Live Classes")}
             >
               Live Classes
             </NavLink>
             <NavLink
               to="/courses"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]"
+              className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]"
               onClick={(event) => openLandingGuestEnrollment(event, "Courses")}
             >
               Courses
             </NavLink>
             {isAuthenticated ? (
-              <NavLink to="/guides" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+              <NavLink to="/guides" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                 Guides
               </NavLink>
             ) : null}
             {isAuthenticated ? (
-              <NavLink to="/join-live" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+              <NavLink to="/join-live" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                 Join Live
               </NavLink>
             ) : null}
-            <NavLink to="/about" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+            <NavLink to="/about" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
               About Us
             </NavLink>
-            <NavLink to="/hall-of-fame" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+            <NavLink to="/hall-of-fame" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
               Hall of Fame
             </NavLink>
-            <NavLink to="/contact" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+            <NavLink to="/contact" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
               Contact
             </NavLink>
-            <NavLink to="/faqs" className="rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+            <NavLink to="/faqs" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
               FAQs
             </NavLink>
           </nav>

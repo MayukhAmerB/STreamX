@@ -325,7 +325,7 @@ export default function CourseDetailPage() {
         </div>
       ) : null}
 
-      <section className="relative mb-6 overflow-hidden rounded-[30px] border border-black bg-[#080808] shadow-[0_26px_70px_rgba(0,0,0,0.36)]">
+      <section className="relative mb-5 overflow-hidden rounded-[20px] border border-black bg-[#080808] shadow-[0_18px_50px_rgba(0,0,0,0.32)] sm:mb-6 sm:rounded-[30px] sm:shadow-[0_26px_70px_rgba(0,0,0,0.36)]">
         <div className="absolute inset-0">
           <img
             src={course.thumbnail || pageBackgroundImage}
@@ -337,7 +337,7 @@ export default function CourseDetailPage() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(192,192,192,0.12),transparent_40%)]" />
         </div>
 
-        <div className="relative grid gap-5 p-5 sm:p-6 lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="relative grid gap-4 p-4 sm:gap-5 sm:p-6 lg:grid-cols-[1.15fr_0.85fr]">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-white/70 bg-white/90 px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-neutral-900">

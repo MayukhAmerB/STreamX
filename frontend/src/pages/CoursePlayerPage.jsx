@@ -963,7 +963,7 @@ export default function CoursePlayerPage() {
                     type="button"
                     onClick={() => previousLecture && handleSelectLecture(previousLecture)}
                     disabled={!previousLecture}
-                    className="rounded-full border border-white/10 bg-[#171717] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#242424] disabled:cursor-not-allowed disabled:opacity-35"
+                    className="min-h-11 rounded-xl border border-white/10 bg-[#171717] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#242424] disabled:cursor-not-allowed disabled:opacity-35 sm:rounded-full"
                   >
                     Previous
                   </button>
@@ -971,7 +971,7 @@ export default function CoursePlayerPage() {
                     type="button"
                     onClick={() => nextLecture && handleSelectLecture(nextLecture)}
                     disabled={!nextLecture}
-                    className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#111111] transition hover:bg-[#E4E4E4] disabled:cursor-not-allowed disabled:opacity-35"
+                    className="min-h-11 rounded-xl bg-white px-4 py-2 text-xs font-semibold text-[#111111] transition hover:bg-[#E4E4E4] disabled:cursor-not-allowed disabled:opacity-35 sm:rounded-full"
                   >
                     Next lesson
                   </button>
@@ -1033,7 +1033,7 @@ export default function CoursePlayerPage() {
                         ? "Write key commands, reminders, timestamps, or important takeaways..."
                         : "Select a lecture to start writing notes."
                     }
-                    className="mt-4 min-h-[220px] w-full flex-1 resize-y rounded-2xl border border-[#303030] bg-black/60 px-4 py-3 text-sm leading-7 text-white outline-none transition placeholder:text-[#6F6F6F] focus:border-[#D8D8D8]/70"
+                    className="mt-4 min-h-[160px] w-full flex-1 resize-y rounded-2xl border border-[#303030] bg-black/60 px-4 py-3 text-base leading-7 text-white outline-none transition placeholder:text-[#6F6F6F] focus:border-[#D8D8D8]/70 sm:min-h-[220px] sm:text-sm"
                   />
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                     <p className="text-xs text-[#8F8F8F]">

@@ -141,7 +141,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             <div className="rounded-xl border border-black panel-gradient px-4 py-3">
               <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#979797]">Role</div>
               <div className="mt-1 text-sm font-semibold text-[#E0E0E0]">{accountRoleLabel}</div>

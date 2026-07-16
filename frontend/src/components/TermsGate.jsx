@@ -80,9 +80,9 @@ export default function TermsGate() {
   };
 
   return (
-    <div className="fixed inset-0 z-[1000] overflow-y-auto bg-black/86 px-4 py-6 backdrop-blur-xl">
-      <div className="mx-auto max-w-4xl overflow-hidden rounded-[28px] border border-white/15 bg-[#080808] shadow-[0_32px_90px_rgba(0,0,0,0.72)]">
-        <div className="border-b border-white/10 bg-gradient-to-r from-[#151515] via-[#101010] to-[#1F1F1F] px-5 py-5 sm:px-7">
+    <div className="fixed inset-0 z-[1000] overflow-y-auto overscroll-contain bg-black/86 px-3 py-3 backdrop-blur-xl sm:px-4 sm:py-6">
+      <div className="mx-auto max-w-4xl overflow-hidden rounded-[20px] border border-white/15 bg-[#080808] pb-[env(safe-area-inset-bottom)] shadow-[0_32px_90px_rgba(0,0,0,0.72)] sm:rounded-[28px]">
+        <div className="border-b border-white/10 bg-gradient-to-r from-[#151515] via-[#101010] to-[#1F1F1F] px-4 py-4 sm:px-7 sm:py-5">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#BDBDBD]">
             Required Legal Consent
           </p>
@@ -94,8 +94,8 @@ export default function TermsGate() {
           </p>
         </div>
 
-        <div className="grid gap-5 p-5 sm:p-7 lg:grid-cols-[1fr_280px]">
-          <section className="min-h-[360px] max-h-[58vh] overflow-y-auto rounded-2xl border border-white/10 bg-black/45 p-4">
+        <div className="grid gap-4 p-4 sm:gap-5 sm:p-7 lg:grid-cols-[1fr_280px]">
+          <section className="max-h-[48vh] overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-black/45 p-3 sm:min-h-[360px] sm:max-h-[58vh] sm:p-4">
             <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-[#AFAFAF]">
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
                 Version {terms.version}
@@ -139,14 +139,14 @@ export default function TermsGate() {
               </Button>
               <Link
                 to="/terms"
-                className="inline-flex min-h-10 items-center justify-center rounded-xl border border-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
               >
                 Open Full Terms Page
               </Link>
               <button
                 type="button"
                 onClick={logout}
-                className="min-h-10 rounded-xl border border-red-300/20 px-4 py-2 text-sm font-semibold text-red-200 transition hover:bg-red-500/10"
+                className="min-h-11 rounded-xl border border-red-300/20 px-4 py-2 text-sm font-semibold text-red-200 transition hover:bg-red-500/10"
               >
                 Logout
               </button>

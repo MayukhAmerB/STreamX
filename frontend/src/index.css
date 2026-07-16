@@ -13,6 +13,8 @@
 
 html {
   zoom: var(--site-zoom);
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: 6rem;
 }
 
 @supports not (zoom: 1) {
@@ -46,7 +48,16 @@ body {
   font-family: "Inter", "Segoe UI", Arial, system-ui, sans-serif;
   background: #000000;
   color: #FFFFFF;
+  overflow-x: hidden;
   @apply antialiased;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
 }
 
 [data-protected-playback-surface] video::-webkit-media-controls-fullscreen-button,
@@ -559,5 +570,40 @@ h6 {
 @media (max-width: 1024px) {
   .hero-glitch-overlay {
     display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  html {
+    zoom: 1;
+    scroll-padding-top: 5rem;
+  }
+
+  @supports not (zoom: 1) {
+    body {
+      width: 100%;
+      min-height: 100vh;
+      transform: none;
+    }
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  .panel-gradient.p-5,
+  .panel-gradient.p-6 {
+    padding: 1rem;
+  }
+
+  .hover-lift:hover,
+  .hall-of-fame-card:hover {
+    transform: none;
+  }
+
+  .glossy:hover::after {
+    animation: none;
   }
 }

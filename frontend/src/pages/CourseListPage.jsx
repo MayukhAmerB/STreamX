@@ -46,7 +46,7 @@ export function CourseCatalogContent({
   return (
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="min-w-0">
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-4 flex flex-col items-start gap-2 min-[430px]:flex-row min-[430px]:items-end min-[430px]:justify-between">
           <div>
             <h3 className="font-reference text-lg font-semibold text-white">Available Tracks</h3>
             <p className="mt-1 text-xs text-[#949494]">
@@ -73,9 +73,9 @@ export function CourseCatalogContent({
         ) : null}
 
         {courses.length > 0 ? (
-          <div className="relative rounded-[26px] border border-black panel-gradient p-4 sm:p-5">
-            <div className="absolute inset-0 rounded-[26px] bg-[radial-gradient(circle_at_0%_0%,rgba(192,192,192,0.07),transparent_35%)]" />
-            <div className="relative grid auto-rows-fr gap-5 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
+          <div className="relative rounded-[20px] border border-black panel-gradient p-3 sm:rounded-[26px] sm:p-5">
+            <div className="absolute inset-0 rounded-[20px] bg-[radial-gradient(circle_at_0%_0%,rgba(192,192,192,0.07),transparent_35%)] sm:rounded-[26px]" />
+            <div className="relative grid auto-rows-fr gap-3 sm:gap-5 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
               {courses.map((course) => (
                 <CourseCard key={course.id} course={course} />
               ))}

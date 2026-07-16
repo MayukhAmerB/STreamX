@@ -99,15 +99,15 @@ export default function AppFooter() {
   return (
     <footer
       id="contact"
-      className="relative mt-14 overflow-hidden border-t border-white/10 bg-[#050505] text-[#F6F6F6]"
+      className="relative mt-10 overflow-hidden border-t border-white/10 bg-[#050505] text-[#F6F6F6] sm:mt-14"
     >
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div className="absolute right-[-10rem] top-[-12rem] h-96 w-96 rounded-full bg-white/[0.035] blur-[110px]" />
         <div className="absolute left-0 top-0 h-px w-full bg-gradient-to-r from-transparent via-white/60 to-transparent" />
       </div>
 
-      <div className="relative mx-auto max-w-6xl px-4 py-12 sm:py-14">
-        <div className="grid gap-10 border-b border-white/10 pb-10 sm:grid-cols-2 lg:grid-cols-12 lg:gap-8">
+      <div className="relative mx-auto max-w-6xl px-4 py-9 sm:py-14">
+        <div className="grid gap-8 border-b border-white/10 pb-8 sm:grid-cols-2 sm:gap-10 sm:pb-10 lg:grid-cols-12 lg:gap-8">
           <section className="sm:col-span-2 lg:col-span-5 lg:pr-10">
             <BrandLogo />
             <p className="mt-5 max-w-md text-sm leading-7 text-[#969696]">
@@ -122,7 +122,7 @@ export default function AppFooter() {
 
           <section className="lg:col-span-2">
             <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white">Explore</h3>
-            <div className="mt-4 grid gap-1">
+            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 sm:mt-4 sm:grid-cols-1">
               {quickLinks.map((item) => (
                 <FooterLink key={item.label} to={item.to} label={item.label} />
               ))}
@@ -131,7 +131,7 @@ export default function AppFooter() {
 
           <section className="lg:col-span-2">
             <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white">Programs</h3>
-            <div className="mt-4 grid gap-1">
+            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 sm:mt-4 sm:grid-cols-1">
               {programLinks.map((item) => (
                 <FooterLink key={item.label} to={item.to} label={item.label} />
               ))}
@@ -160,13 +160,13 @@ export default function AppFooter() {
           </section>
         </div>
 
-        <section className="pt-8">
+        <section className="pt-7 sm:pt-8">
           <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
             <div>
               <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white">Connect</h3>
               <p className="mt-2 text-xs text-[#777777]">Official channels for support and platform updates.</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 gap-2 min-[430px]:flex min-[430px]:flex-wrap">
             {socialLinks.map((item) => (
               <FooterSocialLink
                 key={`${item.kind}-${item.href}`}

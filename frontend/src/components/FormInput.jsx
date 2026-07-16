@@ -15,7 +15,7 @@ export default function FormInput({
         </span>
       ) : null}
       <Component
-        className="w-full rounded-xl border border-black bg-[#111111] px-3.5 py-2.5 text-sm text-white placeholder:text-[#868686] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] focus:border-[#C0C0C0] focus:outline-none focus:ring-2 focus:ring-[#C0C0C0]/20"
+        className="min-h-11 w-full rounded-xl border border-black bg-[#111111] px-3.5 py-2.5 text-base text-white placeholder:text-[#868686] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] focus:border-[#C0C0C0] focus:outline-none focus:ring-2 focus:ring-[#C0C0C0]/20 sm:text-sm"
         {...props}
       />
       {hint ? <span className="mt-1.5 block text-xs text-[#949494]">{hint}</span> : null}

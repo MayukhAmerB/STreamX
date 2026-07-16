@@ -113,12 +113,12 @@ export default function PublicEnrollmentRequestModal({
 
   return (
     <div
-      className="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 px-4 py-8 backdrop-blur-sm"
+      className="fixed inset-0 z-[130] flex items-start justify-center overflow-y-auto overscroll-contain bg-black/80 px-3 py-3 backdrop-blur-sm sm:items-center sm:px-4 sm:py-8"
       onClick={onClose}
       role="presentation"
     >
       <div
-        className="w-full max-w-2xl rounded-2xl border border-black panel-gradient p-5 shadow-[0_28px_80px_rgba(0,0,0,0.55)]"
+        className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-black panel-gradient p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_28px_80px_rgba(0,0,0,0.55)] sm:max-h-[calc(100dvh-4rem)] sm:p-5"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-3">
@@ -126,7 +126,7 @@ export default function PublicEnrollmentRequestModal({
             <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
               Access Request
             </div>
-            <h3 className="mt-1 font-reference text-2xl font-semibold text-white">{heading}</h3>
+            <h3 className="mt-1 font-reference text-xl font-semibold text-white sm:text-2xl">{heading}</h3>
             <p className="mt-2 text-sm text-[#BBBBBB]">
               {targetName
                 ? `Target: ${targetName}`
@@ -135,7 +135,7 @@ export default function PublicEnrollmentRequestModal({
           </div>
           <button
             type="button"
-            className="rounded-lg border border-black bg-[#161616] px-3 py-1.5 text-xs font-semibold text-[#DBDBDB] hover:bg-[#1C1C1C]"
+            className="inline-flex min-h-11 shrink-0 items-center rounded-lg border border-black bg-[#161616] px-3 py-2 text-xs font-semibold text-[#DBDBDB] hover:bg-[#1C1C1C]"
             onClick={onClose}
           >
             Close
@@ -207,12 +207,12 @@ export default function PublicEnrollmentRequestModal({
             />
           ) : null}
 
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <Button type="submit" loading={state.loading} disabled={turnstileEnabled && !turnstile.token}>
+          <div className="mt-1 grid gap-2 sm:flex sm:flex-wrap sm:items-center">
+            <Button className="w-full sm:w-auto" type="submit" loading={state.loading} disabled={turnstileEnabled && !turnstile.token}>
               Submit Request
             </Button>
-            <Link to={loginPath} onClick={onClose} className="inline-flex">
-              <Button type="button" variant="secondary">
+            <Link to={loginPath} onClick={onClose} className="inline-flex w-full sm:w-auto">
+              <Button className="w-full sm:w-auto" type="button" variant="secondary">
                 Already Registered? Login
               </Button>
             </Link>

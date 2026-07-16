@@ -87,21 +87,21 @@ export default function MyCoursesPage() {
 
       {!loading && !error ? (
         <>
-          <section className="mb-6 grid gap-4 md:grid-cols-3">
-            <div className="rounded-[24px] border border-black panel-gradient p-5 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
+          <section className="mb-5 grid grid-cols-3 gap-2 sm:mb-6 sm:gap-4">
+            <div className="rounded-[16px] border border-black panel-gradient p-3 shadow-[0_12px_35px_rgba(0,0,0,0.2)] sm:rounded-[24px] sm:p-5 sm:shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
               <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Courses Ready</div>
-              <div className="mt-2 text-3xl font-semibold text-white">{libraryStats.total}</div>
-              <p className="mt-2 text-sm text-[#BBBBBB]">Courses currently unlocked for this account.</p>
+              <div className="mt-2 text-2xl font-semibold text-white sm:text-3xl">{libraryStats.total}</div>
+              <p className="mt-2 hidden text-sm text-[#BBBBBB] sm:block">Courses currently unlocked for this account.</p>
             </div>
-            <div className="rounded-[24px] border border-black panel-gradient p-5 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
+            <div className="rounded-[16px] border border-black panel-gradient p-3 shadow-[0_12px_35px_rgba(0,0,0,0.2)] sm:rounded-[24px] sm:p-5 sm:shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
               <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Verified</div>
-              <div className="mt-2 text-3xl font-semibold text-white">{libraryStats.purchased}</div>
-              <p className="mt-2 text-sm text-[#BBBBBB]">Courses unlocked after admin verification.</p>
+              <div className="mt-2 text-2xl font-semibold text-white sm:text-3xl">{libraryStats.purchased}</div>
+              <p className="mt-2 hidden text-sm text-[#BBBBBB] sm:block">Courses unlocked after admin verification.</p>
             </div>
-            <div className="rounded-[24px] border border-black panel-gradient p-5 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
+            <div className="rounded-[16px] border border-black panel-gradient p-3 shadow-[0_12px_35px_rgba(0,0,0,0.2)] sm:rounded-[24px] sm:p-5 sm:shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
               <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Granted</div>
-              <div className="mt-2 text-3xl font-semibold text-white">{libraryStats.granted}</div>
-              <p className="mt-2 text-sm text-[#BBBBBB]">Courses approved for access by your admin team.</p>
+              <div className="mt-2 text-2xl font-semibold text-white sm:text-3xl">{libraryStats.granted}</div>
+              <p className="mt-2 hidden text-sm text-[#BBBBBB] sm:block">Courses approved for access by your admin team.</p>
             </div>
           </section>
 
@@ -182,20 +182,20 @@ export default function MyCoursesPage() {
                       {course.description || "Your course description will appear here once the curriculum is published."}
                     </p>
 
-                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
                       <div className="rounded-2xl border border-black panel-gradient p-3">
                         <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Lessons</div>
-                        <div className="mt-1 text-lg font-semibold text-white">{course.lecture_count || 0}</div>
+                        <div className="mt-1 text-base font-semibold text-white sm:text-lg">{course.lecture_count || 0}</div>
                       </div>
                       <div className="rounded-2xl border border-black panel-gradient p-3">
                         <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Instructor</div>
-                        <div className="mt-1 truncate text-sm font-semibold text-white">
+                        <div className="mt-1 truncate text-xs font-semibold text-white sm:text-sm">
                           {course.instructor?.full_name || "Instructor"}
                         </div>
                       </div>
                       <div className="rounded-2xl border border-black panel-gradient p-3">
                         <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Price</div>
-                        <div className="mt-1 text-sm font-semibold text-white">{formatINR(course.price)}</div>
+                        <div className="mt-1 truncate text-xs font-semibold text-white sm:text-sm">{formatINR(course.price)}</div>
                       </div>
                     </div>
 
