@@ -325,7 +325,7 @@ export default function CourseDetailPage() {
         </div>
       ) : null}
 
-      <section className="relative mb-5 overflow-hidden rounded-[20px] border border-black bg-[#080808] shadow-[0_18px_50px_rgba(0,0,0,0.32)] sm:mb-6 sm:rounded-[30px] sm:shadow-[0_26px_70px_rgba(0,0,0,0.36)]">
+      <section className="relative mb-5 min-w-0 overflow-hidden rounded-[18px] border border-black bg-[#080808] shadow-[0_18px_50px_rgba(0,0,0,0.32)] sm:mb-6 sm:rounded-[30px] sm:shadow-[0_26px_70px_rgba(0,0,0,0.36)]">
         <div className="absolute inset-0">
           <img
             src={course.thumbnail || pageBackgroundImage}
@@ -337,8 +337,8 @@ export default function CourseDetailPage() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(192,192,192,0.12),transparent_40%)]" />
         </div>
 
-        <div className="relative grid gap-4 p-4 sm:gap-5 sm:p-6 lg:grid-cols-[1.15fr_0.85fr]">
-          <div>
+        <div className="relative grid min-w-0 gap-4 p-3 sm:gap-5 sm:p-6 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-white/70 bg-white/90 px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-neutral-900">
                 {formatCategory(course.category)}
@@ -357,40 +357,40 @@ export default function CourseDetailPage() {
               </span>
             </div>
 
-            <h2 className="mt-4 max-w-3xl font-reference text-2xl font-semibold leading-tight text-white sm:text-3xl lg:text-[2.35rem]">
+            <h2 className="mt-4 max-w-3xl break-words font-reference text-[1.65rem] font-semibold leading-[1.08] text-white sm:text-3xl lg:text-[2.35rem]">
               {course.title}
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[#BBBBBB]">
               {course.description || "Structured cybersecurity training with practical modules and guided progression."}
             </p>
 
-            <div className="mt-4 max-w-sm">
+            <div className="mt-4 w-full sm:max-w-sm">
               {renderPrimaryEnrollmentAction()}
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-black panel-gradient p-3 backdrop-blur-sm">
+            <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
+              <div className="min-w-0 rounded-xl border border-black panel-gradient p-2.5 backdrop-blur-sm sm:rounded-2xl sm:p-3">
                 <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Modules</div>
-                <div className="mt-1 text-2xl font-semibold text-white">{sections.length}</div>
-                <div className="mt-1 text-xs text-[#BBBBBB]">Curriculum sections</div>
+                <div className="mt-1 text-xl font-semibold text-white sm:text-2xl">{sections.length}</div>
+                <div className="mt-1 hidden text-xs text-[#BBBBBB] sm:block">Curriculum sections</div>
               </div>
-              <div className="rounded-2xl border border-black panel-gradient p-3 backdrop-blur-sm">
+              <div className="min-w-0 rounded-xl border border-black panel-gradient p-2.5 backdrop-blur-sm sm:rounded-2xl sm:p-3">
                 <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Lessons</div>
-                <div className="mt-1 text-2xl font-semibold text-white">{lectureCount}</div>
-                <div className="mt-1 text-xs text-[#BBBBBB]">Lecture entries</div>
+                <div className="mt-1 text-xl font-semibold text-white sm:text-2xl">{lectureCount}</div>
+                <div className="mt-1 hidden text-xs text-[#BBBBBB] sm:block">Lecture entries</div>
               </div>
-              <div className="rounded-2xl border border-black panel-gradient p-3 backdrop-blur-sm">
+              <div className="min-w-0 rounded-xl border border-black panel-gradient p-2.5 backdrop-blur-sm sm:rounded-2xl sm:p-3">
                 <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Access</div>
-                <div className="mt-1 text-lg font-semibold text-white">
+                <div className="mt-1 break-words text-sm font-semibold leading-tight text-white sm:text-lg">
                   {launchStatus.isComingSoon ? "Coming Soon" : formatINR(course.price)}
                 </div>
-                <div className="mt-1 text-xs text-[#BBBBBB]">
+                <div className="mt-1 hidden text-xs text-[#BBBBBB] sm:block">
                   {launchStatus.isComingSoon ? "Waitlist release" : "Admin-approved access"}
                 </div>
               </div>
             </div>
 
-            <div className="mt-4 rounded-2xl border border-black panel-gradient p-4 backdrop-blur-sm">
+            <div className="mt-4 rounded-xl border border-black panel-gradient p-3.5 backdrop-blur-sm sm:rounded-2xl sm:p-4">
               <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
                 About This Course
               </div>
@@ -404,7 +404,7 @@ export default function CourseDetailPage() {
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             <div className="relative overflow-hidden rounded-2xl border border-black panel-gradient p-3 shadow-[0_20px_60px_rgba(0,0,0,0.25)] backdrop-blur-sm">
               <div className="relative aspect-[16/10] overflow-hidden rounded-xl border border-black panel-gradient">
                 {course.thumbnail && !previewImageFailed ? (
@@ -462,17 +462,17 @@ export default function CourseDetailPage() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1.55fr_1fr]">
-        <div className="space-y-6">
-          <section className="rounded-[24px] border border-black panel-gradient p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
+      <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-[1.55fr_1fr]">
+        <div className="min-w-0 space-y-4 sm:space-y-6">
+          <section className="min-w-0 rounded-[18px] border border-black panel-gradient p-4 shadow-[0_20px_60px_rgba(0,0,0,0.22)] sm:rounded-[24px] sm:p-5">
+            <div className="mb-4 flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <div className="min-w-0">
                 <h2 className="font-reference text-lg font-semibold text-white">Course Roadmap</h2>
                 <p className="mt-1 text-xs leading-5 text-[#949494]">
                   Module-by-module breakdown with lecture previews and section descriptions.
                 </p>
               </div>
-              <span className="rounded-full border border-black bg-[#141414] px-3 py-1 text-xs font-semibold text-[#CACACA]">
+              <span className="max-w-full rounded-full border border-black bg-[#141414] px-3 py-1 text-xs font-semibold text-[#CACACA]">
                 {sections.length} modules / {lectureCount} lessons
               </span>
             </div>
@@ -482,16 +482,16 @@ export default function CourseDetailPage() {
                 {sections.map((section, sectionIndex) => (
                   <div
                     key={section.id}
-                    className="relative overflow-hidden rounded-2xl border border-black panel-gradient p-4"
+                    className="relative min-w-0 overflow-hidden rounded-xl border border-black panel-gradient p-3.5 sm:rounded-2xl sm:p-4"
                   >
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(192,192,192,0.05),transparent_45%)]" />
                     <div className="relative">
-                      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-                        <div className="flex min-w-0 items-start gap-2">
+                      <div className="mb-3 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                        <div className="flex min-w-0 flex-col items-start gap-2 sm:flex-row">
                           <span className="shrink-0 whitespace-nowrap rounded-full border border-[#DADADA]/20 bg-[#1A1A1A] px-3 py-1 text-[11px] font-semibold tracking-wide text-[#D7D7D7]">
                             Module {sectionIndex + 1}
                           </span>
-                          <h3 className="min-w-0 font-reference text-base font-semibold text-white sm:text-lg">
+                          <h3 className="w-full min-w-0 break-words font-reference text-base font-semibold leading-snug text-white sm:text-lg">
                             {section.title}
                           </h3>
                         </div>
@@ -510,13 +510,13 @@ export default function CourseDetailPage() {
                             key={lecture.id}
                             className="rounded-xl border border-black panel-gradient px-3 py-3"
                           >
-                            <div className="flex items-start justify-between gap-3">
+                            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2 sm:gap-3">
                               <div className="flex min-w-0 items-start gap-3">
                                 <span className="mt-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-black bg-[#171717] px-1 text-[10px] font-semibold text-[#D3D3D3]">
                                   {lectureIndex + 1}
                                 </span>
                                 <div className="min-w-0">
-                                  <div className="truncate text-sm font-medium text-[#E2E2E2]">
+                                  <div className="break-words text-sm font-medium leading-5 text-[#E2E2E2]">
                                     {lecture.title}
                                   </div>
                                   {lecture.description ? (
@@ -546,7 +546,7 @@ export default function CourseDetailPage() {
             )}
           </section>
 
-          <section className="rounded-[24px] border border-black panel-gradient p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
+          <section className="rounded-[18px] border border-black panel-gradient p-4 shadow-[0_20px_60px_rgba(0,0,0,0.22)] sm:rounded-[24px] sm:p-5">
             <div className="mb-4">
               <h2 className="font-reference text-lg font-semibold text-white">Expected Outcomes</h2>
               <p className="mt-1 text-xs leading-5 text-[#949494]">
@@ -567,8 +567,8 @@ export default function CourseDetailPage() {
           </section>
         </div>
 
-        <aside className="space-y-5 lg:sticky lg:top-24 lg:h-fit">
-          <div className="rounded-[24px] border border-black panel-gradient p-5 text-white shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
+        <aside className="min-w-0 space-y-4 sm:space-y-5 lg:sticky lg:top-24 lg:h-fit">
+          <div className="rounded-[18px] border border-black panel-gradient p-4 text-white shadow-[0_20px_60px_rgba(0,0,0,0.22)] sm:rounded-[24px] sm:p-5">
             <div className="flex items-center justify-between gap-2">
               <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
                 Enrollment
@@ -619,7 +619,7 @@ export default function CourseDetailPage() {
             </p>
           </div>
 
-          <div className="rounded-[24px] border border-black panel-gradient p-5 text-white shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
+          <div className="rounded-[18px] border border-black panel-gradient p-4 text-white shadow-[0_20px_60px_rgba(0,0,0,0.22)] sm:rounded-[24px] sm:p-5">
             <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
               Course Snapshot
             </div>
