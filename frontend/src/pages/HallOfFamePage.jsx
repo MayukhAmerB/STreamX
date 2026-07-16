@@ -1,20 +1,29 @@
 import PageShell from "../components/PageShell";
 
-const certifiedStudents = [
-  "ALHaq",
-  "Bani Adam",
-  "Baseej",
-  "Fly-Nightingale",
-  "Jarvis",
-  "Khalid",
-  "Laisullah",
-  "LegallyStalking",
-  "RadicalGates",
-  "Shaikh Sahab",
-  "Spectre",
-  "STOIC MURDOCK",
-  "Vision",
-  "Yamach",
+const certifiedBatches = [
+  {
+    name: "Batch 1",
+    students: ["Al Bashar", "MalakulMaut"],
+  },
+  {
+    name: "Batch 2",
+    students: [
+      "ALHaq",
+      "Bani Adam",
+      "Baseej",
+      "Fly-Nightingale",
+      "Jarvis",
+      "Khalid",
+      "Laisullah",
+      "LegallyStalking",
+      "RadicalGates",
+      "Shaikh Sahab",
+      "Spectre",
+      "STOIC MURDOCK",
+      "Vision",
+      "Yamach",
+    ],
+  },
 ];
 
 function LaurelsMark() {
@@ -73,33 +82,52 @@ export default function HallOfFamePage() {
           </div>
         </div>
 
-        <div className="relative mt-10 grid gap-4 sm:mt-12 sm:grid-cols-2 lg:grid-cols-3">
-          {certifiedStudents.map((student, index) => (
-            <article
-              key={student}
-              className="hall-of-fame-card group relative min-h-44 overflow-hidden rounded-2xl border border-[#3E321A] bg-[#0C0B08] p-5 sm:p-6"
-              style={{ "--hall-delay": `${index * 75}ms` }}
-            >
-              <div className="pointer-events-none absolute inset-0 hall-of-fame-card-glow" aria-hidden="true" />
-              <div className="relative flex h-full flex-col justify-between gap-8">
-                <div className="flex items-start justify-between gap-4">
-                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#5C4820] bg-[#161207] text-[#D5B65F]">
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-                      <path d="m12 3 2.5 5.1 5.6.8-4 3.9.9 5.5-5-2.6-5 2.6.9-5.5-4-3.9 5.6-.8L12 3Z" fill="currentColor" />
-                    </svg>
-                  </span>
-                  <span className="text-[9px] font-semibold uppercase tracking-[0.22em] text-[#766A50]">
-                    Certified Student
-                  </span>
-                </div>
-                <div>
-                  <h2 className="hall-of-fame-gold break-words text-2xl font-bold leading-tight tracking-[-0.025em] sm:text-[1.7rem]">
-                    {student}
-                  </h2>
-                  <div className="mt-4 h-px w-12 bg-gradient-to-r from-[#D8B653] to-transparent transition-all duration-500 group-hover:w-24" aria-hidden="true" />
-                </div>
+        <div className="relative mt-10 space-y-12 sm:mt-12 sm:space-y-14">
+          {certifiedBatches.map((batch, batchIndex) => (
+            <section key={batch.name} aria-labelledby={`hall-${batch.name.toLowerCase().replace(" ", "-")}`}>
+              <div className="mb-5 flex items-center gap-4 sm:mb-6">
+                <h2
+                  id={`hall-${batch.name.toLowerCase().replace(" ", "-")}`}
+                  className="shrink-0 text-xs font-bold uppercase tracking-[0.28em] text-[#D7B95F] sm:text-sm"
+                >
+                  {batch.name}
+                </h2>
+                <span className="h-px flex-1 bg-gradient-to-r from-[#6A5222] to-transparent" aria-hidden="true" />
+                <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[#766A50] sm:text-[10px]">
+                  {batch.students.length} certified
+                </span>
               </div>
-            </article>
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {batch.students.map((student, index) => (
+                  <article
+                    key={student}
+                    className="hall-of-fame-card group relative min-h-44 overflow-hidden rounded-2xl border border-[#3E321A] bg-[#0C0B08] p-5 sm:p-6"
+                    style={{ "--hall-delay": `${(batchIndex * 4 + index) * 75}ms` }}
+                  >
+                    <div className="pointer-events-none absolute inset-0 hall-of-fame-card-glow" aria-hidden="true" />
+                    <div className="relative flex h-full flex-col justify-between gap-8">
+                      <div className="flex items-start justify-between gap-4">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#5C4820] bg-[#161207] text-[#D5B65F]">
+                          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                            <path d="m12 3 2.5 5.1 5.6.8-4 3.9.9 5.5-5-2.6-5 2.6.9-5.5-4-3.9 5.6-.8L12 3Z" fill="currentColor" />
+                          </svg>
+                        </span>
+                        <span className="text-[9px] font-semibold uppercase tracking-[0.22em] text-[#766A50]">
+                          Certified Student
+                        </span>
+                      </div>
+                      <div>
+                        <h3 className="hall-of-fame-gold break-words text-2xl font-bold leading-tight tracking-[-0.025em] sm:text-[1.7rem]">
+                          {student}
+                        </h3>
+                        <div className="mt-4 h-px w-12 bg-gradient-to-r from-[#D8B653] to-transparent transition-all duration-500 group-hover:w-24" aria-hidden="true" />
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
 
