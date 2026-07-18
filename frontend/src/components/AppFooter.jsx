@@ -5,15 +5,14 @@ const quickLinks = [
   { label: "Home", to: "/" },
   { label: "Courses", to: "/courses" },
   { label: "Live Classes", to: "/live-classes" },
-  { label: "Join Live", to: "/join-live" },
-  { label: "Terms and Conditions", to: "/terms" },
+  { label: "Hall of Fame", to: "/hall-of-fame" },
 ];
 
-const programLinks = [
-  { label: "OSINT Tracks", to: "/courses" },
-  { label: "Web Pentesting Tracks", to: "/courses" },
-  { label: "Live Weekend Batches", to: "/live-classes" },
-  { label: "Instructor Sessions", to: "/meeting" },
+const companyLinks = [
+  { label: "About Us", to: "/about" },
+  { label: "Contact", to: "/contact" },
+  { label: "FAQs", to: "/faqs" },
+  { label: "Terms", to: "/terms" },
 ];
 
 const socialLinks = [
@@ -23,9 +22,9 @@ const socialLinks = [
     kind: "instagram",
   },
   { label: "X", href: "https://x.com/AdlFront", kind: "x" },
-  { label: "WhatsApp +91 99708 75040", href: "https://wa.me/919970875040", kind: "whatsapp" },
-  { label: "WhatsApp +91 9800415583", href: "https://wa.me/919800415583", kind: "whatsapp" },
-  { label: "Email", href: "mailto:contact@adlfront.com", kind: "email" },
+  { label: "+91 99708 75040", href: "https://wa.me/919970875040", kind: "whatsapp" },
+  { label: "+91 98004 15583", href: "https://wa.me/919800415583", kind: "whatsapp" },
+  { label: "contact@adlfront.com", href: "mailto:contact@adlfront.com", kind: "email" },
 ];
 
 function FooterLink({ to, label }) {
@@ -85,10 +84,10 @@ function FooterSocialLink({ href, label, kind }) {
       rel={isMail ? undefined : "noreferrer"}
       title={label}
       aria-label={label}
-      className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/10 bg-[#0D0D0D] px-3 text-[#BDBDBD] transition hover:border-white/25 hover:bg-[#151515] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+      className="inline-flex min-h-11 min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-[#0D0D0D] px-3 text-[#BDBDBD] transition hover:border-white/25 hover:bg-[#151515] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
     >
       <SocialIcon kind={kind} />
-      <span className="text-xs font-medium">{label}</span>
+      <span className="min-w-0 truncate text-xs font-medium">{label}</span>
     </a>
   );
 }
@@ -99,15 +98,15 @@ export default function AppFooter() {
   return (
     <footer
       id="contact"
-      className="relative mt-10 overflow-hidden border-t border-white/10 bg-[#050505] text-[#F6F6F6] sm:mt-14"
+      className="relative mt-12 overflow-hidden border-t border-white/10 bg-[#050505] text-[#F6F6F6] sm:mt-16"
     >
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div className="absolute right-[-10rem] top-[-12rem] h-96 w-96 rounded-full bg-white/[0.035] blur-[110px]" />
         <div className="absolute left-0 top-0 h-px w-full bg-gradient-to-r from-transparent via-white/60 to-transparent" />
       </div>
 
-      <div className="relative mx-auto max-w-6xl px-4 py-9 sm:py-14">
-        <div className="grid gap-8 border-b border-white/10 pb-8 sm:grid-cols-2 sm:gap-10 sm:pb-10 lg:grid-cols-12 lg:gap-8">
+      <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+        <div className="grid gap-9 border-b border-white/10 pb-9 sm:grid-cols-2 sm:gap-10 sm:pb-11 lg:grid-cols-12 lg:gap-8">
           <section className="sm:col-span-2 lg:col-span-5 lg:pr-10">
             <BrandLogo />
             <p className="mt-5 max-w-md text-sm leading-7 text-[#969696]">
@@ -130,15 +129,15 @@ export default function AppFooter() {
           </section>
 
           <section className="lg:col-span-2">
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white">Programs</h3>
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white">Company</h3>
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 sm:mt-4 sm:grid-cols-1">
-              {programLinks.map((item) => (
+              {companyLinks.map((item) => (
                 <FooterLink key={item.label} to={item.to} label={item.label} />
               ))}
             </div>
           </section>
 
-          <section className="rounded-2xl border border-white/10 bg-[#0B0B0B] p-5 lg:col-span-3">
+          <section className="rounded-2xl border border-white/10 bg-[#0B0B0B] p-5 sm:col-span-2 lg:col-span-3">
             <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white">Need support?</h3>
             <p className="mt-3 text-sm leading-6 text-[#969696]">
               Need help with enrollment, live classes, or account setup?
@@ -166,7 +165,7 @@ export default function AppFooter() {
               <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white">Connect</h3>
               <p className="mt-2 text-xs text-[#777777]">Official channels for support and platform updates.</p>
             </div>
-            <div className="grid grid-cols-2 gap-2 min-[430px]:flex min-[430px]:flex-wrap">
+            <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:justify-end">
             {socialLinks.map((item) => (
               <FooterSocialLink
                 key={`${item.kind}-${item.href}`}
@@ -181,8 +180,8 @@ export default function AppFooter() {
       </div>
 
       <div className="relative border-t border-white/10 bg-black/40">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 py-5 text-center text-[10px] uppercase tracking-[0.16em] text-[#777777] sm:flex-row sm:text-left">
-          <span>{"\u00A9"} {year} Al syed Initiative. All rights reserved.</span>
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-5 text-center text-[10px] uppercase tracking-[0.16em] text-[#777777] sm:flex-row sm:px-6 sm:text-left lg:px-8">
+          <span>{"\u00A9"} {year} Al Syed Initiative. All rights reserved.</span>
           <span>Secure Learning Infrastructure</span>
         </div>
       </div>

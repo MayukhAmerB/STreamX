@@ -19,14 +19,13 @@ export default function Navbar() {
   const canAccessControls = Boolean(isAdmin || isInstructor);
   const navigate = useNavigate();
   const location = useLocation();
-  const isHome = location.pathname === "/";
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const djangoAdminUrl = resolveDjangoAdminUrl();
 
   const openLandingGuestEnrollment = (event, title) => {
-    if (!isHome || isAuthenticated) return;
+    if (isAuthenticated) return;
     event.preventDefault();
     requestLandingPublicEnrollmentPrompt({ type: "general", title });
     setMobileMenuOpen(false);

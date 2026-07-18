@@ -4,6 +4,7 @@ import {
   hasReachedGuestPromptScrollPoint,
   reserveGuestEnrollmentPrompt,
 } from "../utils/guestEnrollmentPrompt";
+import { shouldHandlePublicEnrollmentPromptInLayout } from "../utils/publicEnrollmentPrompt";
 
 function createStorage() {
   const values = new Map();
@@ -18,6 +19,12 @@ function createStorage() {
 }
 
 describe("landing guest enrollment prompt", () => {
+  it("keeps non-home enrollment prompts on the page that requested them", () => {
+    expect(shouldHandlePublicEnrollmentPromptInLayout("/courses/11")).toBe(true);
+    expect(shouldHandlePublicEnrollmentPromptInLayout("/live-classes")).toBe(true);
+    expect(shouldHandlePublicEnrollmentPromptInLayout("/")).toBe(false);
+  });
+
   it("opens once most of the hero has scrolled away", () => {
     expect(hasReachedGuestPromptScrollPoint({ heroBottom: 500, viewportHeight: 1000 })).toBe(false);
     expect(hasReachedGuestPromptScrollPoint({ heroBottom: 450, viewportHeight: 1000 })).toBe(true);
