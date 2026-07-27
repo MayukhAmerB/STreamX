@@ -18,6 +18,12 @@ from config.turnstile import enforce_turnstile
 
 from apps.payments.models import Payment
 
+from .access import (
+    active_enrollment_q,
+    build_live_class_access_maps,
+    enrollment_has_active_access,
+    user_has_course_access,
+)
 from .cache_utils import get_course_list_cache_version, get_live_class_list_cache_version
 from .models import (
     Course,
@@ -122,7 +128,13 @@ def _course_prefetch_queryset():
                     queryset=Lecture.objects.all().prefetch_related("resources"),
                 )
             ),
-        )
+        ),
+        Prefetch(
+            "live_classes",
+            queryset=LiveClass.objects.filter(is_active=True)
+            .select_related("linked_course")
+            .order_by("month_number", "id"),
+        ),
     )
 
 
@@ -132,14 +144,7 @@ def _get_lecture_access_context(lecture, user):
     is_instructor_owner = bool(
         is_authenticated and user.role == "instructor" and getattr(user, "id", None) == course.instructor_id
     )
-    is_enrolled = bool(
-        is_authenticated
-        and Enrollment.objects.filter(
-            user=user,
-            course=course,
-            payment_status=Enrollment.STATUS_PAID,
-        ).exists()
-    )
+    is_enrolled = bool(is_authenticated and user_has_course_access(user, course.id))
     can_access = bool(lecture.is_preview and is_authenticated) or is_instructor_owner or is_enrolled
     return {
         "course": course,
@@ -181,14 +186,26 @@ def _build_course_enrollment_status_map(*, courses, user):
 
     enrollments = (
         Enrollment.objects.filter(user=user, course_id__in=course_ids)
-        .only("course_id", "payment_status", "enrolled_at")
+        .only(
+            "course_id",
+            "payment_status",
+            "access_type",
+            "access_expires_at",
+            "installments_paid",
+            "enrolled_at",
+        )
         .order_by("course_id", "-enrolled_at")
     )
     for enrollment in enrollments:
         if enrollment.course_id in status_map:
             continue
-        if enrollment.payment_status == Enrollment.STATUS_PAID:
+        if enrollment_has_active_access(enrollment):
             status_map[enrollment.course_id] = "approved"
+        elif (
+            enrollment.payment_status == Enrollment.STATUS_PAID
+            and enrollment.access_type == Enrollment.ACCESS_INSTALLMENT
+        ):
+            status_map[enrollment.course_id] = "payment_pending"
         elif enrollment.payment_status == Enrollment.STATUS_PENDING:
             status_map[enrollment.course_id] = "pending"
         else:
@@ -226,6 +243,7 @@ class CourseListCreateView(APIView):
             cache_key = (
                 "course-list:"
                 f"v={cache_version}:"
+                f"direct_pay={int(bool(getattr(settings, 'DIRECT_COURSE_PAYMENTS_ENABLED', False)))}:"
                 f"search={search.lower()}:"
                 f"paginate={request.query_params.get('paginate','')}:"
                 f"page={request.query_params.get('page','')}:"
@@ -341,7 +359,8 @@ class CourseDetailView(APIView):
     @staticmethod
     def _build_public_cache_key(course_id, updated_at):
         updated_ts = int(updated_at.timestamp()) if updated_at else 0
-        return f"course-detail:{course_id}:v={updated_ts}"
+        direct_pay = int(bool(getattr(settings, "DIRECT_COURSE_PAYMENTS_ENABLED", False)))
+        return f"course-detail:{course_id}:v={updated_ts}:direct_pay={direct_pay}"
 
     def get_object(self, request, pk):
         queryset = _course_prefetch_queryset()
@@ -389,13 +408,16 @@ class CourseDetailView(APIView):
                 courses=[course],
                 user=request.user,
             ).get(course.id, "none")
+            live_classes = list(course.live_classes.all())
+            live_statuses, live_sources = build_live_class_access_maps(
+                live_classes=live_classes,
+                user=request.user,
+            )
+            serializer_context["live_class_enrollment_statuses"] = live_statuses
+            serializer_context["live_class_access_sources"] = live_sources
             can_view_progress = bool(
                 request.user.id == course.instructor_id
-                or Enrollment.objects.filter(
-                    user=request.user,
-                    course=course,
-                    payment_status=Enrollment.STATUS_PAID,
-                ).exists()
+                or user_has_course_access(request.user, course.id)
             )
             if can_view_progress:
                 serializer_context["lecture_progress_map"] = _build_lecture_progress_map(
@@ -1181,7 +1203,8 @@ class MyCoursesView(APIView):
 
     def get(self, request):
         enrollments = list(
-            Enrollment.objects.filter(user=request.user, payment_status=Enrollment.STATUS_PAID)
+            Enrollment.objects.filter(user=request.user)
+            .filter(active_enrollment_q())
             .order_by("-enrolled_at")
             .values("course_id", "enrolled_at")
         )
@@ -1324,7 +1347,7 @@ class LiveClassListView(APIView):
     def get(self, request):
         disallowed_query_params = find_disallowed_query_params(
             request,
-            {"paginate", "page", "page_size"},
+            {"paginate", "page", "page_size", "course_id"},
         )
         if disallowed_query_params:
             log_security_event(
@@ -1348,7 +1371,8 @@ class LiveClassListView(APIView):
                 f"v={cache_version}:"
                 f"paginate={request.query_params.get('paginate','')}:"
                 f"page={request.query_params.get('page','')}:"
-                f"page_size={request.query_params.get('page_size','')}"
+                f"page_size={request.query_params.get('page_size','')}:"
+                f"course_id={request.query_params.get('course_id','')}"
             )
             cached = cache.get(cache_key)
             if cached is not None:
@@ -1365,18 +1389,25 @@ class LiveClassListView(APIView):
             )
             .order_by("month_number", "id")
         )
+        raw_course_id = str(request.query_params.get("course_id") or "").strip()
+        if raw_course_id:
+            if not raw_course_id.isdigit() or int(raw_course_id) <= 0:
+                return api_response(
+                    success=False,
+                    message="Invalid request query.",
+                    errors={"course_id": "Enter a valid course id."},
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+            queryset = queryset.filter(linked_course_id=int(raw_course_id))
         paged_queryset, page_meta = apply_optional_pagination(request, queryset, default_page_size=12, max_page_size=50)
         serializer_context = {"request": request}
         if request.user.is_authenticated:
-            live_class_ids = [item.id for item in paged_queryset]
-            enrollment_statuses = {
-                live_class_id: status_value
-                for live_class_id, status_value in LiveClassEnrollment.objects.filter(
-                    user=request.user,
-                    live_class_id__in=live_class_ids,
-                ).values_list("live_class_id", "status")
-            }
+            enrollment_statuses, access_sources = build_live_class_access_maps(
+                live_classes=paged_queryset,
+                user=request.user,
+            )
             serializer_context["live_class_enrollment_statuses"] = enrollment_statuses
+            serializer_context["live_class_access_sources"] = access_sources
         serializer = LiveClassListSerializer(paged_queryset, many=True, context=serializer_context)
         payload = (
             {"results": serializer.data, "pagination": page_meta}

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Button from "../components/Button";
+import OsintToolsAccessCard from "../components/OsintToolsAccessCard";
 import PageShell from "../components/PageShell";
-import PublicEnrollmentRequestModal from "../components/PublicEnrollmentRequestModal";
-import { getCourse, requestCourseEnrollment } from "../api/courses";
+import { getCourse } from "../api/courses";
 import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
+import { getPurchaseUnavailableMessage, isOsintCourse } from "../utils/courseAccess";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
 import { formatINR } from "../utils/currency";
 import { normalizeTextList } from "../utils/textList";
@@ -109,8 +110,6 @@ export default function CourseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [previewImageFailed, setPreviewImageFailed] = useState(false);
-  const [enrollmentState, setEnrollmentState] = useState({ loading: false, error: "", success: "" });
-  const [showPublicLeadModal, setShowPublicLeadModal] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -140,6 +139,7 @@ export default function CourseDetailPage() {
     [course?.enrollment_status]
   );
   const hasApprovedEnrollment = Boolean(course?.is_enrolled) || normalizedEnrollmentStatus === "approved";
+  const purchaseAvailable = Boolean(course?.purchase_available);
 
   useEffect(() => {
     if (!isAuthenticated || normalizedEnrollmentStatus !== "pending") return undefined;
@@ -151,9 +151,6 @@ export default function CourseDetailPage() {
         if (!active) return;
         const latest = withNormalizedEnrollment(apiData(response));
         setCourse((prev) => (prev ? { ...prev, ...latest } : latest));
-        if (normalizeEnrollmentStatus(latest?.enrollment_status) !== "pending") {
-          setEnrollmentState((prev) => ({ ...prev, success: "" }));
-        }
       } catch {
         // Silently ignore status refresh failures; main fetch path already handles errors.
       }
@@ -177,6 +174,7 @@ export default function CourseDetailPage() {
   }, [id, isAuthenticated, normalizedEnrollmentStatus]);
 
   const sections = course?.sections || [];
+  const liveClasses = Array.isArray(course?.live_classes) ? course.live_classes : [];
   const lectureCount = useMemo(
     () => sections.reduce((acc, section) => acc + (section.lectures?.length || 0), 0),
     [sections]
@@ -217,8 +215,10 @@ export default function CourseDetailPage() {
     if (configured) return configured;
     return launchStatus.isComingSoon
       ? "This track is not live yet. We will open enrollment once the curriculum release is ready."
-      : "Access requests are reviewed by admin. Course access is enabled only after approval.";
-  }, [course?.enrollment_message, launchStatus.isComingSoon]);
+      : purchaseAvailable
+        ? "Buy securely for immediate verified access to the course and its linked live classes."
+        : getPurchaseUnavailableMessage(course);
+  }, [course, course?.enrollment_message, launchStatus.isComingSoon, purchaseAvailable]);
   const snapshotCategoryText = useMemo(
     () => String(course?.snapshot_category || "").trim() || formatCategory(course?.category),
     [course?.snapshot_category, course?.category]
@@ -232,7 +232,7 @@ export default function CourseDetailPage() {
     [course?.snapshot_instructor, course?.instructor?.full_name]
   );
 
-  const renderPrimaryEnrollmentAction = ({ className = "w-full", showFeedback = false } = {}) => (
+  const renderPrimaryEnrollmentAction = ({ className = "w-full" } = {}) => (
     <div className="space-y-2">
       {launchStatus.isComingSoon ? (
         <Button
@@ -241,66 +241,29 @@ export default function CourseDetailPage() {
         >
           Coming Soon
         </Button>
+      ) : !isAuthenticated ? (
+        <Link to="/login" className="block">
+          <Button className={className}>Sign In to Continue</Button>
+        </Link>
       ) : hasApprovedEnrollment ? (
         <Link to={`/learn/${course.id}`} className="block">
           <Button className={className}>Continue Course</Button>
         </Link>
+      ) : purchaseAvailable ? (
+        <Link to={`/courses/${course.id}/payment`} className="block">
+          <Button className={className}>Buy Course</Button>
+        </Link>
       ) : normalizedEnrollmentStatus === "pending" ? (
         <Button className={className} disabled>
-          Request Pending
+          Legacy Access Request Pending
         </Button>
       ) : (
-        <Button className={className} onClick={handleEnrollNow} loading={enrollmentState.loading}>
-          Request Access
+        <Button className={className} disabled>
+          Purchase Unavailable
         </Button>
       )}
-      {showFeedback && enrollmentState.error ? (
-        <p className="text-xs text-red-300">{enrollmentState.error}</p>
-      ) : null}
-      {showFeedback && enrollmentState.success ? (
-        <p className="text-xs text-zinc-300">{enrollmentState.success}</p>
-      ) : null}
     </div>
   );
-
-  const handleEnrollNow = async () => {
-    if (launchStatus.isComingSoon) return;
-    if (!isAuthenticated) {
-      setShowPublicLeadModal(true);
-      return;
-    }
-
-    setEnrollmentState({ loading: true, error: "", success: "" });
-    try {
-      const response = await requestCourseEnrollment({ course_id: Number(id) });
-      const data = apiData(response, {});
-      const enrollmentStatus = normalizeEnrollmentStatus(data?.enrollment_status || "pending");
-      setCourse((prev) =>
-        prev
-          ? {
-              ...prev,
-              is_enrolled: Boolean(data?.is_enrolled) || enrollmentStatus === "approved",
-              enrollment_status: enrollmentStatus,
-            }
-          : prev
-      );
-      setEnrollmentState({
-        loading: false,
-        error: "",
-        success:
-          response?.data?.message ||
-          (enrollmentStatus === "approved"
-            ? "Access approved."
-            : "Access request submitted. Admin will review it and contact you."),
-      });
-    } catch (err) {
-      setEnrollmentState({
-        loading: false,
-        error: apiMessage(err, "Unable to submit access request."),
-        success: "",
-      });
-    }
-  };
 
   if (loading) {
     return <PageShell title="Course">Loading...</PageShell>;
@@ -461,6 +424,57 @@ export default function CourseDetailPage() {
 
       <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-[1.55fr_1fr]">
         <div className="min-w-0 space-y-4 sm:space-y-6">
+          {hasApprovedEnrollment && isOsintCourse(course) ? <OsintToolsAccessCard /> : null}
+
+          {hasApprovedEnrollment && liveClasses.length ? (
+            <section className="rounded-[18px] border border-white/15 bg-[#101010] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.25)] sm:rounded-[24px] sm:p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#A0A0A0]">
+                    Included With This Course
+                  </div>
+                  <h2 className="mt-2 font-reference text-xl font-semibold text-white">
+                    Live classroom
+                  </h2>
+                  <p className="mt-1 text-sm leading-6 text-[#AFAFAF]">
+                    Your approved course access includes these linked live classes. No separate
+                    live-class request is required.
+                  </p>
+                </div>
+                <Link
+                  to={`/courses/${course.id}/live`}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-black transition hover:bg-[#E6E6E6]"
+                >
+                  Open Live Classroom
+                </Link>
+              </div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {liveClasses.map((liveClass) => (
+                  <Link
+                    key={liveClass.id}
+                    to={`/courses/${course.id}/live`}
+                    className="group rounded-2xl border border-white/10 bg-black/35 p-4 transition hover:border-white/30 hover:bg-black/55"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-reference text-base font-semibold text-white">
+                          {liveClass.title}
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-[#999999]">
+                          {liveClass.schedule_days || "Friday, Saturday and Sunday"} /{" "}
+                          {liveClass.class_duration_minutes || 60} minutes
+                        </p>
+                      </div>
+                      <span className="text-lg text-[#BDBDBD] transition group-hover:translate-x-1">
+                        -&gt;
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           <section className="min-w-0 rounded-[18px] border border-black panel-gradient p-4 shadow-[0_20px_60px_rgba(0,0,0,0.22)] sm:rounded-[24px] sm:p-5">
             <div className="mb-4 flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <div className="min-w-0">
@@ -582,7 +596,7 @@ export default function CourseDetailPage() {
             </div>
 
             <div className="mt-4">
-              {renderPrimaryEnrollmentAction({ showFeedback: true })}
+              {renderPrimaryEnrollmentAction()}
             </div>
 
             <div className="mt-4 font-reference text-3xl font-semibold tracking-tight text-white">
@@ -641,15 +655,6 @@ export default function CourseDetailPage() {
           </div>
         </aside>
       </div>
-      <PublicEnrollmentRequestModal
-        isOpen={showPublicLeadModal}
-        onClose={() => setShowPublicLeadModal(false)}
-        targetType="course"
-        targetId={course?.id}
-        targetName={course?.title}
-        sourcePath={`/courses/${id}`}
-        loginPath={`/login`}
-      />
     </PageShell>
   );
 }

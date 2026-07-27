@@ -1,5 +1,6 @@
 import { memo, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { getPurchaseUnavailableMessage } from "../utils/courseAccess";
 import { formatINR } from "../utils/currency";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
 
@@ -129,7 +130,9 @@ function CourseCard({ course }) {
           <span className="line-clamp-2 min-h-[1.2rem]">
             {status.isComingSoon
               ? "Join waitlist updates when the track launches."
-              : "Request admin-approved access for this track."}
+              : course?.purchase_available
+                ? "Buy securely for immediate verified access."
+                : getPurchaseUnavailableMessage(course)}
           </span>
         </div>
 
@@ -148,13 +151,17 @@ function CourseCard({ course }) {
               >
                 Go to Course
               </Link>
-            ) : status.isLive ? (
+            ) : status.isLive && course?.purchase_available ? (
               <Link
-                to={detailsLink}
+                to={`/courses/${course.id}/payment`}
                 className="glossy inline-flex min-h-11 items-center justify-center rounded-xl border border-[#EFE1AF] bg-[linear-gradient(135deg,#FFFBEA_0%,#F6EAC7_55%,#E8D7A6_100%)] px-3 py-2.5 text-sm font-semibold text-[#1A1A1A] shadow-[0_8px_18px_rgba(0,0,0,0.14)] transition hover:bg-[linear-gradient(135deg,#FFFDF2_0%,#F9EFD1_55%,#EEDFB4_100%)] sm:rounded-full"
               >
-                Request Access
+                Buy Course
               </Link>
+            ) : status.isLive ? (
+              <span className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#B7B7B7] bg-gradient-to-r from-[#CFCFCF] to-[#989898] px-3 py-2.5 text-sm font-semibold text-[#121212] shadow-[0_8px_18px_rgba(0,0,0,0.2)] sm:rounded-full">
+                Purchase Unavailable
+              </span>
             ) : (
               <span className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#B7B7B7] bg-gradient-to-r from-[#CFCFCF] to-[#989898] px-3 py-2.5 text-sm font-semibold text-[#121212] shadow-[0_8px_18px_rgba(0,0,0,0.2)] sm:rounded-full">
                 Coming Soon

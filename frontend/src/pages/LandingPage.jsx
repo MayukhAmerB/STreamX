@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import certificateExcellenceImage from "../assets/certificate-excellence.png";
-import { enrollInLiveClass, getMyCourses, listCourses, listLiveClasses } from "../api/courses";
+import { getMyCourses, listCourses, listLiveClasses } from "../api/courses";
 import { listRealtimeSessions } from "../api/realtime";
 import BrandLogo from "../components/BrandLogo";
 import Button from "../components/Button";
-import PublicEnrollmentRequestModal from "../components/PublicEnrollmentRequestModal";
 import StoryJourneySection from "../components/StoryJourneySection";
 import { useAuth } from "../hooks/useAuth";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
@@ -13,15 +12,6 @@ import { apiData, apiMessage } from "../utils/api";
 import { readCachedCourseCatalog, writeCachedCourseCatalog } from "../utils/courseCatalog";
 import { formatINR } from "../utils/currency";
 import { featuredCourse } from "../utils/featuredCourse";
-import {
-  hasReachedGuestPromptScrollPoint,
-  reserveGuestEnrollmentPrompt,
-} from "../utils/guestEnrollmentPrompt";
-import { isKnownRegisteredVisitor } from "../utils/knownRegisteredVisitor";
-import {
-  LANDING_PUBLIC_ENROLLMENT_PROMPT_EVENT,
-  requestLandingPublicEnrollmentPrompt,
-} from "../utils/publicEnrollmentPrompt";
 
 const HERO_LIVE_BROADCAST_VISIBLE_POLL_MS = 45000;
 const HERO_LIVE_BROADCAST_HIDDEN_POLL_MS = 180000;
@@ -213,12 +203,6 @@ function selectHeroLiveBroadcast(payload) {
   );
 }
 
-function toValidLiveClassId(value) {
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) return null;
-  return parsed;
-}
-
 function toValidCourseId(value) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) return null;
@@ -338,7 +322,7 @@ function StudentAccessPanel({
 
       <div className="mt-3 grid grid-cols-1 gap-3 min-[440px]:grid-cols-2">
         <Link
-          to="/my-courses"
+          to="/courses?view=owned"
           className="group min-w-0 rounded-[16px] border border-white/10 bg-[#171717] p-4 transition duration-200 hover:-translate-y-0.5 hover:border-white/30 hover:bg-[#1D1D1D] hover:shadow-[0_14px_30px_rgba(0,0,0,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
         >
           <div className="flex items-center justify-between gap-3">
@@ -376,7 +360,7 @@ function StudentAccessPanel({
         </Link>
 
         <Link
-          to="/join-live"
+          to="/courses?view=owned"
           className="group min-w-0 rounded-[16px] border border-white/10 bg-[#171717] p-4 transition duration-200 hover:-translate-y-0.5 hover:border-white/30 hover:bg-[#1D1D1D] hover:shadow-[0_14px_30px_rgba(0,0,0,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
         >
           <div className="flex items-center justify-between gap-3">
@@ -413,10 +397,10 @@ function StudentAccessPanel({
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 min-[440px]:grid-cols-2">
-        <Link to="/my-courses" className="group inline-flex items-center justify-center gap-2 rounded-[14px] border border-white bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-black transition hover:bg-[#E7E7E7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+        <Link to="/courses?view=owned" className="group inline-flex items-center justify-center gap-2 rounded-[14px] border border-white bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-black transition hover:bg-[#E7E7E7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
           My courses <DashboardArrow className="transition-transform group-hover:translate-x-0.5" />
         </Link>
-        <Link to="/join-live" className="group inline-flex items-center justify-center gap-2 rounded-[14px] border border-white/15 bg-[#171717] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-white transition hover:border-white/35 hover:bg-[#222222] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+        <Link to="/courses?view=owned" className="group inline-flex items-center justify-center gap-2 rounded-[14px] border border-white/15 bg-[#171717] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-white transition hover:border-white/35 hover:bg-[#222222] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
           Live classes <DashboardArrow className="transition-transform group-hover:translate-x-0.5" />
         </Link>
       </div>
@@ -426,27 +410,9 @@ function StudentAccessPanel({
   );
 }
 
-function GuestAccessPanel({ courses, liveClasses, liveClassesError, onRequestAccess }) {
+function GuestAccessPanel({ courses, liveClasses, liveClassesError }) {
   const visibleCourses = courses.slice(0, 2);
   const visibleLiveClasses = liveClasses.slice(0, 2);
-
-  const requestCourse = (event, course) => {
-    const courseId = toValidCourseId(course?.id);
-    onRequestAccess(event, {
-      type: courseId ? "course" : "general",
-      id: courseId,
-      title: course?.title || "Course access",
-    });
-  };
-
-  const requestLiveClass = (event, liveClass) => {
-    const liveClassId = toValidLiveClassId(liveClass?.id);
-    onRequestAccess(event, {
-      type: liveClassId ? "live_class" : "general",
-      id: liveClassId,
-      title: liveClass?.title || "Live class access",
-    });
-  };
 
   return (
     <div className="rounded-[24px] border border-white/15 bg-[#242424] p-4 shadow-[0_28px_90px_rgba(0,0,0,0.55)] sm:p-5">
@@ -472,7 +438,6 @@ function GuestAccessPanel({ courses, liveClasses, liveClassesError, onRequestAcc
               <Link
                 key={course.id}
                 to={`/courses/${course.id}`}
-                onClick={(event) => requestCourse(event, course)}
                 className="group flex min-w-0 items-center justify-between gap-2 rounded-lg border border-transparent px-2 py-1.5 text-xs font-medium text-[#D8D8D8] transition hover:border-white/10 hover:bg-white/[0.04] hover:text-white"
                 title={course.title}
               >
@@ -492,8 +457,7 @@ function GuestAccessPanel({ courses, liveClasses, liveClassesError, onRequestAcc
             {visibleLiveClasses.length ? visibleLiveClasses.map((liveClass) => (
               <Link
                 key={liveClass.id}
-                to="/join-live"
-                onClick={(event) => requestLiveClass(event, liveClass)}
+                to="/login"
                 className="group flex min-w-0 items-center justify-between gap-2 rounded-lg border border-transparent px-2 py-1.5 text-xs font-medium text-[#D8D8D8] transition hover:border-white/10 hover:bg-white/[0.04] hover:text-white"
                 title={liveClass.title}
               >
@@ -510,11 +474,11 @@ function GuestAccessPanel({ courses, liveClasses, liveClassesError, onRequestAcc
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 min-[440px]:grid-cols-2">
-        <Link to="/courses" onClick={(event) => onRequestAccess(event, { type: "general", title: "Courses" })} className="group inline-flex items-center justify-center gap-2 rounded-[14px] border border-white bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-black transition hover:bg-[#E7E7E7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+        <Link to="/courses" className="group inline-flex items-center justify-center gap-2 rounded-[14px] border border-white bg-white px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-black transition hover:bg-[#E7E7E7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
           View courses <DashboardArrow className="transition-transform group-hover:translate-x-0.5" />
         </Link>
-        <Link to="/join-live" onClick={(event) => onRequestAccess(event, { type: "general", title: "Live classes" })} className="group inline-flex items-center justify-center gap-2 rounded-[14px] border border-white/15 bg-[#171717] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-white transition hover:border-white/35 hover:bg-[#222222] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
-          View live <DashboardArrow className="transition-transform group-hover:translate-x-0.5" />
+        <Link to="/login" className="group inline-flex items-center justify-center gap-2 rounded-[14px] border border-white/15 bg-[#171717] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-white transition hover:border-white/35 hover:bg-[#222222] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+          Sign in for live <DashboardArrow className="transition-transform group-hover:translate-x-0.5" />
         </Link>
       </div>
     </div>
@@ -522,69 +486,14 @@ function GuestAccessPanel({ courses, liveClasses, liveClassesError, onRequestAcc
 }
 
 export default function LandingPage() {
-  const { isAuthenticated, loading: authLoading } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [catalogCourses, setCatalogCourses] = useState([]);
   const [studentCourses, setStudentCourses] = useState([]);
   const [studentAccessLoading, setStudentAccessLoading] = useState(false);
   const [studentAccessError, setStudentAccessError] = useState("");
   const [landingLiveClasses, setLandingLiveClasses] = useState([]);
   const [landingLiveClassesError, setLandingLiveClassesError] = useState("");
-  const [landingActionState, setLandingActionState] = useState({});
-  const [landingPublicLeadTarget, setLandingPublicLeadTarget] = useState(null);
   const [heroLiveBroadcast, setHeroLiveBroadcast] = useState(null);
-  const [hasScrolledPastHero, setHasScrolledPastHero] = useState(false);
-  const heroRef = useRef(null);
-
-  useEffect(() => {
-    if (hasScrolledPastHero) return undefined;
-
-    const updateHeroScrollBoundary = () => {
-      if (
-        hasReachedGuestPromptScrollPoint({
-          heroBottom: heroRef.current?.getBoundingClientRect().bottom,
-          viewportHeight: window.innerHeight,
-        })
-      ) {
-        setHasScrolledPastHero(true);
-      }
-    };
-
-    updateHeroScrollBoundary();
-    window.addEventListener("scroll", updateHeroScrollBoundary, { passive: true });
-    window.addEventListener("resize", updateHeroScrollBoundary);
-
-    return () => {
-      window.removeEventListener("scroll", updateHeroScrollBoundary);
-      window.removeEventListener("resize", updateHeroScrollBoundary);
-    };
-  }, [hasScrolledPastHero]);
-
-  useEffect(() => {
-    const openRequestedEnrollmentPrompt = (event) => {
-      setLandingPublicLeadTarget(event.detail || { type: "general" });
-    };
-
-    window.addEventListener(LANDING_PUBLIC_ENROLLMENT_PROMPT_EVENT, openRequestedEnrollmentPrompt);
-    return () => {
-      window.removeEventListener(
-        LANDING_PUBLIC_ENROLLMENT_PROMPT_EVENT,
-        openRequestedEnrollmentPrompt
-      );
-    };
-  }, []);
-
-  useEffect(() => {
-    if (
-      !reserveGuestEnrollmentPrompt({
-        authLoading,
-        isAuthenticated,
-        hasScrolledPastHero,
-        isKnownRegistered: isKnownRegisteredVisitor(),
-        getStorage: () => window.sessionStorage,
-      })
-    ) return;
-    setLandingPublicLeadTarget({ type: "general" });
-  }, [authLoading, hasScrolledPastHero, isAuthenticated]);
 
   useEffect(() => {
     let active = true;
@@ -753,17 +662,20 @@ export default function LandingPage() {
   }, [catalogCourses]);
 
   const featuredLiveCourseLink = featuredLiveCourse?._fallbackLink || `/courses/${featuredLiveCourse.id}`;
-  const heroLiveBroadcastJoinPath = heroLiveBroadcast ? `/join-live?session=${heroLiveBroadcast.id}` : "/join-live";
+  const heroLiveBroadcastCourseId = Number(
+    heroLiveBroadcast?.linked_course?.id
+      || heroLiveBroadcast?.linked_live_class?.linked_course_id
+      || 0
+  );
+  const heroLiveBroadcastJoinPath = heroLiveBroadcast
+    ? heroLiveBroadcastCourseId > 0
+      ? `/courses/${heroLiveBroadcastCourseId}/live?session=${heroLiveBroadcast.id}`
+      : `/join-live?session=${heroLiveBroadcast.id}`
+    : "/courses?view=owned";
 
   const landingLiveCourses = useMemo(() => {
     return catalogCourses.filter((course) => getCourseLaunchStatus(course).isLive);
   }, [catalogCourses]);
-
-  const openGuestEnrollment = (event, target = { type: "general" }) => {
-    if (isAuthenticated) return;
-    event.preventDefault();
-    requestLandingPublicEnrollmentPrompt(target);
-  };
 
   const landingPrograms = useMemo(() => {
     return [...landingLiveClasses].sort((a, b) => {
@@ -781,72 +693,6 @@ export default function LandingPage() {
     });
   }, [landingPrograms]);
 
-  const handleLandingEnroll = async (liveClassId) => {
-    const targetId = toValidLiveClassId(liveClassId);
-    if (!targetId) {
-      setLandingActionState((prev) => ({
-        ...prev,
-        [liveClassId]: {
-          loading: false,
-          error: "Access request is unavailable in preview mode.",
-          success: "",
-        },
-      }));
-      return;
-    }
-
-    setLandingActionState((prev) => ({
-      ...prev,
-      [liveClassId]: { loading: true, error: "", success: "" },
-    }));
-
-    try {
-      const response = await enrollInLiveClass({ live_class_id: targetId });
-      const data = apiData(response, {});
-      const enrollmentStatus = String(
-        data?.enrollment_status || (data?.enrolled ? "approved" : "pending")
-      ).toLowerCase();
-
-      setLandingLiveClasses((prev) =>
-        prev.map((item) =>
-          item.id === liveClassId
-            ? {
-                ...item,
-                is_enrolled: enrollmentStatus === "approved",
-                enrollment_status: enrollmentStatus,
-                enrollment_count:
-                  enrollmentStatus === "approved" && !data.already_enrolled
-                    ? (item.enrollment_count || 0) + 1
-                    : item.enrollment_count || 0,
-              }
-            : item
-        )
-      );
-
-      setLandingActionState((prev) => ({
-        ...prev,
-        [liveClassId]: {
-          loading: false,
-          error: "",
-          success:
-            response?.data?.message ||
-            (enrollmentStatus === "approved"
-              ? "Already enrolled."
-              : "Access request submitted. Admin will review it and contact you."),
-        },
-      }));
-    } catch (err) {
-      setLandingActionState((prev) => ({
-        ...prev,
-        [liveClassId]: {
-          loading: false,
-          error: apiMessage(err, "Unable to submit access request."),
-          success: "",
-        },
-      }));
-    }
-  };
-
   return (
     <div className="relative bg-[#030303] text-[#F6F6F6]">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0">
@@ -855,7 +701,6 @@ export default function LandingPage() {
       </div>
 
       <section
-        ref={heroRef}
         className="landing-hero relative z-10 overflow-hidden border-b border-white/10 bg-black px-4"
       >
         <div className="relative mx-auto grid min-h-[calc(100dvh-4rem)] max-w-6xl items-center gap-10 py-12 sm:min-h-[620px] sm:py-20 lg:grid-cols-[0.96fr_1.04fr] lg:gap-20 lg:py-24">
@@ -881,30 +726,39 @@ export default function LandingPage() {
               protected lessons, and instructor-led live classes.
             </p>
 
+            {heroLiveBroadcast ? (
+              <Link
+                to={isAuthenticated ? heroLiveBroadcastJoinPath : "/login"}
+                className="mt-7 flex w-full max-w-xl items-center justify-between gap-4 rounded-xl border border-red-400/45 bg-red-600 px-5 py-4 text-left text-white shadow-[0_20px_48px_rgba(220,38,38,0.3)] transition hover:bg-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+              >
+                <span>
+                  <span className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.2em] text-red-100">
+                    <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-white shadow-[0_0_18px_rgba(255,255,255,0.95)]" />
+                    Class is live
+                  </span>
+                  <span className="mt-1 block text-base font-extrabold sm:text-lg">
+                    {heroLiveBroadcast.title || "Join your live classroom"}
+                  </span>
+                </span>
+                <span className="shrink-0 text-sm font-extrabold uppercase tracking-[0.1em]">
+                  Join now -&gt;
+                </span>
+              </Link>
+            ) : null}
+
             <div className="mt-7 flex flex-wrap gap-3">
               <Link
                 to="/courses"
-                onClick={(event) =>
-                  openGuestEnrollment(event, { type: "general", title: "Courses" })
-                }
                 className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-5 text-sm font-semibold text-black transition hover:bg-[#E5E5E5]"
               >
                 Browse Courses
               </Link>
               <Link
-                to={isAuthenticated ? "/my-courses" : "/login"}
+                to={isAuthenticated ? "/courses?view=owned" : "/login"}
                 className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/15 bg-[#090909] px-5 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-[#111111]"
               >
                 {isAuthenticated ? "My Learning" : "Get Started"}
               </Link>
-              {isAuthenticated && heroLiveBroadcast ? (
-                <Link
-                  to={heroLiveBroadcastJoinPath}
-                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-red-500/40 bg-red-500/10 px-5 text-sm font-semibold text-red-100 transition hover:bg-red-500/20"
-                >
-                  Join Live
-                </Link>
-              ) : null}
             </div>
           </div>
 
@@ -925,7 +779,6 @@ export default function LandingPage() {
                 courses={catalogCourses}
                 liveClasses={landingLiveClassesError ? [] : landingPrograms}
                 liveClassesError={landingLiveClassesError}
-                onRequestAccess={openGuestEnrollment}
               />
             )}
           </div>
@@ -1078,7 +931,6 @@ export default function LandingPage() {
             {landingLiveCourses.length ? (
               <div className="mt-6 grid auto-rows-fr gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {landingLiveCourses.map((course, idx) => {
-                  const courseId = toValidCourseId(course.id);
                   return (
                     <article
                       key={course.id}
@@ -1140,19 +992,12 @@ export default function LandingPage() {
                             Open Course
                           </Link>
                         ) : (
-                          <button
-                            type="button"
+                          <Link
+                            to={course?._fallbackLink || `/courses/${course.id}`}
                             className="inline-flex items-center justify-center rounded-xl border border-white bg-white px-3 py-2.5 text-sm font-semibold text-black transition hover:bg-[#E8E8E8]"
-                            onClick={(event) =>
-                              openGuestEnrollment(event, {
-                                type: courseId ? "course" : "general",
-                                id: courseId,
-                                title: course.title,
-                              })
-                            }
                           >
-                            Request Access
-                          </button>
+                            View Course
+                          </Link>
                         )}
                       </div>
                     </article>
@@ -1258,50 +1103,17 @@ export default function LandingPage() {
                       </Button>
                     ) : enrollmentStatus === "pending" ? (
                       <Button className="w-full" disabled>
-                        Request Pending
+                        Legacy Request Pending
                       </Button>
-                    ) : isAuthenticated ? (
-                      <Button
-                        className="w-full"
-                        onClick={() => handleLandingEnroll(program.id)}
-                        loading={Boolean(landingActionState[program.id]?.loading)}
-                      >
-                        Request Access
-                      </Button>
+                    ) : program.linked_course_id ? (
+                      <Link to={`/courses/${program.linked_course_id}`} className="block">
+                        <Button className="w-full">Buy Linked Course</Button>
+                      </Link>
                     ) : (
-                      <Button
-                        className="w-full"
-                        onClick={() => {
-                          const targetId = toValidLiveClassId(program.id);
-                          if (!targetId) {
-                            setLandingActionState((prev) => ({
-                              ...prev,
-                              [program.id]: {
-                                loading: false,
-                                error: "Access request is unavailable in preview mode.",
-                                success: "",
-                              },
-                            }));
-                            return;
-                          }
-                          setLandingPublicLeadTarget({
-                            type: "live_class",
-                            id: targetId,
-                            title: program.title,
-                          });
-                        }}
-                      >
-                        Request Access
+                      <Button className="w-full" disabled>
+                        Included With Course
                       </Button>
                     )}
-                    {landingActionState[program.id]?.error ? (
-                      <p className="mt-2 text-xs text-red-300">{landingActionState[program.id].error}</p>
-                    ) : null}
-                    {landingActionState[program.id]?.success ? (
-                      <p className="mt-2 text-xs text-zinc-300">
-                        {landingActionState[program.id].success}
-                      </p>
-                    ) : null}
                   </div>
                 </div>
                 );
@@ -1321,9 +1133,6 @@ export default function LandingPage() {
                 <div className="flex flex-wrap gap-2">
                   <Link
                     to="/courses"
-                    onClick={(event) =>
-                      openGuestEnrollment(event, { type: "general", title: "Courses" })
-                    }
                   >
                     <button className="rounded-xl border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/5">
                       Explore
@@ -1331,13 +1140,6 @@ export default function LandingPage() {
                   </Link>
                   <Link
                     to={featuredLiveCourseLink}
-                    onClick={(event) =>
-                      openGuestEnrollment(event, {
-                        type: toValidCourseId(featuredLiveCourse?.id) ? "course" : "general",
-                        id: toValidCourseId(featuredLiveCourse?.id),
-                        title: featuredLiveCourse?.title || "Flagship Course",
-                      })
-                    }
                   >
                     <button className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-[#E8E8E8]">
                       Join Now
@@ -1350,15 +1152,6 @@ export default function LandingPage() {
         </div>
       </div>
 
-      <PublicEnrollmentRequestModal
-        isOpen={Boolean(landingPublicLeadTarget)}
-        onClose={() => setLandingPublicLeadTarget(null)}
-        targetType={landingPublicLeadTarget?.type}
-        targetId={landingPublicLeadTarget?.id}
-        targetName={landingPublicLeadTarget?.title}
-        sourcePath="/"
-        loginPath="/login"
-      />
     </div>
   );
 }

@@ -15,7 +15,6 @@ class User(AbstractUser):
         (ROLE_STUDENT, "Student"),
         (ROLE_INSTRUCTOR, "Instructor"),
     ]
-
     username = None
     email = models.EmailField(unique=True)
     full_name = models.CharField(max_length=255)

@@ -79,6 +79,11 @@ class Course(models.Model):
     thumbnail = models.URLField(blank=True, default="")
     thumbnail_file = models.ImageField(upload_to="course_thumbnails/", blank=True, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    full_payment_enabled = models.BooleanField(default=True)
+    installment_payment_enabled = models.BooleanField(default=True)
+    monthly_price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("1500.00"))
+    installments_required = models.PositiveSmallIntegerField(default=3)
+    installment_access_days = models.PositiveSmallIntegerField(default=30)
     category = models.CharField(max_length=32, choices=CATEGORY_CHOICES, default=CATEGORY_OSINT)
     level = models.CharField(max_length=20, choices=LEVEL_CHOICES, default=LEVEL_BEGINNER)
     launch_status = models.CharField(
@@ -671,10 +676,21 @@ class Enrollment(models.Model):
         (STATUS_PAID, "Paid"),
         (STATUS_FAILED, "Failed"),
     ]
+    ACCESS_LEGACY = "legacy"
+    ACCESS_INSTALLMENT = "installment"
+    ACCESS_LIFETIME = "lifetime"
+    ACCESS_TYPE_CHOICES = [
+        (ACCESS_LEGACY, "Legacy permanent access"),
+        (ACCESS_INSTALLMENT, "Time-limited installment access"),
+        (ACCESS_LIFETIME, "Lifetime access"),
+    ]
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="enrollments")
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="enrollments")
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default=STATUS_PENDING)
+    access_type = models.CharField(max_length=20, choices=ACCESS_TYPE_CHOICES, default=ACCESS_LEGACY)
+    access_expires_at = models.DateTimeField(blank=True, null=True)
+    installments_paid = models.PositiveSmallIntegerField(default=0)
     enrolled_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -688,6 +704,13 @@ class Enrollment(models.Model):
 
     def __str__(self):
         return f"{self.user.email} -> {self.course.title}"
+
+    def has_active_access(self, at=None):
+        if self.payment_status != self.STATUS_PAID:
+            return False
+        if self.access_type != self.ACCESS_INSTALLMENT:
+            return True
+        return bool(self.access_expires_at and self.access_expires_at > (at or timezone.now()))
 
 
 class LiveClass(models.Model):

@@ -71,7 +71,6 @@ class UserSerializer(serializers.ModelSerializer):
     def get_terms_acceptance_required(self, obj):
         return str(getattr(obj, "terms_accepted_version", "") or "") != TERMS_VERSION
 
-
 class TermsSerializer(serializers.Serializer):
     title = serializers.CharField(default=TERMS_TITLE)
     version = serializers.CharField(default=TERMS_VERSION)
@@ -93,44 +92,6 @@ class TermsAcceptSerializer(serializers.Serializer):
             )
         attrs["terms_version"] = TERMS_VERSION
         return attrs
-
-
-class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=8)
-
-    class Meta:
-        model = User
-        fields = ("email", "full_name", "phone_number", "password", "role")
-        extra_kwargs = {
-            "role": {"required": False},
-        }
-
-    def validate_password(self, value):
-        validate_password(value)
-        return value
-
-    def validate_email(self, value):
-        normalized = User.objects.normalize_auth_email(value)
-        if User.objects.filter(email__iexact=normalized).exists():
-            raise serializers.ValidationError("A user with that email already exists.")
-        return normalized
-
-    def validate_full_name(self, value):
-        if contains_active_content(value):
-            raise serializers.ValidationError("Suspicious script or active-content payload detected.")
-        return value
-
-    def validate_phone_number(self, value):
-        return validate_phone_number_value(value)
-
-    def validate_role(self, value):
-        # Public/self-service registration is always student-only.
-        return User.ROLE_STUDENT
-
-    def create(self, validated_data):
-        password = validated_data.pop("password")
-        validated_data["role"] = User.ROLE_STUDENT
-        return User.objects.create_user(password=password, **validated_data)
 
 
 class LoginSerializer(serializers.Serializer):
@@ -167,19 +128,6 @@ class LoginSerializer(serializers.Serializer):
                 )
         attrs["user"] = user
         return attrs
-
-
-class GoogleLoginSerializer(serializers.Serializer):
-    credential = serializers.CharField()
-    role = serializers.ChoiceField(
-        choices=User.ROLE_CHOICES,
-        required=False,
-        default=User.ROLE_STUDENT,
-    )
-
-    def validate_role(self, value):
-        # Public/social signup must never elevate role.
-        return User.ROLE_STUDENT
 
 
 class PasswordResetRequestSerializer(serializers.Serializer):

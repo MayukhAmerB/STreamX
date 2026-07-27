@@ -5,7 +5,12 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Q
 
-from apps.courses.models import LiveClassEnrollment
+from apps.courses.access import (
+    accessible_course_ids_for_user,
+    accessible_live_class_ids_for_user,
+    user_has_course_access,
+    user_has_live_class_access,
+)
 
 from .models import RealtimeSession
 
@@ -42,8 +47,33 @@ def _enrollment_access_cache_ttl_seconds():
     return max(0, int(getattr(settings, "REALTIME_ENROLLMENT_ACCESS_CACHE_TTL_SECONDS", 10) or 0))
 
 
-def _build_enrollment_access_cache_key(*, user_id, live_class_id):
-    return f"realtime:join-access:user={int(user_id)}:live-class={int(live_class_id)}"
+def _build_enrollment_access_cache_key(*, user_id, course_id=None, live_class_id=None):
+    return (
+        f"realtime:join-access:user={int(user_id)}:"
+        f"course={int(course_id or 0)}:live-class={int(live_class_id or 0)}"
+    )
+
+
+def invalidate_course_join_access_cache(*, user_id, course_id):
+    if not user_id or not course_id:
+        return
+    live_class_ids = set(
+        RealtimeSession.objects.filter(
+            Q(linked_course_id=course_id) | Q(linked_live_class__linked_course_id=course_id)
+        )
+        .exclude(linked_live_class_id__isnull=True)
+        .values_list("linked_live_class_id", flat=True)
+    )
+    cache.delete_many(
+        [
+            _build_enrollment_access_cache_key(
+                user_id=user_id,
+                course_id=course_id,
+                live_class_id=live_class_id,
+            )
+            for live_class_id in [None, *sorted(live_class_ids)]
+        ]
+    )
 
 
 def list_queryset(*, session_type: str, status_filter: str, user):
@@ -70,15 +100,14 @@ def list_queryset(*, session_type: str, status_filter: str, user):
     if is_admin:
         return queryset
 
-    approved_live_class_ids = LiveClassEnrollment.objects.filter(
-        user_id=user.id,
-        status=LiveClassEnrollment.STATUS_APPROVED,
-        live_class__is_active=True,
-    ).values_list("live_class_id", flat=True)
+    accessible_course_ids = accessible_course_ids_for_user(user)
+    accessible_live_class_ids = accessible_live_class_ids_for_user(user)
     return queryset.filter(
         Q(host_id=user.id)
         | Q(linked_course__instructor_id=user.id)
-        | Q(linked_live_class_id__in=approved_live_class_ids)
+        | Q(linked_course_id__in=accessible_course_ids)
+        | Q(linked_live_class_id__in=accessible_live_class_ids)
+        | Q(linked_course__isnull=True, linked_live_class__isnull=True)
     )
 
 
@@ -119,12 +148,19 @@ def get_access_decision(session: RealtimeSession, user) -> JoinAccessDecision:
     is_instructor_owner = session.is_instructor_owner(user)
 
     if not (is_host or is_admin or is_instructor_owner):
-        if not session.linked_live_class_id:
+        linked_course_id = session.linked_course_id or getattr(
+            getattr(session, "linked_live_class", None),
+            "linked_course_id",
+            None,
+        )
+        # Preserve legacy general sessions: only explicitly linked classrooms
+        # require a course or live-class entitlement.
+        if not linked_course_id and not session.linked_live_class_id:
             return JoinAccessDecision(
-                allowed=False,
-                status_code=403,
-                message="Access denied.",
-                detail="This live session is not linked to a permitted live class.",
+                allowed=True,
+                status_code=200,
+                message="OK",
+                detail="",
                 is_host=is_host,
                 is_admin=is_admin,
                 is_instructor_owner=is_instructor_owner,
@@ -132,18 +168,21 @@ def get_access_decision(session: RealtimeSession, user) -> JoinAccessDecision:
         cache_ttl_seconds = _enrollment_access_cache_ttl_seconds()
         cache_key = _build_enrollment_access_cache_key(
             user_id=user.id,
+            course_id=linked_course_id,
             live_class_id=session.linked_live_class_id,
         )
         is_enrolled = None
         if cache_ttl_seconds > 0:
             is_enrolled = cache.get(cache_key)
         if is_enrolled is None:
-            is_enrolled = LiveClassEnrollment.objects.filter(
-                user_id=user.id,
+            is_enrolled = user_has_course_access(
+                user,
+                course_id=linked_course_id,
+            ) or user_has_live_class_access(
+                user,
                 live_class_id=session.linked_live_class_id,
-                status=LiveClassEnrollment.STATUS_APPROVED,
-                live_class__is_active=True,
-            ).exists()
+                linked_course_id=linked_course_id,
+            )
             if cache_ttl_seconds > 0:
                 cache.set(cache_key, bool(is_enrolled), timeout=cache_ttl_seconds)
         else:
@@ -153,7 +192,7 @@ def get_access_decision(session: RealtimeSession, user) -> JoinAccessDecision:
                 allowed=False,
                 status_code=403,
                 message="Access denied.",
-                detail="You are not approved for the live class linked to this session.",
+                detail="You do not have access to the course or live class linked to this session.",
                 is_host=is_host,
                 is_admin=is_admin,
                 is_instructor_owner=is_instructor_owner,

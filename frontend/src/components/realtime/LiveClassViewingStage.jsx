@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import BroadcastViewerTheater from "./BroadcastViewerTheater";
 import MeetingRoomExperience from "./MeetingRoomExperience";
 import { resolveBroadcastEmbedUrls } from "../../utils/broadcastUrls";
@@ -10,15 +11,26 @@ function PlayerChrome({ children, live = false }) {
         {children}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/85 to-transparent" />
         <div className="pointer-events-none absolute inset-x-5 bottom-4 flex items-center gap-3 text-white/80">
-          <span className="text-lg">▶</span>
+          <span className="inline-block h-0 w-0 border-y-[6px] border-l-[10px] border-y-transparent border-l-white/80" />
           <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/25">
             <div className={`h-full ${live ? "w-1/3 bg-red-600" : "w-0 bg-white"}`} />
           </div>
           <span className="text-xs font-semibold">{live ? "LIVE" : "OFFLINE"}</span>
-          <span aria-hidden="true">⛶</span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.12em]">Full</span>
         </div>
       </div>
     </div>
+  );
+}
+
+function LegacyFallbackLink({ href }) {
+  return (
+    <Link
+      to={href || "/join-live"}
+      className="inline-flex min-h-10 items-center justify-center rounded-lg border border-white/15 bg-[#141414] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-[#D8D8D8] transition hover:border-white/30 hover:bg-[#1D1D1D] hover:text-white"
+    >
+      Open legacy live fallback
+    </Link>
   );
 }
 
@@ -30,17 +42,23 @@ export default function LiveClassViewingStage({
   onLeave,
   joining = false,
   error = "",
+  legacyHref = "/join-live",
 }) {
   const currentSchedule = schedule || DEFAULT_LIVE_CLASS_SCHEDULE;
 
   if (activePayload?.mode === "meeting") {
     return (
-      <MeetingRoomExperience
-        payload={activePayload}
-        audiencePanel
-        onLeave={onLeave}
-        onReconnect={() => onJoin(activePayload?.session?.id)}
-      />
+      <div>
+        <MeetingRoomExperience
+          payload={activePayload}
+          audiencePanel
+          onLeave={onLeave}
+          onReconnect={() => onJoin(activePayload?.session?.id)}
+        />
+        <div className="mt-3 flex justify-end">
+          <LegacyFallbackLink href={legacyHref} />
+        </div>
+      </div>
     );
   }
 
@@ -61,13 +79,16 @@ export default function LiveClassViewingStage({
           headerLabel="Now playing"
           showChat={false}
         />
-        <button
-          type="button"
-          onClick={onLeave}
-          className="mt-3 rounded-lg border border-white/10 bg-[#141414] px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#CFCFCF]"
-        >
-          Leave player
-        </button>
+        <div className="mt-3 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={onLeave}
+            className="rounded-lg border border-white/10 bg-[#141414] px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#CFCFCF]"
+          >
+            Leave player
+          </button>
+          <LegacyFallbackLink href={legacyHref} />
+        </div>
       </div>
     );
   }
@@ -101,7 +122,7 @@ export default function LiveClassViewingStage({
           ) : (
             <div className="max-w-2xl">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-2xl text-white/70">
-                ▷
+                LIVE
               </div>
               <div className="mt-5 text-xs font-semibold uppercase tracking-[0.2em] text-[#8B8B8B]">
                 Live classroom offline
@@ -139,6 +160,9 @@ export default function LiveClassViewingStage({
         </span>
       </div>
       {error ? <p className="mt-3 text-sm text-red-300">{error}</p> : null}
+      <div className="mt-4 flex justify-end">
+        <LegacyFallbackLink href={legacyHref} />
+      </div>
     </div>
   );
 }

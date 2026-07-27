@@ -9,7 +9,6 @@ pyotp==2.9.0
 psycopg2-binary==2.9.10
 boto3==1.37.11
 razorpay==1.4.2
-google-auth==2.38.0
 gunicorn==23.0.0
 dj-database-url==2.3.0
 redis==5.2.1

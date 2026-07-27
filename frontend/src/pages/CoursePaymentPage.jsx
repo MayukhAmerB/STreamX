@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 import { getCourse } from "../api/courses";
@@ -12,21 +12,30 @@ import { formatINR } from "../utils/currency";
 const pageBackgroundImage =
   "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
 
-function formatCategory(category) {
-  if (category === "web_pentesting") return "Web Pentesting";
-  if (category === "osint") return "OSINT";
-  return "Cybersecurity";
-}
+const steps = [
+  { id: "identity", label: "Your name", summaryKey: "buyer_name" },
+  { id: "email", label: "Email", summaryKey: "buyer_email" },
+  { id: "contact", label: "WhatsApp", summaryKey: "whatsapp_number" },
+  { id: "plan", label: "Payment plan" },
+];
 
-function formatLevel(level) {
-  if (!level) return "Program";
-  return level.charAt(0).toUpperCase() + level.slice(1);
-}
+const inputClassName =
+  "mt-4 min-h-14 w-full rounded-xl border border-white/15 bg-black/65 px-4 py-3 text-base text-white outline-none transition placeholder:text-[#606060] focus:border-white/50 focus:bg-black";
 
 function loadRazorpayScript() {
   return new Promise((resolve, reject) => {
     if (window.Razorpay) {
       resolve(true);
+      return;
+    }
+    const existing = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+    if (existing) {
+      existing.addEventListener("load", () => resolve(true), { once: true });
+      existing.addEventListener(
+        "error",
+        () => reject(new Error("Failed to load Razorpay checkout SDK.")),
+        { once: true }
+      );
       return;
     }
     const script = document.createElement("script");
@@ -37,14 +46,51 @@ function loadRazorpayScript() {
   });
 }
 
+function isValidPhone(value) {
+  return /^\+?[0-9][0-9 ()-]{7,22}$/.test(value.trim());
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function stepSummary(step, profile, plan, course) {
+  if (step.id === "plan") {
+    return plan === "monthly"
+      ? `Monthly - ${formatINR(course?.monthly_price)}`
+      : `One-time - ${formatINR(course?.price)}`;
+  }
+  if (step.id === "contact" && profile.alternate_number) {
+    return `${profile.whatsapp_number} - Alternate added`;
+  }
+  return profile[step.summaryKey] || "Not completed";
+}
+
 export default function CoursePaymentPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const { refreshUser } = useAuth();
+  const { user } = useAuth();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState("");
+  const [currentStep, setCurrentStep] = useState(0);
+  const [plan, setPlan] = useState("full");
+  const [paymentResult, setPaymentResult] = useState(null);
+  const [checkoutProfile, setCheckoutProfile] = useState({
+    buyer_name: user?.full_name || "",
+    buyer_email: user?.email || "",
+    whatsapp_number: user?.phone_number || "",
+    alternate_number: "",
+  });
+
+  useEffect(() => {
+    setCheckoutProfile((current) => ({
+      ...current,
+      buyer_name: current.buyer_name || user?.full_name || "",
+      buyer_email: current.buyer_email || user?.email || "",
+      whatsapp_number: current.whatsapp_number || user?.phone_number || "",
+    }));
+  }, [user?.email, user?.full_name, user?.phone_number]);
 
   useEffect(() => {
     let active = true;
@@ -52,7 +98,11 @@ export default function CoursePaymentPage() {
       try {
         const response = await getCourse(id);
         if (!active) return;
-        setCourse(apiData(response));
+        const loadedCourse = apiData(response);
+        setCourse(loadedCourse);
+        if (!loadedCourse?.full_payment_enabled && loadedCourse?.installment_payment_enabled) {
+          setPlan("monthly");
+        }
       } catch (err) {
         if (active) setError(apiMessage(err, "Failed to load payment details."));
       } finally {
@@ -65,186 +115,516 @@ export default function CoursePaymentPage() {
   }, [id]);
 
   const launchStatus = useMemo(() => getCourseLaunchStatus(course), [course]);
-  const lectureCount = useMemo(
-    () =>
-      course?.sections?.reduce((acc, section) => acc + ((section.lectures || []).length || 0), 0) || 0,
-    [course]
-  );
+  const activeStep = steps[currentStep];
 
-  const handlePayNow = async () => {
-    if (!course || launchStatus.isComingSoon || course.is_enrolled) return;
+  const handleProfileChange = (event) => {
+    const { name, value } = event.target;
+    setCheckoutProfile((current) => ({ ...current, [name]: value }));
+    setError("");
+  };
+
+  const validateCurrentStep = () => {
+    if (activeStep.id === "identity" && checkoutProfile.buyer_name.trim().length < 2) {
+      return "Enter your full name to continue.";
+    }
+    if (activeStep.id === "email" && !isValidEmail(checkoutProfile.buyer_email)) {
+      return "Enter a valid email address.";
+    }
+    if (activeStep.id === "contact") {
+      if (!isValidPhone(checkoutProfile.whatsapp_number)) {
+        return "Enter a valid WhatsApp number with country code.";
+      }
+      if (
+        checkoutProfile.alternate_number.trim() &&
+        !isValidPhone(checkoutProfile.alternate_number)
+      ) {
+        return "Enter a valid alternate WhatsApp number or leave it blank.";
+      }
+    }
+    if (
+      activeStep.id === "plan" &&
+      ((plan === "full" && !course?.full_payment_enabled) ||
+        (plan === "monthly" && !course?.installment_payment_enabled))
+    ) {
+      return "Choose an available payment plan.";
+    }
+    return "";
+  };
+
+  const moveForward = (event) => {
+    event.preventDefault();
+    const validationError = validateCurrentStep();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setError("");
+    setCurrentStep((step) => Math.min(step + 1, steps.length - 1));
+  };
+
+  const handlePayNow = async (event) => {
+    event.preventDefault();
+    const validationError = validateCurrentStep();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    if (
+      !course ||
+      launchStatus.isComingSoon ||
+      course.is_enrolled ||
+      !course.purchase_available
+    ) {
+      return;
+    }
 
     setPaying(true);
     setError("");
     try {
       await loadRazorpayScript();
-      const orderResponse = await createPaymentOrder({ course_id: Number(id) });
+      const orderResponse = await createPaymentOrder({
+        course_id: Number(id),
+        plan,
+        buyer_name: checkoutProfile.buyer_name.trim(),
+        buyer_email: checkoutProfile.buyer_email.trim(),
+        whatsapp_number: checkoutProfile.whatsapp_number.trim(),
+        alternate_number: checkoutProfile.alternate_number.trim(),
+      });
       const orderData = apiData(orderResponse);
 
       if (orderData?.already_enrolled) {
-        navigate(`/learn/${id}`);
+        setError("This account already has active access to the course.");
+        setPaying(false);
         return;
       }
 
-      const rzp = new window.Razorpay({
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+      const razorpayKey = orderData?.key_id || import.meta.env.VITE_RAZORPAY_KEY_ID;
+      if (!razorpayKey) {
+        throw new Error("Razorpay is not configured for this environment.");
+      }
+
+      const checkout = new window.Razorpay({
+        key: razorpayKey,
         amount: orderData.amount,
         currency: orderData.currency,
         order_id: orderData.razorpay_order_id,
         name: "Al syed Initiative",
-        description: course.title,
+        description: `${course.title} - ${plan === "monthly" ? "Monthly" : "One-time"}`,
         theme: { color: "#111111" },
+        prefill: {
+          name: orderData?.checkout_profile?.name || checkoutProfile.buyer_name,
+          email: orderData?.checkout_profile?.email || checkoutProfile.buyer_email,
+          contact: orderData?.checkout_profile?.contact || checkoutProfile.whatsapp_number,
+        },
+        notes: {
+          course_id: String(course.id),
+          course_title: course.title,
+          access_plan: plan,
+        },
         handler: async (response) => {
           try {
-            await verifyPayment({
+            const verifyResponse = await verifyPayment({
               course_id: Number(id),
+              checkout_reference: orderData.checkout_reference,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
             });
-            await refreshUser();
-            navigate(`/learn/${id}`);
-          } catch (verifyErr) {
-            setError(apiMessage(verifyErr, "Payment verification failed."));
+            setPaymentResult(apiData(verifyResponse));
+          } catch (verifyError) {
+            setError(apiMessage(verifyError, "Payment verification failed."));
+          } finally {
+            setPaying(false);
           }
         },
         modal: {
           ondismiss: () => setPaying(false),
         },
       });
-
-      rzp.open();
+      checkout.open();
     } catch (err) {
       setError(apiMessage(err, "Unable to start payment."));
-    } finally {
       setPaying(false);
     }
   };
 
   if (loading) {
-    return <PageShell title="Payment">Loading...</PageShell>;
+    return <PageShell title="Secure checkout">Loading checkout...</PageShell>;
   }
 
   if (!course) {
     return (
-      <PageShell title="Payment">
+      <PageShell title="Secure checkout">
         <p className="text-sm text-red-400">{error || "Course not found."}</p>
       </PageShell>
     );
   }
 
+  if (paymentResult) {
+    return (
+      <PageShell
+        title="Payment successful"
+        subtitle="Your payment was verified and recorded securely"
+      >
+        <section className="mx-auto max-w-3xl overflow-hidden rounded-[28px] border border-white/15 bg-[#090909] shadow-[0_24px_70px_rgba(0,0,0,0.45)]">
+          <div className="border-b border-white/10 bg-white/[0.04] p-6 sm:p-8">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-400/10 text-2xl text-emerald-300">
+              OK
+            </div>
+            <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">
+              Razorpay payment verified
+            </p>
+            <h2 className="mt-2 font-reference text-3xl font-semibold text-white">
+              Your enrollment is recorded
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-[#BDBDBD]">
+              Your invoice, payment, buyer details, generated login, course access, and linked
+              live-class access are saved. Contact our team on WhatsApp to complete document
+              verification and receive your password.
+            </p>
+          </div>
+
+          <dl className="grid gap-3 p-6 sm:grid-cols-2 sm:p-8">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+              <dt className="text-[10px] uppercase tracking-[0.16em] text-[#858585]">Invoice</dt>
+              <dd className="mt-2 break-all text-base font-semibold text-white">
+                {paymentResult.invoice_number || "Recorded"}
+              </dd>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+              <dt className="text-[10px] uppercase tracking-[0.16em] text-[#858585]">
+                Generated login
+              </dt>
+              <dd className="mt-2 break-all text-base font-semibold text-white">
+                {paymentResult.generated_login || "Pending"}
+              </dd>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4 sm:col-span-2">
+              <dt className="text-[10px] uppercase tracking-[0.16em] text-[#858585]">
+                Credential status
+              </dt>
+              <dd className="mt-2 text-sm leading-6 text-[#D0D0D0]">
+                Password pending admin verification. The generated login becomes usable only
+                after our team issues your credentials.
+              </dd>
+            </div>
+          </dl>
+
+          <div className="flex flex-col gap-3 border-t border-white/10 p-6 sm:flex-row sm:p-8">
+            {paymentResult.support_whatsapp_url ? (
+              <a
+                href={paymentResult.support_whatsapp_url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1"
+              >
+                <Button type="button" className="w-full">
+                  Contact us on WhatsApp
+                </Button>
+              </a>
+            ) : null}
+            <Link to="/courses" className="flex-1">
+              <Button type="button" variant="secondary" className="w-full">
+                Return to courses
+              </Button>
+            </Link>
+          </div>
+        </section>
+      </PageShell>
+    );
+  }
+
+  const isFinalStep = currentStep === steps.length - 1;
+
   return (
-    <PageShell title="Payment" subtitle="Secure checkout powered by Razorpay">
-      <section className="relative overflow-hidden rounded-[28px] border border-black bg-[#080808] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
+    <PageShell
+      title="Course checkout"
+      subtitle="Complete one short step at a time, then continue to Razorpay"
+    >
+      <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#080808] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">
           <img
             src={course.thumbnail || pageBackgroundImage}
             alt=""
             aria-hidden="true"
-            className="h-full w-full object-cover opacity-[0.14]"
+            className="h-full w-full object-cover opacity-[0.08]"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-black/90 via-black/80 to-[#111111]/95" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(192,192,192,0.1),transparent_36%)]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/95 via-black/90 to-[#111111]/95" />
         </div>
 
-        <div className="relative grid gap-6 p-5 sm:p-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <div>
-            <div className="flex flex-wrap gap-2">
-              <span className="rounded-full border border-white/70 bg-white/90 px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-neutral-900">
-                {formatCategory(course.category)}
-              </span>
-              <span className="rounded-full border border-[#DBDBDB]/20 bg-[#121212]/85 px-3 py-1 text-[10px] font-semibold tracking-[0.14em] text-[#DBDBDB]">
-                {formatLevel(course.level)}
-              </span>
-              <span
-                className={`rounded-full px-3 py-1 text-[10px] font-semibold tracking-[0.14em] ${
-                  launchStatus.isLive
-                    ? "border border-[#E5E5E5]/80 bg-[linear-gradient(135deg,#FEFEFE_0%,#F5F5F5_55%,#D4D4D4_100%)] text-[#242424]"
-                    : "border border-[#CCCCCC] bg-[#D9D9D9] text-[#131313]"
-                }`}
-              >
-                {launchStatus.label}
-              </span>
-            </div>
-
-            <h2 className="mt-4 font-reference text-2xl font-semibold leading-tight text-white sm:text-3xl">
+        <div className="relative grid min-h-[610px] lg:grid-cols-[310px_1fr]">
+          <aside className="border-b border-white/10 bg-white/[0.025] p-5 lg:border-b-0 lg:border-r lg:p-7">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#888]">
+              Secure enrollment
+            </p>
+            <h2 className="mt-3 font-reference text-xl font-semibold text-white">
               {course.title}
             </h2>
-            <p className="mt-3 text-sm leading-7 text-[#BBBBBB]">
-              Review your course details and continue to secure payment. Enrollment is activated
-              after successful Razorpay verification.
+            <p className="mt-2 text-sm text-[#8F8F8F]">
+              {plan === "monthly"
+                ? `${formatINR(course.monthly_price)} every 30 days`
+                : `${formatINR(course.price)} one-time`}
             </p>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-black panel-gradient p-3">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Price</div>
-                <div className="mt-1 text-lg font-semibold text-white">{formatINR(course.price)}</div>
-              </div>
-              <div className="rounded-2xl border border-black panel-gradient p-3">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Modules</div>
-                <div className="mt-1 text-lg font-semibold text-white">{course.sections?.length || 0}</div>
-              </div>
-              <div className="rounded-2xl border border-black panel-gradient p-3">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Lectures</div>
-                <div className="mt-1 text-lg font-semibold text-white">{lectureCount}</div>
-              </div>
-            </div>
-          </div>
+            <ol className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-1">
+              {steps.map((step, index) => {
+                const complete = index < currentStep;
+                const active = index === currentStep;
+                return (
+                  <li key={step.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (index <= currentStep) {
+                          setCurrentStep(index);
+                          setError("");
+                        }
+                      }}
+                      className={`w-full rounded-xl border p-3 text-left transition ${
+                        active
+                          ? "border-white/45 bg-white/[0.1]"
+                          : "border-white/[0.07] bg-black/30"
+                      } ${index <= currentStep ? "cursor-pointer" : "cursor-default"}`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                            complete
+                              ? "bg-white text-black"
+                              : active
+                                ? "border border-white text-white"
+                                : "border border-white/15 text-[#666]"
+                          }`}
+                        >
+                          {complete ? "OK" : index + 1}
+                        </span>
+                        <span className="text-xs font-semibold text-white">{step.label}</span>
+                      </span>
+                      <span className="mt-2 hidden truncate pl-8 text-[11px] text-[#777] lg:block">
+                        {stepSummary(step, checkoutProfile, plan, course)}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
 
-          <div className="rounded-2xl border border-black panel-gradient p-5 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
-              Checkout
+            <div className="mt-6 hidden rounded-xl border border-white/[0.08] bg-black/40 p-4 lg:block">
+              <p className="text-[10px] uppercase tracking-[0.16em] text-[#777]">
+                Payment security
+              </p>
+              <p className="mt-2 text-xs leading-5 text-[#999]">
+                The amount is calculated by our server. Card and UPI details are handled only by
+                Razorpay.
+              </p>
             </div>
-            <div className="mt-2 font-reference text-3xl font-semibold text-white">
-              {launchStatus.isComingSoon ? "Coming Soon" : formatINR(course.price)}
+          </aside>
+
+          <form
+            className="flex min-w-0 flex-col justify-between p-5 sm:p-8 lg:p-12"
+            onSubmit={isFinalStep ? handlePayNow : moveForward}
+          >
+            <div key={activeStep.id} className="animate-[checkoutStepIn_260ms_ease-out]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#858585]">
+                Step {currentStep + 1} of {steps.length}
+              </p>
+
+              {activeStep.id === "identity" ? (
+                <div className="mt-5 max-w-2xl">
+                  <h3 className="font-reference text-3xl font-semibold text-white sm:text-4xl">
+                    What is your full name?
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-[#999]">
+                    Use the name that should appear in the payment and verification record.
+                  </p>
+                  <input
+                    className={inputClassName}
+                    name="buyer_name"
+                    value={checkoutProfile.buyer_name}
+                    onChange={handleProfileChange}
+                    autoComplete="name"
+                    autoFocus
+                    minLength={2}
+                    maxLength={255}
+                    placeholder="Enter your full name"
+                  />
+                </div>
+              ) : null}
+
+              {activeStep.id === "email" ? (
+                <div className="mt-5 max-w-2xl">
+                  <h3 className="font-reference text-3xl font-semibold text-white sm:text-4xl">
+                    Where should we record your invoice?
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-[#999]">
+                    Enter an email you can access. It will also help our admin match your
+                    documents to this payment.
+                  </p>
+                  <input
+                    className={inputClassName}
+                    type="email"
+                    name="buyer_email"
+                    value={checkoutProfile.buyer_email}
+                    onChange={handleProfileChange}
+                    autoComplete="email"
+                    autoFocus
+                    maxLength={254}
+                    placeholder="you@example.com"
+                  />
+                </div>
+              ) : null}
+
+              {activeStep.id === "contact" ? (
+                <div className="mt-5 max-w-2xl">
+                  <h3 className="font-reference text-3xl font-semibold text-white sm:text-4xl">
+                    How can our team reach you?
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-[#999]">
+                    Include the country code. The alternate WhatsApp number is optional.
+                  </p>
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                    <label className="text-xs font-semibold uppercase tracking-[0.12em] text-[#AFAFAF]">
+                      WhatsApp number
+                      <input
+                        className={inputClassName}
+                        type="tel"
+                        name="whatsapp_number"
+                        value={checkoutProfile.whatsapp_number}
+                        onChange={handleProfileChange}
+                        autoComplete="tel"
+                        autoFocus
+                        placeholder="+91 98765 43210"
+                        maxLength={24}
+                      />
+                    </label>
+                    <label className="text-xs font-semibold uppercase tracking-[0.12em] text-[#AFAFAF]">
+                      Alternate WhatsApp
+                      <input
+                        className={inputClassName}
+                        type="tel"
+                        name="alternate_number"
+                        value={checkoutProfile.alternate_number}
+                        onChange={handleProfileChange}
+                        placeholder="Optional"
+                        maxLength={24}
+                      />
+                    </label>
+                  </div>
+                </div>
+              ) : null}
+
+              {activeStep.id === "plan" ? (
+                <div className="mt-5 max-w-3xl">
+                  <h3 className="font-reference text-3xl font-semibold text-white sm:text-4xl">
+                    Choose your access plan
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-[#999]">
+                    The final amount is locked by the backend before Razorpay opens.
+                  </p>
+                  <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                    {course.installment_payment_enabled ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPlan("monthly");
+                          setError("");
+                        }}
+                        className={`rounded-2xl border p-5 text-left transition ${
+                          plan === "monthly"
+                            ? "border-white bg-white text-black"
+                            : "border-white/15 bg-black/55 text-white hover:border-white/35"
+                        }`}
+                      >
+                        <span className="text-xs font-semibold uppercase tracking-[0.15em]">
+                          Monthly
+                        </span>
+                        <span className="mt-4 block text-3xl font-semibold">
+                          {formatINR(course.monthly_price)}
+                        </span>
+                        <span
+                          className={`mt-3 block text-sm leading-6 ${
+                            plan === "monthly" ? "text-black/65" : "text-[#8F8F8F]"
+                          }`}
+                        >
+                          30 days of access. Lifetime access after three verified monthly
+                          payments.
+                        </span>
+                      </button>
+                    ) : null}
+                    {course.full_payment_enabled ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPlan("full");
+                          setError("");
+                        }}
+                        className={`rounded-2xl border p-5 text-left transition ${
+                          plan === "full"
+                            ? "border-white bg-white text-black"
+                            : "border-white/15 bg-black/55 text-white hover:border-white/35"
+                        }`}
+                      >
+                        <span className="text-xs font-semibold uppercase tracking-[0.15em]">
+                          One-time
+                        </span>
+                        <span className="mt-4 block text-3xl font-semibold">
+                          {formatINR(course.price)}
+                        </span>
+                        <span
+                          className={`mt-3 block text-sm leading-6 ${
+                            plan === "full" ? "text-black/65" : "text-[#8F8F8F]"
+                          }`}
+                        >
+                          One verified payment for lifetime course and linked live-class access.
+                        </span>
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
+              {error ? (
+                <div className="mt-6 max-w-3xl rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                  {error}
+                </div>
+              ) : null}
             </div>
-            <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
-              Razorpay secure checkout for Card, UPI, and supported payment methods.
-            </p>
 
-            <div className="mt-4 space-y-2">
-              <div className="rounded-lg border border-black panel-gradient px-3 py-2 text-sm text-[#C8C8C8]">
-                Course: {course.title}
+            <div className="mt-10 flex flex-col-reverse gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex gap-2">
+                {currentStep > 0 ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setCurrentStep((step) => step - 1);
+                      setError("");
+                    }}
+                  >
+                    Back
+                  </Button>
+                ) : (
+                  <Link to={`/courses/${course.id}`}>
+                    <Button type="button" variant="secondary">
+                      Cancel
+                    </Button>
+                  </Link>
+                )}
               </div>
-              <div className="rounded-lg border border-black panel-gradient px-3 py-2 text-sm text-[#C8C8C8]">
-                Access: {launchStatus.label}
-              </div>
-            </div>
 
-            {error ? (
-              <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                {error}
-              </div>
-            ) : null}
-
-            <div className="mt-4 space-y-2">
-              {launchStatus.isComingSoon ? (
-                <Button
-                  className="w-full border border-[#D1D1D1]/70 bg-[linear-gradient(90deg,#DBDBDB_0%,#C4C4C4_55%,#A1A1A1_100%)] text-[#141414] shadow-[0_8px_18px_rgba(0,0,0,0.18)] hover:bg-[linear-gradient(90deg,#E1E1E1_0%,#CBCBCB_55%,#ABABAB_100%)]"
-                  disabled
-                >
-                  Coming Soon
+              {!course.purchase_available ? (
+                <Button type="button" disabled>
+                  Purchase unavailable
                 </Button>
-              ) : course.is_enrolled ? (
-                <Link to={`/learn/${course.id}`} className="block">
-                  <Button className="w-full">Go to Course</Button>
-                </Link>
               ) : (
-                <Button className="w-full" onClick={handlePayNow} loading={paying}>
-                  Buy Now
+                <Button type="submit" loading={paying} className="min-w-44">
+                  {isFinalStep ? "Continue to Razorpay" : "Continue"}
                 </Button>
               )}
-
-              <Link to={`/courses/${course.id}`} className="block">
-                <Button variant="secondary" className="w-full">
-                  Back to Course
-                </Button>
-              </Link>
             </div>
-          </div>
+          </form>
         </div>
       </section>
     </PageShell>
   );
 }
-

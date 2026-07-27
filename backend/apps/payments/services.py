@@ -49,6 +49,14 @@ def verify_razorpay_signature(*, razorpay_order_id, razorpay_payment_id, razorpa
         raise RazorpayServiceError("Razorpay signature verification failed.") from exc
 
 
+def fetch_razorpay_payment(*, razorpay_payment_id):
+    client = get_razorpay_client()
+    try:
+        return client.payment.fetch(razorpay_payment_id)
+    except Exception as exc:
+        raise RazorpayServiceError("Failed to confirm payment status with Razorpay.") from exc
+
+
 def verify_razorpay_webhook_signature(*, payload_body, razorpay_signature):
     webhook_secret = str(getattr(settings, "RAZORPAY_WEBHOOK_SECRET", "") or "").strip()
     if not webhook_secret:

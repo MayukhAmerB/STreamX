@@ -11,13 +11,11 @@ from config.cookies import ACCESS_COOKIE
 TERMS_ACCEPTANCE_EXEMPT_PATHS = {
     "/api/auth/config/",
     "/api/auth/csrf/",
-    "/api/auth/google/",
     "/api/auth/login/",
     "/api/auth/logout/",
     "/api/auth/password-reset/",
     "/api/auth/password-reset-confirm/",
     "/api/auth/refresh/",
-    "/api/auth/register/",
     "/api/auth/terms/",
     "/api/auth/terms/accept/",
     "/api/auth/user/",

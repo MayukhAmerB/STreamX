@@ -44,11 +44,44 @@ describe("CourseCard", () => {
         ...baseCourse,
         is_enrolled: false,
         enrollment_status: "none",
+        purchase_available: true,
       },
     });
 
     expect(html).toContain("Live");
+    expect(html).toContain("Buy Course");
+    expect(html).toContain('href="/courses/11/payment"');
     expect(html).not.toContain("Go to Course");
+  });
+
+  it("does not offer a legacy request when purchasing is unavailable", () => {
+    const html = renderCourseCard({
+      course: {
+        ...baseCourse,
+        is_enrolled: false,
+        enrollment_status: "none",
+        purchase_available: false,
+      },
+    });
+
+    expect(html).toContain("Purchase Unavailable");
+    expect(html).not.toContain("Request Access");
+    expect(html).not.toContain('href="/courses/11/payment"');
+  });
+
+  it("explains when purchase is unavailable because the course price is not configured", () => {
+    const html = renderCourseCard({
+      course: {
+        ...baseCourse,
+        price: 0,
+        is_enrolled: false,
+        enrollment_status: "none",
+        purchase_available: false,
+      },
+    });
+
+    expect(html).toContain("Enrollment price has not been configured for this track.");
+    expect(html).toContain("Purchase Unavailable");
   });
 
   it("does not render Go to Course for coming soon courses", () => {

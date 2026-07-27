@@ -15,7 +15,7 @@ from rest_framework.authtoken.models import Token
 from apps.courses.models import Enrollment, LiveClassEnrollment
 from config.audit import log_security_event
 
-from .models import AsyncJob, AuthConfiguration, TermsAcceptance, User, UserTermsStatus
+from .models import AsyncJob, TermsAcceptance, User, UserTermsStatus
 
 admin.site.enable_nav_sidebar = False
 
@@ -155,7 +155,6 @@ class UserAdmin(DjangoUserAdmin):
                 )
             },
         ),
-        ("OAuth", {"fields": ("oauth_provider", "oauth_provider_uid")}),
         ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser")}),
         ("Important dates", {"fields": ("last_login", "created_at", "updated_at")}),
     )
@@ -256,22 +255,6 @@ class UserAdmin(DjangoUserAdmin):
 
     class Media:
         js = ("admin/js/user_password_generator.js",)
-
-
-@admin.register(AuthConfiguration)
-class AuthConfigurationAdmin(admin.ModelAdmin):
-    list_display = ("registration_enabled", "updated_at")
-    readonly_fields = ("created_at", "updated_at")
-    fields = ("registration_enabled", "created_at", "updated_at")
-
-    def has_add_permission(self, request):
-        if AuthConfiguration.objects.exists():
-            return False
-        return super().has_add_permission(request)
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
 
 @admin.register(UserTermsStatus)
 class UserTermsStatusAdmin(admin.ModelAdmin):

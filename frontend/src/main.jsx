@@ -1,17 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { GoogleOAuthProvider } from "@react-oauth/google";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
 import "./index.css";
 
 // Developer credit: Ibrahim Mohsin Mayukh Bhatt
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
-const googleOAuthEnabled =
-  Boolean(googleClientId) && String(googleClientId).trim().toLowerCase() !== "disabled";
-
-const appTree = (
+const routedApp = (
   <BrowserRouter>
     <AuthProvider>
       <App />
@@ -20,13 +15,7 @@ const appTree = (
 );
 
 ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    {googleOAuthEnabled ? (
-      <GoogleOAuthProvider clientId={googleClientId}>{appTree}</GoogleOAuthProvider>
-    ) : (
-      appTree
-    )}
-  </React.StrictMode>
+  <React.StrictMode>{routedApp}</React.StrictMode>
 );
 
 const bootLoader = document.getElementById("boot-loader");

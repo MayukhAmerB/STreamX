@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import PageShell from "../components/PageShell";
 import Button from "../components/Button";
-import PublicEnrollmentRequestModal from "../components/PublicEnrollmentRequestModal";
 import LiveClassViewingStage from "../components/realtime/LiveClassViewingStage";
-import { enrollInLiveClass, listLiveClasses } from "../api/courses";
+import { getCourse, listLiveClasses } from "../api/courses";
 import { joinRealtimeSession, listRealtimeSessions } from "../api/realtime";
 import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
@@ -106,31 +105,87 @@ function toValidLiveClassId(value) {
   return parsed;
 }
 
+function hasApprovedCourseAccess(course) {
+  const status = String(course?.enrollment_status || "").toLowerCase();
+  return Boolean(course?.is_enrolled) || status === "approved" || status === "paid";
+}
+
+export function sessionBelongsToCourse(session, courseId) {
+  const normalizedCourseId = Number(courseId || 0);
+  if (!normalizedCourseId) return true;
+  const linkedCourseId = Number(
+    session?.linked_course?.id || session?.linked_live_class?.linked_course_id || 0
+  );
+  return linkedCourseId === normalizedCourseId;
+}
+
 export default function LiveClassesPage() {
+  const { id: routeCourseId } = useParams();
   const { user, isAuthenticated } = useAuth();
+  const scopedCourseId = toValidLiveClassId(routeCourseId);
+  const isCourseClassroom = Boolean(scopedCourseId);
+  const [course, setCourse] = useState(null);
+  const [courseLoading, setCourseLoading] = useState(isCourseClassroom);
+  const [courseError, setCourseError] = useState("");
   const [tracks, setTracks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [actionState, setActionState] = useState({});
-  const [publicLeadTarget, setPublicLeadTarget] = useState(null);
   const [realtimeSessions, setRealtimeSessions] = useState([]);
   const [activeLivePayload, setActiveLivePayload] = useState(null);
   const [liveJoinState, setLiveJoinState] = useState({ loading: false, error: "" });
   const liveStageRef = useRef(null);
 
   useEffect(() => {
+    if (!isCourseClassroom) {
+      setCourse(null);
+      setCourseLoading(false);
+      setCourseError("");
+      return undefined;
+    }
+
+    let active = true;
+    setCourseLoading(true);
+    (async () => {
+      try {
+        const response = await getCourse(scopedCourseId);
+        if (!active) return;
+        setCourse(apiData(response, null));
+        setCourseError("");
+      } catch (err) {
+        if (!active) return;
+        setCourse(null);
+        setCourseError(apiMessage(err, "Unable to load this course classroom."));
+      } finally {
+        if (active) setCourseLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [isCourseClassroom, scopedCourseId]);
+
+  useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const response = await listLiveClasses();
+        const response = await listLiveClasses(
+          isCourseClassroom ? { course_id: scopedCourseId } : {}
+        );
         if (!active) return;
         const liveClasses = apiData(response, []);
-        setTracks(liveClasses.length ? liveClasses : fallbackLiveClasses);
+        setTracks(
+          liveClasses.length || isCourseClassroom ? liveClasses : fallbackLiveClasses
+        );
         setError("");
-      } catch {
+      } catch (err) {
         if (!active) return;
-        setTracks(fallbackLiveClasses);
-        setError("Showing local OSINT live classes preview. Backend is unavailable.");
+        setTracks(isCourseClassroom ? [] : fallbackLiveClasses);
+        setError(
+          isCourseClassroom
+            ? apiMessage(err, "Unable to load this course's live classes.")
+            : "Showing local OSINT live classes preview. Backend is unavailable."
+        );
       } finally {
         if (active) setLoading(false);
       }
@@ -139,7 +194,7 @@ export default function LiveClassesPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [isCourseClassroom, scopedCourseId]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -165,23 +220,37 @@ export default function LiveClassesPage() {
     };
   }, [isAuthenticated]);
 
+  const scopedRealtimeSessions = useMemo(
+    () =>
+      realtimeSessions.filter((session) =>
+        sessionBelongsToCourse(session, scopedCourseId)
+      ),
+    [realtimeSessions, scopedCourseId]
+  );
   const liveSchedule = useMemo(
-    () => resolveLiveClassSchedule(realtimeSessions),
-    [realtimeSessions]
+    () => resolveLiveClassSchedule(scopedRealtimeSessions),
+    [scopedRealtimeSessions]
   );
   const activeLiveSession = useMemo(
-    () => findJoinableLiveSession(realtimeSessions),
-    [realtimeSessions]
+    () => findJoinableLiveSession(scopedRealtimeSessions),
+    [scopedRealtimeSessions]
   );
+  const legacySessionId = activeLivePayload?.session?.id || activeLiveSession?.id;
+  const legacyLiveHref = legacySessionId
+    ? `/join-live?session=${legacySessionId}`
+    : "/join-live";
 
   useEffect(() => {
-    const latestActiveSession = realtimeSessions.find(
+    const latestActiveSession = scopedRealtimeSessions.find(
       (session) => session.id === activeLivePayload?.session?.id
     );
-    if (latestActiveSession && !isJoinableLiveSession(latestActiveSession)) {
+    if (
+      activeLivePayload &&
+      (!latestActiveSession || !isJoinableLiveSession(latestActiveSession))
+    ) {
       setActiveLivePayload(null);
     }
-  }, [activeLivePayload?.session?.id, realtimeSessions]);
+  }, [activeLivePayload, scopedRealtimeSessions]);
 
   const orderedTracks = useMemo(() => {
     return [...tracks].sort((a, b) => {
@@ -191,62 +260,6 @@ export default function LiveClassesPage() {
       return String(a?.title || "").localeCompare(String(b?.title || ""));
     });
   }, [tracks]);
-
-  const handleEnroll = async (liveClassId) => {
-    const targetId = toValidLiveClassId(liveClassId);
-    if (!targetId) {
-      setActionState((prev) => ({
-        ...prev,
-        [liveClassId]: {
-          loading: false,
-          error: "Access request is unavailable in preview mode.",
-          success: "",
-        },
-      }));
-      return;
-    }
-    setActionState((prev) => ({
-      ...prev,
-      [liveClassId]: { loading: true, error: "", success: "" },
-    }));
-    try {
-      const response = await enrollInLiveClass({ live_class_id: targetId });
-      const data = apiData(response, {});
-      const enrollmentStatus = String(data?.enrollment_status || (data?.enrolled ? "approved" : "pending")).toLowerCase();
-      setTracks((prev) =>
-        prev.map((item) =>
-          item.id === liveClassId
-            ? {
-                ...item,
-                is_enrolled: enrollmentStatus === "approved",
-                enrollment_status: enrollmentStatus,
-                enrollment_count:
-                  enrollmentStatus === "approved" && !data.already_enrolled
-                    ? (item.enrollment_count || 0) + 1
-                    : item.enrollment_count || 0,
-              }
-            : item
-        )
-      );
-      setActionState((prev) => ({
-        ...prev,
-        [liveClassId]: {
-          loading: false,
-          error: "",
-          success:
-            response?.data?.message ||
-            (enrollmentStatus === "approved"
-              ? "Already enrolled."
-              : "Access request submitted. Admin will review it and contact you."),
-        },
-      }));
-    } catch (err) {
-      setActionState((prev) => ({
-        ...prev,
-        [liveClassId]: { loading: false, error: apiMessage(err, "Unable to submit access request."), success: "" },
-      }));
-    }
-  };
 
   const handleJoinLiveClass = async (sessionId) => {
     setLiveJoinState({ loading: true, error: "" });
@@ -270,10 +283,61 @@ export default function LiveClassesPage() {
     }
   };
 
+  if (courseLoading) {
+    return (
+      <PageShell title="Live Classroom" subtitle="Loading your approved course classroom.">
+        <div className="rounded-2xl border border-white/10 bg-[#0D0D0D] p-6 text-sm text-[#BDBDBD]">
+          Loading classroom...
+        </div>
+      </PageShell>
+    );
+  }
+
+  if (isCourseClassroom && (courseError || !course)) {
+    return (
+      <PageShell title="Live Classroom" subtitle="This course classroom could not be opened.">
+        <div className="rounded-2xl border border-red-300/20 bg-red-950/20 p-6">
+          <p className="text-sm text-red-200">{courseError || "Course not found."}</p>
+          <Link
+            to={`/courses/${scopedCourseId}`}
+            className="mt-4 inline-flex rounded-xl border border-white/15 px-4 py-2 text-sm font-semibold text-white"
+          >
+            Back to course
+          </Link>
+        </div>
+      </PageShell>
+    );
+  }
+
+  if (isCourseClassroom && !hasApprovedCourseAccess(course)) {
+    return (
+      <PageShell
+        title="Live Classroom"
+        subtitle="Live classes are included with approved course access."
+      >
+        <div className="rounded-2xl border border-white/10 bg-[#0D0D0D] p-6">
+          <p className="text-sm leading-6 text-[#BDBDBD]">
+            Your account does not currently have approved access to this course.
+          </p>
+          <Link
+            to={`/courses/${scopedCourseId}`}
+            className="mt-4 inline-flex rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black"
+          >
+            View course access
+          </Link>
+        </div>
+      </PageShell>
+    );
+  }
+
   return (
     <PageShell
-      title="Live Classes"
-      subtitle="Weekend live OSINT classes with a structured month-by-month progression."
+      title={isCourseClassroom ? `${course.title} Live Classroom` : "Live Classes"}
+      subtitle={
+        isCourseClassroom
+          ? "Your approved course classroom, live player, and weekend schedule in one place."
+          : "Weekend live OSINT classes with a structured month-by-month progression."
+      }
       decryptTitle
     >
       <section className="relative mb-5 overflow-hidden rounded-[20px] border border-black bg-[#080808] shadow-[0_18px_50px_rgba(0,0,0,0.32)] sm:mb-6 sm:rounded-[30px] sm:shadow-[0_26px_70px_rgba(0,0,0,0.35)]">
@@ -294,11 +358,12 @@ export default function LiveClassesPage() {
               WEEKEND LIVE CLASSES
             </div>
             <h2 className="mt-4 max-w-3xl font-reference text-2xl font-semibold leading-tight text-white sm:text-3xl lg:text-[2.2rem]">
-              OSINT Live Program (Month 1 to Month 3)
+              {isCourseClassroom ? course.title : "OSINT Live Program (Month 1 to Month 3)"}
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[#BBBBBB]">
-              These are live classes, not self-paced course sessions. The OSINT track is delivered
-              as a progressive 3-month path: Beginner, Intermediate, and Advanced.
+              {isCourseClassroom
+                ? "Your approved course access includes the linked instructor-led classroom below. When no session is live, the player shows the next scheduled class."
+                : "These are live classes, not self-paced course sessions. The OSINT track is delivered as a progressive 3-month path: Beginner, Intermediate, and Advanced."}
             </p>
 
             <div className="mt-5 grid grid-cols-1 gap-2 min-[390px]:grid-cols-3 sm:auto-rows-fr sm:gap-3">
@@ -345,6 +410,7 @@ export default function LiveClassesPage() {
           activePayload={activeLivePayload}
           joining={liveJoinState.loading}
           error={liveJoinState.error}
+          legacyHref={legacyLiveHref}
           onJoin={handleJoinLiveClass}
           onLeave={() => {
             setActiveLivePayload(null);
@@ -362,7 +428,9 @@ export default function LiveClassesPage() {
       <section className="rounded-[26px] border border-black panel-gradient p-4 sm:p-5">
         <div className="mb-4 flex flex-col items-start gap-2 min-[430px]:flex-row min-[430px]:items-end min-[430px]:justify-between">
           <div>
-            <h3 className="font-reference text-lg font-semibold text-white">OSINT Month-Wise Live Classes</h3>
+            <h3 className="font-reference text-lg font-semibold text-white">
+              {isCourseClassroom ? "Included Live Classes" : "OSINT Month-Wise Live Classes"}
+            </h3>
             <p className="mt-1 text-xs text-[#949494]">
               Month 1 (Beginner), Month 2 (Intermediate), Month 3 (Advanced)
             </p>
@@ -380,9 +448,14 @@ export default function LiveClassesPage() {
               label: "Month",
               subtitle: formatLevel(course?.level),
             };
-            const courseLiveSession = findJoinableLiveSession(realtimeSessions, course.id);
+            const courseLiveSession = findJoinableLiveSession(
+              scopedRealtimeSessions,
+              course.id
+            );
             const hasApprovedAccess =
-              course.is_enrolled || String(course.enrollment_status || "").toLowerCase() === "approved";
+              isCourseClassroom ||
+              course.is_enrolled ||
+              String(course.enrollment_status || "").toLowerCase() === "approved";
             return (
               <article
                 key={course.id}
@@ -467,47 +540,17 @@ export default function LiveClassesPage() {
                       </div>
                     ) : String(course.enrollment_status || "").toLowerCase() === "pending" ? (
                       <Button className="w-full" disabled>
-                        Request Pending
+                        Legacy Request Pending
                       </Button>
-                    ) : isAuthenticated ? (
-                      <Button
-                        className="w-full"
-                        onClick={() => handleEnroll(course.id)}
-                        loading={Boolean(actionState[course.id]?.loading)}
-                      >
-                        Request Access
-                      </Button>
+                    ) : course.linked_course_id ? (
+                      <Link to={`/courses/${course.linked_course_id}`} className="block">
+                        <Button className="w-full">Buy Linked Course</Button>
+                      </Link>
                     ) : (
-                      <Button
-                        className="w-full"
-                        onClick={() => {
-                          const targetId = toValidLiveClassId(course.id);
-                          if (!targetId) {
-                            setActionState((prev) => ({
-                              ...prev,
-                              [course.id]: {
-                                loading: false,
-                                error: "Access request is unavailable in preview mode.",
-                                success: "",
-                              },
-                            }));
-                            return;
-                          }
-                          setPublicLeadTarget({
-                            id: targetId,
-                            title: course.title,
-                          });
-                        }}
-                      >
-                        Request Access
+                      <Button className="w-full" disabled>
+                        Included With Course
                       </Button>
                     )}
-                    {actionState[course.id]?.error ? (
-                      <p className="mt-2 text-xs text-red-300">{actionState[course.id].error}</p>
-                    ) : null}
-                    {actionState[course.id]?.success ? (
-                      <p className="mt-2 text-xs text-zinc-300">{actionState[course.id].success}</p>
-                    ) : null}
                   </div>
                 </div>
               </article>
@@ -516,15 +559,6 @@ export default function LiveClassesPage() {
         </div>
       </section>
 
-      <PublicEnrollmentRequestModal
-        isOpen={Boolean(publicLeadTarget)}
-        onClose={() => setPublicLeadTarget(null)}
-        targetType="live_class"
-        targetId={publicLeadTarget?.id}
-        targetName={publicLeadTarget?.title}
-        sourcePath="/live-classes"
-        loginPath="/login"
-      />
     </PageShell>
   );
 }

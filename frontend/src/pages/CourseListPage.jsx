@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 
 import { listCourses } from "../api/courses";
 import CourseCard from "../components/CourseCard";
+import OsintToolsAccessCard from "../components/OsintToolsAccessCard";
 import PageShell from "../components/PageShell";
+import { useAuth } from "../hooks/useAuth";
 import { apiData } from "../utils/api";
+import { hasApprovedCourseAccess, isOsintCourse } from "../utils/courseAccess";
 import {
   filterCourseCatalog,
   readCachedCourseCatalog,
@@ -33,6 +36,8 @@ export function getCourseLevelSummary(courses) {
     { beginner: 0, intermediate: 0, advanced: 0, other: 0 }
   );
 }
+
+export { hasApprovedCourseAccess };
 
 export function CourseCatalogContent({
   courses = [],
@@ -184,6 +189,7 @@ export function CourseCatalogContent({
 }
 
 export default function CourseListPage() {
+  const { isAuthenticated } = useAuth();
   const [courses, setCourses] = useState(() => readCachedCourseCatalog());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -245,17 +251,70 @@ export default function CourseListPage() {
     };
   }, [search]);
 
-  const summary = useMemo(() => getCourseCatalogSummary(courses), [courses]);
-  const levelSummary = useMemo(() => getCourseLevelSummary(courses), [courses]);
+  const ownedCourses = useMemo(
+    () => (isAuthenticated ? courses.filter(hasApprovedCourseAccess) : []),
+    [courses, isAuthenticated]
+  );
+  const catalogCourses = useMemo(
+    () => (isAuthenticated ? courses.filter((course) => !hasApprovedCourseAccess(course)) : courses),
+    [courses, isAuthenticated]
+  );
+  const hasApprovedOsintCourse = useMemo(
+    () => ownedCourses.some(isOsintCourse),
+    [ownedCourses]
+  );
+  const summary = useMemo(() => getCourseCatalogSummary(catalogCourses), [catalogCourses]);
+  const levelSummary = useMemo(() => getCourseLevelSummary(catalogCourses), [catalogCourses]);
 
   return (
     <PageShell
-      title="Course Catalog"
-      subtitle="Browse OSINT and web application pentesting tracks."
+      title={isAuthenticated ? "Courses & Live Learning" : "Course Catalog"}
+      subtitle={
+        isAuthenticated
+          ? "Continue approved courses, enter their live classrooms, or explore another track."
+          : "Browse OSINT and web application pentesting tracks."
+      }
       decryptTitle
     >
+      {isAuthenticated ? (
+        <>
+        <section className="mb-6 rounded-[24px] border border-white/15 bg-[#101010] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.32)] sm:p-6">
+          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#A5A5A5]">
+                Your Learning
+              </div>
+              <h2 className="mt-2 font-reference text-2xl font-semibold text-white">
+                Approved courses
+              </h2>
+              <p className="mt-1 text-sm text-[#A5A5A5]">
+                Course lessons and bundled live classrooms are available from the same course.
+              </p>
+            </div>
+            <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-[#D8D8D8]">
+              {ownedCourses.length} approved
+            </span>
+          </div>
+
+          {ownedCourses.length ? (
+            <div className="grid auto-rows-fr gap-4 lg:grid-cols-2 xl:grid-cols-3">
+              {ownedCourses.map((course) => (
+                <CourseCard key={course.id} course={course} />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-white/10 bg-black/35 px-5 py-6 text-sm leading-6 text-[#B5B5B5]">
+              No approved courses yet. Your course will appear here automatically after admin
+              approval.
+            </div>
+          )}
+        </section>
+        {hasApprovedOsintCourse ? <OsintToolsAccessCard className="mb-8" /> : null}
+        </>
+      ) : null}
+
       <CourseCatalogContent
-        courses={courses}
+        courses={catalogCourses}
         loading={loading}
         error={error}
         search={search}

@@ -1029,7 +1029,124 @@ export default function IdCardPage() {
           color: rgba(255,255,255,.06);
         }
 
+        .asi-id-card-shell {
+          max-width: 1180px;
+          margin-inline: auto;
+          padding: clamp(16px, 3vw, 34px);
+          border-color: rgba(255,255,255,.12);
+          background:
+            radial-gradient(circle at 12% 4%, rgba(255,255,255,.08), transparent 30%),
+            linear-gradient(145deg, #171717 0%, #080808 48%, #111111 100%);
+        }
+
+        .asi-id-card-card {
+          border-radius: 24px;
+          border-color: rgba(255,255,255,.14);
+        }
+
+        .asi-id-card-inner {
+          gap: 18px;
+          padding: clamp(18px, 3vw, 34px);
+        }
+
+        .asi-id-card-org-label,
+        .asi-id-card-id-badge,
+        .asi-id-card-handle,
+        .asi-id-card-username,
+        .asi-id-card-info-label,
+        .asi-id-card-section-title,
+        .asi-id-card-course-name,
+        .asi-id-card-status-text,
+        .asi-id-card-status-sub,
+        .asi-id-card-footer {
+          letter-spacing: .1em;
+        }
+
+        .asi-id-card-org-label,
+        .asi-id-card-id-badge {
+          font-size: 9px;
+        }
+
+        .asi-id-card-avatar {
+          width: 104px;
+          height: 104px;
+          flex: 0 0 104px;
+        }
+
+        .asi-id-card-handle,
+        .asi-id-card-username,
+        .asi-id-card-course-name,
+        .asi-id-card-status-text {
+          font-size: 11px;
+        }
+
+        .asi-id-card-display-name {
+          font-size: clamp(28px, 4vw, 44px);
+          line-height: 1;
+        }
+
+        .asi-id-card-info-strip,
+        .asi-id-card-fact,
+        .asi-id-card-course-item,
+        .asi-id-card-status-block {
+          border-color: rgba(255,255,255,.1);
+          background: rgba(255,255,255,.035);
+        }
+
+        .asi-id-card-info-label,
+        .asi-id-card-fact-label,
+        .asi-id-card-section-title {
+          font-size: 8.5px;
+        }
+
+        .asi-id-card-info-value,
+        .asi-id-card-fact-value {
+          font-size: 12px;
+          line-height: 1.45;
+        }
+
+        .asi-id-card-status-sub {
+          font-size: 8.5px;
+        }
+
         @media (max-width: 639px) {
+          .asi-id-card-shell {
+            border-radius: 24px;
+            padding: 10px;
+          }
+
+          .asi-id-card-inner {
+            gap: 14px;
+            padding: 18px 14px;
+          }
+
+          .asi-id-card-top-row,
+          .asi-id-card-identity-row {
+            align-items: flex-start;
+          }
+
+          .asi-id-card-top-row {
+            flex-direction: column;
+          }
+
+          .asi-id-card-id-badge {
+            text-align: left;
+          }
+
+          .asi-id-card-avatar {
+            width: 78px;
+            height: 78px;
+            flex-basis: 78px;
+          }
+
+          .asi-id-card-display-name {
+            font-size: clamp(24px, 9vw, 34px);
+          }
+
+          .asi-id-card-info-strip {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
           .asi-id-card-facts-grid {
             grid-template-columns: 1fr;
           }

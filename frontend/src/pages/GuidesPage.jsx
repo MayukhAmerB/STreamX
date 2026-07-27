@@ -242,7 +242,7 @@ export default function GuidesPage() {
       subtitle="Watch admin-uploaded walkthrough videos for learning how to use the platform."
       badge="Guide Library"
       action={
-        <Link to="/my-courses" className="inline-flex">
+        <Link to="/courses?view=owned" className="inline-flex">
           <Button variant="secondary">Your Courses</Button>
         </Link>
       }

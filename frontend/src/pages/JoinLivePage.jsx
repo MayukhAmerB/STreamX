@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 import BroadcastViewerTheater from "../components/realtime/BroadcastViewerTheater";
@@ -101,8 +101,13 @@ function sessionTypeLabel(sessionType) {
 
 export default function JoinLivePage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { id: courseIdParam } = useParams();
   const [searchParams] = useSearchParams();
   const authenticatedUserId = Number(user?.id || 0) || null;
+  const courseId = useMemo(() => {
+    const parsed = Number(courseIdParam || 0);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  }, [courseIdParam]);
 
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -162,9 +167,21 @@ export default function JoinLivePage() {
     });
   }, [sessions]);
 
+  const courseSessions = useMemo(() => {
+    if (!courseId) {
+      return orderedSessions;
+    }
+    return orderedSessions.filter((session) => {
+      const linkedCourseId = Number(
+        session.linked_course?.id || session.linked_live_class?.linked_course_id || 0
+      );
+      return linkedCourseId === courseId;
+    });
+  }, [courseId, orderedSessions]);
+
   const filteredSessions = useMemo(() => {
     const trimmed = query.trim().toLowerCase();
-    return orderedSessions.filter((session) => {
+    return courseSessions.filter((session) => {
       if (mode !== "all" && session.session_type !== mode) {
         return false;
       }
@@ -177,26 +194,26 @@ export default function JoinLivePage() {
         (session.host?.full_name || "").toLowerCase().includes(trimmed)
       );
     });
-  }, [mode, orderedSessions, query]);
+  }, [courseSessions, mode, query]);
 
   const stats = useMemo(() => {
-    const liveCount = orderedSessions.filter((session) => session.status === "live").length;
-    const meetingCount = orderedSessions.filter((session) => session.session_type === "meeting").length;
-    const broadcastCount = orderedSessions.filter(
+    const liveCount = courseSessions.filter((session) => session.status === "live").length;
+    const meetingCount = courseSessions.filter((session) => session.session_type === "meeting").length;
+    const broadcastCount = courseSessions.filter(
       (session) => session.session_type === "broadcasting"
     ).length;
     return {
-      total: orderedSessions.length,
+      total: courseSessions.length,
       live: liveCount,
       meeting: meetingCount,
       broadcasting: broadcastCount,
     };
-  }, [orderedSessions]);
+  }, [courseSessions]);
 
-  const liveSchedule = useMemo(() => resolveLiveClassSchedule(orderedSessions), [orderedSessions]);
+  const liveSchedule = useMemo(() => resolveLiveClassSchedule(courseSessions), [courseSessions]);
   const joinableLiveSession = useMemo(
-    () => findJoinableLiveSession(orderedSessions),
-    [orderedSessions]
+    () => findJoinableLiveSession(courseSessions),
+    [courseSessions]
   );
 
   const handleJoin = async (sessionId) => {
@@ -491,9 +508,13 @@ export default function JoinLivePage() {
 
   return (
     <PageShell
-      title="Join Live"
-      subtitle="Access all active meetings and broadcasts from one premium live operations screen."
-      badge="LIVE ACCESS"
+      title={courseId ? "Course Live Classroom" : "Join Live"}
+      subtitle={
+        courseId
+          ? "Watch the schedule and join live sessions included with this course."
+          : "Access all active meetings and broadcasts from one premium live operations screen."
+      }
+      badge={courseId ? "COURSE LIVE" : "LIVE ACCESS"}
       decryptTitle
       containerClassName="xl:max-w-[86rem] 2xl:max-w-[92rem]"
     >

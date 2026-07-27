@@ -1,6 +1,6 @@
 from rest_framework.permissions import BasePermission
 
-from .models import Enrollment
+from .access import user_has_course_access
 
 
 class IsInstructor(BasePermission):
@@ -29,8 +29,4 @@ class IsEnrolledInCourse(BasePermission):
         course = obj.section.course
         if obj.is_preview:
             return True
-        return Enrollment.objects.filter(
-            user=request.user,
-            course=course,
-            payment_status=Enrollment.STATUS_PAID,
-        ).exists()
+        return user_has_course_access(request.user, course.id)

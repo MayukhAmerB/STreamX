@@ -5,10 +5,8 @@ import {
   fetchCsrfToken,
   fetchCurrentUser,
   acceptTerms as acceptTermsRequest,
-  googleLoginUser,
   loginUser,
   logoutUser,
-  registerUser,
 } from "../api/auth";
 import { apiData, apiMessage } from "../utils/api";
 import { markKnownRegisteredVisitor } from "../utils/knownRegisteredVisitor";
@@ -20,8 +18,6 @@ const buildTimeTurnstileSiteKey = String(import.meta.env.VITE_TURNSTILE_SITE_KEY
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [registrationEnabled, setRegistrationEnabled] = useState(false);
-  const [googleLoginEnabled, setGoogleLoginEnabled] = useState(false);
   const [webPushEnabled, setWebPushEnabled] = useState(false);
   const [webPushPublicKey, setWebPushPublicKey] = useState("");
   const [turnstileEnabled, setTurnstileEnabled] = useState(Boolean(buildTimeTurnstileSiteKey));
@@ -50,8 +46,6 @@ export function AuthProvider({ children }) {
     try {
       const response = await fetchAuthConfig();
       const data = apiData(response, {});
-      setRegistrationEnabled(Boolean(data?.registration_enabled));
-      setGoogleLoginEnabled(Boolean(data?.google_login_enabled));
       setWebPushEnabled(Boolean(data?.web_push_enabled));
       setWebPushPublicKey(String(data?.web_push_public_key || ""));
       const runtimeTurnstileSiteKey = String(data?.turnstile_site_key || "").trim();
@@ -59,8 +53,6 @@ export function AuthProvider({ children }) {
       setTurnstileEnabled(Boolean(data?.turnstile_enabled && resolvedTurnstileSiteKey));
       setTurnstileSiteKey(resolvedTurnstileSiteKey);
     } catch {
-      setRegistrationEnabled(false);
-      setGoogleLoginEnabled(false);
       setWebPushEnabled(false);
       setWebPushPublicKey("");
       setTurnstileEnabled(Boolean(buildTimeTurnstileSiteKey));
@@ -105,20 +97,6 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  const register = async (payload) => {
-    const response = await registerUser(payload);
-    const data = apiData(response);
-    setAuthenticatedUser(data);
-    return data;
-  };
-
-  const googleLogin = async (credential) => {
-    const response = await googleLoginUser({ credential });
-    const data = apiData(response);
-    setAuthenticatedUser(data);
-    return data;
-  };
-
   const logout = async () => {
     try {
       await logoutUser();
@@ -141,15 +119,11 @@ export function AuthProvider({ children }) {
       isAuthenticated: Boolean(user),
       isInstructor: user?.role === "instructor",
       isAdmin: Boolean(user?.is_admin),
-      registrationEnabled,
-      googleLoginEnabled,
       webPushEnabled,
       webPushPublicKey,
       turnstileEnabled,
       turnstileSiteKey,
       login,
-      register,
-      googleLogin,
       logout,
       acceptTerms,
       refreshUser,
@@ -159,8 +133,6 @@ export function AuthProvider({ children }) {
     [
       user,
       loading,
-      registrationEnabled,
-      googleLoginEnabled,
       webPushEnabled,
       webPushPublicKey,
       turnstileEnabled,

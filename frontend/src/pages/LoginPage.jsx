@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { GoogleLogin } from "@react-oauth/google";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { requestPasswordReset } from "../api/auth";
 import Button from "../components/Button";
@@ -20,7 +19,11 @@ function hasEdgeWhitespace(value) {
 }
 
 export default function LoginPage() {
-  const { login, googleLogin, registrationEnabled, googleLoginEnabled, turnstileEnabled, turnstileSiteKey } = useAuth();
+  const {
+    login,
+    turnstileEnabled,
+    turnstileSiteKey,
+  } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTo = location.state?.from || "/";
@@ -31,10 +34,6 @@ export default function LoginPage() {
   const [info, setInfo] = useState("");
   const [emailWhitespaceWarning, setEmailWhitespaceWarning] = useState("");
   const [needs2FA, setNeeds2FA] = useState(false);
-  const frontendGoogleOAuthEnabled = Boolean(
-    import.meta.env.VITE_GOOGLE_CLIENT_ID && String(import.meta.env.VITE_GOOGLE_CLIENT_ID).trim().toLowerCase() !== "disabled"
-  );
-  const showGoogleLogin = Boolean(googleLoginEnabled && frontendGoogleOAuthEnabled);
 
   const setNormalizedEmail = (value, { fromPaste = false } = {}) => {
     const rawValue = String(value || "");
@@ -87,16 +86,6 @@ export default function LoginPage() {
       turnstile.reset();
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleGoogleSuccess = async (credentialResponse) => {
-    setError("");
-    try {
-      await googleLogin(credentialResponse?.credential);
-      navigate(redirectTo, { replace: true });
-    } catch (err) {
-      setError(apiMessage(err, "Google login failed."));
     }
   };
 
@@ -314,42 +303,10 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            {showGoogleLogin ? (
-              <>
-                <div className="my-5 flex items-center gap-3 text-xs text-[#8F8F8F]">
-                  <div className="h-px flex-1 bg-[#303030]" />
-                  <span>OR CONTINUE WITH</span>
-                  <div className="h-px flex-1 bg-[#303030]" />
-                </div>
-
-                <div className="rounded-xl border border-black bg-[#131313] p-3">
-                  <div className="flex justify-center">
-                    <GoogleLogin
-                      onSuccess={handleGoogleSuccess}
-                      onError={() => setError("Google login failed.")}
-                    />
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="my-5 rounded-xl border border-black bg-[#131313] px-4 py-3 text-xs text-[#949494]">
-                Google sign-in is currently disabled.
-              </div>
-            )}
-
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-black bg-[#131313] px-4 py-3">
-              {registrationEnabled ? (
-                <p className="text-sm text-[#BBBBBB]">
-                  New here?{" "}
-                  <Link to="/register" className="font-semibold text-white hover:underline">
-                    Create account
-                  </Link>
-                </p>
-              ) : (
-                <p className="text-sm text-[#BBBBBB]">
-                  Account creation is managed by admin. Use provided credentials.
-                </p>
-              )}
+              <p className="text-sm text-[#BBBBBB]">
+                Account creation is managed by admin. Use the credentials issued after verification.
+              </p>
               <Link
                 to="/courses"
                 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#DBDBDB] hover:text-white"

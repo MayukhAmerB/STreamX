@@ -5,7 +5,6 @@ import { resolveDjangoAdminUrl } from "../utils/backendUrl";
 import Button from "./Button";
 import BrandLogo from "./BrandLogo";
 import NotificationBell from "./NotificationBell";
-import { requestLandingPublicEnrollmentPrompt } from "../utils/publicEnrollmentPrompt";
 
 const navClass = ({ isActive }) =>
   `text-sm ${
@@ -15,7 +14,7 @@ const navClass = ({ isActive }) =>
   } transition font-medium`;
 
 export default function Navbar() {
-  const { user, isAuthenticated, isInstructor, isAdmin, registrationEnabled, logout } = useAuth();
+  const { user, isAuthenticated, isInstructor, isAdmin, logout } = useAuth();
   const canAccessControls = Boolean(isAdmin || isInstructor);
   const navigate = useNavigate();
   const location = useLocation();
@@ -23,13 +22,6 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const djangoAdminUrl = resolveDjangoAdminUrl();
-
-  const openLandingGuestEnrollment = (event, title) => {
-    if (isAuthenticated) return;
-    event.preventDefault();
-    requestLandingPublicEnrollmentPrompt({ type: "general", title });
-    setMobileMenuOpen(false);
-  };
 
   useEffect(() => {
     setMenuOpen(false);
@@ -64,27 +56,14 @@ export default function Navbar() {
         <BrandLogo className="min-w-0 flex-1 lg:flex-none" />
         <nav className="hidden items-center gap-5 lg:flex">
           <NavLink
-            to="/live-classes"
-            className={navClass}
-            onClick={(event) => openLandingGuestEnrollment(event, "Live Classes")}
-          >
-            Live Classes
-          </NavLink>
-          <NavLink
             to="/courses"
             className={navClass}
-            onClick={(event) => openLandingGuestEnrollment(event, "Courses")}
           >
             Courses
           </NavLink>
           {isAuthenticated ? (
             <NavLink to="/guides" className={navClass}>
               Guides
-            </NavLink>
-          ) : null}
-          {isAuthenticated ? (
-            <NavLink to="/join-live" className={navClass}>
-              Join Live
             </NavLink>
           ) : null}
           <NavLink to="/about" className={navClass}>
@@ -115,7 +94,7 @@ export default function Navbar() {
               {menuOpen ? (
                 <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-black panel-gradient shadow-[0_16px_35px_rgba(0,0,0,0.36)]">
                   <Link
-                    to="/my-courses"
+                    to="/courses?view=owned"
                     className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
                   >
                       Your Courses
@@ -137,12 +116,6 @@ export default function Navbar() {
                     className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
                   >
                     ID Card
-                  </Link>
-                  <Link
-                    to="/join-live"
-                    className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
-                  >
-                    Join Live
                   </Link>
                   {isInstructor ? (
                     <Link
@@ -211,16 +184,6 @@ export default function Navbar() {
                   Login
                 </Button>
               </Link>
-              {registrationEnabled ? (
-                <Link to="/register" className="hidden sm:block">
-                  <Button
-                    variant="indigo"
-                    className="border border-[#D8D8D8] bg-[#EFEFEF] text-[#121212] shadow-none hover:bg-white"
-                  >
-                    Register
-                  </Button>
-                </Link>
-              ) : null}
             </div>
           )}
           <button
@@ -257,27 +220,14 @@ export default function Navbar() {
         <div className="mx-auto mt-1 max-h-[calc(100dvh-4.75rem-env(safe-area-inset-top))] max-w-7xl overflow-y-auto overscroll-contain rounded-2xl border border-black panel-gradient p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-[0_18px_34px_rgba(0,0,0,0.34)] backdrop-blur lg:hidden">
           <nav className="grid gap-1">
             <NavLink
-              to="/live-classes"
-              className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]"
-              onClick={(event) => openLandingGuestEnrollment(event, "Live Classes")}
-            >
-              Live Classes
-            </NavLink>
-            <NavLink
               to="/courses"
               className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]"
-              onClick={(event) => openLandingGuestEnrollment(event, "Courses")}
             >
               Courses
             </NavLink>
             {isAuthenticated ? (
               <NavLink to="/guides" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                 Guides
-              </NavLink>
-            ) : null}
-            {isAuthenticated ? (
-              <NavLink to="/join-live" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-                Join Live
               </NavLink>
             ) : null}
             <NavLink to="/about" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
@@ -302,7 +252,7 @@ export default function Navbar() {
                   <div className="mt-0.5 truncate text-[#A4A4A4]">{user?.email}</div>
                 </div>
                 <div className="grid gap-1">
-                    <Link to="/my-courses" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+                    <Link to="/courses?view=owned" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                       Your Courses
                   </Link>
                   <Link to="/guides" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
@@ -367,13 +317,6 @@ export default function Navbar() {
                 <Link to="/login" className="block">
                   <Button className="w-full">Login</Button>
                 </Link>
-                {registrationEnabled ? (
-                  <Link to="/register" className="block">
-                    <Button variant="secondary" className="w-full">
-                      Register
-                    </Button>
-                  </Link>
-                ) : null}
               </div>
             )}
           </div>

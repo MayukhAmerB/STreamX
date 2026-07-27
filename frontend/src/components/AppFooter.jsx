@@ -4,7 +4,7 @@ import BrandLogo from "./BrandLogo";
 const quickLinks = [
   { label: "Home", to: "/" },
   { label: "Courses", to: "/courses" },
-  { label: "Live Classes", to: "/live-classes" },
+  { label: "My Learning", to: "/courses?view=owned" },
   { label: "Hall of Fame", to: "/hall-of-fame" },
 ];
 

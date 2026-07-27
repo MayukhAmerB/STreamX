@@ -2,7 +2,7 @@
 from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings
 from django.core.mail import EmailMessage
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_bytes, force_str
@@ -27,11 +27,9 @@ from config.turnstile import enforce_turnstile, turnstile_public_config
 
 from .async_jobs import async_jobs_enabled, enqueue_email_job
 from .serializers import (
-    GoogleLoginSerializer,
     LoginSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
-    RegisterSerializer,
     ContactMessageSerializer,
     ChangePasswordSerializer,
     ProfileUpdateSerializer,
@@ -40,7 +38,7 @@ from .serializers import (
     TwoFactorDisableSerializer,
     UserSerializer,
 )
-from .models import AuthConfiguration, TermsAcceptance
+from .models import TermsAcceptance
 from .security import clear_failed_login, get_lockout_state, register_failed_login
 from .session_policy import (
     SESSION_VERSION_CLAIM,
@@ -48,14 +46,9 @@ from .session_policy import (
     should_enforce_single_session,
     token_matches_active_session,
 )
-from .services import GoogleAuthError, verify_google_credential
 from .terms import TERMS_BODY, TERMS_LAST_UPDATED, TERMS_TITLE, TERMS_VERSION
 
 User = get_user_model()
-
-
-def _registration_enabled():
-    return bool(AuthConfiguration.get_solo().registration_enabled)
 
 
 def _self_service_credentials_enabled():
@@ -156,31 +149,17 @@ def _auth_success_response(user, message, request=None, *, rotate_session=True):
     return _attach_csrf_token(response, request)
 
 
-class RegisterView(APIView):
-    permission_classes = [permissions.AllowAny]
-    parser_classes = [JSONParser]
-
-    def post(self, request):
-        if not _registration_enabled():
-            return api_response(
-                success=False,
-                message="Registration is currently disabled.",
-                errors={"detail": "Only admin-created accounts can log in right now."},
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
-        turnstile_response = enforce_turnstile(request, action="register")
-        if turnstile_response is not None:
-            return turnstile_response
-        serializer = RegisterSerializer(data=request.data)
-        if not serializer.is_valid():
-            return api_response(
-                success=False,
-                message="Registration failed.",
-                errors=serializer.errors,
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-        user = serializer.save()
-        return _auth_success_response(user, "Registration successful.", request=request)
+def _mobile_auth_success_response(user, message, request=None, *, rotate_session=True):
+    access, refresh = _issue_tokens_for_user(user, rotate_session=rotate_session)
+    return api_response(
+        success=True,
+        message=message,
+        data={
+            "user": _serialize_user(user, request=request),
+            "tokens": {"access": access, "refresh": refresh},
+        },
+        status_code=status.HTTP_200_OK,
+    )
 
 
 class LoginView(APIView):
@@ -247,6 +226,135 @@ class LoginView(APIView):
         clear_failed_login(email, request)
         log_security_event("auth.login_success", request=request, target_user_id=user.id, target_email=user.email)
         return _auth_success_response(user, "Login successful.", request=request)
+
+
+class MobileLoginView(APIView):
+    """Bearer-token login for trusted native clients; web cookie auth is unchanged."""
+
+    permission_classes = [permissions.AllowAny]
+    parser_classes = [JSONParser]
+    throttle_classes = [LoginRateThrottle, ScopedRateThrottle]
+    throttle_scope = "login"
+
+    def post(self, request):
+        if request.query_params:
+            return api_response(
+                success=False,
+                message="Login failed.",
+                errors={"detail": "Credentials must not be sent in URL query parameters."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        email = User.objects.normalize_auth_email(request.data.get("email", ""))
+        is_locked, attempts, max_failures = get_lockout_state(email, request)
+        if is_locked:
+            log_security_event(
+                "auth.mobile_login_locked",
+                request=request,
+                email=email or None,
+                attempts=attempts,
+                max_failures=max_failures,
+            )
+            return api_response(
+                success=False,
+                message="Login temporarily blocked due to repeated failed attempts.",
+                errors={
+                    "detail": "Too many failed login attempts. Please wait and try again.",
+                    "code": "login_temporarily_locked",
+                },
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        serializer = LoginSerializer(data=request.data, context={"request": request})
+        if not serializer.is_valid():
+            attempts = register_failed_login(email, request)
+            log_security_event(
+                "auth.mobile_login_failed",
+                request=request,
+                email=email or None,
+                attempts=attempts,
+                errors=serializer.errors,
+            )
+            return api_response(
+                success=False,
+                message="Login failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = serializer.validated_data["user"]
+        clear_failed_login(email, request)
+        log_security_event(
+            "auth.mobile_login_success",
+            request=request,
+            target_user_id=user.id,
+            target_email=user.email,
+        )
+        return _mobile_auth_success_response(user, "Login successful.", request=request)
+
+
+class MobileRefreshTokenView(APIView):
+    permission_classes = [permissions.AllowAny]
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        refresh_token = str(request.data.get("refresh", "")).strip()
+        if not refresh_token:
+            return api_response(
+                success=False,
+                message="Refresh token missing.",
+                errors={"detail": "Refresh token missing."},
+                status_code=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        try:
+            refresh = RefreshToken(refresh_token)
+            user = User.objects.get(id=refresh["user_id"])
+        except (TokenError, User.DoesNotExist, KeyError) as exc:
+            return api_response(
+                success=False,
+                message="Invalid refresh token.",
+                errors={"detail": str(exc)},
+                status_code=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if not token_matches_active_session(refresh, user):
+            _blacklist_refresh_token_string(refresh_token)
+            return api_response(
+                success=False,
+                message="Session expired.",
+                errors={"detail": "This account is active on another device. Please log in again."},
+                status_code=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        issued_refresh = refresh
+        if bool(getattr(settings, "SIMPLE_JWT", {}).get("ROTATE_REFRESH_TOKENS", False)):
+            if bool(getattr(settings, "SIMPLE_JWT", {}).get("BLACKLIST_AFTER_ROTATION", False)):
+                _blacklist_refresh_token_string(refresh_token)
+            issued_refresh = RefreshToken.for_user(user)
+            if should_enforce_single_session(user):
+                issued_refresh[SESSION_VERSION_CLAIM] = get_active_session_version(user)
+
+        return api_response(
+            success=True,
+            message="Token refreshed.",
+            data={
+                "user": _serialize_user(user, request=request),
+                "tokens": {
+                    "access": str(issued_refresh.access_token),
+                    "refresh": str(issued_refresh),
+                },
+            },
+        )
+
+
+class MobileLogoutView(APIView):
+    permission_classes = [permissions.AllowAny]
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        _blacklist_refresh_token_string(request.data.get("refresh"))
+        return api_response(success=True, message="Logged out successfully.", data=None)
 
 
 class LogoutView(APIView):
@@ -320,77 +428,6 @@ class CurrentUserView(APIView):
         return _attach_csrf_token(response, request)
 
 
-class GoogleLoginView(APIView):
-    permission_classes = [permissions.AllowAny]
-    parser_classes = [JSONParser]
-
-    def post(self, request):
-        serializer = GoogleLoginSerializer(data=request.data)
-        if not serializer.is_valid():
-            return api_response(
-                success=False,
-                message="Google login failed.",
-                errors=serializer.errors,
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-        try:
-            info = verify_google_credential(serializer.validated_data["credential"])
-        except GoogleAuthError as exc:
-            return api_response(
-                success=False,
-                message="Google login failed.",
-                errors={"detail": str(exc)},
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-        email = User.objects.normalize_auth_email(info.get("email"))
-        if not email:
-            return api_response(
-                success=False,
-                message="Google login failed.",
-                errors={"detail": "Google account email is unavailable."},
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-        existing_user = User.objects.filter(email__iexact=email).first()
-        if existing_user is None and not _registration_enabled():
-            return api_response(
-                success=False,
-                message="Registration is currently disabled.",
-                errors={"detail": "Only admin-created accounts can log in right now."},
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
-
-        if existing_user is None:
-            user = User.objects.create_user(
-                email=email,
-                password=None,
-                full_name=info.get("name", email.split("@")[0]),
-                role=User.ROLE_STUDENT,
-                oauth_provider="google",
-                oauth_provider_uid=info.get("sub", ""),
-            )
-            created = True
-        else:
-            user = existing_user
-            created = False
-            updated = False
-            oauth_provider_needs_update = not user.oauth_provider
-            oauth_uid_needs_update = bool(info.get("sub") and user.oauth_provider_uid != info.get("sub"))
-            if oauth_provider_needs_update:
-                user.oauth_provider = "google"
-                updated = True
-            if oauth_uid_needs_update:
-                user.oauth_provider_uid = info["sub"]
-                updated = True
-            if updated:
-                update_fields = ["updated_at"]
-                if oauth_provider_needs_update:
-                    update_fields.append("oauth_provider")
-                if oauth_uid_needs_update:
-                    update_fields.append("oauth_provider_uid")
-                user.save(update_fields=list(dict.fromkeys(update_fields)))
-        return _auth_success_response(user, "Google login successful.", request=request)
-
-
 class AuthConfigView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -399,8 +436,6 @@ class AuthConfigView(APIView):
             success=True,
             message="Auth configuration fetched.",
             data={
-                "registration_enabled": _registration_enabled(),
-                "google_login_enabled": bool(getattr(settings, "GOOGLE_CLIENT_ID", "").strip()),
                 "terms_version": TERMS_VERSION,
                 "terms_last_updated": TERMS_LAST_UPDATED,
                 "web_push_enabled": bool(

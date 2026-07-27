@@ -111,6 +111,7 @@ class WebhookRetryQueueTests(APITestCase):
                         "order_id": "order_test",
                         "status": "captured",
                         "amount": 10000,
+                        "currency": "INR",
                     }
                 }
             },

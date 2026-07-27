@@ -4,11 +4,9 @@ export const fetchAuthConfig = () => apiClient.get("/auth/config/");
 export const fetchCsrfToken = () => apiClient.get("/auth/csrf/");
 export const fetchTerms = () => apiClient.get("/auth/terms/");
 export const acceptTerms = (payload) => apiClient.post("/auth/terms/accept/", payload);
-export const registerUser = (payload) => apiClient.post("/auth/register/", payload);
 export const loginUser = (payload) => apiClient.post("/auth/login/", payload);
 export const logoutUser = () => apiClient.post("/auth/logout/");
 export const fetchCurrentUser = () => apiClient.get("/auth/user/");
-export const googleLoginUser = (payload) => apiClient.post("/auth/google/", payload);
 export const requestPasswordReset = (payload) => apiClient.post("/auth/password-reset/", payload);
 export const confirmPasswordReset = (payload) =>
   apiClient.post("/auth/password-reset-confirm/", payload);

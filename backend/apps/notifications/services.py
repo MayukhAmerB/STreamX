@@ -101,20 +101,23 @@ def create_notification(
 def course_enrolled_user_ids(course):
     if not course or not getattr(course, "pk", None):
         return []
+    from apps.courses.access import active_enrollment_q
     from apps.courses.models import Enrollment
 
     return list(
         Enrollment.objects.filter(
             course=course,
-            payment_status=Enrollment.STATUS_PAID,
             user__is_active=True,
-        ).values_list("user_id", flat=True)
+        )
+        .filter(active_enrollment_q())
+        .values_list("user_id", flat=True)
     )
 
 
 def live_class_recipient_user_ids(live_class):
     if not live_class or not getattr(live_class, "pk", None):
         return []
+    from apps.courses.access import active_enrollment_q
     from apps.courses.models import Enrollment, LiveClassEnrollment
 
     user_ids = list(
@@ -129,9 +132,10 @@ def live_class_recipient_user_ids(live_class):
         user_ids.extend(
             Enrollment.objects.filter(
                 course=linked_course,
-                payment_status=Enrollment.STATUS_PAID,
                 user__is_active=True,
-            ).values_list("user_id", flat=True)
+            )
+            .filter(active_enrollment_q())
+            .values_list("user_id", flat=True)
         )
     return _dedupe_user_ids(user_ids)
 

@@ -2,6 +2,7 @@ import ast
 import json
 
 from django import forms
+from django.conf import settings
 from django.contrib import admin, messages
 from django.db.models import Count
 from django.urls import reverse
@@ -289,9 +290,28 @@ class GuideVideoAdmin(admin.ModelAdmin):
     )
 
 
+class LiveClassInline(admin.TabularInline):
+    model = LiveClass
+    fk_name = "linked_course"
+    extra = 0
+    show_change_link = True
+    fields = (
+        "title",
+        "level",
+        "month_number",
+        "schedule_days",
+        "class_duration_minutes",
+        "is_active",
+    )
+    ordering = ("month_number", "id")
+    verbose_name = "Included Live Class"
+    verbose_name_plural = "Live Classes Included With This Course"
+
+
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
     form = CourseAdminForm
+    inlines = (LiveClassInline,)
     list_display = (
         "id",
         "title",
@@ -299,6 +319,7 @@ class CourseAdmin(admin.ModelAdmin):
         "level",
         "launch_status",
         "price",
+        "purchase_readiness",
         "is_published",
         "instructor",
         "section_count",
@@ -314,6 +335,7 @@ class CourseAdmin(admin.ModelAdmin):
         "slug",
         "frontend_container_guide",
         "enrollment_container_source",
+        "purchase_readiness",
         "thumbnail_preview",
         "instructor_admin_link",
         "section_count_display",
@@ -352,6 +374,12 @@ class CourseAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "price",
+                    "full_payment_enabled",
+                    "installment_payment_enabled",
+                    "monthly_price",
+                    "installments_required",
+                    "installment_access_days",
+                    "purchase_readiness",
                     "about_the_course",
                 )
             },
@@ -433,6 +461,37 @@ class CourseAdmin(admin.ModelAdmin):
         initial.setdefault("is_published", True)
         initial.setdefault("launch_status", Course.STATUS_LIVE)
         return initial
+
+    @admin.display(description="Purchase Readiness")
+    def purchase_readiness(self, obj):
+        if not obj or not getattr(obj, "pk", None):
+            return "Save the course to evaluate checkout readiness."
+
+        blockers = []
+        if not getattr(settings, "DIRECT_COURSE_PAYMENTS_ENABLED", False):
+            blockers.append("direct payments disabled")
+        if not getattr(settings, "RAZORPAY_KEY_ID", "") or not getattr(
+            settings, "RAZORPAY_KEY_SECRET", ""
+        ):
+            blockers.append("Razorpay credentials missing")
+        if not obj.is_published:
+            blockers.append("course unpublished")
+        if obj.launch_status != Course.STATUS_LIVE:
+            blockers.append("course not live")
+        full_ready = bool(obj.full_payment_enabled)
+        monthly_ready = bool(obj.installment_payment_enabled)
+        if not (full_ready or monthly_ready):
+            blockers.append("enable at least one payment plan")
+
+        if blockers:
+            return format_html(
+                '<span style="color:#b42318;font-weight:700">Blocked:</span> {}',
+                ", ".join(blockers),
+            )
+
+        return format_html(
+            '<span style="color:#067647;font-weight:700">Ready for secure purchase</span>'
+        )
 
     @admin.display(ordering="_section_count", description="Modules")
     def section_count(self, obj):
@@ -807,9 +866,12 @@ class EnrollmentAdmin(admin.ModelAdmin):
         "requester_phone",
         "course",
         "payment_status",
+        "access_type",
+        "access_expires_at",
+        "installments_paid",
         "enrolled_at",
     )
-    list_filter = ("payment_status", "course__category", "course__level")
+    list_filter = ("payment_status", "access_type", "course__category", "course__level")
     search_fields = ("user__email", "user__full_name", "user__phone_number", "course__title")
     list_editable = ("payment_status",)
     raw_id_fields = ("user", "course")
@@ -817,7 +879,18 @@ class EnrollmentAdmin(admin.ModelAdmin):
     list_per_page = 50
     actions = ("approve_enrollment_requests", "reject_enrollment_requests")
 
-    fields = ("requester_username", "requester_email", "requester_phone", "user", "course", "payment_status", "enrolled_at")
+    fields = (
+        "requester_username",
+        "requester_email",
+        "requester_phone",
+        "user",
+        "course",
+        "payment_status",
+        "access_type",
+        "access_expires_at",
+        "installments_paid",
+        "enrolled_at",
+    )
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("user", "course")
@@ -887,6 +960,7 @@ class LiveClassAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "title",
+        "access_model",
         "price",
         "month_number",
         "level",
@@ -904,6 +978,17 @@ class LiveClassAdmin(admin.ModelAdmin):
     readonly_fields = ("slug", "enrollment_count_display", "created_at", "updated_at")
     fieldsets = (
         (
+            "Student Access Model",
+            {
+                "description": (
+                    "Link this live class to a course for the simplified workflow. "
+                    "Students with paid course access receive this live class automatically. "
+                    "Leave it unlinked only for legacy standalone access."
+                ),
+                "fields": ("linked_course",),
+            },
+        ),
+        (
             "Live Class",
             {
                 "fields": (
@@ -911,7 +996,6 @@ class LiveClassAdmin(admin.ModelAdmin):
                     "slug",
                     "description",
                     "price",
-                    "linked_course",
                     "level",
                     "month_number",
                 )
@@ -930,6 +1014,10 @@ class LiveClassAdmin(admin.ModelAdmin):
     @admin.display(ordering="_enrollment_count", description="Enrollments")
     def enrollment_count(self, obj):
         return getattr(obj, "_enrollment_count", None) or obj.enrollments.count()
+
+    @admin.display(ordering="linked_course", description="Student Access")
+    def access_model(self, obj):
+        return "Included with course" if obj.linked_course_id else "Legacy standalone"
 
     @admin.display(description="Enrollment Count")
     def enrollment_count_display(self, obj):

@@ -870,7 +870,7 @@ export default function OsintToolsPage() {
       subtitle="A categorized student reference for choosing the right research tool for the clue in front of you."
       badge="Student Toolkit"
       action={
-        <Link to="/my-courses" className="inline-flex">
+        <Link to="/courses?view=owned" className="inline-flex">
           <Button variant="secondary">Back To Your Courses</Button>
         </Link>
       }

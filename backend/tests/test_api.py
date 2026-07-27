@@ -43,6 +43,8 @@ from apps.courses.models import (
 from apps.courses.serializers import LectureSerializer
 from apps.courses.services import transcode_lecture_to_hls
 from apps.payments.models import Payment
+from apps.payments.provisioning import provision_paid_payment
+from apps.payments.services import RazorpayServiceError
 from apps.realtime import domain as realtime_domain
 from apps.realtime import services as realtime_services
 from apps.realtime.models import (
@@ -52,7 +54,7 @@ from apps.realtime.models import (
     RealtimeSessionRecording,
 )
 from apps.notifications.models import Notification, NotificationRecipient, WebPushSubscription
-from apps.users.models import AuthConfiguration, User
+from apps.users.models import User
 from apps.users.serializers import ProfileUpdateSerializer
 from apps.users.terms import TERMS_BODY, TERMS_VERSION
 
@@ -236,14 +238,14 @@ class AuthTests(APITestCase):
         self.assertFalse(response.data["success"])
         self.assertTrue(response.data["csrf_token"])
 
-    def test_auth_config_endpoint_reflects_registration_toggle(self):
-        config = AuthConfiguration.get_solo()
-        config.registration_enabled = False
-        config.save(update_fields=["registration_enabled", "updated_at"])
+    def test_auth_config_endpoint_does_not_expose_registration_or_oauth(self):
         response = self.client.get(reverse("auth-config"))
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.data["data"]["registration_enabled"])
-        self.assertEqual(response.data["data"]["terms_version"], TERMS_VERSION)
+        data = response.data["data"]
+        self.assertNotIn("registration_enabled", data)
+        self.assertNotIn("google_login_enabled", data)
+        self.assertNotIn("auth0_enabled", data)
+        self.assertEqual(data["terms_version"], TERMS_VERSION)
 
     @override_settings(
         TURNSTILE_ENABLED=True,
@@ -323,27 +325,13 @@ class AuthTests(APITestCase):
         user.refresh_from_db()
         self.assertEqual(user.terms_accepted_version, "")
 
-    def test_register_and_login_sets_jwt_cookies(self):
-        config = AuthConfiguration.get_solo()
-        config.registration_enabled = True
-        config.save(update_fields=["registration_enabled", "updated_at"])
-
-        register_resp = self.client.post(
-            reverse("auth-register"),
-            {
-                "email": "newuser@test.com",
-                "full_name": "New User",
-                "password": "StrongPass@123",
-                "role": "student",
-            },
-            format="json",
+    def test_admin_created_user_login_sets_jwt_cookies(self):
+        User.objects.create_user(
+            email="newuser@test.com",
+            full_name="New User",
+            password="StrongPass@123",
+            role=User.ROLE_STUDENT,
         )
-        self.assertEqual(register_resp.status_code, 200)
-        self.assertIn("access_token", register_resp.cookies)
-        self.assertIn("refresh_token", register_resp.cookies)
-        self.assertIn("csrftoken", register_resp.cookies)
-
-        self.client.post(reverse("auth-logout"))
         login_resp = self.client.post(
             reverse("auth-login"),
             {"email": "newuser@test.com", "password": "StrongPass@123"},
@@ -370,87 +358,27 @@ class AuthTests(APITestCase):
         self.assertEqual(login_resp.status_code, 200)
         self.assertTrue(login_resp.data["success"])
 
-    @override_settings(GOOGLE_CLIENT_ID="google-client-id")
-    @patch("apps.users.views.verify_google_credential")
-    def test_google_login_matches_existing_user_case_insensitively(self, mock_verify_google):
-        existing_user = User.objects.create_user(
-            email="MixedCaseGoogle@Test.com",
-            password="StrongPass@123",
-            full_name="Existing Google User",
-            role=User.ROLE_STUDENT,
-        )
-        mock_verify_google.return_value = {
-            "email": "mixedcasegoogle@test.com",
-            "name": "Existing Google User",
-            "sub": "google-existing-1",
-        }
-
-        response = self.client.post(
-            reverse("auth-google"),
-            {"credential": "dummy"},
-            format="json",
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(User.objects.filter(email__iexact="mixedcasegoogle@test.com").count(), 1)
-
-        existing_user.refresh_from_db()
-        self.assertEqual(existing_user.email, "mixedcasegoogle@test.com")
-        self.assertEqual(existing_user.oauth_provider, "google")
-        self.assertEqual(existing_user.oauth_provider_uid, "google-existing-1")
-
-    def test_register_cannot_elevate_role_to_instructor(self):
-        config = AuthConfiguration.get_solo()
-        config.registration_enabled = True
-        config.save(update_fields=["registration_enabled", "updated_at"])
-
-        register_resp = self.client.post(
-            reverse("auth-register"),
-            {
-                "email": "rolecheck@test.com",
-                "full_name": "Role Check",
-                "password": "StrongPass@123",
-                "role": "instructor",
-            },
-            format="json",
-        )
-        self.assertEqual(register_resp.status_code, 200)
-        created_user = User.objects.get(email="rolecheck@test.com")
-        self.assertEqual(created_user.role, User.ROLE_STUDENT)
-
-    @override_settings(GOOGLE_CLIENT_ID="google-client-id")
-    @patch("apps.users.views.verify_google_credential")
-    def test_google_signup_cannot_elevate_role_to_instructor(self, mock_verify_google):
-        config = AuthConfiguration.get_solo()
-        config.registration_enabled = True
-        config.save(update_fields=["registration_enabled", "updated_at"])
-
-        mock_verify_google.return_value = {
-            "email": "google-role@test.com",
-            "name": "Google Role",
-            "sub": "google-subject-1",
-        }
-        response = self.client.post(
-            reverse("auth-google"),
-            {"credential": "dummy", "role": "instructor"},
-            format="json",
-        )
-        self.assertEqual(response.status_code, 200)
-        created_user = User.objects.get(email="google-role@test.com")
-        self.assertEqual(created_user.role, User.ROLE_STUDENT)
+    def test_public_registration_and_oauth_routes_are_absent(self):
+        for endpoint in (
+            "/api/auth/register/",
+            "/api/auth/google/",
+            "/api/auth/auth0/",
+            "/api/auth/auth0/link/",
+        ):
+            response = self.client.post(endpoint, {}, format="json")
+            self.assertEqual(response.status_code, 404)
 
     def test_logout_blacklists_refresh_token(self):
-        config = AuthConfiguration.get_solo()
-        config.registration_enabled = True
-        config.save(update_fields=["registration_enabled", "updated_at"])
-
+        user = User.objects.create_user(
+            email="logoutblacklist@test.com",
+            full_name="Logout Blacklist",
+            password="StrongPass@123",
+            role=User.ROLE_STUDENT,
+        )
+        mark_terms_accepted(user)
         self.client.post(
-            reverse("auth-register"),
-            {
-                "email": "logoutblacklist@test.com",
-                "full_name": "Logout Blacklist",
-                "password": "StrongPass@123",
-                "role": "student",
-            },
+            reverse("auth-login"),
+            {"email": user.email, "password": "StrongPass@123"},
             format="json",
         )
         issued_refresh = self.client.cookies.get("refresh_token").value
@@ -602,13 +530,9 @@ class AuthTests(APITestCase):
         stale_refresh = stale_client.post(reverse("auth-refresh"), {}, format="json")
         self.assertEqual(stale_refresh.status_code, 401)
 
-    def test_register_is_blocked_when_disabled(self):
-        config = AuthConfiguration.get_solo()
-        config.registration_enabled = False
-        config.save(update_fields=["registration_enabled", "updated_at"])
-
+    def test_register_route_is_not_available(self):
         response = self.client.post(
-            reverse("auth-register"),
+            "/api/auth/register/",
             {
                 "email": "blocked@test.com",
                 "full_name": "Blocked User",
@@ -617,8 +541,7 @@ class AuthTests(APITestCase):
             },
             format="json",
         )
-        self.assertEqual(response.status_code, 403)
-        self.assertFalse(response.data["success"])
+        self.assertEqual(response.status_code, 404)
 
     def test_login_rejects_credentials_in_url_query_string(self):
         user = User.objects.create_user(
@@ -1557,10 +1480,302 @@ class InstructorDeletionSafetyTests(APITestCase):
         self.assertIn(course.id, returned_ids)
 
 
+@override_settings(
+    DIRECT_COURSE_PAYMENTS_ENABLED=True,
+    RAZORPAY_KEY_ID="rzp_test_public",
+    RAZORPAY_KEY_SECRET="test-secret",
+    COURSE_MONTHLY_PRICE_INR=1500,
+    COURSE_FULL_PRICE_INR=3500,
+    PAYMENT_SUPPORT_WHATSAPP_NUMBER="919970875040",
+)
 class PaymentVerificationTests(BaseAPITestCase):
+    def checkout_payload(self, **overrides):
+        payload = {
+            "course_id": self.course.id,
+            "buyer_name": "Test Student",
+            "buyer_email": "buyer@example.com",
+            "whatsapp_number": "+91 98765 43210",
+            "alternate_number": "+91 91234 56789",
+            "age": 24,
+            "country": "India",
+            "state": "West Bengal",
+            "city": "Kolkata",
+            "pincode": "700001",
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_guest_monthly_payments_create_controlled_account_and_become_lifetime(self):
+        unrelated = User.objects.create_user(
+            email="buyer@example.com",
+            password="MustNotBeReused@123",
+            full_name="Existing Unrelated User",
+            role=User.ROLE_STUDENT,
+        )
+        generated_user = None
+        first_expiry = None
+
+        for installment in range(1, 4):
+            payment = Payment.objects.create(
+                course=self.course,
+                buyer_name="Guest Buyer",
+                buyer_email="buyer@example.com",
+                whatsapp_number="+91 98765 43210",
+                amount=self.course.monthly_price,
+                currency="INR",
+                plan=Payment.PLAN_MONTHLY,
+                status=Payment.STATUS_PAID,
+                razorpay_order_id=f"order_guest_monthly_{installment}",
+                razorpay_payment_id=f"pay_guest_monthly_{installment}",
+                paid_at=timezone.now(),
+            )
+
+            enrollment = provision_paid_payment(payment)
+            payment.refresh_from_db()
+            enrollment.refresh_from_db()
+
+            if generated_user is None:
+                generated_user = payment.user
+                first_expiry = enrollment.access_expires_at
+                self.assertRegex(generated_user.email, r"^adl-\d{4,}@adlfront\.com$")
+                self.assertFalse(generated_user.has_usable_password())
+                self.assertNotEqual(generated_user.id, unrelated.id)
+                self.assertEqual(enrollment.access_type, Enrollment.ACCESS_INSTALLMENT)
+                self.assertTrue(enrollment.has_active_access())
+            else:
+                self.assertEqual(payment.user_id, generated_user.id)
+
+            self.assertEqual(payment.installment_number, installment)
+            self.assertEqual(enrollment.installments_paid, installment)
+
+        self.assertEqual(enrollment.access_type, Enrollment.ACCESS_LIFETIME)
+        self.assertIsNone(enrollment.access_expires_at)
+        self.assertTrue(enrollment.has_active_access())
+        self.assertGreater(first_expiry, timezone.now())
+
+    def test_expired_installment_denies_access_without_deleting_enrollment(self):
+        enrollment = Enrollment.objects.create(
+            user=self.student,
+            course=self.course,
+            payment_status=Enrollment.STATUS_PAID,
+            access_type=Enrollment.ACCESS_INSTALLMENT,
+            access_expires_at=timezone.now() - timedelta(seconds=1),
+            installments_paid=1,
+        )
+
+        self.assertFalse(enrollment.has_active_access())
+        self.login(self.student.email)
+        response = self.client.get(reverse("my-courses"))
+        self.assertEqual(response.status_code, 200)
+        returned_ids = {item["id"] for item in response.data["data"]}
+        self.assertNotIn(self.course.id, returned_ids)
+
+    @patch("apps.payments.views.create_razorpay_order")
+    def test_create_order_uses_fixed_backend_price_and_returns_public_key(self, mock_create_order):
+        mock_create_order.return_value = {
+            "id": "order_server_priced",
+            "amount": 350000,
+            "currency": "INR",
+        }
+        self.login(self.student.email)
+
+        response = self.client.post(
+            reverse("payment-create-order"),
+            self.checkout_payload(amount=1),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["data"]["amount"], 350000)
+        self.assertEqual(response.data["data"]["key_id"], "rzp_test_public")
+        payment = Payment.objects.get()
+        self.assertEqual(payment.amount, Decimal("3500.00"))
+        self.assertEqual(payment.buyer_name, "Test Student")
+        self.assertEqual(payment.buyer_email, "buyer@example.com")
+        self.assertEqual(payment.whatsapp_number, "+91 98765 43210")
+        self.assertEqual(payment.alternate_number, "+91 91234 56789")
+        self.assertEqual(payment.age, 24)
+        self.assertEqual(payment.country, "India")
+        self.assertEqual(payment.state, "West Bengal")
+        self.assertEqual(payment.city, "Kolkata")
+        self.assertEqual(payment.pincode, "700001")
+        self.assertEqual(payment.user_email_snapshot, self.student.email)
+        self.assertEqual(payment.course_id_snapshot, self.course.id)
+        self.assertEqual(payment.course_title_snapshot, self.course.title)
+        self.assertEqual(payment.gateway_details["order"]["id"], "order_server_priced")
+        self.assertTrue(payment.internal_reference)
+        self.assertEqual(
+            response.data["data"]["checkout_profile"],
+            {
+                "name": "Test Student",
+                "email": "buyer@example.com",
+                "contact": "+91 98765 43210",
+            },
+        )
+        self.assertEqual(mock_create_order.call_args.kwargs["amount_paise"], 350000)
+
+    @patch("apps.payments.views.create_razorpay_order")
+    def test_guest_can_create_monthly_order_without_linking_an_existing_user(self, mock_create_order):
+        existing_user = User.objects.create_user(
+            email="buyer@example.com",
+            password="ExistingUser@123",
+            full_name="Existing User",
+            role=User.ROLE_STUDENT,
+        )
+        mock_create_order.return_value = {
+            "id": "order_guest_monthly",
+            "amount": 150000,
+            "currency": "INR",
+        }
+
+        response = self.client.post(
+            reverse("payment-create-order"),
+            self.checkout_payload(plan=Payment.PLAN_MONTHLY),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payment = Payment.objects.get(razorpay_order_id="order_guest_monthly")
+        self.assertIsNone(payment.user_id)
+        self.assertEqual(payment.plan, Payment.PLAN_MONTHLY)
+        self.assertEqual(payment.amount, Decimal("1500.00"))
+        self.assertEqual(payment.buyer_email, existing_user.email)
+        self.assertEqual(response.data["data"]["amount"], 150000)
+        self.assertEqual(
+            response.data["data"]["checkout_reference"],
+            str(payment.internal_reference),
+        )
+
+    def test_guest_payment_verification_requires_checkout_reference(self):
+        payment = Payment.objects.create(
+            course=self.course,
+            razorpay_order_id="order_guest_requires_reference",
+            amount=self.course.price,
+            currency="INR",
+            status=Payment.STATUS_CREATED,
+        )
+
+        response = self.client.post(
+            reverse("payment-verify"),
+            {
+                "course_id": self.course.id,
+                "razorpay_order_id": payment.razorpay_order_id,
+                "razorpay_payment_id": "pay_guest_requires_reference",
+                "razorpay_signature": "signature",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data["errors"]["detail"],
+            "Checkout reference is required.",
+        )
+
+    @patch("apps.payments.views.create_razorpay_order")
+    def test_create_order_requires_short_checkout_profile(self, mock_create_order):
+        self.login(self.student.email)
+
+        response = self.client.post(
+            reverse("payment-create-order"),
+            {"course_id": self.course.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("buyer_name", response.data["errors"])
+        self.assertIn("whatsapp_number", response.data["errors"])
+        self.assertIn("buyer_email", response.data["errors"])
+        self.assertNotIn("pincode", response.data["errors"])
+        self.assertFalse(Payment.objects.exists())
+        mock_create_order.assert_not_called()
+
+    @patch("apps.payments.views.create_razorpay_order")
+    def test_guest_short_checkout_profile_keeps_legacy_fields_blank(self, mock_create_order):
+        mock_create_order.return_value = {
+            "id": "order_short_profile",
+            "amount": 350000,
+            "currency": "INR",
+        }
+
+        response = self.client.post(
+            reverse("payment-create-order"),
+            {
+                "course_id": self.course.id,
+                "plan": Payment.PLAN_FULL,
+                "buyer_name": "Short Profile",
+                "buyer_email": "short@example.com",
+                "whatsapp_number": "+91 98765 43210",
+                "alternate_number": "",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payment = Payment.objects.get(razorpay_order_id="order_short_profile")
+        self.assertEqual(payment.amount, Decimal("3500.00"))
+        self.assertIsNone(payment.age)
+        self.assertEqual(payment.country, "")
+        self.assertEqual(payment.state, "")
+        self.assertEqual(payment.city, "")
+        self.assertEqual(payment.pincode, "")
+
+    @patch("apps.payments.views.create_razorpay_order")
+    def test_gateway_order_failure_is_retained_as_failed_purchase_attempt(self, mock_create_order):
+        mock_create_order.side_effect = RazorpayServiceError("Gateway unavailable.")
+        self.login(self.student.email)
+
+        response = self.client.post(
+            reverse("payment-create-order"),
+            self.checkout_payload(),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payment = Payment.objects.get()
+        self.assertEqual(payment.status, Payment.STATUS_FAILED)
+        self.assertEqual(payment.gateway_status, "order_creation_failed")
+        self.assertEqual(payment.failure_reason, "Gateway unavailable.")
+        self.assertEqual(payment.user_email_snapshot, self.student.email)
+        self.assertEqual(payment.course_title_snapshot, self.course.title)
+        self.assertEqual(payment.razorpay_order_id, "")
+
+    @patch("apps.payments.views.create_razorpay_order")
+    def test_create_order_rejects_active_content_in_buyer_profile(self, mock_create_order):
+        self.login(self.student.email)
+
+        response = self.client.post(
+            reverse("payment-create-order"),
+            self.checkout_payload(city="<script>alert(1)</script>"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Payment.objects.exists())
+        mock_create_order.assert_not_called()
+
+    @patch("apps.payments.views.fetch_razorpay_payment")
     @patch("apps.payments.views.verify_razorpay_signature")
-    def test_verify_payment_creates_enrollment(self, mock_verify):
+    def test_verify_payment_creates_enrollment(self, mock_verify, mock_fetch_payment):
         mock_verify.return_value = True
+        live_class = LiveClass.objects.create(
+            title="Included Live Class",
+            description="Included with the paid course.",
+            linked_course=self.course,
+        )
+        RealtimeSession.objects.create(
+            title="Included Live Session",
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            status=RealtimeSession.STATUS_LIVE,
+            host=self.instructor,
+            linked_course=self.course,
+            linked_live_class=live_class,
+        )
+        denied_cache_key = (
+            f"realtime:join-access:user={self.student.id}:"
+            f"course={self.course.id}:live-class={live_class.id}"
+        )
+        cache.set(denied_cache_key, False, timeout=60)
         payment = Payment.objects.create(
             user=self.student,
             course=self.course,
@@ -1569,6 +1784,16 @@ class PaymentVerificationTests(BaseAPITestCase):
             currency="INR",
             status=Payment.STATUS_CREATED,
         )
+        mock_fetch_payment.return_value = {
+            "id": "pay_test_123",
+            "order_id": payment.razorpay_order_id,
+            "status": "captured",
+            "amount": int(payment.amount * 100),
+            "currency": payment.currency,
+            "method": "upi",
+            "vpa": "must-not-be-stored@example",
+            "card": {"last4": "1111"},
+        }
         self.login(self.student.email)
         response = self.client.post(
             reverse("payment-verify"),
@@ -1581,8 +1806,18 @@ class PaymentVerificationTests(BaseAPITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            response.data["data"]["support_whatsapp_url"].startswith(
+                "https://wa.me/919970875040?"
+            )
+        )
         payment.refresh_from_db()
         self.assertEqual(payment.status, Payment.STATUS_PAID)
+        self.assertEqual(payment.gateway_status, "captured")
+        self.assertEqual(payment.payment_method, "upi")
+        self.assertIsNotNone(payment.paid_at)
+        self.assertNotIn("vpa", payment.gateway_details["payment"])
+        self.assertNotIn("card", payment.gateway_details["payment"])
         self.assertTrue(
             Enrollment.objects.filter(
                 user=self.student,
@@ -1590,6 +1825,160 @@ class PaymentVerificationTests(BaseAPITestCase):
                 payment_status=Enrollment.STATUS_PAID,
             ).exists()
         )
+        self.assertIsNone(cache.get(denied_cache_key))
+
+    @patch("apps.payments.views.verify_razorpay_signature")
+    def test_invalid_client_signature_does_not_poison_payment_order(self, mock_verify):
+        mock_verify.side_effect = RazorpayServiceError("Invalid payment signature.")
+        payment = Payment.objects.create(
+            user=self.student,
+            course=self.course,
+            razorpay_order_id="order_invalid_callback",
+            amount=self.course.price,
+            currency="INR",
+            status=Payment.STATUS_CREATED,
+        )
+        self.login(self.student.email)
+
+        response = self.client.post(
+            reverse("payment-verify"),
+            {
+                "course_id": self.course.id,
+                "razorpay_order_id": payment.razorpay_order_id,
+                "razorpay_payment_id": "pay_untrusted_callback",
+                "razorpay_signature": "invalid-signature",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, Payment.STATUS_CREATED)
+        self.assertIsNone(payment.razorpay_payment_id)
+        self.assertIsNone(payment.razorpay_signature)
+
+    @patch("apps.payments.views.fetch_razorpay_payment")
+    @patch("apps.payments.views.verify_razorpay_signature")
+    def test_signed_but_uncaptured_payment_does_not_create_enrollment(
+        self,
+        mock_verify,
+        mock_fetch_payment,
+    ):
+        mock_verify.return_value = True
+        payment = Payment.objects.create(
+            user=self.student,
+            course=self.course,
+            razorpay_order_id="order_authorized_only",
+            amount=self.course.price,
+            currency="INR",
+            status=Payment.STATUS_CREATED,
+        )
+        mock_fetch_payment.return_value = {
+            "id": "pay_authorized_only",
+            "order_id": payment.razorpay_order_id,
+            "status": "authorized",
+            "amount": int(payment.amount * 100),
+            "currency": payment.currency,
+        }
+        self.login(self.student.email)
+
+        response = self.client.post(
+            reverse("payment-verify"),
+            {
+                "course_id": self.course.id,
+                "razorpay_order_id": payment.razorpay_order_id,
+                "razorpay_payment_id": "pay_authorized_only",
+                "razorpay_signature": "sig_authorized_only",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, Payment.STATUS_CREATED)
+        self.assertFalse(Enrollment.objects.filter(user=self.student, course=self.course).exists())
+
+    @patch("apps.payments.views.fetch_razorpay_payment")
+    @patch("apps.payments.views.verify_razorpay_signature")
+    def test_captured_payment_with_mismatched_amount_does_not_create_enrollment(
+        self,
+        mock_verify,
+        mock_fetch_payment,
+    ):
+        mock_verify.return_value = True
+        payment = Payment.objects.create(
+            user=self.student,
+            course=self.course,
+            razorpay_order_id="order_gateway_amount_mismatch",
+            amount=self.course.price,
+            currency="INR",
+            status=Payment.STATUS_CREATED,
+        )
+        mock_fetch_payment.return_value = {
+            "id": "pay_gateway_amount_mismatch",
+            "order_id": payment.razorpay_order_id,
+            "status": "captured",
+            "amount": int(payment.amount * 100) - 1,
+            "currency": payment.currency,
+        }
+        self.login(self.student.email)
+
+        response = self.client.post(
+            reverse("payment-verify"),
+            {
+                "course_id": self.course.id,
+                "razorpay_order_id": payment.razorpay_order_id,
+                "razorpay_payment_id": "pay_gateway_amount_mismatch",
+                "razorpay_signature": "sig_gateway_amount_mismatch",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, Payment.STATUS_CREATED)
+        self.assertFalse(Enrollment.objects.filter(user=self.student, course=self.course).exists())
+
+    @patch("apps.payments.views.fetch_razorpay_payment")
+    @patch("apps.payments.views.verify_razorpay_signature")
+    def test_captured_payment_from_another_order_does_not_create_enrollment(
+        self,
+        mock_verify,
+        mock_fetch_payment,
+    ):
+        mock_verify.return_value = True
+        payment = Payment.objects.create(
+            user=self.student,
+            course=self.course,
+            razorpay_order_id="order_expected",
+            amount=self.course.price,
+            currency="INR",
+            status=Payment.STATUS_CREATED,
+        )
+        mock_fetch_payment.return_value = {
+            "id": "pay_wrong_order",
+            "order_id": "order_different",
+            "status": "captured",
+            "amount": int(payment.amount * 100),
+            "currency": payment.currency,
+        }
+        self.login(self.student.email)
+
+        response = self.client.post(
+            reverse("payment-verify"),
+            {
+                "course_id": self.course.id,
+                "razorpay_order_id": payment.razorpay_order_id,
+                "razorpay_payment_id": "pay_wrong_order",
+                "razorpay_signature": "sig_wrong_order",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, Payment.STATUS_CREATED)
+        self.assertFalse(Enrollment.objects.filter(user=self.student, course=self.course).exists())
 
     @override_settings(RAZORPAY_WEBHOOK_SECRET="whsec_test")
     def test_payment_webhook_marks_payment_paid_and_creates_enrollment(self):
@@ -1610,6 +1999,7 @@ class PaymentVerificationTests(BaseAPITestCase):
                         "order_id": payment.razorpay_order_id,
                         "status": "captured",
                         "amount": int(Decimal(self.course.price) * 100),
+                        "currency": payment.currency,
                     }
                 }
             },
@@ -1629,6 +2019,9 @@ class PaymentVerificationTests(BaseAPITestCase):
         payment.refresh_from_db()
         self.assertEqual(payment.status, Payment.STATUS_PAID)
         self.assertEqual(payment.razorpay_payment_id, "pay_webhook_123")
+        self.assertEqual(payment.gateway_status, "captured")
+        self.assertEqual(payment.last_webhook_event, "payment.captured")
+        self.assertIsNotNone(payment.paid_at)
         self.assertTrue(
             Enrollment.objects.filter(
                 user=self.student,
@@ -1679,6 +2072,153 @@ class PaymentVerificationTests(BaseAPITestCase):
                 payment_status=Enrollment.STATUS_PAID,
             ).exists()
         )
+
+    @override_settings(RAZORPAY_WEBHOOK_SECRET="whsec_test")
+    def test_payment_webhook_rejects_currency_mismatch(self):
+        payment = Payment.objects.create(
+            user=self.student,
+            course=self.course,
+            razorpay_order_id="order_currency_mismatch",
+            amount=self.course.price,
+            currency="INR",
+            status=Payment.STATUS_CREATED,
+        )
+        payload = {
+            "event": "payment.captured",
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "id": "pay_currency_mismatch",
+                        "order_id": payment.razorpay_order_id,
+                        "status": "captured",
+                        "amount": int(self.course.price * 100),
+                        "currency": "USD",
+                    }
+                }
+            },
+        }
+        body = json.dumps(payload).encode("utf-8")
+        signature = hmac.new(b"whsec_test", body, hashlib.sha256).hexdigest()
+
+        response = self.client.post(
+            reverse("payment-webhook"),
+            data=body,
+            content_type="application/json",
+            HTTP_X_RAZORPAY_SIGNATURE=signature,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, Payment.STATUS_CREATED)
+        self.assertFalse(Enrollment.objects.filter(user=self.student, course=self.course).exists())
+
+    @override_settings(RAZORPAY_WEBHOOK_SECRET="whsec_test")
+    def test_payment_failed_webhook_retains_failure_details_without_enrollment(self):
+        payment = Payment.objects.create(
+            user=self.student,
+            course=self.course,
+            razorpay_order_id="order_webhook_failed",
+            amount=self.course.price,
+            currency="INR",
+            status=Payment.STATUS_CREATED,
+        )
+        payload = {
+            "event": "payment.failed",
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "id": "pay_webhook_failed",
+                        "order_id": payment.razorpay_order_id,
+                        "status": "failed",
+                        "amount": int(Decimal(self.course.price) * 100),
+                        "currency": payment.currency,
+                        "method": "card",
+                        "error_code": "BAD_REQUEST_ERROR",
+                        "error_description": "Payment was declined.",
+                        "card": {"last4": "1111"},
+                    }
+                }
+            },
+        }
+        body = json.dumps(payload).encode("utf-8")
+        signature = hmac.new(b"whsec_test", body, hashlib.sha256).hexdigest()
+
+        response = self.client.post(
+            reverse("payment-webhook"),
+            data=body,
+            content_type="application/json",
+            HTTP_X_RAZORPAY_SIGNATURE=signature,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, Payment.STATUS_FAILED)
+        self.assertEqual(payment.gateway_status, "failed")
+        self.assertEqual(payment.payment_method, "card")
+        self.assertEqual(payment.failure_reason, "Payment was declined.")
+        self.assertEqual(payment.last_webhook_event, "payment.failed")
+        self.assertNotIn("card", payment.gateway_details["payment"])
+        self.assertFalse(Enrollment.objects.filter(user=self.student, course=self.course).exists())
+
+    def test_payment_audit_survives_user_and_course_deletion(self):
+        payment = Payment.objects.create(
+            user=self.student,
+            course=self.course,
+            razorpay_order_id="order_retained_history",
+            razorpay_payment_id="pay_retained_history",
+            amount=self.course.price,
+            currency="INR",
+            status=Payment.STATUS_PAID,
+        )
+        student_email = self.student.email
+        course_id = self.course.id
+        course_title = self.course.title
+
+        self.student.delete()
+        self.course.delete()
+
+        payment.refresh_from_db()
+        self.assertIsNone(payment.user_id)
+        self.assertIsNone(payment.course_id)
+        self.assertEqual(payment.user_email_snapshot, student_email)
+        self.assertEqual(payment.course_id_snapshot, course_id)
+        self.assertEqual(payment.course_title_snapshot, course_title)
+
+    @override_settings(RAZORPAY_WEBHOOK_SECRET="whsec_test")
+    def test_payment_webhook_rejects_incomplete_captured_payload(self):
+        payment = Payment.objects.create(
+            user=self.student,
+            course=self.course,
+            razorpay_order_id="order_incomplete_capture",
+            amount=self.course.price,
+            currency="INR",
+            status=Payment.STATUS_CREATED,
+        )
+        payload = {
+            "event": "payment.captured",
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "order_id": payment.razorpay_order_id,
+                        "status": "captured",
+                    }
+                }
+            },
+        }
+        body = json.dumps(payload).encode("utf-8")
+        signature = hmac.new(b"whsec_test", body, hashlib.sha256).hexdigest()
+
+        response = self.client.post(
+            reverse("payment-webhook"),
+            data=body,
+            content_type="application/json",
+            HTTP_X_RAZORPAY_SIGNATURE=signature,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, Payment.STATUS_CREATED)
+        self.assertFalse(Enrollment.objects.filter(user=self.student, course=self.course).exists())
 
 
 class MyCoursesViewTests(BaseAPITestCase):
@@ -1747,6 +2287,35 @@ class MyCoursesViewTests(BaseAPITestCase):
 
 
 class CourseListAccessTests(BaseAPITestCase):
+    def test_purchase_eligibility_cache_is_isolated_by_feature_flag(self):
+        disabled_response = self.client.get(reverse("course-list-create"))
+
+        with override_settings(DIRECT_COURSE_PAYMENTS_ENABLED=True):
+            enabled_response = self.client.get(reverse("course-list-create"))
+
+        disabled_course = next(
+            item for item in disabled_response.data["data"] if item["id"] == self.course.id
+        )
+        enabled_course = next(
+            item for item in enabled_response.data["data"] if item["id"] == self.course.id
+        )
+        self.assertFalse(disabled_course["purchase_available"])
+        self.assertTrue(enabled_course["purchase_available"])
+
+    @override_settings(DIRECT_COURSE_PAYMENTS_ENABLED=True)
+    def test_course_list_exposes_backend_purchase_eligibility(self):
+        response = self.client.get(reverse("course-list-create"))
+
+        self.assertEqual(response.status_code, 200)
+        returned = {item["id"]: item for item in response.data["data"]}
+        self.assertTrue(returned[self.course.id]["purchase_available"])
+
+        self.course.launch_status = Course.STATUS_COMING_SOON
+        self.course.save(update_fields=["launch_status"])
+        response = self.client.get(reverse("course-list-create"))
+        returned = {item["id"]: item for item in response.data["data"]}
+        self.assertFalse(returned[self.course.id]["purchase_available"])
+
     def test_authenticated_course_list_includes_enrollment_access_flags(self):
         pending_course = Course.objects.create(
             title="Pending Access Course",
@@ -1788,6 +2357,47 @@ class CourseListAccessTests(BaseAPITestCase):
 
         self.assertFalse(returned[no_access_course.id]["is_enrolled"])
         self.assertEqual(returned[no_access_course.id]["enrollment_status"], "none")
+
+
+class LiveClassCourseFilterCacheTests(BaseAPITestCase):
+    def test_anonymous_course_filter_uses_an_isolated_cache_entry(self):
+        other_course = Course.objects.create(
+            title="Other Live Course",
+            description="A separate course with its own live class.",
+            price=Decimal("399.00"),
+            instructor=self.instructor,
+            is_published=True,
+        )
+        first_live_class = LiveClass.objects.create(
+            title="First Course Live Class",
+            linked_course=self.course,
+            is_active=True,
+        )
+        second_live_class = LiveClass.objects.create(
+            title="Second Course Live Class",
+            linked_course=other_course,
+            is_active=True,
+        )
+
+        first_response = self.client.get(
+            reverse("live-class-list"),
+            {"course_id": self.course.id},
+        )
+        second_response = self.client.get(
+            reverse("live-class-list"),
+            {"course_id": other_course.id},
+        )
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 200)
+        self.assertEqual(
+            [item["id"] for item in first_response.data["data"]],
+            [first_live_class.id],
+        )
+        self.assertEqual(
+            [item["id"] for item in second_response.data["data"]],
+            [second_live_class.id],
+        )
 
 
 class GuideVideoAccessTests(BaseAPITestCase):
@@ -2941,6 +3551,15 @@ class AdaptiveHLSTranscodeTests(BaseAPITestCase):
 class RealtimeSessionTests(APITestCase):
     def setUp(self):
         cache.clear()
+        schedule_patcher = patch(
+            "apps.realtime.views.get_live_class_schedule_snapshot",
+            return_value={
+                "is_open": True,
+                "label": "Friday, Saturday and Sunday, 7:00 PM to 8:00 PM IST",
+            },
+        )
+        self.schedule_snapshot_mock = schedule_patcher.start()
+        self.addCleanup(schedule_patcher.stop)
         self.host = User.objects.create_user(
             email="host@test.com",
             password="StrongPass@123",
@@ -3000,15 +3619,86 @@ class RealtimeSessionTests(APITestCase):
         )
 
         with patch(
-            "apps.realtime.domain.LiveClassEnrollment.objects.filter",
-            wraps=LiveClassEnrollment.objects.filter,
-        ) as mocked_filter:
+            "apps.realtime.domain.user_has_live_class_access",
+            wraps=realtime_domain.user_has_live_class_access,
+        ) as mocked_access_check:
             first = realtime_domain.get_access_decision(session, self.viewer)
             second = realtime_domain.get_access_decision(session, self.viewer)
 
         self.assertTrue(first.allowed)
         self.assertTrue(second.allowed)
-        self.assertEqual(mocked_filter.call_count, 1)
+        self.assertEqual(mocked_access_check.call_count, 1)
+
+    def test_paid_course_enrollment_grants_linked_live_session_access(self):
+        LiveClassEnrollment.objects.filter(
+            user=self.viewer,
+            live_class=self.live_class,
+        ).delete()
+        Enrollment.objects.create(
+            user=self.viewer,
+            course=self.meeting_course,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        session = RealtimeSession.objects.create(
+            title="Course Bundled Live Session",
+            description="Paid course ownership should include linked live access.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            meeting_capacity=200,
+            max_audience=500,
+        )
+
+        decision = realtime_domain.get_access_decision(session, self.viewer)
+        visible_sessions = realtime_domain.list_queryset(
+            session_type="all",
+            status_filter="all",
+            user=self.viewer,
+        )
+
+        self.assertTrue(decision.allowed)
+        self.assertTrue(visible_sessions.filter(pk=session.pk).exists())
+
+    def test_paid_course_enrollment_grants_direct_course_session_access(self):
+        Enrollment.objects.create(
+            user=self.viewer,
+            course=self.meeting_course,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        session = RealtimeSession.objects.create(
+            title="Direct Course Live Session",
+            description="Course-linked sessions should not require a duplicate live enrollment.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            meeting_capacity=200,
+            max_audience=500,
+        )
+
+        decision = realtime_domain.get_access_decision(session, self.viewer)
+
+        self.assertTrue(decision.allowed)
+
+    def test_course_detail_exposes_linked_live_classes_only_to_course_owner(self):
+        self.login(self.viewer.email)
+        response = self.client.get(reverse("course-detail", args=[self.meeting_course.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["live_classes"], [])
+
+        Enrollment.objects.create(
+            user=self.viewer,
+            course=self.meeting_course,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        response = self.client.get(reverse("course-detail", args=[self.meeting_course.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["data"]["live_classes"]), 1)
+        self.assertEqual(response.data["data"]["live_classes"][0]["id"], self.live_class.id)
+        self.assertEqual(response.data["data"]["live_classes"][0]["access_source"], "course")
 
     @override_settings(
         OWNCAST_BASE_URL="https://stream.example.com",
@@ -3127,6 +3817,7 @@ class RealtimeSessionTests(APITestCase):
             full_name="Assigned Instructor",
             role=User.ROLE_INSTRUCTOR,
         )
+        mark_terms_accepted(instructor)
         assigned_course = Course.objects.create(
             title="Assigned Instructor Course",
             description="Instructor-owned course for realtime tests.",
@@ -3166,6 +3857,7 @@ class RealtimeSessionTests(APITestCase):
             full_name="Outsider Instructor",
             role=User.ROLE_INSTRUCTOR,
         )
+        mark_terms_accepted(outsider_instructor)
         self.login(outsider_instructor.email)
         response = self.client.post(
             reverse("realtime-session-list-create"),
@@ -3378,6 +4070,32 @@ class RealtimeSessionTests(APITestCase):
             format="json",
         )
         self.assertEqual(join_response.status_code, 403)
+
+    def test_approved_student_cannot_join_outside_live_class_schedule(self):
+        self.schedule_snapshot_mock.return_value = {
+            "is_open": False,
+            "label": "Friday, Saturday and Sunday, 7:00 PM to 8:00 PM IST",
+        }
+        session = RealtimeSession.objects.create(
+            title="Closed Schedule Meeting",
+            description="Approved students must still respect the weekly schedule.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_MEETING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+
+        self.login(self.viewer.email)
+        response = self.client.post(
+            reverse("realtime-session-join", kwargs={"pk": session.id}),
+            {"display_name": "Viewer User"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["message"], "Live class is outside its scheduled time.")
+        self.assertIn("Friday, Saturday and Sunday", response.data["errors"]["detail"])
 
     def test_blocked_user_join_does_not_mark_scheduled_session_live(self):
         blocked_user = User.objects.create_user(

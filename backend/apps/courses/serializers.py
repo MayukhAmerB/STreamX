@@ -1,11 +1,13 @@
 import re
 
-from rest_framework import serializers
+from django.conf import settings
 from django.urls import reverse
+from rest_framework import serializers
 
 from config.request_security import contains_active_content, contains_suspicious_sqli, is_safe_public_http_url
 from config.upload_validators import validate_profile_image_upload, validate_video_upload
 from config.url_utils import build_public_url, get_media_public_url
+from apps.payments.pricing import FULL_PLAN, MONTHLY_PLAN, get_plan_amount
 
 from .services import ProtectedMediaError, build_protected_lecture_playback_url, resolve_lecture_playback_expires_in
 from .models import (
@@ -22,6 +24,7 @@ from .models import (
     PublicEnrollmentLead,
     Section,
 )
+from .access import user_has_course_access
 
 
 def _normalize_text_list(value):
@@ -236,16 +239,9 @@ class LectureNestedSerializer(serializers.ModelSerializer):
         else:
             course_enrollment_status = self.context.get("course_detail_enrollment_status")
             if course_enrollment_status is None:
-                enrollment = (
-                    Enrollment.objects.filter(
-                        user=user,
-                        course=course,
-                        payment_status=Enrollment.STATUS_PAID,
-                    )
-                    .only("id")
-                    .first()
+                course_enrollment_status = (
+                    "approved" if user_has_course_access(user, course.id) else "none"
                 )
-                course_enrollment_status = "approved" if enrollment else "none"
             can_access = course_enrollment_status == "approved"
 
         if not can_access:
@@ -305,11 +301,45 @@ class SectionNestedSerializer(serializers.ModelSerializer):
 
 
 class CourseEnrollmentStatusMixin:
+    def get_price(self, obj):
+        return format(get_plan_amount(FULL_PLAN), ".2f")
+
+    def get_monthly_price(self, obj):
+        return format(get_plan_amount(MONTHLY_PLAN), ".2f")
+
+    def get_purchase_available(self, obj):
+        full_available = bool(obj.full_payment_enabled)
+        monthly_available = bool(obj.installment_payment_enabled)
+        return bool(
+            getattr(settings, "DIRECT_COURSE_PAYMENTS_ENABLED", False)
+            and obj.is_published
+            and obj.launch_status == Course.STATUS_LIVE
+            and (full_available or monthly_available)
+        )
+
+    def get_purchase_unavailable_reason(self, obj):
+        if self.get_purchase_available(obj):
+            return ""
+        if not getattr(settings, "DIRECT_COURSE_PAYMENTS_ENABLED", False):
+            return "checkout_disabled"
+        if not obj.is_published:
+            return "course_unpublished"
+        if obj.launch_status != Course.STATUS_LIVE:
+            return "course_not_live"
+        if not (obj.full_payment_enabled or obj.installment_payment_enabled):
+            return "price_not_configured"
+        return "checkout_unavailable"
+
     def _normalize_enrollment_status(self, enrollment):
         if not enrollment:
             return "none"
-        if enrollment.payment_status == Enrollment.STATUS_PAID:
+        if enrollment.has_active_access():
             return "approved"
+        if (
+            enrollment.payment_status == Enrollment.STATUS_PAID
+            and enrollment.access_type == Enrollment.ACCESS_INSTALLMENT
+        ):
+            return "payment_pending"
         if enrollment.payment_status == Enrollment.STATUS_PENDING:
             return "pending"
         return "none"
@@ -328,7 +358,13 @@ class CourseEnrollmentStatusMixin:
 
         enrollment = (
             Enrollment.objects.filter(user=request.user, course=obj)
-            .only("payment_status", "enrolled_at")
+            .only(
+                "payment_status",
+                "access_type",
+                "access_expires_at",
+                "installments_paid",
+                "enrolled_at",
+            )
             .order_by("-enrolled_at")
             .first()
         )
@@ -359,6 +395,10 @@ class CourseListSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeriali
     section_count = serializers.IntegerField(read_only=True)
     is_enrolled = serializers.SerializerMethodField()
     enrollment_status = serializers.SerializerMethodField()
+    purchase_available = serializers.SerializerMethodField()
+    purchase_unavailable_reason = serializers.SerializerMethodField()
+    price = serializers.SerializerMethodField()
+    monthly_price = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -369,6 +409,11 @@ class CourseListSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeriali
             "description",
             "thumbnail",
             "price",
+            "full_payment_enabled",
+            "installment_payment_enabled",
+            "monthly_price",
+            "installments_required",
+            "installment_access_days",
             "category",
             "level",
             "launch_status",
@@ -376,6 +421,8 @@ class CourseListSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeriali
             "section_count",
             "is_enrolled",
             "enrollment_status",
+            "purchase_available",
+            "purchase_unavailable_reason",
             "instructor",
             "created_at",
             "updated_at",
@@ -401,6 +448,11 @@ class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeria
     sections = SectionNestedSerializer(many=True, read_only=True)
     is_enrolled = serializers.SerializerMethodField()
     enrollment_status = serializers.SerializerMethodField()
+    purchase_available = serializers.SerializerMethodField()
+    purchase_unavailable_reason = serializers.SerializerMethodField()
+    live_classes = serializers.SerializerMethodField()
+    price = serializers.SerializerMethodField()
+    monthly_price = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -419,6 +471,11 @@ class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeria
             "snapshot_instructor",
             "thumbnail",
             "price",
+            "full_payment_enabled",
+            "installment_payment_enabled",
+            "monthly_price",
+            "installments_required",
+            "installment_access_days",
             "category",
             "level",
             "launch_status",
@@ -427,6 +484,9 @@ class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeria
             "sections",
             "is_enrolled",
             "enrollment_status",
+            "purchase_available",
+            "purchase_unavailable_reason",
+            "live_classes",
             "created_at",
             "updated_at",
         )
@@ -443,6 +503,24 @@ class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeria
     def get_thumbnail(self, obj):
         request = self.context.get("request")
         return obj.get_thumbnail_url(request=request)
+
+    def get_live_classes(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return []
+        can_manage = bool(
+            getattr(request.user, "is_staff", False)
+            or getattr(request.user, "is_superuser", False)
+            or request.user.id == obj.instructor_id
+        )
+        if not can_manage and self.get_enrollment_status(obj) != "approved":
+            return []
+        live_classes = list(obj.live_classes.all())
+        return LiveClassListSerializer(
+            live_classes,
+            many=True,
+            context=self.context,
+        ).data
 
 
 class GuideVideoListSerializer(serializers.ModelSerializer):
@@ -551,6 +629,7 @@ class LiveClassListSerializer(serializers.ModelSerializer):
     enrollment_count = serializers.IntegerField(read_only=True)
     is_enrolled = serializers.SerializerMethodField()
     enrollment_status = serializers.SerializerMethodField()
+    access_source = serializers.SerializerMethodField()
 
     class Meta:
         model = LiveClass
@@ -570,6 +649,7 @@ class LiveClassListSerializer(serializers.ModelSerializer):
             "enrollment_count",
             "is_enrolled",
             "enrollment_status",
+            "access_source",
         )
 
     def get_is_enrolled(self, obj):
@@ -590,6 +670,12 @@ class LiveClassListSerializer(serializers.ModelSerializer):
         if not enrollment:
             return "none"
         return enrollment.status
+
+    def get_access_source(self, obj):
+        source_map = self.context.get("live_class_access_sources")
+        if source_map is not None:
+            return source_map.get(obj.id, "none")
+        return "none"
 
 
 class CourseEnrollSerializer(serializers.Serializer):

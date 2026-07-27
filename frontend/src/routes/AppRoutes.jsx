@@ -10,6 +10,7 @@ const BroadcastingPage = lazy(() => import("../pages/BroadcastingPage"));
 const ContactPage = lazy(() => import("../pages/ContactPage"));
 const CourseDetailPage = lazy(() => import("../pages/CourseDetailPage"));
 const CourseListPage = lazy(() => import("../pages/CourseListPage"));
+const CoursePaymentPage = lazy(() => import("../pages/CoursePaymentPage"));
 const CoursePlayerPage = lazy(() => import("../pages/CoursePlayerPage"));
 const CreateCoursePage = lazy(() => import("../pages/CreateCoursePage"));
 const EditCoursePage = lazy(() => import("../pages/EditCoursePage"));
@@ -24,10 +25,8 @@ const LectureQuestionsPage = lazy(() => import("../pages/LectureQuestionsPage"))
 const LiveClassesPage = lazy(() => import("../pages/LiveClassesPage"));
 const LoginPage = lazy(() => import("../pages/LoginPage"));
 const MeetingPage = lazy(() => import("../pages/MeetingPage"));
-const MyCoursesPage = lazy(() => import("../pages/MyCoursesPage"));
 const OsintToolsPage = lazy(() => import("../pages/OsintToolsPage"));
 const ProfilePage = lazy(() => import("../pages/ProfilePage"));
-const RegisterPage = lazy(() => import("../pages/RegisterPage"));
 const TermsPage = lazy(() => import("../pages/TermsPage"));
 
 export default function AppRoutes() {
@@ -37,7 +36,7 @@ export default function AppRoutes() {
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/live-classes" element={<LiveClassesPage />} />
+          <Route path="/live-classes" element={<Navigate to="/courses?view=live" replace />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/faqs" element={<FaqPage />} />
@@ -45,16 +44,16 @@ export default function AppRoutes() {
           <Route path="/courses" element={<CourseListPage />} />
           <Route path="/courses/:id" element={<CourseDetailPage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/courses/:id/payment" element={<CoursePaymentPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/guides" element={<GuidesPage />} />
-            <Route path="/my-courses" element={<MyCoursesPage />} />
+            <Route path="/my-courses" element={<Navigate to="/courses?view=owned" replace />} />
             <Route path="/osint-tools" element={<OsintToolsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/id-card" element={<IdCardPage />} />
             <Route path="/learn/:courseId" element={<CoursePlayerPage />} />
-            <Route path="/courses/:id/payment" element={<Navigate to=".." replace relative="path" />} />
+            <Route path="/courses/:id/live" element={<LiveClassesPage />} />
             <Route path="/join-live" element={<JoinLivePage />} />
           </Route>
           <Route element={<ProtectedRoute requireModerator />}>
