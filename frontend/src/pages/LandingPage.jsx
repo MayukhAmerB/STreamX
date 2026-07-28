@@ -1157,7 +1157,7 @@ export default function LandingPage() {
                       </Button>
                     ) : program.linked_course_id ? (
                       <Link to={`/courses/${program.linked_course_id}`} className="block">
-                        <Button className="w-full">View Course</Button>
+                        <Button className="w-full">Included with Course</Button>
                       </Link>
                     ) : (
                       <Button className="w-full" disabled>

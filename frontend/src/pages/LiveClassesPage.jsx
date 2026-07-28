@@ -546,7 +546,7 @@ export default function LiveClassesPage() {
                       </Button>
                     ) : course.linked_course_id ? (
                       <Link to={`/courses/${course.linked_course_id}`} className="block">
-                        <Button className="w-full">View Course</Button>
+                        <Button className="w-full">Included with Course</Button>
                       </Link>
                     ) : (
                       <Button className="w-full" disabled>
