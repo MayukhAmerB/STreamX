@@ -379,7 +379,10 @@ export default function CoursePaymentPage() {
         currency: orderData.currency,
         order_id: orderData.razorpay_order_id,
         name: "Al syed Initiative",
-        description: `${course.title} - ${plan === "monthly" ? "Monthly" : "One-time"}`,
+        description:
+          plan === "monthly"
+            ? "Monthly course installment"
+            : "One-time course payment",
         theme: { color: "#111111" },
         prefill: {
           name: orderData?.checkout_profile?.name || checkoutProfile.buyer_name,
