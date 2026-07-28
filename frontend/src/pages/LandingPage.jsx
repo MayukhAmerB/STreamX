@@ -1112,9 +1112,11 @@ export default function LandingPage() {
                       </div>
                     </div>
                     <div className="h-full rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5">
-                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Price</div>
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">
+                        {program.linked_course_id ? "Access" : "Price"}
+                      </div>
                       <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
-                        {formatLiveClassPrice(program.price)}
+                        {program.linked_course_id ? "Included with course" : formatLiveClassPrice(program.price)}
                       </div>
                     </div>
                   </div>
@@ -1123,6 +1125,18 @@ export default function LandingPage() {
                     <span className="rounded-full border border-white/10 bg-[#060606] px-3 py-1 text-xs font-semibold text-[#AAAAAA]">
                       {(program.enrollment_count ?? 0)} enrolled
                     </span>
+                    {program.linked_course_id ? (
+                      <Link
+                        to={`/courses/${program.linked_course_id}`}
+                        className="rounded-full border border-white/10 bg-[#060606] px-3 py-1 text-xs font-semibold text-[#D4D4D4] transition hover:border-white/25 hover:text-white"
+                      >
+                        Included with {program.linked_course_title || "parent course"}
+                      </Link>
+                    ) : (
+                      <span className="rounded-full border border-white/10 bg-[#060606] px-3 py-1 text-xs font-semibold text-[#AAAAAA]">
+                        Legacy standalone
+                      </span>
+                    )}
                   </div>
 
                   <div className="mt-auto pt-4">
@@ -1142,12 +1156,12 @@ export default function LandingPage() {
                         Legacy Request Pending
                       </Button>
                     ) : program.linked_course_id ? (
-                      <Link to={`/courses/${program.linked_course_id}/payment`} className="block">
-                        <Button className="w-full">Buy Course</Button>
+                      <Link to={`/courses/${program.linked_course_id}`} className="block">
+                        <Button className="w-full">View Course</Button>
                       </Link>
                     ) : (
                       <Button className="w-full" disabled>
-                        Included With Course
+                        Legacy Enrollment Required
                       </Button>
                     )}
                   </div>

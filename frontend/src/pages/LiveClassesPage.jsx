@@ -495,9 +495,11 @@ export default function LiveClassesPage() {
                       </div>
                     </div>
                     <div className="h-full rounded-xl border border-black panel-gradient px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Price</div>
+                      <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">
+                        {course.linked_course_id ? "Access" : "Price"}
+                      </div>
                       <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
-                        {formatLiveClassPrice(course.price)}
+                        {course.linked_course_id ? "Included with course" : formatLiveClassPrice(course.price)}
                       </div>
                     </div>
                   </div>
@@ -511,7 +513,7 @@ export default function LiveClassesPage() {
                         to={`/courses/${course.linked_course_id}`}
                         className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#CFCFCF] to-[#989898] px-4 py-2 text-sm font-semibold text-[#121212] transition hover:from-[#DBDBDB] hover:to-[#A6A6A6]"
                       >
-                        View Course
+                        Included with {course.linked_course_title || "parent course"}
                       </Link>
                     ) : (
                       <span className="inline-flex items-center justify-center rounded-full border border-black bg-[#141414] px-4 py-2 text-sm font-semibold text-[#DBDBDB]">
@@ -544,11 +546,11 @@ export default function LiveClassesPage() {
                       </Button>
                     ) : course.linked_course_id ? (
                       <Link to={`/courses/${course.linked_course_id}`} className="block">
-                        <Button className="w-full">Buy Linked Course</Button>
+                        <Button className="w-full">View Course</Button>
                       </Link>
                     ) : (
                       <Button className="w-full" disabled>
-                        Included With Course
+                        Legacy Enrollment Required
                       </Button>
                     )}
                   </div>
