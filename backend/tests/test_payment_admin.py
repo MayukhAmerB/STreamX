@@ -127,7 +127,7 @@ class SuccessfulPaymentUserAdminTests(TestCase):
 
         self.assertNotContains(response, existing_user.email)
 
-    def test_admin_can_generate_one_time_password_for_paid_account(self):
+    def test_admin_can_generate_actual_account_password_for_paid_account(self):
         self.client.force_login(self.admin_user)
         url = reverse(
             "admin:payments_successfulpaymentuser_generate_credentials",
@@ -146,6 +146,8 @@ class SuccessfulPaymentUserAdminTests(TestCase):
         self.paid_user.refresh_from_db()
         self.payment.refresh_from_db()
         self.assertTrue(self.paid_user.check_password(generated_password))
+        self.assertContains(response, "actual account password")
+        self.assertNotContains(response, "Temporary password")
         self.assertEqual(
             self.payment.provisioning_status,
             Payment.PROVISION_CREDENTIALS_ISSUED,

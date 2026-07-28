@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.courses.models import Enrollment
@@ -18,8 +19,11 @@ def _allocate_student_login():
     while True:
         number = sequence.next_number
         sequence.next_number += 1
-        email = f"adl-{number:04d}@adlfront.com"
-        if not User.objects.filter(email__iexact=email).exists():
+        email = f"ADL{number:04d}@adlfront.com"
+        legacy_email = f"adl-{number:04d}@adlfront.com"
+        if not User.objects.filter(
+            Q(email__iexact=email) | Q(email__iexact=legacy_email)
+        ).exists():
             sequence.save(update_fields=["next_number", "updated_at"])
             return email
 
@@ -64,11 +68,7 @@ def _resolve_or_create_user(payment):
 
 @transaction.atomic
 def provision_paid_payment(payment):
-    payment = (
-        Payment.objects.select_for_update()
-        .select_related("course", "user")
-        .get(pk=payment.pk)
-    )
+    payment = Payment.objects.select_for_update().get(pk=payment.pk)
     if payment.status != Payment.STATUS_PAID or not payment.course_id:
         return None
 

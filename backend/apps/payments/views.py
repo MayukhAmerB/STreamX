@@ -269,7 +269,6 @@ def process_payment_webhook_payload(
     with transaction.atomic():
         payment = (
             Payment.objects.select_for_update()
-            .select_related("course", "user")
             .get(pk=payment.pk)
         )
         if event == "payment.captured" or payment_status == "captured":
@@ -734,7 +733,6 @@ class VerifyPaymentView(APIView):
         with transaction.atomic():
             payment = (
                 Payment.objects.select_for_update()
-                .select_related("course", "user")
                 .get(pk=payment.pk)
             )
             if payment.status == Payment.STATUS_PAID:

@@ -541,6 +541,15 @@ class PasswordResetRequestView(APIView):
     throttle_scope = "password_reset_request"
 
     def post(self, request):
+        if not _self_service_credentials_enabled():
+            log_security_event("auth.password_reset_disabled", request=request)
+            return api_response(
+                success=False,
+                message="Password reset is currently disabled.",
+                errors={"detail": "Password management is handled by admin."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
         turnstile_response = enforce_turnstile(request, action="auth")
         if turnstile_response is not None:
             return turnstile_response
@@ -616,6 +625,15 @@ class PasswordResetConfirmView(APIView):
     throttle_scope = "password_reset_confirm"
 
     def post(self, request):
+        if not _self_service_credentials_enabled():
+            log_security_event("auth.password_reset_confirm_disabled", request=request)
+            return api_response(
+                success=False,
+                message="Password reset is currently disabled.",
+                errors={"detail": "Password management is handled by admin."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
         serializer = PasswordResetConfirmSerializer(data=request.data)
         if not serializer.is_valid():
             return api_response(

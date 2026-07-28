@@ -672,6 +672,7 @@ class AuthTests(APITestCase):
         self.assertEqual(response.data["errors"]["code"], "turnstile_required")
 
     @override_settings(
+        ACCOUNT_SELF_SERVICE_CREDENTIALS_ENABLED=True,
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="noreply@test.com",
         FRONTEND_URL="http://localhost:5173",
@@ -726,6 +727,56 @@ class AuthTests(APITestCase):
             format="json",
         )
         self.assertEqual(login_resp.status_code, 200)
+
+    @override_settings(ACCOUNT_SELF_SERVICE_CREDENTIALS_ENABLED=False)
+    def test_admin_managed_credentials_block_all_self_service_password_updates(self):
+        user = User.objects.create_user(
+            email="admin-managed@test.com",
+            password="AdminIssuedPass@123",
+            full_name="Admin Managed User",
+            role=User.ROLE_STUDENT,
+        )
+        mark_terms_accepted(user)
+
+        reset_request = self.client.post(
+            reverse("auth-password-reset"),
+            {"email": user.email},
+            format="json",
+        )
+        self.assertEqual(reset_request.status_code, 403)
+        self.assertEqual(reset_request.data["errors"]["detail"], "Password management is handled by admin.")
+
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        reset_confirm = self.client.post(
+            reverse("auth-password-reset-confirm"),
+            {
+                "uid": uid,
+                "token": token,
+                "new_password": "UserChosenPass@123",
+            },
+            format="json",
+        )
+        self.assertEqual(reset_confirm.status_code, 403)
+        self.assertTrue(user.check_password("AdminIssuedPass@123"))
+
+        login_response = self.client.post(
+            reverse("auth-login"),
+            {"email": user.email, "password": "AdminIssuedPass@123"},
+            format="json",
+        )
+        self.assertEqual(login_response.status_code, 200)
+        change_response = self.client.post(
+            reverse("auth-change-password"),
+            {
+                "current_password": "AdminIssuedPass@123",
+                "new_password": "UserChosenPass@123",
+            },
+            format="json",
+        )
+        self.assertEqual(change_response.status_code, 403)
+        user.refresh_from_db()
+        self.assertTrue(user.check_password("AdminIssuedPass@123"))
 
 
 class AdminPasswordVerificationTests(APITestCase):
@@ -1559,7 +1610,7 @@ class PaymentVerificationTests(BaseAPITestCase):
             if generated_user is None:
                 generated_user = payment.user
                 first_expiry = enrollment.access_expires_at
-                self.assertRegex(generated_user.email, r"^adl-\d{4,}@adlfront\.com$")
+                self.assertRegex(generated_user.email, r"^ADL\d{4,}@adlfront\.com$")
                 self.assertFalse(generated_user.has_usable_password())
                 self.assertNotEqual(generated_user.id, unrelated.id)
                 self.assertEqual(enrollment.access_type, Enrollment.ACCESS_INSTALLMENT)

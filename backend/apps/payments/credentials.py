@@ -13,7 +13,7 @@ SAFE_DIGITS = "23456789"
 PASSWORD_SYMBOLS = "!@#$%^&*"
 
 
-def generate_temporary_password():
+def generate_account_password():
     characters = [
         *(secrets.choice(SAFE_LETTERS) for _ in range(8)),
         *(secrets.choice(SAFE_DIGITS) for _ in range(2)),
@@ -36,7 +36,7 @@ def issue_credentials_for_paid_user(*, user_id):
     if payment is None:
         raise ValueError("Credentials can only be issued for a successfully paid account.")
 
-    password = generate_temporary_password()
+    password = generate_account_password()
     user.set_password(password)
     user.active_session_version += 1
     user.save(update_fields=["password", "active_session_version", "updated_at"])

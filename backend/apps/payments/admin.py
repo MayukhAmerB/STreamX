@@ -166,7 +166,7 @@ class PaymentAdmin(admin.ModelAdmin):
         if len(selected) != 1:
             self.message_user(
                 request,
-                "Select exactly one paid record so its temporary password can be shown safely.",
+                "Select exactly one paid record so its account password can be shown safely.",
                 level=messages.ERROR,
             )
             return
@@ -184,7 +184,7 @@ class PaymentAdmin(admin.ModelAdmin):
         self.log_change(request, payment, "Generated or reset paid-user login credentials.")
         self.message_user(
             request,
-            f"Credentials generated. Username: {payment.user.email} | Temporary password: {password}",
+            f"Credentials generated. Username: {payment.user.email} | Account password: {password}",
             level=messages.SUCCESS,
         )
 
@@ -243,7 +243,7 @@ class SuccessfulPaymentUserAdmin(admin.ModelAdmin):
             "-paid_at", "-created_at", "-id"
         )
         generated_username = (
-            Q(email__istartswith="adl-", email__iendswith="@adlfront.com")
+            Q(email__istartswith="adl", email__iendswith="@adlfront.com")
             | Q(email__istartswith="adl", email__iendswith="@alsyedinitiative.com")
         )
         return (
