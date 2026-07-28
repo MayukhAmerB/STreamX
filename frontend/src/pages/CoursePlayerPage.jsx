@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
   createLectureQuestion,
   getCourse,
@@ -733,8 +733,16 @@ export default function CoursePlayerPage() {
             <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#949494]">
               Course Videos
             </div>
-            <div className="mt-2 text-lg font-semibold text-white">
-              All lessons
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <div className="text-lg font-semibold text-white">
+                All lessons
+              </div>
+              <Link
+                to={`/courses/${courseId}/live`}
+                className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg border border-white/20 bg-white px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-black transition hover:bg-[#DEDEDE] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                Live Classes <span aria-hidden="true" className="ml-2">-&gt;</span>
+              </Link>
             </div>
             <div className="mt-1 text-xs leading-5 text-[#A7A7B7]">
               {course?.sections?.length || 0} modules | {lectureCount} lessons | {lectureStats.completedCount} completed
