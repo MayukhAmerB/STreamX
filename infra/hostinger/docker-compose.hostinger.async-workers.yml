@@ -12,7 +12,7 @@ services:
       [
         "sh",
         "-c",
-        "python manage.py process_async_jobs --batch-size ${ASYNC_JOBS_BATCH_SIZE:-25} --poll-seconds ${ASYNC_JOBS_WORKER_POLL_SECONDS:-10}",
+        "python manage.py process_async_jobs --batch-size ${ASYNC_JOBS_BATCH_SIZE:-100} --poll-seconds ${ASYNC_JOBS_WORKER_POLL_SECONDS:-1}",
       ]
     depends_on:
       postgres:
@@ -32,5 +32,49 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    networks:
+      - appnet
+
+  worker-2:
+    build:
+      context: ./backend
+    restart: always
+    env_file:
+      - ./backend/.env.hostinger.production
+    environment:
+      RUN_MIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "0"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-alsyed_app}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in environment}@pgbouncer:5432/${POSTGRES_DB:-alsyedacademy}"
+      DATABASE_CONN_MAX_AGE: "${DATABASE_CONN_MAX_AGE:-300}"
+    command:
+      [
+        "sh",
+        "-c",
+        "python manage.py process_async_jobs --batch-size ${ASYNC_JOBS_BATCH_SIZE:-100} --poll-seconds ${ASYNC_JOBS_WORKER_POLL_SECONDS:-1}",
+      ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+    volumes:
+      - backend_media:/app/media
+      - recordings_data:/recordings:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "from pathlib import Path; import sys; cmd = Path('/proc/1/cmdline').read_text().replace('\\x00', ' '); sys.exit(0 if 'process_async_jobs' in cmd else 1)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    cpus: "${WORKER_2_CPUS:-1.0}"
+    mem_limit: "${WORKER_2_MEM_LIMIT:-1.5g}"
+    mem_reservation: "${WORKER_2_MEM_RESERVATION:-768m}"
+    pids_limit: 512
     networks:
       - appnet

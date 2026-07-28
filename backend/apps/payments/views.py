@@ -1,5 +1,7 @@
 import json
+import hashlib
 import re
+from datetime import timedelta
 from decimal import Decimal
 from urllib.parse import urlencode
 
@@ -19,7 +21,7 @@ from apps.realtime.domain import invalidate_course_join_access_cache
 from config.audit import log_security_event
 from config.response import api_response
 
-from .models import Payment
+from .models import Payment, PaymentWebhookEvent
 from .pricing import get_plan_amount, get_plan_amount_paise
 from .provisioning import provision_paid_payment
 from .serializers import CreateOrderSerializer, VerifyPaymentSerializer
@@ -146,7 +148,14 @@ def _gateway_payment_validation_error(*, payment, callback_data, gateway_payment
     return None
 
 
-def process_payment_webhook_payload(*, payload, signature="", request=None, source="api"):
+def process_payment_webhook_payload(
+    *,
+    payload,
+    signature="",
+    request=None,
+    source="api",
+    defer_provisioning=False,
+):
     event = str(payload.get("event") or "").strip().lower()
     payload_data = payload.get("payload") or {}
     payment_entity = ((payload_data.get("payment") or {}).get("entity") or {})
@@ -240,6 +249,7 @@ def process_payment_webhook_payload(*, payload, signature="", request=None, sour
         }
 
     processed = False
+    provisioning_queued = False
     with transaction.atomic():
         payment = (
             Payment.objects.select_for_update()
@@ -303,7 +313,21 @@ def process_payment_webhook_payload(*, payload, signature="", request=None, sour
             if update_fields:
                 payment.save(update_fields=[*update_fields, "updated_at"])
 
-            _grant_paid_course_access(payment)
+            if (
+                defer_provisioning
+                and bool(getattr(settings, "ASYNC_JOBS_ENABLED", False))
+            ):
+                from apps.users.async_jobs import enqueue_payment_provision_job
+
+                enqueue_payment_provision_job(
+                    payment_id=payment.id,
+                    max_attempts=int(
+                        getattr(settings, "ASYNC_PAYMENT_PROVISION_MAX_ATTEMPTS", 8)
+                    ),
+                )
+                provisioning_queued = True
+            else:
+                _grant_paid_course_access(payment)
             processed = True
             log_security_event(
                 "payment.webhook_payment_captured",
@@ -379,7 +403,12 @@ def process_payment_webhook_payload(*, payload, signature="", request=None, sour
         "success": True,
         "status_code": status.HTTP_200_OK,
         "message": "Webhook processed." if processed else "Webhook ignored.",
-        "data": {"processed": processed, "payment_id": payment.id, "status": payment.status},
+        "data": {
+            "processed": processed,
+            "payment_id": payment.id,
+            "status": payment.status,
+            "provisioning_queued": provisioning_queued,
+        },
     }
 
 
@@ -767,12 +796,59 @@ class PaymentWebhookView(APIView):
             )
 
         event = str(payload.get("event") or "").strip().lower()
+        payload_hash = hashlib.sha256(raw_body).hexdigest()
+        event_id = str(request.headers.get("X-Razorpay-Event-Id", "")).strip()
+        if not event_id:
+            event_id = f"payload-{payload_hash}"
+        webhook_event, created = PaymentWebhookEvent.objects.get_or_create(
+            event_id=event_id[:255],
+            defaults={
+                "event_type": event[:120],
+                "payload_hash": payload_hash,
+            },
+        )
+        duplicate_statuses = {
+            PaymentWebhookEvent.STATUS_PROCESSED,
+            PaymentWebhookEvent.STATUS_IGNORED,
+            PaymentWebhookEvent.STATUS_REJECTED,
+            PaymentWebhookEvent.STATUS_RETRY_QUEUED,
+        }
+        processing_is_fresh = (
+            webhook_event.status == PaymentWebhookEvent.STATUS_RECEIVED
+            and webhook_event.received_at
+            > timezone.now() - timedelta(minutes=5)
+        )
+        if not created and (
+            webhook_event.status in duplicate_statuses or processing_is_fresh
+        ):
+            return api_response(
+                success=True,
+                message=(
+                    "Webhook processing is already in progress."
+                    if processing_is_fresh
+                    else "Webhook already received."
+                ),
+                data={
+                    "processed": webhook_event.status
+                    == PaymentWebhookEvent.STATUS_PROCESSED,
+                    "duplicate": True,
+                    "processing": processing_is_fresh,
+                    "event_id": webhook_event.event_id,
+                },
+                status_code=(
+                    status.HTTP_202_ACCEPTED
+                    if processing_is_fresh
+                    else status.HTTP_200_OK
+                ),
+            )
+
         try:
             result = process_payment_webhook_payload(
                 payload=payload,
                 signature=signature,
                 request=request,
                 source="api",
+                defer_provisioning=True,
             )
         except Exception as exc:  # noqa: BLE001
             log_security_event(
@@ -788,12 +864,23 @@ class PaymentWebhookView(APIView):
                     retry_job = enqueue_payment_webhook_retry_job(
                         payload=payload,
                         signature=signature,
+                        webhook_event_id=webhook_event.event_id,
                         max_attempts=int(getattr(settings, "ASYNC_WEBHOOK_RETRY_MAX_ATTEMPTS", 6)),
                     )
                 except Exception:
                     retry_job = None
 
                 if retry_job is not None:
+                    webhook_event.status = PaymentWebhookEvent.STATUS_RETRY_QUEUED
+                    webhook_event.processing_note = "Queued after transient processing failure."
+                    webhook_event.processed_at = timezone.now()
+                    webhook_event.save(
+                        update_fields=[
+                            "status",
+                            "processing_note",
+                            "processed_at",
+                        ]
+                    )
                     return api_response(
                         success=True,
                         message="Webhook queued for retry.",
@@ -801,10 +888,17 @@ class PaymentWebhookView(APIView):
                             "processed": False,
                             "queued": True,
                             "job_id": retry_job.id,
+                            "event_id": webhook_event.event_id,
                         },
                         status_code=status.HTTP_202_ACCEPTED,
                     )
 
+            webhook_event.status = PaymentWebhookEvent.STATUS_FAILED
+            webhook_event.processing_note = str(exc)[:500]
+            webhook_event.processed_at = timezone.now()
+            webhook_event.save(
+                update_fields=["status", "processing_note", "processed_at"]
+            )
             return api_response(
                 success=False,
                 message="Webhook processing failed.",
@@ -812,12 +906,34 @@ class PaymentWebhookView(APIView):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+        result_status_code = int(result.get("status_code", status.HTTP_200_OK))
+        result_data = result.get("data") or {}
+        payment_id = result_data.get("payment_id")
+        if payment_id and Payment.objects.filter(pk=payment_id).exists():
+            webhook_event.payment_id = payment_id
+        if not bool(result.get("success", True)):
+            webhook_event.status = PaymentWebhookEvent.STATUS_REJECTED
+        elif bool(result_data.get("processed")):
+            webhook_event.status = PaymentWebhookEvent.STATUS_PROCESSED
+        else:
+            webhook_event.status = PaymentWebhookEvent.STATUS_IGNORED
+        webhook_event.processing_note = str(result.get("message") or "")[:500]
+        webhook_event.processed_at = timezone.now()
+        webhook_event.save(
+            update_fields=[
+                "payment",
+                "status",
+                "processing_note",
+                "processed_at",
+            ]
+        )
+
         return api_response(
             success=bool(result.get("success", True)),
             message=str(result.get("message") or "Webhook processed."),
-            data=result.get("data"),
+            data={**result_data, "event_id": webhook_event.event_id},
             errors=result.get("errors"),
-            status_code=int(result.get("status_code", status.HTTP_200_OK)),
+            status_code=result_status_code,
         )
 
 

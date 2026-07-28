@@ -1,11 +1,22 @@
 import hashlib
 import hmac
 
+import requests
 from django.conf import settings
 
 
 class RazorpayServiceError(Exception):
     pass
+
+
+class _TimeoutSession(requests.Session):
+    def __init__(self, *, timeout_seconds):
+        super().__init__()
+        self.timeout_seconds = max(1.0, float(timeout_seconds))
+
+    def request(self, method, url, **kwargs):
+        kwargs.setdefault("timeout", self.timeout_seconds)
+        return super().request(method, url, **kwargs)
 
 
 def get_razorpay_client():
@@ -17,7 +28,13 @@ def get_razorpay_client():
         raise RazorpayServiceError(
             "Razorpay SDK dependency is unavailable. Install setuptools and razorpay dependencies."
         ) from exc
-    return razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+    session = _TimeoutSession(
+        timeout_seconds=getattr(settings, "RAZORPAY_HTTP_TIMEOUT_SECONDS", 12)
+    )
+    return razorpay.Client(
+        session=session,
+        auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET),
+    )
 
 
 def create_razorpay_order(*, amount_paise, currency="INR", receipt=""):

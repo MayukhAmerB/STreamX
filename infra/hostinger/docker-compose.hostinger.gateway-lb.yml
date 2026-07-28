@@ -11,6 +11,10 @@ services:
         condition: service_healthy
       backend-4:
         condition: service_healthy
+      payment-backend-1:
+        condition: service_healthy
+      payment-backend-2:
+        condition: service_healthy
       frontend:
         condition: service_started
       media:

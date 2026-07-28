@@ -31,13 +31,30 @@ def enqueue_email_job(*, subject, body, from_email, to, reply_to=None, max_attem
     )
 
 
-def enqueue_payment_webhook_retry_job(*, payload, signature, max_attempts=6):
+def enqueue_payment_provision_job(*, payment_id, max_attempts=8):
+    return AsyncJob.objects.create(
+        job_type=AsyncJob.TYPE_PAYMENT_PROVISION,
+        status=AsyncJob.STATUS_PENDING,
+        payload={"payment_id": int(payment_id)},
+        max_attempts=max(1, int(max_attempts or 1)),
+        run_after=timezone.now(),
+    )
+
+
+def enqueue_payment_webhook_retry_job(
+    *,
+    payload,
+    signature,
+    webhook_event_id="",
+    max_attempts=6,
+):
     return AsyncJob.objects.create(
         job_type=AsyncJob.TYPE_PAYMENT_WEBHOOK_RETRY,
         status=AsyncJob.STATUS_PENDING,
         payload={
             "payload": payload,
             "signature": str(signature or ""),
+            "webhook_event_id": str(webhook_event_id or ""),
         },
         max_attempts=max(1, int(max_attempts or 1)),
         run_after=timezone.now(),
@@ -128,11 +145,59 @@ def _run_payment_webhook_retry_job(job):
         signature=str(payload.get("signature") or ""),
         request=None,
         source="async_retry",
+        defer_provisioning=False,
     )
     status_code = int(result.get("status_code", 200))
     if status_code >= 500:
         raise RuntimeError(f"Webhook retry processing returned status_code={status_code}")
+    webhook_event_id = str(payload.get("webhook_event_id") or "").strip()
+    if webhook_event_id:
+        from apps.payments.models import PaymentWebhookEvent
+
+        result_data = result.get("data") or {}
+        event_status = (
+            PaymentWebhookEvent.STATUS_PROCESSED
+            if bool(result.get("success", True)) and bool(result_data.get("processed"))
+            else PaymentWebhookEvent.STATUS_IGNORED
+            if bool(result.get("success", True))
+            else PaymentWebhookEvent.STATUS_REJECTED
+        )
+        payment_id = result_data.get("payment_id")
+        if payment_id:
+            from apps.payments.models import Payment
+
+            payment_id = (
+                payment_id if Payment.objects.filter(pk=payment_id).exists() else None
+            )
+        PaymentWebhookEvent.objects.filter(event_id=webhook_event_id).update(
+            payment_id=payment_id,
+            status=event_status,
+            processing_note=str(result.get("message") or "")[:500],
+            processed_at=timezone.now(),
+        )
     return result
+
+
+def _run_payment_provision_job(job):
+    payment_id = (job.payload or {}).get("payment_id")
+    if not payment_id:
+        raise ValueError("Payment provision job has no payment_id.")
+
+    from apps.payments.models import Payment
+    from apps.payments.provisioning import provision_paid_payment
+
+    payment = Payment.objects.select_related("course", "user").get(pk=int(payment_id))
+    enrollment = provision_paid_payment(payment)
+    payment.refresh_from_db(
+        fields=["provisioning_status", "invoice_number", "user_email_snapshot"]
+    )
+    return {
+        "payment_id": payment.id,
+        "enrollment_id": getattr(enrollment, "id", None),
+        "provisioning_status": payment.provisioning_status,
+        "invoice_number": payment.invoice_number,
+        "generated_login": payment.user_email_snapshot,
+    }
 
 
 def _run_web_push_job(job):
@@ -153,6 +218,8 @@ def _run_web_push_job(job):
 def _run_job(job):
     if job.job_type == AsyncJob.TYPE_EMAIL_SEND:
         return _run_email_job(job)
+    if job.job_type == AsyncJob.TYPE_PAYMENT_PROVISION:
+        return _run_payment_provision_job(job)
     if job.job_type == AsyncJob.TYPE_PAYMENT_WEBHOOK_RETRY:
         return _run_payment_webhook_retry_job(job)
     if job.job_type == AsyncJob.TYPE_WEB_PUSH_SEND:

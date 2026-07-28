@@ -42,7 +42,7 @@ from apps.courses.models import (
 )
 from apps.courses.serializers import LectureSerializer
 from apps.courses.services import transcode_lecture_to_hls
-from apps.payments.models import Payment
+from apps.payments.models import Payment, PaymentWebhookEvent
 from apps.payments.provisioning import provision_paid_payment
 from apps.payments.services import RazorpayServiceError
 from apps.realtime import domain as realtime_domain
@@ -54,7 +54,8 @@ from apps.realtime.models import (
     RealtimeSessionRecording,
 )
 from apps.notifications.models import Notification, NotificationRecipient, WebPushSubscription
-from apps.users.models import User
+from apps.users.async_jobs import run_pending_jobs
+from apps.users.models import AsyncJob, User
 from apps.users.serializers import ProfileUpdateSerializer
 from apps.users.terms import TERMS_BODY, TERMS_VERSION
 
@@ -2114,6 +2115,165 @@ class PaymentVerificationTests(BaseAPITestCase):
         self.assertEqual(payment.gateway_status, "captured")
         self.assertEqual(payment.last_webhook_event, "payment.captured")
         self.assertIsNotNone(payment.paid_at)
+        self.assertTrue(
+            Enrollment.objects.filter(
+                user=self.student,
+                course=self.course,
+                payment_status=Enrollment.STATUS_PAID,
+            ).exists()
+        )
+
+    @override_settings(RAZORPAY_WEBHOOK_SECRET="whsec_test")
+    def test_payment_webhook_event_id_is_idempotent(self):
+        payment = Payment.objects.create(
+            user=self.student,
+            course=self.course,
+            razorpay_order_id="order_webhook_duplicate",
+            amount=self.course.price,
+            currency="INR",
+            status=Payment.STATUS_CREATED,
+        )
+        payload = {
+            "event": "payment.captured",
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "id": "pay_webhook_duplicate",
+                        "order_id": payment.razorpay_order_id,
+                        "status": "captured",
+                        "amount": int(Decimal(self.course.price) * 100),
+                        "currency": payment.currency,
+                    }
+                }
+            },
+        }
+        body = json.dumps(payload).encode("utf-8")
+        signature = hmac.new(b"whsec_test", body, hashlib.sha256).hexdigest()
+        request_kwargs = {
+            "data": body,
+            "content_type": "application/json",
+            "HTTP_X_RAZORPAY_SIGNATURE": signature,
+            "HTTP_X_RAZORPAY_EVENT_ID": "event_duplicate_123",
+        }
+
+        first = self.client.post(reverse("payment-webhook"), **request_kwargs)
+        second = self.client.post(reverse("payment-webhook"), **request_kwargs)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertTrue(second.data["data"]["duplicate"])
+        self.assertEqual(
+            PaymentWebhookEvent.objects.filter(event_id="event_duplicate_123").count(),
+            1,
+        )
+        self.assertEqual(
+            Enrollment.objects.filter(user=self.student, course=self.course).count(),
+            1,
+        )
+
+    @override_settings(RAZORPAY_WEBHOOK_SECRET="whsec_test")
+    def test_payment_webhook_duplicate_does_not_race_inflight_event(self):
+        payment = Payment.objects.create(
+            user=self.student,
+            course=self.course,
+            razorpay_order_id="order_webhook_inflight",
+            amount=self.course.price,
+            currency="INR",
+            status=Payment.STATUS_CREATED,
+        )
+        payload = {
+            "event": "payment.captured",
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "id": "pay_webhook_inflight",
+                        "order_id": payment.razorpay_order_id,
+                        "status": "captured",
+                        "amount": int(Decimal(self.course.price) * 100),
+                        "currency": payment.currency,
+                    }
+                }
+            },
+        }
+        body = json.dumps(payload).encode("utf-8")
+        signature = hmac.new(b"whsec_test", body, hashlib.sha256).hexdigest()
+        PaymentWebhookEvent.objects.create(
+            event_id="event_inflight_123",
+            event_type="payment.captured",
+            payload_hash=hashlib.sha256(body).hexdigest(),
+        )
+
+        response = self.client.post(
+            reverse("payment-webhook"),
+            data=body,
+            content_type="application/json",
+            HTTP_X_RAZORPAY_SIGNATURE=signature,
+            HTTP_X_RAZORPAY_EVENT_ID="event_inflight_123",
+        )
+
+        self.assertEqual(response.status_code, 202)
+        self.assertTrue(response.data["data"]["duplicate"])
+        self.assertTrue(response.data["data"]["processing"])
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, Payment.STATUS_CREATED)
+
+    @override_settings(
+        RAZORPAY_WEBHOOK_SECRET="whsec_test",
+        ASYNC_JOBS_ENABLED=True,
+        ASYNC_PAYMENT_PROVISION_MAX_ATTEMPTS=8,
+    )
+    def test_payment_webhook_queues_access_provisioning(self):
+        payment = Payment.objects.create(
+            user=self.student,
+            course=self.course,
+            razorpay_order_id="order_webhook_async",
+            amount=self.course.price,
+            currency="INR",
+            status=Payment.STATUS_CREATED,
+        )
+        payload = {
+            "event": "payment.captured",
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "id": "pay_webhook_async",
+                        "order_id": payment.razorpay_order_id,
+                        "status": "captured",
+                        "amount": int(Decimal(self.course.price) * 100),
+                        "currency": payment.currency,
+                    }
+                }
+            },
+        }
+        body = json.dumps(payload).encode("utf-8")
+        signature = hmac.new(b"whsec_test", body, hashlib.sha256).hexdigest()
+
+        response = self.client.post(
+            reverse("payment-webhook"),
+            data=body,
+            content_type="application/json",
+            HTTP_X_RAZORPAY_SIGNATURE=signature,
+            HTTP_X_RAZORPAY_EVENT_ID="event_async_123",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["data"]["provisioning_queued"])
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, Payment.STATUS_PAID)
+        self.assertFalse(
+            Enrollment.objects.filter(user=self.student, course=self.course).exists()
+        )
+        self.assertEqual(
+            AsyncJob.objects.filter(
+                job_type=AsyncJob.TYPE_PAYMENT_PROVISION,
+                status=AsyncJob.STATUS_PENDING,
+            ).count(),
+            1,
+        )
+
+        stats = run_pending_jobs(batch_size=10)
+
+        self.assertEqual(stats["succeeded"], 1)
         self.assertTrue(
             Enrollment.objects.filter(
                 user=self.student,

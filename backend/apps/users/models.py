@@ -110,10 +110,12 @@ class UserTermsStatus(User):
 
 class AsyncJob(models.Model):
     TYPE_EMAIL_SEND = "email_send"
+    TYPE_PAYMENT_PROVISION = "payment_provision"
     TYPE_PAYMENT_WEBHOOK_RETRY = "payment_webhook_retry"
     TYPE_WEB_PUSH_SEND = "web_push_send"
     TYPE_CHOICES = [
         (TYPE_EMAIL_SEND, "Email Send"),
+        (TYPE_PAYMENT_PROVISION, "Payment Provision"),
         (TYPE_PAYMENT_WEBHOOK_RETRY, "Payment Webhook Retry"),
         (TYPE_WEB_PUSH_SEND, "Web Push Send"),
     ]

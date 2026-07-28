@@ -222,8 +222,8 @@ REST_FRAMEWORK = {
         "campaign_volunteer": "30/hour",
         "password_reset_request": "5/hour",
         "password_reset_confirm": "20/hour",
-        "payment_create": "20/hour",
-        "payment_verify": "60/hour",
+        "payment_create": "120/minute",
+        "payment_verify": "240/minute",
         "course_enroll": "20/hour",
         "live_class_enroll": "20/hour",
         "lecture_playback": "120/minute",
@@ -317,6 +317,12 @@ AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", "")
 RAZORPAY_KEY_ID = env("RAZORPAY_KEY_ID", "")
 RAZORPAY_KEY_SECRET = env("RAZORPAY_KEY_SECRET", "")
 RAZORPAY_WEBHOOK_SECRET = env("RAZORPAY_WEBHOOK_SECRET", "")
+try:
+    RAZORPAY_HTTP_TIMEOUT_SECONDS = max(
+        1.0, float(env("RAZORPAY_HTTP_TIMEOUT_SECONDS", "12"))
+    )
+except (TypeError, ValueError):
+    RAZORPAY_HTTP_TIMEOUT_SECONDS = 12.0
 DIRECT_COURSE_PAYMENTS_ENABLED = env_bool("DIRECT_COURSE_PAYMENTS_ENABLED", False)
 PAYMENT_SUPPORT_WHATSAPP_NUMBER = env(
     "PAYMENT_SUPPORT_WHATSAPP_NUMBER",
@@ -447,6 +453,9 @@ ASYNC_JOBS_POLL_SECONDS = env_int("ASYNC_JOBS_POLL_SECONDS", 10)
 ASYNC_JOBS_LOCK_TIMEOUT_SECONDS = env_int("ASYNC_JOBS_LOCK_TIMEOUT_SECONDS", 300)
 ASYNC_EMAIL_MAX_ATTEMPTS = env_int("ASYNC_EMAIL_MAX_ATTEMPTS", 5)
 ASYNC_WEBHOOK_RETRY_MAX_ATTEMPTS = env_int("ASYNC_WEBHOOK_RETRY_MAX_ATTEMPTS", 6)
+ASYNC_PAYMENT_PROVISION_MAX_ATTEMPTS = env_int(
+    "ASYNC_PAYMENT_PROVISION_MAX_ATTEMPTS", 8
+)
 WEB_PUSH_ENABLED = env_bool("WEB_PUSH_ENABLED", False)
 WEB_PUSH_VAPID_PUBLIC_KEY = env("WEB_PUSH_VAPID_PUBLIC_KEY", "").strip()
 WEB_PUSH_VAPID_PRIVATE_KEY = env("WEB_PUSH_VAPID_PRIVATE_KEY", "").strip()

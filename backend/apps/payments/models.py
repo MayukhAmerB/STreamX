@@ -111,3 +111,49 @@ class StudentAccountSequence(models.Model):
     class Meta:
         verbose_name = "Student account sequence"
         verbose_name_plural = "Student account sequence"
+
+
+class PaymentWebhookEvent(models.Model):
+    STATUS_RECEIVED = "received"
+    STATUS_PROCESSED = "processed"
+    STATUS_IGNORED = "ignored"
+    STATUS_REJECTED = "rejected"
+    STATUS_RETRY_QUEUED = "retry_queued"
+    STATUS_FAILED = "failed"
+    STATUS_CHOICES = [
+        (STATUS_RECEIVED, "Received"),
+        (STATUS_PROCESSED, "Processed"),
+        (STATUS_IGNORED, "Ignored"),
+        (STATUS_REJECTED, "Rejected"),
+        (STATUS_RETRY_QUEUED, "Retry queued"),
+        (STATUS_FAILED, "Failed"),
+    ]
+
+    event_id = models.CharField(max_length=255, unique=True)
+    event_type = models.CharField(max_length=120, blank=True, default="")
+    payload_hash = models.CharField(max_length=64)
+    payment = models.ForeignKey(
+        Payment,
+        on_delete=models.SET_NULL,
+        related_name="webhook_events",
+        blank=True,
+        null=True,
+    )
+    status = models.CharField(
+        max_length=24,
+        choices=STATUS_CHOICES,
+        default=STATUS_RECEIVED,
+    )
+    processing_note = models.CharField(max_length=500, blank=True, default="")
+    received_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["-received_at"]
+        indexes = [
+            models.Index(fields=["status", "received_at"]),
+            models.Index(fields=["event_type", "received_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.event_id}:{self.status}"

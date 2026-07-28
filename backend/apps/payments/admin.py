@@ -4,7 +4,7 @@ import string
 from django.contrib import admin, messages
 from django.utils import timezone
 
-from .models import Payment
+from .models import Payment, PaymentWebhookEvent
 
 
 @admin.register(Payment)
@@ -186,3 +186,39 @@ class PaymentAdmin(admin.ModelAdmin):
             f"Credentials generated. Username: {payment.user.email} | Temporary password: {password}",
             level=messages.SUCCESS,
         )
+
+
+@admin.register(PaymentWebhookEvent)
+class PaymentWebhookEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "event_id",
+        "event_type",
+        "status",
+        "payment",
+        "received_at",
+        "processed_at",
+    )
+    search_fields = (
+        "event_id",
+        "event_type",
+        "payload_hash",
+        "payment__razorpay_order_id",
+        "payment__razorpay_payment_id",
+    )
+    list_filter = ("status", "event_type", "received_at")
+    readonly_fields = (
+        "event_id",
+        "event_type",
+        "payload_hash",
+        "payment",
+        "status",
+        "processing_note",
+        "received_at",
+        "processed_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

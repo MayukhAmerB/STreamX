@@ -17,6 +17,18 @@ services:
     mem_reservation: "${BACKEND_POOL_MEM_RESERVATION:-1g}"
     pids_limit: 512
 
+  payment-backend-1:
+    cpus: "${PAYMENT_BACKEND_CPUS:-1.5}"
+    mem_limit: "${PAYMENT_BACKEND_MEM_LIMIT:-2g}"
+    mem_reservation: "${PAYMENT_BACKEND_MEM_RESERVATION:-1g}"
+    pids_limit: 512
+
+  payment-backend-2:
+    cpus: "${PAYMENT_BACKEND_CPUS:-1.5}"
+    mem_limit: "${PAYMENT_BACKEND_MEM_LIMIT:-2g}"
+    mem_reservation: "${PAYMENT_BACKEND_MEM_RESERVATION:-1g}"
+    pids_limit: 512
+
   gateway:
     cpus: "${GATEWAY_CPUS:-0.75}"
     mem_limit: "${GATEWAY_MEM_LIMIT:-512m}"
