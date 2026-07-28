@@ -24,7 +24,7 @@ const inputClassName =
 
 function CheckIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-5 w-5">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-4 w-4 sm:h-5 sm:w-5">
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
       <path d="m8 12 2.6 2.6L16.5 9" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
@@ -75,11 +75,11 @@ function ShieldIcon() {
 
 function PlanFeature({ children }) {
   return (
-    <li className="flex items-start gap-3 text-sm leading-6 text-[#D3D3D3] sm:text-base">
+    <li className="flex min-w-0 items-start gap-1.5 text-[11px] leading-4 text-[#D3D3D3] sm:gap-3 sm:text-base sm:leading-6">
       <span className="mt-0.5 shrink-0 text-[#79A5FF]">
         <CheckIcon />
       </span>
-      <span>{children}</span>
+      <span className="min-w-0 break-words">{children}</span>
     </li>
   );
 }
@@ -487,7 +487,7 @@ export default function CoursePaymentPage() {
 
           <form
             className={`flex min-w-0 flex-col justify-between ${
-              isFinalStep ? "mx-auto w-full max-w-6xl p-5 sm:p-8 lg:px-14 lg:py-12" : "p-5 sm:p-8 lg:p-12"
+              isFinalStep ? "mx-auto w-full max-w-6xl p-3 sm:p-8 lg:px-14 lg:py-12" : "p-5 sm:p-8 lg:p-12"
             }`}
             onSubmit={isFinalStep ? handlePayNow : moveForward}
           >
@@ -584,7 +584,7 @@ export default function CoursePaymentPage() {
                 <div className="mx-auto w-full max-w-5xl">
                   <div className="flex items-center gap-5" aria-hidden="true">
                     <span className="h-px flex-1 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.15))]" />
-                    <span className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white sm:h-28 sm:w-28">
+                    <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white sm:h-28 sm:w-28">
                       <PlanIcon type="wallet" />
                     </span>
                     <span className="h-px flex-1 bg-[linear-gradient(90deg,rgba(255,255,255,0.15),transparent)]" />
@@ -594,7 +594,7 @@ export default function CoursePaymentPage() {
                     <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#B7B7B7] sm:text-sm">
                       Enrollment step {currentStep + 1} of {steps.length}
                     </p>
-                    <h3 className="mt-3 font-reference text-4xl font-semibold tracking-[-0.03em] text-white sm:text-5xl">
+                    <h3 className="mt-3 font-reference text-3xl font-semibold tracking-[-0.03em] text-white sm:text-5xl">
                       Choose Your Plan
                     </h3>
                     <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-[#A5A5A5] sm:text-lg sm:leading-8">
@@ -602,7 +602,7 @@ export default function CoursePaymentPage() {
                     </p>
                   </div>
 
-                  <div className="mt-9 grid gap-4 lg:grid-cols-2 lg:gap-5">
+                  <div className="mt-7 grid grid-cols-2 gap-2 sm:mt-9 sm:gap-4 lg:gap-5">
                     {course.installment_payment_enabled ? (
                       <button
                         type="button"
@@ -611,34 +611,34 @@ export default function CoursePaymentPage() {
                           setError("");
                         }}
                         aria-pressed={plan === "monthly"}
-                        className={`flex min-h-[490px] flex-col rounded-2xl border p-5 text-left transition sm:p-7 ${
+                        className={`flex min-h-[430px] min-w-0 flex-col rounded-xl border p-3 text-left transition sm:min-h-[490px] sm:rounded-2xl sm:p-7 ${
                           plan === "monthly"
                             ? "border-[#79A5FF] bg-[#10141C] text-white shadow-[0_0_0_1px_rgba(121,165,255,0.2)]"
                             : "border-white/15 bg-black/55 text-white hover:border-white/35"
                         }`}
                       >
-                        <span className="block text-center text-2xl font-semibold">
+                        <span className="block text-center text-base font-semibold sm:text-2xl">
                           Plan 1
                         </span>
-                        <span className="mt-2 block text-center text-sm text-[#C3C3C3] sm:text-base">
+                        <span className="mt-1 block text-center text-[10px] leading-4 text-[#C3C3C3] sm:mt-2 sm:text-base">
                           Monthly Payment Plan
                         </span>
-                        <span className="mt-6 block border-t border-white/10 pt-7 text-4xl font-semibold sm:text-5xl">
+                        <span className="mt-4 block border-t border-white/10 pt-4 text-xl font-semibold leading-tight sm:mt-6 sm:pt-7 sm:text-5xl">
                           {formatINR(course.monthly_price)}
-                          <span className="ml-2 text-sm font-normal text-[#B5B5B5]">/ month</span>
+                          <span className="mt-1 block text-[10px] font-normal text-[#B5B5B5] sm:ml-2 sm:mt-0 sm:inline sm:text-sm">/ month</span>
                         </span>
-                        <ul className="mt-7 space-y-3">
+                        <ul className="mt-4 space-y-2 sm:mt-7 sm:space-y-3">
                           <PlanFeature>
                             Pay <span className="text-[#79A5FF]">{formatINR(course.monthly_price)}</span> every month
                           </PlanFeature>
                           <PlanFeature>For 3 months (3 installments)</PlanFeature>
                         </ul>
-                        <span className="mt-auto flex items-center gap-4 rounded-xl border border-white/[0.08] bg-white/[0.045] p-4">
-                          <span className="shrink-0 text-white"><PlanIcon type="calendar" /></span>
-                          <span>
-                            <span className="block text-base font-semibold">3 Monthly Payments</span>
-                            <span className="mt-1 block text-sm text-[#A7A7A7]">
-                              {formatINR(course.monthly_price)} × 3 months
+                        <span className="mt-auto flex min-w-0 items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.045] p-2 sm:gap-4 sm:rounded-xl sm:p-4">
+                          <span className="hidden shrink-0 text-white sm:block"><PlanIcon type="calendar" /></span>
+                          <span className="min-w-0">
+                            <span className="block text-[11px] font-semibold leading-4 sm:text-base">3 Monthly Payments</span>
+                            <span className="mt-1 block text-[10px] leading-4 text-[#A7A7A7] sm:text-sm">
+                              {formatINR(course.monthly_price)} x 3 months
                             </span>
                           </span>
                         </span>
@@ -652,25 +652,25 @@ export default function CoursePaymentPage() {
                           setError("");
                         }}
                         aria-pressed={plan === "full"}
-                        className={`relative flex min-h-[490px] flex-col rounded-2xl border p-5 text-left transition sm:p-7 ${
+                        className={`relative flex min-h-[430px] min-w-0 flex-col rounded-xl border p-3 text-left transition sm:min-h-[490px] sm:rounded-2xl sm:p-7 ${
                           plan === "full"
                             ? "border-[#79A5FF] bg-[#10141C] text-white shadow-[0_0_0_1px_rgba(121,165,255,0.25)]"
                             : "border-white/15 bg-black/55 text-white hover:border-white/35"
                         }`}
                       >
-                        <span className="mx-auto -mt-1 mb-3 rounded-lg bg-[#79A5FF] px-4 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#07101F]">
+                        <span className="mx-auto -mt-1 mb-2 rounded-md bg-[#79A5FF] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.08em] text-[#07101F] sm:mb-3 sm:rounded-lg sm:px-4 sm:text-[10px] sm:tracking-[0.12em]">
                           Most chosen
                         </span>
-                        <span className="block text-center text-2xl font-semibold text-[#79A5FF]">
+                        <span className="block text-center text-base font-semibold text-[#79A5FF] sm:text-2xl">
                           Plan 2
                         </span>
-                        <span className="mt-2 block text-center text-sm text-[#C3C3C3] sm:text-base">
+                        <span className="mt-1 block text-center text-[10px] leading-4 text-[#C3C3C3] sm:mt-2 sm:text-base">
                           One-Time Payment
                         </span>
-                        <span className="mt-6 block border-t border-white/10 pt-7 text-4xl font-semibold sm:text-5xl">
+                        <span className="mt-4 block border-t border-white/10 pt-4 text-xl font-semibold leading-tight sm:mt-6 sm:pt-7 sm:text-5xl">
                           {formatINR(course.price)}
                         </span>
-                        <ul className="mt-7 space-y-3">
+                        <ul className="mt-4 space-y-2 sm:mt-7 sm:space-y-3">
                           <PlanFeature>One-time payment</PlanFeature>
                           <PlanFeature>Full duration: 3 months</PlanFeature>
                           <PlanFeature>Full access to all live sessions</PlanFeature>
@@ -678,11 +678,11 @@ export default function CoursePaymentPage() {
                           <PlanFeature>Certificate of completion</PlanFeature>
                           <PlanFeature>24x7 team chat support</PlanFeature>
                         </ul>
-                        <span className="mt-auto flex items-center gap-4 rounded-xl border border-white/[0.08] bg-white/[0.045] p-4">
-                          <span className="shrink-0 text-white"><PlanIcon type="tag" /></span>
-                          <span>
-                            <span className="block text-base font-semibold">One-Time Payment</span>
-                            <span className="mt-1 block text-sm text-[#A7A7A7]">Pay once, learn fully</span>
+                        <span className="mt-auto flex min-w-0 items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.045] p-2 sm:gap-4 sm:rounded-xl sm:p-4">
+                          <span className="hidden shrink-0 text-white sm:block"><PlanIcon type="tag" /></span>
+                          <span className="min-w-0">
+                            <span className="block text-[11px] font-semibold leading-4 sm:text-base">One-Time Payment</span>
+                            <span className="mt-1 block text-[10px] leading-4 text-[#A7A7A7] sm:text-sm">Pay once, learn fully</span>
                           </span>
                         </span>
                       </button>

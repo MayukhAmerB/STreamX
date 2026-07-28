@@ -13,7 +13,8 @@ gunicorn==23.0.0
 dj-database-url==2.3.0
 redis==5.2.1
 whitenoise==6.9.0
-setuptools>=69.0.0
+# razorpay 1.4.2 still imports pkg_resources, removed in setuptools 81+.
+setuptools==80.9.0
 prometheus-client==0.21.1
 sentry-sdk==2.19.2
 pywebpush==2.0.3
