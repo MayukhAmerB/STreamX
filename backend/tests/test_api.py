@@ -1484,11 +1484,15 @@ class InstructorDeletionSafetyTests(APITestCase):
     DIRECT_COURSE_PAYMENTS_ENABLED=True,
     RAZORPAY_KEY_ID="rzp_test_public",
     RAZORPAY_KEY_SECRET="test-secret",
-    COURSE_MONTHLY_PRICE_INR=1500,
-    COURSE_FULL_PRICE_INR=3500,
     PAYMENT_SUPPORT_WHATSAPP_NUMBER="919970875040",
 )
 class PaymentVerificationTests(BaseAPITestCase):
+    def setUp(self):
+        super().setUp()
+        self.course.price = Decimal("3500.00")
+        self.course.monthly_price = Decimal("1500.00")
+        self.course.save(update_fields=("price", "monthly_price"))
+
     def checkout_payload(self, **overrides):
         payload = {
             "course_id": self.course.id,
@@ -1571,7 +1575,7 @@ class PaymentVerificationTests(BaseAPITestCase):
         self.assertNotIn(self.course.id, returned_ids)
 
     @patch("apps.payments.views.create_razorpay_order")
-    def test_create_order_uses_fixed_backend_price_and_returns_public_key(self, mock_create_order):
+    def test_create_order_uses_admin_course_price_and_returns_public_key(self, mock_create_order):
         mock_create_order.return_value = {
             "id": "order_server_priced",
             "amount": 350000,

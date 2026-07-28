@@ -1,20 +1,18 @@
 from decimal import Decimal
 
-from django.conf import settings
-
-
 FULL_PLAN = "full"
 MONTHLY_PLAN = "monthly"
 
 
-def get_plan_amount(plan):
-    setting_name = (
-        "COURSE_MONTHLY_PRICE_INR"
-        if plan == MONTHLY_PLAN
-        else "COURSE_FULL_PRICE_INR"
-    )
-    return Decimal(str(getattr(settings, setting_name)))
+def get_plan_amount(course, plan):
+    if plan == MONTHLY_PLAN:
+        amount = course.monthly_price
+    elif plan == FULL_PLAN:
+        amount = course.price
+    else:
+        raise ValueError("Unsupported payment plan.")
+    return Decimal(str(amount))
 
 
-def get_plan_amount_paise(plan):
-    return int(get_plan_amount(plan) * 100)
+def get_plan_amount_paise(course, plan):
+    return int(get_plan_amount(course, plan) * 100)

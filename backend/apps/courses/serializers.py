@@ -302,10 +302,10 @@ class SectionNestedSerializer(serializers.ModelSerializer):
 
 class CourseEnrollmentStatusMixin:
     def get_price(self, obj):
-        return format(get_plan_amount(FULL_PLAN), ".2f")
+        return format(get_plan_amount(obj, FULL_PLAN), ".2f")
 
     def get_monthly_price(self, obj):
-        return format(get_plan_amount(MONTHLY_PLAN), ".2f")
+        return format(get_plan_amount(obj, MONTHLY_PLAN), ".2f")
 
     def get_purchase_available(self, obj):
         full_available = bool(obj.full_payment_enabled)

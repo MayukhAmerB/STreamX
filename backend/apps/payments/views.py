@@ -464,7 +464,7 @@ class CreateOrderView(APIView):
                 data={"already_enrolled": True, "course_id": course.id},
             )
 
-        amount = get_plan_amount(plan)
+        amount = get_plan_amount(course, plan)
         if Decimal(amount) <= 0:
             return api_response(
                 success=False,
@@ -472,7 +472,7 @@ class CreateOrderView(APIView):
                 errors={"detail": "The selected plan does not have a valid price."},
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
-        amount_paise = get_plan_amount_paise(plan)
+        amount_paise = get_plan_amount_paise(course, plan)
         payment = Payment.objects.create(
             user=request.user if request.user.is_authenticated else None,
             course=course,
