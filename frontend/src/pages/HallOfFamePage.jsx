@@ -3,7 +3,7 @@ import PageShell from "../components/PageShell";
 const certifiedBatches = [
   {
     name: "Batch 1",
-    students: ["Al Bashar", "Al Haris", "Zulqarnain", "Orvax", "Ibn Adam"],
+    students: ["Araxis", "Al Haris", "Zulqarnain", "Orvax", "Ibn Adam"],
   },
   {
     name: "Batch 2",
