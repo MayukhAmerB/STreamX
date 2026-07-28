@@ -537,7 +537,7 @@ function TrainingProgramPanel({ course }) {
         };
 
   return (
-    <article className="relative overflow-hidden rounded-[26px] border border-white/20 bg-[#111111] p-5 shadow-[0_28px_90px_rgba(0,0,0,0.6)] sm:p-7">
+    <article className="relative w-full max-w-[500px] overflow-hidden rounded-[24px] border border-white/20 bg-[#111111] p-4 shadow-[0_24px_72px_rgba(0,0,0,0.55)] sm:p-5">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -right-16 -top-16 h-52 w-52 rounded-full bg-white/[0.055] blur-[70px]"
@@ -552,12 +552,12 @@ function TrainingProgramPanel({ course }) {
         </span>
       </div>
 
-      <div className="relative mt-7 grid grid-cols-[64px_minmax(0,1fr)] gap-5 sm:grid-cols-[78px_minmax(0,1fr)] sm:gap-7">
-        <span className="flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-[#171717] sm:h-[78px] sm:w-[78px]">
+      <div className="relative mt-5 grid grid-cols-[56px_minmax(0,1fr)] gap-4 sm:grid-cols-[64px_minmax(0,1fr)] sm:gap-5">
+        <span className="flex h-14 w-14 items-center justify-center rounded-full border border-white/15 bg-[#171717] sm:h-16 sm:w-16">
           <svg
             viewBox="0 0 48 48"
             aria-hidden="true"
-            className="h-10 w-10 fill-none stroke-[#D5D5D5] stroke-[1.4]"
+            className="h-8 w-8 fill-none stroke-[#D5D5D5] stroke-[1.4] sm:h-9 sm:w-9"
           >
             <circle cx="24" cy="24" r="14" />
             <circle cx="24" cy="24" r="5" />
@@ -565,25 +565,25 @@ function TrainingProgramPanel({ course }) {
           </svg>
         </span>
         <div className="min-w-0">
-          <h2 className="font-reference text-[clamp(1.65rem,4vw,2.55rem)] font-semibold leading-[1.08] tracking-[-0.03em] text-white">
+          <h2 className="font-reference text-[clamp(1.45rem,3.5vw,2rem)] font-semibold leading-[1.08] tracking-[-0.03em] text-white">
             {course?.title || "OSINT Professional Training Program"}
           </h2>
-          <p className="mt-3 line-clamp-3 text-sm leading-6 text-[#A9A9A9] sm:text-base sm:leading-7">
+          <p className="mt-2 line-clamp-2 text-[13px] leading-5 text-[#A9A9A9] sm:text-sm sm:leading-6">
             {course?.description ||
               "A complete program featuring live instructor-led classes, practical assignments, exclusive resources, and real-world OSINT skills."}
           </p>
         </div>
       </div>
 
-      <div className="relative mt-7 border-t border-white/10 pt-5">
-        <ul className="space-y-3">
+      <div className="relative mt-5 border-t border-white/10 pt-4">
+        <ul className="space-y-2">
           {HERO_PROGRAM_FEATURES.map((feature) => (
-            <li key={feature.label} className="flex items-center gap-3 text-sm text-[#D1D1D1] sm:text-[15px]">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#171717]">
+            <li key={feature.label} className="flex items-center gap-3 text-[13px] text-[#D1D1D1] sm:text-sm">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#171717]">
                 <svg
                   viewBox="0 0 24 24"
                   aria-hidden="true"
-                  className="h-[18px] w-[18px] fill-none stroke-current stroke-[1.6] stroke-linecap-round stroke-linejoin-round"
+                  className="h-4 w-4 fill-none stroke-current stroke-[1.6] stroke-linecap-round stroke-linejoin-round"
                 >
                   <path d={feature.path} />
                 </svg>
@@ -594,17 +594,17 @@ function TrainingProgramPanel({ course }) {
         </ul>
       </div>
 
-      <div className="relative mt-6">
+      <div className="relative mt-5">
         {action.to ? (
           <Link
             to={action.to}
-            className="group inline-flex min-h-14 w-full items-center justify-center gap-4 rounded-xl border border-white bg-white px-5 text-sm font-bold uppercase tracking-[0.16em] text-black transition hover:bg-[#E7E7E7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className="group inline-flex min-h-12 w-full items-center justify-center gap-4 rounded-xl border border-white bg-white px-5 text-[13px] font-bold uppercase tracking-[0.16em] text-black transition hover:bg-[#E7E7E7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
           >
             {action.label}
             <DashboardArrow className="transition-transform group-hover:translate-x-1" />
           </Link>
         ) : (
-          <span className="inline-flex min-h-14 w-full cursor-not-allowed items-center justify-center rounded-xl border border-white/10 bg-[#181818] px-5 text-sm font-bold uppercase tracking-[0.14em] text-[#777777]">
+          <span className="inline-flex min-h-12 w-full cursor-not-allowed items-center justify-center rounded-xl border border-white/10 bg-[#181818] px-5 text-[13px] font-bold uppercase tracking-[0.14em] text-[#777777]">
             {action.label}
           </span>
         )}
@@ -882,7 +882,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="reveal-up reveal-delay-1 relative">
+          <div className="reveal-up reveal-delay-1 relative flex justify-center lg:justify-end">
             <div
               aria-hidden="true"
               className="pointer-events-none absolute -right-12 -top-8 -z-10 h-72 w-72 rounded-full bg-white/[0.08] blur-[96px] sm:-right-16 sm:h-80 sm:w-80"
