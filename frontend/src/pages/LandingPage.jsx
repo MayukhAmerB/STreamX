@@ -5,6 +5,7 @@ import { getMyCourses, listCourses, listLiveClasses } from "../api/courses";
 import { listRealtimeSessions } from "../api/realtime";
 import BrandLogo from "../components/BrandLogo";
 import Button from "../components/Button";
+import CourseCard from "../components/CourseCard";
 import StoryJourneySection from "../components/StoryJourneySection";
 import { useAuth } from "../hooks/useAuth";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
@@ -925,84 +926,14 @@ export default function LandingPage() {
           <SectionCard className="p-5 sm:p-6">
             <SectionTitle
               title="Live courses"
-              subtitle="Explore courses that are currently open for enrollment."
+              subtitle="Explore current programs and review previous batches from the same course catalog."
             />
 
             {landingLiveCourses.length ? (
-              <div className="mt-6 grid auto-rows-fr gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {landingLiveCourses.map((course, idx) => {
-                  return (
-                    <article
-                      key={course.id}
-                      className={`hover-lift reveal-up ${
-                        idx % 3 === 0
-                          ? "reveal-delay-1"
-                          : idx % 3 === 1
-                            ? "reveal-delay-2"
-                            : "reveal-delay-3"
-                      } flex h-full flex-col rounded-2xl border border-white/10 ${cornerGlowCardBg} p-5 transition-colors hover:border-white/20`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="rounded-full border border-white/10 bg-[#050505] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A8A8A8]">
-                          {formatLevel(course.level)}
-                        </span>
-                        <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-300">
-                          Live
-                        </span>
-                      </div>
-
-                      <h3 className="mt-4 font-reference text-2xl font-semibold leading-tight text-white">
-                        {course.title}
-                      </h3>
-                      <p className="mt-3 line-clamp-4 text-sm leading-6 text-[#BBBBBB]">
-                        {course.description || "Structured cybersecurity course with guided progression."}
-                      </p>
-
-                      <div className="mt-4 grid grid-cols-2 gap-2">
-                        <div className="rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5">
-                          <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">
-                            Modules
-                          </div>
-                          <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
-                            {course.section_count ?? 0}
-                          </div>
-                        </div>
-                        <div className="rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5">
-                          <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">
-                            Price
-                          </div>
-                          <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
-                            {formatINR(course.price)}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-auto grid grid-cols-2 gap-2 pt-5">
-                        <Link
-                          to={course?._fallbackLink || `/courses/${course.id}`}
-                          className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5 text-sm font-semibold text-[#D8D8D8] transition hover:border-white/20 hover:bg-[#101010]"
-                        >
-                          View Details
-                        </Link>
-                        {isAuthenticated ? (
-                          <Link
-                            to={course?._fallbackLink || `/courses/${course.id}`}
-                            className="inline-flex items-center justify-center rounded-xl border border-white bg-white px-3 py-2.5 text-sm font-semibold text-black transition hover:bg-[#E8E8E8]"
-                          >
-                            Open Course
-                          </Link>
-                        ) : (
-                          <Link
-                            to={course?._fallbackLink || `/courses/${course.id}`}
-                            className="inline-flex items-center justify-center rounded-xl border border-white bg-white px-3 py-2.5 text-sm font-semibold text-black transition hover:bg-[#E8E8E8]"
-                          >
-                            View Course
-                          </Link>
-                        )}
-                      </div>
-                    </article>
-                  );
-                })}
+              <div className="mt-7 grid auto-rows-fr gap-6 lg:grid-cols-2">
+                {landingLiveCourses.map((course) => (
+                  <CourseCard key={course.id} course={course} />
+                ))}
               </div>
             ) : (
               <p className="mt-6 rounded-xl border border-white/10 bg-[#090909] px-4 py-3 text-sm text-[#AAAAAA]">

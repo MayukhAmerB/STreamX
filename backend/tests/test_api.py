@@ -1637,6 +1637,22 @@ class PaymentVerificationTests(BaseAPITestCase):
         self.assertEqual(mock_create_order.call_args.kwargs["amount_paise"], 350000)
 
     @patch("apps.payments.views.create_razorpay_order")
+    def test_create_order_rejects_course_with_closed_registration(self, mock_create_order):
+        self.course.registration_closed = True
+        self.course.save(update_fields=["registration_closed"])
+        self.login(self.student.email)
+
+        response = self.client.post(
+            reverse("payment-create-order"),
+            self.checkout_payload(),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.data["message"], "Course unavailable.")
+        mock_create_order.assert_not_called()
+
+    @patch("apps.payments.views.create_razorpay_order")
     def test_guest_can_create_monthly_order_without_linking_an_existing_user(self, mock_create_order):
         existing_user = User.objects.create_user(
             email="buyer@example.com",
@@ -2584,6 +2600,22 @@ class CourseListAccessTests(BaseAPITestCase):
         response = self.client.get(reverse("course-list-create"))
         returned = {item["id"]: item for item in response.data["data"]}
         self.assertFalse(returned[self.course.id]["purchase_available"])
+
+    @override_settings(DIRECT_COURSE_PAYMENTS_ENABLED=True)
+    def test_course_list_marks_closed_registration_as_unavailable(self):
+        self.course.registration_closed = True
+        self.course.save(update_fields=["registration_closed"])
+
+        response = self.client.get(reverse("course-list-create"))
+
+        self.assertEqual(response.status_code, 200)
+        returned = {item["id"]: item for item in response.data["data"]}
+        self.assertTrue(returned[self.course.id]["registration_closed"])
+        self.assertFalse(returned[self.course.id]["purchase_available"])
+        self.assertEqual(
+            returned[self.course.id]["purchase_unavailable_reason"],
+            "registration_closed",
+        )
 
     def test_authenticated_course_list_includes_enrollment_access_flags(self):
         pending_course = Course.objects.create(

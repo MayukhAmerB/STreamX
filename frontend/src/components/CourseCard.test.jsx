@@ -69,6 +69,41 @@ describe("CourseCard", () => {
     expect(html).not.toContain('href="/courses/11/payment"');
   });
 
+  it("shows Registration Closed for a previous batch", () => {
+    const html = renderCourseCard({
+      course: {
+        ...baseCourse,
+        is_enrolled: false,
+        enrollment_status: "none",
+        registration_closed: true,
+        purchase_available: false,
+        purchase_unavailable_reason: "registration_closed",
+      },
+    });
+
+    expect(html).toContain("Registration Closed");
+    expect(html).toContain("Previous batch");
+    expect(html).not.toContain('href="/courses/11/payment"');
+    expect(html).not.toContain("Purchase Unavailable");
+  });
+
+  it("keeps a closed previous batch accessible to an enrolled student", () => {
+    const html = renderCourseCard({
+      course: {
+        ...baseCourse,
+        is_enrolled: true,
+        enrollment_status: "approved",
+        registration_closed: true,
+        purchase_available: false,
+        purchase_unavailable_reason: "registration_closed",
+      },
+    });
+
+    expect(html).toContain("Continue Course");
+    expect(html).toContain('href="/learn/11"');
+    expect(html).not.toContain("Registration Closed");
+  });
+
   it("explains when purchase is unavailable because the course price is not configured", () => {
     const html = renderCourseCard({
       course: {

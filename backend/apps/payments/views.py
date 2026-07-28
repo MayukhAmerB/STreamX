@@ -444,6 +444,7 @@ class CreateOrderView(APIView):
             not course
             or not course.is_published
             or course.launch_status != Course.STATUS_LIVE
+            or course.registration_closed
         ):
             log_security_event("payment.create_order_course_unavailable", request=request)
             return api_response(

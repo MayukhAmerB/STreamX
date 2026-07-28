@@ -175,6 +175,13 @@ class Course(models.Model):
     launch_status = models.CharField(
         max_length=20, choices=LAUNCH_STATUS_CHOICES, default=STATUS_LIVE
     )
+    registration_closed = models.BooleanField(
+        default=False,
+        help_text=(
+            "Close new registrations while keeping this course visible and available "
+            "to students who already have access."
+        ),
+    )
     instructor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

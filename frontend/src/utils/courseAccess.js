@@ -16,6 +16,9 @@ export function getPurchaseUnavailableMessage(course) {
   if (reason === "course_not_live") {
     return "This track is not open for enrollment yet.";
   }
+  if (reason === "registration_closed") {
+    return "Registration is closed for this batch.";
+  }
   if (reason === "course_unpublished") {
     return "This track is not published for enrollment.";
   }

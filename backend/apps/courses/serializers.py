@@ -315,6 +315,7 @@ class CourseEnrollmentStatusMixin:
             getattr(settings, "DIRECT_COURSE_PAYMENTS_ENABLED", False)
             and obj.is_published
             and obj.launch_status == Course.STATUS_LIVE
+            and not obj.registration_closed
             and (full_available or monthly_available)
         )
 
@@ -327,6 +328,8 @@ class CourseEnrollmentStatusMixin:
             return "course_unpublished"
         if obj.launch_status != Course.STATUS_LIVE:
             return "course_not_live"
+        if obj.registration_closed:
+            return "registration_closed"
         if not (obj.full_payment_enabled or obj.installment_payment_enabled):
             return "price_not_configured"
         return "checkout_unavailable"
@@ -419,6 +422,7 @@ class CourseListSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeriali
             "category",
             "level",
             "launch_status",
+            "registration_closed",
             "is_published",
             "section_count",
             "is_enrolled",
@@ -482,6 +486,7 @@ class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeria
             "category",
             "level",
             "launch_status",
+            "registration_closed",
             "is_published",
             "instructor",
             "sections",
@@ -630,6 +635,7 @@ class CourseWriteSerializer(serializers.ModelSerializer):
             "category",
             "level",
             "launch_status",
+            "registration_closed",
             "is_published",
         )
 

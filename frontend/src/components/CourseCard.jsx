@@ -130,6 +130,9 @@ function CourseCard({ course }) {
     if (hasCourseAccess) {
       return { label: "Continue Course", to: `/learn/${course.id}` };
     }
+    if (course?.registration_closed) {
+      return { label: "Registration Closed", disabled: true };
+    }
     if (course?.purchase_available) {
       return { label: "Enroll Now", to: `/courses/${course.id}/payment` };
     }
@@ -232,6 +235,8 @@ function CourseCard({ course }) {
                 ? "Protected learning access"
                 : status.isComingSoon
                   ? "Program enrollment opening soon"
+                  : course?.registration_closed
+                    ? "Previous batch"
                   : "Secure Enrollment"}
             </span>
             <span aria-hidden="true">•</span>
@@ -240,7 +245,10 @@ function CourseCard({ course }) {
             </Link>
           </div>
 
-          {!status.isComingSoon && !hasCourseAccess && !course?.purchase_available ? (
+          {!status.isComingSoon &&
+          !hasCourseAccess &&
+          !course?.purchase_available &&
+          !course?.registration_closed ? (
             <p className="mt-3 text-center text-xs leading-5 text-[#858585]">
               {getPurchaseUnavailableMessage(course)}
             </p>

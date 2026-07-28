@@ -377,6 +377,7 @@ class CourseAdmin(admin.ModelAdmin):
         "category",
         "level",
         "launch_status",
+        "registration_closed",
         "price",
         "purchase_readiness",
         "is_published",
@@ -387,9 +388,23 @@ class CourseAdmin(admin.ModelAdmin):
         "updated_at",
     )
     list_display_links = ("id", "title")
-    list_filter = ("category", "level", "launch_status", "is_published", "created_at", "updated_at")
+    list_filter = (
+        "category",
+        "level",
+        "launch_status",
+        "registration_closed",
+        "is_published",
+        "created_at",
+        "updated_at",
+    )
     search_fields = ("title", "slug", "description", "instructor__email", "instructor__full_name")
-    list_editable = ("launch_status", "price", "is_published", "instructor")
+    list_editable = (
+        "launch_status",
+        "registration_closed",
+        "price",
+        "is_published",
+        "instructor",
+    )
     readonly_fields = (
         "slug",
         "frontend_container_guide",
@@ -406,7 +421,14 @@ class CourseAdmin(admin.ModelAdmin):
     autocomplete_fields = ("instructor",)
     save_on_top = True
     list_per_page = 25
-    actions = ("mark_live", "mark_coming_soon", "publish_courses", "unpublish_courses")
+    actions = (
+        "mark_live",
+        "mark_coming_soon",
+        "open_registrations",
+        "close_registrations",
+        "publish_courses",
+        "unpublish_courses",
+    )
     fieldsets = (
         (
             "Frontend Container Map (Read First)",
@@ -422,6 +444,7 @@ class CourseAdmin(admin.ModelAdmin):
                     "category",
                     "level",
                     "launch_status",
+                    "registration_closed",
                     "title",
                     "description",
                     "slug",
@@ -547,6 +570,8 @@ class CourseAdmin(admin.ModelAdmin):
             blockers.append("course unpublished")
         if obj.launch_status != Course.STATUS_LIVE:
             blockers.append("course not live")
+        if obj.registration_closed:
+            blockers.append("registration closed")
         full_ready = bool(obj.full_payment_enabled)
         monthly_ready = bool(obj.installment_payment_enabled)
         if not (full_ready or monthly_ready):
@@ -666,6 +691,16 @@ class CourseAdmin(admin.ModelAdmin):
     @admin.action(description="Mark selected courses as Coming Soon")
     def mark_coming_soon(self, request, queryset):
         queryset.update(launch_status=Course.STATUS_COMING_SOON)
+        bump_course_list_cache_version()
+
+    @admin.action(description="Open registrations for selected courses")
+    def open_registrations(self, request, queryset):
+        queryset.update(registration_closed=False)
+        bump_course_list_cache_version()
+
+    @admin.action(description="Close registrations for selected courses")
+    def close_registrations(self, request, queryset):
+        queryset.update(registration_closed=True)
         bump_course_list_cache_version()
 
     @admin.action(description="Publish selected courses")
