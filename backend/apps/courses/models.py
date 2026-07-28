@@ -41,6 +41,91 @@ def _sanitize_string_list(value):
     return cleaned
 
 
+COURSE_CARD_FEATURE_ICONS = {
+    "check",
+    "certificate",
+    "support",
+    "live",
+    "chat",
+    "recording",
+}
+
+DEFAULT_COURSE_CARD_FEATURES = (
+    (
+        "live",
+        "Live Sessions",
+        "Attend interactive live classes with real-time guidance from industry experts.",
+    ),
+    (
+        "chat",
+        "Live Broadcast Chat Room",
+        "Get your doubts cleared instantly in our live chat room during sessions.",
+    ),
+    (
+        "recording",
+        "Lifetime Recorded Access",
+        "Access all recorded sessions and materials for lifetime anytime, anywhere.",
+    ),
+    (
+        "check",
+        "3 Exclusive Live Q&A Sessions",
+        "Join 3 exclusive live Q&A sessions with the Al Syed team.",
+    ),
+    (
+        "certificate",
+        "Course Completion Certificate",
+        "Get a verified certificate upon successful completion of the training.",
+    ),
+    (
+        "support",
+        "24x7 Team Chat Support",
+        "Round-the-clock support from our team whenever you need help.",
+    ),
+)
+
+
+def default_course_card_features():
+    return [
+        {"icon": icon, "title": title, "description": description}
+        for icon, title, description in DEFAULT_COURSE_CARD_FEATURES
+    ]
+
+
+def sanitize_course_card_features(value):
+    if value in (None, "", []):
+        return default_course_card_features()
+    if not isinstance(value, list):
+        raise ValidationError("Enter a valid list of course-card features.")
+    if len(value) > 8:
+        raise ValidationError("A course card can contain at most 8 features.")
+
+    cleaned = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ValidationError(f"Feature {index + 1} must contain an icon, title, and description.")
+
+        icon = str(item.get("icon") or "check").strip().lower()
+        title = str(item.get("title") or "").strip()
+        description = str(item.get("description") or "").strip()
+        if icon not in COURSE_CARD_FEATURE_ICONS:
+            raise ValidationError(
+                f"Feature {index + 1} has an unsupported icon. "
+                f"Use one of: {', '.join(sorted(COURSE_CARD_FEATURE_ICONS))}."
+            )
+        if not title or not description:
+            raise ValidationError(f"Feature {index + 1} requires both a title and description.")
+        if len(title) > 120:
+            raise ValidationError(f"Feature {index + 1} title cannot exceed 120 characters.")
+        if len(description) > 320:
+            raise ValidationError(f"Feature {index + 1} description cannot exceed 320 characters.")
+
+        validate_no_active_content(title, f"course_card_features[{index}].title")
+        validate_no_active_content(description, f"course_card_features[{index}].description")
+        cleaned.append({"icon": icon, "title": title, "description": description})
+
+    return cleaned or default_course_card_features()
+
+
 class Course(models.Model):
     CATEGORY_OSINT = "osint"
     CATEGORY_WEB_PENTESTING = "web_pentesting"
@@ -72,6 +157,7 @@ class Course(models.Model):
     course_overview = models.TextField(blank=True, default="")
     what_you_will_learn = models.JSONField(blank=True, default=list)
     expected_outcomes = models.JSONField(blank=True, default=list)
+    course_card_features = models.JSONField(blank=True, default=default_course_card_features)
     enrollment_message = models.TextField(blank=True, default="")
     snapshot_category = models.CharField(max_length=255, blank=True, default="")
     snapshot_level = models.CharField(max_length=255, blank=True, default="")
@@ -121,6 +207,7 @@ class Course(models.Model):
 
         self.what_you_will_learn = _sanitize_string_list(self.what_you_will_learn)
         self.expected_outcomes = _sanitize_string_list(self.expected_outcomes)
+        self.course_card_features = sanitize_course_card_features(self.course_card_features)
         for index, item in enumerate(self.what_you_will_learn):
             validate_no_active_content(item, f"what_you_will_learn[{index}]")
         for index, item in enumerate(self.expected_outcomes):

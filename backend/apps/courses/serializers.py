@@ -23,6 +23,7 @@ from .models import (
     LiveClassEnrollment,
     PublicEnrollmentLead,
     Section,
+    sanitize_course_card_features,
 )
 from .access import user_has_course_access
 
@@ -407,6 +408,7 @@ class CourseListSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeriali
             "title",
             "slug",
             "description",
+            "course_card_features",
             "thumbnail",
             "price",
             "full_payment_enabled",
@@ -465,6 +467,7 @@ class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeria
             "course_overview",
             "what_you_will_learn",
             "expected_outcomes",
+            "course_card_features",
             "enrollment_message",
             "snapshot_category",
             "snapshot_level",
@@ -584,6 +587,13 @@ class CourseWriteSerializer(serializers.ModelSerializer):
     def validate_expected_outcomes(self, value):
         return _normalize_text_list(value)
 
+    def validate_course_card_features(self, value):
+        try:
+            return sanitize_course_card_features(value)
+        except Exception as exc:
+            detail = getattr(exc, "messages", None) or str(exc)
+            raise serializers.ValidationError(detail) from exc
+
     def validate_thumbnail(self, value):
         if value and not is_safe_public_http_url(value):
             raise serializers.ValidationError(
@@ -609,6 +619,7 @@ class CourseWriteSerializer(serializers.ModelSerializer):
             "course_overview",
             "what_you_will_learn",
             "expected_outcomes",
+            "course_card_features",
             "enrollment_message",
             "snapshot_category",
             "snapshot_level",

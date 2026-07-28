@@ -21,6 +21,8 @@ from .models import (
     LiveClassEnrollment,
     PublicEnrollmentLead,
     Section,
+    default_course_card_features,
+    sanitize_course_card_features,
 )
 from .cache_utils import bump_course_list_cache_version
 from .services import VideoTranscodeError, transcode_lecture_to_hls
@@ -62,6 +64,38 @@ def _parse_admin_list_field(value):
     return cleaned
 
 
+def _format_course_card_features(value):
+    return "\n".join(
+        f"{item.get('icon', 'check')} | {item.get('title', '')} | {item.get('description', '')}"
+        for item in (value or default_course_card_features())
+    )
+
+
+def _parse_course_card_features(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return default_course_card_features()
+
+    features = []
+    for line_number, line in enumerate(raw.splitlines(), start=1):
+        line = line.strip()
+        if not line:
+            continue
+        parts = [part.strip() for part in line.split("|", 2)]
+        if len(parts) != 3:
+            raise forms.ValidationError(
+                f"Line {line_number}: use icon | title | description."
+            )
+        icon, title, description = parts
+        features.append({"icon": icon, "title": title, "description": description})
+
+    try:
+        return sanitize_course_card_features(features)
+    except Exception as exc:
+        messages = getattr(exc, "messages", None)
+        raise forms.ValidationError(messages or str(exc)) from exc
+
+
 class CourseAdminForm(forms.ModelForm):
     what_you_will_learn = forms.CharField(
         required=False,
@@ -88,6 +122,21 @@ class CourseAdminForm(forms.ModelForm):
             }
         ),
     )
+    course_card_features = forms.CharField(
+        required=False,
+        label="Catalog Card Features",
+        help_text=(
+            "One feature per line: icon | title | description. "
+            "Icons: check, certificate, support, live, chat, recording. "
+            "Leave blank to restore the six default features."
+        ),
+        widget=forms.Textarea(
+            attrs={
+                "rows": 12,
+                "placeholder": "live | Live Sessions | Attend interactive live classes.",
+            }
+        ),
+    )
 
     class Meta:
         model = Course
@@ -99,6 +148,13 @@ class CourseAdminForm(forms.ModelForm):
         if instance and instance.pk:
             self.fields["what_you_will_learn"].initial = "\n".join(instance.what_you_will_learn or [])
             self.fields["expected_outcomes"].initial = "\n".join(instance.expected_outcomes or [])
+            self.fields["course_card_features"].initial = _format_course_card_features(
+                instance.course_card_features
+            )
+        else:
+            self.fields["course_card_features"].initial = _format_course_card_features(
+                default_course_card_features()
+            )
 
         textarea_rows = {
             "description": 3,
@@ -169,6 +225,9 @@ class CourseAdminForm(forms.ModelForm):
 
     def clean_expected_outcomes(self):
         return _parse_admin_list_field(self.cleaned_data.get("expected_outcomes"))
+
+    def clean_course_card_features(self):
+        return _parse_course_card_features(self.cleaned_data.get("course_card_features"))
 
 
 class LectureInlineForm(forms.ModelForm):
@@ -413,6 +472,16 @@ class CourseAdmin(admin.ModelAdmin):
                 "fields": (
                     "expected_outcomes",
                 ),
+            },
+        ),
+        (
+            "Catalog Card: Program Features",
+            {
+                "description": (
+                    "Controls the feature rows shown on this course's public catalog card. "
+                    "Use one row per line in icon | title | description format."
+                ),
+                "fields": ("course_card_features",),
             },
         ),
         (

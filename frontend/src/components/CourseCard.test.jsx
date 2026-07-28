@@ -34,7 +34,7 @@ describe("CourseCard", () => {
       },
     });
 
-    expect(html).toContain("Go to Course");
+    expect(html).toContain("Continue Course");
     expect(html).toContain('href="/learn/11"');
   });
 
@@ -49,9 +49,9 @@ describe("CourseCard", () => {
     });
 
     expect(html).toContain("Live");
-    expect(html).toContain("Buy Course");
+    expect(html).toContain("Enroll Now");
     expect(html).toContain('href="/courses/11/payment"');
-    expect(html).not.toContain("Go to Course");
+    expect(html).not.toContain("Continue Course");
   });
 
   it("does not offer a legacy request when purchasing is unavailable", () => {
@@ -95,6 +95,39 @@ describe("CourseCard", () => {
     });
 
     expect(html).toContain("Coming Soon");
-    expect(html).not.toContain("Go to Course");
+    expect(html).not.toContain("Continue Course");
+  });
+
+  it("renders the default premium feature set when the API has no custom features", () => {
+    const html = renderCourseCard({
+      course: {
+        ...baseCourse,
+        purchase_available: true,
+      },
+    });
+
+    expect(html).toContain("Live Sessions");
+    expect(html).toContain("Course Completion Certificate");
+    expect(html).toContain("24x7 Team Chat Support");
+  });
+
+  it("renders admin-configured course-card features", () => {
+    const html = renderCourseCard({
+      course: {
+        ...baseCourse,
+        purchase_available: true,
+        course_card_features: [
+          {
+            icon: "recording",
+            title: "Private Recording Vault",
+            description: "Revisit every lesson after the live program.",
+          },
+        ],
+      },
+    });
+
+    expect(html).toContain("Private Recording Vault");
+    expect(html).toContain("Revisit every lesson after the live program.");
+    expect(html).not.toContain("24x7 Team Chat Support");
   });
 });

@@ -1118,6 +1118,23 @@ class SecurityHeaderTests(APITestCase):
         self.assertIn("payment=()", response["Permissions-Policy"])
 
 
+class CourseCardFeatureAPITests(APITestCase):
+    def test_public_course_list_exposes_default_card_features(self):
+        course = Course.objects.create(
+            title="Feature Card Course",
+            description="Feature API regression test.",
+            price=Decimal("3500.00"),
+            is_published=True,
+        )
+
+        response = self.client.get(reverse("course-list-create"))
+
+        self.assertEqual(response.status_code, 200)
+        returned_course = next(item for item in response.data["data"] if item["id"] == course.id)
+        self.assertEqual(len(returned_course["course_card_features"]), 6)
+        self.assertEqual(returned_course["course_card_features"][0]["title"], "Live Sessions")
+
+
 class RequestFirewallTests(APITestCase):
     def test_blocks_sqli_in_query_params(self):
         response = self.client.get(

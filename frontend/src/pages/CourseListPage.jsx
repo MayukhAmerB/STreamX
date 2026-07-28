@@ -80,7 +80,7 @@ export function CourseCatalogContent({
         {courses.length > 0 ? (
           <div className="relative rounded-[20px] border border-black panel-gradient p-3 sm:rounded-[26px] sm:p-5">
             <div className="absolute inset-0 rounded-[20px] bg-[radial-gradient(circle_at_0%_0%,rgba(192,192,192,0.07),transparent_35%)] sm:rounded-[26px]" />
-            <div className="relative grid auto-rows-fr gap-3 sm:gap-5 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
+            <div className="relative grid auto-rows-fr gap-4 sm:gap-6 lg:grid-cols-2">
               {courses.map((course) => (
                 <CourseCard key={course.id} course={course} />
               ))}
@@ -297,7 +297,7 @@ export default function CourseListPage() {
           </div>
 
           {ownedCourses.length ? (
-            <div className="grid auto-rows-fr gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            <div className="grid auto-rows-fr gap-4 sm:gap-6 lg:grid-cols-2">
               {ownedCourses.map((course) => (
                 <CourseCard key={course.id} course={course} />
               ))}

@@ -470,11 +470,6 @@ export default function CoursePaymentPage() {
             <h2 className="mt-3 font-reference text-xl font-semibold text-white">
               {course.title}
             </h2>
-            <p className="mt-2 text-sm text-[#8F8F8F]">
-              {plan === "monthly"
-                ? `${formatINR(course.monthly_price)} every 30 days`
-                : `${formatINR(course.price)} one-time`}
-            </p>
 
             <ol className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-1">
               {steps.map((step, index) => {
@@ -675,9 +670,14 @@ export default function CoursePaymentPage() {
                         </span>
                         <ul className="mt-4 space-y-2 sm:mt-7 sm:space-y-3">
                           <PlanFeature>
-                            Pay <span className="text-[#79A5FF]">{formatINR(course.monthly_price)}</span> every month
+                            <span className="text-[#79A5FF]">{formatINR(course.monthly_price)}</span> per month
                           </PlanFeature>
-                          <PlanFeature>For 3 months (3 installments)</PlanFeature>
+                          <PlanFeature>3 monthly installments</PlanFeature>
+                          <PlanFeature>1 month of live class access per payment</PlanFeature>
+                          <PlanFeature>Continue access by paying the next installment</PlanFeature>
+                          <PlanFeature>
+                            Complete all 3 months to unlock certificate, recordings &amp; full course benefits
+                          </PlanFeature>
                         </ul>
                         <span className="mt-auto flex min-w-0 items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.045] p-2 sm:gap-4 sm:rounded-xl sm:p-4">
                           <span className="hidden shrink-0 text-white sm:block"><PlanIcon type="calendar" /></span>
