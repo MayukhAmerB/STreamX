@@ -23,7 +23,7 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.urls import reverse
 from django.test import RequestFactory, override_settings
-from rest_framework.test import APITestCase
+from rest_framework.test import APIClient, APITestCase
 from PIL import Image
 
 from config.url_utils import get_media_public_url
@@ -1757,6 +1757,94 @@ class PaymentVerificationTests(BaseAPITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertFalse(Payment.objects.exists())
         mock_create_order.assert_not_called()
+
+    @patch("apps.payments.views.create_razorpay_order")
+    def test_create_order_rejects_encoded_active_content(self, mock_create_order):
+        response = self.client.post(
+            reverse("payment-create-order"),
+            self.checkout_payload(
+                buyer_name="Test Student",
+                city="&lt;svg onload=alert(1)&gt;",
+            ),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Payment.objects.exists())
+        mock_create_order.assert_not_called()
+
+    @patch("apps.payments.views.create_razorpay_order")
+    def test_create_order_rejects_sql_like_profile_payload(self, mock_create_order):
+        response = self.client.post(
+            reverse("payment-create-order"),
+            self.checkout_payload(buyer_name="Robert'; DROP TABLE payments_payment;--"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Payment.objects.exists())
+        self.assertTrue(Course.objects.filter(pk=self.course.pk).exists())
+        mock_create_order.assert_not_called()
+
+    @patch("apps.payments.views.create_razorpay_order")
+    def test_create_order_rejects_duplicate_contact_numbers(self, mock_create_order):
+        response = self.client.post(
+            reverse("payment-create-order"),
+            self.checkout_payload(
+                whatsapp_number="+91 98765 43210",
+                alternate_number="91-98765-43210",
+            ),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("alternate_number", response.data["errors"])
+        self.assertFalse(Payment.objects.exists())
+        mock_create_order.assert_not_called()
+
+    def test_verify_payment_rejects_malformed_gateway_identifiers(self):
+        response = self.client.post(
+            reverse("payment-verify"),
+            {
+                "course_id": self.course.id,
+                "checkout_reference": "4b50880b-260b-440c-b5ea-71d33e1af378",
+                "razorpay_order_id": "<script>alert(1)</script>",
+                "razorpay_payment_id": "not-a-payment-id",
+                "razorpay_signature": "short",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Payment.objects.exists())
+
+    @patch("apps.payments.views.create_razorpay_order")
+    def test_create_order_requires_csrf_for_browser_requests(self, mock_create_order):
+        mock_create_order.return_value = {
+            "id": "order_csrf_protected",
+            "amount": 350000,
+            "currency": "INR",
+        }
+        csrf_client = APIClient(enforce_csrf_checks=True)
+
+        blocked = csrf_client.post(
+            reverse("payment-create-order"),
+            self.checkout_payload(),
+            format="json",
+        )
+        self.assertEqual(blocked.status_code, 403)
+        self.assertFalse(Payment.objects.exists())
+
+        csrf_response = csrf_client.get(reverse("auth-csrf"))
+        csrf_token = csrf_response.data["csrf_token"]
+        allowed = csrf_client.post(
+            reverse("payment-create-order"),
+            self.checkout_payload(),
+            format="json",
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+        self.assertEqual(allowed.status_code, 201)
+        self.assertTrue(Payment.objects.exists())
 
     @patch("apps.payments.views.fetch_razorpay_payment")
     @patch("apps.payments.views.verify_razorpay_signature")

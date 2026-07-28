@@ -109,11 +109,50 @@ function loadRazorpayScript() {
 }
 
 function isValidPhone(value) {
-  return /^\+?[0-9][0-9 ()-]{7,22}$/.test(value.trim());
+  const text = value.trim();
+  const digitCount = text.replace(/\D/g, "").length;
+  return /^\+?[0-9][0-9 ()-]{7,22}$/.test(text) && digitCount >= 8 && digitCount <= 15;
 }
 
 function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+  const text = value.trim();
+  return (
+    text.length <= 254 &&
+    !containsUnsafeText(text) &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)
+  );
+}
+
+function containsUnsafeText(value) {
+  const text = String(value || "");
+  const hasControlCharacter = Array.from(text).some((character) => {
+    const codePoint = character.codePointAt(0);
+    return codePoint <= 31 || codePoint === 127;
+  });
+  return (
+    hasControlCharacter ||
+    /[<>]/.test(text) ||
+    /(?:javascript\s*:|data\s*:\s*text\/html|\bon\w+\s*=)/i.test(text) ||
+    /\b(?:union\s+(?:all\s+)?select|drop\s+table|alter\s+table|truncate\s+table|information_schema|pg_catalog|sleep\s*\(|benchmark\s*\(|pg_sleep\s*\()\b/i.test(
+      text
+    )
+  );
+}
+
+function isValidFullName(value) {
+  const text = value.normalize("NFKC").trim();
+  const letterCount = (text.match(/\p{L}/gu) || []).length;
+  return (
+    text.length >= 2 &&
+    text.length <= 120 &&
+    letterCount >= 2 &&
+    !containsUnsafeText(text) &&
+    /^[\p{L}\p{M} .'\u2019-]+$/u.test(text)
+  );
+}
+
+function phoneDigits(value) {
+  return String(value || "").replace(/\D/g, "");
 }
 
 function stepSummary(step, profile, plan, course) {
@@ -186,8 +225,8 @@ export default function CoursePaymentPage() {
   };
 
   const validateCurrentStep = () => {
-    if (activeStep.id === "identity" && checkoutProfile.buyer_name.trim().length < 2) {
-      return "Enter your full name to continue.";
+    if (activeStep.id === "identity" && !isValidFullName(checkoutProfile.buyer_name)) {
+      return "Enter a valid full name using letters, spaces, apostrophes, periods, or hyphens.";
     }
     if (activeStep.id === "email" && !isValidEmail(checkoutProfile.buyer_email)) {
       return "Enter a valid email address.";
@@ -201,6 +240,13 @@ export default function CoursePaymentPage() {
         !isValidPhone(checkoutProfile.alternate_number)
       ) {
         return "Enter a valid alternate WhatsApp number or leave it blank.";
+      }
+      if (
+        checkoutProfile.alternate_number.trim() &&
+        phoneDigits(checkoutProfile.alternate_number) ===
+          phoneDigits(checkoutProfile.whatsapp_number)
+      ) {
+        return "Alternate WhatsApp number must be different from your primary number.";
       }
     }
     if (
@@ -512,7 +558,7 @@ export default function CoursePaymentPage() {
                     autoComplete="name"
                     autoFocus
                     minLength={2}
-                    maxLength={255}
+                    maxLength={120}
                     placeholder="Enter your full name"
                   />
                 </div>

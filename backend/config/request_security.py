@@ -21,7 +21,10 @@ SQLI_PATTERNS = [
 XSS_PATTERNS = [
     re.compile(r"(?i)<\s*script\b"),
     re.compile(r"(?i)<\s*iframe\b"),
+    re.compile(r"(?i)<\s*(?:object|embed|svg|math|link|meta)\b"),
     re.compile(r"(?i)javascript\s*:"),
+    re.compile(r"(?i)data\s*:\s*text/html"),
+    re.compile(r"(?i)\bsrcdoc\s*="),
     re.compile(r"(?i)\bon\w+\s*="),
 ]
 
@@ -63,8 +66,11 @@ def contains_suspicious_sqli(value):
 
 
 def contains_suspicious_xss(value):
-    text = str(value or "")
-    return any(pattern.search(text) for pattern in XSS_PATTERNS)
+    original_text = str(value or "")
+    normalized_text = _normalize_for_security_scan(original_text)
+    return any(pattern.search(original_text) for pattern in XSS_PATTERNS) or any(
+        pattern.search(normalized_text) for pattern in XSS_PATTERNS
+    )
 
 
 def contains_active_content(value):

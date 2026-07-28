@@ -6,7 +6,10 @@ from urllib.parse import urlencode
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_protect
 from rest_framework import permissions, status
+from rest_framework.parsers import JSONParser
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
@@ -380,8 +383,10 @@ def process_payment_webhook_payload(*, payload, signature="", request=None, sour
     }
 
 
+@method_decorator(csrf_protect, name="dispatch")
 class CreateOrderView(APIView):
     permission_classes = [permissions.AllowAny]
+    parser_classes = [JSONParser]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "payment_create"
 
@@ -560,8 +565,10 @@ class CreateOrderView(APIView):
         )
 
 
+@method_decorator(csrf_protect, name="dispatch")
 class VerifyPaymentView(APIView):
     permission_classes = [permissions.AllowAny]
+    parser_classes = [JSONParser]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "payment_verify"
 
