@@ -9,7 +9,7 @@ import CourseCard from "../components/CourseCard";
 import StoryJourneySection from "../components/StoryJourneySection";
 import { useAuth } from "../hooks/useAuth";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
-import { selectLandingCourses } from "../utils/landingCourses";
+import { selectHeroProgramCourse, selectLandingCourses } from "../utils/landingCourses";
 import { apiData } from "../utils/api";
 import { readCachedCourseCatalog, writeCachedCourseCatalog } from "../utils/courseCatalog";
 import { formatINR } from "../utils/currency";
@@ -780,13 +780,12 @@ export default function LandingPage() {
   }, [catalogCourses]);
 
   const heroProgramCourse = useMemo(() => {
-    const ownedCourse = studentCourses.find(
-      (course) => Number(course?.id) === Number(featuredLiveCourse?.id)
-    );
-    return ownedCourse
-      ? { ...featuredLiveCourse, ...ownedCourse, is_enrolled: true }
-      : featuredLiveCourse;
-  }, [featuredLiveCourse, studentCourses]);
+    return selectHeroProgramCourse({
+      featuredCourse: featuredLiveCourse,
+      catalogCourses,
+      studentCourses,
+    });
+  }, [catalogCourses, featuredLiveCourse, studentCourses]);
 
   const featuredLiveCourseLink = featuredLiveCourse?._fallbackLink || `/courses/${featuredLiveCourse.id}`;
   const heroLiveBroadcastCourseId = Number(

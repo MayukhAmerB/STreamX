@@ -130,12 +130,20 @@ function WhatsAppIcon() {
 function PlanFeature({ children }) {
   return (
     <li className="flex min-w-0 items-start gap-1.5 text-[11px] leading-4 text-[#D3D3D3] sm:gap-3 sm:text-base sm:leading-6">
-      <span className="mt-0.5 shrink-0 text-[#79A5FF]">
+      <span className="mt-0.5 shrink-0 text-[#8FE3B0]">
         <CheckIcon />
       </span>
       <span className="min-w-0 break-words">{children}</span>
     </li>
   );
+}
+
+function formatWholeINR(value) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
 }
 
 function loadRazorpayScript() {
@@ -783,15 +791,11 @@ export default function CoursePaymentPage() {
                           <span className="mt-1 block text-[10px] font-normal text-[#B5B5B5] sm:ml-2 sm:mt-0 sm:inline sm:text-sm">/ month</span>
                         </span>
                         <ul className="mt-4 space-y-2 sm:mt-7 sm:space-y-3">
+                          <PlanFeature>{formatWholeINR(course.monthly_price)} per month</PlanFeature>
                           <PlanFeature>
-                            <span className="text-[#79A5FF]">{formatINR(course.monthly_price)}</span> per month
+                            3 monthly installments ({formatWholeINR(Number(course.monthly_price || 0) * 3)} total)
                           </PlanFeature>
-                          <PlanFeature>3 monthly installments</PlanFeature>
-                          <PlanFeature>1 month of live class access per payment</PlanFeature>
-                          <PlanFeature>Continue access by paying the next installment</PlanFeature>
-                          <PlanFeature>
-                            Complete all 3 months to unlock certificate, recordings &amp; full course benefits
-                          </PlanFeature>
+                          <PlanFeature>Continue your training by paying each monthly installment</PlanFeature>
                         </ul>
                         <span className="mt-auto flex min-w-0 items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.045] p-2 sm:gap-4 sm:rounded-xl sm:p-4">
                           <span className="hidden shrink-0 text-white sm:block"><PlanIcon type="calendar" /></span>

@@ -15,3 +15,25 @@ export function selectLandingCourses(courses = []) {
       return String(left?.title || "").localeCompare(String(right?.title || ""));
     });
 }
+
+export function selectHeroProgramCourse({
+  featuredCourse,
+  catalogCourses = [],
+  studentCourses = [],
+} = {}) {
+  const ownedCourse = studentCourses[0];
+  if (!ownedCourse) {
+    return featuredCourse;
+  }
+
+  const catalogCourse = catalogCourses.find(
+    (course) => Number(course?.id) === Number(ownedCourse?.id)
+  );
+
+  return {
+    ...(catalogCourse || {}),
+    ...ownedCourse,
+    is_enrolled: true,
+    enrollment_status: "approved",
+  };
+}
