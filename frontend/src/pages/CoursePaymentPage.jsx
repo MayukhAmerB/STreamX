@@ -22,6 +22,68 @@ const steps = [
 const inputClassName =
   "mt-4 min-h-14 w-full rounded-xl border border-white/15 bg-black/65 px-4 py-3 text-base text-white outline-none transition placeholder:text-[#606060] focus:border-white/50 focus:bg-black";
 
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-5 w-5">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
+      <path d="m8 12 2.6 2.6L16.5 9" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PlanIcon({ type }) {
+  if (type === "calendar") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-8 w-8">
+        <rect x="3.5" y="5.5" width="17" height="15" rx="2" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M7 3.5v4M17 3.5v4M3.5 10h17M8 14h2M14 14h2M8 17h2M14 17h2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (type === "tag") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-8 w-8">
+        <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H13l7 7-9 9-7-7V5.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <circle cx="8.2" cy="8.2" r="1.2" fill="currentColor" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-10 w-10">
+      <path d="M4 7.5h14a2 2 0 0 1 2 2v9H6a2 2 0 0 1-2-2v-9Z" stroke="currentColor" strokeWidth="1.5" />
+      <path d="m5 7.5 10-3v3M16 12h5v4h-5a2 2 0 1 1 0-4Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ArrowIcon({ className = "h-5 w-5" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
+      <path d="M5 12h14m-5-5 5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-5 w-5">
+      <path d="M12 3 5 6v5c0 4.6 2.8 8.1 7 10 4.2-1.9 7-5.4 7-10V6l-7-3Z" stroke="currentColor" strokeWidth="1.5" />
+      <path d="m9.5 12 1.7 1.7 3.5-3.8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PlanFeature({ children }) {
+  return (
+    <li className="flex items-start gap-3 text-sm leading-6 text-[#D3D3D3] sm:text-base">
+      <span className="mt-0.5 shrink-0 text-[#79A5FF]">
+        <CheckIcon />
+      </span>
+      <span>{children}</span>
+    </li>
+  );
+}
+
 function loadRazorpayScript() {
   return new Promise((resolve, reject) => {
     if (window.Razorpay) {
@@ -338,8 +400,9 @@ export default function CoursePaymentPage() {
 
   return (
     <PageShell
-      title="Course checkout"
-      subtitle="Complete one short step at a time, then continue to Razorpay"
+      title={isFinalStep ? "" : "Course checkout"}
+      subtitle={isFinalStep ? "" : "Complete one short step at a time, then continue to Razorpay"}
+      containerClassName={isFinalStep ? "max-w-[1180px] py-4 sm:py-8" : ""}
     >
       <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#080808] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">
@@ -352,7 +415,8 @@ export default function CoursePaymentPage() {
           <div className="absolute inset-0 bg-gradient-to-br from-black/95 via-black/90 to-[#111111]/95" />
         </div>
 
-        <div className="relative grid min-h-[610px] lg:grid-cols-[310px_1fr]">
+        <div className={`relative min-h-[610px] ${isFinalStep ? "" : "grid lg:grid-cols-[310px_1fr]"}`}>
+          {!isFinalStep ? (
           <aside className="border-b border-white/10 bg-white/[0.025] p-5 lg:border-b-0 lg:border-r lg:p-7">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#888]">
               Secure enrollment
@@ -419,9 +483,12 @@ export default function CoursePaymentPage() {
               </p>
             </div>
           </aside>
+          ) : null}
 
           <form
-            className="flex min-w-0 flex-col justify-between p-5 sm:p-8 lg:p-12"
+            className={`flex min-w-0 flex-col justify-between ${
+              isFinalStep ? "mx-auto w-full max-w-6xl p-5 sm:p-8 lg:px-14 lg:py-12" : "p-5 sm:p-8 lg:p-12"
+            }`}
             onSubmit={isFinalStep ? handlePayNow : moveForward}
           >
             <div key={activeStep.id} className="animate-[checkoutStepIn_260ms_ease-out]">
@@ -514,14 +581,28 @@ export default function CoursePaymentPage() {
               ) : null}
 
               {activeStep.id === "plan" ? (
-                <div className="mt-5 max-w-3xl">
-                  <h3 className="font-reference text-3xl font-semibold text-white sm:text-4xl">
-                    Choose your access plan
-                  </h3>
-                  <p className="mt-3 text-sm leading-6 text-[#999]">
-                    The final amount is locked by the backend before Razorpay opens.
-                  </p>
-                  <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <div className="mx-auto w-full max-w-5xl">
+                  <div className="flex items-center gap-5" aria-hidden="true">
+                    <span className="h-px flex-1 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.15))]" />
+                    <span className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white sm:h-28 sm:w-28">
+                      <PlanIcon type="wallet" />
+                    </span>
+                    <span className="h-px flex-1 bg-[linear-gradient(90deg,rgba(255,255,255,0.15),transparent)]" />
+                  </div>
+
+                  <div className="mt-7 text-center">
+                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#B7B7B7] sm:text-sm">
+                      Enrollment step {currentStep + 1} of {steps.length}
+                    </p>
+                    <h3 className="mt-3 font-reference text-4xl font-semibold tracking-[-0.03em] text-white sm:text-5xl">
+                      Choose Your Plan
+                    </h3>
+                    <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-[#A5A5A5] sm:text-lg sm:leading-8">
+                      Select the plan that best fits your goals and start your OSINT journey.
+                    </p>
+                  </div>
+
+                  <div className="mt-9 grid gap-4 lg:grid-cols-2 lg:gap-5">
                     {course.installment_payment_enabled ? (
                       <button
                         type="button"
@@ -529,25 +610,37 @@ export default function CoursePaymentPage() {
                           setPlan("monthly");
                           setError("");
                         }}
-                        className={`rounded-2xl border p-5 text-left transition ${
+                        aria-pressed={plan === "monthly"}
+                        className={`flex min-h-[490px] flex-col rounded-2xl border p-5 text-left transition sm:p-7 ${
                           plan === "monthly"
-                            ? "border-white bg-white text-black"
+                            ? "border-[#79A5FF] bg-[#10141C] text-white shadow-[0_0_0_1px_rgba(121,165,255,0.2)]"
                             : "border-white/15 bg-black/55 text-white hover:border-white/35"
                         }`}
                       >
-                        <span className="text-xs font-semibold uppercase tracking-[0.15em]">
-                          Monthly
+                        <span className="block text-center text-2xl font-semibold">
+                          Plan 1
                         </span>
-                        <span className="mt-4 block text-3xl font-semibold">
+                        <span className="mt-2 block text-center text-sm text-[#C3C3C3] sm:text-base">
+                          Monthly Payment Plan
+                        </span>
+                        <span className="mt-6 block border-t border-white/10 pt-7 text-4xl font-semibold sm:text-5xl">
                           {formatINR(course.monthly_price)}
+                          <span className="ml-2 text-sm font-normal text-[#B5B5B5]">/ month</span>
                         </span>
-                        <span
-                          className={`mt-3 block text-sm leading-6 ${
-                            plan === "monthly" ? "text-black/65" : "text-[#8F8F8F]"
-                          }`}
-                        >
-                          30 days of access. Lifetime access after three verified monthly
-                          payments.
+                        <ul className="mt-7 space-y-3">
+                          <PlanFeature>
+                            Pay <span className="text-[#79A5FF]">{formatINR(course.monthly_price)}</span> every month
+                          </PlanFeature>
+                          <PlanFeature>For 3 months (3 installments)</PlanFeature>
+                        </ul>
+                        <span className="mt-auto flex items-center gap-4 rounded-xl border border-white/[0.08] bg-white/[0.045] p-4">
+                          <span className="shrink-0 text-white"><PlanIcon type="calendar" /></span>
+                          <span>
+                            <span className="block text-base font-semibold">3 Monthly Payments</span>
+                            <span className="mt-1 block text-sm text-[#A7A7A7]">
+                              {formatINR(course.monthly_price)} × 3 months
+                            </span>
+                          </span>
                         </span>
                       </button>
                     ) : null}
@@ -558,24 +651,39 @@ export default function CoursePaymentPage() {
                           setPlan("full");
                           setError("");
                         }}
-                        className={`rounded-2xl border p-5 text-left transition ${
+                        aria-pressed={plan === "full"}
+                        className={`relative flex min-h-[490px] flex-col rounded-2xl border p-5 text-left transition sm:p-7 ${
                           plan === "full"
-                            ? "border-white bg-white text-black"
+                            ? "border-[#79A5FF] bg-[#10141C] text-white shadow-[0_0_0_1px_rgba(121,165,255,0.25)]"
                             : "border-white/15 bg-black/55 text-white hover:border-white/35"
                         }`}
                       >
-                        <span className="text-xs font-semibold uppercase tracking-[0.15em]">
-                          One-time
+                        <span className="mx-auto -mt-1 mb-3 rounded-lg bg-[#79A5FF] px-4 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#07101F]">
+                          Most chosen
                         </span>
-                        <span className="mt-4 block text-3xl font-semibold">
+                        <span className="block text-center text-2xl font-semibold text-[#79A5FF]">
+                          Plan 2
+                        </span>
+                        <span className="mt-2 block text-center text-sm text-[#C3C3C3] sm:text-base">
+                          One-Time Payment
+                        </span>
+                        <span className="mt-6 block border-t border-white/10 pt-7 text-4xl font-semibold sm:text-5xl">
                           {formatINR(course.price)}
                         </span>
-                        <span
-                          className={`mt-3 block text-sm leading-6 ${
-                            plan === "full" ? "text-black/65" : "text-[#8F8F8F]"
-                          }`}
-                        >
-                          One verified payment for lifetime course and linked live-class access.
+                        <ul className="mt-7 space-y-3">
+                          <PlanFeature>One-time payment</PlanFeature>
+                          <PlanFeature>Full duration: 3 months</PlanFeature>
+                          <PlanFeature>Full access to all live sessions</PlanFeature>
+                          <PlanFeature>Lifetime access to recordings</PlanFeature>
+                          <PlanFeature>Certificate of completion</PlanFeature>
+                          <PlanFeature>24x7 team chat support</PlanFeature>
+                        </ul>
+                        <span className="mt-auto flex items-center gap-4 rounded-xl border border-white/[0.08] bg-white/[0.045] p-4">
+                          <span className="shrink-0 text-white"><PlanIcon type="tag" /></span>
+                          <span>
+                            <span className="block text-base font-semibold">One-Time Payment</span>
+                            <span className="mt-1 block text-sm text-[#A7A7A7]">Pay once, learn fully</span>
+                          </span>
                         </span>
                       </button>
                     ) : null}
@@ -590,7 +698,47 @@ export default function CoursePaymentPage() {
               ) : null}
             </div>
 
-            <div className="mt-10 flex flex-col-reverse gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className={`mt-10 ${
+              isFinalStep
+                ? "mx-auto flex w-full max-w-5xl flex-col gap-5"
+                : "flex flex-col-reverse gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between"
+            }`}>
+              {isFinalStep ? (
+                <>
+                  {!course.purchase_available ? (
+                    <Button type="button" disabled className="min-h-16 w-full rounded-xl text-base uppercase tracking-[0.12em]">
+                      Purchase unavailable
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      loading={paying}
+                      className="min-h-16 w-full rounded-xl text-base uppercase tracking-[0.12em]"
+                    >
+                      Proceed to payment
+                      <ArrowIcon />
+                    </Button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentStep((step) => step - 1);
+                      setError("");
+                    }}
+                    className="mx-auto inline-flex items-center gap-2 text-sm text-[#8B8B8B] transition hover:text-white"
+                  >
+                    <ArrowIcon className="h-4 w-4 rotate-180" />
+                    Back
+                  </button>
+                  <p className="flex items-center justify-center gap-2 border-t border-white/[0.08] pt-5 text-xs text-[#8F8F8F] sm:text-sm">
+                    <ShieldIcon />
+                    Secure Enrollment
+                    <span aria-hidden="true">•</span>
+                    Limited Seats
+                  </p>
+                </>
+              ) : (
+                <>
               <div className="flex gap-2">
                 {currentStep > 0 ? (
                   <Button
@@ -620,6 +768,8 @@ export default function CoursePaymentPage() {
                 <Button type="submit" loading={paying} className="min-w-44">
                   {isFinalStep ? "Continue to Razorpay" : "Continue"}
                 </Button>
+              )}
+                </>
               )}
             </div>
           </form>
