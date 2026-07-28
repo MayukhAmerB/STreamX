@@ -110,7 +110,6 @@ function FeatureIcon({ type }) {
 
 function CourseCard({ course }) {
   const status = getCourseLaunchStatus(course);
-  const detailsLink = course?._fallbackLink || `/courses/${course.id}`;
   const [thumbnailSrc, setThumbnailSrc] = useState(course?.thumbnail || "");
   const safeTitle = course?.title || "Untitled course";
   const safeDescription = course?.description || "Professional cybersecurity training program.";
@@ -128,13 +127,13 @@ function CourseCard({ course }) {
       return { label: "Coming Soon", disabled: true };
     }
     if (hasCourseAccess) {
-      return { label: "Continue Course", to: `/learn/${course.id}` };
+      return { label: "Access Course", to: `/learn/${course.id}` };
     }
     if (course?.registration_closed) {
       return { label: "Registration Closed", disabled: true };
     }
     if (course?.purchase_available) {
-      return { label: "Enroll Now", to: `/courses/${course.id}/payment` };
+      return { label: "Buy Course", to: `/courses/${course.id}/payment` };
     }
     return { label: "Purchase Unavailable", disabled: true };
   })();
@@ -171,11 +170,11 @@ function CourseCard({ course }) {
               {status.label}
             </span>
           </div>
-          <Link to={detailsLink} className="block max-w-[92%]">
+          <div className="max-w-[92%]">
             <h3 className="font-reference text-[clamp(1.85rem,4vw,3rem)] font-semibold leading-[1.03] tracking-[-0.035em] text-white transition group-hover:text-[#F2F2F2]">
               {safeTitle}
             </h3>
-          </Link>
+          </div>
           <p className="mt-4 max-w-[92%] text-sm leading-6 text-[#A4A4A4] sm:text-base sm:leading-7">
             {safeDescription}
           </p>
@@ -212,7 +211,7 @@ function CourseCard({ course }) {
             >
               {primaryAction.label}
               <span aria-hidden="true" className="text-2xl font-light leading-none">
-                →
+                &rarr;
               </span>
             </Link>
           ) : (
@@ -239,10 +238,6 @@ function CourseCard({ course }) {
                     ? "Previous batch"
                   : "Secure Enrollment"}
             </span>
-            <span aria-hidden="true">•</span>
-            <Link to={detailsLink} className="transition hover:text-white">
-              View Details
-            </Link>
           </div>
 
           {!status.isComingSoon &&

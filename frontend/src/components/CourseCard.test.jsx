@@ -34,8 +34,9 @@ describe("CourseCard", () => {
       },
     });
 
-    expect(html).toContain("Continue Course");
+    expect(html).toContain("Access Course");
     expect(html).toContain('href="/learn/11"');
+    expect(html).not.toContain("View Details");
   });
 
   it("keeps the standard live action when the user does not have access", () => {
@@ -49,9 +50,10 @@ describe("CourseCard", () => {
     });
 
     expect(html).toContain("Live");
-    expect(html).toContain("Enroll Now");
+    expect(html).toContain("Buy Course");
     expect(html).toContain('href="/courses/11/payment"');
-    expect(html).not.toContain("Continue Course");
+    expect(html).not.toContain("Access Course");
+    expect(html).not.toContain("View Details");
   });
 
   it("does not offer a legacy request when purchasing is unavailable", () => {
@@ -99,7 +101,7 @@ describe("CourseCard", () => {
       },
     });
 
-    expect(html).toContain("Continue Course");
+    expect(html).toContain("Access Course");
     expect(html).toContain('href="/learn/11"');
     expect(html).not.toContain("Registration Closed");
   });
@@ -130,7 +132,7 @@ describe("CourseCard", () => {
     });
 
     expect(html).toContain("Coming Soon");
-    expect(html).not.toContain("Continue Course");
+    expect(html).not.toContain("Access Course");
   });
 
   it("renders the default premium feature set when the API has no custom features", () => {

@@ -25,7 +25,7 @@ function renderCatalog(courses) {
 }
 
 describe("CourseListPage catalog rendering", () => {
-  it("renders Continue Course from authenticated course-list access data", () => {
+  it("renders Access Course from authenticated course-list access data", () => {
     const html = renderCatalog([
       {
         id: 11,
@@ -55,12 +55,12 @@ describe("CourseListPage catalog rendering", () => {
       },
     ]);
 
-    expect(html).toContain("Continue Course");
+    expect(html).toContain("Access Course");
     expect(html).toContain('href="/learn/11"');
     expect(html).toContain("Live");
   });
 
-  it("does not over-render Continue Course for pending or coming soon catalog items", () => {
+  it("does not over-render Access Course for pending or coming soon catalog items", () => {
     const html = renderCatalog([
       {
         id: 21,

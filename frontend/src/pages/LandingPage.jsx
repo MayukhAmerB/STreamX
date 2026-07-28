@@ -10,7 +10,7 @@ import StoryJourneySection from "../components/StoryJourneySection";
 import { useAuth } from "../hooks/useAuth";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
 import { selectLandingCourses } from "../utils/landingCourses";
-import { apiData, apiMessage } from "../utils/api";
+import { apiData } from "../utils/api";
 import { readCachedCourseCatalog, writeCachedCourseCatalog } from "../utils/courseCatalog";
 import { formatINR } from "../utils/currency";
 import { featuredCourse } from "../utils/featuredCourse";
@@ -487,12 +487,136 @@ function GuestAccessPanel({ courses, liveClasses, liveClassesError }) {
   );
 }
 
+const HERO_PROGRAM_FEATURES = [
+  {
+    label: "Live Instructor-Led Classes",
+    path: "M3 5h18v14H3zM10 9l5 3-5 3V9z",
+  },
+  {
+    label: "Lifetime Access to Recordings",
+    path: "M4 4h16v16H4zM10 8l6 4-6 4V8z",
+  },
+  {
+    label: "Exclusive Resources & Tools",
+    path: "M3 7h7l2 2h9v10H3V7z",
+  },
+  {
+    label: "Doubt Clearing Support",
+    path: "M4 5h16v11H9l-5 4V5zM8 9h8M8 12h5",
+  },
+  {
+    label: "Certificate of Completion",
+    path: "M6 3h12v12H6zM9 7h6M9 10h4M9 15l-1 6 4-2 4 2-1-6",
+  },
+];
+
+function TrainingProgramPanel({ course }) {
+  const launchStatus = getCourseLaunchStatus(course);
+  const enrollmentStatus = String(course?.enrollment_status || "").toLowerCase();
+  const hasAccess =
+    Boolean(course?.is_enrolled) ||
+    enrollmentStatus === "approved" ||
+    enrollmentStatus === "paid";
+  const safeCourseId = Number(course?.id || 0);
+  const canPurchase =
+    safeCourseId > 0 &&
+    Boolean(course?.purchase_available) &&
+    !course?.registration_closed &&
+    !launchStatus.isComingSoon;
+
+  const action = hasAccess && safeCourseId > 0
+    ? { label: "Access Course", to: `/learn/${safeCourseId}` }
+    : canPurchase
+      ? { label: "Buy Course", to: `/courses/${safeCourseId}/payment` }
+      : {
+          label: course?.registration_closed
+            ? "Registration Closed"
+            : launchStatus.isComingSoon
+              ? "Coming Soon"
+              : "Purchase Unavailable",
+        };
+
+  return (
+    <article className="relative overflow-hidden rounded-[26px] border border-white/20 bg-[#111111] p-5 shadow-[0_28px_90px_rgba(0,0,0,0.6)] sm:p-7">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-16 -top-16 h-52 w-52 rounded-full bg-white/[0.055] blur-[70px]"
+      />
+
+      <div className="relative flex items-center justify-between gap-4">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[#A5A5A5]">
+          Our training program
+        </span>
+        <span className="rounded-full border border-white/15 px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-[#BDBDBD]">
+          {hasAccess ? "Enrolled" : "Overview"}
+        </span>
+      </div>
+
+      <div className="relative mt-7 grid grid-cols-[64px_minmax(0,1fr)] gap-5 sm:grid-cols-[78px_minmax(0,1fr)] sm:gap-7">
+        <span className="flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-[#171717] sm:h-[78px] sm:w-[78px]">
+          <svg
+            viewBox="0 0 48 48"
+            aria-hidden="true"
+            className="h-10 w-10 fill-none stroke-[#D5D5D5] stroke-[1.4]"
+          >
+            <circle cx="24" cy="24" r="14" />
+            <circle cx="24" cy="24" r="5" />
+            <path d="M24 3v9M24 36v9M3 24h9M36 24h9M9 9l7 7M32 32l7 7M39 9l-7 7M16 32l-7 7" />
+          </svg>
+        </span>
+        <div className="min-w-0">
+          <h2 className="font-reference text-[clamp(1.65rem,4vw,2.55rem)] font-semibold leading-[1.08] tracking-[-0.03em] text-white">
+            {course?.title || "OSINT Professional Training Program"}
+          </h2>
+          <p className="mt-3 line-clamp-3 text-sm leading-6 text-[#A9A9A9] sm:text-base sm:leading-7">
+            {course?.description ||
+              "A complete program featuring live instructor-led classes, practical assignments, exclusive resources, and real-world OSINT skills."}
+          </p>
+        </div>
+      </div>
+
+      <div className="relative mt-7 border-t border-white/10 pt-5">
+        <ul className="space-y-3">
+          {HERO_PROGRAM_FEATURES.map((feature) => (
+            <li key={feature.label} className="flex items-center gap-3 text-sm text-[#D1D1D1] sm:text-[15px]">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#171717]">
+                <svg
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                  className="h-[18px] w-[18px] fill-none stroke-current stroke-[1.6] stroke-linecap-round stroke-linejoin-round"
+                >
+                  <path d={feature.path} />
+                </svg>
+              </span>
+              <span>{feature.label}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="relative mt-6">
+        {action.to ? (
+          <Link
+            to={action.to}
+            className="group inline-flex min-h-14 w-full items-center justify-center gap-4 rounded-xl border border-white bg-white px-5 text-sm font-bold uppercase tracking-[0.16em] text-black transition hover:bg-[#E7E7E7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          >
+            {action.label}
+            <DashboardArrow className="transition-transform group-hover:translate-x-1" />
+          </Link>
+        ) : (
+          <span className="inline-flex min-h-14 w-full cursor-not-allowed items-center justify-center rounded-xl border border-white/10 bg-[#181818] px-5 text-sm font-bold uppercase tracking-[0.14em] text-[#777777]">
+            {action.label}
+          </span>
+        )}
+      </div>
+    </article>
+  );
+}
+
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
   const [catalogCourses, setCatalogCourses] = useState([]);
   const [studentCourses, setStudentCourses] = useState([]);
-  const [studentAccessLoading, setStudentAccessLoading] = useState(false);
-  const [studentAccessError, setStudentAccessError] = useState("");
   const [landingLiveClasses, setLandingLiveClasses] = useState([]);
   const [landingLiveClassesError, setLandingLiveClassesError] = useState("");
   const [heroLiveBroadcast, setHeroLiveBroadcast] = useState(null);
@@ -521,15 +645,10 @@ export default function LandingPage() {
 
     if (!isAuthenticated) {
       setStudentCourses([]);
-      setStudentAccessLoading(false);
-      setStudentAccessError("");
       return () => {
         active = false;
       };
     }
-
-    setStudentAccessLoading(true);
-    setStudentAccessError("");
 
     (async () => {
       try {
@@ -537,12 +656,9 @@ export default function LandingPage() {
         if (!active) return;
         const courses = apiData(response, []);
         setStudentCourses(Array.isArray(courses) ? courses : []);
-      } catch (err) {
+      } catch {
         if (!active) return;
-        setStudentAccessError(apiMessage(err, "Unable to load your approved access."));
         setStudentCourses([]);
-      } finally {
-        if (active) setStudentAccessLoading(false);
       }
     })();
 
@@ -655,13 +771,22 @@ export default function LandingPage() {
     );
     return (
       liveCourses.find((course) =>
-        String(course.title || "").toLowerCase().includes("osint beginner")
+        String(course.title || "").toLowerCase().includes("professional")
       ) ||
       liveCourses[0] ||
       catalogCourses[0] ||
       featuredCourse
     );
   }, [catalogCourses]);
+
+  const heroProgramCourse = useMemo(() => {
+    const ownedCourse = studentCourses.find(
+      (course) => Number(course?.id) === Number(featuredLiveCourse?.id)
+    );
+    return ownedCourse
+      ? { ...featuredLiveCourse, ...ownedCourse, is_enrolled: true }
+      : featuredLiveCourse;
+  }, [featuredLiveCourse, studentCourses]);
 
   const featuredLiveCourseLink = featuredLiveCourse?._fallbackLink || `/courses/${featuredLiveCourse.id}`;
   const heroLiveBroadcastCourseId = Number(
@@ -687,13 +812,6 @@ export default function LandingPage() {
       return String(a?.title || "").localeCompare(String(b?.title || ""));
     });
   }, [landingLiveClasses]);
-
-  const approvedLiveClasses = useMemo(() => {
-    return landingPrograms.filter((program) => {
-      const status = String(program?.enrollment_status || "").toLowerCase();
-      return Boolean(program?.is_enrolled) || status === "approved";
-    });
-  }, [landingPrograms]);
 
   return (
     <div className="relative bg-[#030303] text-[#F6F6F6]">
@@ -769,20 +887,7 @@ export default function LandingPage() {
               aria-hidden="true"
               className="pointer-events-none absolute -right-12 -top-8 -z-10 h-72 w-72 rounded-full bg-white/[0.08] blur-[96px] sm:-right-16 sm:h-80 sm:w-80"
             />
-            {isAuthenticated ? (
-              <StudentAccessPanel
-                courses={studentCourses}
-                liveClasses={approvedLiveClasses}
-                loading={studentAccessLoading}
-                error={studentAccessError}
-              />
-            ) : (
-              <GuestAccessPanel
-                courses={catalogCourses}
-                liveClasses={landingLiveClassesError ? [] : landingPrograms}
-                liveClassesError={landingLiveClassesError}
-              />
-            )}
+            <TrainingProgramPanel course={heroProgramCourse} />
           </div>
         </div>
       </section>
@@ -964,7 +1069,6 @@ export default function LandingPage() {
                   subtitle: formatLevel(program?.level),
                 };
                 const enrollmentStatus = String(program.enrollment_status || "").toLowerCase();
-                const detailsLink = "/live-classes";
                 return (
                 <div
                   key={program.id}
@@ -1016,30 +1120,31 @@ export default function LandingPage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
                     <span className="rounded-full border border-white/10 bg-[#060606] px-3 py-1 text-xs font-semibold text-[#AAAAAA]">
                       {(program.enrollment_count ?? 0)} enrolled
                     </span>
-                    <Link
-                      to={detailsLink}
-                      className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-[#060606] px-4 py-2 text-sm font-semibold text-[#D8D8D8] transition hover:border-white/20 hover:bg-[#101010]"
-                    >
-                      View Details
-                    </Link>
                   </div>
 
                   <div className="mt-auto pt-4">
                     {program.is_enrolled || enrollmentStatus === "approved" ? (
-                      <Button className="w-full" disabled>
-                        Access Approved
-                      </Button>
+                      <Link
+                        to={
+                          program.linked_course_id
+                            ? `/courses/${program.linked_course_id}/live`
+                            : "/courses?view=owned"
+                        }
+                        className="block"
+                      >
+                        <Button className="w-full">Access Live Class</Button>
+                      </Link>
                     ) : enrollmentStatus === "pending" ? (
                       <Button className="w-full" disabled>
                         Legacy Request Pending
                       </Button>
                     ) : program.linked_course_id ? (
-                      <Link to={`/courses/${program.linked_course_id}`} className="block">
-                        <Button className="w-full">Buy Linked Course</Button>
+                      <Link to={`/courses/${program.linked_course_id}/payment`} className="block">
+                        <Button className="w-full">Buy Course</Button>
                       </Link>
                     ) : (
                       <Button className="w-full" disabled>
