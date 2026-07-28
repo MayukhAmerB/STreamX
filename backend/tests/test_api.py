@@ -1769,7 +1769,8 @@ class PaymentVerificationTests(BaseAPITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.data["errors"]["detail"], "Gateway unavailable.")
         payment = Payment.objects.get()
         self.assertEqual(payment.status, Payment.STATUS_FAILED)
         self.assertEqual(payment.gateway_status, "order_creation_failed")
@@ -1937,6 +1938,19 @@ class PaymentVerificationTests(BaseAPITestCase):
                 "https://wa.me/919970875040?"
             )
         )
+        self.assertEqual(response.data["data"]["course_title"], self.course.title)
+        self.assertEqual(response.data["data"]["transaction_id"], "pay_test_123")
+        self.assertEqual(response.data["data"]["plan"], Payment.PLAN_FULL)
+        self.assertEqual(
+            response.data["data"]["plan_label"],
+            "Plan 2 - One-Time Payment",
+        )
+        self.assertEqual(
+            response.data["data"]["access_duration"],
+            "Lifetime course access",
+        )
+        self.assertEqual(response.data["data"]["amount"], "3500.00")
+        self.assertEqual(response.data["data"]["currency"], "INR")
         payment.refresh_from_db()
         self.assertEqual(payment.status, Payment.STATUS_PAID)
         self.assertEqual(payment.gateway_status, "captured")

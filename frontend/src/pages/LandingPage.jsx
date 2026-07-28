@@ -9,6 +9,7 @@ import CourseCard from "../components/CourseCard";
 import StoryJourneySection from "../components/StoryJourneySection";
 import { useAuth } from "../hooks/useAuth";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
+import { selectLandingCourses } from "../utils/landingCourses";
 import { apiData, apiMessage } from "../utils/api";
 import { readCachedCourseCatalog, writeCachedCourseCatalog } from "../utils/courseCatalog";
 import { formatINR } from "../utils/currency";
@@ -675,7 +676,7 @@ export default function LandingPage() {
     : "/courses?view=owned";
 
   const landingLiveCourses = useMemo(() => {
-    return catalogCourses.filter((course) => getCourseLaunchStatus(course).isLive);
+    return selectLandingCourses(catalogCourses);
   }, [catalogCourses]);
 
   const landingPrograms = useMemo(() => {

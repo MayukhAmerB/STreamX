@@ -4,6 +4,7 @@ from django.conf import settings
 from django.db import models
 
 from apps.courses.models import Course
+from apps.users.models import User
 
 
 class Payment(models.Model):
@@ -111,6 +112,15 @@ class StudentAccountSequence(models.Model):
     class Meta:
         verbose_name = "Student account sequence"
         verbose_name_plural = "Student account sequence"
+
+
+class SuccessfulPaymentUser(User):
+    """Admin-only view of accounts provisioned by successful payments."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "Successful Payment User"
+        verbose_name_plural = "Successful Payment Users"
 
 
 class PaymentWebhookEvent(models.Model):

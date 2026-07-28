@@ -1,8 +1,14 @@
 import hashlib
 import hmac
+import logging
+from urllib.parse import quote
 
 import requests
 from django.conf import settings
+
+
+logger = logging.getLogger(__name__)
+RAZORPAY_API_BASE_URL = "https://api.razorpay.com/v1"
 
 
 class RazorpayServiceError(Exception):
@@ -19,59 +25,82 @@ class _TimeoutSession(requests.Session):
         return super().request(method, url, **kwargs)
 
 
-def get_razorpay_client():
+def _razorpay_credentials():
     if not settings.RAZORPAY_KEY_ID or not settings.RAZORPAY_KEY_SECRET:
         raise RazorpayServiceError("Razorpay credentials are not configured.")
-    try:
-        import razorpay
-    except ModuleNotFoundError as exc:
-        raise RazorpayServiceError(
-            "Razorpay SDK dependency is unavailable. Install setuptools and razorpay dependencies."
-        ) from exc
+    return settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET
+
+
+def _razorpay_request(method, path, *, json_body=None):
+    key_id, key_secret = _razorpay_credentials()
     session = _TimeoutSession(
         timeout_seconds=getattr(settings, "RAZORPAY_HTTP_TIMEOUT_SECONDS", 12)
     )
-    return razorpay.Client(
-        session=session,
-        auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET),
-    )
+    try:
+        response = session.request(
+            method,
+            f"{RAZORPAY_API_BASE_URL}{path}",
+            auth=(key_id, key_secret),
+            headers={"Accept": "application/json"},
+            json=json_body,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("Razorpay returned a non-object response.")
+        return payload
+    except Exception as exc:
+        status_code = getattr(getattr(exc, "response", None), "status_code", None)
+        logger.exception(
+            "Razorpay API request failed: method=%s path=%s status=%s",
+            method,
+            path,
+            status_code or "unavailable",
+        )
+        raise RazorpayServiceError(
+            "The payment gateway is temporarily unavailable. Please try again shortly."
+        ) from exc
 
 
 def create_razorpay_order(*, amount_paise, currency="INR", receipt=""):
-    client = get_razorpay_client()
     try:
-        return client.order.create(
-            {
+        return _razorpay_request(
+            "POST",
+            "/orders",
+            json_body={
                 "amount": amount_paise,
                 "currency": currency,
                 "receipt": receipt or "alsyedinitiative-order",
                 "payment_capture": 1,
-            }
+            },
         )
-    except Exception as exc:
-        raise RazorpayServiceError("Failed to create Razorpay order.") from exc
+    except RazorpayServiceError:
+        raise
 
 
 def verify_razorpay_signature(*, razorpay_order_id, razorpay_payment_id, razorpay_signature):
-    client = get_razorpay_client()
-    payload = {
-        "razorpay_order_id": razorpay_order_id,
-        "razorpay_payment_id": razorpay_payment_id,
-        "razorpay_signature": razorpay_signature,
-    }
-    try:
-        client.utility.verify_payment_signature(payload)
-        return True
-    except Exception as exc:
-        raise RazorpayServiceError("Razorpay signature verification failed.") from exc
+    _, key_secret = _razorpay_credentials()
+    message = f"{razorpay_order_id}|{razorpay_payment_id}".encode("utf-8")
+    expected_signature = hmac.new(
+        key=key_secret.encode("utf-8"),
+        msg=message,
+        digestmod=hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(expected_signature, str(razorpay_signature or "")):
+        raise RazorpayServiceError("Razorpay signature verification failed.")
+    return True
 
 
 def fetch_razorpay_payment(*, razorpay_payment_id):
-    client = get_razorpay_client()
+    payment_id = quote(str(razorpay_payment_id or "").strip(), safe="")
+    if not payment_id:
+        raise RazorpayServiceError("Razorpay payment ID is required.")
     try:
-        return client.payment.fetch(razorpay_payment_id)
-    except Exception as exc:
-        raise RazorpayServiceError("Failed to confirm payment status with Razorpay.") from exc
+        return _razorpay_request("GET", f"/payments/{payment_id}")
+    except RazorpayServiceError as exc:
+        raise RazorpayServiceError(
+            "Failed to confirm payment status with Razorpay."
+        ) from exc
 
 
 def verify_razorpay_webhook_signature(*, payload_body, razorpay_signature):

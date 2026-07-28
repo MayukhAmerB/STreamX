@@ -56,10 +56,26 @@ def _payment_support_whatsapp_url(payment):
 
 
 def _payment_success_data(payment):
+    course = payment.course
+    if payment.plan == Payment.PLAN_MONTHLY:
+        access_days = max(int(getattr(course, "installment_access_days", 30) or 30), 1)
+        access_duration = f"{access_days} days"
+        plan_label = "Plan 1 - Monthly Payment"
+    else:
+        access_duration = "Lifetime course access"
+        plan_label = "Plan 2 - One-Time Payment"
     return {
         "course_id": payment.course_id or payment.course_id_snapshot,
+        "course_title": payment.course_title_snapshot
+        or getattr(course, "title", ""),
         "enrolled": True,
         "invoice_number": payment.invoice_number,
+        "transaction_id": payment.razorpay_payment_id,
+        "plan": payment.plan,
+        "plan_label": plan_label,
+        "access_duration": access_duration,
+        "amount": str(payment.amount),
+        "currency": payment.currency,
         "generated_login": payment.user_email_snapshot,
         "credentials_pending": payment.provisioning_status
         == Payment.PROVISION_AWAITING_ADMIN,
@@ -554,7 +570,7 @@ class CreateOrderView(APIView):
                 success=False,
                 message="Order creation failed.",
                 errors={"detail": str(exc)},
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
         payment.razorpay_order_id = str(order["id"])

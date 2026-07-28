@@ -73,6 +73,60 @@ function ShieldIcon() {
   );
 }
 
+function SuccessIcon() {
+  return (
+    <svg viewBox="0 0 64 64" fill="none" aria-hidden="true" className="h-20 w-20 sm:h-24 sm:w-24">
+      <circle cx="32" cy="32" r="30" stroke="currentColor" strokeWidth="1.2" opacity="0.24" />
+      <circle cx="32" cy="32" r="23" stroke="currentColor" strokeWidth="1.2" opacity="0.5" />
+      <path
+        d="m20 32 8 8 17-18"
+        stroke="currentColor"
+        strokeWidth="3.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ReceiptIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-6 w-6">
+      <path d="M6 3h12v18l-2-1.2L14 21l-2-1.2L10 21l-2-1.2L6 21V3Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M9 8h6M9 12h6M9 16h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-6 w-6">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function WhatsAppIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-7 w-7">
+      <path
+        d="M20 11.6a8 8 0 0 1-11.7 7.1L4 20l1.3-4.1A8 8 0 1 1 20 11.6Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9 8.2c.3-.5.6-.5.9-.5h.3c.2 0 .4.1.5.4l.8 1.8c.1.3.1.5-.1.7l-.6.8c-.2.2-.1.4 0 .6.6 1 1.4 1.8 2.4 2.4.2.1.4.2.6 0l.8-1c.2-.2.4-.3.7-.2l1.8.9c.3.1.4.3.4.5 0 .3-.1 1.3-.7 1.8-.5.5-1.3.8-2.1.6-1.1-.2-2.7-.8-4.4-2.3-1.4-1.3-2.4-2.8-2.7-4-.3-.9.1-1.8.4-2.5Z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function PlanFeature({ children }) {
   return (
     <li className="flex min-w-0 items-start gap-1.5 text-[11px] leading-4 text-[#D3D3D3] sm:gap-3 sm:text-base sm:leading-6">
@@ -369,75 +423,135 @@ export default function CoursePaymentPage() {
   }
 
   if (paymentResult) {
+    const transactionId =
+      paymentResult.transaction_id || paymentResult.invoice_number || "Recorded";
+    const selectedPlan =
+      paymentResult.plan_label ||
+      (plan === "monthly"
+        ? "Plan 1 - Monthly Payment"
+        : "Plan 2 - One-Time Payment");
+    const accessDuration =
+      paymentResult.access_duration ||
+      (plan === "monthly" ? "30 days" : "Lifetime course access");
+
     return (
       <PageShell
-        title="Payment successful"
-        subtitle="Your payment was verified and recorded securely"
+        title=""
+        subtitle=""
+        containerClassName="max-w-[1040px] py-4 sm:py-8"
       >
-        <section className="mx-auto max-w-3xl overflow-hidden rounded-[28px] border border-white/15 bg-[#090909] shadow-[0_24px_70px_rgba(0,0,0,0.45)]">
-          <div className="border-b border-white/10 bg-white/[0.04] p-6 sm:p-8">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-400/10 text-2xl text-emerald-300">
-              OK
-            </div>
-            <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">
-              Razorpay payment verified
-            </p>
-            <h2 className="mt-2 font-reference text-3xl font-semibold text-white">
-              Your enrollment is recorded
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-[#BDBDBD]">
-              Your invoice, payment, buyer details, generated login, course access, and linked
-              live-class access are saved. Contact our team on WhatsApp to complete document
-              verification and receive your password.
-            </p>
-          </div>
+        <div className="mx-auto max-w-[900px]">
+          <section className="relative overflow-hidden rounded-[30px] border border-white/20 bg-[#080808] px-5 py-9 shadow-[0_26px_80px_rgba(0,0,0,0.55)] sm:px-12 sm:py-12">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_14%,rgba(255,255,255,0.055),transparent_34%)]" />
 
-          <dl className="grid gap-3 p-6 sm:grid-cols-2 sm:p-8">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
-              <dt className="text-[10px] uppercase tracking-[0.16em] text-[#858585]">Invoice</dt>
-              <dd className="mt-2 break-all text-base font-semibold text-white">
-                {paymentResult.invoice_number || "Recorded"}
-              </dd>
+            <div className="relative text-center">
+              <div className="mx-auto flex max-w-[700px] items-center gap-4 sm:gap-7">
+                <span className="h-px flex-1 bg-[linear-gradient(to_right,transparent,rgba(255,255,255,0.2))]" />
+                <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-full border border-white/20 text-white shadow-[0_0_32px_rgba(255,255,255,0.05)] sm:h-36 sm:w-36">
+                  <SuccessIcon />
+                </div>
+                <span className="h-px flex-1 bg-[linear-gradient(to_left,transparent,rgba(255,255,255,0.2))]" />
+              </div>
+              <p className="mt-7 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#BEBEBE] sm:text-sm">
+                Payment successful
+              </p>
+              <h1 className="mt-3 font-reference text-4xl font-semibold tracking-[-0.035em] text-white sm:text-6xl">
+                Payment Successful!
+              </h1>
+              <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[#B8B8B8] sm:text-lg sm:leading-8">
+                Your payment has been received and verified securely. Thank you for
+                enrolling with us.
+              </p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
-              <dt className="text-[10px] uppercase tracking-[0.16em] text-[#858585]">
-                Generated login
-              </dt>
-              <dd className="mt-2 break-all text-base font-semibold text-white">
-                {paymentResult.generated_login || "Pending"}
-              </dd>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4 sm:col-span-2">
-              <dt className="text-[10px] uppercase tracking-[0.16em] text-[#858585]">
-                Credential status
-              </dt>
-              <dd className="mt-2 text-sm leading-6 text-[#D0D0D0]">
-                Password pending admin verification. The generated login becomes usable only
-                after our team issues your credentials.
-              </dd>
-            </div>
-          </dl>
 
-          <div className="flex flex-col gap-3 border-t border-white/10 p-6 sm:flex-row sm:p-8">
-            {paymentResult.support_whatsapp_url ? (
-              <a
-                href={paymentResult.support_whatsapp_url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1"
-              >
-                <Button type="button" className="w-full">
-                  Contact us on WhatsApp
-                </Button>
-              </a>
-            ) : null}
-            <Link to="/courses" className="flex-1">
-              <Button type="button" variant="secondary" className="w-full">
-                Return to courses
-              </Button>
-            </Link>
+            <dl className="relative mt-8 overflow-hidden rounded-2xl border border-white/15 bg-black/45 px-4 sm:mt-10 sm:px-7">
+              <div className="grid grid-cols-[40px_1fr] items-center gap-3 border-b border-white/10 py-5 sm:grid-cols-[48px_1fr_auto]">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 text-white sm:h-11 sm:w-11">
+                  <ReceiptIcon />
+                </span>
+                <dt className="text-sm text-[#D0D0D0] sm:text-base">Transaction ID</dt>
+                <dd className="col-span-2 break-all pl-[52px] text-right text-sm font-semibold text-white sm:col-span-1 sm:pl-0 sm:text-base">
+                  {transactionId}
+                </dd>
+              </div>
+              <div className="grid grid-cols-[40px_1fr] items-center gap-3 border-b border-white/10 py-5 sm:grid-cols-[48px_1fr_auto]">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 text-white sm:h-11 sm:w-11">
+                  <PlanIcon type="calendar" />
+                </span>
+                <dt className="text-sm text-[#D0D0D0] sm:text-base">Plan Selected</dt>
+                <dd className="col-span-2 pl-[52px] text-right text-sm font-semibold text-white sm:col-span-1 sm:pl-0 sm:text-base">
+                  {selectedPlan}
+                </dd>
+              </div>
+              <div className="grid grid-cols-[40px_1fr] items-center gap-3 py-5 sm:grid-cols-[48px_1fr_auto]">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 text-white sm:h-11 sm:w-11">
+                  <ClockIcon />
+                </span>
+                <dt className="text-sm text-[#D0D0D0] sm:text-base">Access Duration</dt>
+                <dd className="col-span-2 pl-[52px] text-right text-sm font-semibold text-white sm:col-span-1 sm:pl-0 sm:text-base">
+                  {accessDuration}
+                </dd>
+              </div>
+            </dl>
+
+            <div className="relative mt-7 rounded-2xl border border-white/15 bg-black/45 p-5 sm:p-7">
+              <div className="grid gap-5 sm:grid-cols-[120px_1fr] sm:items-center">
+                <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full border border-white/15 text-white sm:mx-0">
+                  <WhatsAppIcon />
+                </div>
+                <div className="border-white/20 text-center sm:border-l sm:pl-7 sm:text-left">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#A0A0A0]">
+                    Next step
+                  </p>
+                  <h2 className="mt-2 font-reference text-2xl font-medium text-white sm:text-3xl">
+                    Talk to our team for the remaining enrollment process.
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-[#9C9C9C]">
+                    Our team will guide you through verification and credential delivery.
+                  </p>
+                </div>
+              </div>
+
+              {paymentResult.support_whatsapp_url ? (
+                <a
+                  href={paymentResult.support_whatsapp_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-6 flex min-h-14 w-full items-center justify-center gap-3 rounded-xl border border-white/70 bg-transparent px-5 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-white hover:text-black sm:text-sm"
+                >
+                  <WhatsAppIcon />
+                  Message us on WhatsApp
+                  <ArrowIcon />
+                </a>
+              ) : (
+                <Link
+                  to="/courses"
+                  className="mt-6 flex min-h-14 w-full items-center justify-center gap-3 rounded-xl border border-white/70 px-5 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-white hover:text-black sm:text-sm"
+                >
+                  Return to courses
+                  <ArrowIcon />
+                </Link>
+              )}
+            </div>
+
+            <div className="relative mt-7 flex items-start justify-center gap-3 text-left text-xs leading-5 text-[#888] sm:text-sm">
+              <span className="mt-0.5 shrink-0">
+                <ShieldIcon />
+              </span>
+              <p>
+                Your payment and enrollment information are stored securely. Sensitive
+                gateway details are never exposed on this page.
+              </p>
+            </div>
+          </section>
+
+          <div className="mt-6 flex items-center justify-center gap-2 text-xs text-[#777] sm:text-sm">
+            <ShieldIcon />
+            <span>Secure Enrollment</span>
+            <span aria-hidden="true">-</span>
+            <span>Verified Payment</span>
           </div>
-        </section>
+        </div>
       </PageShell>
     );
   }
