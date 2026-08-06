@@ -662,10 +662,27 @@ export default function BroadcastingPage() {
   };
 
   const handleCopyJoinLink = async (session) => {
-    await copyText(buildJoinLink(session), "Join link copied.", "Unable to copy join link.");
+    const joinLink = buildJoinLink(session);
+    if (!joinLink) {
+      setShareState({ error: "Join link is not ready yet.", info: "" });
+      return;
+    }
+    await copyText(joinLink, "Join link copied.", "Unable to copy join link.");
   };
 
-  const handleCopyStreamLink = async (session) => {
+  const handleCopyStreamUrl = async (session) => {
+    const streamUrl = getSessionStreamUrl(session);
+    if (!streamUrl) {
+      setShareState({
+        error: "Stream URL is not ready yet.",
+        info: "",
+      });
+      return;
+    }
+    await copyText(streamUrl, "Stream URL copied.", "Unable to copy stream URL.");
+  };
+
+  const handleCopySecureViewerLink = async (session) => {
     const joinLink = buildJoinLink(session);
     if (!joinLink) {
       setShareState({
@@ -674,7 +691,11 @@ export default function BroadcastingPage() {
       });
       return;
     }
-    await copyText(joinLink, "Secure viewer link copied.", "Unable to copy secure viewer link.");
+    await copyText(
+      joinLink,
+      "Secure viewer link copied.",
+      "Unable to copy secure viewer link.",
+    );
   };
 
   const preparePersonalizedChatUrl = async (session) => {
@@ -1652,6 +1673,7 @@ export default function BroadcastingPage() {
                     {buildJoinLink(studioSession)}
                   </code>
                   <Button
+                    type="button"
                     variant="secondary"
                     className="px-3 py-1.5 text-xs"
                     onClick={() => handleCopyJoinLink(studioSession)}
@@ -1671,6 +1693,7 @@ export default function BroadcastingPage() {
                       : "Stream URL becomes available after joining the broadcast or setting custom URL."}
                   </code>
                   <Button
+                    type="button"
                     variant="secondary"
                     className="px-3 py-1.5 text-xs"
                     onClick={() => setIsStudioStreamUrlVisible((prev) => !prev)}
@@ -1680,9 +1703,10 @@ export default function BroadcastingPage() {
                     {isStudioStreamUrlVisible ? "Hide" : "Show"}
                   </Button>
                   <Button
+                    type="button"
                     variant="secondary"
                     className="px-3 py-1.5 text-xs"
-                    onClick={() => handleCopyStreamLink(studioSession)}
+                    onClick={() => handleCopyStreamUrl(studioSession)}
                     disabled={!studioStreamUrl}
                   >
                     Copy
@@ -1696,6 +1720,7 @@ export default function BroadcastingPage() {
                     {studioChatUrl || "Broadcast chat URL unavailable for this session."}
                   </code>
                   <Button
+                    type="button"
                     variant="secondary"
                     className="px-3 py-1.5 text-xs"
                     onClick={() => handleOpenBroadcastChat(studioSession)}
@@ -1704,6 +1729,7 @@ export default function BroadcastingPage() {
                     Open Broadcast Chat
                   </Button>
                   <Button
+                    type="button"
                     variant="secondary"
                     className="px-3 py-1.5 text-xs"
                     onClick={() => handleCopyChatLink(studioSession)}
@@ -1726,6 +1752,7 @@ export default function BroadcastingPage() {
                           : "OBS server URL unavailable"}
                       </code>
                       <Button
+                        type="button"
                         variant="secondary"
                         className="px-3 py-1.5 text-xs"
                         onClick={() => setIsStudioObsServerUrlVisible((prev) => !prev)}
@@ -1735,6 +1762,7 @@ export default function BroadcastingPage() {
                         {isStudioObsServerUrlVisible ? "Hide" : "Show"}
                       </Button>
                       <Button
+                        type="button"
                         variant="secondary"
                         className="px-3 py-1.5 text-xs"
                         onClick={() => handleCopyObsServerUrl(studioSession)}
@@ -1755,6 +1783,7 @@ export default function BroadcastingPage() {
                           : "OBS stream key unavailable"}
                       </code>
                       <Button
+                        type="button"
                         variant="secondary"
                         className="px-3 py-1.5 text-xs"
                         onClick={() => setIsStudioObsKeyVisible((prev) => !prev)}
@@ -1763,6 +1792,7 @@ export default function BroadcastingPage() {
                         {isStudioObsKeyVisible ? "Hide" : "Show"}
                       </Button>
                       <Button
+                        type="button"
                         variant="secondary"
                         className="px-3 py-1.5 text-xs"
                         onClick={() => handleCopyObsStreamKey(studioSession)}
@@ -1773,6 +1803,16 @@ export default function BroadcastingPage() {
                     </div>
                   </div>
                 </>
+              ) : null}
+              {shareState.error ? (
+                <p role="alert" className="text-xs text-red-300">
+                  {shareState.error}
+                </p>
+              ) : null}
+              {shareState.info ? (
+                <p role="status" className="text-xs text-zinc-300">
+                  {shareState.info}
+                </p>
               ) : null}
             </div>
           </div>
@@ -2339,7 +2379,7 @@ export default function BroadcastingPage() {
                 <Button
                   variant="secondary"
                   className="px-3 py-1.5 text-xs"
-                  onClick={() => handleCopyStreamLink(activeBroadcast?.session)}
+                  onClick={() => handleCopySecureViewerLink(activeBroadcast?.session)}
                   disabled={!activeBroadcast?.session}
                 >
                   Copy Secure Link

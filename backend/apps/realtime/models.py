@@ -1,7 +1,6 @@
 import os
 import re
 import hashlib
-import secrets
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -221,7 +220,7 @@ class RealtimeSession(models.Model):
             self.livekit_room_name = self.room_name
         self.obs_stream_key = str(self.obs_stream_key or "").strip()
         if self.session_type == self.TYPE_BROADCASTING and self.stream_service == self.STREAM_SERVICE_OBS:
-            self.obs_stream_key = self.obs_stream_key or self.default_obs_stream_key()
+            self.obs_stream_key = self.default_obs_stream_key()
 
         if self.linked_live_class_id and not self.linked_course_id:
             self.linked_course_id = self.linked_live_class.linked_course_id
@@ -305,24 +304,18 @@ class RealtimeSession(models.Model):
             base_path = f"/{path_rows[0]}"
         return f"{parsed.scheme}://{parsed.netloc}{base_path}".rstrip("/")
 
-    @classmethod
-    def generate_obs_stream_key(cls):
-        generated = re.sub(r"[^A-Za-z0-9]", "", secrets.token_urlsafe(36))
-        if len(generated) < 20:
-            generated = f"{generated}{secrets.token_hex(16)}"
-        return generated[:60]
-
     def default_obs_stream_key(self):
+        # Owncast accepts one ingest key at a time. Keep it server-managed so
+        # every OBS broadcast uses the same canonical credential.
         candidates = [
             getattr(settings, "OWNCAST_STREAM_KEY", ""),
             self._extract_stream_key_from_target(getattr(settings, "OWNCAST_RTMP_TARGET", "")),
-            self._extract_stream_key_from_target(self.rtmp_target_url),
         ]
         for candidate in candidates:
             normalized = str(candidate or "").strip()
             if normalized:
                 return normalized
-        return self.generate_obs_stream_key()
+        return ""
 
     def resolve_obs_stream_server_url(self):
         explicit_server_url = str(getattr(settings, "OWNCAST_OBS_STREAM_SERVER_URL", "") or "").strip()
@@ -341,14 +334,18 @@ class RealtimeSession(models.Model):
     def resolve_stream_target_url(self):
         if self.stream_service == self.STREAM_SERVICE_OBS:
             server_url = self.resolve_obs_stream_server_url()
-            stream_key = str(self.obs_stream_key or "").strip() or self.default_obs_stream_key()
+            stream_key = self.default_obs_stream_key()
             return f"{server_url.rstrip('/')}/{stream_key}".rstrip("/")
         return (self.rtmp_target_url or "").strip() or (
             getattr(settings, "OWNCAST_RTMP_TARGET", "") or ""
         ).strip()
 
     def rotate_obs_stream_key(self, *, save=True):
-        self.obs_stream_key = self.generate_obs_stream_key()
+        self.obs_stream_key = self.default_obs_stream_key()
+        if not self.obs_stream_key:
+            raise ValidationError(
+                {"obs_stream_key": "Fixed OBS stream key is not configured on the server."}
+            )
         if save:
             self.save(update_fields=["obs_stream_key", "updated_at"])
         return self.obs_stream_key
