@@ -698,40 +698,21 @@ export default function BroadcastingPage() {
     );
   };
 
-  const preparePersonalizedChatUrl = async (session) => {
-    if (!session?.id) {
-      throw new Error("Broadcast session is not ready yet.");
-    }
-    const launchResponse = await createRealtimeOwncastChatLaunch(session.id);
-    const launchData = apiData(launchResponse, {});
-    const launchUrl = String(launchData?.launch_url || "").trim();
-    if (!launchUrl) {
-      throw new Error("Personalized chat launch URL was not returned.");
-    }
-    return launchUrl;
-  };
-
   const handleCopyChatLink = async (session) => {
-    if (!getSessionChatUrl(session)) {
+    const chatUrl = getSessionChatUrl(session);
+    if (!chatUrl) {
       setShareState({
         error: "Broadcast chat URL is not configured for this session.",
         info: "",
       });
       return;
     }
-    try {
-      const launchUrl = await preparePersonalizedChatUrl(session);
-      await copyText(launchUrl, "Verified chat link copied.", "Unable to copy verified chat link.");
-    } catch (err) {
-      setShareState({
-        error: apiMessage(err, "Unable to prepare verified chat link."),
-        info: "",
-      });
-    }
+    await copyText(chatUrl, "Broadcast chat link copied.", "Unable to copy broadcast chat link.");
   };
 
   const handleOpenBroadcastChat = (session) => {
-    if (!getSessionChatUrl(session)) {
+    const chatUrl = getSessionChatUrl(session);
+    if (!chatUrl) {
       setShareState({
         error: "Broadcast chat URL is not configured for this session.",
         info: "",
@@ -748,30 +729,11 @@ export default function BroadcastingPage() {
     }
     try {
       popup.opener = null;
+      popup.location.replace(chatUrl);
     } catch {
-      // Best effort only; keep the verified chat popup isolated from this window.
+      popup.location.href = chatUrl;
     }
-    setShareState({ error: "", info: "Preparing verified broadcast chat..." });
-
-    (async () => {
-      try {
-        const launchUrl = await preparePersonalizedChatUrl(session);
-        if (!popup.closed) {
-          popup.location.replace(launchUrl);
-        }
-        setShareState({ error: "", info: "Verified broadcast chat opened in a new tab." });
-      } catch (err) {
-        try {
-          popup.close();
-        } catch {
-          // Best effort only; the blank popup may already be closed.
-        }
-        setShareState({
-          error: apiMessage(err, "Unable to prepare verified chat launch."),
-          info: "",
-        });
-      }
-    })();
+    setShareState({ error: "", info: "Broadcast chat opened in a new tab." });
   };
 
   const handleCopyObsServerUrl = async (session) => {
