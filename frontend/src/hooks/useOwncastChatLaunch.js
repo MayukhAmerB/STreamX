@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createRealtimeOwncastChatLaunch } from "../api/realtime";
-import { apiData } from "../utils/api";
+import { apiData, apiMessage } from "../utils/api";
 
 const emptyLaunchState = {
   sessionId: null,
@@ -74,7 +74,7 @@ export default function useOwncastChatLaunch({ sessionId, chatUrl, refreshKey = 
           url: "",
           expiresAt: 0,
           loading: false,
-          error: error?.message || "Unable to prepare secure chat.",
+          error: apiMessage(error, "Unable to prepare secure chat."),
         });
       });
 

@@ -38,6 +38,8 @@ services:
     restart: always
     env_file:
       - ./backend/.env.hostinger.production
+    environment:
+      OWNCAST_CHAT_BRIDGE_ENABLED: "${OWNCAST_CHAT_BRIDGE_ENABLED:-1}"
     depends_on:
       postgres:
         condition: service_healthy
