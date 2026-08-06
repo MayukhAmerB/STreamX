@@ -37,9 +37,23 @@ class LiveClassScheduleTests(SimpleTestCase):
             STATUS_LIVE="live",
             session_type="broadcasting",
             TYPE_BROADCASTING="broadcasting",
+            stream_status="live",
+            STREAM_LIVE="live",
         )
 
         self.assertTrue(attendee_can_join_live_session(session, now=monday_evening))
+
+    def test_stopped_broadcast_is_not_joinable(self):
+        session = SimpleNamespace(
+            status="live",
+            STATUS_LIVE="live",
+            session_type="broadcasting",
+            TYPE_BROADCASTING="broadcasting",
+            stream_status="stopped",
+            STREAM_LIVE="live",
+        )
+
+        self.assertFalse(attendee_can_join_live_session(session))
 
     def test_live_meeting_still_respects_weekly_window(self):
         monday_evening = datetime(2026, 7, 13, 19, 30, tzinfo=LIVE_CLASS_TIMEZONE)

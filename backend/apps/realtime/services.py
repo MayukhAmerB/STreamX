@@ -772,6 +772,36 @@ def _extract_owncast_chat_messages(payload):
     return []
 
 
+def _extract_owncast_collection(payload, *keys):
+    if isinstance(payload, list):
+        return payload
+    if not isinstance(payload, dict):
+        return []
+
+    for key in keys:
+        value = payload.get(key)
+        if isinstance(value, list):
+            return value
+        nested = _extract_owncast_collection(value, *keys)
+        if nested:
+            return nested
+    return []
+
+
+def _owncast_bool(value, *, default=False):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes", "on"}:
+            return True
+        if normalized in {"false", "0", "no", "off", ""}:
+            return False
+    return default
+
+
 def _normalize_owncast_chat_user(user_payload):
     if not isinstance(user_payload, dict):
         user_payload = {}
@@ -783,8 +813,15 @@ def _normalize_owncast_chat_user(user_payload):
             for name in (user_payload.get("previousNames") or [])
             if str(name).strip()
         ],
-        "authenticated": bool(user_payload.get("authenticated", False)),
-        "is_bot": bool(user_payload.get("isBot", False)),
+        "authenticated": _owncast_bool(user_payload.get("authenticated")),
+        "is_bot": _owncast_bool(user_payload.get("isBot")),
+        "is_disabled": _owncast_bool(
+            user_payload.get("isDisabled", user_payload.get("disabled")),
+            default=bool(user_payload.get("disabledAt")),
+        ),
+        "is_moderator": _owncast_bool(
+            user_payload.get("isModerator", user_payload.get("moderator")),
+        ),
         "display_color": user_payload.get("displayColor"),
         "scopes": user_payload.get("scopes") if isinstance(user_payload.get("scopes"), list) else [],
         "created_at": str(user_payload.get("createdAt") or "").strip(),
@@ -798,12 +835,19 @@ def _normalize_owncast_chat_message(message):
         return {}
     user_payload = message.get("user")
     normalized_user = _normalize_owncast_chat_user(user_payload)
+    hidden_at = str(message.get("hiddenAt") or message.get("hidden_at") or "").strip()
+    explicit_visible = message.get("visible")
+    is_hidden = bool(hidden_at)
+    if explicit_visible is not None:
+        is_hidden = not _owncast_bool(explicit_visible, default=True)
     return {
         "id": str(message.get("id") or "").strip(),
         "timestamp": str(message.get("timestamp") or "").strip(),
         "type": str(message.get("type") or "").strip(),
         "body": str(message.get("body") or "").strip(),
-        "hidden_at": str(message.get("hiddenAt") or "").strip(),
+        "hidden_at": hidden_at,
+        "visible": not is_hidden,
+        "is_hidden": is_hidden,
         "client_id": message.get("clientId"),
         "user": normalized_user,
     }
@@ -978,8 +1022,11 @@ def fetch_owncast_disabled_chat_users(*, timeout=5):
         headers=headers,
         timeout=timeout,
     )
-    users = payload if isinstance(payload, list) else []
-    return [_normalize_owncast_chat_user(user) for user in users]
+    users = _extract_owncast_collection(payload, "users", "disabledUsers", "results", "data", "items")
+    return [
+        {**_normalize_owncast_chat_user(user), "is_disabled": True}
+        for user in users
+    ]
 
 
 def fetch_owncast_moderator_chat_users(*, timeout=5):
@@ -990,8 +1037,11 @@ def fetch_owncast_moderator_chat_users(*, timeout=5):
         headers=headers,
         timeout=timeout,
     )
-    users = payload if isinstance(payload, list) else []
-    return [_normalize_owncast_chat_user(user) for user in users]
+    users = _extract_owncast_collection(payload, "users", "moderators", "results", "data", "items")
+    return [
+        {**_normalize_owncast_chat_user(user), "is_moderator": True}
+        for user in users
+    ]
 
 
 def fetch_owncast_ip_bans(*, timeout=5):
@@ -1002,7 +1052,7 @@ def fetch_owncast_ip_bans(*, timeout=5):
         headers=headers,
         timeout=timeout,
     )
-    return payload if isinstance(payload, list) else []
+    return _extract_owncast_collection(payload, "ipBans", "bans", "results", "data", "items")
 
 
 def release_expired_owncast_chat_timeouts(*, timeout=10):

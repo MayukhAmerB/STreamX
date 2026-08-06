@@ -2133,7 +2133,7 @@ export default function BroadcastingPage() {
                     </div>
                   ) : (
                     <p className="rounded-lg border border-black bg-[#151515] px-3 py-2 text-xs text-[#AFAFAF]">
-                      No mapped Owncast handles yet. Ask viewers to join chat through the verified chat link, then sync handles.
+                      No Owncast chat participants yet. Ask viewers to join chat, then refresh this panel.
                     </p>
                   )}
                 </div>
@@ -2147,7 +2147,12 @@ export default function BroadcastingPage() {
                     {chatModerationMessages.length > 0 ? (
                       chatModerationMessages.map((message) => {
                         const messageUser = message.user || {};
-                        const isHidden = Boolean(message.hidden_at);
+                        const isHidden =
+                          typeof message.is_hidden === "boolean"
+                            ? message.is_hidden
+                            : typeof message.visible === "boolean"
+                              ? !message.visible
+                              : Boolean(message.hidden_at);
                         return (
                           <article key={message.id} className="rounded-lg border border-black bg-[#151515] p-3">
                             <div className="flex flex-wrap items-center justify-between gap-2">

@@ -171,6 +171,8 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         user = getattr(request, "user", None)
         if obj.is_moderator_allowed(user):
+            if obj.session_type == obj.TYPE_BROADCASTING:
+                return obj.status == obj.STATUS_LIVE and obj.stream_status == obj.STREAM_LIVE
             return obj.status in {obj.STATUS_SCHEDULED, obj.STATUS_LIVE}
         return attendee_can_join_live_session(obj)
 

@@ -213,7 +213,7 @@ export default function LiveClassesPage() {
       }
     };
     loadRealtimeSessions();
-    const refreshId = window.setInterval(loadRealtimeSessions, 30_000);
+    const refreshId = window.setInterval(loadRealtimeSessions, 10_000);
     return () => {
       active = false;
       window.clearInterval(refreshId);

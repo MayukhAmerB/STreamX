@@ -11,7 +11,11 @@ export const DEFAULT_LIVE_CLASS_SCHEDULE = {
 };
 
 export function isJoinableLiveSession(session) {
-  return session?.status === "live" && session?.viewer_can_join_now === true;
+  if (session?.status !== "live" || session?.viewer_can_join_now !== true) return false;
+  if (session?.session_type === "broadcasting") {
+    return session?.stream_status === "live";
+  }
+  return true;
 }
 
 export function findJoinableLiveSession(sessions, liveClassId = null) {

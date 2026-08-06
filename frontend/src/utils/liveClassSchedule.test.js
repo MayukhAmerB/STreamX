@@ -4,6 +4,22 @@ import { findJoinableLiveSession, isJoinableLiveSession, resolveLiveClassSchedul
 describe("live class schedule helpers", () => {
   it("only treats a backend-approved live session as joinable", () => {
     expect(isJoinableLiveSession({ status: "live", viewer_can_join_now: true })).toBe(true);
+    expect(
+      isJoinableLiveSession({
+        status: "live",
+        viewer_can_join_now: true,
+        session_type: "broadcasting",
+        stream_status: "live",
+      })
+    ).toBe(true);
+    expect(
+      isJoinableLiveSession({
+        status: "live",
+        viewer_can_join_now: true,
+        session_type: "broadcasting",
+        stream_status: "stopped",
+      })
+    ).toBe(false);
     expect(isJoinableLiveSession({ status: "scheduled", viewer_can_join_now: true })).toBe(false);
     expect(isJoinableLiveSession({ status: "live", viewer_can_join_now: false })).toBe(false);
   });

@@ -561,6 +561,16 @@ class RealtimeSessionListCreateView(APIView):
             default_page_size=20,
             max_page_size=100,
         )
+        # Owncast is the authority for OBS availability. Refresh before
+        # serializing so an ended encoder connection cannot leave a stale
+        # viewer_can_join_now flag on the student-facing live-class page.
+        for session in paged_queryset:
+            if (
+                session.session_type == RealtimeSession.TYPE_BROADCASTING
+                and session.stream_service == RealtimeSession.STREAM_SERVICE_OBS
+                and session.status != RealtimeSession.STATUS_ENDED
+            ):
+                refresh_obs_session_stream_health(session)
         serializer = RealtimeSessionListSerializer(paged_queryset, many=True, context={"request": request})
         payload = (
             {"results": serializer.data, "pagination": page_meta}
@@ -733,6 +743,19 @@ class RealtimeSessionJoinView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
         refresh_obs_session_stream_health(session, force_refresh=True)
+        if (
+            not is_session_manager
+            and session.session_type == RealtimeSession.TYPE_BROADCASTING
+            and session.stream_service == RealtimeSession.STREAM_SERVICE_OBS
+            and session.stream_status != RealtimeSession.STREAM_LIVE
+        ):
+            _record_join_metric(result="failure", mode="broadcast", reason="stream_not_live")
+            return api_response(
+                success=False,
+                message="Live class has ended or is currently offline.",
+                errors={"detail": "The broadcast is no longer live. It will reopen when the instructor resumes streaming."},
+                status_code=status.HTTP_409_CONFLICT,
+            )
         if session.status == RealtimeSession.STATUS_SCHEDULED:
             session.mark_live()
         room_name = session.livekit_room_name or session.room_name
@@ -1188,6 +1211,30 @@ def _serialize_owncast_identity(identity, *, disabled_ids, moderator_ids):
         "timeout_until": identity.owncast_timeout_until,
         "is_moderator": bool(identity.owncast_user_id in moderator_ids or identity.owncast_is_moderator),
         "updated_at": identity.updated_at,
+        "is_platform_mapped": True,
+    }
+
+
+def _serialize_unmapped_owncast_identity(user_payload, *, disabled_ids, moderator_ids):
+    owncast_user_id = str(user_payload.get("id") or "").strip()
+    return {
+        "id": f"owncast:{owncast_user_id}",
+        "owncast_user_id": owncast_user_id,
+        "owncast_display_name": str(user_payload.get("display_name") or "").strip(),
+        "platform_user_id": None,
+        "platform_email": "",
+        "platform_full_name": "",
+        "platform_role": "",
+        "last_session_id": None,
+        "last_session_title": "",
+        "bridge_used_at": None,
+        "launch_ip": "",
+        "is_disabled": bool(owncast_user_id in disabled_ids or user_payload.get("is_disabled")),
+        "is_timeout_active": False,
+        "timeout_until": None,
+        "is_moderator": bool(owncast_user_id in moderator_ids or user_payload.get("is_moderator")),
+        "updated_at": None,
+        "is_platform_mapped": False,
     }
 
 
@@ -1215,17 +1262,43 @@ def _build_owncast_chat_moderation_payload(*, session, request):
         identities = identities.filter(session=session)
     identities = identities.exclude(owncast_user_id="").order_by("-updated_at", "-id")[:200]
 
+    serialized_identities = [
+        _serialize_owncast_identity(
+            identity,
+            disabled_ids=disabled_ids,
+            moderator_ids=moderator_ids,
+        )
+        for identity in identities
+    ]
+    mapped_ids = {
+        str(identity.get("owncast_user_id") or "").strip()
+        for identity in serialized_identities
+        if identity.get("owncast_user_id")
+    }
+    participant_users = {}
+    for message in messages:
+        user_payload = message.get("user") if isinstance(message.get("user"), dict) else {}
+        user_id = str(user_payload.get("id") or "").strip()
+        if user_id:
+            participant_users[user_id] = user_payload
+    for user_payload in disabled_users + moderator_users:
+        user_id = str(user_payload.get("id") or "").strip()
+        if user_id:
+            participant_users[user_id] = {**participant_users.get(user_id, {}), **user_payload}
+    serialized_identities.extend(
+        _serialize_unmapped_owncast_identity(
+            user_payload,
+            disabled_ids=disabled_ids,
+            moderator_ids=moderator_ids,
+        )
+        for user_id, user_payload in participant_users.items()
+        if user_id not in mapped_ids
+    )
+
     return {
         "session": RealtimeSessionListSerializer(session, context={"request": request}).data,
         "sync": sync_result,
-        "identities": [
-            _serialize_owncast_identity(
-                identity,
-                disabled_ids=disabled_ids,
-                moderator_ids=moderator_ids,
-            )
-            for identity in identities
-        ],
+        "identities": serialized_identities,
         "recent_messages": messages,
         "disabled_users": disabled_users,
         "moderator_users": moderator_users,
@@ -1243,6 +1316,37 @@ def _build_owncast_chat_moderation_payload(*, session, request):
             "sync_handles",
         ],
     }
+
+
+def _overlay_owncast_moderation_action(data, *, action, owncast_user_id="", message_ids=None):
+    if not isinstance(data, dict):
+        return data
+
+    if action in {
+        RealtimeOwncastChatModerationActionSerializer.ACTION_BAN_USER,
+        RealtimeOwncastChatModerationActionSerializer.ACTION_UNBAN_USER,
+        RealtimeOwncastChatModerationActionSerializer.ACTION_TIMEOUT_USER,
+    }:
+        disabled = action != RealtimeOwncastChatModerationActionSerializer.ACTION_UNBAN_USER
+        for identity in data.get("identities") or []:
+            if str(identity.get("owncast_user_id") or "").strip() == owncast_user_id:
+                identity["is_disabled"] = disabled
+                identity["is_timeout_active"] = (
+                    action == RealtimeOwncastChatModerationActionSerializer.ACTION_TIMEOUT_USER
+                )
+
+    if action in {
+        RealtimeOwncastChatModerationActionSerializer.ACTION_HIDE_MESSAGES,
+        RealtimeOwncastChatModerationActionSerializer.ACTION_SHOW_MESSAGES,
+    }:
+        hidden = action == RealtimeOwncastChatModerationActionSerializer.ACTION_HIDE_MESSAGES
+        target_ids = {str(message_id).strip() for message_id in (message_ids or [])}
+        for message in data.get("recent_messages") or []:
+            if str(message.get("id") or "").strip() in target_ids:
+                message["is_hidden"] = hidden
+                message["visible"] = not hidden
+                message["hidden_at"] = timezone.now().isoformat() if hidden else ""
+    return data
 
 
 class RealtimeSessionOwncastChatModerationView(APIView):
@@ -1366,6 +1470,12 @@ class RealtimeSessionOwncastChatModerationView(APIView):
             data = _build_owncast_chat_moderation_payload(session=session, request=request)
         except (OwncastConfigError, OwncastAdminError):
             data = {"owncast_result": owncast_result}
+        data = _overlay_owncast_moderation_action(
+            data,
+            action=action,
+            owncast_user_id=owncast_user_id,
+            message_ids=message_ids,
+        )
         return api_response(success=True, message="Owncast chat moderation action applied.", data=data)
 
 

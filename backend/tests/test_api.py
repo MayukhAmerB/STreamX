@@ -4409,6 +4409,7 @@ class RealtimeSessionTests(APITestCase):
             linked_live_class=self.live_class,
             linked_course=self.meeting_course,
             status=RealtimeSession.STATUS_LIVE,
+            stream_status=RealtimeSession.STREAM_LIVE,
         )
 
         for viewer in (self.viewer, second_viewer):
@@ -5690,6 +5691,37 @@ class RealtimeSessionTests(APITestCase):
         request = mock_urlopen.call_args.args[0]
         self.assertEqual(request.full_url, "http://owncast:8080/api/admin/chat/messages")
 
+    def test_owncast_chat_message_normalization_honors_explicit_visibility(self):
+        message = realtime_services._normalize_owncast_chat_message(
+            {
+                "id": "hidden-message",
+                "visible": False,
+                "user": {"id": "viewer-1", "displayName": "Viewer One"},
+                "body": "hidden content",
+            }
+        )
+
+        self.assertTrue(message["is_hidden"])
+        self.assertFalse(message["visible"])
+        self.assertEqual(message["user"]["display_name"], "Viewer One")
+
+    @patch("apps.realtime.services._owncast_admin_get_json")
+    @patch("apps.realtime.services._resolve_owncast_admin_request_context")
+    def test_owncast_disabled_users_supports_wrapped_response(self, mock_admin_context, mock_admin_get):
+        mock_admin_context.return_value = ("http://owncast:8080", {"Authorization": "Basic token"})
+        mock_admin_get.return_value = {
+            "data": {
+                "users": [
+                    {"id": "disabled-viewer", "displayName": "Disabled Viewer"},
+                ]
+            }
+        }
+
+        users = realtime_services.fetch_owncast_disabled_chat_users()
+
+        self.assertEqual(users[0]["id"], "disabled-viewer")
+        self.assertTrue(users[0]["is_disabled"])
+
     @patch("apps.realtime.views._build_owncast_chat_moderation_payload")
     @patch("apps.realtime.views.owncast_set_chat_user_enabled")
     def test_broadcast_chat_moderation_bans_user_for_session_manager(
@@ -5698,7 +5730,12 @@ class RealtimeSessionTests(APITestCase):
         mock_build_payload,
     ):
         mock_set_chat_user_enabled.return_value = {"success": True}
-        mock_build_payload.return_value = {"identities": [], "recent_messages": []}
+        mock_build_payload.return_value = {
+            "identities": [
+                {"owncast_user_id": "owncast-viewer-ban", "is_disabled": False},
+            ],
+            "recent_messages": [],
+        }
         session = RealtimeSession.objects.create(
             title="Moderated Broadcast",
             description="Host should be able to ban Owncast chat users.",
@@ -5738,6 +5775,64 @@ class RealtimeSessionTests(APITestCase):
         identity.refresh_from_db()
         self.assertIsNotNone(identity.owncast_disabled_at)
         self.assertIsNone(identity.owncast_timeout_until)
+        self.assertTrue(response.data["data"]["identities"][0]["is_disabled"])
+
+    @patch("apps.realtime.views._build_owncast_chat_moderation_payload")
+    @patch("apps.realtime.views.owncast_set_chat_user_enabled")
+    def test_broadcast_chat_moderation_unbans_user_for_session_manager(
+        self,
+        mock_set_chat_user_enabled,
+        mock_build_payload,
+    ):
+        mock_set_chat_user_enabled.return_value = {"success": True}
+        mock_build_payload.return_value = {
+            "identities": [
+                {"owncast_user_id": "owncast-viewer-unban", "is_disabled": True},
+            ],
+            "recent_messages": [],
+        }
+        session = RealtimeSession.objects.create(
+            title="Unban Moderated Broadcast",
+            description="Host should be able to unban Owncast chat users.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+            chat_embed_url="https://stream.example.com/embed/chat/readwrite",
+        )
+        identity = OwncastChatIdentity.objects.create(
+            session=session,
+            user=self.viewer,
+            platform_user_id=self.viewer.id,
+            platform_email=self.viewer.email,
+            platform_full_name=self.viewer.full_name,
+            platform_role=self.viewer.role,
+            platform_display_name="Viewer User",
+            owncast_user_id="owncast-viewer-unban",
+            owncast_display_name="Viewer User",
+            access_token_hash=OwncastChatIdentity.hash_access_token("viewer-token"),
+            owncast_disabled_at=timezone.now(),
+            owncast_timeout_until=timezone.now() + timedelta(minutes=10),
+        )
+
+        self.login(self.host.email)
+        response = self.client.post(
+            reverse("realtime-session-owncast-chat-moderation", kwargs={"pk": session.id}),
+            {"action": "unban_user", "owncast_user_id": "owncast-viewer-unban"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mock_set_chat_user_enabled.assert_called_once_with(
+            owncast_user_id="owncast-viewer-unban",
+            enabled=True,
+        )
+        identity.refresh_from_db()
+        self.assertIsNone(identity.owncast_disabled_at)
+        self.assertIsNone(identity.owncast_timeout_until)
+        self.assertFalse(response.data["data"]["identities"][0]["is_disabled"])
 
     @patch("apps.realtime.views.owncast_set_chat_user_enabled")
     def test_broadcast_chat_moderation_rejects_viewer(self, mock_set_chat_user_enabled):
@@ -5771,7 +5866,13 @@ class RealtimeSessionTests(APITestCase):
         mock_build_payload,
     ):
         mock_set_chat_user_enabled.return_value = {"success": True}
-        mock_build_payload.return_value = {"identities": [], "recent_messages": []}
+        mock_build_payload.return_value = {
+            "identities": [],
+            "recent_messages": [
+                {"id": "msg-1", "is_hidden": False, "visible": True, "hidden_at": ""},
+                {"id": "msg-2", "is_hidden": False, "visible": True, "hidden_at": ""},
+            ],
+        }
         session = RealtimeSession.objects.create(
             title="Timeout Broadcast",
             description="Host should be able to temporarily disable Owncast chat users.",
@@ -5826,7 +5927,13 @@ class RealtimeSessionTests(APITestCase):
         mock_build_payload,
     ):
         mock_set_message_visibility.return_value = {"success": True}
-        mock_build_payload.return_value = {"identities": [], "recent_messages": []}
+        mock_build_payload.return_value = {
+            "identities": [],
+            "recent_messages": [
+                {"id": "msg-1", "is_hidden": False, "visible": True, "hidden_at": ""},
+                {"id": "msg-2", "is_hidden": False, "visible": True, "hidden_at": ""},
+            ],
+        }
         session = RealtimeSession.objects.create(
             title="Message Moderation Broadcast",
             description="Host should be able to hide Owncast chat messages.",
@@ -5851,6 +5958,8 @@ class RealtimeSessionTests(APITestCase):
             message_ids=["msg-1", "msg-2"],
             visible=False,
         )
+        self.assertTrue(response.data["data"]["recent_messages"][0]["is_hidden"])
+        self.assertFalse(response.data["data"]["recent_messages"][0]["visible"])
 
     @override_settings(
         OWNCAST_ADMIN_API_BASE_URL="http://owncast:8080",
