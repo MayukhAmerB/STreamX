@@ -1,11 +1,58 @@
 import { useEffect, useRef, useState } from "react";
 import ProtectedPlaybackSurface from "../ProtectedPlaybackSurface";
+import useOwncastChatLaunch from "../../hooks/useOwncastChatLaunch";
 import useOwncastStreamLaunch from "../../hooks/useOwncastStreamLaunch";
 
 function EmptyPanel({ className, message }) {
   return (
     <div className={`flex items-center justify-center px-6 text-center text-sm text-[#BBBBBB] ${className}`.trim()}>
       {message}
+    </div>
+  );
+}
+
+function ChatPanel({ title, url, message, onRefresh }) {
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex min-h-14 items-center justify-between gap-3 border-b border-white/10 bg-[#101010] px-4 py-3">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-white">{title}</div>
+          <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.13em] text-emerald-300">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            Read &amp; reply
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="rounded-lg border border-white/10 bg-[#171717] px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[#D7D7D7] transition hover:bg-[#222222]"
+          >
+            Refresh
+          </button>
+          {url ? (
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-lg border border-white/10 bg-white px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-black transition hover:bg-[#E5E5E5]"
+            >
+              Open
+            </a>
+          ) : null}
+        </div>
+      </div>
+      {url ? (
+        <iframe
+          title={title}
+          src={url}
+          className="block h-[58vh] min-h-[340px] w-full flex-1 lg:h-full lg:min-h-[466px] lg:max-h-[calc(100vh-276px)]"
+          allow="clipboard-read; clipboard-write"
+          referrerPolicy="strict-origin-when-cross-origin"
+        />
+      ) : (
+        <EmptyPanel className="h-[340px] flex-1 lg:min-h-[466px]" message={message} />
+      )}
     </div>
   );
 }
@@ -28,11 +75,13 @@ export default function BroadcastViewerTheater({
   onRefreshChat = null,
   showHeaderMeta = true,
   showChat = true,
+  personalizeChat = false,
   withContainer = true,
   className = "",
 }) {
-  const [mobileChatOpen, setMobileChatOpen] = useState(false);
+  const [mobileChatOpen, setMobileChatOpen] = useState(true);
   const [streamFrameVersion, setStreamFrameVersion] = useState(0);
+  const [chatFrameVersion, setChatFrameVersion] = useState(0);
   const previousStreamStatusRef = useRef(streamStatus);
   const normalizedStreamStatus = String(streamStatus || "").trim().toLowerCase();
   const normalizedSessionStatus = String(sessionStatus || "").trim().toLowerCase();
@@ -45,6 +94,13 @@ export default function BroadcastViewerTheater({
     enabled: Boolean(streamUrl && canRenderLiveFrames),
   });
   const resolvedStreamUrl = secureStream.streamUrl;
+  const secureChat = useOwncastChatLaunch({
+    sessionId,
+    chatUrl,
+    refreshKey: chatFrameVersion,
+    enabled: Boolean(personalizeChat && showChat && chatUrl && canRenderLiveFrames),
+  });
+  const resolvedChatUrl = secureChat.chatUrl;
   const layoutClassName = showChat
     ? showHeaderMeta
       ? "mt-3 grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:items-stretch"
@@ -67,6 +123,10 @@ export default function BroadcastViewerTheater({
       : streamFallbackMessage;
   const resolvedChatFallbackMessage = isSessionEnded
     ? "Chat is closed because this broadcast has ended."
+    : secureChat.requiresLaunch && secureChat.loading
+      ? "Preparing your secure live-class chat..."
+      : secureChat.error
+        ? "Secure chat could not be prepared. Refresh chat or sign in again."
     : chatFallbackMessage;
   const resolvedStatusMessage =
     String(statusMessage || "").trim() ||
@@ -85,14 +145,11 @@ export default function BroadcastViewerTheater({
     }
   };
 
-  const handleMobileChatToggle = () => {
-    setMobileChatOpen((previous) => {
-      const next = !previous;
-      if (next && typeof onRefreshChat === "function") {
-        onRefreshChat();
-      }
-      return next;
-    });
+  const refreshChatFrame = () => {
+    setChatFrameVersion((previous) => previous + 1);
+    if (typeof onRefreshChat === "function") {
+      onRefreshChat();
+    }
   };
 
   useEffect(() => {
@@ -165,51 +222,28 @@ export default function BroadcastViewerTheater({
           )}
         </div>
 
-        {showChat ? <div className="hidden overflow-hidden rounded-2xl border border-black panel-gradient lg:block lg:h-full lg:min-h-0">
-          {chatUrl && canRenderLiveFrames ? (
-            <iframe
-              title={chatTitle}
-              src={chatUrl}
-              className="block h-[260px] w-full sm:h-[360px] lg:h-full lg:min-h-[520px] lg:max-h-[calc(100vh-220px)]"
-              allow="clipboard-read; clipboard-write"
-            />
-          ) : (
-            <EmptyPanel
-              className="h-[260px] sm:h-[360px] lg:h-full lg:min-h-[520px] lg:max-h-[calc(100vh-220px)]"
-              message={resolvedChatFallbackMessage}
-            />
-          )}
-        </div> : null}
-      </div>
-
-      {showChat ? <div className="mt-3 lg:hidden">
-        <button
-          type="button"
-          onClick={handleMobileChatToggle}
-          className="sticky bottom-3 z-20 w-full rounded-xl border border-black bg-[#151515]/96 px-4 py-2.5 text-sm font-semibold text-[#E2E2E2] shadow-[0_16px_34px_rgba(0,0,0,0.3)] backdrop-blur transition hover:bg-[#1C1C1C]"
-        >
-          {mobileChatOpen ? "Hide Chat" : "Open Chat"}
-        </button>
-      </div> : null}
-
-      {showChat ? <div
-        className={`mt-3 overflow-hidden rounded-2xl panel-gradient transition-[max-height,opacity] duration-300 lg:hidden ${
-          mobileChatOpen ? "max-h-[70vh] border border-black opacity-100" : "max-h-0 border border-transparent opacity-0"
-        }`}
-      >
-        {mobileChatOpen ? (
-          chatUrl && canRenderLiveFrames ? (
-            <iframe
-              title={`${chatTitle} (Mobile)`}
-              src={chatUrl}
-              className="block h-[58vh] min-h-[300px] w-full"
-              allow="clipboard-read; clipboard-write"
-            />
-          ) : (
-            <EmptyPanel className="h-[280px]" message={resolvedChatFallbackMessage} />
-          )
+        {showChat ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setMobileChatOpen((previous) => !previous)}
+              className="sticky bottom-3 z-20 w-full rounded-xl border border-white/10 bg-[#151515]/96 px-4 py-3 text-sm font-semibold text-[#EAEAEA] shadow-[0_16px_34px_rgba(0,0,0,0.3)] backdrop-blur transition hover:bg-[#1C1C1C] lg:hidden"
+            >
+              {mobileChatOpen ? "Hide Live Chat" : "Show Live Chat & Reply"}
+            </button>
+            <div
+              className={`${mobileChatOpen ? "block" : "hidden"} overflow-hidden rounded-2xl border border-black panel-gradient lg:block lg:h-full lg:min-h-0`}
+            >
+              <ChatPanel
+                title={chatTitle}
+                url={canRenderLiveFrames ? resolvedChatUrl : ""}
+                message={resolvedChatFallbackMessage}
+                onRefresh={refreshChatFrame}
+              />
+            </div>
+          </>
         ) : null}
-      </div> : null}
+      </div>
     </>
   );
 

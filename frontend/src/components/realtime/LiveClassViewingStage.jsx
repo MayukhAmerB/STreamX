@@ -73,11 +73,13 @@ export default function LiveClassViewingStage({
           title={activePayload?.session?.title}
           sessionId={activePayload?.session?.id}
           streamUrl={urls.streamEmbedUrl}
+          chatUrl={urls.writableChatEmbedUrl || urls.chatEmbedUrl}
           streamStatus={activePayload?.broadcast?.stream_status}
           sessionStatus={activePayload?.session?.status}
           badgeLabel="Live Class"
           headerLabel="Now playing"
-          showChat={false}
+          chatTitle="Live Class Chat"
+          personalizeChat
         />
         <div className="mt-3 flex flex-wrap justify-end gap-2">
           <button
