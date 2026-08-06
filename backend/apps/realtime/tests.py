@@ -1,8 +1,9 @@
 from datetime import datetime
+from types import SimpleNamespace
 
 from django.test import SimpleTestCase
 
-from .schedule import LIVE_CLASS_TIMEZONE, get_live_class_schedule_snapshot
+from .schedule import LIVE_CLASS_TIMEZONE, attendee_can_join_live_session, get_live_class_schedule_snapshot
 
 
 class LiveClassScheduleTests(SimpleTestCase):
@@ -28,3 +29,25 @@ class LiveClassScheduleTests(SimpleTestCase):
 
         self.assertEqual(snapshot["next_start"], "2026-07-17T19:00:00+05:30")
         self.assertEqual(snapshot["next_end"], "2026-07-17T20:00:00+05:30")
+
+    def test_live_broadcast_is_joinable_outside_weekly_window(self):
+        monday_evening = datetime(2026, 7, 13, 19, 30, tzinfo=LIVE_CLASS_TIMEZONE)
+        session = SimpleNamespace(
+            status="live",
+            STATUS_LIVE="live",
+            session_type="broadcasting",
+            TYPE_BROADCASTING="broadcasting",
+        )
+
+        self.assertTrue(attendee_can_join_live_session(session, now=monday_evening))
+
+    def test_live_meeting_still_respects_weekly_window(self):
+        monday_evening = datetime(2026, 7, 13, 19, 30, tzinfo=LIVE_CLASS_TIMEZONE)
+        session = SimpleNamespace(
+            status="live",
+            STATUS_LIVE="live",
+            session_type="meeting",
+            TYPE_BROADCASTING="broadcasting",
+        )
+
+        self.assertFalse(attendee_can_join_live_session(session, now=monday_evening))

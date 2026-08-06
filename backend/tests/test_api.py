@@ -4383,6 +4383,42 @@ class RealtimeSessionTests(APITestCase):
         self.assertIn(allowed_broadcast.id, returned_ids)
         self.assertNotIn(blocked_broadcast.id, returned_ids)
 
+    @patch("apps.realtime.serializers.get_live_class_schedule_snapshot")
+    def test_all_enrolled_students_see_active_broadcast_as_joinable(self, mock_schedule_snapshot):
+        mock_schedule_snapshot.return_value = {
+            "is_open": False,
+            "label": "Friday, Saturday and Sunday, 7:00 PM to 8:00 PM IST",
+        }
+        second_viewer = User.objects.create_user(
+            email="second-viewer@test.com",
+            password="StrongPass@123",
+            full_name="Second Viewer",
+            role=User.ROLE_STUDENT,
+        )
+        mark_terms_accepted(second_viewer)
+        LiveClassEnrollment.objects.create(
+            user=second_viewer,
+            live_class=self.live_class,
+            status=LiveClassEnrollment.STATUS_APPROVED,
+        )
+        session = RealtimeSession.objects.create(
+            title="Active Broadcast For Every Viewer",
+            description="Every entitled viewer must receive the same live state.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+
+        for viewer in (self.viewer, second_viewer):
+            self.login(viewer.email)
+            response = self.client.get(reverse("realtime-session-list-create"), {"status": "all"})
+            self.assertEqual(response.status_code, 200)
+            payload = next(item for item in response.data["data"] if item["id"] == session.id)
+            self.assertTrue(payload["viewer_can_join_now"])
+            self.client.post(reverse("auth-logout"))
+
     def test_unapproved_student_cannot_fetch_or_join_broadcast_session(self):
         blocked_user = User.objects.create_user(
             email="blocked-broadcast@test.com",
@@ -4462,6 +4498,33 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.data["message"], "Live class is outside its scheduled time.")
         self.assertIn("Friday, Saturday and Sunday", response.data["errors"]["detail"])
+
+    def test_approved_student_can_join_live_broadcast_outside_schedule(self):
+        self.schedule_snapshot_mock.return_value = {
+            "is_open": False,
+            "label": "Friday, Saturday and Sunday, 7:00 PM to 8:00 PM IST",
+        }
+        session = RealtimeSession.objects.create(
+            title="Make-up Broadcast",
+            description="An explicitly live broadcast remains available outside the normal schedule.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+            chat_embed_url="https://stream.example.com/embed/chat/readwrite",
+        )
+
+        self.login(self.viewer.email)
+        response = self.client.post(
+            reverse("realtime-session-join", kwargs={"pk": session.id}),
+            {"display_name": "Viewer User"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["mode"], "broadcast")
 
     def test_blocked_user_join_does_not_mark_scheduled_session_live(self):
         blocked_user = User.objects.create_user(
@@ -4788,6 +4851,30 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(parsed_stream_launch_url.scheme, "https")
         self.assertEqual(parsed_stream_launch_url.netloc, "stream.example.com")
         self.assertEqual(parsed_stream_launch_url.path, "/api/realtime/owncast/stream-bridge/")
+
+    def test_broadcast_presenter_flag_does_not_open_meeting_for_student(self):
+        session = RealtimeSession.objects.create(
+            title="Broadcast Viewer With Historical Presenter Flag",
+            description="A student presenter flag must not replace broadcast playback.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+            chat_embed_url="https://stream.example.com/embed/chat/readwrite",
+            presenter_user_ids=[self.viewer.id],
+        )
+
+        self.login(self.viewer.email)
+        join_response = self.client.post(
+            reverse("realtime-session-join", kwargs={"pk": session.id}),
+            {"display_name": "Viewer User"},
+            format="json",
+        )
+
+        self.assertEqual(join_response.status_code, 200)
+        self.assertEqual(join_response.data["data"]["mode"], "broadcast")
 
     def test_broadcast_stream_launch_returns_stream_bridge_url(self):
         session = RealtimeSession.objects.create(
@@ -5793,7 +5880,7 @@ class RealtimeSessionTests(APITestCase):
     @patch("apps.realtime.views.apply_live_presenter_permission_update")
     @patch("apps.realtime.views.build_meet_embed_url")
     @patch("apps.realtime.views.build_participant_token")
-    def test_broadcast_presenter_grant_allows_stage_join(
+    def test_broadcast_presenter_grant_keeps_student_in_viewer_mode(
         self,
         mock_build_token,
         mock_build_meet_url,
@@ -5840,9 +5927,12 @@ class RealtimeSessionTests(APITestCase):
             format="json",
         )
         self.assertEqual(join_response.status_code, 200)
-        self.assertEqual(join_response.data["data"]["mode"], "meeting")
-        self.assertTrue(join_response.data["data"]["meeting"]["permissions"]["can_present"])
-        self.assertFalse(join_response.data["data"]["meeting"]["permissions"]["can_speak"])
+        self.assertEqual(join_response.data["data"]["mode"], "broadcast")
+        self.assertNotIn("meeting", join_response.data["data"])
+        self.assertEqual(
+            join_response.data["data"]["broadcast"]["stream_embed_url"],
+            "https://stream.example.com/embed/video",
+        )
 
     @override_settings(
         LIVEKIT_URL="ws://livekit.test",

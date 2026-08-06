@@ -720,7 +720,11 @@ class RealtimeSessionJoinView(APIView):
                 errors={"detail": f"Your class schedule is {schedule_snapshot['label']}."},
                 status_code=status.HTTP_409_CONFLICT,
             )
-        if not is_session_manager and not schedule_snapshot["is_open"]:
+        if (
+            not is_session_manager
+            and session.session_type != RealtimeSession.TYPE_BROADCASTING
+            and not schedule_snapshot["is_open"]
+        ):
             _record_join_metric(result="failure", mode="meeting", reason="outside_schedule_window")
             return api_response(
                 success=False,
@@ -776,11 +780,13 @@ class RealtimeSessionJoinView(APIView):
 
         should_use_broadcast = participant_state.should_use_broadcast
         if session.session_type == RealtimeSession.TYPE_BROADCASTING:
-            if prefer_broadcast:
+            if prefer_broadcast or not is_session_manager:
+                # Broadcast attendees always watch Owncast. Historical speaker
+                # or presenter flags must never route a student into LiveKit.
                 should_use_broadcast = True
             elif permissions_set.can_publish:
-                # StreamYard-like flow: moderators/stage users join interactive room,
-                # while regular attendees stay in broadcast viewer mode.
+                # Hosts and administrators may still enter the interactive
+                # production room when they do not explicitly request playback.
                 should_use_broadcast = False
 
         if should_use_broadcast:

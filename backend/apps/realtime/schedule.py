@@ -61,4 +61,8 @@ def get_live_class_schedule_snapshot(now=None):
 def attendee_can_join_live_session(session, *, now=None):
     if session.status != session.STATUS_LIVE:
         return False
+    if session.session_type == session.TYPE_BROADCASTING:
+        # The host's explicit broadcast state is authoritative, including
+        # delayed or make-up classes outside the normal weekly window.
+        return True
     return bool(get_live_class_schedule_snapshot(now=now)["is_open"])

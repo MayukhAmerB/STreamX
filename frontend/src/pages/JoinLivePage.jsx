@@ -219,8 +219,12 @@ export default function JoinLivePage() {
   const handleJoin = async (sessionId) => {
     setJoinState({ loadingId: sessionId, error: "", info: "" });
     try {
+      const requestedSession = courseSessions.find(
+        (session) => String(session.id) === String(sessionId),
+      );
       const response = await joinRealtimeSession(sessionId, {
         display_name: user?.full_name || "",
+        prefer_broadcast: requestedSession?.session_type === "broadcasting",
       });
       const data = apiData(response, null);
       const nextActiveSession = data?.mode === "broadcast" ? sanitizeBroadcastPayload(data) : data;
@@ -235,8 +239,12 @@ export default function JoinLivePage() {
   };
 
   const handleReconnectMeeting = async (sessionId) => {
+    const requestedSession = courseSessions.find(
+      (session) => String(session.id) === String(sessionId),
+    );
     const response = await joinRealtimeSession(sessionId, {
       display_name: user?.full_name || "",
+      prefer_broadcast: requestedSession?.session_type === "broadcasting",
     });
     const data = apiData(response, null);
     const nextActiveSession = data?.mode === "broadcast" ? sanitizeBroadcastPayload(data) : data;

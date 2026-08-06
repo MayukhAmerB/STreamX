@@ -264,8 +264,12 @@ export default function LiveClassesPage() {
   const handleJoinLiveClass = async (sessionId) => {
     setLiveJoinState({ loading: true, error: "" });
     try {
+      const requestedSession = scopedRealtimeSessions.find(
+        (session) => String(session.id) === String(sessionId),
+      );
       const response = await joinRealtimeSession(sessionId, {
         display_name: user?.full_name || "",
+        prefer_broadcast: requestedSession?.session_type === "broadcasting",
       });
       const payload = apiData(response, null);
       setActiveLivePayload(payload);
