@@ -46,12 +46,12 @@ function ChatPanel({ title, url, message, onRefresh }) {
         <iframe
           title={title}
           src={url}
-          className="block h-[58vh] min-h-[340px] w-full flex-1 lg:h-full lg:min-h-[466px] lg:max-h-[calc(100vh-276px)]"
+          className="block h-[58vh] min-h-[340px] w-full flex-1 lg:h-0 lg:min-h-0 lg:max-h-none"
           allow="clipboard-read; clipboard-write"
           referrerPolicy="strict-origin-when-cross-origin"
         />
       ) : (
-        <EmptyPanel className="h-[340px] flex-1 lg:min-h-[466px]" message={message} />
+        <EmptyPanel className="h-[340px] flex-1 lg:h-0 lg:min-h-0" message={message} />
       )}
     </div>
   );
@@ -199,7 +199,7 @@ export default function BroadcastViewerTheater({
         <div className="overflow-hidden rounded-2xl border border-black bg-black shadow-[0_14px_34px_rgba(0,0,0,0.24)]">
           {streamUrl && canRenderLiveFrames ? (
             <ProtectedPlaybackSurface
-              className="aspect-video w-full min-h-[260px] sm:min-h-[360px] lg:min-h-[520px] lg:max-h-[calc(100vh-220px)]"
+              className="aspect-video w-full"
               watermarkEnabled={Boolean(resolvedStreamUrl)}
             >
               {resolvedStreamUrl ? (
@@ -211,12 +211,12 @@ export default function BroadcastViewerTheater({
                   allow="autoplay"
                 />
               ) : (
-                <EmptyPanel className="h-full min-h-[260px] sm:min-h-[360px]" message={resolvedStreamFallbackMessage} />
+                <EmptyPanel className="h-full" message={resolvedStreamFallbackMessage} />
               )}
             </ProtectedPlaybackSurface>
           ) : (
             <EmptyPanel
-              className="h-[260px] sm:h-[360px] lg:h-[520px] lg:max-h-[calc(100vh-220px)]"
+              className="aspect-video w-full"
               message={resolvedStreamFallbackMessage}
             />
           )}

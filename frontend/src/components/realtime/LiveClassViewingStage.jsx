@@ -7,7 +7,7 @@ import { DEFAULT_LIVE_CLASS_SCHEDULE, formatNextLiveWindow } from "../../utils/l
 function PlayerChrome({ children, live = false }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_26px_70px_rgba(0,0,0,0.42)]">
-      <div className="relative aspect-video min-h-[260px] w-full sm:min-h-[380px] lg:min-h-[560px]">
+      <div className="relative aspect-video w-full">
         {children}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/85 to-transparent" />
         <div className="pointer-events-none absolute inset-x-5 bottom-4 flex items-center gap-3 text-white/80">
