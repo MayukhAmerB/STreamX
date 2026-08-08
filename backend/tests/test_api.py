@@ -5964,6 +5964,64 @@ class RealtimeSessionTests(APITestCase):
     @override_settings(
         OWNCAST_ADMIN_API_BASE_URL="http://owncast:8080",
         OWNCAST_ADMIN_PASSWORD="secret",
+    )
+    @patch("apps.realtime.services.fetch_owncast_chat_messages_admin")
+    @patch("apps.realtime.services._owncast_admin_post_json")
+    def test_owncast_message_visibility_is_verified_after_hide(
+        self,
+        mock_admin_post,
+        mock_fetch_messages,
+    ):
+        mock_admin_post.return_value = {"success": True, "message": "changed"}
+        mock_fetch_messages.return_value = [
+            {"id": "msg-1", "visible": False, "is_hidden": True},
+            {"id": "msg-2", "visible": False, "is_hidden": True},
+        ]
+
+        result = realtime_services.owncast_set_chat_message_visibility(
+            message_ids=["msg-1", "msg-1", "msg-2"],
+            visible=False,
+        )
+
+        self.assertTrue(result["verified"])
+        self.assertEqual(result["verifiedMessageIds"], ["msg-1", "msg-2"])
+        self.assertEqual(mock_admin_post.call_count, 1)
+        self.assertEqual(
+            mock_admin_post.call_args.kwargs["payload"],
+            {"idArray": ["msg-1", "msg-2"], "visible": False},
+        )
+
+    @override_settings(
+        OWNCAST_ADMIN_API_BASE_URL="http://owncast:8080",
+        OWNCAST_ADMIN_PASSWORD="secret",
+    )
+    @patch("apps.realtime.services.fetch_owncast_chat_messages_admin")
+    @patch("apps.realtime.services._owncast_admin_post_json")
+    def test_owncast_message_visibility_rejects_false_success(
+        self,
+        mock_admin_post,
+        mock_fetch_messages,
+    ):
+        mock_admin_post.return_value = {"success": True, "message": "changed"}
+        mock_fetch_messages.return_value = [
+            {"id": "msg-1", "visible": True, "is_hidden": False},
+        ]
+
+        with self.assertRaisesRegex(
+            realtime_services.OwncastAdminError,
+            r"did not make message\(s\) msg-1 hidden",
+        ):
+            realtime_services.owncast_set_chat_message_visibility(
+                message_ids=["msg-1"],
+                visible=False,
+            )
+
+        self.assertEqual(mock_admin_post.call_count, 2)
+        self.assertEqual(mock_fetch_messages.call_count, 2)
+
+    @override_settings(
+        OWNCAST_ADMIN_API_BASE_URL="http://owncast:8080",
+        OWNCAST_ADMIN_PASSWORD="secret",
         OWNCAST_CHAT_REQUIRE_AUTHENTICATION=True,
     )
     @patch("apps.realtime.services._owncast_admin_post_json")

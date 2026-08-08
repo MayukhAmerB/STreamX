@@ -987,16 +987,57 @@ def owncast_set_chat_user_moderator(*, owncast_user_id, is_moderator, timeout=10
 
 
 def owncast_set_chat_message_visibility(*, message_ids, visible, timeout=10):
-    ids = [str(message_id).strip() for message_id in (message_ids or []) if str(message_id).strip()]
+    ids = list(
+        dict.fromkeys(
+            str(message_id).strip()
+            for message_id in (message_ids or [])
+            if str(message_id).strip()
+        )
+    )
     if not ids:
         raise OwncastAdminError("At least one Owncast chat message ID is required.")
+
     base_url, headers = _resolve_owncast_admin_request_context()
-    return _owncast_admin_post_json(
-        base_url=base_url,
-        endpoint_path="/api/admin/chat/messagevisibility",
-        payload={"idArray": ids, "visible": bool(visible)},
-        headers=headers,
-        timeout=timeout,
+    expected_visible = bool(visible)
+    result = {}
+
+    # Owncast's visibility endpoint reports success even when no message row
+    # matched the supplied IDs. Verify the persisted state so the moderation UI
+    # never reports a successful hide/show operation that Owncast did not apply.
+    for attempt in range(2):
+        result = _owncast_admin_post_json(
+            base_url=base_url,
+            endpoint_path="/api/admin/chat/messagevisibility",
+            payload={"idArray": ids, "visible": expected_visible},
+            headers=headers,
+            timeout=timeout,
+        )
+        messages = fetch_owncast_chat_messages_admin(limit=0, timeout=timeout)
+        visibility_by_id = {
+            str(message.get("id") or "").strip(): bool(message.get("visible"))
+            for message in messages
+            if isinstance(message, dict) and str(message.get("id") or "").strip()
+        }
+        unresolved_ids = [
+            message_id
+            for message_id in ids
+            if visibility_by_id.get(message_id) is not expected_visible
+        ]
+        if not unresolved_ids:
+            result["verified"] = True
+            result["verifiedMessageIds"] = ids
+            return result
+
+        if attempt == 0:
+            logger.warning(
+                "Owncast accepted a chat visibility request without applying it; retrying message IDs: %s",
+                unresolved_ids,
+            )
+
+    desired_state = "visible" if expected_visible else "hidden"
+    raise OwncastAdminError(
+        "Owncast accepted the moderation request but did not make message(s) "
+        f"{', '.join(unresolved_ids)} {desired_state}. Refresh chat moderation and try again."
     )
 
 
