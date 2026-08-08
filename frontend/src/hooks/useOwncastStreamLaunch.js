@@ -68,13 +68,19 @@ export default function useOwncastStreamLaunch({ sessionId, streamUrl, refreshKe
       })
       .catch((error) => {
         if (cancelled) return;
-        setLaunchState({
-          sessionId: normalizedSessionId,
-          sourceUrl: normalizedStreamUrl,
-          url: "",
-          expiresAt: 0,
-          loading: false,
-          error: error?.message || "Unable to prepare secure video launch.",
+        setLaunchState((previous) => {
+          const canKeepCurrentLaunch =
+            previous.sessionId === normalizedSessionId &&
+            previous.sourceUrl === normalizedStreamUrl &&
+            Boolean(previous.url);
+          return {
+            sessionId: normalizedSessionId,
+            sourceUrl: normalizedStreamUrl,
+            url: canKeepCurrentLaunch ? previous.url : "",
+            expiresAt: canKeepCurrentLaunch ? previous.expiresAt : 0,
+            loading: false,
+            error: error?.message || "Unable to prepare secure video launch.",
+          };
         });
       });
 
@@ -93,6 +99,16 @@ export default function useOwncastStreamLaunch({ sessionId, streamUrl, refreshKe
     }, refreshDelay);
     return () => window.clearTimeout(timeoutId);
   }, [launchState.expiresAt, launchState.url, shouldLaunch]);
+
+  useEffect(() => {
+    if (!shouldLaunch || !launchState.error) {
+      return undefined;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setAutoRefreshKey((previous) => previous + 1);
+    }, 10_000);
+    return () => window.clearTimeout(timeoutId);
+  }, [launchState.error, shouldLaunch]);
 
   const launchIsCurrent =
     launchState.sessionId === normalizedSessionId &&

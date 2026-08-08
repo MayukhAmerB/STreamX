@@ -116,6 +116,7 @@ class RealtimeSession(models.Model):
 
     stream_embed_url = models.URLField(blank=True, default="")
     chat_embed_url = models.URLField(blank=True, default="")
+    chat_enabled = models.BooleanField(default=True)
     rtmp_target_url = models.CharField(max_length=1024, blank=True, default="")
     stream_status = models.CharField(
         max_length=20,

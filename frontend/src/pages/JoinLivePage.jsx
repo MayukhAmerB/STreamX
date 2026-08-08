@@ -604,6 +604,7 @@ export default function JoinLivePage() {
           chatFallbackMessage={activeBroadcastChatFallbackMessage}
           streamStatus={activeSession.broadcast?.stream_status}
           sessionStatus={activeSession.session?.status}
+          chatEnabled={activeSession.session?.chat_enabled !== false}
           badgeLabel="Live Broadcast"
           statusMessage={activeBroadcastStatusMessage}
           onRefreshStream={handleRefreshActiveBroadcast}

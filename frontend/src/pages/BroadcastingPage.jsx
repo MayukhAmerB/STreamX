@@ -1426,6 +1426,10 @@ export default function BroadcastingPage() {
     "OBS stream is ready. If OBS warned that the connection dropped, start streaming again in OBS using the same server URL and key. Viewers stay in the same session.";
   const chatModerationData =
     chatModerationState.sessionId === studioSession?.id ? chatModerationState.data || {} : {};
+  const isBroadcastChatEnabled =
+    typeof chatModerationData.chat_enabled === "boolean"
+      ? chatModerationData.chat_enabled
+      : studioSession?.chat_enabled !== false;
   const chatModerationIdentities = Array.isArray(chatModerationData.identities)
     ? chatModerationData.identities
     : [];
@@ -1969,6 +1973,34 @@ export default function BroadcastingPage() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <span
+                  className={`inline-flex items-center rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] ${
+                    isBroadcastChatEnabled
+                      ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-300"
+                      : "border-white/10 bg-white/5 text-[#A8A8A8]"
+                  }`}
+                >
+                  {isBroadcastChatEnabled ? "Chat enabled" : "Chat disabled"}
+                </span>
+                <Button
+                  variant="secondary"
+                  className="px-3 py-1.5 text-xs"
+                  onClick={() =>
+                    applyChatModerationAction(
+                      isBroadcastChatEnabled ? "disable_chat" : "enable_chat",
+                      {},
+                      isBroadcastChatEnabled
+                        ? "Broadcast chat disabled. Video remains live."
+                        : "Broadcast chat enabled."
+                    )
+                  }
+                  loading={
+                    chatModerationState.actionLoading ===
+                    (isBroadcastChatEnabled ? "disable_chat" : "enable_chat")
+                  }
+                >
+                  {isBroadcastChatEnabled ? "Disable Chat" : "Enable Chat"}
+                </Button>
                 <Button
                   variant="secondary"
                   className="px-3 py-1.5 text-xs"
@@ -2363,6 +2395,11 @@ export default function BroadcastingPage() {
             chatFallbackMessage={activeChatFallbackMessage}
             streamStatus={activeBroadcast.broadcast?.stream_status}
             sessionStatus={activeBroadcast.session?.status}
+            chatEnabled={
+              activeBroadcast.session?.id === studioSession?.id
+                ? isBroadcastChatEnabled
+                : activeBroadcast.session?.chat_enabled !== false
+            }
             showHeaderMeta={false}
             withContainer={false}
             statusMessage={activeBroadcastStatusMessage}

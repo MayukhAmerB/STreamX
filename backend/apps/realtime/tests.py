@@ -1,9 +1,13 @@
 from datetime import datetime
 from types import SimpleNamespace
+from unittest.mock import patch
 
+from django.core.cache import cache
+from django.test import override_settings
 from django.test import SimpleTestCase
 
 from .schedule import LIVE_CLASS_TIMEZONE, attendee_can_join_live_session, get_live_class_schedule_snapshot
+from .services import refresh_obs_session_stream_health
 
 
 class LiveClassScheduleTests(SimpleTestCase):
@@ -65,3 +69,44 @@ class LiveClassScheduleTests(SimpleTestCase):
         )
 
         self.assertFalse(attendee_can_join_live_session(session, now=monday_evening))
+
+
+class OwncastStreamHealthTests(SimpleTestCase):
+    def setUp(self):
+        cache.clear()
+        self.session = SimpleNamespace(
+            pk=71,
+            session_type="broadcasting",
+            TYPE_BROADCASTING="broadcasting",
+            stream_service="obs",
+            STREAM_SERVICE_OBS="obs",
+            status="live",
+            STATUS_ENDED="ended",
+            stream_status="live",
+            STREAM_IDLE="idle",
+            STREAM_STARTING="starting",
+            STREAM_LIVE="live",
+            STREAM_STOPPED="stopped",
+            STREAM_FAILED="failed",
+        )
+
+    @override_settings(REALTIME_OWNCAST_OFFLINE_GRACE_SECONDS=45)
+    @patch("apps.realtime.services.get_owncast_public_status")
+    def test_transient_offline_status_does_not_stop_live_stream(self, mock_status):
+        mock_status.side_effect = [{"online": True}, {"online": False}]
+
+        refresh_obs_session_stream_health(self.session, persist=False)
+        result = refresh_obs_session_stream_health(self.session, force_refresh=True, persist=False)
+
+        self.assertEqual(result["stream_status"], "live")
+        self.assertTrue(result["grace_active"])
+
+    @override_settings(REALTIME_OWNCAST_OFFLINE_GRACE_SECONDS=45)
+    @patch("apps.realtime.services.get_owncast_public_status", return_value={"online": False})
+    def test_sustained_offline_status_stops_stream_after_grace(self, _mock_status):
+        cache.delete("realtime:owncast:last-online:71")
+
+        result = refresh_obs_session_stream_health(self.session, force_refresh=True, persist=False)
+
+        self.assertEqual(result["stream_status"], "stopped")
+        self.assertFalse(result["grace_active"])

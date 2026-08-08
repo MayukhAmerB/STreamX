@@ -59,6 +59,7 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
             "join_url",
             "stream_embed_url",
             "chat_embed_url",
+            "chat_enabled",
             "live_schedule",
             "viewer_can_join_now",
             "stream_status",
@@ -316,6 +317,8 @@ class RealtimeOwncastChatModerationActionSerializer(serializers.Serializer):
     ACTION_BAN_IP = "ban_ip"
     ACTION_UNBAN_IP = "unban_ip"
     ACTION_SYNC_HANDLES = "sync_handles"
+    ACTION_ENABLE_CHAT = "enable_chat"
+    ACTION_DISABLE_CHAT = "disable_chat"
 
     USER_ACTIONS = {
         ACTION_BAN_USER,
@@ -339,6 +342,8 @@ class RealtimeOwncastChatModerationActionSerializer(serializers.Serializer):
             ACTION_BAN_IP,
             ACTION_UNBAN_IP,
             ACTION_SYNC_HANDLES,
+            ACTION_ENABLE_CHAT,
+            ACTION_DISABLE_CHAT,
         )
     )
     owncast_user_id = serializers.CharField(required=False, allow_blank=True, max_length=120)

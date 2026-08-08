@@ -85,6 +85,7 @@ from .services import (
     release_expired_owncast_chat_timeouts,
     sync_owncast_chat_identities_from_recent_messages,
     sync_owncast_chat_settings,
+    set_owncast_chat_enabled,
     start_room_recording_egress,
     start_room_broadcast_egress,
     stop_room_recording_egress,
@@ -121,6 +122,16 @@ def _owncast_stream_access_ttl_seconds():
 
 def _owncast_stream_access_cookie_name():
     return str(getattr(settings, "OWNCAST_STREAM_ACCESS_COOKIE_NAME", "") or "").strip() or "owncast_stream_access"
+
+
+def _owncast_stream_auth_cache_ttl_seconds():
+    configured = int(getattr(settings, "REALTIME_OWNCAST_STREAM_AUTH_CACHE_TTL_SECONDS", 15) or 15)
+    return max(1, min(configured, 30))
+
+
+def _owncast_stream_auth_cache_key(cookie_value):
+    digest = hashlib.sha256(str(cookie_value or "").encode("utf-8")).hexdigest()
+    return f"realtime:owncast:stream-access:{digest}"
 
 
 def _resolve_owncast_chat_origin(chat_embed_url):
@@ -230,6 +241,32 @@ def _owncast_chat_disabled_response():
         message="Broadcast chat access is disabled.",
         errors={"detail": "A moderator disabled chat access for this account."},
         status_code=status.HTTP_403_FORBIDDEN,
+    )
+
+
+def _owncast_chat_session_disabled_response():
+    return api_response(
+        success=False,
+        message="Broadcast chat is disabled.",
+        errors={"detail": "Live chat has been disabled by a moderator for this broadcast."},
+        status_code=status.HTTP_403_FORBIDDEN,
+    )
+
+
+def _owncast_chat_bridge_session(payload):
+    try:
+        session_id = int(payload.get("session_id") or 0)
+    except (TypeError, ValueError):
+        session_id = 0
+    if session_id <= 0:
+        return None
+    return (
+        RealtimeSession.objects.filter(
+            pk=session_id,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+        )
+        .only("id", "chat_enabled")
+        .first()
     )
 
 
@@ -457,6 +494,8 @@ def _sync_owncast_chat_settings_non_blocking(*, session):
         return
     try:
         result = sync_owncast_chat_settings()
+        if not session.chat_enabled:
+            set_owncast_chat_enabled(enabled=False)
         warnings = result.get("warnings") or []
         if warnings:
             realtime_ops_logger.warning(
@@ -1001,6 +1040,8 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
                 errors={"detail": "This endpoint is available only for broadcasting sessions."},
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
+        if not session.chat_enabled:
+            return _owncast_chat_session_disabled_response()
         if not bool(getattr(settings, "OWNCAST_CHAT_BRIDGE_ENABLED", False)):
             return api_response(
                 success=False,
@@ -1297,6 +1338,7 @@ def _build_owncast_chat_moderation_payload(*, session, request):
 
     return {
         "session": RealtimeSessionListSerializer(session, context={"request": request}).data,
+        "chat_enabled": bool(session.chat_enabled),
         "sync": sync_result,
         "identities": serialized_identities,
         "recent_messages": messages,
@@ -1314,6 +1356,8 @@ def _build_owncast_chat_moderation_payload(*, session, request):
             "ban_ip",
             "unban_ip",
             "sync_handles",
+            "enable_chat",
+            "disable_chat",
         ],
     }
 
@@ -1321,6 +1365,11 @@ def _build_owncast_chat_moderation_payload(*, session, request):
 def _overlay_owncast_moderation_action(data, *, action, owncast_user_id="", message_ids=None):
     if not isinstance(data, dict):
         return data
+
+    if action == RealtimeOwncastChatModerationActionSerializer.ACTION_ENABLE_CHAT:
+        data["chat_enabled"] = True
+    elif action == RealtimeOwncastChatModerationActionSerializer.ACTION_DISABLE_CHAT:
+        data["chat_enabled"] = False
 
     if action in {
         RealtimeOwncastChatModerationActionSerializer.ACTION_BAN_USER,
@@ -1408,7 +1457,24 @@ class RealtimeSessionOwncastChatModerationView(APIView):
         owncast_result = {}
 
         try:
-            if action == RealtimeOwncastChatModerationActionSerializer.ACTION_SYNC_HANDLES:
+            if action in {
+                RealtimeOwncastChatModerationActionSerializer.ACTION_ENABLE_CHAT,
+                RealtimeOwncastChatModerationActionSerializer.ACTION_DISABLE_CHAT,
+            }:
+                chat_enabled = action == RealtimeOwncastChatModerationActionSerializer.ACTION_ENABLE_CHAT
+                owncast_result = set_owncast_chat_enabled(enabled=chat_enabled)
+                RealtimeSession.objects.filter(pk=session.pk).update(
+                    chat_enabled=chat_enabled,
+                    updated_at=now,
+                )
+                session.chat_enabled = chat_enabled
+                log_security_event(
+                    "realtime.owncast_chat.toggled",
+                    request=request,
+                    session_id=session.id,
+                    chat_enabled=chat_enabled,
+                )
+            elif action == RealtimeOwncastChatModerationActionSerializer.ACTION_SYNC_HANDLES:
                 sync_owncast_chat_identities_from_recent_messages(limit=500, timeout=5)
             elif action == RealtimeOwncastChatModerationActionSerializer.ACTION_BAN_USER:
                 owncast_result = owncast_set_chat_user_enabled(owncast_user_id=owncast_user_id, enabled=False)
@@ -1504,6 +1570,17 @@ class RealtimeOwncastChatBridgeView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
+        bridge_session = _owncast_chat_bridge_session(payload)
+        if bridge_session is None:
+            return api_response(
+                success=False,
+                message="Invalid chat bridge request.",
+                errors={"detail": "Chat bridge session could not be verified."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        if not bridge_session.chat_enabled:
+            return _owncast_chat_session_disabled_response()
+
         access_token = str(payload.get("access_token") or "").strip()
         if not access_token:
             return api_response(
@@ -1556,6 +1633,17 @@ class RealtimeOwncastChatBridgeView(APIView):
                 errors={"detail": "Chat bridge token is invalid or expired."},
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
+
+        bridge_session = _owncast_chat_bridge_session(payload)
+        if bridge_session is None:
+            return api_response(
+                success=False,
+                message="Invalid chat bridge request.",
+                errors={"detail": "Chat bridge session could not be verified."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        if not bridge_session.chat_enabled:
+            return _owncast_chat_session_disabled_response()
 
         try:
             identity_id = int(payload.get("identity_id") or 0)
@@ -1713,6 +1801,12 @@ class RealtimeOwncastStreamAccessView(APIView):
         except (signing.BadSignature, TypeError, ValueError):
             return HttpResponse(status=401)
 
+        cache_key = _owncast_stream_auth_cache_key(cookie_value)
+        if cache.get(cache_key) == f"{session_id}:{user_id}":
+            response = HttpResponse(status=204)
+            response["Cache-Control"] = "no-store, max-age=0"
+            return response
+
         session = RealtimeSession.objects.with_related().filter(pk=session_id).first()
         user = User.objects.filter(pk=user_id, is_active=True).first()
         if not session or not user or session.status == RealtimeSession.STATUS_ENDED:
@@ -1724,6 +1818,11 @@ class RealtimeOwncastStreamAccessView(APIView):
         if not access_decision.allowed:
             return HttpResponse(status=403)
 
+        cache.set(
+            cache_key,
+            f"{session_id}:{user_id}",
+            timeout=_owncast_stream_auth_cache_ttl_seconds(),
+        )
         response = HttpResponse(status=204)
         response["Cache-Control"] = "no-store, max-age=0"
         return response

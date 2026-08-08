@@ -76,6 +76,7 @@ export default function LiveClassViewingStage({
           chatUrl={urls.writableChatEmbedUrl || urls.chatEmbedUrl}
           streamStatus={activePayload?.broadcast?.stream_status}
           sessionStatus={activePayload?.session?.status}
+          chatEnabled={activePayload?.session?.chat_enabled !== false}
           badgeLabel="Live Class"
           headerLabel="Now playing"
           chatTitle="Live Class Chat"

@@ -9,7 +9,7 @@ from datetime import timedelta
 from io import BytesIO
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from django.conf import settings
 from django.contrib.admin.models import LogEntry
@@ -5011,6 +5011,38 @@ class RealtimeSessionTests(APITestCase):
 
         self.assertEqual(response.status_code, 204)
 
+    @override_settings(REALTIME_OWNCAST_STREAM_AUTH_CACHE_TTL_SECONDS=15)
+    @patch("apps.realtime.views.get_access_decision")
+    def test_owncast_stream_access_reuses_short_positive_decision_cache(self, mock_access_decision):
+        mock_access_decision.return_value = SimpleNamespace(allowed=True)
+        session = RealtimeSession.objects.create(
+            title="Cached Stream Access Session",
+            description="Repeated HLS requests should not repeat database authorization work.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+        )
+        cookie_value = signing.dumps(
+            {
+                "session_id": session.id,
+                "user_id": self.viewer.id,
+                "issued_at": int(timezone.now().timestamp()),
+            },
+            salt="realtime.owncast-stream-access",
+            compress=True,
+        )
+        self.client.cookies["owncast_stream_access"] = cookie_value
+
+        first_response = self.client.get(reverse("realtime-owncast-stream-access"))
+        second_response = self.client.get(reverse("realtime-owncast-stream-access"))
+
+        self.assertEqual(first_response.status_code, 204)
+        self.assertEqual(second_response.status_code, 204)
+        self.assertEqual(mock_access_decision.call_count, 1)
+
     @override_settings(OWNCAST_CHAT_BRIDGE_ENABLED=True)
     @patch("apps.realtime.views.register_owncast_chat_user")
     def test_broadcast_chat_launch_returns_stream_bridge_url(self, mock_register_chat_user):
@@ -5074,6 +5106,33 @@ class RealtimeSessionTests(APITestCase):
         self.assertNotIn("bridge-access-token-123", identity.access_token_secret)
         self.assertEqual(identity.reveal_access_token(), "bridge-access-token-123")
         mock_register_chat_user.assert_called_once_with(display_name="")
+
+    @override_settings(OWNCAST_CHAT_BRIDGE_ENABLED=True)
+    @patch("apps.realtime.views.register_owncast_chat_user")
+    def test_broadcast_chat_launch_rejects_disabled_session(self, mock_register_chat_user):
+        session = RealtimeSession.objects.create(
+            title="Disabled Broadcast Chat",
+            description="Video remains available while chat is disabled.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_LIVE,
+            stream_embed_url="https://stream.example.com/embed/video",
+            chat_embed_url="https://stream.example.com/embed/chat/readwrite",
+            chat_enabled=False,
+        )
+
+        self.login(self.viewer.email)
+        response = self.client.post(
+            reverse("realtime-session-owncast-chat-launch", kwargs={"pk": session.id}),
+            {},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["message"], "Broadcast chat is disabled.")
+        mock_register_chat_user.assert_not_called()
 
     @override_settings(OWNCAST_CHAT_BRIDGE_ENABLED=True)
     @patch("apps.realtime.views.register_owncast_chat_user")
@@ -5415,7 +5474,7 @@ class RealtimeSessionTests(APITestCase):
                 "display_name": "agitated-rush",
                 "platform_display_name": "Viewer User",
                 "next_path": "/embed/chat/readwrite/",
-                "session_id": 99,
+                "session_id": session.id,
                 "user_id": self.viewer.id,
                 "identity_id": identity.id,
             },
@@ -5444,9 +5503,61 @@ class RealtimeSessionTests(APITestCase):
         identity.refresh_from_db()
         self.assertIsNotNone(identity.bridge_used_at)
 
-    def test_owncast_chat_bridge_rejects_banned_identity(self):
+    def test_owncast_chat_bridge_rejects_existing_token_after_chat_is_disabled(self):
+        session = RealtimeSession.objects.create(
+            title="Chat Disabled After Launch",
+            description="Issued bridge tokens must stop working when a moderator disables chat.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            status=RealtimeSession.STATUS_LIVE,
+            chat_enabled=False,
+        )
         identity = OwncastChatIdentity.objects.create(
-            session=None,
+            session=session,
+            user=self.viewer,
+            platform_user_id=self.viewer.id,
+            platform_email=self.viewer.email,
+            platform_full_name=self.viewer.full_name,
+            platform_role=self.viewer.role,
+            platform_display_name="Viewer User",
+            owncast_user_id="owncast-user-disabled-session",
+            owncast_display_name="agitated-rush",
+            access_token_hash=OwncastChatIdentity.hash_access_token("disabled-session-token"),
+        )
+        signed_token = signing.dumps(
+            {
+                "access_token": "disabled-session-token",
+                "display_name": "agitated-rush",
+                "platform_display_name": "Viewer User",
+                "next_path": "/embed/chat/readwrite/",
+                "session_id": session.id,
+                "user_id": self.viewer.id,
+                "identity_id": identity.id,
+            },
+            salt="realtime.owncast-chat-bridge",
+            compress=True,
+        )
+
+        response = self.client.get(
+            reverse("realtime-owncast-chat-bridge"),
+            {"token": signed_token},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["message"], "Broadcast chat is disabled.")
+        identity.refresh_from_db()
+        self.assertIsNone(identity.bridge_used_at)
+
+    def test_owncast_chat_bridge_rejects_banned_identity(self):
+        session = RealtimeSession.objects.create(
+            title="Banned Identity Session",
+            description="Banned identities remain unable to use chat.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+        identity = OwncastChatIdentity.objects.create(
+            session=session,
             user=self.viewer,
             platform_user_id=self.viewer.id,
             platform_email=self.viewer.email,
@@ -5464,7 +5575,7 @@ class RealtimeSessionTests(APITestCase):
                 "display_name": "agitated-rush",
                 "platform_display_name": "Viewer User",
                 "next_path": "/embed/chat/readwrite/",
-                "session_id": 99,
+                "session_id": session.id,
                 "user_id": self.viewer.id,
                 "identity_id": identity.id,
             },
@@ -5531,8 +5642,15 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(identity.owncast_display_name, "agitated-rush")
 
     def test_owncast_chat_bridge_rejects_banned_identity_sync(self):
+        session = RealtimeSession.objects.create(
+            title="Banned Identity Sync Session",
+            description="Banned identities remain unable to synchronize chat handles.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            status=RealtimeSession.STATUS_LIVE,
+        )
         identity = OwncastChatIdentity.objects.create(
-            session=None,
+            session=session,
             user=self.viewer,
             platform_user_id=self.viewer.id,
             platform_email=self.viewer.email,
@@ -5550,7 +5668,7 @@ class RealtimeSessionTests(APITestCase):
                 "display_name": "agitated-rush",
                 "platform_display_name": "Viewer User",
                 "next_path": "/embed/chat/readwrite/",
-                "session_id": 99,
+                "session_id": session.id,
                 "user_id": self.viewer.id,
                 "identity_id": identity.id,
             },
@@ -5570,8 +5688,15 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(identity.owncast_display_name, "agitated-rush")
 
     def test_owncast_chat_bridge_rejects_platform_name_as_synced_handle(self):
+        session = RealtimeSession.objects.create(
+            title="Rejected Platform Handle Session",
+            description="Platform names cannot replace verified Owncast handles.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            status=RealtimeSession.STATUS_LIVE,
+        )
         identity = OwncastChatIdentity.objects.create(
-            session=None,
+            session=session,
             user=self.viewer,
             platform_user_id=self.viewer.id,
             platform_email=self.viewer.email,
@@ -5588,7 +5713,7 @@ class RealtimeSessionTests(APITestCase):
                 "display_name": "",
                 "platform_display_name": "Viewer User",
                 "next_path": "/embed/chat/readwrite/",
-                "session_id": 99,
+                "session_id": session.id,
                 "user_id": self.viewer.id,
                 "identity_id": identity.id,
             },
@@ -5857,6 +5982,54 @@ class RealtimeSessionTests(APITestCase):
 
         self.assertEqual(response.status_code, 403)
         mock_set_chat_user_enabled.assert_not_called()
+
+    @patch("apps.realtime.views._build_owncast_chat_moderation_payload")
+    @patch("apps.realtime.views.set_owncast_chat_enabled")
+    def test_broadcast_chat_moderation_can_disable_and_enable_chat(
+        self,
+        mock_set_chat_enabled,
+        mock_build_payload,
+    ):
+        mock_set_chat_enabled.return_value = {"success": True}
+        mock_build_payload.return_value = {
+            "chat_enabled": True,
+            "identities": [],
+            "recent_messages": [],
+        }
+        session = RealtimeSession.objects.create(
+            title="Toggle Moderated Broadcast",
+            description="The host can disable and restore chat without stopping video.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+
+        self.login(self.host.email)
+        disable_response = self.client.post(
+            reverse("realtime-session-owncast-chat-moderation", kwargs={"pk": session.id}),
+            {"action": "disable_chat"},
+            format="json",
+        )
+
+        self.assertEqual(disable_response.status_code, 200)
+        self.assertFalse(disable_response.data["data"]["chat_enabled"])
+        session.refresh_from_db()
+        self.assertFalse(session.chat_enabled)
+
+        enable_response = self.client.post(
+            reverse("realtime-session-owncast-chat-moderation", kwargs={"pk": session.id}),
+            {"action": "enable_chat"},
+            format="json",
+        )
+
+        self.assertEqual(enable_response.status_code, 200)
+        self.assertTrue(enable_response.data["data"]["chat_enabled"])
+        session.refresh_from_db()
+        self.assertTrue(session.chat_enabled)
+        self.assertEqual(
+            mock_set_chat_enabled.call_args_list,
+            [call(enabled=False), call(enabled=True)],
+        )
 
     @patch("apps.realtime.views._build_owncast_chat_moderation_payload")
     @patch("apps.realtime.views.owncast_set_chat_user_enabled")

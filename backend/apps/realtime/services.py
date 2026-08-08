@@ -424,12 +424,23 @@ def refresh_obs_session_stream_health(session, *, force_refresh=False, persist=T
         }
 
     current_status = str(getattr(session, "stream_status", "") or "").strip().lower() or session.STREAM_IDLE
+    offline_grace_seconds = max(
+        0,
+        int(getattr(settings, "REALTIME_OWNCAST_OFFLINE_GRACE_SECONDS", 45) or 45),
+    )
+    last_online_cache_key = f"realtime:owncast:last-online:{session.pk}"
+    grace_active = False
     if bool(status_payload.get("online")):
         next_status = session.STREAM_LIVE
+        if offline_grace_seconds > 0:
+            cache.set(last_online_cache_key, True, timeout=offline_grace_seconds)
     elif current_status == session.STREAM_STARTING:
         next_status = session.STREAM_STARTING
     elif current_status == session.STREAM_FAILED:
         next_status = session.STREAM_FAILED
+    elif current_status == session.STREAM_LIVE and offline_grace_seconds > 0 and cache.get(last_online_cache_key):
+        next_status = session.STREAM_LIVE
+        grace_active = True
     elif current_status in {session.STREAM_LIVE, session.STREAM_STOPPED}:
         next_status = session.STREAM_STOPPED
     else:
@@ -444,6 +455,7 @@ def refresh_obs_session_stream_health(session, *, force_refresh=False, persist=T
         "stream_status": next_status,
         "online": bool(status_payload.get("online")),
         "changed": changed,
+        "grace_active": grace_active,
     }
 
 
@@ -517,6 +529,29 @@ def _is_owncast_404_error(error_message):
     return "HTTP 404" in str(error_message or "")
 
 
+def set_owncast_chat_enabled(*, enabled):
+    """Set Owncast's global chat-disabled flag across supported payload shapes."""
+    base_url, headers = _resolve_owncast_admin_request_context()
+    disabled = not bool(enabled)
+    payload_candidates = (
+        {"value": disabled},
+        {"disable": disabled},
+        {"disabled": disabled},
+    )
+    last_error = ""
+    for payload in payload_candidates:
+        try:
+            return _owncast_admin_post_json(
+                base_url=base_url,
+                endpoint_path="/api/admin/config/chat/disable",
+                payload=payload,
+                headers=headers,
+            )
+        except OwncastAdminError as exc:
+            last_error = str(exc)
+    raise OwncastAdminError(f"Unable to update Owncast chat state: {last_error}")
+
+
 def sync_owncast_chat_settings():
     """
     Ensure broadcast chat is writable for viewers by default.
@@ -524,34 +559,18 @@ def sync_owncast_chat_settings():
     Owncast chat can be left disabled (or auth-only) from previous admin state.
     We re-apply chat toggles from backend so broadcast UX remains consistent.
     """
-    base_url, headers = _resolve_owncast_admin_request_context()
-
     result = {
         "chat_disable_synced": False,
         "chat_require_auth_synced": False,
         "warnings": [],
     }
 
-    disable_payload_candidates = (
-        {"value": False},
-        {"disable": False},
-        {"disabled": False},
-    )
     disable_error = ""
-    for payload in disable_payload_candidates:
-        try:
-            _owncast_admin_post_json(
-                base_url=base_url,
-                endpoint_path="/api/admin/config/chat/disable",
-                payload=payload,
-                headers=headers,
-            )
-            result["chat_disable_synced"] = True
-            disable_error = ""
-            break
-        except OwncastAdminError as exc:
-            disable_error = str(exc)
-            continue
+    try:
+        set_owncast_chat_enabled(enabled=True)
+        result["chat_disable_synced"] = True
+    except OwncastAdminError as exc:
+        disable_error = str(exc)
 
     if not result["chat_disable_synced"] and disable_error:
         if _is_owncast_404_error(disable_error):
@@ -562,6 +581,7 @@ def sync_owncast_chat_settings():
             raise OwncastAdminError(f"Unable to sync Owncast chat disabled setting: {disable_error}")
 
     require_authentication = bool(getattr(settings, "OWNCAST_CHAT_REQUIRE_AUTHENTICATION", False))
+    base_url, headers = _resolve_owncast_admin_request_context()
     require_auth_payload_candidates = (
         {"value": require_authentication},
         {"requireauthentication": require_authentication},

@@ -75,6 +75,7 @@ export default function BroadcastViewerTheater({
   onRefreshChat = null,
   showHeaderMeta = true,
   showChat = true,
+  chatEnabled = true,
   personalizeChat = false,
   withContainer = true,
   className = "",
@@ -87,6 +88,7 @@ export default function BroadcastViewerTheater({
   const normalizedSessionStatus = String(sessionStatus || "").trim().toLowerCase();
   const isSessionEnded = normalizedSessionStatus === "ended";
   const canRenderLiveFrames = !isSessionEnded;
+  const canUseChat = Boolean(showChat && chatEnabled && canRenderLiveFrames);
   const secureStream = useOwncastStreamLaunch({
     sessionId,
     streamUrl,
@@ -98,7 +100,7 @@ export default function BroadcastViewerTheater({
     sessionId,
     chatUrl,
     refreshKey: chatFrameVersion,
-    enabled: Boolean(personalizeChat && showChat && chatUrl && canRenderLiveFrames),
+    enabled: Boolean(personalizeChat && canUseChat && chatUrl),
   });
   const resolvedChatUrl = secureChat.chatUrl;
   const layoutClassName = showChat
@@ -123,6 +125,8 @@ export default function BroadcastViewerTheater({
       : streamFallbackMessage;
   const resolvedChatFallbackMessage = isSessionEnded
     ? "Chat is closed because this broadcast has ended."
+    : !chatEnabled
+      ? "Live chat has been disabled by a moderator. Video playback remains available."
     : secureChat.requiresLaunch && secureChat.loading
       ? "Preparing your secure live-class chat..."
       : secureChat.error
@@ -227,16 +231,17 @@ export default function BroadcastViewerTheater({
             <button
               type="button"
               onClick={() => setMobileChatOpen((previous) => !previous)}
-              className="sticky bottom-3 z-20 w-full rounded-xl border border-white/10 bg-[#151515]/96 px-4 py-3 text-sm font-semibold text-[#EAEAEA] shadow-[0_16px_34px_rgba(0,0,0,0.3)] backdrop-blur transition hover:bg-[#1C1C1C] lg:hidden"
+              disabled={!chatEnabled}
+              className="sticky bottom-3 z-20 w-full rounded-xl border border-white/10 bg-[#151515]/96 px-4 py-3 text-sm font-semibold text-[#EAEAEA] shadow-[0_16px_34px_rgba(0,0,0,0.3)] backdrop-blur transition hover:bg-[#1C1C1C] disabled:cursor-not-allowed disabled:opacity-70 lg:hidden"
             >
-              {mobileChatOpen ? "Hide Live Chat" : "Show Live Chat & Reply"}
+              {!chatEnabled ? "Live Chat Disabled" : mobileChatOpen ? "Hide Live Chat" : "Show Live Chat & Reply"}
             </button>
             <div
               className={`${mobileChatOpen ? "block" : "hidden"} overflow-hidden rounded-2xl border border-black panel-gradient lg:block lg:h-full lg:min-h-0`}
             >
               <ChatPanel
                 title={chatTitle}
-                url={canRenderLiveFrames ? resolvedChatUrl : ""}
+                url={canUseChat ? resolvedChatUrl : ""}
                 message={resolvedChatFallbackMessage}
                 onRefresh={refreshChatFrame}
               />
