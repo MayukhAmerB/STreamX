@@ -166,7 +166,6 @@ export default function ProtectedPlaybackSurface({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isAppFullscreen, setIsAppFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
-  const [fullscreenSupported, setFullscreenSupported] = useState(false);
   const [videoDuration, setVideoDuration] = useState(0);
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
   const [videoPaused, setVideoPaused] = useState(true);
@@ -175,8 +174,6 @@ export default function ProtectedPlaybackSurface({
   const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
 
   useEffect(() => {
-    setFullscreenSupported(canFullscreen(containerRef.current));
-
     const syncFullscreenState = () => {
       const fullscreenElement = getFullscreenElement();
       const container = containerRef.current;
@@ -265,8 +262,6 @@ export default function ProtectedPlaybackSurface({
     };
 
     syncVideoState();
-    setFullscreenSupported(canFullscreen(containerRef.current));
-
     const events = [
       "loadedmetadata",
       "durationchange",
@@ -300,7 +295,9 @@ export default function ProtectedPlaybackSurface({
 
   const hasVideoControls = Boolean(videoRef);
   const isImmersiveFullscreen = isFullscreen || isAppFullscreen;
-  const canUseFullscreenControl = showFullscreenButton && (fullscreenSupported || hasVideoControls);
+  // App fullscreen is a reliable fallback for iframe players and mobile
+  // browsers that expose but reject the native Fullscreen API.
+  const canUseFullscreenControl = showFullscreenButton;
   const canSelectQuality =
     showQualityControl && Array.isArray(qualityOptions) && qualityOptions.length > 1 && typeof onQualityChange === "function";
   const shouldShowQualityBadge = showQualityControl && !canSelectQuality && Boolean(activeQualityLabel);
@@ -410,7 +407,7 @@ export default function ProtectedPlaybackSurface({
 
   const surfaceClassName = useMemo(() => {
     if (isAppFullscreen) {
-      return "fixed inset-0 z-[9999] flex h-[100dvh] w-screen flex-col overflow-hidden bg-black";
+      return "fixed inset-0 z-[9999] flex h-[100dvh] w-[100dvw] flex-col overflow-hidden bg-black";
     }
     return `relative isolate bg-black ${isImmersiveFullscreen ? "flex h-full w-full flex-col overflow-hidden" : ""}`.trim();
   }, [isAppFullscreen, isImmersiveFullscreen]);
@@ -679,6 +676,12 @@ export default function ProtectedPlaybackSurface({
         releaseOrientationLock();
         return;
       }
+      if (shouldUseAppFullscreen()) {
+        setIsAppFullscreen(true);
+        setControlsVisible(true);
+        orientationLockedRef.current = await lockLandscapeOrientation();
+        return;
+      }
       if (canFullscreen(containerElement)) {
         try {
           await requestElementFullscreen(containerElement);
@@ -689,17 +692,9 @@ export default function ProtectedPlaybackSurface({
           // but rejects the request on this device/browser combination.
         }
       }
-      if (hasVideoControls && shouldUseAppFullscreen()) {
-        setIsAppFullscreen(true);
-        setControlsVisible(true);
-        orientationLockedRef.current = await lockLandscapeOrientation();
-        return;
-      }
-      if (hasVideoControls) {
-        setIsAppFullscreen(true);
-        setControlsVisible(true);
-        orientationLockedRef.current = await lockLandscapeOrientation();
-      }
+      setIsAppFullscreen(true);
+      setControlsVisible(true);
+      orientationLockedRef.current = await lockLandscapeOrientation();
     } catch {
       // Best-effort enhancement only. Playback must remain usable if fullscreen fails.
     }

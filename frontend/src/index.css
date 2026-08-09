@@ -103,14 +103,25 @@ textarea {
 
 [data-protected-playback-surface]:fullscreen,
 [data-protected-playback-surface]:-webkit-full-screen {
-  width: 100vw !important;
-  height: 100vh !important;
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100dvw !important;
+  height: 100dvh !important;
   max-width: none !important;
   max-height: none !important;
   min-width: 0 !important;
   min-height: 0 !important;
   aspect-ratio: auto !important;
   background: #000000;
+}
+
+@supports not (height: 100dvh) {
+  [data-protected-playback-surface]:fullscreen,
+  [data-protected-playback-surface]:-webkit-full-screen,
+  [data-protected-playback-surface][data-app-fullscreen="true"] {
+    width: 100vw !important;
+    height: 100vh !important;
+  }
 }
 
 [data-protected-playback-surface]:fullscreen > [data-protected-playback-content="true"],

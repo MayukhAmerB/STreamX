@@ -212,7 +212,8 @@ export default function BroadcastViewerTheater({
                   title={streamTitle}
                   src={resolvedStreamUrl}
                   className="block h-full w-full"
-                  allow="autoplay"
+                  allow="autoplay; fullscreen"
+                  allowFullScreen
                 />
               ) : (
                 <EmptyPanel className="h-full" message={resolvedStreamFallbackMessage} />
