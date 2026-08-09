@@ -6,6 +6,8 @@ const emptyLaunchState = {
   sessionId: null,
   sourceUrl: "",
   url: "",
+  sameOriginLaunchUrl: "",
+  hlsUrl: "",
   expiresAt: 0,
   loading: false,
   error: "",
@@ -36,6 +38,14 @@ export default function useOwncastStreamLaunch({ sessionId, streamUrl, refreshKe
         previous.sessionId === normalizedSessionId && previous.sourceUrl === normalizedStreamUrl
           ? previous.expiresAt
           : 0,
+      sameOriginLaunchUrl:
+        previous.sessionId === normalizedSessionId && previous.sourceUrl === normalizedStreamUrl
+          ? previous.sameOriginLaunchUrl
+          : "",
+      hlsUrl:
+        previous.sessionId === normalizedSessionId && previous.sourceUrl === normalizedStreamUrl
+          ? previous.hlsUrl
+          : "",
       loading: true,
       error: "",
     }));
@@ -45,12 +55,16 @@ export default function useOwncastStreamLaunch({ sessionId, streamUrl, refreshKe
         if (cancelled) return;
         const data = apiData(response, {});
         const launchUrl = String(data?.launch_url || "").trim();
+        const sameOriginLaunchUrl = String(data?.same_origin_launch_url || "").trim();
+        const hlsUrl = String(data?.same_origin_hls_url || "").trim();
         const expiresInSeconds = Math.max(60, Number(data?.expires_in_seconds || 0) || 0);
         if (!launchUrl) {
           setLaunchState({
             sessionId: normalizedSessionId,
             sourceUrl: normalizedStreamUrl,
             url: "",
+            sameOriginLaunchUrl: "",
+            hlsUrl: "",
             expiresAt: 0,
             loading: false,
             error: "Secure video launch URL was not returned.",
@@ -61,6 +75,8 @@ export default function useOwncastStreamLaunch({ sessionId, streamUrl, refreshKe
           sessionId: normalizedSessionId,
           sourceUrl: normalizedStreamUrl,
           url: launchUrl,
+          sameOriginLaunchUrl,
+          hlsUrl,
           expiresAt: Date.now() + expiresInSeconds * 1000,
           loading: false,
           error: "",
@@ -77,6 +93,8 @@ export default function useOwncastStreamLaunch({ sessionId, streamUrl, refreshKe
             sessionId: normalizedSessionId,
             sourceUrl: normalizedStreamUrl,
             url: canKeepCurrentLaunch ? previous.url : "",
+            sameOriginLaunchUrl: canKeepCurrentLaunch ? previous.sameOriginLaunchUrl : "",
+            hlsUrl: canKeepCurrentLaunch ? previous.hlsUrl : "",
             expiresAt: canKeepCurrentLaunch ? previous.expiresAt : 0,
             loading: false,
             error: error?.message || "Unable to prepare secure video launch.",
@@ -120,5 +138,8 @@ export default function useOwncastStreamLaunch({ sessionId, streamUrl, refreshKe
     loading: shouldLaunch ? launchState.loading : false,
     error: shouldLaunch ? launchState.error : "",
     streamUrl: shouldLaunch && launchIsCurrent ? launchState.url : shouldLaunch ? "" : normalizedStreamUrl,
+    sameOriginLaunchUrl:
+      shouldLaunch && launchIsCurrent ? launchState.sameOriginLaunchUrl : "",
+    hlsUrl: shouldLaunch && launchIsCurrent ? launchState.hlsUrl : "",
   };
 }

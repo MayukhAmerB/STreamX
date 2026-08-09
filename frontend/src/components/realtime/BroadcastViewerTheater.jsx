@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import ProtectedPlaybackSurface from "../ProtectedPlaybackSurface";
 import useOwncastChatLaunch from "../../hooks/useOwncastChatLaunch";
 import useOwncastStreamLaunch from "../../hooks/useOwncastStreamLaunch";
+import SecureHlsBroadcastPlayer from "./SecureHlsBroadcastPlayer";
 
 function EmptyPanel({ className, message }) {
   return (
@@ -202,23 +202,17 @@ export default function BroadcastViewerTheater({
       <div className={layoutClassName}>
         <div className="overflow-hidden rounded-2xl border border-black bg-black shadow-[0_14px_34px_rgba(0,0,0,0.24)]">
           {streamUrl && canRenderLiveFrames ? (
-            <ProtectedPlaybackSurface
-              className="aspect-video w-full"
-              watermarkEnabled={Boolean(resolvedStreamUrl)}
-            >
-              {resolvedStreamUrl ? (
-                <iframe
-                  key={`${resolvedStreamUrl}|${streamFrameVersion}`}
-                  title={streamTitle}
-                  src={resolvedStreamUrl}
-                  className="block h-full w-full"
-                  allow="autoplay; fullscreen"
-                  allowFullScreen
-                />
-              ) : (
-                <EmptyPanel className="h-full" message={resolvedStreamFallbackMessage} />
-              )}
-            </ProtectedPlaybackSurface>
+            resolvedStreamUrl ? (
+              <SecureHlsBroadcastPlayer
+                bootstrapUrl={secureStream.sameOriginLaunchUrl}
+                hlsUrl={secureStream.hlsUrl}
+                fallbackEmbedUrl={resolvedStreamUrl}
+                refreshKey={streamFrameVersion}
+                title={streamTitle}
+              />
+            ) : (
+              <EmptyPanel className="aspect-video w-full" message={resolvedStreamFallbackMessage} />
+            )
           ) : (
             <EmptyPanel
               className="aspect-video w-full"

@@ -4915,6 +4915,20 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(signed_payload["next_path"], "/embed/video/")
         self.assertNotIn("client_ip", signed_payload)
         self.assertEqual(response.data["data"]["stream_embed_url"], "https://stream.example.com/embed/video")
+        same_origin_launch_url = urlparse(response.data["data"]["same_origin_launch_url"])
+        self.assertEqual(same_origin_launch_url.netloc, "")
+        self.assertEqual(same_origin_launch_url.path, "/api/realtime/owncast/stream-bridge/")
+        same_origin_token = parse_qs(same_origin_launch_url.query)["token"][0]
+        same_origin_payload = signing.loads(
+            same_origin_token,
+            max_age=9000,
+            salt="realtime.owncast-stream-bridge",
+        )
+        self.assertEqual(same_origin_payload["next_path"], "/live-stream-ready/")
+        self.assertEqual(
+            response.data["data"]["same_origin_hls_url"],
+            "/hls/stream.m3u8",
+        )
 
     def test_owncast_stream_bridge_sets_access_cookie_and_redirects(self):
         session = RealtimeSession.objects.create(

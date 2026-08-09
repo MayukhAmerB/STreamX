@@ -187,6 +187,26 @@ def _build_owncast_stream_launch_url(*, session, user, request, stream_embed_url
     return f"{stream_origin}/api/realtime/owncast/stream-bridge/?token={quote(bridge_payload, safe='')}"
 
 
+def _build_same_origin_owncast_stream_urls(*, session, user, request):
+    bridge_payload = signing.dumps(
+        {
+            "session_id": int(session.id),
+            "user_id": int(user.id),
+            "next_path": "/live-stream-ready/",
+            "user_agent_hash": _request_user_agent_hash(request),
+        },
+        salt=_OWNCAST_STREAM_BRIDGE_SIGNING_SALT,
+        compress=True,
+    )
+    return {
+        "launch_url": (
+            "/api/realtime/owncast/stream-bridge/"
+            f"?token={quote(bridge_payload, safe='')}"
+        ),
+        "hls_url": "/hls/stream.m3u8",
+    }
+
+
 def _resolve_owncast_display_name(user):
     full_name = str(getattr(user, "full_name", "") or "").strip()
     if full_name:
@@ -1009,12 +1029,20 @@ class RealtimeSessionOwncastStreamLaunchView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
+        same_origin_urls = _build_same_origin_owncast_stream_urls(
+            session=session,
+            user=request.user,
+            request=request,
+        )
+
         return api_response(
             success=True,
             message="Owncast stream launch URL prepared.",
             data={
                 "launch_url": launch_url,
                 "stream_embed_url": stream_embed_url,
+                "same_origin_launch_url": same_origin_urls["launch_url"],
+                "same_origin_hls_url": same_origin_urls["hls_url"],
                 "expires_in_seconds": _owncast_stream_access_ttl_seconds(),
             },
         )

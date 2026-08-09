@@ -10,9 +10,12 @@ import { apiData, apiMessage } from "../utils/api";
 import { formatINR } from "../utils/currency";
 import {
   findJoinableLiveSession,
-  isJoinableLiveSession,
   resolveLiveClassSchedule,
 } from "../utils/liveClassSchedule";
+import {
+  reconcileActiveLivePayload,
+  retainRealtimeSessionsOnRefresh,
+} from "../utils/realtimeSessionResilience";
 
 const pageBackgroundImage =
   "https://i.pinimg.com/1200x/54/57/f0/5457f05bea206d3aeccf6749065d453b.jpg";
@@ -207,9 +210,10 @@ export default function LiveClassesPage() {
         const response = await listRealtimeSessions({ status: "all" });
         if (!active) return;
         const rows = apiData(response, []);
-        setRealtimeSessions(Array.isArray(rows) ? rows.filter((item) => item.status !== "ended") : []);
+        setRealtimeSessions((previous) => retainRealtimeSessionsOnRefresh(rows, previous));
       } catch {
-        if (active) setRealtimeSessions([]);
+        // Keep the last successful state. A temporary API failure must not
+        // unmount an active broadcast and send viewers back to Join Now.
       }
     };
     loadRealtimeSessions();
@@ -241,16 +245,10 @@ export default function LiveClassesPage() {
     : "/join-live";
 
   useEffect(() => {
-    const latestActiveSession = scopedRealtimeSessions.find(
-      (session) => session.id === activeLivePayload?.session?.id
+    setActiveLivePayload((previous) =>
+      reconcileActiveLivePayload(previous, scopedRealtimeSessions)
     );
-    if (
-      activeLivePayload &&
-      (!latestActiveSession || !isJoinableLiveSession(latestActiveSession))
-    ) {
-      setActiveLivePayload(null);
-    }
-  }, [activeLivePayload, scopedRealtimeSessions]);
+  }, [scopedRealtimeSessions]);
 
   const orderedTracks = useMemo(() => {
     return [...tracks].sort((a, b) => {
