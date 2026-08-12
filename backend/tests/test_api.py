@@ -1284,6 +1284,40 @@ class PaginationTests(APITestCase):
 
 
 class PermissionTests(BaseAPITestCase):
+    def test_anonymous_users_can_read_published_courses_but_cannot_mutate_them(self):
+        list_response = self.client.get(reverse("course-list-create"))
+        detail_response = self.client.get(
+            reverse("course-detail", kwargs={"pk": self.course.id})
+        )
+
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(detail_response.status_code, 200)
+
+        create_response = self.client.post(
+            reverse("course-list-create"),
+            {
+                "title": "Anonymous Course",
+                "description": "Must not be created",
+                "price": "100.00",
+                "is_published": False,
+            },
+            format="json",
+        )
+        update_response = self.client.patch(
+            reverse("course-detail", kwargs={"pk": self.course.id}),
+            {"title": "Anonymous Update"},
+            format="json",
+        )
+        delete_response = self.client.delete(
+            reverse("course-detail", kwargs={"pk": self.course.id})
+        )
+
+        self.assertIn(create_response.status_code, {401, 403})
+        self.assertIn(update_response.status_code, {401, 403})
+        self.assertIn(delete_response.status_code, {401, 403})
+        self.course.refresh_from_db()
+        self.assertEqual(self.course.title, "Test Course")
+
     def test_student_cannot_create_course_but_instructor_can(self):
         self.login(self.student.email)
         student_resp = self.client.post(

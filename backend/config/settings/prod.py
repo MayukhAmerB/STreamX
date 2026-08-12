@@ -23,6 +23,14 @@ ENFORCE_PRODUCTION_REQUIREMENTS = env_bool("ENFORCE_PRODUCTION_REQUIREMENTS", Tr
 ALLOW_SQLITE_IN_PRODUCTION = env_bool("ALLOW_SQLITE_IN_PRODUCTION", False)
 ALLOW_INSECURE_HTTP_ORIGINS = env_bool("ALLOW_INSECURE_HTTP_ORIGINS", False)
 
+# Never expose Django REST Framework's interactive developer UI publicly.
+REST_FRAMEWORK = {
+    **REST_FRAMEWORK,
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ],
+}
+
 
 def _is_placeholder_secret(value):
     return str(value or "").strip() in {"", "change-me", "dev-only-secret-key"}

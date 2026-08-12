@@ -1,4 +1,4 @@
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 from .access import user_has_course_access
 
@@ -8,6 +8,21 @@ class IsInstructor(BasePermission):
 
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_authenticated and request.user.role == "instructor")
+
+
+class PublicReadInstructorWrite(BasePermission):
+    """Allow catalog reads publicly while protecting every mutation."""
+
+    message = "Instructor role required."
+
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return True
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.role == "instructor"
+        )
 
 
 class IsCourseInstructor(BasePermission):

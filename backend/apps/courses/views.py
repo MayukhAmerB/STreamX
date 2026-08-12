@@ -39,7 +39,12 @@ from .models import (
     PublicEnrollmentLead,
     Section,
 )
-from .permissions import IsCourseInstructor, IsEnrolledInCourse, IsInstructor
+from .permissions import (
+    IsCourseInstructor,
+    IsEnrolledInCourse,
+    IsInstructor,
+    PublicReadInstructorWrite,
+)
 from .serializers import (
     CourseEnrollSerializer,
     CourseDetailSerializer,
@@ -215,7 +220,7 @@ def _build_course_enrollment_status_map(*, courses, user):
 
 
 class CourseListCreateView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [PublicReadInstructorWrite]
 
     def get(self, request):
         disallowed_query_params = find_disallowed_query_params(
@@ -354,7 +359,7 @@ class CourseThumbnailView(APIView):
 
 
 class CourseDetailView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [PublicReadInstructorWrite]
 
     @staticmethod
     def _build_public_cache_key(course_id, updated_at):
