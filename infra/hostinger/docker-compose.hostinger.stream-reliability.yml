@@ -1,0 +1,6 @@
+services:
+  owncast:
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535

@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { createRealtimeOwncastChatLaunch } from "../api/realtime";
 import { apiData, apiMessage } from "../utils/api";
 
+const CHAT_REFRESH_SAFETY_MS = 120_000;
+const CHAT_RETRY_MS = 10_000;
+
 const emptyLaunchState = {
   sessionId: null,
   sourceUrl: "",
@@ -68,13 +71,23 @@ export default function useOwncastChatLaunch({ sessionId, chatUrl, refreshKey = 
       })
       .catch((error) => {
         if (cancelled) return;
-        setLaunchState({
-          sessionId: normalizedSessionId,
-          sourceUrl: normalizedChatUrl,
-          url: "",
-          expiresAt: 0,
-          loading: false,
-          error: apiMessage(error, "Unable to prepare secure chat."),
+        setLaunchState((previous) => {
+          const isCurrentSession =
+            previous.sessionId === normalizedSessionId &&
+            previous.sourceUrl === normalizedChatUrl;
+          const hasUsableLaunch =
+            isCurrentSession &&
+            previous.url &&
+            previous.expiresAt > Date.now() + 5000;
+
+          return {
+            sessionId: normalizedSessionId,
+            sourceUrl: normalizedChatUrl,
+            url: hasUsableLaunch ? previous.url : "",
+            expiresAt: hasUsableLaunch ? previous.expiresAt : 0,
+            loading: false,
+            error: apiMessage(error, "Unable to refresh secure chat. Reconnecting..."),
+          };
         });
       });
 
@@ -87,12 +100,23 @@ export default function useOwncastChatLaunch({ sessionId, chatUrl, refreshKey = 
     if (!shouldLaunch || !launchState.url || !launchState.expiresAt) {
       return undefined;
     }
-    const refreshDelay = Math.max(30_000, launchState.expiresAt - Date.now() - 30_000);
+    const refreshDelay = Math.max(
+      30_000,
+      launchState.expiresAt - Date.now() - CHAT_REFRESH_SAFETY_MS
+    );
     const timeoutId = window.setTimeout(() => {
       setAutoRefreshKey((previous) => previous + 1);
     }, refreshDelay);
     return () => window.clearTimeout(timeoutId);
   }, [launchState.expiresAt, launchState.url, shouldLaunch]);
+
+  useEffect(() => {
+    if (!shouldLaunch || !launchState.error) return undefined;
+    const timeoutId = window.setTimeout(() => {
+      setAutoRefreshKey((previous) => previous + 1);
+    }, CHAT_RETRY_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [launchState.error, shouldLaunch]);
 
   const launchIsCurrent =
     launchState.sessionId === normalizedSessionId &&

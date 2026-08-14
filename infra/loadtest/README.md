@@ -1,10 +1,14 @@
-# Realtime Join Load Testing
+# Realtime Join And Playback Load Testing
 
 This folder contains phased load tests for realtime joins at:
 
 - 50 concurrent joiners
 - 100 concurrent joiners
 - 200 concurrent joiners
+
+It also contains a protected HLS playback soak test. A join-only test proves
+API admission capacity; it does not prove that viewers continuously receive
+playlists and media segments.
 
 ## Prerequisites
 
@@ -49,7 +53,7 @@ DURATION="1m" \
 k6 run infra/loadtest/realtime-join.js
 ```
 
-## Run a realistic long-session viewer test
+## Run a join-only long-session test
 
 This simulates viewers joining once and then staying connected for the rest of the test window instead of rejoining every second.
 
@@ -64,6 +68,31 @@ VUS=150 \
 DURATION="10m" \
 k6 run infra/loadtest/realtime-join.js
 ```
+
+## Prove 100-viewer protected playback
+
+Run this only while OBS is publishing an active Owncast broadcast. It obtains
+the same signed cookie as the browser, repeatedly loads the protected HLS
+playlist, and downloads newly published media segments for every virtual user.
+
+```bash
+cd /opt/alsyed/StreamX
+
+API_BASE_URL="https://api.alsyedinitiative.com" \
+WEB_BASE_URL="https://alsyedinitiative.com" \
+SESSION_ID="88" \
+AUTH_TOKENS_FILE="/opt/alsyed/StreamX/infra/loadtest/viewer-tokens.txt" \
+VUS=100 \
+DURATION="30m" \
+POLL_SECONDS=3 \
+SEGMENTS_PER_POLL=3 \
+k6 run infra/loadtest/realtime-playback.js
+```
+
+For release acceptance, repeat for 60-90 minutes using real authorized test
+accounts. The test must maintain more than 99% successful checks and less than
+1% playback failures without Owncast restarts, OOM events, or sustained 5xx
+responses.
 
 ## Run a burst-plus-spread reconnect test
 
@@ -102,3 +131,7 @@ k6 run infra/loadtest/realtime-join.js
 - Join failures by reason (`streamx_realtime_join_total{result="failure"}`)
 - CPU/memory on app, livekit, egress, transcoder
 - Recording failures (`streamx_realtime_recording_operations_total{result="failure"}`)
+- Nginx `X-Owncast-Segment-Cache` should transition from `MISS` to mostly `HIT`
+- Owncast container restarts and OOM state must remain zero/false
+- HLS manifest and segment 401/403/5xx responses
+- Wi-Fi and mobile-data browser viewers must remain playing for the full soak

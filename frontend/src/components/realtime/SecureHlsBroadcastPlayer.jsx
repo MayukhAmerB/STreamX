@@ -2,8 +2,20 @@ import Hls from "hls.js";
 import { useEffect, useRef, useState } from "react";
 import ProtectedPlaybackSurface from "../ProtectedPlaybackSurface";
 
-const NETWORK_RETRY_LIMIT = 12;
-const NETWORK_RETRY_BASE_MS = 750;
+const RETRY_BASE_MS = 750;
+const RETRY_MAX_MS = 10_000;
+const PLAYBACK_WATCHDOG_INTERVAL_MS = 5_000;
+const PLAYBACK_FREEZE_THRESHOLD_MS = 20_000;
+
+const exponentialDelay = (attempt) =>
+  Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** Math.min(attempt, 4));
+
+const retryPolicy = (maxNumRetry) => ({
+  maxNumRetry,
+  retryDelayMs: 500,
+  maxRetryDelayMs: 8_000,
+  backoff: "exponential",
+});
 
 function PlayerMessage({ children }) {
   return (
@@ -21,25 +33,31 @@ export default function SecureHlsBroadcastPlayer({
   title = "Broadcast Stream",
 }) {
   const videoRef = useRef(null);
-  const retryTimerRef = useRef(null);
+  const playerRetryTimerRef = useRef(null);
+  const recoveryAttemptRef = useRef(0);
   const [bootstrapReady, setBootstrapReady] = useState(false);
   const [bootstrapError, setBootstrapError] = useState("");
-  const [useEmbedFallback, setUseEmbedFallback] = useState(false);
+  const [playerGeneration, setPlayerGeneration] = useState(0);
+  const [unsupportedBrowser, setUnsupportedBrowser] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    let bootstrapRetryTimer = null;
+
     setBootstrapReady(false);
     setBootstrapError("");
-    setUseEmbedFallback(false);
+    setUnsupportedBrowser(false);
+    setPlayerGeneration(0);
+    recoveryAttemptRef.current = 0;
 
     if (!bootstrapUrl || !hlsUrl) {
-      setUseEmbedFallback(Boolean(fallbackEmbedUrl));
+      setBootstrapError("Secure stream details are unavailable.");
       return () => {
         cancelled = true;
       };
     }
 
-    const preparePlayback = async () => {
+    const preparePlayback = async (attempt = 0) => {
       try {
         const response = await fetch(bootstrapUrl, {
           method: "GET",
@@ -50,63 +68,169 @@ export default function SecureHlsBroadcastPlayer({
         if (!response.ok) {
           throw new Error(`Secure stream bootstrap failed (${response.status}).`);
         }
-        if (!cancelled) setBootstrapReady(true);
+        if (cancelled) return;
+        setBootstrapError("");
+        setBootstrapReady(true);
       } catch (error) {
         if (cancelled) return;
-        setBootstrapError(error?.message || "Secure stream bootstrap failed.");
-        setUseEmbedFallback(Boolean(fallbackEmbedUrl));
+        setBootstrapReady(false);
+        setBootstrapError(
+          `${error?.message || "Secure stream bootstrap failed."} Reconnecting...`
+        );
+        bootstrapRetryTimer = window.setTimeout(
+          () => void preparePlayback(attempt + 1),
+          exponentialDelay(attempt)
+        );
       }
     };
 
     void preparePlayback();
     return () => {
       cancelled = true;
+      if (bootstrapRetryTimer) window.clearTimeout(bootstrapRetryTimer);
     };
-  }, [bootstrapUrl, fallbackEmbedUrl, hlsUrl, refreshKey]);
+  }, [bootstrapUrl, hlsUrl, refreshKey]);
 
   useEffect(() => {
-    if (!bootstrapReady || useEmbedFallback || !hlsUrl) return undefined;
+    if (!bootstrapReady || unsupportedBrowser || !hlsUrl) return undefined;
 
     const video = videoRef.current;
     if (!video) return undefined;
 
     let hls = null;
     let disposed = false;
-    let networkRetries = 0;
+    let mediaRecoveryAttempted = false;
+    let stalledTimer = null;
+    let lastPlaybackTime = video.currentTime || 0;
+    let lastPlaybackProgressAt = Date.now();
 
-    const clearRetryTimer = () => {
-      if (retryTimerRef.current) {
-        window.clearTimeout(retryTimerRef.current);
-        retryTimerRef.current = null;
+    const clearPlayerRetryTimer = () => {
+      if (playerRetryTimerRef.current) {
+        window.clearTimeout(playerRetryTimerRef.current);
+        playerRetryTimerRef.current = null;
       }
     };
 
-    const scheduleNetworkRecovery = () => {
-      if (disposed || !hls) return;
-      clearRetryTimer();
-      const retryDelay = Math.min(
-        8000,
-        NETWORK_RETRY_BASE_MS * 2 ** Math.min(networkRetries, 4)
-      );
-      networkRetries += 1;
-      retryTimerRef.current = window.setTimeout(() => {
-        retryTimerRef.current = null;
-        if (!disposed && hls) hls.startLoad(-1);
-      }, retryDelay);
+    const markPlaybackHealthy = () => {
+      recoveryAttemptRef.current = 0;
+      mediaRecoveryAttempted = false;
+      clearPlayerRetryTimer();
     };
+
+    const schedulePlayerRecovery = ({ immediate = false } = {}) => {
+      if (disposed || playerRetryTimerRef.current) return;
+      const attempt = recoveryAttemptRef.current;
+      recoveryAttemptRef.current += 1;
+      playerRetryTimerRef.current = window.setTimeout(
+        () => {
+          playerRetryTimerRef.current = null;
+          if (!disposed) setPlayerGeneration((current) => current + 1);
+        },
+        immediate ? 0 : exponentialDelay(attempt)
+      );
+    };
+
+    const handleOnline = () => schedulePlayerRecovery({ immediate: true });
+    const handleVisible = () => {
+      if (document.visibilityState === "visible" && video.readyState < 2) {
+        schedulePlayerRecovery({ immediate: true });
+      }
+    };
+    const handleStalled = () => {
+      if (stalledTimer) window.clearTimeout(stalledTimer);
+      stalledTimer = window.setTimeout(() => {
+        stalledTimer = null;
+        if (!disposed && video.readyState < 3) schedulePlayerRecovery();
+      }, 6_000);
+    };
+    const handlePlaying = () => {
+      if (stalledTimer) {
+        window.clearTimeout(stalledTimer);
+        stalledTimer = null;
+      }
+      lastPlaybackTime = video.currentTime || 0;
+      lastPlaybackProgressAt = Date.now();
+      markPlaybackHealthy();
+    };
+    const handleTimeUpdate = () => {
+      const currentTime = video.currentTime || 0;
+      if (currentTime <= lastPlaybackTime + 0.1) return;
+      lastPlaybackTime = currentTime;
+      lastPlaybackProgressAt = Date.now();
+      markPlaybackHealthy();
+    };
+    const handleVideoError = () => schedulePlayerRecovery();
+    const playbackWatchdog = window.setInterval(() => {
+      if (
+        disposed ||
+        video.paused ||
+        video.ended ||
+        !navigator.onLine ||
+        document.visibilityState !== "visible"
+      ) {
+        lastPlaybackTime = video.currentTime || 0;
+        lastPlaybackProgressAt = Date.now();
+        return;
+      }
+
+      const currentTime = video.currentTime || 0;
+      if (currentTime > lastPlaybackTime + 0.1) {
+        lastPlaybackTime = currentTime;
+        lastPlaybackProgressAt = Date.now();
+        return;
+      }
+
+      if (Date.now() - lastPlaybackProgressAt >= PLAYBACK_FREEZE_THRESHOLD_MS) {
+        lastPlaybackProgressAt = Date.now();
+        schedulePlayerRecovery({ immediate: true });
+      }
+    }, PLAYBACK_WATCHDOG_INTERVAL_MS);
+
+    window.addEventListener("online", handleOnline);
+    document.addEventListener("visibilitychange", handleVisible);
+    video.addEventListener("playing", handlePlaying);
+    video.addEventListener("stalled", handleStalled);
+    video.addEventListener("waiting", handleStalled);
+    video.addEventListener("timeupdate", handleTimeUpdate);
+    video.addEventListener("error", handleVideoError);
 
     if (Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: true,
-        backBufferLength: 30,
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 10,
-        maxBufferLength: 30,
-        manifestLoadingMaxRetry: 8,
-        manifestLoadingRetryDelay: 750,
-        levelLoadingMaxRetry: 8,
-        fragLoadingMaxRetry: 8,
+        lowLatencyMode: false,
+        backBufferLength: 60,
+        liveSyncDurationCount: 5,
+        liveMaxLatencyDurationCount: 15,
+        liveSyncOnStallIncrease: 2,
+        maxBufferLength: 45,
+        maxMaxBufferLength: 90,
+        maxLiveSyncPlaybackRate: 1.05,
+        capLevelToPlayerSize: true,
+        capLevelOnFPSDrop: true,
+        manifestLoadPolicy: {
+          default: {
+            maxTimeToFirstByteMs: 10_000,
+            maxLoadTimeMs: 30_000,
+            timeoutRetry: retryPolicy(4),
+            errorRetry: retryPolicy(8),
+          },
+        },
+        playlistLoadPolicy: {
+          default: {
+            maxTimeToFirstByteMs: 10_000,
+            maxLoadTimeMs: 30_000,
+            timeoutRetry: retryPolicy(4),
+            errorRetry: retryPolicy(8),
+          },
+        },
+        fragLoadPolicy: {
+          default: {
+            maxTimeToFirstByteMs: 15_000,
+            maxLoadTimeMs: 120_000,
+            timeoutRetry: retryPolicy(4),
+            errorRetry: retryPolicy(10),
+          },
+        },
         xhrSetup: (xhr) => {
           xhr.withCredentials = true;
         },
@@ -114,46 +238,45 @@ export default function SecureHlsBroadcastPlayer({
       hls.attachMedia(video);
       hls.on(Hls.Events.MEDIA_ATTACHED, () => hls?.loadSource(hlsUrl));
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        networkRetries = 0;
+        markPlaybackHealthy();
         void video.play().catch(() => {});
-      });
-      hls.on(Hls.Events.FRAG_LOADED, () => {
-        networkRetries = 0;
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data?.fatal || disposed) return;
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-          if (networkRetries < NETWORK_RETRY_LIMIT) {
-            scheduleNetworkRecovery();
-          } else {
-            networkRetries = 0;
-            scheduleNetworkRecovery();
-          }
-          return;
-        }
-        if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR && !mediaRecoveryAttempted) {
+          mediaRecoveryAttempted = true;
           hls?.recoverMediaError();
           return;
         }
-        setUseEmbedFallback(Boolean(fallbackEmbedUrl));
+        schedulePlayerRecovery();
       });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = hlsUrl;
+      video.load();
       void video.play().catch(() => {});
     } else {
-      setUseEmbedFallback(Boolean(fallbackEmbedUrl));
+      setUnsupportedBrowser(true);
     }
 
     return () => {
       disposed = true;
-      clearRetryTimer();
+      clearPlayerRetryTimer();
+      window.clearInterval(playbackWatchdog);
+      if (stalledTimer) window.clearTimeout(stalledTimer);
+      window.removeEventListener("online", handleOnline);
+      document.removeEventListener("visibilitychange", handleVisible);
+      video.removeEventListener("playing", handlePlaying);
+      video.removeEventListener("stalled", handleStalled);
+      video.removeEventListener("waiting", handleStalled);
+      video.removeEventListener("timeupdate", handleTimeUpdate);
+      video.removeEventListener("error", handleVideoError);
       hls?.destroy();
       video.removeAttribute("src");
       video.load();
     };
-  }, [bootstrapReady, fallbackEmbedUrl, hlsUrl, refreshKey, useEmbedFallback]);
+  }, [bootstrapReady, hlsUrl, playerGeneration, refreshKey, unsupportedBrowser]);
 
-  if (useEmbedFallback && fallbackEmbedUrl) {
+  if (unsupportedBrowser && fallbackEmbedUrl) {
     return (
       <ProtectedPlaybackSurface className="aspect-video w-full" watermarkEnabled>
         <iframe
