@@ -248,10 +248,11 @@ export default function ProtectedPlaybackSurface({
   }
 
   useEffect(() => {
-    const videoElement = videoRef?.current;
-    if (!videoElement) return undefined;
+    let videoElement = null;
 
     const syncVideoState = () => {
+      if (!videoElement) return;
+
       const nextDuration = Number.isFinite(videoElement.duration) ? videoElement.duration : 0;
       const nextTime = Number.isFinite(videoElement.currentTime) ? videoElement.currentTime : 0;
       setVideoDuration(nextDuration);
@@ -267,7 +268,9 @@ export default function ProtectedPlaybackSurface({
       "durationchange",
       "timeupdate",
       "play",
+      "playing",
       "pause",
+      "canplay",
       "seeking",
       "seeked",
       "ended",
@@ -276,14 +279,41 @@ export default function ProtectedPlaybackSurface({
       "ratechange",
     ];
 
-    events.forEach((eventName) => {
-      videoElement.addEventListener(eventName, syncVideoState);
-    });
+    const unbindVideoElement = () => {
+      if (!videoElement) return;
 
-    return () => {
       events.forEach((eventName) => {
         videoElement.removeEventListener(eventName, syncVideoState);
       });
+      videoElement = null;
+    };
+
+    const bindVideoElement = () => {
+      const nextVideoElement = videoRef?.current;
+      if (!nextVideoElement || nextVideoElement === videoElement) return;
+
+      unbindVideoElement();
+      videoElement = nextVideoElement;
+      events.forEach((eventName) => {
+        videoElement.addEventListener(eventName, syncVideoState);
+      });
+      syncVideoState();
+    };
+
+    bindVideoElement();
+
+    // Signed HLS preparation renders the video after this surface mounts.
+    // Observe that delayed insertion so playback state never stays at its
+    // initial paused value after the stream has already started.
+    const observer =
+      typeof MutationObserver !== "undefined" && containerRef.current
+        ? new MutationObserver(bindVideoElement)
+        : null;
+    observer?.observe(containerRef.current, { childList: true, subtree: true });
+
+    return () => {
+      observer?.disconnect();
+      unbindVideoElement();
     };
   }, [videoRef, videoSessionKey]);
 
