@@ -204,6 +204,7 @@ export default function BroadcastViewerTheater({
           {streamUrl && canRenderLiveFrames ? (
             resolvedStreamUrl ? (
               <SecureHlsBroadcastPlayer
+                sessionId={sessionId}
                 bootstrapUrl={secureStream.sameOriginLaunchUrl}
                 hlsUrl={secureStream.hlsUrl}
                 fallbackEmbedUrl={resolvedStreamUrl}

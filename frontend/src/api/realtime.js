@@ -9,6 +9,8 @@ export const createRealtimeSession = (payload) => apiClient.post("/realtime/sess
 export const joinRealtimeSession = (id, payload = {}) => apiClient.post(`/realtime/sessions/${id}/join/`, payload);
 export const createRealtimeOwncastStreamLaunch = (id) =>
   apiClient.post(`/realtime/sessions/${id}/broadcast-stream/launch/`);
+export const reportRealtimeBroadcastPlaybackIssue = (id, payload) =>
+  apiClient.post(`/realtime/sessions/${id}/broadcast-playback/issues/`, payload);
 export const createRealtimeOwncastChatLaunch = (id) =>
   apiClient.post(`/realtime/sessions/${id}/broadcast-chat/launch/`);
 export const getRealtimeOwncastChatModeration = (id) =>

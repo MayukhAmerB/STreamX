@@ -1,11 +1,13 @@
 import Hls from "hls.js";
 import { useEffect, useRef, useState } from "react";
+import { reportRealtimeBroadcastPlaybackIssue } from "../../api/realtime";
 import ProtectedPlaybackSurface from "../ProtectedPlaybackSurface";
 
 const RETRY_BASE_MS = 750;
 const RETRY_MAX_MS = 10_000;
 const PLAYBACK_WATCHDOG_INTERVAL_MS = 5_000;
 const PLAYBACK_FREEZE_THRESHOLD_MS = 20_000;
+const PLAYBACK_REPORT_DEDUP_MS = 30_000;
 
 const exponentialDelay = (attempt) =>
   Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** Math.min(attempt, 4));
@@ -17,15 +19,89 @@ const retryPolicy = (maxNumRetry) => ({
   backoff: "exponential",
 });
 
-function PlayerMessage({ children }) {
+function PlayerMessage({ children, onRetry = null }) {
   return (
-    <div className="flex h-full items-center justify-center px-6 text-center text-sm text-[#BBBBBB]">
-      {children}
+    <div className="relative z-10 flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-sm text-[#BBBBBB]">
+      <span>{children}</span>
+      {typeof onRetry === "function" ? (
+        <button
+          type="button"
+          data-playback-gesture-ignore="true"
+          onClick={onRetry}
+          className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
+        >
+          Retry now
+        </button>
+      ) : null}
     </div>
   );
 }
 
+function getPlaybackIssue({ errorType = "", httpStatus = 0, offline = false } = {}) {
+  const normalizedErrorType = String(errorType || "").trim();
+  const normalizedStatus = Number(httpStatus || 0) || 0;
+
+  if (offline) {
+    return {
+      reason: "network",
+      hlsErrorType: normalizedErrorType,
+      httpStatus: normalizedStatus,
+      message: "Connection error: your internet connection was lost. Reconnecting when it returns...",
+    };
+  }
+  if (normalizedStatus === 401 || normalizedStatus === 403) {
+    return {
+      reason: "authorization",
+      hlsErrorType: normalizedErrorType,
+      httpStatus: normalizedStatus,
+      message: "Connection error: your secure viewing session was interrupted. Reconnecting automatically...",
+    };
+  }
+  if (normalizedStatus >= 500) {
+    return {
+      reason: "upstream",
+      hlsErrorType: normalizedErrorType,
+      httpStatus: normalizedStatus,
+      message: "Connection error: the streaming service is temporarily unavailable. Reconnecting automatically...",
+    };
+  }
+  if (normalizedErrorType === Hls.ErrorTypes.MEDIA_ERROR) {
+    return {
+      reason: "media",
+      hlsErrorType: normalizedErrorType,
+      httpStatus: normalizedStatus,
+      message: "Connection error: video playback was interrupted. Reconnecting automatically...",
+    };
+  }
+  return {
+    reason: "network",
+    hlsErrorType: normalizedErrorType,
+    httpStatus: normalizedStatus,
+    message: "Connection error: the video connection was interrupted. Checking the connection and reconnecting...",
+  };
+}
+
+function reportPlaybackIssue({ sessionId, issue, retryAttempt, lastReportedIssueRef }) {
+  if (!sessionId || !issue?.reason) return;
+  const key = `${issue.reason}:${issue.hlsErrorType}:${issue.httpStatus || 0}`;
+  const now = Date.now();
+  if (
+    lastReportedIssueRef.current.key === key &&
+    now - lastReportedIssueRef.current.reportedAt < PLAYBACK_REPORT_DEDUP_MS
+  ) {
+    return;
+  }
+  lastReportedIssueRef.current = { key, reportedAt: now };
+  void reportRealtimeBroadcastPlaybackIssue(sessionId, {
+    reason: issue.reason,
+    hls_error_type: issue.hlsErrorType,
+    http_status: issue.httpStatus || 0,
+    retry_attempt: retryAttempt,
+  }).catch(() => {});
+}
+
 export default function SecureHlsBroadcastPlayer({
+  sessionId = null,
   bootstrapUrl = "",
   hlsUrl = "",
   fallbackEmbedUrl = "",
@@ -35,10 +111,18 @@ export default function SecureHlsBroadcastPlayer({
   const videoRef = useRef(null);
   const playerRetryTimerRef = useRef(null);
   const recoveryAttemptRef = useRef(0);
+  const lastReportedIssueRef = useRef({ key: "", reportedAt: 0 });
   const [bootstrapReady, setBootstrapReady] = useState(false);
   const [bootstrapError, setBootstrapError] = useState("");
+  const [connectionIssue, setConnectionIssue] = useState(null);
+  const [bootstrapGeneration, setBootstrapGeneration] = useState(0);
   const [playerGeneration, setPlayerGeneration] = useState(0);
   const [unsupportedBrowser, setUnsupportedBrowser] = useState(false);
+
+  const retryNow = () => {
+    setConnectionIssue({ message: "Retrying the secure video connection..." });
+    setBootstrapGeneration((current) => current + 1);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -66,7 +150,9 @@ export default function SecureHlsBroadcastPlayer({
           redirect: "follow",
         });
         if (!response.ok) {
-          throw new Error(`Secure stream bootstrap failed (${response.status}).`);
+          const error = new Error(`Secure stream bootstrap failed (${response.status}).`);
+          error.httpStatus = response.status;
+          throw error;
         }
         if (cancelled) return;
         setBootstrapError("");
@@ -74,9 +160,18 @@ export default function SecureHlsBroadcastPlayer({
       } catch (error) {
         if (cancelled) return;
         setBootstrapReady(false);
-        setBootstrapError(
-          `${error?.message || "Secure stream bootstrap failed."} Reconnecting...`
-        );
+        const issue = getPlaybackIssue({
+          httpStatus: error?.httpStatus,
+          offline: typeof navigator !== "undefined" && navigator.onLine === false,
+        });
+        setConnectionIssue(issue);
+        setBootstrapError(issue.message);
+        reportPlaybackIssue({
+          sessionId,
+          issue,
+          retryAttempt: attempt,
+          lastReportedIssueRef,
+        });
         bootstrapRetryTimer = window.setTimeout(
           () => void preparePlayback(attempt + 1),
           exponentialDelay(attempt)
@@ -89,7 +184,7 @@ export default function SecureHlsBroadcastPlayer({
       cancelled = true;
       if (bootstrapRetryTimer) window.clearTimeout(bootstrapRetryTimer);
     };
-  }, [bootstrapUrl, hlsUrl, refreshKey]);
+  }, [bootstrapGeneration, bootstrapUrl, hlsUrl, refreshKey, sessionId]);
 
   useEffect(() => {
     if (!bootstrapReady || unsupportedBrowser || !hlsUrl) return undefined;
@@ -115,22 +210,50 @@ export default function SecureHlsBroadcastPlayer({
       recoveryAttemptRef.current = 0;
       mediaRecoveryAttempted = false;
       clearPlayerRetryTimer();
+      setConnectionIssue(null);
     };
 
-    const schedulePlayerRecovery = ({ immediate = false } = {}) => {
+    const schedulePlayerRecovery = ({ immediate = false, issue = null, renewAccess = false } = {}) => {
       if (disposed || playerRetryTimerRef.current) return;
+      if (issue) {
+        setConnectionIssue(issue);
+        reportPlaybackIssue({
+          sessionId,
+          issue,
+          retryAttempt: recoveryAttemptRef.current,
+          lastReportedIssueRef,
+        });
+      }
       const attempt = recoveryAttemptRef.current;
       recoveryAttemptRef.current += 1;
       playerRetryTimerRef.current = window.setTimeout(
         () => {
           playerRetryTimerRef.current = null;
-          if (!disposed) setPlayerGeneration((current) => current + 1);
+          if (disposed) return;
+          if (renewAccess) {
+            setBootstrapGeneration((current) => current + 1);
+          } else {
+            setPlayerGeneration((current) => current + 1);
+          }
         },
         immediate ? 0 : exponentialDelay(attempt)
       );
     };
 
-    const handleOnline = () => schedulePlayerRecovery({ immediate: true });
+    const handleOnline = () => {
+      setConnectionIssue({ message: "Connection restored. Reconnecting the live video..." });
+      schedulePlayerRecovery({ immediate: true, renewAccess: true });
+    };
+    const handleOffline = () => {
+      const issue = getPlaybackIssue({ offline: true });
+      setConnectionIssue(issue);
+      reportPlaybackIssue({
+        sessionId,
+        issue,
+        retryAttempt: recoveryAttemptRef.current,
+        lastReportedIssueRef,
+      });
+    };
     const handleVisible = () => {
       if (document.visibilityState === "visible" && video.readyState < 2) {
         schedulePlayerRecovery({ immediate: true });
@@ -140,7 +263,11 @@ export default function SecureHlsBroadcastPlayer({
       if (stalledTimer) window.clearTimeout(stalledTimer);
       stalledTimer = window.setTimeout(() => {
         stalledTimer = null;
-        if (!disposed && video.readyState < 3) schedulePlayerRecovery();
+        if (!disposed && video.readyState < 3) {
+          schedulePlayerRecovery({
+            issue: getPlaybackIssue({ errorType: Hls.ErrorTypes.MEDIA_ERROR }),
+          });
+        }
       }, 6_000);
     };
     const handlePlaying = () => {
@@ -159,7 +286,8 @@ export default function SecureHlsBroadcastPlayer({
       lastPlaybackProgressAt = Date.now();
       markPlaybackHealthy();
     };
-    const handleVideoError = () => schedulePlayerRecovery();
+    const handleVideoError = () =>
+      schedulePlayerRecovery({ issue: getPlaybackIssue({ errorType: Hls.ErrorTypes.MEDIA_ERROR }) });
     const playbackWatchdog = window.setInterval(() => {
       if (
         disposed ||
@@ -182,11 +310,15 @@ export default function SecureHlsBroadcastPlayer({
 
       if (Date.now() - lastPlaybackProgressAt >= PLAYBACK_FREEZE_THRESHOLD_MS) {
         lastPlaybackProgressAt = Date.now();
-        schedulePlayerRecovery({ immediate: true });
+        schedulePlayerRecovery({
+          immediate: true,
+          issue: getPlaybackIssue({ errorType: Hls.ErrorTypes.MEDIA_ERROR }),
+        });
       }
     }, PLAYBACK_WATCHDOG_INTERVAL_MS);
 
     window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
     document.addEventListener("visibilitychange", handleVisible);
     video.addEventListener("playing", handlePlaying);
     video.addEventListener("stalled", handleStalled);
@@ -243,12 +375,27 @@ export default function SecureHlsBroadcastPlayer({
       });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data?.fatal || disposed) return;
+        const issue = getPlaybackIssue({
+          errorType: data.type,
+          httpStatus: data.response?.code,
+          offline: typeof navigator !== "undefined" && navigator.onLine === false,
+        });
         if (data.type === Hls.ErrorTypes.MEDIA_ERROR && !mediaRecoveryAttempted) {
           mediaRecoveryAttempted = true;
+          setConnectionIssue(issue);
+          reportPlaybackIssue({
+            sessionId,
+            issue,
+            retryAttempt: recoveryAttemptRef.current,
+            lastReportedIssueRef,
+          });
           hls?.recoverMediaError();
           return;
         }
-        schedulePlayerRecovery();
+        schedulePlayerRecovery({
+          issue,
+          renewAccess: issue.reason === "authorization",
+        });
       });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = hlsUrl;
@@ -264,6 +411,7 @@ export default function SecureHlsBroadcastPlayer({
       window.clearInterval(playbackWatchdog);
       if (stalledTimer) window.clearTimeout(stalledTimer);
       window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
       document.removeEventListener("visibilitychange", handleVisible);
       video.removeEventListener("playing", handlePlaying);
       video.removeEventListener("stalled", handleStalled);
@@ -274,7 +422,7 @@ export default function SecureHlsBroadcastPlayer({
       video.removeAttribute("src");
       video.load();
     };
-  }, [bootstrapReady, hlsUrl, playerGeneration, refreshKey, unsupportedBrowser]);
+  }, [bootstrapReady, hlsUrl, playerGeneration, refreshKey, sessionId, unsupportedBrowser]);
 
   if (unsupportedBrowser && fallbackEmbedUrl) {
     return (
@@ -308,10 +456,23 @@ export default function SecureHlsBroadcastPlayer({
           preload="auto"
         />
       ) : (
-        <PlayerMessage>
+        <PlayerMessage onRetry={retryNow}>
           {bootstrapError || "Preparing secure live video..."}
         </PlayerMessage>
       )}
+      {bootstrapReady && connectionIssue ? (
+        <div className="absolute inset-x-3 top-3 z-30 rounded-xl border border-amber-300/30 bg-[#18140a]/95 px-3 py-2.5 text-center text-xs leading-5 text-amber-100 shadow-[0_12px_30px_rgba(0,0,0,0.34)] backdrop-blur sm:left-1/2 sm:right-auto sm:w-[min(32rem,calc(100%-1.5rem))] sm:-translate-x-1/2">
+          <span>{connectionIssue.message}</span>
+          <button
+            type="button"
+            data-playback-gesture-ignore="true"
+            onClick={retryNow}
+            className="ml-2 whitespace-nowrap font-semibold text-white underline decoration-white/50 underline-offset-2 hover:decoration-white"
+          >
+            Retry now
+          </button>
+        </div>
+      ) : null}
     </ProtectedPlaybackSurface>
   );
 }

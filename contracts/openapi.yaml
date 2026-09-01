@@ -2002,6 +2002,36 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /realtime/sessions/{id}/broadcast-playback/issues/:
+    post:
+      operationId: realtime_sessions_broadcast_playback_issues_create_by_id
+      description: Record client playback failures without changing viewer authorization.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - realtime
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RealtimeBroadcastPlaybackIssueRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RealtimeBroadcastPlaybackIssueRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RealtimeBroadcastPlaybackIssueRequest'
+        required: true
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '204':
+          description: No response body
   /realtime/sessions/{id}/broadcast-stream/launch/:
     post:
       operationId: realtime_sessions_broadcast_stream_launch_create_by_id
@@ -2549,6 +2579,39 @@ paths:
         '204':
           description: No response body
 components:
+  schemas:
+    RealtimeBroadcastPlaybackIssueRequest:
+      type: object
+      properties:
+        reason:
+          $ref: '#/components/schemas/ReasonEnum'
+        hls_error_type:
+          type: string
+          maxLength: 80
+        http_status:
+          type: integer
+          maximum: 599
+          minimum: 0
+        retry_attempt:
+          type: integer
+          maximum: 100
+          minimum: 0
+      required:
+      - reason
+    ReasonEnum:
+      enum:
+      - network
+      - authorization
+      - upstream
+      - media
+      - unknown
+      type: string
+      description: |-
+        * `network` - network
+        * `authorization` - authorization
+        * `upstream` - upstream
+        * `media` - media
+        * `unknown` - unknown
   securitySchemes:
     bearerJWT:
       type: http

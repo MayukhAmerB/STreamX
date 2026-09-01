@@ -80,3 +80,43 @@ class OwncastStreamSecurityTests(APITestCase):
         cookie = response.cookies["owncast_stream_access"]
         self.assertIn("HttpOnly", cookie.OutputString())
         self.assertEqual(cookie["path"], "/")
+
+    def test_authorized_host_can_report_broadcast_playback_issue(self):
+        session = RealtimeSession.objects.create(
+            title="Playback Diagnostics Session",
+            description="Authorized viewers can report reconnect failures for investigation.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.course,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+        self.client.force_authenticate(user=self.host)
+
+        response = self.client.post(
+            reverse("realtime-session-broadcast-playback-issue", args=[session.id]),
+            {"reason": "network", "hls_error_type": "networkError", "http_status": 0, "retry_attempt": 2},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 204)
+
+    def test_playback_issue_requires_session_access(self):
+        session = RealtimeSession.objects.create(
+            title="Restricted Playback Diagnostics",
+            description="Playback diagnostics must not reveal other class sessions.",
+            host=self.host,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            linked_live_class=self.live_class,
+            linked_course=self.course,
+            status=RealtimeSession.STATUS_LIVE,
+        )
+        self.client.force_authenticate(user=self.viewer)
+
+        response = self.client.post(
+            reverse("realtime-session-broadcast-playback-issue", args=[session.id]),
+            {"reason": "network"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)

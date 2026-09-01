@@ -374,6 +374,21 @@ class RealtimeSessionJoinSerializer(serializers.Serializer):
     prefer_broadcast = serializers.BooleanField(required=False, default=False)
 
 
+class RealtimeBroadcastPlaybackIssueSerializer(serializers.Serializer):
+    REASON_NETWORK = "network"
+    REASON_AUTHORIZATION = "authorization"
+    REASON_UPSTREAM = "upstream"
+    REASON_MEDIA = "media"
+    REASON_UNKNOWN = "unknown"
+
+    reason = serializers.ChoiceField(
+        choices=(REASON_NETWORK, REASON_AUTHORIZATION, REASON_UPSTREAM, REASON_MEDIA, REASON_UNKNOWN)
+    )
+    hls_error_type = serializers.CharField(max_length=80, required=False, allow_blank=True)
+    http_status = serializers.IntegerField(required=False, min_value=0, max_value=599)
+    retry_attempt = serializers.IntegerField(required=False, min_value=0, max_value=100)
+
+
 class RealtimePresenterPermissionSerializer(serializers.Serializer):
     user_id = serializers.IntegerField(min_value=1)
 

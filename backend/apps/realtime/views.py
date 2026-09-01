@@ -22,6 +22,7 @@ from rest_framework import permissions, status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
+from drf_spectacular.utils import extend_schema
 
 from config.audit import log_security_event
 from config.authentication import CookieJWTAuthentication
@@ -41,6 +42,7 @@ from .domain import (
 from .models import OwncastChatIdentity, RealtimeConfiguration, RealtimeSession, RealtimeSessionRecording
 from .serializers import (
     RealtimeOwncastChatModerationActionSerializer,
+    RealtimeBroadcastPlaybackIssueSerializer,
     RealtimeSessionBrowserRecordingUploadSerializer,
     RealtimeSessionCreateSerializer,
     RealtimeSessionJoinSerializer,
@@ -999,6 +1001,49 @@ class RealtimeSessionJoinView(APIView):
         cache_room_participant_count(room_name, participant_state.participant_count + 1)
         _record_join_metric(result="success", mode="meeting", reason="ok")
         return api_response(success=True, message="Meeting join payload created.", data=data)
+
+
+class RealtimeSessionBroadcastPlaybackIssueView(APIView):
+    """Record client playback failures without changing viewer authorization."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=RealtimeBroadcastPlaybackIssueSerializer, responses={204: None})
+    def post(self, request, pk):
+        session = get_object_or_404(RealtimeSession.objects.with_related(), pk=pk)
+        access_decision = get_access_decision(session, request.user)
+        if not access_decision.allowed:
+            return api_response(
+                success=False,
+                message=access_decision.message,
+                errors={"detail": access_decision.detail},
+                status_code=access_decision.status_code,
+            )
+        if session.session_type != RealtimeSession.TYPE_BROADCASTING:
+            return api_response(
+                success=False,
+                message="Playback diagnostics are unavailable.",
+                errors={"detail": "This endpoint is available only for broadcasting sessions."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = RealtimeBroadcastPlaybackIssueSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+        realtime_ops_logger.warning(
+            "REALTIME_PLAYBACK_FAILURE %s",
+            {
+                "event": "broadcast.playback.failure",
+                "request_id": getattr(request, "request_id", None),
+                "session_id": session.id,
+                "user_id": request.user.id,
+                "reason": payload["reason"],
+                "hls_error_type": payload.get("hls_error_type", ""),
+                "http_status": payload.get("http_status"),
+                "retry_attempt": payload.get("retry_attempt", 0),
+            },
+        )
+        return HttpResponse(status=status.HTTP_204_NO_CONTENT)
 
 
 class RealtimeSessionOwncastStreamLaunchView(APIView):
