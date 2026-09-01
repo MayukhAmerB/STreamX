@@ -134,6 +134,30 @@ def _owncast_stream_auth_cache_key(cookie_value):
     return f"realtime:owncast:stream-access:{digest}"
 
 
+def _set_owncast_stream_access_cookie(response, *, session_id, user_id, request):
+    """Grant the stream host a short-lived, HttpOnly viewer authorization cookie."""
+    cookie_payload = signing.dumps(
+        {
+            "session_id": int(session_id),
+            "user_id": int(user_id),
+            "issued_at": int(time.time()),
+        },
+        salt=_OWNCAST_STREAM_ACCESS_SIGNING_SALT,
+        compress=True,
+    )
+    secure_cookie = _is_secure_request(request)
+    response.set_cookie(
+        _owncast_stream_access_cookie_name(),
+        cookie_payload,
+        max_age=_owncast_stream_access_ttl_seconds(),
+        path="/",
+        secure=secure_cookie,
+        httponly=True,
+        samesite="None" if secure_cookie else "Lax",
+    )
+    return response
+
+
 def _resolve_owncast_chat_origin(chat_embed_url):
     parsed = urlparse(str(chat_embed_url or "").strip())
     if parsed.scheme.lower() not in {"http", "https"}:
@@ -1633,12 +1657,29 @@ class RealtimeOwncastChatBridgeView(APIView):
                 updated_at=now,
             )
 
-        return _render_owncast_chat_bridge_html(
+        response = _render_owncast_chat_bridge_html(
             bridge_token=token,
             access_token=access_token,
             display_name=display_name,
             platform_display_name=str(payload.get("platform_display_name") or "").strip()[:80],
             next_path=_OWNCAST_CHAT_BRIDGE_NEXT_PATH,
+        )
+        try:
+            user_id = int(payload.get("user_id") or 0)
+        except (TypeError, ValueError):
+            user_id = 0
+        if user_id <= 0:
+            return api_response(
+                success=False,
+                message="Invalid chat bridge request.",
+                errors={"detail": "Chat bridge token is missing user details."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        return _set_owncast_stream_access_cookie(
+            response,
+            session_id=bridge_session.id,
+            user_id=user_id,
+            request=request,
         )
 
     def post(self, request):
@@ -1776,15 +1817,6 @@ class RealtimeOwncastStreamBridgeView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        cookie_payload = signing.dumps(
-            {
-                "session_id": session_id,
-                "user_id": user_id,
-                "issued_at": int(time.time()),
-            },
-            salt=_OWNCAST_STREAM_ACCESS_SIGNING_SALT,
-            compress=True,
-        )
         next_path = str(payload.get("next_path") or _OWNCAST_STREAM_BRIDGE_NEXT_PATH)
         if not next_path.startswith("/") or next_path.startswith("//"):
             next_path = _OWNCAST_STREAM_BRIDGE_NEXT_PATH
@@ -1795,17 +1827,12 @@ class RealtimeOwncastStreamBridgeView(APIView):
         response["Cross-Origin-Embedder-Policy"] = "unsafe-none"
         response["Cross-Origin-Opener-Policy"] = "unsafe-none"
         response.xframe_options_exempt = True
-        secure_cookie = _is_secure_request(request)
-        response.set_cookie(
-            _owncast_stream_access_cookie_name(),
-            cookie_payload,
-            max_age=_owncast_stream_access_ttl_seconds(),
-            path="/",
-            secure=secure_cookie,
-            httponly=True,
-            samesite="None" if secure_cookie else "Lax",
+        return _set_owncast_stream_access_cookie(
+            response,
+            session_id=session_id,
+            user_id=user_id,
+            request=request,
         )
-        return response
 
 
 class RealtimeOwncastStreamAccessView(APIView):
