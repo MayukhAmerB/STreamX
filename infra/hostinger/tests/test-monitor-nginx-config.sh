@@ -13,7 +13,7 @@ require_line() {
 }
 
 require_line '    server_name monitor.alsyedinitiative.com;'
-require_line '    server 127.0.0.1:3001;'
+require_line '    listen 443 ssl http2;'
 require_line '    ssl_certificate /etc/letsencrypt/live/monitor.alsyedinitiative.com/fullchain.pem;'
 require_line '    ssl_certificate_key /etc/letsencrypt/live/monitor.alsyedinitiative.com/privkey.pem;'
 require_line '    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;'
@@ -22,6 +22,8 @@ require_line '    add_header X-Frame-Options "SAMEORIGIN" always;'
 require_line '    add_header Referrer-Policy "strict-origin-when-cross-origin" always;'
 require_line '    add_header Content-Security-Policy "frame-ancestors '\''self'\''; object-src '\''none'\''; base-uri '\''self'\''" always;'
 require_line '    add_header X-Robots-Tag "noindex, nofollow, noarchive" always;'
+require_line '        limit_req zone=monitor_login burst=5 nodelay;'
+require_line '        proxy_pass http://127.0.0.1:3001;'
 require_line '        proxy_set_header Upgrade $http_upgrade;'
 require_line '        proxy_set_header Connection "upgrade";'
 
