@@ -9,6 +9,14 @@ rule_files:
 scrape_configs:
   - job_name: streamx_backend
     metrics_path: /metrics
+    # Backend containers use Django's HTTPS redirect in production. Prometheus
+    # remains on the private HTTP Docker network while declaring the original
+    # request scheme expected by Django, preventing a redirect to HTTPS:8000.
+    scheme: http
+    http_headers:
+      X-Forwarded-Proto:
+        values:
+          - https
     static_configs:
       - targets:
           - backend:8000
