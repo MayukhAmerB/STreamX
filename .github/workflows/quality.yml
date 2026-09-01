@@ -83,7 +83,7 @@ jobs:
           grep -A 10 'job_name: streamx_backend' infra/observability/prometheus/prometheus.yml | grep -q 'X-Forwarded-Proto'
           docker run --rm \
             --entrypoint /bin/promtool \
-            -v "$GITHUB_WORKSPACE/infra/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
+            -v "$GITHUB_WORKSPACE/infra/observability/prometheus:/etc/prometheus:ro" \
             prom/prometheus:v2.55.1 \
             check config /etc/prometheus/prometheus.yml
       - name: Validate operational shell scripts
