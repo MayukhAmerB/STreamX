@@ -78,6 +78,11 @@ services:
       GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-change-this-password}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_DOMAIN: monitor.alsyedinitiative.com
+      GF_SERVER_ROOT_URL: https://monitor.alsyedinitiative.com/
+      GF_SERVER_SERVE_FROM_SUB_PATH: "false"
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_COOKIE_SAMESITE: lax
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
