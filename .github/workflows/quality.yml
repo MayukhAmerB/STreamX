@@ -92,3 +92,5 @@ jobs:
         run: bash infra/hostinger/tests/test-verify-backup.sh
       - name: Test Nginx deployment rollback
         run: bash infra/hostinger/tests/test-deploy-nginx-config.sh
+      - name: Verify monitor Nginx security headers
+        run: bash infra/hostinger/tests/test-monitor-nginx-config.sh

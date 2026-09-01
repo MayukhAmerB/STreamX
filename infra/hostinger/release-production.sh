@@ -40,6 +40,11 @@ log "Activating the tracked Nginx config through the rollback-safe installer."
 "$SCRIPT_DIR/deploy-nginx-config.sh" \
   "$REPO_ROOT/infra/hostinger/nginx/alsyedinitiative.conf"
 
+log "Activating the tracked monitor configuration through the rollback-safe installer."
+"$SCRIPT_DIR/deploy-nginx-config.sh" \
+  "$REPO_ROOT/infra/hostinger/nginx/monitor-subdomain.conf" \
+  /etc/nginx/sites-enabled/monitor.alsyedinitiative.com
+
 if command -v fail2ban-client >/dev/null 2>&1; then
   log "Installing the backup-safe Nginx Fail2ban action and restoring its active snippet."
   install -m 0755 \
