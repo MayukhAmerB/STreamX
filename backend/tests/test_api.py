@@ -3169,18 +3169,20 @@ class LectureVideoAccessTests(BaseAPITestCase):
     @patch("apps.courses.views.generate_signed_video_url")
     def test_enrolled_student_can_get_signed_url_and_unenrolled_cannot(self, mock_signed):
         mock_signed.return_value = "https://signed.example.com/video"
-        self.login(self.student.email)
-        denied = self.client.get(reverse("lecture-video", kwargs={"pk": self.lecture.id}))
-        self.assertEqual(denied.status_code, 403)
+        temp_dir = self._prepare_media_root()
+        with override_settings(MEDIA_ROOT=temp_dir):
+            self.login(self.student.email)
+            denied = self.client.get(reverse("lecture-video", kwargs={"pk": self.lecture.id}))
+            self.assertEqual(denied.status_code, 403)
 
-        Enrollment.objects.create(
-            user=self.student,
-            course=self.course,
-            payment_status=Enrollment.STATUS_PAID,
-        )
-        allowed = self.client.get(reverse("lecture-video", kwargs={"pk": self.lecture.id}))
-        self.assertEqual(allowed.status_code, 200)
-        self.assertEqual(allowed.data["data"]["signed_url"], "https://signed.example.com/video")
+            Enrollment.objects.create(
+                user=self.student,
+                course=self.course,
+                payment_status=Enrollment.STATUS_PAID,
+            )
+            allowed = self.client.get(reverse("lecture-video", kwargs={"pk": self.lecture.id}))
+            self.assertEqual(allowed.status_code, 200)
+            self.assertEqual(allowed.data["data"]["signed_url"], "https://signed.example.com/video")
 
     def test_local_uploaded_lecture_returns_protected_playback_url(self):
         temp_dir = self._prepare_media_root()
