@@ -104,6 +104,29 @@ else
   fi
 fi
 
+primary_backend_image=""
+if [[ -n "$backend_id" ]]; then
+  primary_backend_image="$(docker inspect -f '{{.Image}}' "$backend_id" 2>/dev/null || true)"
+fi
+for pooled_service in backend-2 backend-3 backend-4 payment-backend-1 payment-backend-2; do
+  pooled_id="$(docker ps -aq \
+    --filter 'label=com.docker.compose.project=streamx' \
+    --filter "label=com.docker.compose.service=$pooled_service" | head -n1)"
+  if [[ -z "$pooled_id" ]]; then
+    continue
+  fi
+  pooled_running="$(docker inspect -f '{{.State.Running}}' "$pooled_id" 2>/dev/null || true)"
+  pooled_health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$pooled_id" 2>/dev/null || true)"
+  pooled_image="$(docker inspect -f '{{.Image}}' "$pooled_id" 2>/dev/null || true)"
+  if [[ "$pooled_running" != "true" || "$pooled_health" != "healthy" ]]; then
+    fail "Pooled service $pooled_service is not healthy."
+  elif [[ -n "$primary_backend_image" && "$pooled_image" != "$primary_backend_image" ]]; then
+    fail "Pooled service $pooled_service is running a different backend image."
+  else
+    pass "Pooled service $pooled_service is healthy and current."
+  fi
+done
+
 if "$SCRIPT_DIR/verify-backup.sh" latest; then
   pass "Latest backup is fresh and valid."
 else

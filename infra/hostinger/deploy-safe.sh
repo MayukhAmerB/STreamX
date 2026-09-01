@@ -6,6 +6,7 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 ENV_FILE="${HOSTINGER_ENV_FILE:-$REPO_ROOT/backend/.env.hostinger.production}"
 COMPOSE_FILE="${HOSTINGER_COMPOSE_FILE:-$REPO_ROOT/docker-compose.hostinger.yml}"
 BACKUP_SCRIPT="${HOSTINGER_BACKUP_SCRIPT:-$SCRIPT_DIR/backup-data.sh}"
+DEPLOY_PHASE="${HOSTINGER_DEPLOY_PHASE:-}"
 
 compose() {
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
@@ -41,8 +42,23 @@ else
   exit 1
 fi
 
-log "Rebuilding and starting persistent application services."
-compose up -d --build --remove-orphans
+pooled_backend_id="$(docker ps -aq \
+  --filter 'label=com.docker.compose.project=streamx' \
+  --filter 'label=com.docker.compose.service=backend-2' | head -n1)"
+
+if [[ -n "$pooled_backend_id" && -z "$DEPLOY_PHASE" ]]; then
+  log "Refusing deployment: a pooled backend topology is present but HOSTINGER_DEPLOY_PHASE is unset."
+  log "Set HOSTINGER_DEPLOY_PHASE=phase5 to update every backend and PgBouncer service together."
+  exit 1
+fi
+
+if [[ -n "$DEPLOY_PHASE" ]]; then
+  log "Rebuilding the complete $DEPLOY_PHASE topology."
+  "$SCRIPT_DIR/deploy-phases.sh" "$DEPLOY_PHASE"
+else
+  log "Rebuilding and starting the single-backend topology without removing unrelated services."
+  compose up -d --build
+fi
 wait_for_backend_health
 
 log "Running Django production checks."

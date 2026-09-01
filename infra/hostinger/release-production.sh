@@ -40,6 +40,14 @@ log "Activating the tracked Nginx config through the rollback-safe installer."
 "$SCRIPT_DIR/deploy-nginx-config.sh" \
   "$REPO_ROOT/infra/hostinger/nginx/alsyedinitiative.conf"
 
+if command -v fail2ban-client >/dev/null 2>&1; then
+  log "Installing the backup-safe Nginx Fail2ban action and restoring its active snippet."
+  install -m 0755 \
+    "$REPO_ROOT/infra/hostinger/network/fail2ban/streamx-nginx-denylist.sh" \
+    /usr/local/bin/streamx-nginx-denylist
+  /usr/local/bin/streamx-nginx-denylist ensure
+fi
+
 log "Running post-deployment readiness verification."
 RELEASE_COMMIT="$RELEASE_COMMIT" "$SCRIPT_DIR/verify-production-readiness.sh"
 

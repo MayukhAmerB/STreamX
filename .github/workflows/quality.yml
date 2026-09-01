@@ -67,3 +67,14 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  operations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate operational shell scripts
+        run: bash -n infra/hostinger/*.sh infra/hostinger/network/*.sh infra/hostinger/network/fail2ban/*.sh
+      - name: Test backup verification
+        run: bash infra/hostinger/tests/test-verify-backup.sh
+      - name: Test Nginx deployment rollback
+        run: bash infra/hostinger/tests/test-deploy-nginx-config.sh

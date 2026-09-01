@@ -23,8 +23,15 @@ and migrations, creates and verifies a backup, deploys through the existing safe
 deployment path, activates the tracked Al Syed Nginx configuration through a
 rollback-safe installer, then runs production-readiness checks. Nginx backups
 are stored outside `sites-enabled`; activation is refused if an active backup
-file is detected. It does not edit DNS, Cloudflare, firewall, or environment
-files.
+file is detected. If Fail2ban is installed, its Nginx action is refreshed from
+the tracked backup-safe script. Compose override-managed services are preserved.
+It does not edit DNS, Cloudflare, firewall, or environment files.
+
+Set `HOSTINGER_DEPLOY_PHASE=phase5` and set `RELEASE_BASE_REF` to the commit that
+was running before the pull on servers using the backend pool and PgBouncer
+topology. The release refuses to update only the primary backend when it detects
+an existing pool, preventing mixed application versions; the explicit base ref
+ensures every not-yet-deployed migration is reviewed.
 
 ## Rollback
 

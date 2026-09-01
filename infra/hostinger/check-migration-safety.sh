@@ -18,6 +18,9 @@ log() {
 git -C "$REPO_ROOT" rev-parse --verify "$BASE_REF^{commit}" >/dev/null
 compose config -q
 
+log "Building the candidate backend image before migration validation."
+compose build backend
+
 log "Checking that models have committed migrations."
 compose run --rm \
   -e RUN_MIGRATIONS=0 \

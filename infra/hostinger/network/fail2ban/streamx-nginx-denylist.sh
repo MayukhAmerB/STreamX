@@ -144,14 +144,15 @@ ensure_runtime_ready() {
 reload_nginx_or_restore() {
   local candidate_file="$1"
   local backup_file="$2"
-  if nginx -t; then
-    systemctl reload nginx
+  if nginx -t && systemctl reload nginx && systemctl is-active --quiet nginx; then
     return 0
   fi
 
   cp "$backup_file" "$candidate_file"
-  nginx -t >/dev/null 2>&1 || true
-  log "nginx validation failed; restored previous state."
+  if nginx -t >/dev/null 2>&1; then
+    systemctl reload nginx >/dev/null 2>&1 || true
+  fi
+  log "nginx validation or reload failed; restored previous state."
   return 1
 }
 
@@ -182,14 +183,11 @@ ensure() {
   cp "$site_file" "$site_backup"
   patch_site_file "$site_file"
 
-  if nginx -t; then
-    systemctl reload nginx
+  if reload_nginx_or_restore "$site_file" "$site_backup"; then
     log "nginx denylist ready using $site_file"
     return 0
   fi
 
-  cp "$site_backup" "$site_file"
-  nginx -t >/dev/null 2>&1 || true
   log "Failed to patch nginx site file; restored $site_file"
   exit 1
 }
