@@ -72,6 +72,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Verify directly invoked deployment scripts are executable
+        run: |
+          test -x infra/hostinger/deploy-phases.sh
+          test -x infra/hostinger/deploy-safe.sh
+          test -x infra/hostinger/release-production.sh
       - name: Validate operational shell scripts
         run: bash -n infra/hostinger/*.sh infra/hostinger/network/*.sh infra/hostinger/network/fail2ban/*.sh
       - name: Test backup verification
