@@ -14,6 +14,8 @@ require_line() {
 
 require_line '    server_name monitor.alsyedinitiative.com;'
 require_line '    server 127.0.0.1:3001;'
+require_line '    ssl_certificate /etc/letsencrypt/live/monitor.alsyedinitiative.com/fullchain.pem;'
+require_line '    ssl_certificate_key /etc/letsencrypt/live/monitor.alsyedinitiative.com/privkey.pem;'
 require_line '    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;'
 require_line '    add_header X-Content-Type-Options "nosniff" always;'
 require_line '    add_header X-Frame-Options "SAMEORIGIN" always;'
