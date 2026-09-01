@@ -1,0 +1,10 @@
+[Unit]
+Description=Verify StreamX backup after the daily backup window
+
+[Timer]
+OnCalendar=*-*-* 04:15:00
+Persistent=true
+Unit=hostinger-backup-verify.service
+
+[Install]
+WantedBy=timers.target

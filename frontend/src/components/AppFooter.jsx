@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
+import { siteBrand } from "../config/siteBrand";
 import BrandLogo from "./BrandLogo";
 
-const quickLinks = [
+const baseQuickLinks = [
   { label: "Home", to: "/" },
   { label: "Courses", to: "/courses" },
   { label: "My Learning", to: "/courses?view=owned" },
-  { label: "Hall of Fame", to: "/hall-of-fame" },
 ];
 
 const companyLinks = [
@@ -94,6 +94,9 @@ function FooterSocialLink({ href, label, kind }) {
 
 export default function AppFooter() {
   const year = new Date().getFullYear();
+  const quickLinks = siteBrand.id === "owlcognito"
+    ? baseQuickLinks
+    : [...baseQuickLinks, { label: "Hall of Fame", to: "/hall-of-fame" }];
 
   return (
     <footer
@@ -110,12 +113,11 @@ export default function AppFooter() {
           <section className="sm:col-span-2 lg:col-span-5 lg:pr-10">
             <BrandLogo />
             <p className="mt-5 max-w-md text-sm leading-7 text-[#969696]">
-              Enterprise-focused cybersecurity learning with structured courses, live classes, and
-              practical workflow training.
+              {siteBrand.footerDescription}
             </p>
             <div className="mt-6 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#777777]">
               <span className="h-px w-8 bg-white/70" aria-hidden="true" />
-              Controlled learning access
+              {siteBrand.footerKicker}
             </div>
           </section>
 
@@ -181,7 +183,7 @@ export default function AppFooter() {
 
       <div className="relative border-t border-white/10 bg-black/40">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-5 text-center text-[10px] uppercase tracking-[0.16em] text-[#777777] sm:flex-row sm:px-6 sm:text-left lg:px-8">
-          <span>{"\u00A9"} {year} Al Syed Initiative. All rights reserved.</span>
+          <span>{"\u00A9"} {year} {siteBrand.name}. All rights reserved.</span>
           <span>Secure Learning Infrastructure</span>
         </div>
       </div>

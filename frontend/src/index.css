@@ -11,6 +11,31 @@
   --accent-primary-soft: rgba(255, 255, 255, 0.1);
 }
 
+html[data-site-brand="owlcognito"] {
+  color-scheme: light;
+  --accent-primary: #6d28d9;
+  --accent-primary-hover: #5b21b6;
+  --accent-primary-soft: rgba(109, 40, 217, 0.14);
+  --owl-ink: #18131d;
+  --owl-muted: #332b3a;
+  --owl-panel: #ffffff;
+  --owl-panel-deep: #f2eeff;
+  --owl-border: rgba(109, 40, 217, 0.24);
+}
+
+html[data-site-brand="owlcognito"] body {
+  background:
+    radial-gradient(circle at 90% -8%, rgba(167, 139, 250, 0.34), transparent 31rem),
+    radial-gradient(circle at 3% 34%, rgba(221, 214, 254, 0.72), transparent 34rem),
+    #fbfaff;
+  color: var(--owl-ink);
+}
+
+html[data-site-brand="owlcognito"] ::selection {
+  background: rgba(109, 40, 217, 0.22);
+  color: #18131d;
+}
+
 html {
   zoom: var(--site-zoom);
   -webkit-text-size-adjust: 100%;
@@ -217,6 +242,286 @@ h6 {
 .landing-hero .border-black,
 .landing-hero .panel-gradient {
   border-color: #000000 !important;
+}
+
+/* OwlCognito uses a separate violet interface while the primary platform stays unchanged. */
+html[data-site-brand="owlcognito"] .panel-gradient {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(196, 181, 253, 0.42) 0%, transparent 36%),
+    linear-gradient(145deg, var(--owl-panel) 0%, var(--owl-panel-deep) 100%);
+  border-color: var(--owl-border) !important;
+  box-shadow: 0 18px 48px rgba(76, 29, 149, 0.1);
+}
+
+html[data-site-brand="owlcognito"] .border-black,
+html[data-site-brand="owlcognito"] .landing-hero .border-black,
+html[data-site-brand="owlcognito"] .landing-hero .panel-gradient {
+  border-color: var(--owl-border) !important;
+}
+
+html[data-site-brand="owlcognito"] .landing-hero {
+  background: transparent !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-app-shell {
+  background:
+    radial-gradient(circle at 92% 6%, rgba(167, 139, 250, 0.24), transparent 34rem),
+    linear-gradient(180deg, #ffffff 0%, #f7f4ff 48%, #fbfaff 100%);
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-landing {
+  background:
+    radial-gradient(circle at 96% 32%, rgba(196, 181, 253, 0.28), transparent 30rem),
+    linear-gradient(180deg, #ffffff 0%, #f7f4ff 48%, #fbfaff 100%);
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-landing > .relative.z-10 {
+  position: relative;
+}
+
+/* Course cards originate in the dark theme, so give every text tier a
+   deliberate light-theme colour instead of allowing washed-out utility greys. */
+html[data-site-brand="owlcognito"] .owlcognito-course-card {
+  border-color: rgba(109, 40, 217, 0.32) !important;
+  background:
+    radial-gradient(circle at 92% 8%, rgba(139, 92, 246, 0.17), transparent 31%),
+    linear-gradient(145deg, #ffffff 0%, #f5f1ff 100%) !important;
+  color: #18131d !important;
+  box-shadow: 0 24px 56px rgba(76, 29, 149, 0.16) !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-glow {
+  background: radial-gradient(circle at 92% 9%, rgba(124, 58, 237, 0.18), transparent 34%) !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-scrim {
+  background: linear-gradient(to left, transparent, rgba(245, 241, 255, 0.38), rgba(255, 255, 255, 0.78)) !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card .border-b,
+html[data-site-brand="owlcognito"] .owlcognito-course-card .divide-y,
+html[data-site-brand="owlcognito"] .owlcognito-course-card .divide-y > * {
+  border-color: rgba(109, 40, 217, 0.2) !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-eyebrow {
+  color: #6d28d9 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-status {
+  border-color: rgba(109, 40, 217, 0.28) !important;
+  background: #eee9ff !important;
+  color: #251b2d !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-title {
+  color: #4c1d95 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-description {
+  color: #251f2b !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-icon {
+  border-color: rgba(109, 40, 217, 0.24) !important;
+  background: #eee9ff !important;
+  color: #5b21b6 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-feature {
+  border-color: rgba(109, 40, 217, 0.2) !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-feature h4 {
+  color: #4c1d95 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-feature p,
+html[data-site-brand="owlcognito"] .owlcognito-course-card-note {
+  color: #2c2532 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-action {
+  border-color: #5b21b6 !important;
+  background: #5b21b6 !important;
+  color: #ffffff !important;
+  box-shadow: 0 12px 24px rgba(91, 33, 182, 0.22) !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-action:hover {
+  background: #4c1d95 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-action-disabled {
+  border-color: rgba(109, 40, 217, 0.22) !important;
+  background: #ede9fe !important;
+  color: #2d2534 !important;
+  box-shadow: none !important;
+}
+
+html[data-site-brand="owlcognito"] header.sticky {
+  border-color: rgba(109, 40, 217, 0.32) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 10px 28px rgba(76, 29, 149, 0.1);
+}
+
+html[data-site-brand="owlcognito"] footer#contact {
+  border-color: rgba(109, 40, 217, 0.32) !important;
+  background: linear-gradient(135deg, #ffffff 0%, #f0ebff 100%) !important;
+  color: var(--owl-ink);
+}
+
+html[data-site-brand="owlcognito"] footer#contact::after {
+  position: absolute;
+  top: 0;
+  right: 9%;
+  width: 18rem;
+  height: 12rem;
+  content: "";
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.16), transparent 68%);
+  filter: blur(22px);
+}
+
+/*
+ * OwlCognito shares components with the dark Al Syed platform. Those components
+ * use Tailwind's dark surface utilities, so map them to a light violet system
+ * only when the Owl brand attribute is present.
+ */
+html[data-site-brand="owlcognito"] main [class~="bg-black"],
+html[data-site-brand="owlcognito"] main [class~="bg-black/95"],
+html[data-site-brand="owlcognito"] main [class~="bg-black/90"],
+html[data-site-brand="owlcognito"] main [class~="bg-black/80"],
+html[data-site-brand="owlcognito"] main [class~="bg-black/70"],
+html[data-site-brand="owlcognito"] main [class~="bg-black/60"],
+html[data-site-brand="owlcognito"] main [class~="bg-black/50"],
+html[data-site-brand="owlcognito"] main [class~="bg-black/40"],
+html[data-site-brand="owlcognito"] main [class*="bg-[#0"],
+html[data-site-brand="owlcognito"] main [class*="bg-[#1"],
+html[data-site-brand="owlcognito"] main [class*="bg-[#2"] {
+  background-color: #ffffff !important;
+}
+
+html[data-site-brand="owlcognito"] main .text-white,
+html[data-site-brand="owlcognito"] main [class~="text-white"] {
+  color: var(--owl-ink) !important;
+}
+
+html[data-site-brand="owlcognito"] main [class*="text-[#949494]"],
+html[data-site-brand="owlcognito"] main [class*="text-[#A4A4A4]"],
+html[data-site-brand="owlcognito"] main [class*="text-[#A7A7A7]"],
+html[data-site-brand="owlcognito"] main [class*="text-[#BBBBBB]"],
+html[data-site-brand="owlcognito"] main [class*="text-[#BDBDBD]"],
+html[data-site-brand="owlcognito"] main [class*="text-[#CFCFCF]"],
+html[data-site-brand="owlcognito"] main [class*="text-[#DADADA]"],
+html[data-site-brand="owlcognito"] main [class*="text-[#DBDBDB]"],
+html[data-site-brand="owlcognito"] main [class*="text-[#DFDFDF]"] {
+  color: var(--owl-muted) !important;
+}
+
+html[data-site-brand="owlcognito"] main [class~="border-white/5"],
+html[data-site-brand="owlcognito"] main [class~="border-white/10"],
+html[data-site-brand="owlcognito"] main [class~="border-white/15"],
+html[data-site-brand="owlcognito"] main [class~="border-white/20"],
+html[data-site-brand="owlcognito"] main [class~="border-white/30"] {
+  border-color: var(--owl-border) !important;
+}
+
+html[data-site-brand="owlcognito"] header.sticky .text-white,
+html[data-site-brand="owlcognito"] header.sticky [class~="text-white"] {
+  color: var(--owl-ink) !important;
+}
+
+html[data-site-brand="owlcognito"] header.sticky [class~="text-white/80"],
+html[data-site-brand="owlcognito"] header.sticky [class~="text-white/70"],
+html[data-site-brand="owlcognito"] header.sticky [class~="text-white/60"] {
+  color: var(--owl-muted) !important;
+}
+
+html[data-site-brand="owlcognito"] header.sticky [class~="bg-white/5"],
+html[data-site-brand="owlcognito"] header.sticky [class~="bg-white/10"],
+html[data-site-brand="owlcognito"] header.sticky [class~="bg-white/20"] {
+  background-color: #f1edff !important;
+}
+
+html[data-site-brand="owlcognito"] header.sticky [class~="border-white/10"],
+html[data-site-brand="owlcognito"] header.sticky [class~="border-white/20"],
+html[data-site-brand="owlcognito"] header.sticky [class~="border-white/30"] {
+  border-color: var(--owl-border) !important;
+}
+
+html[data-site-brand="owlcognito"] footer#contact .text-white,
+html[data-site-brand="owlcognito"] footer#contact [class~="text-white"] {
+  color: var(--owl-ink) !important;
+}
+
+html[data-site-brand="owlcognito"] footer#contact [class*="text-[#A"],
+html[data-site-brand="owlcognito"] footer#contact [class*="text-[#B"],
+html[data-site-brand="owlcognito"] footer#contact [class*="text-[#C"],
+html[data-site-brand="owlcognito"] footer#contact [class*="text-[#D"] {
+  color: var(--owl-muted) !important;
+}
+
+html[data-site-brand="owlcognito"] footer#contact [class~="bg-black/40"],
+html[data-site-brand="owlcognito"] footer#contact [class*="bg-[#0"],
+html[data-site-brand="owlcognito"] footer#contact [class*="bg-[#1"] {
+  background-color: #f2eeff !important;
+}
+
+html[data-site-brand="owlcognito"] footer#contact [class~="border-white/10"],
+html[data-site-brand="owlcognito"] footer#contact [class~="border-white/20"] {
+  border-color: var(--owl-border) !important;
+}
+
+/* Video and broadcast controls deliberately remain dark for playback contrast. */
+html[data-site-brand="owlcognito"] [data-protected-playback-surface],
+html[data-site-brand="owlcognito"] [data-protected-playback-surface] [class~="bg-black"],
+html[data-site-brand="owlcognito"] [data-protected-playback-surface] [class*="bg-[#0"],
+html[data-site-brand="owlcognito"] [data-protected-playback-surface] [class*="bg-[#1"] {
+  background-color: #000000 !important;
+}
+
+html[data-site-brand="owlcognito"] [data-protected-playback-surface] .text-white,
+html[data-site-brand="owlcognito"] [data-protected-playback-surface] [class~="text-white"] {
+  color: #ffffff !important;
+}
+
+/* Keep the OwlCognito hierarchy intentional: violet marks structure and action,
+   while the content itself stays neutral black on the light surface. */
+html[data-site-brand="owlcognito"] :is(main, footer#contact) :is(h1, h2, h3, h4) {
+  color: #4c1d95 !important;
+}
+
+html[data-site-brand="owlcognito"] :is(main, footer#contact) :is(p, li, label, dt, dd) {
+  color: #1f1925;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card :is(
+  .owlcognito-course-card-title,
+  .owlcognito-course-card-feature h4
+) {
+  color: #4c1d95 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card :is(
+  .owlcognito-course-card-description,
+  .owlcognito-course-card-feature p,
+  .owlcognito-course-card-note,
+  .owlcognito-course-card-status
+) {
+  color: #251f2b !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-action {
+  color: #ffffff !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-action-disabled {
+  color: #2d2534 !important;
+}
+
+html[data-site-brand="owlcognito"] [data-protected-playback-surface] :is(h1, h2, h3, h4, p, li, label, dt, dd) {
+  color: #ffffff !important;
 }
 
 .hero-glitch-overlay {
@@ -629,4 +934,254 @@ h6 {
   .glossy:hover::after {
     animation: none;
   }
+}
+
+/*
+ * OwlCognito's shared content components began as dark-surface components.
+ * Give their named surfaces explicit light tokens so each text tier remains
+ * readable without changing the black Al Syed interface.
+ */
+html[data-site-brand="owlcognito"] .owlcognito-button:not(:disabled),
+html[data-site-brand="owlcognito"] .owlcognito-course-card-action:not(.owlcognito-course-card-action-disabled),
+html[data-site-brand="owlcognito"] .owlcognito-live-card a.inline-flex:not([aria-disabled="true"]) {
+  border-color: transparent !important;
+  background: linear-gradient(135deg, #4c1d95 0%, #6d28d9 48%, #8b5cf6 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 12px 24px rgba(91, 33, 182, 0.2) !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-button:not(:disabled):hover,
+html[data-site-brand="owlcognito"] .owlcognito-course-card-action:not(.owlcognito-course-card-action-disabled):hover,
+html[data-site-brand="owlcognito"] .owlcognito-live-card a.inline-flex:not([aria-disabled="true"]):hover {
+  background: linear-gradient(135deg, #3b0764 0%, #5b21b6 48%, #7c3aed 100%) !important;
+  box-shadow: 0 16px 30px rgba(91, 33, 182, 0.28) !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-button:disabled,
+html[data-site-brand="owlcognito"] .owlcognito-course-card-action-disabled {
+  border-color: rgba(109, 40, 217, 0.24) !important;
+  background: #eeeaf8 !important;
+  color: #635b6b !important;
+  box-shadow: none !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-button:focus-visible,
+html[data-site-brand="owlcognito"] .owlcognito-course-card-action:focus-visible,
+html[data-site-brand="owlcognito"] .owlcognito-live-card a.inline-flex:focus-visible {
+  outline: 3px solid rgba(124, 58, 237, 0.34);
+  outline-offset: 3px;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-live-card {
+  border-color: var(--owl-border) !important;
+  background:
+    radial-gradient(circle at 90% 2%, rgba(139, 92, 246, 0.14), transparent 37%),
+    linear-gradient(145deg, #ffffff 0%, #f8f5ff 100%) !important;
+  color: var(--owl-ink) !important;
+  box-shadow: 0 18px 42px rgba(76, 29, 149, 0.12) !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-live-card > .absolute {
+  background: radial-gradient(circle at 90% 0%, rgba(124, 58, 237, 0.12), transparent 42%) !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-live-card :is(h1, h2, h3, h4, h5, h6) {
+  color: #4c1d95 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-live-card p,
+html[data-site-brand="owlcognito"] .owlcognito-live-card [class*="text-[#949494]"],
+html[data-site-brand="owlcognito"] .owlcognito-live-card [class*="text-[#A8A8A8]"],
+html[data-site-brand="owlcognito"] .owlcognito-live-card [class*="text-[#BBBBBB]"] {
+  color: #1c1b1f !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-live-card [class~="bg-[#050505]"],
+html[data-site-brand="owlcognito"] .owlcognito-live-card [class~="bg-[#1A1A1A]"] {
+  border-color: var(--owl-border) !important;
+  background: #f0ebff !important;
+  color: #5b21b6 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-live-stat {
+  border-color: rgba(109, 40, 217, 0.22) !important;
+  background: #ffffff !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-live-stat > :first-child {
+  color: #6d28d9 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-live-stat > :not(:first-child) {
+  color: #18131d !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-filter-panel {
+  border-color: var(--owl-border) !important;
+  background:
+    radial-gradient(circle at 92% 4%, rgba(167, 139, 250, 0.2), transparent 34%),
+    linear-gradient(145deg, #ffffff 0%, #f5f1ff 100%) !important;
+  color: var(--owl-ink) !important;
+  box-shadow: 0 16px 38px rgba(76, 29, 149, 0.12) !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-filter-panel > div:first-child > div {
+  color: #5b21b6 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-filter-panel p {
+  color: #1c1b1f !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-filter-stat {
+  border-color: rgba(109, 40, 217, 0.22) !important;
+  background: #ffffff !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-filter-stat > :first-child {
+  color: #6d28d9 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-filter-stat > :not(:first-child) {
+  color: #18131d !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-icon-badge {
+  border-color: rgba(109, 40, 217, 0.28) !important;
+  background: #f0ebff !important;
+  color: #5b21b6 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-icon-badge-glyph {
+  color: #5b21b6 !important;
+  filter: drop-shadow(0 1px 1px rgba(76, 29, 149, 0.16));
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-icon-badge-glyph :is(path, circle, rect) {
+  stroke: currentColor;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-certificate-figure {
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-certificate-image-frame {
+  overflow: visible !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-certificate-image-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card {
+  border-color: var(--owl-border) !important;
+  background:
+    radial-gradient(circle at 91% 8%, rgba(167, 139, 250, 0.18), transparent 31%),
+    linear-gradient(145deg, #ffffff 0%, #f7f3ff 100%) !important;
+  color: var(--owl-ink) !important;
+  box-shadow: 0 18px 42px rgba(76, 29, 149, 0.12) !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-glow,
+html[data-site-brand="owlcognito"] .owlcognito-course-card-scrim,
+html[data-site-brand="owlcognito"] .owlcognito-course-card > img {
+  display: none !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card .border-b,
+html[data-site-brand="owlcognito"] .owlcognito-course-card .divide-y > :not([hidden]) ~ :not([hidden]),
+html[data-site-brand="owlcognito"] .owlcognito-course-card .border-l {
+  border-color: rgba(109, 40, 217, 0.18) !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-eyebrow,
+html[data-site-brand="owlcognito"] .owlcognito-course-card-status,
+html[data-site-brand="owlcognito"] .owlcognito-course-card-note,
+html[data-site-brand="owlcognito"] .owlcognito-course-card [class*="text-[#858585]"],
+html[data-site-brand="owlcognito"] .owlcognito-course-card [class*="text-[#808080]"] {
+  color: #5b21b6 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-status {
+  border-color: rgba(109, 40, 217, 0.28) !important;
+  background: #f0ebff !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-title,
+html[data-site-brand="owlcognito"] .owlcognito-course-card h4 {
+  color: #4c1d95 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-description,
+html[data-site-brand="owlcognito"] .owlcognito-course-card p,
+html[data-site-brand="owlcognito"] .owlcognito-course-card [class*="text-[#929292]"] {
+  color: #1c1b1f !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-icon {
+  border-color: rgba(109, 40, 217, 0.24) !important;
+  background: #f0ebff !important;
+  color: #5b21b6 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-action-disabled {
+  border-color: rgba(109, 40, 217, 0.2) !important;
+  background: #eeeaf5 !important;
+  color: #6b6474 !important;
+}
+
+html[data-site-brand="owlcognito"] .xl\:sticky > section:first-child {
+  border-color: var(--owl-border) !important;
+  background: linear-gradient(145deg, #ffffff 0%, #f7f3ff 100%) !important;
+  color: var(--owl-ink) !important;
+  box-shadow: 0 16px 38px rgba(76, 29, 149, 0.1) !important;
+}
+
+html[data-site-brand="owlcognito"] .xl\:sticky > section:first-child > .absolute {
+  display: none;
+}
+
+html[data-site-brand="owlcognito"] .xl\:sticky > section:first-child :is(h1, h2, h3) {
+  color: #4c1d95 !important;
+}
+
+html[data-site-brand="owlcognito"] .xl\:sticky > section:first-child p,
+html[data-site-brand="owlcognito"] .xl\:sticky > section:first-child label,
+html[data-site-brand="owlcognito"] .xl\:sticky > section:first-child [class*="text-[#DBDBDB]"] {
+  color: #1c1b1f !important;
+}
+
+html[data-site-brand="owlcognito"] .xl\:sticky > section:first-child [class*="bg-[linear-gradient"] {
+  border-color: rgba(109, 40, 217, 0.2) !important;
+  background: #ffffff !important;
+}
+
+html[data-site-brand="owlcognito"] .xl\:sticky > section:first-child [class*="text-[#444444]"] {
+  color: #5b21b6 !important;
+}
+
+html[data-site-brand="owlcognito"] main [class*="text-[#717171]"],
+html[data-site-brand="owlcognito"] main [class*="text-[#777777]"],
+html[data-site-brand="owlcognito"] main [class*="text-[#999999]"],
+html[data-site-brand="owlcognito"] main [class*="text-[#9E9E9E]"],
+html[data-site-brand="owlcognito"] main [class*="text-[#AFAFAF]"],
+html[data-site-brand="owlcognito"] main [class*="text-[#D4D4D4]"] {
+  color: var(--owl-ink) !important;
+}
+
+html[data-site-brand="owlcognito"] main [class*="bg-[#070707]"],
+html[data-site-brand="owlcognito"] main [class*="bg-[#090909]"],
+html[data-site-brand="owlcognito"] main [class*="bg-[#0A0A0A]"] {
+  background-color: #ffffff !important;
 }

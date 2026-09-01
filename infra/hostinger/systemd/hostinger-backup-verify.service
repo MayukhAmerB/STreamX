@@ -1,0 +1,11 @@
+[Unit]
+Description=Verify latest StreamX Hostinger backup
+After=hostinger-backup.service docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/alsyed/StreamX
+Environment=HOSTINGER_BACKUP_ROOT=/opt/alsyed/StreamX/.hostinger-backups
+Environment=HOSTINGER_BACKUP_METRICS_DIR=/var/lib/streamx/node-exporter
+ExecStart=/opt/alsyed/StreamX/infra/hostinger/verify-backup.sh latest

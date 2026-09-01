@@ -1,3 +1,5 @@
+import { siteBrand } from "../config/siteBrand";
+
 export default function Button({
   children,
   variant = "primary",
@@ -20,7 +22,7 @@ export default function Button({
 
   return (
     <button
-      className={`inline-flex min-h-11 touch-manipulation items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold tracking-tight transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${className}`}
+      className={`inline-flex min-h-11 touch-manipulation items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold tracking-tight transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:cursor-not-allowed disabled:opacity-60 ${siteBrand.id === "owlcognito" ? "owlcognito-button" : ""} ${variants[variant]} ${className}`}
       disabled={loading || props.disabled}
       {...props}
     >

@@ -152,7 +152,7 @@ export function CourseCatalogContent({
           </div>
         </section>
 
-        <section className="space-y-4 rounded-2xl border border-black bg-[linear-gradient(90deg,#050505_0%,#0E0E0E_52%,#1A1A1A_100%)] p-4 text-white shadow-[0_10px_30px_rgba(0,0,0,0.22)]">
+        <section className="owlcognito-course-filter-panel space-y-4 rounded-2xl border border-black bg-[linear-gradient(90deg,#050505_0%,#0E0E0E_52%,#1A1A1A_100%)] p-4 text-white shadow-[0_10px_30px_rgba(0,0,0,0.22)]">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#E6E6E6]">
               Search & Filter
@@ -163,21 +163,21 @@ export function CourseCatalogContent({
           </div>
 
           <div className="grid auto-rows-fr grid-cols-2 gap-2 text-sm">
-            <div className="h-full rounded-xl border border-white/40 bg-black/25 px-3 py-2 backdrop-blur-sm">
+            <div className="owlcognito-course-filter-stat h-full rounded-xl border border-white/40 bg-black/25 px-3 py-2 backdrop-blur-sm">
               <div className="text-[10px] uppercase tracking-[0.14em] text-[#E1E1E1]">Beginner</div>
               <div className="mt-1 font-semibold text-white">{levelSummary.beginner}</div>
             </div>
-            <div className="h-full rounded-xl border border-white/40 bg-black/25 px-3 py-2 backdrop-blur-sm">
+            <div className="owlcognito-course-filter-stat h-full rounded-xl border border-white/40 bg-black/25 px-3 py-2 backdrop-blur-sm">
               <div className="text-[10px] uppercase tracking-[0.14em] text-[#E1E1E1]">
                 Intermediate
               </div>
               <div className="mt-1 font-semibold text-white">{levelSummary.intermediate}</div>
             </div>
-            <div className="h-full rounded-xl border border-white/40 bg-black/25 px-3 py-2 backdrop-blur-sm">
+            <div className="owlcognito-course-filter-stat h-full rounded-xl border border-white/40 bg-black/25 px-3 py-2 backdrop-blur-sm">
               <div className="text-[10px] uppercase tracking-[0.14em] text-[#E1E1E1]">Advanced</div>
               <div className="mt-1 font-semibold text-white">{levelSummary.advanced}</div>
             </div>
-            <div className="h-full rounded-xl border border-white/40 bg-black/25 px-3 py-2 backdrop-blur-sm">
+            <div className="owlcognito-course-filter-stat h-full rounded-xl border border-white/40 bg-black/25 px-3 py-2 backdrop-blur-sm">
               <div className="text-[10px] uppercase tracking-[0.14em] text-[#E1E1E1]">Results</div>
               <div className="mt-1 font-semibold text-white">{loading ? "..." : courses.length}</div>
             </div>

@@ -14,6 +14,7 @@ import { apiData } from "../utils/api";
 import { readCachedCourseCatalog, writeCachedCourseCatalog } from "../utils/courseCatalog";
 import { formatINR } from "../utils/currency";
 import { featuredCourse } from "../utils/featuredCourse";
+import { brandText, siteBrand } from "../config/siteBrand";
 
 const HERO_LIVE_BROADCAST_VISIBLE_POLL_MS = 45000;
 const HERO_LIVE_BROADCAST_HIDDEN_POLL_MS = 180000;
@@ -28,7 +29,10 @@ const stats = [
 const infoCards = [
   {
     title: "About Us",
-    body: "Al syed Initiative is a cybersecurity learning platform focused on practical skills, ethical testing, and professional workflows.",
+    body: brandText(
+      "Al syed Initiative is a cybersecurity learning platform focused on practical skills, ethical testing, and professional workflows.",
+      "OwlCognito is a private intelligence learning platform focused on practical research, ethical investigation, and professional workflows.",
+    ),
   },
   {
     title: "Courses We Provide",
@@ -145,7 +149,7 @@ function sortCatalogCourses(courses) {
   });
 }
 
-function programBulletsForCourse(course) {
+function _programBulletsForCourse(course) {
   const title = String(course?.title || "").toLowerCase();
   if (title.includes("osint") && title.includes("beginner")) {
     return ["Search operator fundamentals", "Evidence capture and source validation"];
@@ -205,7 +209,7 @@ function selectHeroLiveBroadcast(payload) {
   );
 }
 
-function toValidCourseId(value) {
+function _toValidCourseId(value) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) return null;
   return parsed;
@@ -214,7 +218,7 @@ function toValidCourseId(value) {
 function IconBadge({ type }) {
   if (type === "target") {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="owlcognito-icon-badge-glyph h-5 w-5">
         <circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" strokeWidth="1.8" />
         <circle cx="12" cy="12" r="2.2" fill="currentColor" />
       </svg>
@@ -223,7 +227,7 @@ function IconBadge({ type }) {
 
   if (type === "stack") {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="owlcognito-icon-badge-glyph h-5 w-5">
         <rect x="5" y="5" width="14" height="14" rx="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
         <path
           d="M9 8.5v7M12 7.5v9M15 8.5v7"
@@ -236,7 +240,7 @@ function IconBadge({ type }) {
   }
 
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="owlcognito-icon-badge-glyph h-5 w-5">
       <path
         d="M6 8h12M6 12h8M6 16h10"
         stroke="currentColor"
@@ -264,7 +268,7 @@ function SectionTitle({ title, subtitle, titleClassName = "" }) {
       <div className="mb-4 flex items-center gap-3" aria-hidden="true">
         <span className="h-px w-10 bg-white/70" />
         <span className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#8E8E8E]">
-          Al Syed Initiative
+          {siteBrand.name}
         </span>
       </div>
       <h2
@@ -293,7 +297,7 @@ function DashboardArrow({ className = "" }) {
   );
 }
 
-function StudentAccessPanel({
+function _StudentAccessPanel({
   courses,
   liveClasses,
   loading,
@@ -412,7 +416,7 @@ function StudentAccessPanel({
   );
 }
 
-function GuestAccessPanel({ courses, liveClasses, liveClassesError }) {
+function _GuestAccessPanel({ courses, liveClasses, liveClassesError }) {
   const visibleCourses = courses.slice(0, 2);
   const visibleLiveClasses = liveClasses.slice(0, 2);
 
@@ -614,6 +618,7 @@ function TrainingProgramPanel({ course }) {
 }
 
 export default function LandingPage() {
+  const isOwlCognito = siteBrand.id === "owlcognito";
   const { isAuthenticated } = useAuth();
   const [catalogCourses, setCatalogCourses] = useState([]);
   const [studentCourses, setStudentCourses] = useState([]);
@@ -813,10 +818,28 @@ export default function LandingPage() {
   }, [landingLiveClasses]);
 
   return (
-    <div className="relative bg-[#030303] text-[#F6F6F6]">
+    <div
+      className={`relative ${
+        isOwlCognito
+          ? "owlcognito-landing bg-[#fbfaff] text-[#241344]"
+          : "bg-[#030303] text-[#F6F6F6]"
+      }`}
+    >
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,#020202_0%,#050505_52%,#030303_100%)]" />
-        <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] [background-size:72px_72px]" />
+        <div
+          className={`absolute inset-0 ${
+            isOwlCognito
+              ? "bg-[linear-gradient(180deg,#ffffff_0%,#f7f4ff_48%,#fbfaff_100%)]"
+              : "bg-[linear-gradient(180deg,#020202_0%,#050505_52%,#030303_100%)]"
+          }`}
+        />
+        <div
+          className={`absolute inset-0 [background-size:72px_72px] ${
+            isOwlCognito
+              ? "opacity-40 [background-image:linear-gradient(rgba(109,40,217,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(109,40,217,0.055)_1px,transparent_1px)]"
+              : "opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)]"
+          }`}
+        />
       </div>
 
       <section
@@ -903,7 +926,7 @@ export default function LandingPage() {
                   Recognition designed to carry forward
                 </h2>
                 <p className="mt-4 text-sm leading-7 text-[#9E9E9E]">
-                  Successful learners receive an ADL FRONT Certificate of Excellence in this
+                  Successful learners receive an official Certificate of Excellence in this
                   official format, recording the recipient, completion date, and authorized
                   recognition of their training achievement.
                 </p>
@@ -924,11 +947,11 @@ export default function LandingPage() {
                 </dl>
               </div>
 
-              <figure className="flex min-w-0 items-center bg-[#0B0B0B] p-3 sm:p-5 lg:p-6">
-                <div className="w-full overflow-hidden rounded-xl border border-white/15 bg-[#151515] shadow-[0_24px_70px_rgba(0,0,0,0.5)]">
+              <figure className="owlcognito-certificate-figure flex min-w-0 items-center bg-[#0B0B0B] p-3 sm:p-5 lg:p-6">
+                <div className="owlcognito-certificate-image-frame w-full overflow-hidden rounded-xl border border-white/15 bg-[#151515] shadow-[0_24px_70px_rgba(0,0,0,0.5)]">
                   <img
                     src={certificateExcellenceImage}
-                    alt="ADL FRONT Certificate of Excellence format"
+                    alt={`${siteBrand.name} Certificate of Excellence format`}
                     className="block h-auto w-full object-contain"
                     loading="lazy"
                     decoding="async"
@@ -982,18 +1005,18 @@ export default function LandingPage() {
 
           <SectionCard>
             <SectionTitle
-              title="Why learners choose Al syed Initiative"
+              title={`Why learners choose ${siteBrand.name}`}
               subtitle="Cybersecurity training depth with a modern online learning experience focused on professional execution."
             />
             <div className="mt-6 grid auto-rows-fr gap-4 lg:grid-cols-3">
               {whyChoose.map((item, idx) => (
                 <div
                   key={item.title}
-                  className={`hover-lift reveal-up ${
+                  className={`owlcognito-live-card hover-lift reveal-up ${
                     idx === 0 ? "reveal-delay-1" : idx === 1 ? "reveal-delay-2" : "reveal-delay-3"
                   } flex h-full flex-col rounded-2xl border border-white/10 bg-[#0A0A0A] p-5`}
                 >
-                  <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-[#050505] text-[#CFCFCF]">
+                  <div className="owlcognito-icon-badge mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-[#050505] text-[#CFCFCF]">
                     <IconBadge type={item.icon} />
                   </div>
                   <h3 className="font-reference text-xl font-semibold leading-tight text-white">
@@ -1073,7 +1096,7 @@ export default function LandingPage() {
                   key={program.id}
                   className={`hover-lift reveal-up ${
                     idx % 3 === 0 ? "reveal-delay-1" : idx % 3 === 1 ? "reveal-delay-2" : "reveal-delay-3"
-                  } flex h-full flex-col rounded-2xl border border-white/10 ${cornerGlowCardBg} p-5 transition-colors hover:border-white/20`}
+                  } owlcognito-live-card flex h-full flex-col rounded-2xl border border-white/10 ${cornerGlowCardBg} p-5 transition-colors hover:border-white/20`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="rounded-full border border-white/10 bg-[#050505] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A8A8A8]">
@@ -1097,13 +1120,13 @@ export default function LandingPage() {
                   </p>
 
                   <div className="mt-4 grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-3">
-                    <div className="h-full rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5">
+                    <div className="owlcognito-live-stat h-full rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Schedule</div>
                       <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
                         {program.schedule_days || "Fri / Sat / Sun"}
                       </div>
                     </div>
-                    <div className="h-full rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5">
+                    <div className="owlcognito-live-stat h-full rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Duration</div>
                       <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
                         {program.class_duration_minutes
@@ -1111,7 +1134,7 @@ export default function LandingPage() {
                           : "1 hour"}
                       </div>
                     </div>
-                    <div className="h-full rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5">
+                    <div className="owlcognito-live-stat h-full rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">
                         {program.linked_course_id ? "Access" : "Price"}
                       </div>

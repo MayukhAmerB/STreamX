@@ -8,6 +8,7 @@ import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
 import { formatINR } from "../utils/currency";
+import { siteBrand } from "../config/siteBrand";
 
 const pageBackgroundImage =
   "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
@@ -378,7 +379,7 @@ export default function CoursePaymentPage() {
         amount: orderData.amount,
         currency: orderData.currency,
         order_id: orderData.razorpay_order_id,
-        name: "Al syed Initiative",
+        name: siteBrand.name,
         description:
           plan === "monthly"
             ? "Monthly course installment"

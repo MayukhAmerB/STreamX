@@ -139,8 +139,8 @@ function CourseCard({ course }) {
   })();
 
   return (
-    <article className="group relative flex h-full min-w-0 flex-col overflow-hidden rounded-[26px] border border-white/15 bg-[#090909] text-white shadow-[0_28px_80px_rgba(0,0,0,0.48)] sm:rounded-[30px]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_92%_9%,rgba(255,255,255,0.075),transparent_31%)]" />
+    <article className="owlcognito-course-card group relative flex h-full min-w-0 flex-col overflow-hidden rounded-[26px] border border-white/15 bg-[#090909] text-white shadow-[0_28px_80px_rgba(0,0,0,0.48)] sm:rounded-[30px]">
+      <div className="owlcognito-course-card-glow pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_92%_9%,rgba(255,255,255,0.075),transparent_31%)]" />
       {thumbnailSrc ? (
         <img
           src={thumbnailSrc}
@@ -158,24 +158,24 @@ function CourseCard({ course }) {
           }}
         />
       ) : null}
-      <div className="pointer-events-none absolute right-0 top-0 h-[40%] w-[70%] bg-gradient-to-l from-transparent via-[#090909]/35 to-[#090909]" />
+      <div className="owlcognito-course-card-scrim pointer-events-none absolute right-0 top-0 h-[40%] w-[70%] bg-gradient-to-l from-transparent via-[#090909]/35 to-[#090909]" />
 
       <div className="relative flex h-full flex-col px-5 pb-5 pt-7 sm:px-7 sm:pb-7 sm:pt-9">
         <div className="border-b border-white/10 pb-6 sm:pb-8">
           <div className="mb-5 flex items-center justify-between gap-3">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.28em] text-[#858585] sm:text-[11px]">
+            <span className="owlcognito-course-card-eyebrow text-[10px] font-semibold uppercase tracking-[0.28em] text-[#858585] sm:text-[11px]">
               Professional Training Program
             </span>
-            <span className="rounded-full border border-white/15 bg-black/55 px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-[#C8C8C8]">
+            <span className="owlcognito-course-card-status rounded-full border border-white/15 bg-black/55 px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-[#C8C8C8]">
               {status.label}
             </span>
           </div>
           <div className="max-w-[92%]">
-            <h3 className="font-reference text-[clamp(1.85rem,4vw,3rem)] font-semibold leading-[1.03] tracking-[-0.035em] text-white transition group-hover:text-[#F2F2F2]">
+            <h3 className="owlcognito-course-card-title font-reference text-[clamp(1.85rem,4vw,3rem)] font-semibold leading-[1.03] tracking-[-0.035em] text-white transition group-hover:text-[#F2F2F2]">
               {safeTitle}
             </h3>
           </div>
-          <p className="mt-4 max-w-[92%] text-sm leading-6 text-[#A4A4A4] sm:text-base sm:leading-7">
+          <p className="owlcognito-course-card-description mt-4 max-w-[92%] text-sm leading-6 text-[#A4A4A4] sm:text-base sm:leading-7">
             {safeDescription}
           </p>
         </div>
@@ -186,12 +186,12 @@ function CourseCard({ course }) {
               key={`${feature.title}-${index}`}
               className="grid grid-cols-[48px_minmax(0,1fr)] gap-4 py-4 sm:grid-cols-[58px_minmax(0,1fr)] sm:gap-5 sm:py-5"
             >
-              <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-[#202020] text-white sm:h-[58px] sm:w-[58px]">
+              <span className="owlcognito-course-card-icon flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-[#202020] text-white sm:h-[58px] sm:w-[58px]">
                 <span className="h-6 w-6 [&_svg]:h-full [&_svg]:w-full [&_svg]:fill-none [&_svg]:stroke-current [&_svg]:stroke-[1.8] [&_svg]:stroke-linecap-round [&_svg]:stroke-linejoin-round">
                   <FeatureIcon type={feature.icon} />
                 </span>
               </span>
-              <div className="min-w-0 border-l border-white/15 pl-4 sm:pl-5">
+              <div className="owlcognito-course-card-feature min-w-0 border-l border-white/15 pl-4 sm:pl-5">
                 <h4 className="text-[15px] font-semibold leading-5 text-[#F3F3F3] sm:text-base">
                   {feature.title}
                 </h4>
@@ -207,7 +207,7 @@ function CourseCard({ course }) {
           {primaryAction.to ? (
             <Link
               to={primaryAction.to}
-              className="inline-flex min-h-[56px] w-full items-center justify-center gap-4 rounded-full border border-white bg-white px-5 text-sm font-bold uppercase tracking-[0.18em] text-black transition hover:bg-[#E7E7E7] focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black"
+              className="owlcognito-course-card-action inline-flex min-h-[56px] w-full items-center justify-center gap-4 rounded-full border border-white bg-white px-5 text-sm font-bold uppercase tracking-[0.18em] text-black transition hover:bg-[#E7E7E7] focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-black"
             >
               {primaryAction.label}
               <span aria-hidden="true" className="text-2xl font-light leading-none">
@@ -215,12 +215,12 @@ function CourseCard({ course }) {
               </span>
             </Link>
           ) : (
-            <span className="inline-flex min-h-[56px] w-full cursor-not-allowed items-center justify-center rounded-full border border-white/15 bg-[#222222] px-5 text-sm font-bold uppercase tracking-[0.14em] text-[#858585]">
+            <span className="owlcognito-course-card-action owlcognito-course-card-action-disabled inline-flex min-h-[56px] w-full cursor-not-allowed items-center justify-center rounded-full border border-white/15 bg-[#222222] px-5 text-sm font-bold uppercase tracking-[0.14em] text-[#858585]">
               {primaryAction.label}
             </span>
           )}
 
-          <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-[#808080]">
+          <div className="owlcognito-course-card-note mt-4 flex items-center justify-center gap-2 text-[11px] text-[#808080]">
             <svg
               viewBox="0 0 24 24"
               aria-hidden="true"

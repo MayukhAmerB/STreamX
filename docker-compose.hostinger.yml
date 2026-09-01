@@ -109,6 +109,26 @@ services:
     networks:
       - appnet
 
+  owlcognito-frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: /api
+        VITE_BACKEND_ORIGIN: ""
+        VITE_ENABLE_PAYMENTS: ${VITE_ENABLE_PAYMENTS:-0}
+        VITE_RAZORPAY_KEY_ID: ${VITE_RAZORPAY_KEY_ID:-}
+        VITE_TURNSTILE_SITE_KEY: ${VITE_TURNSTILE_SITE_KEY:-}
+        VITE_SITE_BRAND: owlcognito
+        VITE_FORCE_SAME_ORIGIN_API: 1
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${OWLCOGNITO_FRONTEND_PORT:-3002}:8080"
+    networks:
+      - appnet
+
   media:
     image: nginx:1.27-alpine
     restart: always
@@ -167,7 +187,7 @@ services:
       - appnet
 
   livekit:
-    image: livekit/livekit-server:latest
+    image: livekit/livekit-server:v1.13.6
     restart: always
     depends_on:
       redis:
@@ -197,7 +217,7 @@ services:
       - appnet
 
   livekit-egress:
-    image: livekit/egress:latest
+    image: livekit/egress:v1.14.1
     restart: always
     depends_on:
       livekit:
@@ -222,7 +242,7 @@ services:
       start_period: 20s
 
   owncast:
-    image: gabekangas/owncast:latest
+    image: gabekangas/owncast:0.2.5
     restart: always
     command: ["-streamkey", "${OWNCAST_STREAM_KEY:?Set OWNCAST_STREAM_KEY in environment}"]
     volumes:

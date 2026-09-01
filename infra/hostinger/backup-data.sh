@@ -91,6 +91,7 @@ run_offsite_sync() {
   fi
   log "Running offsite backup command."
   HOSTINGER_BACKUP_DIR="$BACKUP_DIR" HOSTINGER_BACKUP_TIMESTAMP="$TIMESTAMP" sh -lc "$OFFSITE_COMMAND"
+  touch "${BACKUP_DIR}/offsite-sync.completed"
 }
 
 log "Ensuring PostgreSQL is running for logical backup."

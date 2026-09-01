@@ -9,6 +9,7 @@ from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
+from urllib.parse import urlparse
 import pyotp
 from rest_framework import permissions, status
 from rest_framework.decorators import api_view, permission_classes
@@ -49,6 +50,24 @@ from .session_policy import (
 from .terms import TERMS_BODY, TERMS_LAST_UPDATED, TERMS_TITLE, TERMS_VERSION
 
 User = get_user_model()
+
+
+def _trusted_frontend_origin(request):
+    """Use the current browser origin only when it is a configured frontend."""
+    fallback = (getattr(settings, "FRONTEND_URL", "") or "").strip().rstrip("/")
+    origin = (request.headers.get("Origin", "") or "").strip().rstrip("/")
+    if not origin:
+        return fallback
+
+    parsed_origin = urlparse(origin)
+    if parsed_origin.scheme not in {"http", "https"} or not parsed_origin.netloc:
+        return fallback
+
+    trusted_origins = {
+        str(value or "").strip().rstrip("/")
+        for value in getattr(settings, "CORS_ALLOWED_ORIGINS", [])
+    }
+    return origin if origin in trusted_origins else fallback
 
 
 def _self_service_credentials_enabled():
@@ -567,7 +586,7 @@ class PasswordResetRequestView(APIView):
         if user:
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             token = default_token_generator.make_token(user)
-            reset_url = f"{getattr(settings, 'FRONTEND_URL', '').rstrip('/')}/reset-password?uid={uid}&token={token}"
+            reset_url = f"{_trusted_frontend_origin(request)}/reset-password?uid={uid}&token={token}"
             from_email = (
                 getattr(settings, "DEFAULT_FROM_EMAIL", "")
                 or getattr(settings, "EMAIL_HOST_USER", "")

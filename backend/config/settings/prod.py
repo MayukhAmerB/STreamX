@@ -33,7 +33,19 @@ REST_FRAMEWORK = {
 
 
 def _is_placeholder_secret(value):
-    return str(value or "").strip() in {"", "change-me", "dev-only-secret-key"}
+    normalized = str(value or "").strip().lower()
+    return (
+        normalized
+        in {
+            "",
+            "admin",
+            "change-me",
+            "dev-only-secret-key",
+            "devkey",
+            "secret",
+        }
+        or normalized.startswith("replace-with-")
+    )
 
 
 def _is_secure_origin(value):
@@ -46,6 +58,53 @@ if ENFORCE_PRODUCTION_REQUIREMENTS:
 
     if _is_placeholder_secret(SECRET_KEY):
         errors.append("DJANGO_SECRET_KEY must be set to a strong, non-placeholder value.")
+    if DIRECT_COURSE_PAYMENTS_ENABLED:
+        payment_secrets = {
+            "RAZORPAY_KEY_ID": RAZORPAY_KEY_ID,
+            "RAZORPAY_KEY_SECRET": RAZORPAY_KEY_SECRET,
+            "RAZORPAY_WEBHOOK_SECRET": RAZORPAY_WEBHOOK_SECRET,
+        }
+        missing_payment_secrets = [
+            name for name, value in payment_secrets.items() if _is_placeholder_secret(value)
+        ]
+        if missing_payment_secrets:
+            errors.append(
+                "Direct payments require non-placeholder values for: "
+                + ", ".join(missing_payment_secrets)
+                + "."
+            )
+    if TURNSTILE_ENABLED and _is_placeholder_secret(TURNSTILE_SECRET_KEY):
+        errors.append("TURNSTILE_SECRET_KEY is required when Turnstile is enabled.")
+    if LIVEKIT_URL or LIVEKIT_SERVER_URL or LIVEKIT_RECORDING_ENABLED:
+        missing_livekit_secrets = [
+            name
+            for name, value in {
+                "LIVEKIT_API_KEY": LIVEKIT_API_KEY,
+                "LIVEKIT_API_SECRET": LIVEKIT_API_SECRET,
+            }.items()
+            if _is_placeholder_secret(value)
+        ]
+        if missing_livekit_secrets:
+            errors.append(
+                "LiveKit requires non-placeholder values for: "
+                + ", ".join(missing_livekit_secrets)
+                + "."
+            )
+    if OWNCAST_BASE_URL or OWNCAST_CHAT_BRIDGE_ENABLED:
+        missing_owncast_secrets = [
+            name
+            for name, value in {
+                "OWNCAST_STREAM_KEY": OWNCAST_STREAM_KEY,
+                "OWNCAST_ADMIN_PASSWORD": OWNCAST_ADMIN_PASSWORD,
+            }.items()
+            if _is_placeholder_secret(value)
+        ]
+        if missing_owncast_secrets:
+            errors.append(
+                "Owncast requires non-placeholder values for: "
+                + ", ".join(missing_owncast_secrets)
+                + "."
+            )
     if not ALLOWED_HOSTS:
         errors.append("ALLOWED_HOSTS must include your production hostnames.")
     if not CORS_ALLOWED_ORIGINS:
@@ -56,6 +115,9 @@ if ENFORCE_PRODUCTION_REQUIREMENTS:
     is_sqlite_database = DATABASE_URL.startswith("sqlite:///")
     if is_sqlite_database and not ALLOW_SQLITE_IN_PRODUCTION:
         errors.append("Production should use PostgreSQL. Set DATABASE_URL to postgres://... .")
+    database_url = urlparse(DATABASE_URL)
+    if database_url.scheme in {"postgres", "postgresql"} and not database_url.password:
+        errors.append("Production DATABASE_URL must contain a database password.")
 
     insecure_http_origins = [
         origin

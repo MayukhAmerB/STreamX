@@ -22,6 +22,15 @@ from config.audit import log_security_event
 from config.response import api_response
 
 from .models import Payment, PaymentWebhookEvent
+from .gateway_audit import safe_gateway_entity as _safe_gateway_entity
+from .gateway_audit import set_gateway_audit as _set_gateway_audit
+from .idempotency import (
+    IdempotencyConflict,
+    InvalidIdempotencyKey,
+    claim_create_order,
+    complete_claim,
+)
+from .order_service import create_payment_order
 from .pricing import get_plan_amount, get_plan_amount_paise
 from .provisioning import provision_paid_payment
 from .serializers import CreateOrderSerializer, VerifyPaymentSerializer
@@ -82,61 +91,6 @@ def _payment_success_data(payment):
         "access_expires_at": payment.access_expires_at,
         "support_whatsapp_url": _payment_support_whatsapp_url(payment),
     }
-
-
-def _safe_gateway_entity(entity):
-    """Keep useful audit fields without retaining card, VPA, or bank payloads."""
-    if not isinstance(entity, dict):
-        return {}
-    allowed_fields = (
-        "id",
-        "entity",
-        "order_id",
-        "amount",
-        "amount_paid",
-        "amount_due",
-        "amount_refunded",
-        "currency",
-        "receipt",
-        "status",
-        "attempts",
-        "international",
-        "method",
-        "captured",
-        "refund_status",
-        "fee",
-        "tax",
-        "created_at",
-        "error_code",
-        "error_description",
-        "error_source",
-        "error_step",
-        "error_reason",
-    )
-    return {
-        key: value
-        for key in allowed_fields
-        if (value := entity.get(key)) is not None
-        and isinstance(value, (str, int, float, bool))
-    }
-
-
-def _set_gateway_audit(payment, entity, *, detail_key="payment", event="", failure_reason=""):
-    safe_entity = _safe_gateway_entity(entity)
-    details = dict(payment.gateway_details or {})
-    if safe_entity:
-        details[detail_key] = safe_entity
-        payment.gateway_details = details
-    gateway_status = str(safe_entity.get("status") or "").strip().lower()
-    if gateway_status:
-        payment.gateway_status = gateway_status
-    payment_method = str(safe_entity.get("method") or "").strip().lower()
-    if payment_method:
-        payment.payment_method = payment_method
-    if event:
-        payment.last_webhook_event = str(event)[:120]
-    if failure_reason:
-        payment.failure_reason = str(failure_reason)[:2000]
 
 
 def _gateway_payment_validation_error(*, payment, callback_data, gateway_payment):
@@ -523,77 +477,83 @@ class CreateOrderView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
         amount_paise = get_plan_amount_paise(course, plan)
-        payment = Payment.objects.create(
-            user=request.user if request.user.is_authenticated else None,
+        try:
+            idempotency_claim = claim_create_order(
+                raw_key=request.headers.get("Idempotency-Key", ""),
+                user=request.user,
+                buyer_email=serializer.validated_data["buyer_email"],
+                request_payload={
+                    **serializer.validated_data,
+                    "server_amount": str(amount),
+                    "currency": "INR",
+                },
+            )
+        except InvalidIdempotencyKey as exc:
+            return api_response(
+                success=False,
+                message="Invalid idempotency key.",
+                errors={"detail": str(exc)},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        except IdempotencyConflict as exc:
+            return api_response(
+                success=False,
+                message="Payment request conflict.",
+                errors={"detail": str(exc)},
+                status_code=status.HTTP_409_CONFLICT,
+            )
+
+        if idempotency_claim and idempotency_claim.replay:
+            replay = idempotency_claim.record
+            return api_response(
+                **replay.response_payload,
+                status_code=replay.response_status or status.HTTP_200_OK,
+            )
+
+        order_result = create_payment_order(
+            user=request.user,
             course=course,
             amount=amount,
-            currency="INR",
-            status=Payment.STATUS_CREATED,
+            amount_paise=amount_paise,
             plan=plan,
-            gateway_status="initializing",
-            buyer_name=serializer.validated_data["buyer_name"],
-            buyer_email=serializer.validated_data["buyer_email"],
-            whatsapp_number=serializer.validated_data["whatsapp_number"],
-            alternate_number=serializer.validated_data.get("alternate_number", ""),
-            age=serializer.validated_data.get("age"),
-            country=serializer.validated_data.get("country", ""),
-            state=serializer.validated_data.get("state", ""),
-            city=serializer.validated_data.get("city", ""),
-            pincode=serializer.validated_data.get("pincode", ""),
+            checkout_profile=serializer.validated_data,
+            gateway_create_order=create_razorpay_order,
         )
-        try:
-            order = create_razorpay_order(
-                amount_paise=amount_paise,
-                currency="INR",
-                receipt=f"p-{payment.internal_reference.hex[:24]}",
-            )
-        except RazorpayServiceError as exc:
-            payment.status = Payment.STATUS_FAILED
-            payment.gateway_status = "order_creation_failed"
-            payment.failure_reason = str(exc)[:2000]
-            payment.save(
-                update_fields=[
-                    "status",
-                    "gateway_status",
-                    "failure_reason",
-                    "updated_at",
-                ]
-            )
+        payment = order_result.payment
+        if not order_result.succeeded:
             log_security_event(
                 "payment.create_order_gateway_error",
                 request=request,
                 course_id=course.id,
                 payment_id=payment.id,
             )
+            response_payload = {
+                "success": False,
+                "message": "Order creation failed.",
+                "errors": {"detail": order_result.error},
+            }
+            complete_claim(
+                idempotency_claim,
+                payment=payment,
+                response_payload=response_payload,
+                response_status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
             return api_response(
-                success=False,
-                message="Order creation failed.",
-                errors={"detail": str(exc)},
+                **response_payload,
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        payment.razorpay_order_id = str(order["id"])
-        payment.currency = str(order.get("currency") or "INR")
-        _set_gateway_audit(payment, order, detail_key="order")
-        payment.save(
-            update_fields=[
-                "razorpay_order_id",
-                "currency",
-                "gateway_status",
-                "gateway_details",
-                "updated_at",
-            ]
-        )
+        order = order_result.order
         log_security_event(
             "payment.create_order_success",
             request=request,
             course_id=course.id,
             payment_id=payment.id,
         )
-        return api_response(
-            success=True,
-            message="Razorpay order created.",
-            data={
+        response_payload = {
+            "success": True,
+            "message": "Razorpay order created.",
+            "data": {
                 "payment_id": payment.id,
                 "checkout_reference": str(payment.internal_reference),
                 "razorpay_order_id": order["id"],
@@ -606,6 +566,15 @@ class CreateOrderView(APIView):
                     "contact": payment.whatsapp_number,
                 },
             },
+        }
+        complete_claim(
+            idempotency_claim,
+            payment=payment,
+            response_payload=response_payload,
+            response_status=status.HTTP_201_CREATED,
+        )
+        return api_response(
+            **response_payload,
             status_code=status.HTTP_201_CREATED,
         )
 

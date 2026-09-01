@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { siteBrand } from "../config/siteBrand";
 import { resolveDjangoAdminUrl } from "../utils/backendUrl";
 import Button from "./Button";
 import BrandLogo from "./BrandLogo";
@@ -15,6 +16,7 @@ const navClass = ({ isActive }) =>
 
 export default function Navbar() {
   const { user, isAuthenticated, isInstructor, isAdmin, logout } = useAuth();
+  const isOwlCognito = siteBrand.id === "owlcognito";
   const canAccessControls = Boolean(isAdmin || isInstructor);
   const navigate = useNavigate();
   const location = useLocation();
@@ -69,9 +71,11 @@ export default function Navbar() {
           <NavLink to="/about" className={navClass}>
             About Us
           </NavLink>
-          <NavLink to="/hall-of-fame" className={navClass}>
-            Hall of Fame
-          </NavLink>
+          {!isOwlCognito ? (
+            <NavLink to="/hall-of-fame" className={navClass}>
+              Hall of Fame
+            </NavLink>
+          ) : null}
           <NavLink to="/contact" className={navClass}>
             Contact
           </NavLink>
@@ -233,9 +237,11 @@ export default function Navbar() {
             <NavLink to="/about" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
               About Us
             </NavLink>
-            <NavLink to="/hall-of-fame" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-              Hall of Fame
-            </NavLink>
+            {!isOwlCognito ? (
+              <NavLink to="/hall-of-fame" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+                Hall of Fame
+              </NavLink>
+            ) : null}
             <NavLink to="/contact" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
               Contact
             </NavLink>

@@ -4,6 +4,7 @@ from django.contrib import admin
 from django.urls import include, path
 
 from config.health import liveness_view, metrics_view, readiness_view
+from config.schema import AdminOpenAPISchemaView
 from apps.campaigns.views import CampaignAdminPageView, CampaignPublicPageView
 
 admin.site.enable_nav_sidebar = False
@@ -18,6 +19,7 @@ urlpatterns = [
     path("healthz", liveness_view, name="healthz"),
     path("readyz", readiness_view, name="readyz"),
     path("metrics", metrics_view, name="metrics"),
+    path("api/schema/", AdminOpenAPISchemaView.as_view(), name="openapi-schema"),
     path("api/auth/", include("apps.users.urls")),
     path("api/notifications/", include("apps.notifications.urls")),
     path("api/realtime/", include("apps.realtime.urls")),

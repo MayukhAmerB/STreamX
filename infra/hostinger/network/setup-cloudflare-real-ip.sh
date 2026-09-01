@@ -3,6 +3,7 @@ set -euo pipefail
 
 CONFIG_DIR="${NGINX_REALIP_CONFIG_DIR:-/etc/nginx/conf.d}"
 TARGET_FILE="${NGINX_REALIP_TARGET_FILE:-$CONFIG_DIR/10-streamx-cloudflare-realip.conf}"
+BACKUP_DIR="${NGINX_REALIP_BACKUP_DIR:-/root/nginx-config-backups/streamx-real-ip}"
 REAL_IP_HEADER="${REAL_IP_HEADER:-CF-Connecting-IP}"
 CLOUDFLARE_IPV4_URL="${CLOUDFLARE_IPV4_URL:-https://www.cloudflare.com/ips-v4}"
 CLOUDFLARE_IPV6_URL="${CLOUDFLARE_IPV6_URL:-https://www.cloudflare.com/ips-v6}"
@@ -33,7 +34,7 @@ require_cmd nginx
 require_cmd systemctl
 require_cmd install
 
-install -d "$CONFIG_DIR"
+install -d "$CONFIG_DIR" "$BACKUP_DIR"
 
 tmp_file="$(mktemp)"
 backup_file=""
@@ -63,7 +64,7 @@ fi
 } >"$tmp_file"
 
 if [[ -f "$TARGET_FILE" ]]; then
-  backup_file="${TARGET_FILE}.bak.$(date +%F-%H%M%S)"
+  backup_file="$BACKUP_DIR/$(basename "$TARGET_FILE").bak.$(date +%F-%H%M%S)"
   cp "$TARGET_FILE" "$backup_file"
 fi
 

@@ -3,6 +3,7 @@ import BroadcastViewerTheater from "./BroadcastViewerTheater";
 import MeetingRoomExperience from "./MeetingRoomExperience";
 import { resolveBroadcastEmbedUrls } from "../../utils/broadcastUrls";
 import { DEFAULT_LIVE_CLASS_SCHEDULE, formatNextLiveWindow } from "../../utils/liveClassSchedule";
+import { siteBrand } from "../../config/siteBrand";
 
 function PlayerChrome({ children, live = false }) {
   return (
@@ -148,7 +149,7 @@ export default function LiveClassViewingStage({
       <div className="mt-4 flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-5">
         <div>
           <h3 className="font-reference text-xl font-semibold text-white sm:text-2xl">
-            {liveSession?.title || "AL Syed Initiative live classroom"}
+            {liveSession?.title || `${siteBrand.name} live classroom`}
           </h3>
           <p className="mt-1 text-sm text-[#888888]">
             {liveSession ? "Live now for your approved enrollment" : currentSchedule.label}

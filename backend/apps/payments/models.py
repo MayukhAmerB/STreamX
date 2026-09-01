@@ -167,3 +167,48 @@ class PaymentWebhookEvent(models.Model):
 
     def __str__(self):
         return f"{self.event_id}:{self.status}"
+
+
+class PaymentIdempotencyRecord(models.Model):
+    SCOPE_CREATE_ORDER = "create_order"
+    STATUS_PROCESSING = "processing"
+    STATUS_COMPLETED = "completed"
+    STATUS_CHOICES = [
+        (STATUS_PROCESSING, "Processing"),
+        (STATUS_COMPLETED, "Completed"),
+    ]
+
+    scope = models.CharField(max_length=40, default=SCOPE_CREATE_ORDER)
+    identity_hash = models.CharField(max_length=64)
+    key_hash = models.CharField(max_length=64)
+    request_fingerprint = models.CharField(max_length=64)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_PROCESSING,
+    )
+    payment = models.ForeignKey(
+        Payment,
+        on_delete=models.SET_NULL,
+        related_name="idempotency_records",
+        blank=True,
+        null=True,
+    )
+    response_payload = models.JSONField(blank=True, default=dict)
+    response_status = models.PositiveSmallIntegerField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["scope", "identity_hash", "key_hash"],
+                name="payments_idem_scope_identity_key_uniq",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.scope}:{self.status}:{self.created_at.isoformat()}"

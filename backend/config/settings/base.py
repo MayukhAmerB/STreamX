@@ -19,7 +19,7 @@ def append_internal_allowed_hosts(hosts):
         return hosts
     return _dedupe_preserve_order([*hosts, *INTERNAL_ALLOWED_HOSTS])
 
-SECRET_KEY = env("DJANGO_SECRET_KEY", "dev-only-secret-key")
+SECRET_KEY = env("DJANGO_SECRET_KEY", "")
 DEBUG = env_bool("DEBUG", False)
 APP_ENV = env("APP_ENV", "production" if not DEBUG else "development").strip().lower()
 ALLOWED_HOSTS = env_list(
@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "corsheaders",
     "rest_framework",
+    "drf_spectacular",
     "rest_framework.authtoken",
     "rest_framework_simplejwt.token_blacklist",
     "apps.users",
@@ -201,11 +202,12 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "users.User"
 
 REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "config.openapi.StreamXAutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "config.authentication.CookieJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",
+        "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
@@ -230,6 +232,18 @@ REST_FRAMEWORK = {
         "realtime_session_create": "30/hour",
         "realtime_session_join": "240/hour",
     },
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "StreamX API",
+    "DESCRIPTION": "Versioned API contract for StreamX frontends and operational clients.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": r"/api",
+    "SCHEMA_PATH_PREFIX_TRIM": True,
+    "SERVERS": [{"url": "/api", "description": "Current origin API"}],
+    "PREPROCESSING_HOOKS": ["config.openapi.preprocess_api_endpoints"],
 }
 
 SIMPLE_JWT = {

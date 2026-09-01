@@ -16,6 +16,7 @@ from django.contrib.admin.models import LogEntry
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
 from django.core import mail, signing
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError
 from django.utils import timezone
@@ -727,6 +728,30 @@ class AuthTests(APITestCase):
             format="json",
         )
         self.assertEqual(login_resp.status_code, 200)
+
+    @override_settings(
+        ACCOUNT_SELF_SERVICE_CREDENTIALS_ENABLED=True,
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        FRONTEND_URL="https://alsyedinitiative.com",
+        CORS_ALLOWED_ORIGINS=["https://alsyedinitiative.com", "https://app.owlcognito.example"],
+    )
+    def test_password_reset_link_uses_the_trusted_request_origin(self):
+        user = User.objects.create_user(
+            email="owl-reset@test.com",
+            password="StrongPass@123",
+            full_name="Owl Reset",
+            role=User.ROLE_STUDENT,
+        )
+        response = self.client.post(
+            reverse("auth-password-reset"),
+            {"email": user.email},
+            format="json",
+            HTTP_ORIGIN="https://app.owlcognito.example",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("https://app.owlcognito.example/reset-password?", mail.outbox[0].body)
 
     @override_settings(ACCOUNT_SELF_SERVICE_CREDENTIALS_ENABLED=False)
     def test_admin_managed_credentials_block_all_self_service_password_updates(self):
@@ -1720,6 +1745,63 @@ class PaymentVerificationTests(BaseAPITestCase):
             },
         )
         self.assertEqual(mock_create_order.call_args.kwargs["amount_paise"], 350000)
+
+    @patch("apps.payments.views.create_razorpay_order")
+    def test_create_order_idempotency_key_replays_without_duplicate_gateway_order(self, mock_create_order):
+        mock_create_order.return_value = {
+            "id": "order_idempotent_once",
+            "amount": 350000,
+            "currency": "INR",
+        }
+        self.login(self.student.email)
+        request_kwargs = {"HTTP_IDEMPOTENCY_KEY": "checkout-idempotency-0001"}
+
+        first = self.client.post(
+            reverse("payment-create-order"),
+            self.checkout_payload(),
+            format="json",
+            **request_kwargs,
+        )
+        second = self.client.post(
+            reverse("payment-create-order"),
+            self.checkout_payload(),
+            format="json",
+            **request_kwargs,
+        )
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 201)
+        self.assertEqual(first.data, second.data)
+        self.assertEqual(Payment.objects.count(), 1)
+        mock_create_order.assert_called_once()
+
+    @patch("apps.payments.views.create_razorpay_order")
+    def test_create_order_idempotency_key_rejects_different_payload(self, mock_create_order):
+        mock_create_order.return_value = {
+            "id": "order_idempotency_conflict",
+            "amount": 350000,
+            "currency": "INR",
+        }
+        self.login(self.student.email)
+        request_kwargs = {"HTTP_IDEMPOTENCY_KEY": "checkout-idempotency-0002"}
+
+        first = self.client.post(
+            reverse("payment-create-order"),
+            self.checkout_payload(),
+            format="json",
+            **request_kwargs,
+        )
+        second = self.client.post(
+            reverse("payment-create-order"),
+            self.checkout_payload(buyer_name="Different Buyer"),
+            format="json",
+            **request_kwargs,
+        )
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 409)
+        self.assertEqual(Payment.objects.count(), 1)
+        mock_create_order.assert_called_once()
 
     @patch("apps.payments.views.create_razorpay_order")
     def test_create_order_rejects_course_with_closed_registration(self, mock_create_order):
@@ -4003,6 +4085,36 @@ class RealtimeSessionTests(APITestCase):
         )
         self.assertEqual(response.status_code, 200)
         return response
+
+    def test_ended_realtime_session_cannot_be_reopened(self):
+        session = RealtimeSession.objects.create(
+            title="Ended State Machine Session",
+            description="Ended sessions must remain terminal.",
+            host=self.host,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            status=RealtimeSession.STATUS_ENDED,
+        )
+
+        with self.assertRaises(ValidationError):
+            session.mark_live()
+
+    def test_stream_state_machine_allows_obs_recovery_after_stop(self):
+        session = RealtimeSession.objects.create(
+            title="OBS Recovery State Machine Session",
+            description="Stopped OBS streams may reconnect without recreating the class.",
+            host=self.host,
+            linked_live_class=self.live_class,
+            linked_course=self.meeting_course,
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            stream_service=RealtimeSession.STREAM_SERVICE_OBS,
+            stream_status=RealtimeSession.STREAM_STOPPED,
+        )
+
+        session.sync_stream_status(RealtimeSession.STREAM_LIVE)
+        session.refresh_from_db()
+
+        self.assertEqual(session.stream_status, RealtimeSession.STREAM_LIVE)
 
     @override_settings(REALTIME_ENROLLMENT_ACCESS_CACHE_TTL_SECONDS=30)
     def test_join_access_enrollment_lookup_is_cached(self):
@@ -7312,6 +7424,22 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(
             response.data["data"][0]["join_url"],
             f"https://academy.example.com/join-live?session={session.id}",
+        )
+
+    @override_settings(
+        FRONTEND_PUBLIC_ORIGIN="https://alsyedinitiative.com",
+        CORS_ALLOWED_ORIGINS=["https://alsyedinitiative.com", "https://app.owlcognito.example"],
+        CSRF_TRUSTED_ORIGINS=["https://alsyedinitiative.com", "https://app.owlcognito.example"],
+    )
+    def test_session_join_url_uses_the_trusted_frontend_host(self):
+        request = RequestFactory().get(
+            "/api/realtime/sessions/",
+            HTTP_HOST="app.owlcognito.example",
+            HTTP_ORIGIN="https://app.owlcognito.example",
+        )
+        self.assertEqual(
+            realtime_services.build_session_join_url(42, request=request),
+            "https://app.owlcognito.example/join-live?session=42",
         )
 
     @override_settings(

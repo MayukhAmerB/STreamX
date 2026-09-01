@@ -7,6 +7,7 @@ import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 import { useAuth } from "../hooks/useAuth";
 import { apiData } from "../utils/api";
+import { siteBrand } from "../config/siteBrand";
 
 const DEFAULT_ID_CARD_PROFILE_IMAGE = defaultIdCardProfileImage;
 
@@ -311,7 +312,7 @@ export default function IdCardPage() {
     memberVerificationLabel === "Verified" ? "identity confirmed" : "membership pending";
   const rankHeading = user?.id ? `#${user.id}` : "#0000";
 
-  const profileReadiness = useMemo(() => {
+  const _profileReadiness = useMemo(() => {
     const hasImage = hasProfileImage;
     const hasPhone = hasProfilePhone;
     const hasName = hasProfileName;
@@ -334,7 +335,7 @@ export default function IdCardPage() {
       };
   }, [hasProfileImage, hasProfileName, hasProfilePhone]);
 
-  const securitySummary = useMemo(() => {
+  const _securitySummary = useMemo(() => {
     if (user?.two_factor_enabled) {
       return {
         label: "2FA Enabled",
@@ -350,7 +351,7 @@ export default function IdCardPage() {
     };
   }, [user?.two_factor_enabled]);
 
-  const accessSummary = useMemo(
+  const _accessSummary = useMemo(
     () => `${courses.length} course${courses.length === 1 ? "" : "s"} // ${approvedLiveClasses.length} live class${approvedLiveClasses.length === 1 ? "" : "es"}`,
     [approvedLiveClasses.length, courses.length]
   );
@@ -1190,7 +1191,7 @@ export default function IdCardPage() {
       <div className="mb-6 rounded-[26px] border border-red-400/30 bg-[linear-gradient(135deg,rgba(120,0,0,0.32),rgba(35,0,0,0.9))] p-5 text-white shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
         <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-red-200">Legal Warning</div>
         <p className="mt-3 max-w-4xl text-sm leading-7 text-red-50/92">
-          Sharing of this ID card is a violation of Al syed Initiative terms and conditions and may result in account suspension, access revocation, and legal case escalation.
+          Sharing of this ID card is a violation of {siteBrand.name} terms and conditions and may result in account suspension, access revocation, and legal case escalation.
         </p>
         <p className="mt-2 max-w-4xl text-sm leading-7 text-red-100/80">
           This page uses watermarking, right-click blocking, print blocking, and protected-view shielding as deterrents. Browsers cannot guarantee absolute screenshot or screen-recording prevention, so every visible view carries your account identity markers.
@@ -1371,7 +1372,7 @@ export default function IdCardPage() {
                 <div>
                   <div className="asi-id-card-section-header">
                     <div className="asi-id-card-section-dot asi-id-card-section-dot-red" />
-                    <div className="asi-id-card-section-title">Al Syed Member</div>
+                    <div className="asi-id-card-section-title">{siteBrand.name} Member</div>
                   </div>
                   <div className="asi-id-card-status-block">
                     <div className="asi-id-card-cross-icon" />
@@ -1417,7 +1418,7 @@ export default function IdCardPage() {
                   </div>
                 </div>
                 <div className="asi-id-card-footer">
-                  {usernameLabel} // cybersecurity apprentice // {new Date().getFullYear()} // property of al syed initiative
+                  {usernameLabel} // cybersecurity apprentice // {new Date().getFullYear()} // property of {siteBrand.name.toLowerCase()}
                 </div>
               </div>
             </div>

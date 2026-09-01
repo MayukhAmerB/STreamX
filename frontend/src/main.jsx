@@ -3,7 +3,11 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
+import { siteBrand } from "./config/siteBrand";
 import "./index.css";
+
+document.documentElement.dataset.siteBrand = siteBrand.id;
+document.title = siteBrand.documentTitle;
 
 // Developer credit: Ibrahim Mohsin Mayukh Bhatt
 const routedApp = (

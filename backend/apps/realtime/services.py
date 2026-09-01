@@ -16,6 +16,7 @@ from django.core.exceptions import DisallowedHost
 from django.utils import timezone
 
 from config.url_utils import get_media_public_url
+from .policies.transitions import ensure_stream_transition
 
 
 logger = logging.getLogger(__name__)
@@ -123,6 +124,33 @@ def _resolve_request_host(request):
     return non_local_hosts[0] if non_local_hosts else (cleaned_hosts[0] if cleaned_hosts else "")
 
 
+def _trusted_request_frontend_origin(request):
+    """Return the configured frontend origin that owns this trusted request."""
+    if not request:
+        return ""
+
+    raw_origin = str(request.META.get("HTTP_ORIGIN") or "").strip()
+    raw_referer = str(request.META.get("HTTP_REFERER") or "").strip()
+    requested_origin = raw_origin
+    if not requested_origin and raw_referer:
+        parsed_referer = urlparse(raw_referer)
+        if parsed_referer.scheme and parsed_referer.netloc:
+            requested_origin = f"{parsed_referer.scheme}://{parsed_referer.netloc}"
+    requested_origin = requested_origin.rstrip("/")
+    if not requested_origin:
+        return ""
+
+    configured_origins = [
+        *getattr(settings, "CORS_ALLOWED_ORIGINS", []),
+        *getattr(settings, "CSRF_TRUSTED_ORIGINS", []),
+    ]
+    for value in configured_origins:
+        candidate = str(value or "").strip().rstrip("/")
+        if candidate and candidate.lower() == requested_origin.lower():
+            return candidate
+    return ""
+
+
 def _parse_url_host_and_port(raw_url):
     raw_value = str(raw_url or "").strip()
     if not raw_value:
@@ -181,6 +209,10 @@ def resolve_livekit_client_url(request=None):
 
 
 def resolve_frontend_public_origin(request=None):
+    request_origin = _trusted_request_frontend_origin(request)
+    if request_origin:
+        return request_origin
+
     configured_frontend_public_origin = (getattr(settings, "FRONTEND_PUBLIC_ORIGIN", "") or "").strip()
     if configured_frontend_public_origin:
         return configured_frontend_public_origin.rstrip("/")
@@ -446,10 +478,15 @@ def refresh_obs_session_stream_health(session, *, force_refresh=False, persist=T
     else:
         next_status = session.STREAM_IDLE
 
-    changed = next_status != session.stream_status
-    session.stream_status = next_status
-    if persist and changed:
-        session.save(update_fields=["stream_status", "updated_at"])
+    sync_stream_status = getattr(session, "sync_stream_status", None)
+    if callable(sync_stream_status):
+        changed = sync_stream_status(next_status, persist=persist)
+    else:
+        ensure_stream_transition(session.stream_status, next_status)
+        changed = next_status != session.stream_status
+        session.stream_status = next_status
+        if persist and changed:
+            session.save(update_fields=["stream_status", "updated_at"])
 
     return {
         "stream_status": next_status,

@@ -8,8 +8,16 @@ TIMEOUT_SECONDS="${UPTIME_ALERT_TIMEOUT_SECONDS:-8}"
 STATE_FILE="${UPTIME_ALERT_STATE_FILE:-/opt/alsyed/StreamX/.hostinger-state/uptime-alert.state}"
 WEBHOOK_URL="${UPTIME_ALERT_WEBHOOK_URL:-}"
 REPEAT_EVERY="${UPTIME_ALERT_REPEAT_EVERY:-15}"
+CERT_FILES="${UPTIME_ALERT_CERT_FILES:-/etc/letsencrypt/live/alsyedinitiative.com/fullchain.pem,/etc/letsencrypt/live/adlfront.com/fullchain.pem}"
+CERT_WARN_DAYS="${UPTIME_ALERT_CERT_WARN_DAYS:-21}"
+DISK_USED_WARN_PERCENT="${UPTIME_ALERT_DISK_USED_WARN_PERCENT:-90}"
+MEMORY_USED_WARN_PERCENT="${UPTIME_ALERT_MEMORY_USED_WARN_PERCENT:-90}"
+CONTAINER_STATE_FILE="${UPTIME_ALERT_CONTAINER_STATE_FILE:-/opt/alsyed/StreamX/.hostinger-state/container-restarts.state}"
+PROMETHEUS_URL="${UPTIME_ALERT_PROMETHEUS_URL:-http://127.0.0.1:9090}"
+CHECK_PROMETHEUS="${UPTIME_ALERT_CHECK_PROMETHEUS:-1}"
 
 mkdir -p "$(dirname "$STATE_FILE")"
+mkdir -p "$(dirname "$CONTAINER_STATE_FILE")"
 
 log() {
   printf '[hostinger-uptime] %s\n' "$*"
@@ -60,6 +68,98 @@ fi
 
 if ! check_url "frontend" "$FRONTEND_URL"; then
   failure_messages+=("frontend probe failed (${FRONTEND_URL})")
+fi
+
+if ! systemctl is-active --quiet nginx; then
+  failure_messages+=("nginx service is not active")
+elif ! nginx -t >/dev/null 2>&1; then
+  failure_messages+=("nginx configuration validation failed")
+fi
+
+active_nginx_backups="$(find /etc/nginx/sites-enabled -maxdepth 1 \( -type f -o -type l \) \
+  \( -name '*.bak*' -o -name '*~' \) -printf '%f ' 2>/dev/null || true)"
+if [[ -n "$active_nginx_backups" ]]; then
+  failure_messages+=("backup files are active in sites-enabled: ${active_nginx_backups}")
+fi
+
+if command -v openssl >/dev/null 2>&1; then
+  IFS=',' read -r -a certificate_files <<<"$CERT_FILES"
+  certificate_warning_seconds=$((CERT_WARN_DAYS * 86400))
+  for certificate_file in "${certificate_files[@]}"; do
+    if [[ ! -f "$certificate_file" ]]; then
+      failure_messages+=("TLS certificate file is missing (${certificate_file})")
+    elif ! openssl x509 -checkend "$certificate_warning_seconds" -noout -in "$certificate_file" >/dev/null 2>&1; then
+      failure_messages+=("TLS certificate expires within ${CERT_WARN_DAYS} days (${certificate_file})")
+    fi
+  done
+else
+  failure_messages+=("openssl is unavailable; TLS expiry could not be checked")
+fi
+
+disk_used_percent="$(df -P / | awk 'NR == 2 {gsub(/%/, "", $5); print $5}')"
+if [[ "$disk_used_percent" =~ ^[0-9]+$ ]] && (( disk_used_percent >= DISK_USED_WARN_PERCENT )); then
+  failure_messages+=("root disk usage is ${disk_used_percent}%")
+fi
+
+memory_used_percent="$(awk '
+  /^MemTotal:/ { total=$2 }
+  /^MemAvailable:/ { available=$2 }
+  END { if (total > 0) printf "%.0f", ((total-available)/total)*100 }
+' /proc/meminfo)"
+if [[ "$memory_used_percent" =~ ^[0-9]+$ ]] && (( memory_used_percent >= MEMORY_USED_WARN_PERCENT )); then
+  failure_messages+=("memory usage is ${memory_used_percent}%")
+fi
+
+if command -v docker >/dev/null 2>&1; then
+  unhealthy_containers="$(docker ps --filter health=unhealthy --format '{{.Names}}' | paste -sd, -)"
+  if [[ -n "$unhealthy_containers" ]]; then
+    failure_messages+=("unhealthy containers: ${unhealthy_containers}")
+  fi
+
+  current_container_state="$(mktemp)"
+  trap 'rm -f "${current_container_state:-}"' EXIT
+  mapfile -t container_ids < <(docker ps -aq)
+  if (( ${#container_ids[@]} > 0 )); then
+    docker inspect --format '{{.Name}}|{{.RestartCount}}' "${container_ids[@]}" \
+      | sed 's#^/##' | sort >"$current_container_state"
+  else
+    : >"$current_container_state"
+  fi
+
+  if [[ -f "$CONTAINER_STATE_FILE" ]]; then
+    while IFS='|' read -r container_name restart_count; do
+      [[ -n "$container_name" ]] || continue
+      previous_restart_count="$(awk -F'|' -v name="$container_name" '$1 == name { print $2; exit }' "$CONTAINER_STATE_FILE")"
+      previous_restart_count="${previous_restart_count:-0}"
+      if (( restart_count > previous_restart_count )); then
+        failure_messages+=("container ${container_name} restarted $((restart_count - previous_restart_count)) time(s) since the last probe")
+      fi
+    done <"$current_container_state"
+  fi
+  install -m 0600 "$current_container_state" "$CONTAINER_STATE_FILE"
+fi
+
+if [[ "$CHECK_PROMETHEUS" == "1" ]]; then
+  prometheus_alerts="$(
+    curl -fsS --max-time "$TIMEOUT_SECONDS" "$PROMETHEUS_URL/api/v1/alerts" 2>/dev/null \
+      | python3 -c '
+import json
+import sys
+
+payload = json.load(sys.stdin)
+alerts = payload.get("data", {}).get("alerts", [])
+names = sorted({
+    alert.get("labels", {}).get("alertname", "unknown")
+    for alert in alerts
+    if alert.get("state") == "firing"
+    and alert.get("labels", {}).get("severity") == "critical"
+})
+print(",".join(names))
+' 2>/dev/null
+  )" || failure_messages+=("Prometheus alert API is unavailable")
+  if [[ -n "${prometheus_alerts:-}" ]]; then
+    failure_messages+=("critical Prometheus alerts are firing: ${prometheus_alerts}")
+  fi
 fi
 
 new_status="up"

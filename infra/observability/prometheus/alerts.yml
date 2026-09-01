@@ -127,3 +127,48 @@ groups:
         annotations:
           summary: "Async jobs moved to dead state"
           description: "At least one async job was marked dead in the last 10 minutes."
+
+      - alert: StreamXContainerRestarted
+        expr: changes(container_start_time_seconds{name!=""}[15m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "A StreamX container restarted"
+          description: "Container {{ $labels.name }} restarted during the last 15 minutes."
+
+      - alert: StreamXRootDiskCritical
+        expr: (node_filesystem_avail_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay"}) * 100 < 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Root disk free space is critically low"
+          description: "Root filesystem free space has been below 5% for 5 minutes."
+
+      - alert: StreamXBackupVerificationMissing
+        expr: absent(streamx_backup_verification_success)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "StreamX backup verification metrics are missing"
+          description: "The scheduled backup verifier has not published a result."
+
+      - alert: StreamXBackupVerificationFailed
+        expr: streamx_backup_verification_success == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "StreamX backup verification failed"
+          description: "The latest backup failed freshness, checksum, or archive validation."
+
+      - alert: StreamXBackupStale
+        expr: time() - streamx_backup_last_success_timestamp_seconds > 129600
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "StreamX verified backup is stale"
+          description: "No verified backup newer than 36 hours is available."

@@ -2,6 +2,10 @@ function resolveConfiguredApiBaseUrl() {
   return String(import.meta.env.VITE_API_BASE_URL || "/api").trim();
 }
 
+function forceSameOriginApi() {
+  return String(import.meta.env.VITE_FORCE_SAME_ORIGIN_API || "").trim() === "1";
+}
+
 function resolveConfiguredBackendOrigin() {
   const configured = String(import.meta.env.VITE_BACKEND_ORIGIN || "").trim();
   if (!configured) {
@@ -34,6 +38,10 @@ export function resolveBackendOrigin() {
   const configuredBackendOrigin = resolveConfiguredBackendOrigin();
   if (configuredBackendOrigin) {
     return configuredBackendOrigin;
+  }
+
+  if (forceSameOriginApi() && typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
   }
 
   const apiBaseUrl = resolveConfiguredApiBaseUrl();
@@ -89,6 +97,10 @@ export function resolveApiBaseUrl() {
   const normalizedPath = configuredApiBaseUrl.startsWith("/")
     ? configuredApiBaseUrl
     : `/${configuredApiBaseUrl}`;
+
+  if (forceSameOriginApi()) {
+    return normalizedPath.replace(/\/+$/, "");
+  }
 
   if (typeof window !== "undefined" && window.location?.hostname) {
     const host = String(window.location.hostname || "").trim().toLowerCase();

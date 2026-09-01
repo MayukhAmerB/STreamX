@@ -1,0 +1,69 @@
+name: Quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.dev
+      DJANGO_SECRET_KEY: ci-only-not-for-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements-dev.txt
+      - run: python manage.py check
+      - run: python manage.py makemigrations --check --dry-run
+      - name: Verify OpenAPI contract is current
+        run: |
+          python manage.py spectacular --file ../contracts/openapi.yaml --validate --fail-on-warn
+          git diff --exit-code -- ../contracts/openapi.yaml
+      - name: Ruff
+        working-directory: ${{ github.workspace }}
+        run: ruff check backend/apps/payments/gateway_audit.py backend/apps/payments/idempotency.py backend/apps/payments/order_service.py backend/apps/realtime/policies
+      - name: Mypy
+        working-directory: ${{ github.workspace }}
+        run: mypy
+      - run: python manage.py test --noinput
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Verify generated API client is current
+        run: |
+          npm run contract:generate
+          git diff --exit-code -- src/api/generated/schema.ts
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

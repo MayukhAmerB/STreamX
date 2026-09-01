@@ -1,4 +1,5 @@
 import storyIllustration from "../assets/story-mission.jpg";
+import { siteBrand } from "../config/siteBrand";
 
 const journeyBlocks = [
   {
@@ -15,7 +16,25 @@ By teaching practical skills in ethical hacking, OSINT research, and security an
   },
 ];
 
+const owlCognitoJourneyBlocks = [
+  {
+    title: "Our Approach",
+    body: `OwlCognito is a private intelligence learning environment for people who want to investigate public information with care, structure, and professional judgment.
+
+The platform turns research practice into repeatable workflows through guided OSINT, reconnaissance, digital verification, and secure web research training.`,
+  },
+  {
+    title: "Our Standard",
+    body: `We teach learners to frame questions carefully, document evidence, validate sources, and respect legal and ethical boundaries.
+
+Every course is designed to turn curiosity into disciplined analytical practice: clear methods, practical exercises, and the confidence to explain how a conclusion was reached.`,
+  },
+];
+
 export default function StoryJourneySection({ className = "" }) {
+  const isOwlCognito = siteBrand.id === "owlcognito";
+  const blocks = isOwlCognito ? owlCognitoJourneyBlocks : journeyBlocks;
+
   return (
     <section
       className={`relative overflow-hidden rounded-[22px] border border-white/10 bg-[#070707] text-[#F4F4F4] shadow-[0_18px_50px_rgba(0,0,0,0.28)] ${className}`}
@@ -23,11 +42,11 @@ export default function StoryJourneySection({ className = "" }) {
       <div className="relative z-10 grid lg:grid-cols-[1.1fr_0.9fr]">
         <div className="p-5 sm:p-7 lg:py-8 lg:pl-8 lg:pr-6">
           <div className="inline-flex items-center border-l-2 border-white/60 pl-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#8F8F8F]">
-            Founded in 2026
+            {isOwlCognito ? "Private intelligence learning" : "Founded in 2026"}
           </div>
 
           <div className="mt-5 space-y-6">
-            {journeyBlocks.map((block) => (
+            {blocks.map((block) => (
               <div key={block.title}>
                 <h3 className="font-reference text-3xl font-semibold uppercase leading-tight text-white sm:text-[2.35rem]">
                   {block.title}

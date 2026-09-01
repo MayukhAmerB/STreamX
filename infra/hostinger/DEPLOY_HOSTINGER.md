@@ -257,6 +257,27 @@ systemctl enable --now hostinger-backup.timer
 systemctl list-timers hostinger-backup.timer
 ```
 
+Install the independent backup verification timer and publish its Prometheus
+metrics after the daily backup window:
+
+```bash
+sudo install -m 0644 infra/hostinger/systemd/hostinger-backup-verify.service /etc/systemd/system/
+sudo install -m 0644 infra/hostinger/systemd/hostinger-backup-verify.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now hostinger-backup-verify.timer
+sudo systemctl start hostinger-backup-verify.service
+sudo systemctl status hostinger-backup-verify.service --no-pager
+```
+
+Formal releases use an approved immutable commit:
+
+```bash
+RELEASE_COMMIT="$(git rev-parse HEAD)" ./infra/hostinger/release-production.sh
+```
+
+The complete release, incident, SLO, migration, DR, and secret-rotation policies
+are indexed in `docs/operations/README.md`.
+
 Uptime probe timer (optional):
 
 ```bash

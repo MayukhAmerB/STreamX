@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 
 DEBUG = True
 APP_ENV = "development"
+SECRET_KEY = env("DJANGO_SECRET_KEY", "dev-only-secret-key")
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0"]
 
 _primary_lan_ip = ""

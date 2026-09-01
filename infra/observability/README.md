@@ -5,6 +5,8 @@ This stack adds:
 - Sentry error reporting (backend)
 - Prometheus metrics scraping
 - Grafana dashboards for API latency, join failures, and recording failures
+- 30-day availability, latency, and realtime-join SLO recording rules
+- backup freshness/integrity metrics from the node-exporter textfile collector
 - Uptime alert probe via systemd timer
 
 ## 1) Backend environment variables
@@ -48,6 +50,11 @@ Phase 5 note:
 
 - Prometheus scrapes all backend pool members (`backend`, `backend-2`, `backend-3`, `backend-4`) so API and realtime metrics stay complete after gateway load-balancing is enabled.
 - Grafana includes backend-pool health and per-replica request, latency, and 5xx panels so load-balancing issues are visible at a glance.
+- `StreamX Enterprise Operations` shows availability, error-budget burn, join
+  success, backup verification, latency, traffic, and host saturation.
+- Prometheus retains 45 days of metrics so the 30-day SLO window is complete.
+- The backup verifier writes `/var/lib/streamx/node-exporter/streamx_backup.prom`
+  on the host; enable `hostinger-backup-verify.timer` after installing its units.
 
 ## 3) Enable uptime alerts
 

@@ -2,6 +2,7 @@ import { lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "../components/ProtectedRoute";
 import ScrollToTop from "../components/ScrollToTop";
+import { siteBrand } from "../config/siteBrand";
 import AppLayout from "../layouts/AppLayout";
 
 const AdminControlCenterPage = lazy(() => import("../pages/AdminControlCenterPage"));
@@ -40,7 +41,7 @@ export default function AppRoutes() {
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/faqs" element={<FaqPage />} />
-          <Route path="/hall-of-fame" element={<HallOfFamePage />} />
+          {siteBrand.id !== "owlcognito" ? <Route path="/hall-of-fame" element={<HallOfFamePage />} /> : null}
           <Route path="/courses" element={<CourseListPage />} />
           <Route path="/courses/:id" element={<CourseDetailPage />} />
           <Route path="/login" element={<LoginPage />} />

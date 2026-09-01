@@ -85,7 +85,7 @@ const monthByLevel = {
 
 const levelOrder = { beginner: 1, intermediate: 2, advanced: 3 };
 
-function isOsintCourse(course) {
+function _isOsintCourse(course) {
   const category = String(course?.category || "").toLowerCase();
   const title = String(course?.title || "").toLowerCase();
   return category === "osint" || title.includes("osint");
@@ -461,7 +461,7 @@ export default function LiveClassesPage() {
             return (
               <article
                 key={course.id}
-                className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-black panel-gradient p-4 shadow-[0_16px_36px_rgba(0,0,0,0.24)]"
+                className="owlcognito-live-card relative flex h-full flex-col overflow-hidden rounded-2xl border border-black panel-gradient p-4 shadow-[0_16px_36px_rgba(0,0,0,0.24)]"
               >
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(192,192,192,0.07),transparent_40%)]" />
                 <div className="relative flex h-full flex-1 flex-col">
@@ -485,18 +485,18 @@ export default function LiveClassesPage() {
                   </p>
 
                   <div className="mt-4 grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-3">
-                    <div className="h-full rounded-xl border border-black panel-gradient px-3 py-2">
+                    <div className="owlcognito-live-stat h-full rounded-xl border border-black panel-gradient px-3 py-2">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Schedule</div>
                       <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">Fri / Sat / Sun</div>
                       <div className="mt-1 text-[10px] text-[#949494]">7-8 PM IST</div>
                     </div>
-                    <div className="h-full rounded-xl border border-black panel-gradient px-3 py-2">
+                    <div className="owlcognito-live-stat h-full rounded-xl border border-black panel-gradient px-3 py-2">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Duration</div>
                       <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
                         {course.class_duration_minutes ? `${course.class_duration_minutes} min` : "1 hour"}
                       </div>
                     </div>
-                    <div className="h-full rounded-xl border border-black panel-gradient px-3 py-2">
+                    <div className="owlcognito-live-stat h-full rounded-xl border border-black panel-gradient px-3 py-2">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">
                         {course.linked_course_id ? "Access" : "Price"}
                       </div>

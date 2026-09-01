@@ -6,4 +6,5 @@ Requires=docker.service
 [Service]
 Type=oneshot
 WorkingDirectory=/opt/alsyed/StreamX
+EnvironmentFile=-/etc/streamx/uptime-alert.env
 ExecStart=/opt/alsyed/StreamX/infra/hostinger/uptime-alert.sh

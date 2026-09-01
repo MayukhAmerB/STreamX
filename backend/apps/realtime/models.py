@@ -15,6 +15,7 @@ from config.model_validators import (
     validate_safe_public_stream_url,
     validate_safe_public_url,
 )
+from .policies.transitions import ensure_session_transition, ensure_stream_transition
 
 
 class RealtimeSessionQuerySet(models.QuerySet):
@@ -234,22 +235,26 @@ class RealtimeSession(models.Model):
         super().save(*args, **kwargs)
 
     def mark_live(self):
+        ensure_session_transition(self.status, self.STATUS_LIVE)
         self.status = self.STATUS_LIVE
         self.started_at = self.started_at or timezone.now()
         self.ended_at = None
         self.save(update_fields=["status", "started_at", "ended_at", "updated_at"])
 
     def mark_ended(self):
+        ensure_session_transition(self.status, self.STATUS_ENDED)
         self.status = self.STATUS_ENDED
         self.ended_at = timezone.now()
         self.save(update_fields=["status", "ended_at", "updated_at"])
 
     def mark_stream_starting(self):
+        ensure_stream_transition(self.stream_status, self.STREAM_STARTING)
         self.stream_status = self.STREAM_STARTING
         self.livekit_egress_error = ""
         self.save(update_fields=["stream_status", "livekit_egress_error", "updated_at"])
 
     def mark_stream_live(self, egress_id):
+        ensure_stream_transition(self.stream_status, self.STREAM_LIVE)
         self.stream_status = self.STREAM_LIVE
         self.livekit_egress_id = egress_id or ""
         self.livekit_egress_error = ""
@@ -263,6 +268,7 @@ class RealtimeSession(models.Model):
         )
 
     def mark_stream_stopped(self):
+        ensure_stream_transition(self.stream_status, self.STREAM_STOPPED)
         self.stream_status = self.STREAM_STOPPED
         self.livekit_egress_id = ""
         self.livekit_egress_error = ""
@@ -276,9 +282,19 @@ class RealtimeSession(models.Model):
         )
 
     def mark_stream_failed(self, message):
+        ensure_stream_transition(self.stream_status, self.STREAM_FAILED)
         self.stream_status = self.STREAM_FAILED
         self.livekit_egress_error = str(message or "")[:1000]
         self.save(update_fields=["stream_status", "livekit_egress_error", "updated_at"])
+
+    def sync_stream_status(self, next_status, *, persist=True):
+        ensure_stream_transition(self.stream_status, next_status)
+        if self.stream_status == next_status:
+            return False
+        self.stream_status = next_status
+        if persist:
+            self.save(update_fields=["stream_status", "updated_at"])
+        return True
 
     @staticmethod
     def _extract_stream_key_from_target(raw_target):
