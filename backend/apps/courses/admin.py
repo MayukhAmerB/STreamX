@@ -4,6 +4,9 @@ import json
 from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
+from .experience_models import CourseReview, PentestingApplication
+
+
 from django.db.models import Count
 from django.urls import reverse
 from django.utils.html import format_html
@@ -27,6 +30,27 @@ from .models import (
 from .cache_utils import bump_course_list_cache_version
 from .services import VideoTranscodeError, transcode_lecture_to_hls
 
+
+@admin.register(CourseReview)
+class CourseReviewAdmin(admin.ModelAdmin):
+    list_display = ("course", "student", "rating", "status", "edit_allowed", "created_at", "updated_at")
+    list_filter = ("status", "rating", "course")
+    search_fields = ("student__email", "student__full_name", "text", "course__title")
+    readonly_fields = ("course", "student", "rating", "text", "created_at", "updated_at")
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(PentestingApplication)
+class PentestingApplicationAdmin(admin.ModelAdmin):
+    list_display = ("full_name", "course", "email", "is_student", "status", "payment_status", "created_at")
+    list_filter = ("status", "is_student", "course")
+    search_fields = ("full_name", "email", "phone", "institution")
+    readonly_fields = ("reference", "student", "status", "payment_status", "consent_at", "created_at", "updated_at")
+
+    def has_add_permission(self, request):
+        return False
 
 def _parse_admin_list_field(value):
     raw = str(value or "").strip()
@@ -97,6 +121,11 @@ def _parse_course_card_features(value):
 
 
 class CourseAdminForm(forms.ModelForm):
+    card_highlights = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 5}), help_text="One course-card bullet per line.")
+
+    def clean_card_highlights(self):
+        return [line.strip() for line in self.cleaned_data.get("card_highlights", "").splitlines() if line.strip()]
+
     what_you_will_learn = forms.CharField(
         required=False,
         label="What You Will Cover",
@@ -146,6 +175,8 @@ class CourseAdminForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         instance = getattr(self, "instance", None)
         if instance and instance.pk:
+            self.fields["card_highlights"].initial = "\n".join(instance.card_highlights or [])
+            self.initial["card_highlights"] = self.fields["card_highlights"].initial
             self.fields["what_you_will_learn"].initial = "\n".join(instance.what_you_will_learn or [])
             self.fields["expected_outcomes"].initial = "\n".join(instance.expected_outcomes or [])
             self.fields["course_card_features"].initial = _format_course_card_features(
@@ -369,6 +400,14 @@ class LiveClassInline(admin.TabularInline):
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
+    @admin.display(description="Confirmed students / approved reviews")
+    def confirmed_statistics(self, obj):
+        if not obj or not obj.pk:
+            return "Save the course first."
+        from .experience_views import course_statistics
+        stats = course_statistics(obj)
+        return f"{stats['enrolled_students']} students; {stats['review_count']} reviews; average {stats['average_rating'] or '-'} / 5"
+
     form = CourseAdminForm
     inlines = (LiveClassInline,)
     list_display = (
@@ -406,6 +445,7 @@ class CourseAdmin(admin.ModelAdmin):
         "instructor",
     )
     readonly_fields = (
+        "confirmed_statistics",
         "slug",
         "frontend_container_guide",
         "enrollment_container_source",
@@ -430,6 +470,10 @@ class CourseAdmin(admin.ModelAdmin):
         "unpublish_courses",
     )
     fieldsets = (
+        ("Homepage card", {"description": "Controls the public program card. Thumbnail upload below also controls the course hero image.", "fields": ("card_title", "card_subtitle", "card_summary", "card_highlights", "image_alt")}),
+        ("Batch and extended facts", {"fields": ("start_date", "total_hours_label", "batch_size_label")}),
+        ("Three-month bundle pricing", {"fields": ("bundle_payment_enabled", "bundle_price", "bundle_installments", "bundle_access_days")}),
+        ("Course facts", {"fields": ("is_flagship", "batch", "duration", "schedule", "class_length", "total_classes", "total_hours", "batch_size", "confirmed_statistics")}),
         (
             "Frontend Container Map (Read First)",
             {
@@ -572,10 +616,11 @@ class CourseAdmin(admin.ModelAdmin):
             blockers.append("course not live")
         if obj.registration_closed:
             blockers.append("registration closed")
-        full_ready = bool(obj.full_payment_enabled)
-        monthly_ready = bool(obj.installment_payment_enabled)
-        if not (full_ready or monthly_ready):
-            blockers.append("enable at least one payment plan")
+        full_ready = bool(obj.full_payment_enabled and obj.price > 0)
+        monthly_ready = bool(obj.installment_payment_enabled and obj.monthly_price > 0)
+        bundle_ready = bool(obj.bundle_payment_enabled and obj.bundle_price > 0)
+        if not (full_ready or monthly_ready or bundle_ready):
+            blockers.append("enable a payment plan and set a positive price")
 
         if blockers:
             return format_html(
@@ -738,6 +783,7 @@ class ModuleAdmin(admin.ModelAdmin):
         "course",
         "title",
         "description",
+        "topics",
         "order",
     )
     readonly_fields = ()

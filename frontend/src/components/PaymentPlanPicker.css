@@ -1,0 +1,10 @@
+.payment-plan-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); gap: 18px; margin-top: 32px; }
+.payment-plan { display: flex; flex-direction: column; gap: 10px; text-align: left; padding: 28px; border-radius: 8px; border: 1px solid #3b424e; background: #0b0f14; color: #b5bfcc; min-height: 390px; transition: border-color .15s; }
+.payment-plan:hover { border-color: #8d9aae; }
+.payment-plan.selected { border: 2px solid #c4d0df; padding: 27px; background: #121922; }
+.payment-plan:focus-visible { outline: 2px solid #c4d0df; outline-offset: 3px; }
+.payment-plan-label { color: #f0f3f8; font-size: 18px; font-weight: 600; }
+.payment-plan strong { color: white; font-size: clamp(26px,3vw,38px); margin-top: 20px; }
+.payment-plan-total { border-top: 1px solid #39414b; margin-top: 16px; padding-top: 16px; line-height: 1.7; font-size: 14px; }
+.payment-plan ul { list-style: disc; padding-left: 18px; font-size: 13px; line-height: 1.8; margin: 8px 0 20px; }
+.payment-plan-choice { margin-top: auto; color: #f0f3f8; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }

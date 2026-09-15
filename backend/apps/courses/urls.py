@@ -26,7 +26,13 @@ from .views import (
     SectionDetailView,
 )
 
+from .experience_views import (CourseExperienceView, CourseReviewView, PentestingApplicationView, ApplicationCheckoutView)
+
 urlpatterns = [
+    path("courses/<int:pk>/experience/", CourseExperienceView.as_view()),
+    path("courses/<int:pk>/reviews/", CourseReviewView.as_view()),
+    path("courses/<int:pk>/applications/", PentestingApplicationView.as_view()),
+    path("courses/<int:pk>/application-checkout/", ApplicationCheckoutView.as_view()),
     path("courses/", CourseListCreateView.as_view(), name="course-list-create"),
     path("courses/<int:pk>/", CourseDetailView.as_view(), name="course-detail"),
     path("courses/<int:pk>/thumbnail/", CourseThumbnailView.as_view(), name="course-thumbnail"),

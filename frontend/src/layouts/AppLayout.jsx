@@ -1,4 +1,4 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import AppFooter from "../components/AppFooter";
 import GlobalPageBackground from "../components/GlobalPageBackground";
 import Navbar from "../components/Navbar";
@@ -7,6 +7,8 @@ import TermsGate from "../components/TermsGate";
 import { siteBrand } from "../config/siteBrand";
 
 export default function AppLayout() {
+  const { pathname } = useLocation();
+  const isCourseExperience = pathname === "/" || pathname.startsWith("/courses");
   const isOwlCognito = siteBrand.id === "owlcognito";
 
   return (
@@ -18,7 +20,7 @@ export default function AppLayout() {
       }`}
     >
       <SafeRender fallback={null}>
-        <GlobalPageBackground />
+        {!isCourseExperience && <GlobalPageBackground />}
       </SafeRender>
       <div className="relative z-10">
         <Navbar />

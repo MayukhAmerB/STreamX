@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
+import apiClient from "../api/client";
+import PaymentPlanPicker, { availablePaymentPlans } from "../components/PaymentPlanPicker";
+import "../components/PaymentPlanPicker.css";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 import { getCourse } from "../api/courses";
@@ -10,8 +13,7 @@ import { getCourseLaunchStatus } from "../utils/courseStatus";
 import { formatINR } from "../utils/currency";
 import { siteBrand } from "../config/siteBrand";
 
-const pageBackgroundImage =
-  "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
+const pageBackgroundImage = "";
 
 const steps = [
   { id: "identity", label: "Your name", summaryKey: "buyer_name" },
@@ -22,15 +24,6 @@ const steps = [
 
 const inputClassName =
   "mt-4 min-h-14 w-full rounded-xl border border-white/15 bg-black/65 px-4 py-3 text-base text-white outline-none transition placeholder:text-[#606060] focus:border-white/50 focus:bg-black";
-
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-4 w-4 sm:h-5 sm:w-5">
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
-      <path d="m8 12 2.6 2.6L16.5 9" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 function PlanIcon({ type }) {
   if (type === "calendar") {
@@ -128,24 +121,6 @@ function WhatsAppIcon() {
   );
 }
 
-function PlanFeature({ children }) {
-  return (
-    <li className="flex min-w-0 items-start gap-1.5 text-[11px] leading-4 text-[#D3D3D3] sm:gap-3 sm:text-base sm:leading-6">
-      <span className="mt-0.5 shrink-0 text-[#8FE3B0]">
-        <CheckIcon />
-      </span>
-      <span className="min-w-0 break-words">{children}</span>
-    </li>
-  );
-}
-
-function formatWholeINR(value) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(Number(value || 0));
-}
 
 function loadRazorpayScript() {
   return new Promise((resolve, reject) => {
@@ -220,7 +195,7 @@ function phoneDigits(value) {
 
 function stepSummary(step, profile, plan, course) {
   if (step.id === "plan") {
-    return plan === "monthly"
+    return plan === "bundle" ? `Bundle - ${formatINR(course?.bundle_price)}` : plan === "monthly"
       ? `Monthly - ${formatINR(course?.monthly_price)}`
       : `One-time - ${formatINR(course?.price)}`;
   }
@@ -232,6 +207,12 @@ function stepSummary(step, profile, plan, course) {
 
 export default function CoursePaymentPage() {
   const { id } = useParams();
+  const location = useLocation();
+  const [applicationReady, setApplicationReady] = useState(false);
+  const [applicationReference] = useState(() => {
+    try { return location.state?.applicationReference || sessionStorage.getItem(`pentesting-application:${id}`) || ""; }
+    catch { return location.state?.applicationReference || ""; }
+  });
   const { user } = useAuth();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -241,9 +222,9 @@ export default function CoursePaymentPage() {
   const [plan, setPlan] = useState("full");
   const [paymentResult, setPaymentResult] = useState(null);
   const [checkoutProfile, setCheckoutProfile] = useState({
-    buyer_name: user?.full_name || "",
-    buyer_email: user?.email || "",
-    whatsapp_number: user?.phone_number || "",
+    buyer_name: location.state?.applicant?.buyer_name || user?.full_name || "",
+    buyer_email: location.state?.applicant?.buyer_email || user?.email || "",
+    whatsapp_number: location.state?.applicant?.whatsapp_number || user?.phone_number || "",
     alternate_number: "",
   });
 
@@ -264,9 +245,13 @@ export default function CoursePaymentPage() {
         if (!active) return;
         const loadedCourse = apiData(response);
         setCourse(loadedCourse);
-        if (!loadedCourse?.full_payment_enabled && loadedCourse?.installment_payment_enabled) {
-          setPlan("monthly");
+        if (loadedCourse?.category === "web_pentesting") {
+          await apiClient.post(`/courses/${id}/application-checkout/`, { reference: applicationReference });
+          if (!active) return;
         }
+        setApplicationReady(true);
+        const available = availablePaymentPlans(loadedCourse);
+        setPlan(available.find((item) => item.id === "full")?.id || available[0]?.id || "full");
       } catch (err) {
         if (active) setError(apiMessage(err, "Failed to load payment details."));
       } finally {
@@ -276,7 +261,7 @@ export default function CoursePaymentPage() {
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, applicationReference]);
 
   const launchStatus = useMemo(() => getCourseLaunchStatus(course), [course]);
   const activeStep = steps[currentStep];
@@ -314,8 +299,7 @@ export default function CoursePaymentPage() {
     }
     if (
       activeStep.id === "plan" &&
-      ((plan === "full" && !course?.full_payment_enabled) ||
-        (plan === "monthly" && !course?.installment_payment_enabled))
+      !availablePaymentPlans(course || {}).some((item) => item.id === plan)
     ) {
       return "Choose an available payment plan.";
     }
@@ -355,6 +339,7 @@ export default function CoursePaymentPage() {
       await loadRazorpayScript();
       const orderResponse = await createPaymentOrder({
         course_id: Number(id),
+        ...(course.category === "web_pentesting" ? { application_reference: applicationReference } : {}),
         plan,
         buyer_name: checkoutProfile.buyer_name.trim(),
         buyer_email: checkoutProfile.buyer_email.trim(),
@@ -381,7 +366,7 @@ export default function CoursePaymentPage() {
         order_id: orderData.razorpay_order_id,
         name: siteBrand.name,
         description:
-          plan === "monthly"
+          plan === "bundle" ? "Three-month course bundle" : plan === "monthly"
             ? "Monthly course installment"
             : "One-time course payment",
         theme: { color: "#111111" },
@@ -432,6 +417,10 @@ export default function CoursePaymentPage() {
         <p className="text-sm text-red-400">{error || "Course not found."}</p>
       </PageShell>
     );
+  }
+
+  if (course.category === "web_pentesting" && !applicationReady) {
+    return <PageShell title="Complete your registration"><p role="alert">{error || "Submit your Pentesting application before viewing the fee and payment plans."}</p><Link to={`/courses/${id}/register`}>Register now ?</Link></PageShell>;
   }
 
   if (paymentResult) {
@@ -765,97 +754,11 @@ export default function CoursePaymentPage() {
                       Choose Your Plan
                     </h3>
                     <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-[#A5A5A5] sm:text-lg sm:leading-8">
-                      Select the plan that best fits your goals and start your OSINT journey.
+                      Choose a payment schedule. Every plan includes the same course curriculum and learning benefits.
                     </p>
                   </div>
 
-                  <div className="mt-7 grid grid-cols-2 gap-2 sm:mt-9 sm:gap-4 lg:gap-5">
-                    {course.installment_payment_enabled ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPlan("monthly");
-                          setError("");
-                        }}
-                        aria-pressed={plan === "monthly"}
-                        className={`flex min-h-[430px] min-w-0 flex-col rounded-xl border p-3 text-left transition sm:min-h-[490px] sm:rounded-2xl sm:p-7 ${
-                          plan === "monthly"
-                            ? "border-[#79A5FF] bg-[#10141C] text-white shadow-[0_0_0_1px_rgba(121,165,255,0.2)]"
-                            : "border-white/15 bg-black/55 text-white hover:border-white/35"
-                        }`}
-                      >
-                        <span className="block text-center text-base font-semibold sm:text-2xl">
-                          Plan 1
-                        </span>
-                        <span className="mt-1 block text-center text-[10px] leading-4 text-[#C3C3C3] sm:mt-2 sm:text-base">
-                          Monthly Payment Plan
-                        </span>
-                        <span className="mt-4 block border-t border-white/10 pt-4 text-xl font-semibold leading-tight sm:mt-6 sm:pt-7 sm:text-5xl">
-                          {formatINR(course.monthly_price)}
-                          <span className="mt-1 block text-[10px] font-normal text-[#B5B5B5] sm:ml-2 sm:mt-0 sm:inline sm:text-sm">/ month</span>
-                        </span>
-                        <ul className="mt-4 space-y-2 sm:mt-7 sm:space-y-3">
-                          <PlanFeature>{formatWholeINR(course.monthly_price)} per month</PlanFeature>
-                          <PlanFeature>
-                            3 monthly installments ({formatWholeINR(Number(course.monthly_price || 0) * 3)} total)
-                          </PlanFeature>
-                          <PlanFeature>Continue your training by paying each monthly installment</PlanFeature>
-                        </ul>
-                        <span className="mt-auto flex min-w-0 items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.045] p-2 sm:gap-4 sm:rounded-xl sm:p-4">
-                          <span className="hidden shrink-0 text-white sm:block"><PlanIcon type="calendar" /></span>
-                          <span className="min-w-0">
-                            <span className="block text-[11px] font-semibold leading-4 sm:text-base">3 Monthly Payments</span>
-                            <span className="mt-1 block text-[10px] leading-4 text-[#A7A7A7] sm:text-sm">
-                              {formatINR(course.monthly_price)} x 3 months
-                            </span>
-                          </span>
-                        </span>
-                      </button>
-                    ) : null}
-                    {course.full_payment_enabled ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPlan("full");
-                          setError("");
-                        }}
-                        aria-pressed={plan === "full"}
-                        className={`relative flex min-h-[430px] min-w-0 flex-col rounded-xl border p-3 text-left transition sm:min-h-[490px] sm:rounded-2xl sm:p-7 ${
-                          plan === "full"
-                            ? "border-[#79A5FF] bg-[#10141C] text-white shadow-[0_0_0_1px_rgba(121,165,255,0.25)]"
-                            : "border-white/15 bg-black/55 text-white hover:border-white/35"
-                        }`}
-                      >
-                        <span className="mx-auto -mt-1 mb-2 rounded-md bg-[#79A5FF] px-2 py-1 text-[8px] font-bold uppercase tracking-[0.08em] text-[#07101F] sm:mb-3 sm:rounded-lg sm:px-4 sm:text-[10px] sm:tracking-[0.12em]">
-                          Most chosen
-                        </span>
-                        <span className="block text-center text-base font-semibold text-[#79A5FF] sm:text-2xl">
-                          Plan 2
-                        </span>
-                        <span className="mt-1 block text-center text-[10px] leading-4 text-[#C3C3C3] sm:mt-2 sm:text-base">
-                          One-Time Payment
-                        </span>
-                        <span className="mt-4 block border-t border-white/10 pt-4 text-xl font-semibold leading-tight sm:mt-6 sm:pt-7 sm:text-5xl">
-                          {formatINR(course.price)}
-                        </span>
-                        <ul className="mt-4 space-y-2 sm:mt-7 sm:space-y-3">
-                          <PlanFeature>One-time payment</PlanFeature>
-                          <PlanFeature>Full duration: 3 months</PlanFeature>
-                          <PlanFeature>Full access to all live sessions</PlanFeature>
-                          <PlanFeature>Lifetime access to recordings</PlanFeature>
-                          <PlanFeature>Certificate of completion</PlanFeature>
-                          <PlanFeature>24x7 team chat support</PlanFeature>
-                        </ul>
-                        <span className="mt-auto flex min-w-0 items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.045] p-2 sm:gap-4 sm:rounded-xl sm:p-4">
-                          <span className="hidden shrink-0 text-white sm:block"><PlanIcon type="tag" /></span>
-                          <span className="min-w-0">
-                            <span className="block text-[11px] font-semibold leading-4 sm:text-base">One-Time Payment</span>
-                            <span className="mt-1 block text-[10px] leading-4 text-[#A7A7A7] sm:text-sm">Pay once, learn fully</span>
-                          </span>
-                        </span>
-                      </button>
-                    ) : null}
-                  </div>
+                  <PaymentPlanPicker course={course} value={plan} onChange={(selected) => { setPlan(selected); setError(""); }} />
                 </div>
               ) : null}
 

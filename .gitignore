@@ -39,3 +39,6 @@ infra/recordings/*
 .hostinger-backups/
 hostinger-data.json
 OSINTCTF/private/
+
+# Isolated course experience browser QA data and screenshots
+/tmp/course-v2-qa/

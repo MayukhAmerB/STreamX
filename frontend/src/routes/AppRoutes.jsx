@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import ProtectedRoute from "../components/ProtectedRoute";
 import ScrollToTop from "../components/ScrollToTop";
 import { siteBrand } from "../config/siteBrand";
@@ -9,8 +9,10 @@ const AdminControlCenterPage = lazy(() => import("../pages/AdminControlCenterPag
 const AboutPage = lazy(() => import("../pages/AboutPage"));
 const BroadcastingPage = lazy(() => import("../pages/BroadcastingPage"));
 const ContactPage = lazy(() => import("../pages/ContactPage"));
-const CourseDetailPage = lazy(() => import("../pages/CourseDetailPage"));
-const CourseListPage = lazy(() => import("../pages/CourseListPage"));
+const LegacyCourseDetailPage = lazy(() => import("../pages/CourseDetailPage"));
+const LegacyLandingPage = lazy(() => import("../pages/LandingPage"));
+const CourseDetailPage = lazy(() => import("../pages/ProfessionalCoursePage"));
+const StudentCoursesPage = lazy(() => import("../pages/StudentCoursesPage"));
 const CoursePaymentPage = lazy(() => import("../pages/CoursePaymentPage"));
 const CoursePlayerPage = lazy(() => import("../pages/CoursePlayerPage"));
 const CreateCoursePage = lazy(() => import("../pages/CreateCoursePage"));
@@ -21,7 +23,8 @@ const HallOfFamePage = lazy(() => import("../pages/HallOfFamePage"));
 const IdCardPage = lazy(() => import("../pages/IdCardPage"));
 const InstructorDashboardPage = lazy(() => import("../pages/InstructorDashboardPage"));
 const JoinLivePage = lazy(() => import("../pages/JoinLivePage"));
-const LandingPage = lazy(() => import("../pages/LandingPage"));
+const LandingPage = lazy(() => import("../pages/FlagshipSelectionPage"));
+const PentestingRegistrationPage = lazy(() => import("../pages/PentestingRegistrationPage"));
 const LectureQuestionsPage = lazy(() => import("../pages/LectureQuestionsPage"));
 const LiveClassesPage = lazy(() => import("../pages/LiveClassesPage"));
 const LoginPage = lazy(() => import("../pages/LoginPage"));
@@ -31,25 +34,27 @@ const ProfilePage = lazy(() => import("../pages/ProfilePage"));
 const TermsPage = lazy(() => import("../pages/TermsPage"));
 
 export default function AppRoutes() {
+  const location = useLocation();
   return (
     <>
       <ScrollToTop />
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={siteBrand.id === "owlcognito" ? <LegacyLandingPage /> : <LandingPage />} />
           <Route path="/live-classes" element={<Navigate to="/courses?view=live" replace />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/faqs" element={<FaqPage />} />
           {siteBrand.id !== "owlcognito" ? <Route path="/hall-of-fame" element={<HallOfFamePage />} /> : null}
-          <Route path="/courses" element={<CourseListPage />} />
-          <Route path="/courses/:id" element={<CourseDetailPage />} />
+          <Route path="/courses" element={new URLSearchParams(location.search).get("view") === "owned" ? <Navigate to="/my-courses" replace /> : <LandingPage />} />
+          <Route path="/courses/:id" element={siteBrand.id === "owlcognito" ? <LegacyCourseDetailPage /> : <CourseDetailPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/courses/:id/register" element={<PentestingRegistrationPage />} />
           <Route path="/courses/:id/payment" element={<CoursePaymentPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/guides" element={<GuidesPage />} />
-            <Route path="/my-courses" element={<Navigate to="/courses?view=owned" replace />} />
+            <Route path="/my-courses" element={<StudentCoursesPage />} />
             <Route path="/osint-tools" element={<OsintToolsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/id-card" element={<IdCardPage />} />

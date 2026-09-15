@@ -59,6 +59,8 @@ class PaymentAdmin(admin.ModelAdmin):
     )
     actions = ("generate_login_credentials",)
     readonly_fields = (
+        "terms_snapshot",
+        "application",
         "internal_reference",
         "user",
         "course",
@@ -108,6 +110,8 @@ class PaymentAdmin(admin.ModelAdmin):
                     "course_title_snapshot",
                     "status",
                     "plan",
+                    "terms_snapshot",
+                    "application",
                     "installment_number",
                     "access_expires_at",
                     "invoice_number",

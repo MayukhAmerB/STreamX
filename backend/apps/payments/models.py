@@ -18,7 +18,9 @@ class Payment(models.Model):
     ]
     PLAN_FULL = "full"
     PLAN_MONTHLY = "monthly"
-    PLAN_CHOICES = [(PLAN_FULL, "Full / lifetime"), (PLAN_MONTHLY, "Monthly installment")]
+    PLAN_BUNDLE = "bundle"
+    PLAN_CHOICES = [(PLAN_FULL, "Full / lifetime"), (PLAN_MONTHLY, "Monthly installment"), (PLAN_BUNDLE, "3-month bundle")]
+    terms_snapshot = models.JSONField(default=dict, blank=True)
     PROVISION_PENDING = "pending_payment"
     PROVISION_AWAITING_ADMIN = "awaiting_admin_credentials"
     PROVISION_CREDENTIALS_ISSUED = "credentials_issued"
@@ -30,6 +32,8 @@ class Payment(models.Model):
         (PROVISION_FAILED, "Provisioning failed"),
     ]
 
+    application = models.ForeignKey("courses.PentestingApplication", on_delete=models.PROTECT,
+                                    null=True, blank=True, related_name="payments")
     internal_reference = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

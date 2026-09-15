@@ -309,14 +309,15 @@ class CourseEnrollmentStatusMixin:
         return format(get_plan_amount(obj, MONTHLY_PLAN), ".2f")
 
     def get_purchase_available(self, obj):
-        full_available = bool(obj.full_payment_enabled)
-        monthly_available = bool(obj.installment_payment_enabled)
+        full_available = bool(obj.full_payment_enabled and obj.price > 0)
+        monthly_available = bool(obj.installment_payment_enabled and obj.monthly_price > 0)
+        bundle_available = bool(obj.bundle_payment_enabled and obj.bundle_price > 0)
         return bool(
             getattr(settings, "DIRECT_COURSE_PAYMENTS_ENABLED", False)
             and obj.is_published
             and obj.launch_status == Course.STATUS_LIVE
             and not obj.registration_closed
-            and (full_available or monthly_available)
+            and (full_available or monthly_available or bundle_available)
         )
 
     def get_purchase_unavailable_reason(self, obj):
@@ -330,7 +331,7 @@ class CourseEnrollmentStatusMixin:
             return "course_not_live"
         if obj.registration_closed:
             return "registration_closed"
-        if not (obj.full_payment_enabled or obj.installment_payment_enabled):
+        if not ((obj.full_payment_enabled and obj.price > 0) or (obj.installment_payment_enabled and obj.monthly_price > 0) or (obj.bundle_payment_enabled and obj.bundle_price > 0)):
             return "price_not_configured"
         return "checkout_unavailable"
 
@@ -411,6 +412,9 @@ class CourseListSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeriali
             "title",
             "slug",
             "description",
+            "card_title", "card_subtitle", "card_summary", "card_highlights", "image_alt",
+            "duration", "start_date", "bundle_payment_enabled", "bundle_price", "bundle_installments", "bundle_access_days",
+            "is_flagship",
             "course_card_features",
             "thumbnail",
             "price",
@@ -467,6 +471,8 @@ class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeria
             "title",
             "slug",
             "description",
+            "card_title", "card_subtitle", "card_summary", "card_highlights", "image_alt",
+            "duration", "start_date", "bundle_payment_enabled", "bundle_price", "bundle_installments", "bundle_access_days",
             "about_the_course",
             "course_overview",
             "what_you_will_learn",

@@ -66,7 +66,10 @@ def _payment_support_whatsapp_url(payment):
 
 def _payment_success_data(payment):
     course = payment.course
-    if payment.plan == Payment.PLAN_MONTHLY:
+    if payment.plan == Payment.PLAN_BUNDLE:
+        access_duration = f"{(payment.terms_snapshot or {}).get('access_days', getattr(course, 'bundle_access_days', 90))} days"
+        plan_label = "3-Month Bundle"
+    elif payment.plan == Payment.PLAN_MONTHLY:
         access_days = max(int(getattr(course, "installment_access_days", 30) or 30), 1)
         access_duration = f"{access_days} days"
         plan_label = "Plan 1 - Monthly Payment"
@@ -432,6 +435,21 @@ class CreateOrderView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
+        application = None
+        if course.category == Course.CATEGORY_WEB_PENTESTING:
+            from apps.courses.models import PentestingApplication
+            reference = serializer.validated_data.get("application_reference")
+            application = PentestingApplication.objects.filter(
+                reference=reference, course=course,
+                email__iexact=serializer.validated_data["buyer_email"],
+                status__in=["submitted", "enrolled"],
+            ).first() if reference else None
+            if not application or (application.student_id and (
+                not request.user.is_authenticated or application.student_id != request.user.pk
+            )):
+                return api_response(success=False, message="Complete your Pentesting registration first.",
+                                    status_code=403)
+
         plan = serializer.validated_data["plan"]
         if plan == Payment.PLAN_FULL and not course.full_payment_enabled:
             return api_response(
@@ -447,6 +465,8 @@ class CreateOrderView(APIView):
                 errors={"detail": "Monthly payment is not enabled for this course."},
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
+        if plan == Payment.PLAN_BUNDLE and not course.bundle_payment_enabled:
+            return api_response(success=False, message="Bundle payment is not enabled for this course.", status_code=400)
         existing_enrollment = (
             Enrollment.objects.filter(user=request.user, course=course).first()
             if request.user.is_authenticated
@@ -518,6 +538,7 @@ class CreateOrderView(APIView):
             plan=plan,
             checkout_profile=serializer.validated_data,
             gateway_create_order=create_razorpay_order,
+            application=application,
         )
         payment = order_result.payment
         if not order_result.succeeded:

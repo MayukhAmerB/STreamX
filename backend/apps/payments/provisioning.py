@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, datetime, time, timedelta
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -9,6 +9,7 @@ from apps.courses.models import Enrollment
 from apps.realtime.domain import invalidate_course_join_access_cache
 
 from .models import Payment, StudentAccountSequence
+from .pricing import get_plan_terms
 
 
 def _allocate_student_login():
@@ -74,19 +75,29 @@ def provision_paid_payment(payment):
 
     user = _resolve_or_create_user(payment)
     course = payment.course
-    enrollment, _ = Enrollment.objects.select_for_update().get_or_create(
+    if payment.application_id:
+        application = payment.application
+        application.student = user
+        application.status = "enrolled"
+        application.save(update_fields=["student", "status", "updated_at"])
+    enrollment, created = Enrollment.objects.select_for_update().get_or_create(
         user=user,
         course=course,
         defaults={"payment_status": Enrollment.STATUS_PAID},
     )
+    # Provider retries must not extend access or downgrade previously granted lifetime access.
+    if payment.invoice_number and payment.provisioning_status in (Payment.PROVISION_AWAITING_ADMIN, Payment.PROVISION_CREDENTIALS_ISSUED):
+        return enrollment
+    had_permanent_access = enrollment.payment_status == Enrollment.STATUS_PAID and enrollment.access_type in (Enrollment.ACCESS_LEGACY, Enrollment.ACCESS_LIFETIME) and not created
     enrollment.payment_status = Enrollment.STATUS_PAID
+    terms = payment.terms_snapshot or get_plan_terms(course, payment.plan)
 
-    if payment.plan == Payment.PLAN_MONTHLY:
+    if payment.plan in (Payment.PLAN_MONTHLY, Payment.PLAN_BUNDLE):
         paid_installments = (
             Payment.objects.filter(
                 user=user,
                 course=course,
-                plan=Payment.PLAN_MONTHLY,
+                plan=payment.plan,
                 status=Payment.STATUS_PAID,
             )
             .exclude(pk=payment.pk)
@@ -97,7 +108,7 @@ def provision_paid_payment(payment):
         ) + 1
         payment.installment_number = max(paid_installments, 1)
         enrollment.installments_paid = max(enrollment.installments_paid, paid_installments)
-        if paid_installments >= max(course.installments_required, 1):
+        if had_permanent_access or paid_installments >= max(int(terms["installments"]), 1):
             enrollment.access_type = Enrollment.ACCESS_LIFETIME
             enrollment.access_expires_at = None
             payment.access_expires_at = None
@@ -108,7 +119,10 @@ def provision_paid_payment(payment):
                 if enrollment.access_expires_at and enrollment.access_expires_at > now
                 else now
             )
-            expires_at = base + timedelta(days=max(course.installment_access_days, 1))
+            if terms.get("start_date"):
+                starts_at = timezone.make_aware(datetime.combine(date.fromisoformat(terms["start_date"]), time.min))
+                base = max(base, starts_at)
+            expires_at = base + timedelta(days=max(int(terms["access_days"]), 1))
             enrollment.access_type = Enrollment.ACCESS_INSTALLMENT
             enrollment.access_expires_at = expires_at
             payment.access_expires_at = expires_at

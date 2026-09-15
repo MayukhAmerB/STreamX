@@ -4,6 +4,7 @@ from typing import Any
 
 from .gateway_audit import set_gateway_audit
 from .models import Payment
+from .pricing import get_plan_terms
 from .services import RazorpayServiceError
 
 
@@ -27,8 +28,11 @@ def create_payment_order(
     plan: str,
     checkout_profile: Mapping[str, Any],
     gateway_create_order: Callable[..., dict[str, Any]],
+    application: Any = None,
 ) -> PaymentOrderResult:
     payment = Payment.objects.create(
+        application=application,
+        terms_snapshot=get_plan_terms(course, plan),
         user=user if user and user.is_authenticated else None,
         course=course,
         amount=amount,

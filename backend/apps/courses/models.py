@@ -151,6 +151,26 @@ class Course(models.Model):
     ]
 
     title = models.CharField(max_length=255)
+    batch = models.CharField(max_length=80, blank=True, default="")
+    card_title = models.CharField(max_length=100, blank=True, default="")
+    card_subtitle = models.CharField(max_length=160, blank=True, default="")
+    card_summary = models.TextField(blank=True, default="")
+    card_highlights = models.JSONField(default=list, blank=True)
+    image_alt = models.CharField(max_length=240, blank=True, default="")
+    start_date = models.DateField(null=True, blank=True)
+    total_hours_label = models.CharField(max_length=80, blank=True, default="")
+    batch_size_label = models.CharField(max_length=80, blank=True, default="")
+    bundle_payment_enabled = models.BooleanField(default=False)
+    bundle_price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    bundle_installments = models.PositiveSmallIntegerField(default=2)
+    bundle_access_days = models.PositiveSmallIntegerField(default=90)
+    is_flagship = models.BooleanField(default=False, help_text="Show this course as the category's primary program.")
+    duration = models.CharField(max_length=120, blank=True, default="")
+    schedule = models.CharField(max_length=160, blank=True, default="")
+    class_length = models.CharField(max_length=80, blank=True, default="")
+    total_classes = models.PositiveIntegerField(null=True, blank=True)
+    total_hours = models.PositiveIntegerField(null=True, blank=True)
+    batch_size = models.PositiveIntegerField(null=True, blank=True)
     slug = models.SlugField(max_length=255, unique=True, blank=True)
     description = models.TextField()
     about_the_course = models.TextField(blank=True, default="")
@@ -195,6 +215,7 @@ class Course(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [models.UniqueConstraint(fields=["category"], condition=Q(is_flagship=True), name="one_flagship_per_category")]
         indexes = [
             models.Index(fields=["is_published", "category", "level", "launch_status"]),
             models.Index(fields=["instructor", "is_published"]),
@@ -336,6 +357,7 @@ class Course(models.Model):
 
 
 class Section(models.Model):
+    topics = models.JSONField(default=list, blank=True, help_text="Public lesson topics, exercises, tools and expected skills; a JSON list of text.")
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="sections")
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
@@ -353,7 +375,19 @@ class Section(models.Model):
     def clean(self):
         super().clean()
         validate_no_active_content(self.title, "title")
+        for field in ("card_title", "card_subtitle", "card_summary", "image_alt", "total_hours_label", "batch_size_label"):
+            validate_no_active_content(getattr(self, field), field)
+        self.card_highlights = _sanitize_string_list(self.card_highlights)
+        for item in self.card_highlights:
+            validate_no_active_content(item, "card_highlights")
+        if any(value < 0 for value in (self.price, self.monthly_price, self.bundle_price)):
+            raise ValidationError("Course prices cannot be negative.")
+        if not all((self.installments_required, self.installment_access_days, self.bundle_installments, self.bundle_access_days)):
+            raise ValidationError("Installment counts and access days must be greater than zero.")
         validate_no_active_content(self.description, "description")
+        self.topics = _sanitize_string_list(self.topics)
+        for topic in self.topics:
+            validate_no_active_content(topic, "topics")
 
     def __str__(self):
         return f"{self.course.title} - {self.title}"
@@ -1055,3 +1089,6 @@ class EnrollmentRequestNotification(models.Model):
 
     def __str__(self):
         return f"{self.get_channel_display()} request notification #{self.id}"
+
+
+from .experience_models import CourseReview, PentestingApplication  # noqa: E402,F401

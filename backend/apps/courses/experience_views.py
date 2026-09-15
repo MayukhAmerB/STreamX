@@ -1,0 +1,218 @@
+from config.request_security import contains_active_content
+from config.response import api_response
+from django.db import IntegrityError, transaction
+from django.db.models import Avg, Count
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from rest_framework import permissions, serializers
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+from rest_framework.views import APIView
+
+from .models import Course, CourseReview, Enrollment, PentestingApplication
+
+
+def confirmed_reviews(course):
+    return CourseReview.objects.filter(
+        course=course,
+        status="approved",
+        student__enrollments__course=course,
+        student__enrollments__payment_status=Enrollment.STATUS_PAID,
+    )
+
+
+def course_statistics(course):
+    stats = confirmed_reviews(course).aggregate(average=Avg("rating"), count=Count("pk"))
+    return {
+        "enrolled_students": course.enrollments.filter(payment_status=Enrollment.STATUS_PAID).count(),
+        "count_scope": "Confirmed students across this course record's history",
+        "average_rating": round(stats["average"], 1) if stats["average"] is not None else None,
+        "review_count": stats["count"],
+    }
+
+
+class ExperienceReadThrottle(AnonRateThrottle):
+    scope = "course_experience_read"
+    rate = "120/min"
+
+
+class ExperienceWriteThrottle(UserRateThrottle):
+    scope = "course_experience_write"
+    rate = "10/min"
+
+
+class ReviewInput(serializers.Serializer):
+    rating = serializers.IntegerField(min_value=1, max_value=5)
+    text = serializers.CharField(min_length=10, max_length=3000)
+
+    def validate_text(self, value):
+        if contains_active_content(value):
+            raise serializers.ValidationError("Use plain text for your review.")
+        return value
+
+
+class CourseExperienceView(APIView):
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ExperienceReadThrottle]
+
+    def get(self, request, pk):
+        course = get_object_or_404(Course, pk=pk, is_published=True)
+        page_input = serializers.IntegerField(min_value=1, max_value=100000)
+        page = page_input.run_validation(request.query_params.get("page", 1))
+        reviews = confirmed_reviews(course)
+        own = None
+        eligible = False
+        if request.user.is_authenticated:
+            eligible = course.enrollments.filter(user=request.user, payment_status=Enrollment.STATUS_PAID).exists()
+            own = (
+                CourseReview.objects.filter(course=course, student=request.user)
+                .values(
+                    "rating",
+                    "text",
+                    "status",
+                    "edit_allowed",
+                )
+                .first()
+            )
+        data = {
+            **course_statistics(course),
+            "facts": {
+                key: getattr(course, key)
+                for key in (
+                    "batch",
+                    "duration",
+                    "schedule",
+                    "class_length",
+                    "total_classes",
+                    "total_hours",
+                    "batch_size", "batch_size_label", "total_hours_label", "start_date",
+                )
+            },
+            "modules": [
+                {
+                    "id": section.pk,
+                    "title": section.title,
+                    "description": section.description,
+                    "topics": section.topics,
+                    "lessons": list(section.lectures.values("title", "description")),
+                }
+                for section in course.sections.prefetch_related("lectures").all()
+            ],
+            "reviews": [
+                {
+                    "rating": review.rating,
+                    "text": review.text,
+                    "author": "Verified student",
+                    "verified": True,
+                    "date": review.created_at,
+                }
+                for review in reviews[(page - 1) * 10 : page * 10]
+            ],
+            "has_more": reviews.count() > page * 10,
+            "can_review": eligible,
+            "own_review": own,
+        }
+        response = api_response(data=data)
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+
+class CourseReviewView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ExperienceWriteThrottle]
+
+    def post(self, request, pk):
+        course = get_object_or_404(Course, pk=pk, is_published=True)
+        if not course.enrollments.filter(user=request.user, payment_status=Enrollment.STATUS_PAID).exists():
+            raise PermissionDenied("Only confirmed students of this course may review it.")
+        serializer = ReviewInput(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            with transaction.atomic():
+                review = CourseReview.objects.select_for_update().filter(course=course, student=request.user).first()
+                if review and not review.edit_allowed:
+                    raise ValidationError("You have already reviewed this course. Contact support to request an edit.")
+                if review:
+                    review.rating = serializer.validated_data["rating"]
+                    review.text = serializer.validated_data["text"]
+                    review.status = "pending"
+                    review.edit_allowed = False
+                    review.save()
+                else:
+                    CourseReview.objects.create(course=course, student=request.user, **serializer.validated_data)
+        except IntegrityError as exc:
+            raise ValidationError("You have already reviewed this course.") from exc
+        return api_response(message="Your review is pending moderation.", status_code=201)
+
+
+class ApplicationInput(serializers.ModelSerializer):
+    consent = serializers.BooleanField(write_only=True)
+    phone = serializers.RegexField(r"^\+?[0-9][0-9 ()-]{7,22}$", max_length=24)
+
+    class Meta:
+        model = PentestingApplication
+        fields = (
+            "full_name",
+            "email",
+            "phone",
+            "is_student",
+            "institution",
+            "education",
+            "skill_level",
+            "experience",
+            "motivation",
+            "consent",
+        )
+
+    def validate(self, attrs):
+        if not attrs.pop("consent", False):
+            raise serializers.ValidationError({"consent": "Consent is required."})
+        if attrs["is_student"] and not attrs.get("institution", "").strip():
+            raise serializers.ValidationError({"institution": "Institution is required for students."})
+        if not attrs["is_student"]:
+            attrs["institution"] = ""
+        if not 8 <= sum(char.isdigit() for char in attrs["phone"]) <= 15:
+            raise serializers.ValidationError({"phone": "Enter 8 to 15 digits."})
+        for value in attrs.values():
+            if isinstance(value, str) and contains_active_content(value):
+                raise serializers.ValidationError("Use plain text in application fields.")
+        attrs["email"] = attrs["email"].lower()
+        return attrs
+
+
+class PentestingApplicationView(APIView):
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ExperienceWriteThrottle]
+
+    def post(self, request, pk):
+        course = get_object_or_404(Course, pk=pk, is_published=True, category=Course.CATEGORY_WEB_PENTESTING)
+        if course.registration_closed or course.launch_status != Course.STATUS_LIVE:
+            raise ValidationError("Registration is not currently open.")
+        serializer = ApplicationInput(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        application = serializer.save(
+            course=course,
+            consent_at=timezone.now(),
+            student=request.user if request.user.is_authenticated else None,
+        )
+        response = api_response(
+            data={"reference": str(application.reference), "status": application.status}, status_code=201
+        )
+        response["Cache-Control"] = "no-store"
+        return response
+
+
+class ApplicationCheckoutView(APIView):
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ExperienceWriteThrottle]
+
+    def post(self, request, pk):
+        reference = serializers.UUIDField().run_validation(request.data.get("reference"))
+        application = get_object_or_404(PentestingApplication, reference=reference, course_id=pk)
+        if application.status == "cancelled":
+            raise ValidationError("Application cancelled. Contact support.")
+        if application.student_id and (not request.user.is_authenticated or request.user.pk != application.student_id):
+            raise PermissionDenied("Sign in with the applicant account.")
+        response = api_response(data={"status": application.status, "payment_status": application.payment_status})
+        response["Cache-Control"] = "no-store"
+        return response

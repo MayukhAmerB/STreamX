@@ -124,8 +124,9 @@ class CheckoutProfileSerializer(serializers.Serializer):
 
 
 class CreateOrderSerializer(CheckoutProfileSerializer):
+    application_reference = serializers.UUIDField(required=False)
     course_id = serializers.IntegerField(min_value=1)
-    plan = serializers.ChoiceField(choices=("full", "monthly"), default="full")
+    plan = serializers.ChoiceField(choices=("full", "monthly", "bundle"), default="full")
 
 
 class VerifyPaymentSerializer(serializers.Serializer):

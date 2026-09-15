@@ -363,7 +363,7 @@ class CourseDetailView(APIView):
 
     @staticmethod
     def _build_public_cache_key(course_id, updated_at):
-        updated_ts = int(updated_at.timestamp()) if updated_at else 0
+        updated_ts = int(updated_at.timestamp() * 1_000_000) if updated_at else 0
         direct_pay = int(bool(getattr(settings, "DIRECT_COURSE_PAYMENTS_ENABLED", False)))
         return f"course-detail:{course_id}:v={updated_ts}:direct_pay={direct_pay}"
 
