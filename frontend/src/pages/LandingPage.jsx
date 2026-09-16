@@ -974,7 +974,7 @@ export default function LandingPage() {
             </div>
 
             {landingLiveCourses.length ? (
-              <div className="mt-7 grid auto-rows-fr gap-5 md:grid-cols-2">
+              <div className="mt-7 grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {landingLiveCourses.map((course) => (
                   <CourseCard key={course.id} course={course} />
                 ))}
