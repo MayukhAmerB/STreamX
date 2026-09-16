@@ -146,6 +146,7 @@ describe("CourseCard", () => {
     expect(html).toContain("Live Sessions");
     expect(html).toContain("Course Completion Certificate");
     expect(html).toContain("24x7 Team Chat Support");
+    expect(html).toContain('src="/course-art/osint-program-v2.png"');
   });
 
   it("renders admin-configured course-card features", () => {

@@ -8,6 +8,7 @@ import Button from "../components/Button";
 import CourseCard from "../components/CourseCard";
 import StoryJourneySection from "../components/StoryJourneySection";
 import { useAuth } from "../hooks/useAuth";
+import { resolveCourseArtwork } from "../utils/courseArtwork";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
 import { selectHeroProgramCourse, selectLandingCourses } from "../utils/landingCourses";
 import { apiData } from "../utils/api";
@@ -515,6 +516,7 @@ const HERO_PROGRAM_FEATURES = [
 ];
 
 function TrainingProgramPanel({ course }) {
+  const artwork = resolveCourseArtwork(course);
   const launchStatus = getCourseLaunchStatus(course);
   const enrollmentStatus = String(course?.enrollment_status || "").toLowerCase();
   const hasAccess =
@@ -542,6 +544,14 @@ function TrainingProgramPanel({ course }) {
 
   return (
     <article className="relative w-full max-w-[500px] overflow-hidden rounded-[24px] border border-white/20 bg-[#111111] p-4 shadow-[0_24px_72px_rgba(0,0,0,0.55)] sm:p-5">
+      {artwork ? (
+        <img
+          src={artwork}
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute right-0 top-0 h-[44%] w-[64%] object-cover opacity-20 grayscale"
+        />
+      ) : null}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -right-16 -top-16 h-52 w-52 rounded-full bg-white/[0.055] blur-[70px]"

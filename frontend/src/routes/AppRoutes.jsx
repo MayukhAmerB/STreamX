@@ -10,8 +10,8 @@ const AboutPage = lazy(() => import("../pages/AboutPage"));
 const BroadcastingPage = lazy(() => import("../pages/BroadcastingPage"));
 const ContactPage = lazy(() => import("../pages/ContactPage"));
 const LegacyCourseDetailPage = lazy(() => import("../pages/CourseDetailPage"));
-const LegacyLandingPage = lazy(() => import("../pages/LandingPage"));
 const CourseDetailPage = lazy(() => import("../pages/ProfessionalCoursePage"));
+const CourseListPage = lazy(() => import("../pages/CourseListPage"));
 const StudentCoursesPage = lazy(() => import("../pages/StudentCoursesPage"));
 const CoursePaymentPage = lazy(() => import("../pages/CoursePaymentPage"));
 const CoursePlayerPage = lazy(() => import("../pages/CoursePlayerPage"));
@@ -23,7 +23,7 @@ const HallOfFamePage = lazy(() => import("../pages/HallOfFamePage"));
 const IdCardPage = lazy(() => import("../pages/IdCardPage"));
 const InstructorDashboardPage = lazy(() => import("../pages/InstructorDashboardPage"));
 const JoinLivePage = lazy(() => import("../pages/JoinLivePage"));
-const LandingPage = lazy(() => import("../pages/FlagshipSelectionPage"));
+const LandingPage = lazy(() => import("../pages/LandingPage"));
 const PentestingRegistrationPage = lazy(() => import("../pages/PentestingRegistrationPage"));
 const LectureQuestionsPage = lazy(() => import("../pages/LectureQuestionsPage"));
 const LiveClassesPage = lazy(() => import("../pages/LiveClassesPage"));
@@ -40,13 +40,13 @@ export default function AppRoutes() {
       <ScrollToTop />
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/" element={siteBrand.id === "owlcognito" ? <LegacyLandingPage /> : <LandingPage />} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/live-classes" element={<Navigate to="/courses?view=live" replace />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/faqs" element={<FaqPage />} />
           {siteBrand.id !== "owlcognito" ? <Route path="/hall-of-fame" element={<HallOfFamePage />} /> : null}
-          <Route path="/courses" element={new URLSearchParams(location.search).get("view") === "owned" ? <Navigate to="/my-courses" replace /> : <LandingPage />} />
+          <Route path="/courses" element={new URLSearchParams(location.search).get("view") === "owned" ? <Navigate to="/my-courses" replace /> : <CourseListPage />} />
           <Route path="/courses/:id" element={siteBrand.id === "owlcognito" ? <LegacyCourseDetailPage /> : <CourseDetailPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/courses/:id/register" element={<PentestingRegistrationPage />} />

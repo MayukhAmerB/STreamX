@@ -1,6 +1,7 @@
 import { memo, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getPurchaseUnavailableMessage } from "../utils/courseAccess";
+import { resolveCourseArtwork } from "../utils/courseArtwork";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
 
 const COURSE_FALLBACK_THUMBNAIL =
@@ -110,7 +111,10 @@ function FeatureIcon({ type }) {
 
 function CourseCard({ course }) {
   const status = getCourseLaunchStatus(course);
-  const [thumbnailSrc, setThumbnailSrc] = useState(course?.thumbnail || "");
+  const courseId = course?.id;
+  const courseCategory = course?.category;
+  const courseThumbnail = course?.thumbnail;
+  const [thumbnailSrc, setThumbnailSrc] = useState(() => resolveCourseArtwork(course));
   const safeTitle = course?.title || "Untitled course";
   const safeDescription = course?.description || "Professional cybersecurity training program.";
   const features = normalizeFeatures(course?.course_card_features);
@@ -119,8 +123,10 @@ function CourseCard({ course }) {
     normalizeEnrollmentStatus(course?.enrollment_status) === "approved";
 
   useEffect(() => {
-    setThumbnailSrc(course?.thumbnail || "");
-  }, [course?.id, course?.thumbnail]);
+    setThumbnailSrc(
+      resolveCourseArtwork({ category: courseCategory, thumbnail: courseThumbnail }),
+    );
+  }, [courseCategory, courseId, courseThumbnail]);
 
   const primaryAction = (() => {
     if (status.isComingSoon) {
