@@ -33,30 +33,37 @@ for service in "${services[@]}"; do
   grep -Fxq "$service" <<< "$configured"
 done
 docker exec streamx-gateway-1 nginx -t
-mkdir -p .hostinger-backups
-backup="$(mktemp -d /opt/alsyed/StreamX/.hostinger-backups/course-v2-release-XXXXXXXX)"
-echo "Recovery directory: $backup"
-docker ps -aq --filter label=com.docker.compose.project=streamx |
-while read -r container; do
-  docker inspect --format '{{.Name}} {{.Image}}' "$container"
-done > "$backup/previous-images.txt"
+backup=""
+if [[ "${ALLOW_UNBACKED_RELEASE:-}" == "1" ]]; then
+  echo 'WARNING: Running without a PostgreSQL or media recovery point by explicit operator override.'
+else
+  mkdir -p .hostinger-backups
+  backup="$(mktemp -d /opt/alsyed/StreamX/.hostinger-backups/course-v2-release-XXXXXXXX)"
+  echo "Recovery directory: $backup"
+  docker ps -aq --filter label=com.docker.compose.project=streamx |
+  while read -r container; do
+    docker inspect --format '{{.Name}} {{.Image}}' "$container"
+  done > "$backup/previous-images.txt"
+fi
 echo 'Building application images.'
 "${compose[@]}" build "${services[@]}"
-echo 'Backing up PostgreSQL without restarting it.'
-docker exec streamx-postgres-1 sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup/postgres.dump"
-test -s "$backup/postgres.dump"
-docker exec -i streamx-postgres-1 pg_restore --list < "$backup/postgres.dump" > "$backup/postgres-contents.txt"
-echo 'Archiving media and recordings. This may take a while.'
-for volume in streamx_backend_media streamx_recordings_data streamx_owncast_data; do
-  docker volume inspect "$volume" >/dev/null
-  docker run --rm --mount "type=volume,source=$volume,target=/source,readonly" --mount "type=bind,source=$backup,target=/backup" alpine:3.20 sh -c 'tar czf "/backup/$1.tar.gz" -C /source .' sh "$volume"
-  gzip -t "$backup/$volume.tar.gz"
-done
-(
-  cd "$backup"
-  sha256sum postgres.dump *.tar.gz > SHA256SUMS
-  sha256sum -c SHA256SUMS
-)
+if [[ -n "$backup" ]]; then
+  echo 'Backing up PostgreSQL without restarting it.'
+  docker exec streamx-postgres-1 sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup/postgres.dump"
+  test -s "$backup/postgres.dump"
+  docker exec -i streamx-postgres-1 pg_restore --list < "$backup/postgres.dump" > "$backup/postgres-contents.txt"
+  echo 'Archiving media and recordings. This may take a while.'
+  for volume in streamx_backend_media streamx_recordings_data streamx_owncast_data; do
+    docker volume inspect "$volume" >/dev/null
+    docker run --rm --mount "type=volume,source=$volume,target=/source,readonly" --mount "type=bind,source=$backup,target=/backup" alpine:3.20 sh -c 'tar czf "/backup/$1.tar.gz" -C /source .' sh "$volume"
+    gzip -t "$backup/$volume.tar.gz"
+  done
+  (
+    cd "$backup"
+    sha256sum postgres.dump *.tar.gz > SHA256SUMS
+    sha256sum -c SHA256SUMS
+  )
+fi
 echo 'Checking and applying forward migrations.'
 "${compose[@]}" run --rm --no-deps -T --entrypoint python backend manage.py check
 "${compose[@]}" run --rm --no-deps -T --entrypoint python backend manage.py makemigrations --check --dry-run
@@ -78,4 +85,7 @@ curl --fail --silent --show-error http://127.0.0.1:8088/gateway-healthz
 curl --fail --silent --show-error http://127.0.0.1:3000/healthz
 docker ps --filter label=com.docker.compose.project=streamx --format 'table {{.Names}}\t{{.Status}}'
 echo "Deployment commands completed. Backup: $backup"
+if [[ -z "$backup" ]]; then
+  echo 'No backup was created because ALLOW_UNBACKED_RELEASE=1 was set.'
+fi
 echo 'Verify login, existing video playback, course cards and admin pricing.'

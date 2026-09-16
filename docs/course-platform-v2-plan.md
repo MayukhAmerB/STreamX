@@ -109,3 +109,7 @@ RELEASE_COMMIT="<full-approved-sha>" ./infra/hostinger/deploy-course-v2.sh
 ```
 
 The script creates a PostgreSQL and media recovery point, verifies it, applies only forward migrations, updates the existing pooled services, and creates only missing program slugs. It never overwrites matching courses or admin edits. Existing thumbnails remain stored but are not presented unless an administrator enables their display toggle. Set OSINT pricing in admin, and check an existing student's video playback, login, the new cards and registration before considering the release verified.
+
+### Explicit unbacked release
+
+The default release creates and verifies PostgreSQL, media, recording and Owncast recovery archives. Only when an operator explicitly accepts the loss of that recovery point may they set `ALLOW_UNBACKED_RELEASE=1`. This bypasses Alpine and all archive work but keeps the release guards, migrations, rolling service updates and health checks. It is not the recommended production path.
