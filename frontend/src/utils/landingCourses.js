@@ -28,11 +28,15 @@ export function selectLandingCourses(courses = []) {
       return status.isLive || Boolean(course?.registration_closed);
     })
     .sort((left, right) => {
-      const closedOrder =
-        Number(Boolean(left?.registration_closed)) -
-        Number(Boolean(right?.registration_closed));
-      if (closedOrder !== 0) return closedOrder;
+      const leftCreatedAt = new Date(left?.created_at || "").getTime();
+      const rightCreatedAt = new Date(right?.created_at || "").getTime();
+      if (Number.isFinite(leftCreatedAt) && Number.isFinite(rightCreatedAt)) {
+        const createdOrder = leftCreatedAt - rightCreatedAt;
+        if (createdOrder !== 0) return createdOrder;
+      }
 
+      const idOrder = Number(left?.id || 0) - Number(right?.id || 0);
+      if (idOrder !== 0) return idOrder;
       return String(left?.title || "").localeCompare(String(right?.title || ""));
     });
 }

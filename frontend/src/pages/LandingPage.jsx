@@ -4,7 +4,7 @@ import certificateExcellenceImage from "../assets/certificate-excellence.png";
 import { getMyCourses, listCourses, listLiveClasses } from "../api/courses";
 import { listRealtimeSessions } from "../api/realtime";
 import Button from "../components/Button";
-import CourseCard from "../components/CourseCard";
+import CourseCardRail from "../components/CourseCardRail";
 import HeroCountdown from "../components/HeroCountdown";
 import StoryJourneySection from "../components/StoryJourneySection";
 import { useAuth } from "../hooks/useAuth";
@@ -983,11 +983,7 @@ export default function LandingPage() {
             </div>
 
             {landingLiveCourses.length ? (
-              <div className="mt-7 grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-                {landingLiveCourses.map((course) => (
-                  <CourseCard key={course.id} course={course} />
-                ))}
-              </div>
+              <CourseCardRail courses={landingLiveCourses} />
             ) : (
               <p className="mt-6 rounded-xl border border-white/10 bg-[#090909] px-4 py-3 text-sm text-[#AAAAAA]">
                 Live courses are being updated. Submit an enrollment enquiry and our team will contact you.

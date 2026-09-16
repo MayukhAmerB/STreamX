@@ -22,13 +22,41 @@ describe("selectLandingCourses", () => {
     expect(courses.map((course) => course.id)).toEqual([1, 2]);
   });
 
-  it("keeps open enrollment programs before closed batches", () => {
+  it("uses first-in, first-out order across open and previous batches", () => {
     const courses = selectLandingCourses([
-      { id: 2, title: "Archived batch", launch_status: "live", registration_closed: true },
-      { id: 1, title: "Open batch", launch_status: "live", registration_closed: false },
+      {
+        id: 8,
+        title: "Newest open batch",
+        launch_status: "live",
+        registration_closed: false,
+        created_at: "2026-09-01T00:00:00Z",
+      },
+      {
+        id: 3,
+        title: "Oldest previous batch",
+        launch_status: "live",
+        registration_closed: true,
+        created_at: "2026-06-01T00:00:00Z",
+      },
+      {
+        id: 5,
+        title: "Middle open batch",
+        launch_status: "live",
+        registration_closed: false,
+        created_at: "2026-07-01T00:00:00Z",
+      },
     ]);
 
-    expect(courses.map((course) => course.id)).toEqual([1, 2]);
+    expect(courses.map((course) => course.id)).toEqual([3, 5, 8]);
+  });
+
+  it("uses ascending IDs as the FIFO fallback when creation dates are absent", () => {
+    const courses = selectLandingCourses([
+      { id: 9, title: "Later", launch_status: "live" },
+      { id: 2, title: "Earlier", launch_status: "live" },
+    ]);
+
+    expect(courses.map((course) => course.id)).toEqual([2, 9]);
   });
 });
 

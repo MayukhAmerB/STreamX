@@ -1248,6 +1248,47 @@ html[data-site-brand="owlcognito"] .student-library-secondary {
   color: #4c1d95 !important;
 }
 
+.course-card-rail {
+  scrollbar-color: rgba(255, 255, 255, 0.38) rgba(255, 255, 255, 0.06);
+  scrollbar-width: thin;
+}
+
+.course-card-rail::-webkit-scrollbar {
+  height: 7px;
+}
+
+.course-card-rail::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+}
+
+.course-card-rail::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.38);
+  border-radius: 999px;
+}
+
+html[data-site-brand="owlcognito"] .course-card-rail {
+  scrollbar-color: rgba(109, 40, 217, 0.45) rgba(109, 40, 217, 0.08);
+}
+
+html[data-site-brand="owlcognito"] .course-card-rail::-webkit-scrollbar-track {
+  background: rgba(109, 40, 217, 0.08);
+}
+
+html[data-site-brand="owlcognito"] .course-card-rail::-webkit-scrollbar-thumb {
+  background: rgba(109, 40, 217, 0.45);
+}
+
+html[data-site-brand="owlcognito"] .course-rail-note {
+  color: #61516f !important;
+}
+
+html[data-site-brand="owlcognito"] .course-rail-control {
+  border-color: rgba(109, 40, 217, 0.25) !important;
+  background: #ffffff !important;
+  color: #4c1d95 !important;
+}
+
 html[data-site-brand="owlcognito"] .hero-course-card-body,
 html[data-site-brand="owlcognito"] .hero-course-card-body > div {
   border-color: rgba(109, 40, 217, 0.16) !important;
