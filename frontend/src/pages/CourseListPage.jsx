@@ -2,11 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 
 import { listCourses } from "../api/courses";
 import CourseCard from "../components/CourseCard";
-import OsintToolsAccessCard from "../components/OsintToolsAccessCard";
 import PageShell from "../components/PageShell";
 import { useAuth } from "../hooks/useAuth";
 import { apiData } from "../utils/api";
-import { hasApprovedCourseAccess, isOsintCourse } from "../utils/courseAccess";
+import { hasApprovedCourseAccess } from "../utils/courseAccess";
 import {
   filterCourseCatalog,
   readCachedCourseCatalog,
@@ -259,10 +258,6 @@ export default function CourseListPage() {
     () => (isAuthenticated ? courses.filter((course) => !hasApprovedCourseAccess(course)) : courses),
     [courses, isAuthenticated]
   );
-  const hasApprovedOsintCourse = useMemo(
-    () => ownedCourses.some(isOsintCourse),
-    [ownedCourses]
-  );
   const summary = useMemo(() => getCourseCatalogSummary(catalogCourses), [catalogCourses]);
   const levelSummary = useMemo(() => getCourseLevelSummary(catalogCourses), [catalogCourses]);
 
@@ -309,7 +304,6 @@ export default function CourseListPage() {
             </div>
           )}
         </section>
-        {hasApprovedOsintCourse ? <OsintToolsAccessCard className="mb-8" /> : null}
         </>
       ) : null}
 

@@ -5,17 +5,17 @@ import Button from "./Button";
 export default function OsintToolsAccessCard({ className = "" }) {
   return (
     <section
-      className={`overflow-hidden rounded-[24px] border border-white/15 bg-[#101010] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)] sm:p-6 ${className}`.trim()}
+      className={`student-resource-card overflow-hidden rounded-[24px] border border-white/15 bg-[#101010] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)] sm:p-6 ${className}`.trim()}
     >
       <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
         <div>
           <div className="inline-flex rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#DBDBDB]">
             Included Student Resource
           </div>
-          <h2 className="mt-3 font-reference text-2xl font-semibold text-white">
+          <h2 className="student-resource-title mt-3 font-reference text-2xl font-semibold text-white">
             OSINT Tools Library
           </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-7 text-[#BBBBBB]">
+          <p className="student-resource-description mt-2 max-w-3xl text-sm leading-7 text-[#BBBBBB]">
             Your OSINT course includes the categorized tools reference, guided tool finder, and
             practical descriptions for identity, metadata, archives, images, infrastructure, and
             behavioral analysis.

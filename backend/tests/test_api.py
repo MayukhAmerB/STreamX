@@ -2702,6 +2702,11 @@ class MyCoursesViewTests(BaseAPITestCase):
             course=self.course,
             payment_status=Enrollment.STATUS_PAID,
         )
+        LectureProgress.objects.create(
+            user=self.student,
+            lecture=self.lecture,
+            completed=True,
+        )
         Payment.objects.create(
             user=self.student,
             course=self.course,
@@ -2734,6 +2739,12 @@ class MyCoursesViewTests(BaseAPITestCase):
         self.assertEqual(returned[self.course.id]["access_label"], "Purchased")
         self.assertEqual(returned[self.course.id]["section_count"], 1)
         self.assertEqual(returned[self.course.id]["lecture_count"], 1)
+        self.assertEqual(returned[self.course.id]["started_lecture_count"], 1)
+        self.assertEqual(returned[self.course.id]["completed_lecture_count"], 1)
+        self.assertEqual(returned[self.course.id]["progress_percent"], 100)
+        self.assertIn("duration", returned[self.course.id])
+        self.assertIn("schedule", returned[self.course.id])
+        self.assertIn("course_card_features", returned[self.course.id])
 
         self.assertEqual(returned[granted_course.id]["access_source"], "granted")
         self.assertEqual(returned[granted_course.id]["access_label"], "Granted Access")

@@ -895,6 +895,9 @@ class MyCourseLibrarySerializer(serializers.ModelSerializer):
     instructor = serializers.SerializerMethodField()
     section_count = serializers.IntegerField(read_only=True)
     lecture_count = serializers.IntegerField(read_only=True)
+    started_lecture_count = serializers.IntegerField(read_only=True)
+    completed_lecture_count = serializers.IntegerField(read_only=True)
+    progress_percent = serializers.IntegerField(read_only=True)
     enrolled_at = serializers.DateTimeField(read_only=True)
     access_source = serializers.CharField(read_only=True)
     access_label = serializers.CharField(read_only=True)
@@ -906,13 +909,29 @@ class MyCourseLibrarySerializer(serializers.ModelSerializer):
             "title",
             "slug",
             "description",
+            "card_summary",
+            "image_alt",
             "thumbnail",
             "price",
             "category",
             "level",
             "launch_status",
+            "registration_closed",
+            "batch",
+            "duration",
+            "schedule",
+            "class_length",
+            "total_classes",
+            "total_hours",
+            "start_date",
+            "total_hours_label",
+            "batch_size_label",
+            "course_card_features",
             "section_count",
             "lecture_count",
+            "started_lecture_count",
+            "completed_lecture_count",
+            "progress_percent",
             "instructor",
             "enrolled_at",
             "access_source",

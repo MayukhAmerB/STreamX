@@ -1198,6 +1198,56 @@ html[data-site-brand="owlcognito"] .hero-program-title {
   color: #251b2d !important;
 }
 
+html[data-site-brand="owlcognito"] .student-library-card,
+html[data-site-brand="owlcognito"] .student-resource-card {
+  border-color: rgba(109, 40, 217, 0.24) !important;
+  background: #ffffff !important;
+  box-shadow: 0 18px 48px rgba(76, 29, 149, 0.12) !important;
+}
+
+html[data-site-brand="owlcognito"] .student-library-title,
+html[data-site-brand="owlcognito"] .student-resource-title,
+html[data-site-brand="owlcognito"] .student-library-stat-value,
+html[data-site-brand="owlcognito"] .student-library-progress-value,
+html[data-site-brand="owlcognito"] .student-library-fact-value,
+html[data-site-brand="owlcognito"] .student-library-instructor {
+  color: #251b2d !important;
+}
+
+html[data-site-brand="owlcognito"] .student-library-description,
+html[data-site-brand="owlcognito"] .student-resource-description,
+html[data-site-brand="owlcognito"] .student-library-muted,
+html[data-site-brand="owlcognito"] .student-library-feature {
+  color: #51465b !important;
+}
+
+html[data-site-brand="owlcognito"] .student-library-chip,
+html[data-site-brand="owlcognito"] .student-library-fact,
+html[data-site-brand="owlcognito"] .student-library-progress {
+  border-color: rgba(109, 40, 217, 0.17) !important;
+  background: #f7f4ff !important;
+  color: #3b2750 !important;
+}
+
+html[data-site-brand="owlcognito"] .student-library-progress-track {
+  background: rgba(109, 40, 217, 0.14) !important;
+}
+
+html[data-site-brand="owlcognito"] .student-library-progress-track > div,
+html[data-site-brand="owlcognito"] .student-library-feature > span {
+  background: #6d28d9 !important;
+}
+
+html[data-site-brand="owlcognito"] .student-library-primary {
+  background: linear-gradient(135deg, #4c1d95 0%, #6d28d9 52%, #8b5cf6 100%) !important;
+  color: #ffffff !important;
+}
+
+html[data-site-brand="owlcognito"] .student-library-secondary {
+  border-color: rgba(109, 40, 217, 0.28) !important;
+  color: #4c1d95 !important;
+}
+
 html[data-site-brand="owlcognito"] .hero-course-card-body,
 html[data-site-brand="owlcognito"] .hero-course-card-body > div {
   border-color: rgba(109, 40, 217, 0.16) !important;

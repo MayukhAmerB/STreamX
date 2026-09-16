@@ -12,7 +12,7 @@ const ContactPage = lazy(() => import("../pages/ContactPage"));
 const LegacyCourseDetailPage = lazy(() => import("../pages/CourseDetailPage"));
 const CourseDetailPage = lazy(() => import("../pages/ProfessionalCoursePage"));
 const CourseListPage = lazy(() => import("../pages/CourseListPage"));
-const StudentCoursesPage = lazy(() => import("../pages/StudentCoursesPage"));
+const MyCoursesPage = lazy(() => import("../pages/MyCoursesPage"));
 const CoursePaymentPage = lazy(() => import("../pages/CoursePaymentPage"));
 const CoursePlayerPage = lazy(() => import("../pages/CoursePlayerPage"));
 const CreateCoursePage = lazy(() => import("../pages/CreateCoursePage"));
@@ -54,7 +54,7 @@ export default function AppRoutes() {
           <Route path="/terms" element={<TermsPage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/guides" element={<GuidesPage />} />
-            <Route path="/my-courses" element={<StudentCoursesPage />} />
+            <Route path="/my-courses" element={<MyCoursesPage />} />
             <Route path="/osint-tools" element={<OsintToolsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/id-card" element={<IdCardPage />} />

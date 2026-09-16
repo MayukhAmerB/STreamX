@@ -1244,6 +1244,19 @@ class MyCoursesView(APIView):
             .annotate(
                 section_count=Count("sections", distinct=True),
                 lecture_count=Count("sections__lectures", distinct=True),
+                started_lecture_count=Count(
+                    "sections__lectures__progress_entries",
+                    filter=Q(sections__lectures__progress_entries__user=request.user),
+                    distinct=True,
+                ),
+                completed_lecture_count=Count(
+                    "sections__lectures__progress_entries",
+                    filter=Q(
+                        sections__lectures__progress_entries__user=request.user,
+                        sections__lectures__progress_entries__completed=True,
+                    ),
+                    distinct=True,
+                ),
             )
         }
 
@@ -1255,6 +1268,11 @@ class MyCoursesView(APIView):
             course.enrolled_at = row["enrolled_at"]
             course.access_source = "purchased" if course.id in purchased_course_ids else "granted"
             course.access_label = "Purchased" if course.id in purchased_course_ids else "Granted Access"
+            course.progress_percent = (
+                round((course.completed_lecture_count / course.lecture_count) * 100)
+                if course.lecture_count
+                else 0
+            )
             courses.append(course)
 
         serializer = MyCourseLibrarySerializer(courses, many=True, context={"request": request})
