@@ -77,6 +77,7 @@ jobs:
           test -x infra/hostinger/deploy-phases.sh
           test -x infra/hostinger/deploy-safe.sh
           test -x infra/hostinger/release-production.sh
+          test -x infra/hostinger/deploy-course-v2.sh
       - name: Verify internal Prometheus scrape configuration
         run: |
           grep -A 10 'job_name: streamx_backend' infra/observability/prometheus/prometheus.yml | grep -q 'scheme: http'
@@ -96,3 +97,5 @@ jobs:
         run: bash infra/hostinger/tests/test-gateway-routing-config.sh
       - name: Verify monitor Nginx security headers
         run: bash infra/hostinger/tests/test-monitor-nginx-config.sh
+      - name: Verify course release commit guard
+        run: bash infra/hostinger/tests/test-deploy-course-v2.sh

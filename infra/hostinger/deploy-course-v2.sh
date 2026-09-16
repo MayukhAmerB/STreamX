@@ -5,7 +5,16 @@ trap 'echo "Deployment stopped at line $LINENO. Share the preceding error; do no
 cd /opt/alsyed/StreamX
 exec 9>/root/streamx-course-v2-deploy.lock
 flock -n 9
-test "$(git rev-parse HEAD)" = 16a426cbc38616f0ebb9400213bd04f0a282326c
+RELEASE_COMMIT="${RELEASE_COMMIT:-}"
+if [[ ! "$RELEASE_COMMIT" =~ ^[0-9a-fA-F]{40}$ ]]; then
+  echo 'RELEASE_COMMIT must contain the full approved 40-character Git SHA.' >&2
+  exit 1
+fi
+current_commit="$(git rev-parse HEAD)"
+if [[ "$current_commit" != "$RELEASE_COMMIT" ]]; then
+  echo "Refusing course release: current SHA $current_commit does not match RELEASE_COMMIT." >&2
+  exit 1
+fi
 git diff --quiet
 git diff --cached --quiet
 config_files="$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}' streamx-backend-4-1)"

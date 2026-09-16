@@ -98,16 +98,16 @@ Local implementation, migrations and course creation are complete. Production de
 
 ### Hostinger production release
 
-Use the existing `infra/hostinger/release-production.sh` from the server checkout at `/opt/alsyed/StreamX`. Record the currently deployed commit before updating, fast-forward to the exact release commit, and pass that old commit as `RELEASE_BASE_REF`. For the existing backend-pool/PgBouncer topology, set `HOSTINGER_DEPLOY_PHASE=phase5` so every backend is updated. Do not run a fresh-install/reset script.
+Use the targeted `infra/hostinger/deploy-course-v2.sh` script from the server checkout at `/opt/alsyed/StreamX`. It requires an explicit, full `RELEASE_COMMIT` value and refuses to run if the checked-out commit differs. Record the currently deployed commit before updating, then fast-forward to the approved release commit. Do not run a fresh-install/reset script.
 
 The release script checks migrations, backs up PostgreSQL and the media/recording volumes, verifies the backup, rebuilds services and checks readiness. Set `HOSTINGER_BACKUP_RETENTION_COUNT=0` and `HOSTINGER_BACKUP_RETENTION_DAYS=0` for this release to retain older backups as well. Run outside a live class and allow enough free disk space for the video archives and image builds.
 
-After the release succeeds, create the missing course records:
+Run the deployment only outside a live class:
 
 ```bash
-docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml exec -T backend python manage.py setup_course_experience --publish
+RELEASE_COMMIT="<full-approved-sha>" ./infra/hostinger/deploy-course-v2.sh
 ```
 
-This preserves existing matching courses and admin edits. In Docker, the frontend ships the bundled artwork as the fallback; thumbnails can subsequently be uploaded through admin. Set OSINT pricing in admin, and check an existing student's video playback, login, the new cards and registration before considering the release verified.
+The script creates a PostgreSQL and media recovery point, verifies it, applies only forward migrations, updates the existing pooled services, and creates only missing program slugs. It never overwrites matching courses or admin edits. In Docker, the frontend ships the bundled artwork as the fallback; thumbnails can subsequently be uploaded through admin. Set OSINT pricing in admin, and check an existing student's video playback, login, the new cards and registration before considering the release verified.
 
 See `course-program-artwork.md` for the built-in image-generation prompts and saved asset paths.
