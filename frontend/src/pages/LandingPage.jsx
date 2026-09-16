@@ -6,11 +6,12 @@ import { listRealtimeSessions } from "../api/realtime";
 import BrandLogo from "../components/BrandLogo";
 import Button from "../components/Button";
 import CourseCard from "../components/CourseCard";
+import HeroCountdown from "../components/HeroCountdown";
 import StoryJourneySection from "../components/StoryJourneySection";
 import { useAuth } from "../hooks/useAuth";
-import { resolveCourseArtwork } from "../utils/courseArtwork";
+import { resolveCourseArtwork, resolveCourseArtworkFallback } from "../utils/courseArtwork";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
-import { selectHeroProgramCourse, selectLandingCourses } from "../utils/landingCourses";
+import { selectHeroCategoryCourses, selectLandingCourses } from "../utils/landingCourses";
 import { apiData } from "../utils/api";
 import { readCachedCourseCatalog, writeCachedCourseCatalog } from "../utils/courseCatalog";
 import { formatINR } from "../utils/currency";
@@ -135,6 +136,36 @@ const monthByLevel = {
 };
 const cornerGlowPanelBg = "bg-[#070707]";
 const cornerGlowCardBg = "bg-[#0A0A0A]";
+const HERO_COURSE_FALLBACKS = [
+  {
+    category: "osint",
+    card_title: "OSINT",
+    card_subtitle: "Open Source Intelligence",
+    card_summary:
+      "Find, verify, and analyse open-source information through professional investigation workflows.",
+    card_highlights: [
+      "Digital footprint analysis",
+      "Identity and social intelligence",
+      "Advanced research techniques",
+      "Practical case studies",
+    ],
+    _fallbackLink: "/courses",
+  },
+  {
+    category: "web_pentesting",
+    card_title: "Pentesting",
+    card_subtitle: "Web & API Security",
+    card_summary:
+      "Build hands-on skills for identifying vulnerabilities, validating risk, and strengthening systems.",
+    card_highlights: [
+      "Web application testing",
+      "API security assessment",
+      "Vulnerability validation",
+      "Reporting and remediation",
+    ],
+    _fallbackLink: "/courses",
+  },
+];
 
 function sortCatalogCourses(courses) {
   return [...courses].sort((a, b) => {
@@ -492,138 +523,119 @@ function _GuestAccessPanel({ courses, liveClasses, liveClassesError }) {
   );
 }
 
-const HERO_PROGRAM_FEATURES = [
-  {
-    label: "Live Instructor-Led Classes",
-    path: "M3 5h18v14H3zM10 9l5 3-5 3V9z",
-  },
-  {
-    label: "Lifetime Access to Recordings",
-    path: "M4 4h16v16H4zM10 8l6 4-6 4V8z",
-  },
-  {
-    label: "Exclusive Resources & Tools",
-    path: "M3 7h7l2 2h9v10H3V7z",
-  },
-  {
-    label: "Doubt Clearing Support",
-    path: "M4 5h16v11H9l-5 4V5zM8 9h8M8 12h5",
-  },
-  {
-    label: "Certificate of Completion",
-    path: "M6 3h12v12H6zM9 7h6M9 10h4M9 15l-1 6 4-2 4 2-1-6",
-  },
-];
-
-function TrainingProgramPanel({ course }) {
-  const artwork = resolveCourseArtwork(course);
-  const launchStatus = getCourseLaunchStatus(course);
-  const enrollmentStatus = String(course?.enrollment_status || "").toLowerCase();
-  const hasAccess =
-    Boolean(course?.is_enrolled) ||
-    enrollmentStatus === "approved" ||
-    enrollmentStatus === "paid";
-  const safeCourseId = Number(course?.id || 0);
-  const canPurchase =
-    safeCourseId > 0 &&
-    Boolean(course?.purchase_available) &&
-    !course?.registration_closed &&
-    !launchStatus.isComingSoon;
-
-  const action = hasAccess && safeCourseId > 0
-    ? { label: "Access Course", to: `/learn/${safeCourseId}` }
-    : canPurchase
-      ? { label: "Buy Course", to: `/courses/${safeCourseId}/payment` }
-      : {
-          label: course?.registration_closed
-            ? "Registration Closed"
-            : launchStatus.isComingSoon
-              ? "Coming Soon"
-              : "Purchase Unavailable",
-        };
+function HeroCourseIcon({ category }) {
+  if (category === "web_pentesting") {
+    return (
+      <svg viewBox="0 0 32 32" aria-hidden="true" className="h-7 w-7 fill-none stroke-current stroke-[1.6]">
+        <path d="M16 3 27 7v8c0 7-4.5 11.5-11 14C9.5 26.5 5 22 5 15V7l11-4Z" />
+        <path d="M16 8v15M10 14h12" />
+      </svg>
+    );
+  }
 
   return (
-    <article className="relative w-full max-w-[500px] overflow-hidden rounded-[24px] border border-white/20 bg-[#111111] p-4 shadow-[0_24px_72px_rgba(0,0,0,0.55)] sm:p-5">
-      {artwork ? (
-        <img
-          src={artwork}
-          alt=""
-          aria-hidden="true"
-          className="pointer-events-none absolute right-0 top-0 h-[44%] w-[64%] object-cover opacity-20 grayscale"
-        />
-      ) : null}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -right-16 -top-16 h-52 w-52 rounded-full bg-white/[0.055] blur-[70px]"
-      />
+    <svg viewBox="0 0 32 32" aria-hidden="true" className="h-7 w-7 fill-none stroke-current stroke-[1.6]">
+      <circle cx="16" cy="16" r="8" />
+      <circle cx="16" cy="16" r="3" />
+      <path d="M16 2v6M16 24v6M2 16h6M24 16h6M6 6l4 4M22 22l4 4M26 6l-4 4M10 22l-4 4" />
+    </svg>
+  );
+}
 
-      <div className="relative flex items-center justify-between gap-4">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[#A5A5A5]">
-          Our training program
-        </span>
-        <span className="rounded-full border border-white/15 px-3 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-[#BDBDBD]">
-          {hasAccess ? "Enrolled" : "Overview"}
+function HeroCourseCard({ course }) {
+  const courseCategory = course?.category;
+  const courseId = course?.id;
+  const courseThumbnail = course?.thumbnail;
+  const fallbackArtwork = resolveCourseArtworkFallback(courseCategory);
+  const [artwork, setArtwork] = useState(() => resolveCourseArtwork(course));
+  const title = course?.card_title || (course?.category === "web_pentesting" ? "Pentesting" : "OSINT");
+  const subtitle =
+    course?.card_subtitle ||
+    (course?.category === "web_pentesting" ? "Web & API Security" : "Open Source Intelligence");
+  const summary = course?.card_summary || course?.description || "Explore the complete professional training program.";
+  const configuredHighlights = Array.isArray(course?.card_highlights)
+    ? course.card_highlights.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+  const featureHighlights = Array.isArray(course?.course_card_features)
+    ? course.course_card_features.map((item) => String(item?.title || "").trim()).filter(Boolean)
+    : [];
+  const fallbackHighlights = HERO_COURSE_FALLBACKS.find(
+    (item) => item.category === course?.category,
+  )?.card_highlights || [];
+  const highlights = (configuredHighlights.length
+    ? configuredHighlights
+    : featureHighlights.length
+      ? featureHighlights
+      : fallbackHighlights
+  ).slice(0, 4);
+  const detailPath = Number(course?.id || 0) > 0
+    ? `/courses/${course.id}`
+    : course?._fallbackLink || "/courses";
+
+  useEffect(() => {
+    setArtwork(resolveCourseArtwork({ category: courseCategory, thumbnail: courseThumbnail }));
+  }, [courseCategory, courseId, courseThumbnail]);
+
+  return (
+    <Link
+      to={detailPath}
+      className="group flex min-h-[500px] flex-col overflow-hidden rounded-[20px] border border-white/25 bg-[#080B0D] shadow-[0_28px_80px_rgba(0,0,0,0.5)] transition duration-300 hover:-translate-y-1 hover:border-white/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+    >
+      <div className="relative h-[215px] overflow-hidden border-b border-white/15 bg-[#11161A]">
+        {artwork ? (
+          <img
+            src={artwork}
+            alt={course?.image_alt || `${title} training program`}
+            className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+            onError={() => {
+              if (fallbackArtwork && artwork !== fallbackArtwork) setArtwork(fallbackArtwork);
+              else setArtwork("");
+            }}
+          />
+        ) : null}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#080B0D] via-transparent to-black/20" />
+        <span className="absolute left-4 top-4 rounded-full border border-white/20 bg-black/70 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-white backdrop-blur-md">
+          {title}
         </span>
       </div>
 
-      <div className="relative mt-5 grid grid-cols-[56px_minmax(0,1fr)] gap-4 sm:grid-cols-[64px_minmax(0,1fr)] sm:gap-5">
-        <span className="flex h-14 w-14 items-center justify-center rounded-full border border-white/15 bg-[#171717] sm:h-16 sm:w-16">
-          <svg
-            viewBox="0 0 48 48"
-            aria-hidden="true"
-            className="h-8 w-8 fill-none stroke-[#D5D5D5] stroke-[1.4] sm:h-9 sm:w-9"
-          >
-            <circle cx="24" cy="24" r="14" />
-            <circle cx="24" cy="24" r="5" />
-            <path d="M24 3v9M24 36v9M3 24h9M36 24h9M9 9l7 7M32 32l7 7M39 9l-7 7M16 32l-7 7" />
-          </svg>
-        </span>
-        <div className="min-w-0">
-          <h2 className="font-reference text-[clamp(1.45rem,3.5vw,2rem)] font-semibold leading-[1.08] tracking-[-0.03em] text-white">
-            {course?.title || "OSINT Professional Training Program"}
-          </h2>
-          <p className="mt-2 line-clamp-2 text-[13px] leading-5 text-[#A9A9A9] sm:text-sm sm:leading-6">
-            {course?.description ||
-              "A complete program featuring live instructor-led classes, practical assignments, exclusive resources, and real-world OSINT skills."}
-          </p>
+      <div className="flex flex-1 flex-col p-5 sm:p-6">
+        <div className="flex items-center gap-4 border-b border-white/10 pb-4">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/25 text-white">
+            <HeroCourseIcon category={course?.category} />
+          </span>
+          <div className="min-w-0">
+            <h2 className="font-reference text-2xl font-semibold uppercase tracking-[-0.02em] text-white">
+              {title}
+            </h2>
+            <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.22em] text-[#8F9AA2]">
+              {subtitle}
+            </p>
+          </div>
         </div>
-      </div>
 
-      <div className="relative mt-5 border-t border-white/10 pt-4">
-        <ul className="space-y-2">
-          {HERO_PROGRAM_FEATURES.map((feature) => (
-            <li key={feature.label} className="flex items-center gap-3 text-[13px] text-[#D1D1D1] sm:text-sm">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-[#171717]">
-                <svg
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                  className="h-4 w-4 fill-none stroke-current stroke-[1.6] stroke-linecap-round stroke-linejoin-round"
-                >
-                  <path d={feature.path} />
-                </svg>
+        <p className="mt-4 line-clamp-3 text-sm leading-6 text-[#A9B0B5]">{summary}</p>
+        <ul className="mt-4 space-y-2">
+          {highlights.map((highlight) => (
+            <li key={highlight} className="flex items-center gap-3 text-xs leading-5 text-[#D4D9DC]">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/15 text-[10px] text-white">
+                +
               </span>
-              <span>{feature.label}</span>
+              <span>{highlight}</span>
             </li>
           ))}
         </ul>
-      </div>
 
-      <div className="relative mt-5">
-        {action.to ? (
-          <Link
-            to={action.to}
-            className="group inline-flex min-h-12 w-full items-center justify-center gap-4 rounded-xl border border-white bg-white px-5 text-[13px] font-bold uppercase tracking-[0.16em] text-black transition hover:bg-[#E7E7E7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-          >
-            {action.label}
-            <DashboardArrow className="transition-transform group-hover:translate-x-1" />
-          </Link>
-        ) : (
-          <span className="inline-flex min-h-12 w-full cursor-not-allowed items-center justify-center rounded-xl border border-white/10 bg-[#181818] px-5 text-[13px] font-bold uppercase tracking-[0.14em] text-[#777777]">
-            {action.label}
+        <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-4">
+          <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#98A2A9]">
+            View full program
           </span>
-        )}
+          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/30 text-lg text-white transition group-hover:bg-white group-hover:text-black">
+            -&gt;
+          </span>
+        </div>
       </div>
-    </article>
+    </Link>
   );
 }
 
@@ -794,13 +806,15 @@ export default function LandingPage() {
     );
   }, [catalogCourses]);
 
-  const heroProgramCourse = useMemo(() => {
-    return selectHeroProgramCourse({
-      featuredCourse: featuredLiveCourse,
-      catalogCourses,
-      studentCourses,
-    });
-  }, [catalogCourses, featuredLiveCourse, studentCourses]);
+  const heroCourses = useMemo(
+    () =>
+      selectHeroCategoryCourses({
+        catalogCourses,
+        studentCourses,
+        fallbackCourses: HERO_COURSE_FALLBACKS,
+      }),
+    [catalogCourses, studentCourses],
+  );
 
   const featuredLiveCourseLink = featuredLiveCourse?._fallbackLink || `/courses/${featuredLiveCourse.id}`;
   const heroLiveBroadcastCourseId = Number(
@@ -855,72 +869,93 @@ export default function LandingPage() {
       <section
         className="landing-hero relative z-10 overflow-hidden border-b border-white/10 bg-black px-4"
       >
-        <div className="relative mx-auto grid min-h-[calc(100dvh-4rem)] max-w-6xl items-center gap-10 py-12 sm:min-h-[620px] sm:py-20 lg:grid-cols-[0.96fr_1.04fr] lg:gap-20 lg:py-24">
-          <div className="reveal-up">
-            <div className="flex items-center gap-4">
-              <span className="h-px w-10 bg-white/70" aria-hidden="true" />
-              <BrandLogo className="shrink-0" />
-            </div>
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <div className="absolute -bottom-48 -left-40 h-[520px] w-[520px] rounded-full border border-white/[0.05]" />
+          <div className="absolute -bottom-36 -left-28 h-[410px] w-[410px] rounded-full border border-white/[0.04]" />
+          <div className="absolute right-[8%] top-[8%] h-64 w-64 rounded-full bg-white/[0.035] blur-[100px]" />
+        </div>
 
-            {heroLiveBroadcast ? (
-              <div className="ml-2 inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#BDBDBD]">
-                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                Live now
+        <div className="relative mx-auto max-w-[1440px] pt-10 sm:pt-14 lg:pt-16">
+          <div className="grid min-h-[650px] items-center gap-10 pb-10 lg:grid-cols-[0.7fr_1.3fr] lg:gap-12 xl:gap-16">
+            <div className="reveal-up py-4 lg:py-10">
+              <div className="flex items-center gap-4">
+                <span className="h-px w-10 bg-white/70" aria-hidden="true" />
+                <BrandLogo className="shrink-0" />
               </div>
-            ) : null}
 
-            <h1 className="mt-6 max-w-[660px] font-reference text-[clamp(2.35rem,11vw,4.25rem)] font-semibold leading-[1.02] tracking-[-0.045em] text-white sm:mt-7 sm:text-[clamp(2.75rem,4.5vw,4.25rem)]">
-              Learn practical skills through clean, focused courses.
-            </h1>
+              {heroLiveBroadcast ? (
+                <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-red-400/30 bg-red-950/35 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-red-100">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+                  Live now
+                </div>
+              ) : null}
 
-            <p className="mt-6 max-w-xl text-sm leading-7 text-[#8E8E8E] sm:text-base">
-              A focused learning platform for OSINT, reconnaissance, web application testing,
-              protected lessons, and instructor-led live classes.
-            </p>
+              <h1 className="mt-7 max-w-[640px] font-reference text-[clamp(2.65rem,11vw,4.6rem)] font-semibold leading-[0.98] tracking-[-0.05em] text-white sm:text-[clamp(3.15rem,5vw,4.6rem)]">
+                Learn practical skills through clean, focused courses.
+              </h1>
 
-            {heroLiveBroadcast ? (
-              <Link
-                to={isAuthenticated ? heroLiveBroadcastJoinPath : "/login"}
-                className="mt-7 flex w-full max-w-xl items-center justify-between gap-4 rounded-xl border border-red-400/45 bg-red-600 px-5 py-4 text-left text-white shadow-[0_20px_48px_rgba(220,38,38,0.3)] transition hover:bg-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
-              >
-                <span>
-                  <span className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.2em] text-red-100">
-                    <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-white shadow-[0_0_18px_rgba(255,255,255,0.95)]" />
-                    Class is live
+              <p className="mt-6 max-w-xl text-sm leading-7 text-[#9CA4AA] sm:text-base">
+                A structured learning platform for OSINT, reconnaissance, web application testing,
+                protected lessons, and instructor-led live classes.
+              </p>
+
+              <div className="mt-7 grid max-w-xl grid-cols-1 gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10 min-[430px]:grid-cols-3">
+                {["Practical learning", "Industry relevant", "Expert instructors"].map((label, index) => (
+                  <div key={label} className="flex items-center gap-3 bg-black/65 px-3 py-3.5">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/20 text-[10px] font-bold text-white">
+                      0{index + 1}
+                    </span>
+                    <span className="text-[9px] font-bold uppercase leading-4 tracking-[0.14em] text-[#C6CCD0]">
+                      {label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {heroLiveBroadcast ? (
+                <Link
+                  to={isAuthenticated ? heroLiveBroadcastJoinPath : "/login"}
+                  className="mt-6 flex w-full max-w-xl items-center justify-between gap-4 rounded-xl border border-red-400/45 bg-red-600 px-5 py-4 text-left text-white shadow-[0_20px_48px_rgba(220,38,38,0.3)] transition hover:bg-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+                >
+                  <span>
+                    <span className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.2em] text-red-100">
+                      <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-white shadow-[0_0_18px_rgba(255,255,255,0.95)]" />
+                      Class is live
+                    </span>
+                    <span className="mt-1 block text-base font-extrabold sm:text-lg">
+                      {heroLiveBroadcast.title || "Join your live classroom"}
+                    </span>
                   </span>
-                  <span className="mt-1 block text-base font-extrabold sm:text-lg">
-                    {heroLiveBroadcast.title || "Join your live classroom"}
+                  <span className="shrink-0 text-sm font-extrabold uppercase tracking-[0.1em]">
+                    Join now -&gt;
                   </span>
-                </span>
-                <span className="shrink-0 text-sm font-extrabold uppercase tracking-[0.1em]">
-                  Join now -&gt;
-                </span>
-              </Link>
-            ) : null}
+                </Link>
+              ) : null}
 
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Link
-                to="/courses"
-                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-5 text-sm font-semibold text-black transition hover:bg-[#E5E5E5]"
-              >
-                Browse Courses
-              </Link>
-              <Link
-                to={isAuthenticated ? "/courses?view=owned" : "/login"}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/15 bg-[#090909] px-5 text-sm font-semibold text-white transition hover:border-white/25 hover:bg-[#111111]"
-              >
-                {isAuthenticated ? "My Learning" : "Get Started"}
-              </Link>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link
+                  to="/courses"
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-5 text-sm font-semibold text-black transition hover:bg-[#E5E5E5]"
+                >
+                  Browse Courses
+                </Link>
+                <Link
+                  to={isAuthenticated ? "/courses?view=owned" : "/login"}
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/20 bg-[#090909] px-5 text-sm font-semibold text-white transition hover:border-white/40 hover:bg-[#111111]"
+                >
+                  {isAuthenticated ? "My Learning" : "Get Started"}
+                </Link>
+              </div>
+            </div>
+
+            <div className="reveal-up reveal-delay-1 relative grid gap-4 md:grid-cols-2 lg:gap-5">
+              {heroCourses.map((course) => (
+                <HeroCourseCard key={course.id || course.category} course={course} />
+              ))}
             </div>
           </div>
 
-          <div className="reveal-up reveal-delay-1 relative flex justify-center lg:justify-end">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -right-12 -top-8 -z-10 h-72 w-72 rounded-full bg-white/[0.08] blur-[96px] sm:-right-16 sm:h-80 sm:w-80"
-            />
-            <TrainingProgramPanel course={heroProgramCourse} />
-          </div>
+          <HeroCountdown courses={catalogCourses} />
         </div>
       </section>
 

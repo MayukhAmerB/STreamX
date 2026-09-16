@@ -4,7 +4,7 @@ from io import StringIO
 
 from apps.courses.admin import CourseAdminForm
 from apps.courses.models import Course, Enrollment
-from apps.courses.serializers import CourseDetailSerializer
+from apps.courses.serializers import CourseDetailSerializer, CourseListSerializer
 from apps.payments.models import Payment
 from apps.payments.order_service import create_payment_order
 from apps.payments.provisioning import provision_paid_payment
@@ -49,6 +49,7 @@ class ProgramCatalogTests(TestCase):
 
     @override_settings(DIRECT_COURSE_PAYMENTS_ENABLED=True)
     def test_admin_prices_and_card_content_reach_course_api(self):
+        countdown_end = timezone.now() + timedelta(days=14)
         course = Course.objects.create(
             title="Course",
             description="Details",
@@ -59,14 +60,23 @@ class ProgramCatalogTests(TestCase):
             is_published=True,
             bundle_payment_enabled=True,
             bundle_price=3000,
+            hero_countdown_end_at=countdown_end,
+            hero_countdown_label="Batch enrollment closes in",
         )
         data = CourseDetailSerializer(course, context={}).data
+        list_data = CourseListSerializer(course, context={}).data
         self.assertEqual(data["price"], "6999.00")
         self.assertEqual(data["bundle_price"], "3000.00")
         self.assertEqual(data["card_title"], "Research")
         self.assertEqual(data["card_highlights"], ["Admin bullet"])
+        self.assertEqual(data["hero_countdown_label"], "Batch enrollment closes in")
+        self.assertIsNotNone(data["hero_countdown_end_at"])
+        self.assertEqual(list_data["hero_countdown_label"], "Batch enrollment closes in")
+        self.assertIsNotNone(list_data["hero_countdown_end_at"])
         self.assertFalse(data["show_course_image"])
-        self.assertEqual(CourseAdminForm(instance=course).fields["card_highlights"].initial, "Admin bullet")
+        admin_form = CourseAdminForm(instance=course)
+        self.assertEqual(admin_form.fields["card_highlights"].initial, "Admin bullet")
+        self.assertIn("homepage countdown", admin_form.fields["hero_countdown_end_at"].help_text.lower())
 
     def test_bundle_snapshots_terms_handles_future_start_and_retries(self):
         course = Course.objects.create(

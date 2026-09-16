@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveCourseArtwork } from "./courseArtwork";
+import { resolveCourseArtwork, resolveCourseArtworkFallback } from "./courseArtwork";
 
 describe("resolveCourseArtwork", () => {
   it("keeps an admin-configured thumbnail", () => {
@@ -16,5 +16,10 @@ describe("resolveCourseArtwork", () => {
 
   it("does not invent artwork for an unknown category", () => {
     expect(resolveCourseArtwork({ category: "other" })).toBe("");
+  });
+
+  it("can recover the bundled category artwork after an admin image fails", () => {
+    expect(resolveCourseArtworkFallback("web_pentesting"))
+      .toBe("/course-art/pentesting-program-v2.png");
   });
 });

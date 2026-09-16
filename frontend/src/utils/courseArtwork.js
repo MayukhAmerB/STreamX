@@ -3,9 +3,13 @@ const CATEGORY_ARTWORK = Object.freeze({
   web_pentesting: "/course-art/pentesting-program-v2.png",
 });
 
+export function resolveCourseArtworkFallback(category) {
+  return CATEGORY_ARTWORK[String(category || "").toLowerCase()] || "";
+}
+
 export function resolveCourseArtwork(course) {
   const configuredThumbnail = String(course?.thumbnail || "").trim();
   if (configuredThumbnail) return configuredThumbnail;
 
-  return CATEGORY_ARTWORK[String(course?.category || "").toLowerCase()] || "";
+  return resolveCourseArtworkFallback(course?.category);
 }

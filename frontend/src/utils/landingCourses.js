@@ -37,6 +37,38 @@ export function selectLandingCourses(courses = []) {
     });
 }
 
+export function selectHeroCategoryCourses({
+  catalogCourses = [],
+  studentCourses = [],
+  fallbackCourses = [],
+} = {}) {
+  return ["osint", "web_pentesting"].map((category) => {
+    const categoryCourses = catalogCourses.filter(
+      (course) => course?.category === category && course?.is_published !== false,
+    );
+    const selectedCourse =
+      categoryCourses.find((course) => course?.is_flagship) ||
+      categoryCourses.find(isOpenLiveCourse) ||
+      newestCourse(categoryCourses);
+
+    if (!selectedCourse) {
+      return fallbackCourses.find((course) => course?.category === category) || null;
+    }
+
+    const ownedCourse = studentCourses.find(
+      (course) => Number(course?.id) === Number(selectedCourse?.id),
+    );
+    if (!ownedCourse) return selectedCourse;
+
+    return {
+      ...selectedCourse,
+      ...ownedCourse,
+      is_enrolled: true,
+      enrollment_status: "approved",
+    };
+  }).filter(Boolean);
+}
+
 export function selectHeroProgramCourse({
   featuredCourse,
   catalogCourses = [],

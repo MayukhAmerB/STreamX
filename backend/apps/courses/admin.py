@@ -213,6 +213,15 @@ class CourseAdminForm(forms.ModelForm):
         self.fields["show_course_image"].help_text = (
             "Keep disabled unless the image has a direct instructional or course-context purpose."
         )
+        self.fields["hero_countdown_end_at"].label = "Homepage Countdown Deadline"
+        self.fields["hero_countdown_end_at"].help_text = (
+            "Set the exact date and time when enrollment closes. Leave blank to hide the red "
+            "homepage countdown."
+        )
+        self.fields["hero_countdown_label"].label = "Homepage Countdown Label"
+        self.fields["hero_countdown_label"].help_text = (
+            "Short text shown before the timer, for example: Enrollment closes in."
+        )
         self.fields["thumbnail_file"].help_text = (
             "Optional course-context image. It is displayed only when 'Show course image' is enabled."
         )
@@ -488,6 +497,16 @@ class CourseAdmin(admin.ModelAdmin):
                     "image_alt",
                     "show_course_image",
                 ),
+            },
+        ),
+        (
+            "Homepage countdown",
+            {
+                "description": (
+                    "Optional red enrollment countdown shown below the homepage hero. "
+                    "The timer hides automatically when no future deadline is configured."
+                ),
+                "fields": ("hero_countdown_label", "hero_countdown_end_at"),
             },
         ),
         ("Batch and extended facts", {"fields": ("start_date", "total_hours_label", "batch_size_label")}),

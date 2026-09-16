@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { selectHeroProgramCourse, selectLandingCourses } from "./landingCourses";
+import {
+  selectHeroCategoryCourses,
+  selectHeroProgramCourse,
+  selectLandingCourses,
+} from "./landingCourses";
 
 describe("selectLandingCourses", () => {
   it("includes open live courses and registration-closed previous batches", () => {
@@ -121,5 +125,33 @@ describe("selectHeroProgramCourse", () => {
 
   it("uses the featured fallback when the API provides no courses", () => {
     expect(selectHeroProgramCourse({ featuredCourse })).toBe(featuredCourse);
+  });
+});
+
+describe("selectHeroCategoryCourses", () => {
+  it("selects one flagship card per category and preserves owned access", () => {
+    const selected = selectHeroCategoryCourses({
+      catalogCourses: [
+        { id: 1, category: "osint", is_flagship: false, is_published: true },
+        { id: 2, category: "osint", is_flagship: true, is_published: true },
+        { id: 3, category: "web_pentesting", is_flagship: true, is_published: true },
+      ],
+      studentCourses: [{ id: 3, title: "Owned pentesting" }],
+    });
+
+    expect(selected.map((course) => course.id)).toEqual([2, 3]);
+    expect(selected[1]).toMatchObject({
+      is_enrolled: true,
+      enrollment_status: "approved",
+    });
+  });
+
+  it("uses category fallbacks without inventing database identifiers", () => {
+    const fallbacks = [
+      { category: "osint", card_title: "OSINT" },
+      { category: "web_pentesting", card_title: "Pentesting" },
+    ];
+
+    expect(selectHeroCategoryCourses({ fallbackCourses: fallbacks })).toEqual(fallbacks);
   });
 });

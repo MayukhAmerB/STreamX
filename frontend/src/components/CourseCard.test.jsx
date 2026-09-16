@@ -36,7 +36,8 @@ describe("CourseCard", () => {
 
     expect(html).toContain("Access Course");
     expect(html).toContain('href="/learn/11"');
-    expect(html).not.toContain("View Details");
+    expect(html).toContain('href="/courses/11"');
+    expect(html).toContain("View details");
   });
 
   it("keeps the standard live action when the user does not have access", () => {
@@ -53,7 +54,7 @@ describe("CourseCard", () => {
     expect(html).toContain("Buy Course");
     expect(html).toContain('href="/courses/11/payment"');
     expect(html).not.toContain("Access Course");
-    expect(html).not.toContain("View Details");
+    expect(html).toContain('aria-label="View full details for OSINT Professional Training Program"');
   });
 
   it("does not offer a legacy request when purchasing is unavailable", () => {
@@ -69,6 +70,7 @@ describe("CourseCard", () => {
     expect(html).toContain("Purchase Unavailable");
     expect(html).not.toContain("Request Access");
     expect(html).not.toContain('href="/courses/11/payment"');
+    expect(html).toContain('href="/courses/11"');
   });
 
   it("shows Registration Closed for a previous batch", () => {
@@ -135,7 +137,7 @@ describe("CourseCard", () => {
     expect(html).not.toContain("Access Course");
   });
 
-  it("renders the default premium feature set when the API has no custom features", () => {
+  it("renders a concise default feature set when the API has no custom features", () => {
     const html = renderCourseCard({
       course: {
         ...baseCourse,
@@ -143,9 +145,9 @@ describe("CourseCard", () => {
       },
     });
 
-    expect(html).toContain("Live Sessions");
-    expect(html).toContain("Course Completion Certificate");
-    expect(html).toContain("24x7 Team Chat Support");
+    expect(html).toContain("Live classes");
+    expect(html).toContain("Practical learning");
+    expect(html).toContain("Certificate");
     expect(html).toContain('src="/course-art/osint-program-v2.png"');
   });
 
@@ -166,6 +168,41 @@ describe("CourseCard", () => {
 
     expect(html).toContain("Private Recording Vault");
     expect(html).toContain("Revisit every lesson after the live program.");
-    expect(html).not.toContain("24x7 Team Chat Support");
+    expect(html).not.toContain("Practical learning");
+  });
+
+  it("shows admin-managed facts, pricing, and the full-detail card destination", () => {
+    const html = renderCourseCard({
+      course: {
+        ...baseCourse,
+        duration: "3 months",
+        schedule: "Friday to Sunday",
+        total_classes: 36,
+        start_date: "2026-10-01",
+        purchase_available: true,
+        monthly_price: 1500,
+        installment_payment_enabled: true,
+      },
+    });
+
+    expect(html).toContain("3 months");
+    expect(html).toContain("Friday to Sunday");
+    expect(html).toContain("36 live classes");
+    expect(html).toContain("1 Oct 2026");
+    expect(html).toContain("/ month");
+    expect(html).toContain('href="/courses/11"');
+  });
+
+  it("routes pentesting applications through the required application flow", () => {
+    const html = renderCourseCard({
+      course: {
+        ...baseCourse,
+        category: "web_pentesting",
+        purchase_available: false,
+      },
+    });
+
+    expect(html).toContain("Apply for Course");
+    expect(html).toContain('href="/courses/11/register"');
   });
 });

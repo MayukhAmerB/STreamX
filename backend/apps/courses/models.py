@@ -162,6 +162,20 @@ class Course(models.Model):
         help_text="Show the optional course image only when it directly explains the program.",
     )
     start_date = models.DateField(null=True, blank=True)
+    hero_countdown_end_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Optional enrollment deadline shown as a red countdown on the public homepage. "
+            "Leave blank to hide the countdown."
+        ),
+    )
+    hero_countdown_label = models.CharField(
+        max_length=120,
+        blank=True,
+        default="Enrollment closes in",
+        help_text="Short label displayed beside the homepage countdown.",
+    )
     total_hours_label = models.CharField(max_length=80, blank=True, default="")
     batch_size_label = models.CharField(max_length=80, blank=True, default="")
     bundle_payment_enabled = models.BooleanField(default=False)
@@ -233,6 +247,7 @@ class Course(models.Model):
         validate_no_active_content(self.about_the_course, "about_the_course")
         validate_no_active_content(self.course_overview, "course_overview")
         validate_no_active_content(self.enrollment_message, "enrollment_message")
+        validate_no_active_content(self.hero_countdown_label, "hero_countdown_label")
         validate_no_active_content(self.snapshot_category, "snapshot_category")
         validate_no_active_content(self.snapshot_level, "snapshot_level")
         validate_no_active_content(self.snapshot_instructor, "snapshot_instructor")
