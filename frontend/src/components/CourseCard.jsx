@@ -16,17 +16,6 @@ function normalizeEnrollmentStatus(value) {
   return "none";
 }
 
-function formatDate(value) {
-  if (!value) return "";
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
-
 function formatCategory(category) {
   return category === "web_pentesting" ? "Pentesting" : "OSINT";
 }
@@ -48,18 +37,22 @@ function getPrimaryAction(course, status, hasCourseAccess) {
   return { label: "Purchase Unavailable", disabled: true };
 }
 
+function getCompactActionLabel(action) {
+  const labels = {
+    "Access Course": "Access",
+    "Apply for Course": "Apply",
+    "Buy Course": "Buy Course",
+    "Registration Closed": "Closed",
+    "Purchase Unavailable": "Unavailable",
+    "Coming Soon": "Coming Soon",
+  };
+  return labels[action?.label] || action?.label;
+}
+
 function StarIcon() {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true" className="h-4 w-4 fill-current">
       <path d="m10 1.8 2.45 4.96 5.47.8-3.96 3.85.94 5.45L10 14.3l-4.9 2.56.94-5.45-3.96-3.85 5.47-.8L10 1.8Z" />
-    </svg>
-  );
-}
-
-function ArrowIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-none stroke-current stroke-[1.7]">
-      <path d="M5 12h13M13 7l5 5-5 5" />
     </svg>
   );
 }
@@ -77,8 +70,8 @@ function CourseCard({ course }) {
     Boolean(course?.is_enrolled) ||
     normalizeEnrollmentStatus(course?.enrollment_status) === "approved";
   const primaryAction = getPrimaryAction(course, status, hasCourseAccess);
+  const compactActionLabel = getCompactActionLabel(primaryAction);
   const numericPrice = Number(course?.price || 0);
-  const numericMonthlyPrice = Number(course?.monthly_price || 0);
   const parsedReviewCount = Number(course?.review_count || 0);
   const reviewCount = Number.isFinite(parsedReviewCount)
     ? Math.max(0, Math.trunc(parsedReviewCount))
@@ -94,8 +87,8 @@ function CourseCard({ course }) {
       : Number(course?.section_count || 0) > 0
         ? `${course.section_count} modules`
         : "";
-  const startLabel = formatDate(course?.start_date);
   const learningFacts = [hoursLabel, unitLabel, formatLevel(course?.level)].filter(Boolean);
+  const unavailableMessage = getPurchaseUnavailableMessage(course);
 
   useEffect(() => {
     setThumbnailSrc(
@@ -104,16 +97,16 @@ function CourseCard({ course }) {
   }, [courseCategory, courseId, courseThumbnail]);
 
   return (
-    <article className="owlcognito-course-card group relative flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-white/15 bg-[#070809] text-white shadow-[0_16px_38px_rgba(0,0,0,0.36)] transition duration-300 hover:-translate-y-1 hover:border-white/35 hover:shadow-[0_22px_54px_rgba(0,0,0,0.5)]">
+    <article className="owlcognito-course-card group relative grid min-h-[158px] min-w-0 grid-cols-[108px_minmax(0,1fr)] overflow-hidden rounded-lg border border-white/15 bg-[#070809] text-white shadow-[0_12px_30px_rgba(0,0,0,0.34)] transition duration-300 hover:-translate-y-0.5 hover:border-white/35 hover:shadow-[0_18px_40px_rgba(0,0,0,0.46)] sm:flex sm:h-full sm:min-h-0 sm:flex-col">
       <Link
         to={detailPath}
         aria-label={`View full details for ${safeTitle}`}
-        className="absolute inset-0 z-10 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-inset"
+        className="absolute inset-0 z-10 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-inset"
       >
         <span className="sr-only">View full course details</span>
       </Link>
 
-      <div className="relative aspect-[16/9] overflow-hidden border-b border-white/10 bg-[#101316]">
+      <div className="relative min-h-[158px] overflow-hidden border-r border-white/10 bg-[#101316] sm:aspect-[16/9] sm:min-h-0 sm:border-b sm:border-r-0">
         {thumbnailSrc ? (
           <img
             src={thumbnailSrc}
@@ -133,27 +126,27 @@ function CourseCard({ course }) {
           <div className="h-full w-full bg-[radial-gradient(circle_at_75%_25%,rgba(255,255,255,0.13),transparent_34%),linear-gradient(135deg,#11161A,#050607)]" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
-        <div className="absolute inset-x-3 top-3 flex items-center justify-between gap-2">
-          <span className="owlcognito-course-card-status rounded-full border border-white/25 bg-black/75 px-2.5 py-1 text-[8px] font-bold uppercase tracking-[0.16em] text-white backdrop-blur-md">
+        <div className="absolute inset-x-2 top-2 flex items-center justify-between gap-1.5 sm:inset-x-2.5 sm:top-2.5">
+          <span className="owlcognito-course-card-status rounded-full border border-white/25 bg-black/75 px-2 py-1 text-[7px] font-bold uppercase tracking-[0.14em] text-white backdrop-blur-md">
             {formatCategory(courseCategory)}
           </span>
-          <span className="owlcognito-course-card-status rounded-full border border-white/25 bg-black/75 px-2.5 py-1 text-[8px] font-bold uppercase tracking-[0.16em] text-white backdrop-blur-md">
+          <span className="owlcognito-course-card-status hidden rounded-full border border-white/25 bg-black/75 px-2 py-1 text-[7px] font-bold uppercase tracking-[0.14em] text-white backdrop-blur-md sm:inline-flex">
             {course?.registration_closed ? "Previous batch" : status.label}
           </span>
         </div>
       </div>
 
-      <div className="relative flex flex-1 flex-col p-3.5 sm:p-4">
-        <h3 className="owlcognito-course-card-title line-clamp-2 font-reference text-base font-semibold leading-[1.24] tracking-[-0.02em] text-white sm:text-[1.05rem]">
+      <div className="relative flex min-w-0 flex-1 flex-col p-3 sm:p-3.5">
+        <h3 className="owlcognito-course-card-title line-clamp-2 font-reference text-[0.93rem] font-semibold leading-[1.22] tracking-[-0.02em] text-white sm:text-[0.98rem]">
           {safeTitle}
         </h3>
         {course?.instructor?.full_name ? (
-          <p className="owlcognito-course-card-instructor mt-1 text-[11px] text-[#969EA4]">
+          <p className="owlcognito-course-card-instructor mt-1 truncate text-[10px] text-[#969EA4]">
             {course.instructor.full_name}
           </p>
         ) : null}
 
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]" aria-label="Verified course rating">
+        <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px]" aria-label="Verified course rating">
           <span className="inline-flex items-center gap-1 font-bold text-amber-400">
             <span className="text-[#F4A62A]">{hasRating ? averageRating.toFixed(1) : "New"}</span>
             <span className="text-amber-400"><StarIcon /></span>
@@ -167,60 +160,34 @@ function CourseCard({ course }) {
           </Link>
         </div>
 
-        <p className="owlcognito-course-card-note mt-2 line-clamp-2 text-[11px] leading-4 text-[#A8B0B6]">
+        <p className="owlcognito-course-card-note mt-1.5 line-clamp-1 text-[10px] leading-4 text-[#A8B0B6]" title={learningFacts.join(" | ")}>
           {learningFacts.join(" | ")}
         </p>
 
-        {course?.schedule || startLabel ? (
-          <p className="owlcognito-course-card-note mt-1.5 line-clamp-1 text-[10px] leading-4 text-[#858E95]" title={[startLabel ? `Starts ${startLabel}` : "", course?.schedule || ""].filter(Boolean).join(" | ")}>
-            {[startLabel ? `Starts ${startLabel}` : "", course?.schedule || ""].filter(Boolean).join(" | ")}
-          </p>
-        ) : null}
-
-        <div className="mt-auto flex items-end justify-between gap-3 border-t border-white/10 pt-3">
-          <div className="min-w-0 flex-1">
-            <p className="owlcognito-course-card-price font-reference text-lg font-semibold leading-none text-white">
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-white/10 pt-2.5">
+          <div className="min-w-0">
+            <p className="owlcognito-course-card-price truncate font-reference text-base font-semibold leading-none text-white">
               {numericPrice > 0 ? formatINR(numericPrice) : "Price on request"}
             </p>
-            {course?.installment_payment_enabled && numericMonthlyPrice > 0 ? (
-              <p className="owlcognito-course-card-note mt-1 text-[9px] text-[#8F989F]">
-                or {formatINR(numericMonthlyPrice)} / month
-              </p>
-            ) : null}
           </div>
-          <Link
-            to={detailPath}
-            aria-label={`Open ${safeTitle}`}
-            className="owlcognito-course-card-arrow relative z-20 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/30 text-white transition group-hover:border-white group-hover:bg-white group-hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-          >
-            <ArrowIcon />
-          </Link>
-        </div>
-
-        <div className="mt-3">
           {primaryAction.to ? (
             <Link
               to={primaryAction.to}
-              className="owlcognito-course-card-action relative z-20 inline-flex min-h-9 w-full items-center justify-center rounded-md border border-white bg-white px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-black transition hover:bg-[#E7E7E7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+              aria-label={primaryAction.label}
+              className="owlcognito-course-card-action relative z-20 inline-flex min-h-8 shrink-0 items-center justify-center rounded-md border border-white bg-white px-2.5 text-[8px] font-bold uppercase tracking-[0.08em] text-black transition hover:bg-[#E7E7E7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
             >
-              {primaryAction.label}
+              {compactActionLabel}
             </Link>
           ) : (
-            <span className="owlcognito-course-card-action-disabled relative z-20 inline-flex min-h-9 w-full cursor-not-allowed items-center justify-center rounded-md border border-white/10 bg-white/[0.06] px-3 text-center text-[9px] font-bold uppercase tracking-[0.08em] text-[#7F888F]">
-              {primaryAction.label}
+            <span
+              className="owlcognito-course-card-action-disabled relative z-20 inline-flex min-h-8 max-w-[92px] shrink-0 cursor-not-allowed items-center justify-center rounded-md border border-white/10 bg-white/[0.06] px-2 text-center text-[7px] font-bold uppercase leading-3 tracking-[0.06em] text-[#7F888F]"
+              aria-label={primaryAction.label}
+              title={unavailableMessage}
+            >
+              {compactActionLabel}
             </span>
           )}
         </div>
-
-        {!status.isComingSoon &&
-        !hasCourseAccess &&
-        !course?.purchase_available &&
-        course?.category !== "web_pentesting" &&
-        !course?.registration_closed ? (
-          <p className="owlcognito-course-card-note mt-2 line-clamp-2 text-[10px] leading-4 text-[#858E95]">
-            {getPurchaseUnavailableMessage(course)}
-          </p>
-        ) : null}
       </div>
     </article>
   );

@@ -1179,6 +1179,25 @@ html[data-site-brand="owlcognito"] .hero-course-card {
   box-shadow: 0 20px 46px rgba(76, 29, 149, 0.14) !important;
 }
 
+html[data-site-brand="owlcognito"] .hero-program-panel {
+  border-color: rgba(109, 40, 217, 0.2) !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  box-shadow: 0 28px 70px rgba(76, 29, 149, 0.12) !important;
+}
+
+html[data-site-brand="owlcognito"] .hero-program-panel > div:first-child {
+  border-color: rgba(109, 40, 217, 0.14) !important;
+}
+
+html[data-site-brand="owlcognito"] .hero-program-kicker,
+html[data-site-brand="owlcognito"] .hero-program-count {
+  color: #6d28d9 !important;
+}
+
+html[data-site-brand="owlcognito"] .hero-program-title {
+  color: #251b2d !important;
+}
+
 html[data-site-brand="owlcognito"] .hero-course-card-body,
 html[data-site-brand="owlcognito"] .hero-course-card-body > div {
   border-color: rgba(109, 40, 217, 0.16) !important;

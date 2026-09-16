@@ -566,7 +566,7 @@ function HeroCourseCard({ course }) {
     : featureHighlights.length
       ? featureHighlights
       : fallbackHighlights
-  ).slice(0, 3);
+  ).slice(0, 2);
   const detailPath = Number(course?.id || 0) > 0
     ? `/courses/${course.id}`
     : course?._fallbackLink || "/courses";
@@ -578,9 +578,9 @@ function HeroCourseCard({ course }) {
   return (
     <Link
       to={detailPath}
-      className="hero-course-card group flex min-h-[430px] flex-col overflow-hidden rounded-[20px] border border-white/20 bg-[#080B0D] shadow-[0_28px_80px_rgba(0,0,0,0.5)] transition duration-300 hover:-translate-y-1 hover:border-white/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+      className="hero-course-card group grid min-h-[168px] grid-cols-[126px_minmax(0,1fr)] overflow-hidden rounded-[18px] border border-white/15 bg-[#080B0D] shadow-[0_18px_48px_rgba(0,0,0,0.42)] transition duration-300 hover:-translate-y-0.5 hover:border-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:grid-cols-[170px_minmax(0,1fr)]"
     >
-      <div className="relative aspect-[16/9] max-h-[195px] overflow-hidden border-b border-white/15 bg-[#11161A]">
+      <div className="relative min-h-[168px] overflow-hidden border-r border-white/15 bg-[#11161A]">
         {artwork ? (
           <img
             src={artwork}
@@ -593,18 +593,18 @@ function HeroCourseCard({ course }) {
           />
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-[#080B0D] via-transparent to-black/20" />
-        <span className="absolute left-4 top-4 rounded-full border border-white/20 bg-black/70 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-white backdrop-blur-md">
+        <span className="absolute left-3 top-3 rounded-full border border-white/20 bg-black/70 px-2.5 py-1 text-[8px] font-bold uppercase tracking-[0.16em] text-white backdrop-blur-md">
           {title}
         </span>
       </div>
 
-      <div className="hero-course-card-body flex flex-1 flex-col p-5">
-        <div className="flex items-center gap-4 border-b border-white/10 pb-4">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/25 text-white">
+      <div className="hero-course-card-body flex min-w-0 flex-1 flex-col p-4">
+        <div className="flex items-center gap-3 border-b border-white/10 pb-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/25 text-white">
             <HeroCourseIcon category={course?.category} />
           </span>
           <div className="min-w-0">
-            <h2 className="hero-course-card-title font-reference text-2xl font-semibold uppercase tracking-[-0.02em] text-white">
+            <h2 className="hero-course-card-title truncate font-reference text-lg font-semibold uppercase tracking-[-0.02em] text-white sm:text-xl">
               {title}
             </h2>
             <p className="hero-course-card-subtitle mt-1 text-[9px] font-semibold uppercase tracking-[0.22em] text-[#8F9AA2]">
@@ -613,11 +613,11 @@ function HeroCourseCard({ course }) {
           </div>
         </div>
 
-        <p className="hero-course-card-summary mt-4 line-clamp-2 text-sm leading-6 text-[#A9B0B5]">{summary}</p>
-        <ul className="mt-4 space-y-2">
+        <p className="hero-course-card-summary mt-3 line-clamp-2 text-[11px] leading-5 text-[#A9B0B5] sm:text-xs">{summary}</p>
+        <ul className="mt-2 hidden space-y-1.5 sm:block">
           {highlights.map((highlight) => (
-            <li key={highlight} className="flex items-center gap-3 text-xs leading-5 text-[#D4D9DC]">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/15 text-[10px] text-white">
+            <li key={highlight} className="flex items-center gap-2 text-[10px] leading-4 text-[#D4D9DC]">
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-white/15 text-[8px] text-white">
                 +
               </span>
               <span>{highlight}</span>
@@ -625,11 +625,11 @@ function HeroCourseCard({ course }) {
           ))}
         </ul>
 
-        <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-4">
-          <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#98A2A9]">
+        <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-2.5">
+          <span className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#98A2A9]">
             View full program
           </span>
-          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/30 text-lg text-white transition group-hover:bg-white group-hover:text-black">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/30 text-sm text-white transition group-hover:bg-white group-hover:text-black">
             -&gt;
           </span>
         </div>
@@ -874,9 +874,9 @@ export default function LandingPage() {
           <div className="absolute right-[4%] top-[4%] h-80 w-80 bg-white/[0.04] blur-[120px]" />
         </div>
 
-        <div className="relative mx-auto max-w-[1440px] pt-10 sm:pt-14 lg:pt-16">
-          <div className="grid min-h-[610px] items-center gap-10 pb-10 lg:grid-cols-[0.82fr_1.18fr] lg:gap-12 xl:gap-16">
-            <div className="reveal-up py-4 lg:py-8">
+        <div className="relative mx-auto max-w-[1320px] pt-9 sm:pt-12 lg:pt-14">
+          <div className="grid min-h-[540px] items-center gap-9 pb-9 lg:grid-cols-[0.92fr_1.08fr] lg:gap-12 xl:gap-16">
+            <div className="reveal-up py-3 lg:py-6">
               <p className="hero-eyebrow flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.24em] text-[#B8C0C5] sm:text-xs">
                 <span className="h-px w-10 bg-white/65" aria-hidden="true" />
                 Professional cybersecurity training
@@ -889,10 +889,10 @@ export default function LandingPage() {
                 </div>
               ) : null}
 
-              <h1 className="hero-heading mt-6 max-w-[650px] font-reference text-[clamp(2.75rem,11vw,4.8rem)] font-semibold leading-[0.94] tracking-[-0.055em] text-white sm:text-[clamp(3.25rem,5.2vw,4.8rem)]">
-                <span className="block">Build practical</span>
-                <span className="block text-[#AEB7BD]">intelligence &amp;</span>
-                <span className="block">security skills.</span>
+              <h1 className="hero-heading mt-6 max-w-[640px] font-reference text-[clamp(2.8rem,11vw,4.7rem)] font-semibold leading-[0.92] tracking-[-0.055em] text-white sm:text-[clamp(3.35rem,5.4vw,4.7rem)]">
+                <span className="block">Learn practical</span>
+                <span className="block">cyber skills.</span>
+                <span className="mt-2 block text-[0.56em] leading-[1.02] tracking-[-0.035em] text-[#AEB7BD]">Build real capability.</span>
               </h1>
 
               <p className="hero-summary mt-6 max-w-xl text-sm leading-7 text-[#9CA4AA] sm:text-base">
@@ -945,10 +945,19 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="reveal-up reveal-delay-1 relative grid gap-4 md:grid-cols-2 lg:gap-5">
-              {heroCourses.map((course) => (
-                <HeroCourseCard key={course.id || course.category} course={course} />
-              ))}
+            <div className="hero-program-panel reveal-up reveal-delay-1 relative rounded-[24px] border border-white/12 bg-white/[0.035] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.38)] backdrop-blur-sm sm:p-5">
+              <div className="mb-4 flex items-end justify-between gap-4 border-b border-white/10 pb-4">
+                <div>
+                  <p className="hero-program-kicker text-[9px] font-bold uppercase tracking-[0.22em] text-[#8F9AA2]">Featured programs</p>
+                  <h2 className="hero-program-title mt-1.5 font-reference text-xl font-semibold tracking-[-0.025em] text-white sm:text-2xl">Choose your training path</h2>
+                </div>
+                <span className="hero-program-count shrink-0 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#788188]">2 professional tracks</span>
+              </div>
+              <div className="grid gap-3">
+                {heroCourses.map((course) => (
+                  <HeroCourseCard key={course.id || course.category} course={course} />
+                ))}
+              </div>
             </div>
           </div>
 
@@ -965,16 +974,16 @@ export default function LandingPage() {
                 Our training program
               </p>
               <h2 className="course-showcase-heading mt-5 font-reference text-3xl font-semibold tracking-[-0.035em] text-white sm:text-4xl lg:text-5xl">
-                Hot and Fresh Courses
+                Bestsellers
               </h2>
               <p className="course-showcase-summary mt-3 max-w-2xl text-sm leading-7 text-[#A7A7A7] sm:text-base">
-                Compare active professional programs, verified learner ratings, schedules, fees,
-                and access options before opening the full course page.
+                Compare active professional programs, verified learner ratings, learning scope,
+                fees, and access options before opening the full course page.
               </p>
             </div>
 
             {landingLiveCourses.length ? (
-              <div className="mt-7 grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="mt-7 grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
                 {landingLiveCourses.map((course) => (
                   <CourseCard key={course.id} course={course} />
                 ))}

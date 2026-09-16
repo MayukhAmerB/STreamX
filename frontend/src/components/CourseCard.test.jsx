@@ -173,7 +173,7 @@ describe("CourseCard", () => {
     expect(html).not.toContain("5.0");
   });
 
-  it("shows admin-managed facts, pricing, and the full-detail card destination", () => {
+  it("shows compact admin-managed learning facts, pricing, and the full-detail destination", () => {
     const html = renderCourseCard({
       course: {
         ...baseCourse,
@@ -188,11 +188,11 @@ describe("CourseCard", () => {
     });
 
     expect(html).toContain("3 months");
-    expect(html).toContain("Friday to Sunday");
     expect(html).toContain("36 live classes");
-    expect(html).toContain("1 Oct 2026");
-    expect(html).toContain("/ month");
+    expect(html).toContain("₹3,500");
     expect(html).toContain('href="/courses/11"');
+    expect(html).not.toContain("Friday to Sunday");
+    expect(html).not.toContain("1 Oct 2026");
   });
 
   it("routes pentesting applications through the required application flow", () => {
