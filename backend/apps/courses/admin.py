@@ -33,13 +33,33 @@ from .services import VideoTranscodeError, transcode_lecture_to_hls
 
 @admin.register(CourseReview)
 class CourseReviewAdmin(admin.ModelAdmin):
-    list_display = ("course", "student", "rating", "status", "edit_allowed", "created_at", "updated_at")
+    list_display = ("id", "course", "student", "rating", "status", "edit_allowed", "created_at", "updated_at")
+    list_display_links = ("id", "course")
     list_filter = ("status", "rating", "course")
     search_fields = ("student__email", "student__full_name", "text", "course__title")
     readonly_fields = ("course", "student", "rating", "text", "created_at", "updated_at")
+    actions = ("approve_reviews", "hide_reviews", "allow_review_edits")
+    list_per_page = 50
 
     def has_add_permission(self, request):
         return False
+
+    @admin.action(description="Approve selected reviews")
+    def approve_reviews(self, request, queryset):
+        updated = queryset.update(status="approved")
+        bump_course_list_cache_version()
+        self.message_user(request, f"Approved {updated} review(s).")
+
+    @admin.action(description="Hide selected reviews")
+    def hide_reviews(self, request, queryset):
+        updated = queryset.update(status="hidden")
+        bump_course_list_cache_version()
+        self.message_user(request, f"Hid {updated} review(s).")
+
+    @admin.action(description="Allow students to edit selected reviews")
+    def allow_review_edits(self, request, queryset):
+        updated = queryset.update(edit_allowed=True)
+        self.message_user(request, f"Enabled editing for {updated} review(s).")
 
 
 @admin.register(PentestingApplication)

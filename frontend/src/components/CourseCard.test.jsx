@@ -37,7 +37,7 @@ describe("CourseCard", () => {
     expect(html).toContain("Access Course");
     expect(html).toContain('href="/learn/11"');
     expect(html).toContain('href="/courses/11"');
-    expect(html).toContain("View details");
+    expect(html).toContain("View full course details");
   });
 
   it("keeps the standard live action when the user does not have access", () => {
@@ -137,38 +137,40 @@ describe("CourseCard", () => {
     expect(html).not.toContain("Access Course");
   });
 
-  it("renders a concise default feature set when the API has no custom features", () => {
+  it("renders real verified ratings and compact learning facts", () => {
     const html = renderCourseCard({
       course: {
         ...baseCourse,
         purchase_available: true,
+        average_rating: 4.8,
+        review_count: 27,
+        total_hours: 18,
+        lecture_count: 42,
       },
     });
 
-    expect(html).toContain("Live classes");
-    expect(html).toContain("Practical learning");
-    expect(html).toContain("Certificate");
+    expect(html).toContain("4.8");
+    expect(html).toContain("27 reviews");
+    expect(html).toContain('href="/courses/11#reviews"');
+    expect(html).toContain("18 total hours");
+    expect(html).toContain("42 lectures");
+    expect(html).toContain("Advanced");
     expect(html).toContain('src="/course-art/osint-program-v2.png"');
   });
 
-  it("renders admin-configured course-card features", () => {
+  it("does not invent ratings when a course has no approved reviews", () => {
     const html = renderCourseCard({
       course: {
         ...baseCourse,
         purchase_available: true,
-        course_card_features: [
-          {
-            icon: "recording",
-            title: "Private Recording Vault",
-            description: "Revisit every lesson after the live program.",
-          },
-        ],
+        average_rating: null,
+        review_count: 0,
       },
     });
 
-    expect(html).toContain("Private Recording Vault");
-    expect(html).toContain("Revisit every lesson after the live program.");
-    expect(html).not.toContain("Practical learning");
+    expect(html).toContain("New");
+    expect(html).toContain("0 reviews");
+    expect(html).not.toContain("5.0");
   });
 
   it("shows admin-managed facts, pricing, and the full-detail card destination", () => {

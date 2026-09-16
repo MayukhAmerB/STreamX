@@ -1,12 +1,14 @@
 from decimal import Decimal
 from unittest.mock import patch
 
-from apps.courses.models import Course, CourseReview, Enrollment, PentestingApplication, Section
+from apps.courses.admin import CourseReviewAdmin
+from apps.courses.models import Course, CourseReview, Enrollment, Lecture, PentestingApplication, Section
 from apps.payments.models import Payment
 from apps.payments.provisioning import provision_paid_payment
 from apps.users.models import User
+from django.contrib import admin
 from django.core.cache import cache
-from django.test import override_settings
+from django.test import RequestFactory, override_settings
 from rest_framework.test import APITestCase
 
 from tests.test_api import mark_terms_accepted
@@ -143,6 +145,66 @@ class CourseExperienceTests(APITestCase):
         self.course.is_published = False
         self.course.save()
         self.assertEqual(self.experience().status_code, 404)
+
+    def test_catalog_exposes_fresh_verified_ratings_and_real_lesson_counts(self):
+        section = Section.objects.create(course=self.course, title="Search")
+        Lecture.objects.create(
+            section=section,
+            title="Evidence collection",
+            description="Capture evidence safely.",
+            video_key="courses/evidence-collection.mp4",
+        )
+        Enrollment.objects.create(
+            course=self.course,
+            user=self.student,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        approved_review = CourseReview.objects.create(
+            course=self.course,
+            student=self.student,
+            rating=5,
+            text="Clear, practical, and useful.",
+            status="approved",
+        )
+        unverified_student = User.objects.create_user(
+            email="unverified@example.com",
+            password="Strong-test-123!",
+            full_name="Unverified Student",
+        )
+        CourseReview.objects.create(
+            course=self.course,
+            student=unverified_student,
+            rating=1,
+            text="This must not affect the public rating.",
+            status="approved",
+        )
+
+        response = self.client.get("/api/courses/")
+        course_data = next(item for item in response.data["data"] if item["id"] == self.course.pk)
+        self.assertEqual(course_data["section_count"], 1)
+        self.assertEqual(course_data["lecture_count"], 1)
+        self.assertEqual(course_data["average_rating"], 5.0)
+        self.assertEqual(course_data["review_count"], 1)
+
+        approved_review.delete()
+        response = self.client.get("/api/courses/")
+        course_data = next(item for item in response.data["data"] if item["id"] == self.course.pk)
+        self.assertIsNone(course_data["average_rating"])
+        self.assertEqual(course_data["review_count"], 0)
+
+    def test_admin_can_moderate_and_delete_reviews(self):
+        self.student.is_staff = True
+        self.student.is_superuser = True
+        self.student.save(update_fields=["is_staff", "is_superuser"])
+        request = RequestFactory().get("/admin/courses/coursereview/")
+        request.user = self.student
+        review_admin = CourseReviewAdmin(CourseReview, admin.site)
+
+        self.assertTrue(review_admin.has_delete_permission(request))
+        actions = review_admin.get_actions(request)
+        self.assertIn("delete_selected", actions)
+        self.assertIn("approve_reviews", actions)
+        self.assertIn("hide_reviews", actions)
 
     def test_application_conditional_validation_and_separate_storage(self):
         url = f"/api/courses/{self.pentesting.pk}/applications/"

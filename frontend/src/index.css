@@ -1141,6 +1141,104 @@ html[data-site-brand="owlcognito"] .owlcognito-course-card-action-disabled {
   color: #6b6474 !important;
 }
 
+html[data-site-brand="owlcognito"] .hero-atmosphere > :first-child {
+  background-image:
+    linear-gradient(rgba(109, 40, 217, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 40, 217, 0.055) 1px, transparent 1px) !important;
+}
+
+html[data-site-brand="owlcognito"] .hero-eyebrow,
+html[data-site-brand="owlcognito"] .hero-trust {
+  color: #5b21b6 !important;
+}
+
+html[data-site-brand="owlcognito"] .hero-heading > span:nth-child(2) {
+  color: #6d28d9 !important;
+}
+
+html[data-site-brand="owlcognito"] .hero-summary {
+  color: #211a28 !important;
+}
+
+html[data-site-brand="owlcognito"] .hero-primary-action {
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, #4c1d95 0%, #6d28d9 52%, #8b5cf6 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 14px 30px rgba(91, 33, 182, 0.24);
+}
+
+html[data-site-brand="owlcognito"] .hero-secondary-action {
+  border-color: rgba(109, 40, 217, 0.28) !important;
+  background: #ffffff !important;
+  color: #251b2d !important;
+}
+
+html[data-site-brand="owlcognito"] .hero-course-card {
+  border-color: rgba(109, 40, 217, 0.26) !important;
+  background: #ffffff !important;
+  box-shadow: 0 20px 46px rgba(76, 29, 149, 0.14) !important;
+}
+
+html[data-site-brand="owlcognito"] .hero-course-card-body,
+html[data-site-brand="owlcognito"] .hero-course-card-body > div {
+  border-color: rgba(109, 40, 217, 0.16) !important;
+}
+
+html[data-site-brand="owlcognito"] .hero-course-card-title {
+  color: #4c1d95 !important;
+}
+
+html[data-site-brand="owlcognito"] .hero-course-card-subtitle {
+  color: #6d28d9 !important;
+}
+
+html[data-site-brand="owlcognito"] .hero-course-card-summary,
+html[data-site-brand="owlcognito"] .hero-course-card li {
+  color: #211a28 !important;
+}
+
+html[data-site-brand="owlcognito"] .course-showcase-section {
+  border-color: rgba(109, 40, 217, 0.2) !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+}
+
+html[data-site-brand="owlcognito"] .course-showcase-eyebrow {
+  color: #6d28d9 !important;
+}
+
+html[data-site-brand="owlcognito"] .course-showcase-heading {
+  color: #4c1d95 !important;
+}
+
+html[data-site-brand="owlcognito"] .course-showcase-summary {
+  color: #211a28 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-instructor,
+html[data-site-brand="owlcognito"] .owlcognito-course-card-note {
+  color: #4b4352 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-chip {
+  border-color: rgba(109, 40, 217, 0.2) !important;
+  background: #f4f0ff !important;
+  color: #251b2d !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-price {
+  color: #4c1d95 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-arrow {
+  border-color: rgba(109, 40, 217, 0.34) !important;
+  color: #5b21b6 !important;
+}
+
+html[data-site-brand="owlcognito"] .owlcognito-course-card-arrow:hover {
+  background: #5b21b6 !important;
+  color: #ffffff !important;
+}
+
 html[data-site-brand="owlcognito"] .xl\:sticky > section:first-child {
   border-color: var(--owl-border) !important;
   background: linear-gradient(145deg, #ffffff 0%, #f7f3ff 100%) !important;

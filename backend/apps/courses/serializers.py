@@ -397,7 +397,10 @@ class CourseEnrollmentStatusMixin:
 class CourseListSerializer(CourseEnrollmentStatusMixin, serializers.ModelSerializer):
     thumbnail = serializers.SerializerMethodField()
     instructor = serializers.SerializerMethodField()
-    section_count = serializers.IntegerField(read_only=True)
+    section_count = serializers.SerializerMethodField()
+    lecture_count = serializers.SerializerMethodField()
+    average_rating = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
     is_enrolled = serializers.SerializerMethodField()
     enrollment_status = serializers.SerializerMethodField()
     purchase_available = serializers.SerializerMethodField()
@@ -431,6 +434,9 @@ class CourseListSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeriali
             "registration_closed",
             "is_published",
             "section_count",
+            "lecture_count",
+            "average_rating",
+            "review_count",
             "is_enrolled",
             "enrollment_status",
             "purchase_available",
@@ -452,6 +458,23 @@ class CourseListSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeriali
     def get_thumbnail(self, obj):
         request = self.context.get("request")
         return obj.get_thumbnail_url(request=request)
+
+    def get_section_count(self, obj):
+        value = getattr(obj, "section_count", None)
+        return int(value if value is not None else obj.sections.count())
+
+    def get_lecture_count(self, obj):
+        value = getattr(obj, "lecture_count", None)
+        if value is not None:
+            return int(value)
+        return Lecture.objects.filter(section__course=obj).count()
+
+    def get_average_rating(self, obj):
+        value = getattr(obj, "average_rating", None)
+        return round(float(value), 1) if value is not None else None
+
+    def get_review_count(self, obj):
+        return int(getattr(obj, "review_count", 0) or 0)
 
 
 class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSerializer):

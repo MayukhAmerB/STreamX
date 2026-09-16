@@ -3,7 +3,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Avg, Count, F, Prefetch, Q
 from django.http import FileResponse, HttpResponse, HttpResponseNotFound
 from django.shortcuts import redirect
 from rest_framework import generics, permissions, status
@@ -143,6 +143,20 @@ def _course_prefetch_queryset():
     )
 
 
+def _with_course_catalog_metrics(queryset):
+    verified_review_filter = Q(
+        reviews__status="approved",
+        reviews__student__enrollments__payment_status=Enrollment.STATUS_PAID,
+        reviews__student__enrollments__course=F("pk"),
+    )
+    return queryset.annotate(
+        section_count=Count("sections", distinct=True),
+        lecture_count=Count("sections__lectures", distinct=True),
+        average_rating=Avg("reviews__rating", filter=verified_review_filter),
+        review_count=Count("reviews", filter=verified_review_filter, distinct=True),
+    )
+
+
 def _get_lecture_access_context(lecture, user):
     course = lecture.section.course
     is_authenticated = bool(user and getattr(user, "is_authenticated", False))
@@ -258,10 +272,9 @@ class CourseListCreateView(APIView):
             if cached is not None:
                 return api_response(success=True, message="Courses fetched.", data=cached)
 
-        queryset = (
+        queryset = _with_course_catalog_metrics(
             Course.objects.filter(is_published=True)
             .select_related("instructor")
-            .annotate(section_count=Count("sections"))
         )
         if search:
             queryset = queryset.filter(
@@ -1252,10 +1265,9 @@ class InstructorCoursesView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsInstructor]
 
     def get(self, request):
-        queryset = (
+        queryset = _with_course_catalog_metrics(
             Course.objects.filter(instructor=request.user)
             .select_related("instructor")
-            .annotate(section_count=Count("sections"))
         )
         serializer = CourseListSerializer(
             queryset,

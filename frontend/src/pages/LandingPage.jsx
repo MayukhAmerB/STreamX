@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import certificateExcellenceImage from "../assets/certificate-excellence.png";
 import { getMyCourses, listCourses, listLiveClasses } from "../api/courses";
 import { listRealtimeSessions } from "../api/realtime";
-import BrandLogo from "../components/BrandLogo";
 import Button from "../components/Button";
 import CourseCard from "../components/CourseCard";
 import HeroCountdown from "../components/HeroCountdown";
@@ -567,7 +566,7 @@ function HeroCourseCard({ course }) {
     : featureHighlights.length
       ? featureHighlights
       : fallbackHighlights
-  ).slice(0, 4);
+  ).slice(0, 3);
   const detailPath = Number(course?.id || 0) > 0
     ? `/courses/${course.id}`
     : course?._fallbackLink || "/courses";
@@ -579,9 +578,9 @@ function HeroCourseCard({ course }) {
   return (
     <Link
       to={detailPath}
-      className="group flex min-h-[500px] flex-col overflow-hidden rounded-[20px] border border-white/25 bg-[#080B0D] shadow-[0_28px_80px_rgba(0,0,0,0.5)] transition duration-300 hover:-translate-y-1 hover:border-white/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+      className="hero-course-card group flex min-h-[430px] flex-col overflow-hidden rounded-[20px] border border-white/20 bg-[#080B0D] shadow-[0_28px_80px_rgba(0,0,0,0.5)] transition duration-300 hover:-translate-y-1 hover:border-white/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
     >
-      <div className="relative h-[215px] overflow-hidden border-b border-white/15 bg-[#11161A]">
+      <div className="relative aspect-[16/9] max-h-[195px] overflow-hidden border-b border-white/15 bg-[#11161A]">
         {artwork ? (
           <img
             src={artwork}
@@ -599,22 +598,22 @@ function HeroCourseCard({ course }) {
         </span>
       </div>
 
-      <div className="flex flex-1 flex-col p-5 sm:p-6">
+      <div className="hero-course-card-body flex flex-1 flex-col p-5">
         <div className="flex items-center gap-4 border-b border-white/10 pb-4">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/25 text-white">
             <HeroCourseIcon category={course?.category} />
           </span>
           <div className="min-w-0">
-            <h2 className="font-reference text-2xl font-semibold uppercase tracking-[-0.02em] text-white">
+            <h2 className="hero-course-card-title font-reference text-2xl font-semibold uppercase tracking-[-0.02em] text-white">
               {title}
             </h2>
-            <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.22em] text-[#8F9AA2]">
+            <p className="hero-course-card-subtitle mt-1 text-[9px] font-semibold uppercase tracking-[0.22em] text-[#8F9AA2]">
               {subtitle}
             </p>
           </div>
         </div>
 
-        <p className="mt-4 line-clamp-3 text-sm leading-6 text-[#A9B0B5]">{summary}</p>
+        <p className="hero-course-card-summary mt-4 line-clamp-2 text-sm leading-6 text-[#A9B0B5]">{summary}</p>
         <ul className="mt-4 space-y-2">
           {highlights.map((highlight) => (
             <li key={highlight} className="flex items-center gap-3 text-xs leading-5 text-[#D4D9DC]">
@@ -869,19 +868,19 @@ export default function LandingPage() {
       <section
         className="landing-hero relative z-10 overflow-hidden border-b border-white/10 bg-black px-4"
       >
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-          <div className="absolute -bottom-48 -left-40 h-[520px] w-[520px] rounded-full border border-white/[0.05]" />
-          <div className="absolute -bottom-36 -left-28 h-[410px] w-[410px] rounded-full border border-white/[0.04]" />
-          <div className="absolute right-[8%] top-[8%] h-64 w-64 rounded-full bg-white/[0.035] blur-[100px]" />
+        <div aria-hidden="true" className="hero-atmosphere pointer-events-none absolute inset-0">
+          <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:64px_64px]" />
+          <div className="absolute -left-24 top-20 h-[360px] w-[520px] -rotate-12 bg-[linear-gradient(110deg,rgba(255,255,255,0.08),transparent_68%)] blur-3xl" />
+          <div className="absolute right-[4%] top-[4%] h-80 w-80 bg-white/[0.04] blur-[120px]" />
         </div>
 
         <div className="relative mx-auto max-w-[1440px] pt-10 sm:pt-14 lg:pt-16">
-          <div className="grid min-h-[650px] items-center gap-10 pb-10 lg:grid-cols-[0.7fr_1.3fr] lg:gap-12 xl:gap-16">
-            <div className="reveal-up py-4 lg:py-10">
-              <div className="flex items-center gap-4">
-                <span className="h-px w-10 bg-white/70" aria-hidden="true" />
-                <BrandLogo className="shrink-0" />
-              </div>
+          <div className="grid min-h-[610px] items-center gap-10 pb-10 lg:grid-cols-[0.82fr_1.18fr] lg:gap-12 xl:gap-16">
+            <div className="reveal-up py-4 lg:py-8">
+              <p className="hero-eyebrow flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.24em] text-[#B8C0C5] sm:text-xs">
+                <span className="h-px w-10 bg-white/65" aria-hidden="true" />
+                Professional cybersecurity training
+              </p>
 
               {heroLiveBroadcast ? (
                 <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-red-400/30 bg-red-950/35 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-red-100">
@@ -890,27 +889,25 @@ export default function LandingPage() {
                 </div>
               ) : null}
 
-              <h1 className="mt-7 max-w-[640px] font-reference text-[clamp(2.65rem,11vw,4.6rem)] font-semibold leading-[0.98] tracking-[-0.05em] text-white sm:text-[clamp(3.15rem,5vw,4.6rem)]">
-                Learn practical skills through clean, focused courses.
+              <h1 className="hero-heading mt-6 max-w-[650px] font-reference text-[clamp(2.75rem,11vw,4.8rem)] font-semibold leading-[0.94] tracking-[-0.055em] text-white sm:text-[clamp(3.25rem,5.2vw,4.8rem)]">
+                <span className="block">Build practical</span>
+                <span className="block text-[#AEB7BD]">intelligence &amp;</span>
+                <span className="block">security skills.</span>
               </h1>
 
-              <p className="mt-6 max-w-xl text-sm leading-7 text-[#9CA4AA] sm:text-base">
-                A structured learning platform for OSINT, reconnaissance, web application testing,
-                protected lessons, and instructor-led live classes.
+              <p className="hero-summary mt-6 max-w-xl text-sm leading-7 text-[#9CA4AA] sm:text-base">
+                Learn OSINT, reconnaissance, and web application testing through structured live
+                programs, protected recordings, and practical instructor guidance.
               </p>
 
-              <div className="mt-7 grid max-w-xl grid-cols-1 gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10 min-[430px]:grid-cols-3">
-                {["Practical learning", "Industry relevant", "Expert instructors"].map((label, index) => (
-                  <div key={label} className="flex items-center gap-3 bg-black/65 px-3 py-3.5">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/20 text-[10px] font-bold text-white">
-                      0{index + 1}
-                    </span>
-                    <span className="text-[9px] font-bold uppercase leading-4 tracking-[0.14em] text-[#C6CCD0]">
-                      {label}
-                    </span>
-                  </div>
+              <ul className="hero-trust mt-6 flex max-w-xl flex-wrap gap-x-5 gap-y-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#C6CCD0]">
+                {["Live mentorship", "Protected recordings", "Verified certificates"].map((label) => (
+                  <li key={label} className="flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 bg-white" aria-hidden="true" />
+                    {label}
+                  </li>
                 ))}
-              </div>
+              </ul>
 
               {heroLiveBroadcast ? (
                 <Link
@@ -932,16 +929,16 @@ export default function LandingPage() {
                 </Link>
               ) : null}
 
-              <div className="mt-6 flex flex-wrap gap-3">
+              <div className="mt-7 flex flex-wrap gap-3">
                 <Link
                   to="/courses"
-                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-5 text-sm font-semibold text-black transition hover:bg-[#E5E5E5]"
+                  className="hero-primary-action inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-6 text-sm font-semibold text-black transition hover:bg-[#E5E5E5]"
                 >
                   Browse Courses
                 </Link>
                 <Link
                   to={isAuthenticated ? "/courses?view=owned" : "/login"}
-                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/20 bg-[#090909] px-5 text-sm font-semibold text-white transition hover:border-white/40 hover:bg-[#111111]"
+                  className="hero-secondary-action inline-flex min-h-12 items-center justify-center rounded-lg border border-white/20 bg-[#090909] px-6 text-sm font-semibold text-white transition hover:border-white/40 hover:bg-[#111111]"
                 >
                   {isAuthenticated ? "My Learning" : "Get Started"}
                 </Link>
@@ -959,8 +956,36 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <div className="relative z-10 px-4 pb-20 pt-2">
+      <div className="relative z-10 px-4 pb-20 pt-8">
         <div className="mx-auto max-w-6xl space-y-8">
+          <SectionCard className="course-showcase-section p-5 sm:p-7">
+            <div className="max-w-3xl">
+              <p className="course-showcase-eyebrow flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.24em] text-[#969EA4] sm:text-xs">
+                <span className="h-px w-10 bg-white/65" aria-hidden="true" />
+                Our training program
+              </p>
+              <h2 className="course-showcase-heading mt-5 font-reference text-3xl font-semibold tracking-[-0.035em] text-white sm:text-4xl lg:text-5xl">
+                Hot and Fresh Courses
+              </h2>
+              <p className="course-showcase-summary mt-3 max-w-2xl text-sm leading-7 text-[#A7A7A7] sm:text-base">
+                Compare active professional programs, verified learner ratings, schedules, fees,
+                and access options before opening the full course page.
+              </p>
+            </div>
+
+            {landingLiveCourses.length ? (
+              <div className="mt-7 grid auto-rows-fr gap-5 md:grid-cols-2">
+                {landingLiveCourses.map((course) => (
+                  <CourseCard key={course.id} course={course} />
+                ))}
+              </div>
+            ) : (
+              <p className="mt-6 rounded-xl border border-white/10 bg-[#090909] px-4 py-3 text-sm text-[#AAAAAA]">
+                Live courses are being updated. Submit an enrollment enquiry and our team will contact you.
+              </p>
+            )}
+          </SectionCard>
+
           <SectionCard className="!p-0">
             <div className="grid gap-0 lg:grid-cols-[0.72fr_1.28fr]">
               <div className="flex flex-col justify-center border-b border-white/10 p-5 sm:p-7 lg:border-b-0 lg:border-r lg:p-8">
@@ -1094,25 +1119,6 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
-          </SectionCard>
-
-          <SectionCard className="p-5 sm:p-6">
-            <SectionTitle
-              title="Live courses"
-              subtitle="Explore current programs and review previous batches from the same course catalog."
-            />
-
-            {landingLiveCourses.length ? (
-              <div className="mt-7 grid auto-rows-fr gap-6 lg:grid-cols-2">
-                {landingLiveCourses.map((course) => (
-                  <CourseCard key={course.id} course={course} />
-                ))}
-              </div>
-            ) : (
-              <p className="mt-6 rounded-xl border border-white/10 bg-[#090909] px-4 py-3 text-sm text-[#AAAAAA]">
-                Live courses are being updated. Submit an enrollment enquiry and our team will contact you.
-              </p>
-            )}
           </SectionCard>
 
           <SectionCard className="p-5 sm:p-6">
