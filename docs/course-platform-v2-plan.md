@@ -5,7 +5,7 @@
 - V2 developer requirements: course selection, detailed curriculum, genuine reviews, confirmed enrollment counts and separate Pentesting applications.
 - OSINT Batch IV screenshot: three-month course, limited seats, live classes, live chat, lifetime recordings, three Q&A sessions and completion certificate.
 - `6-Month-Web-and-API-Pentesting-Course (2).pdf`: six phases, 24 weeks, 48 classes, approximately 100?120 hours, six projects, Al Mikael, January 1, 2027 start, and three payment plans.
-- The latest user instruction requests generated imagery like the references. This supersedes the older no-decorative-imagery requirement. All labels, facts and fees remain HTML/database content.
+- The requirements PDF prohibits decorative cybersecurity imagery, fake interfaces and hooded-hacker visuals. The default card and hero layouts are information-led; an administrator can opt into an uploaded, directly relevant course-context image when appropriate. All labels, facts and fees remain HTML/database content.
 - The latest user instruction leaves OSINT pricing to admin. The screenshot's prices are deliberately not used.
 
 ## Stages completed
@@ -17,7 +17,7 @@
 | Source content | Separate OSINT Batch IV and six-month Web/API Pentesting program records |
 | Student workflows | Verified reviews, moderation, enrollment counts, application review step, private checkout reference, student dashboard |
 | Payments | One-time, monthly and three-month bundle plans; server-controlled amounts and installment counts; order terms snapshots; retry-safe provisioning |
-| Visuals | Generated local course imagery; two equal cards; image-led heroes; responsive pages; sticky desktop enrollment panel |
+| Visuals | Two equal information-led cards; facts placed in the course header; optional admin-controlled course-context imagery; responsive pages; sticky desktop enrollment panel |
 | Verification | API/admin/payment tests, frontend tests, build, desktop/mobile browser checks and data preservation audit |
 
 ## Local data state
@@ -35,12 +35,12 @@ Open **Django admin ? Courses ? select the course**.
 
 | Section | Controls |
 | --- | --- |
-| Homepage card | Card title, subtitle, summary, one bullet per line, image alt text |
+| Homepage card | Card title, subtitle, summary, one bullet per line, image alt text and the optional image display toggle |
 | Course facts | Flagship selection, batch, duration, schedule, class length, class count, hours and seat count |
 | Batch and extended facts | Start date, descriptive hours range, descriptive seat availability |
 | Pricing | One-time price, monthly price, enabled flags, number of monthly payments and access days |
 | Three-month bundle pricing | Enabled flag, per-installment price, installment count and access days |
-| Media | Thumbnail upload or public image URL; applies to card and hero |
+| Media | Optional thumbnail upload or public image URL. It is shown on the card and hero only when `Show course image` is enabled and the image directly explains the program. |
 | Course content | Overview, learning capabilities, outcomes, benefits and enrollment message |
 | Modules | Ordered module title, description, public topics and lesson records |
 
@@ -81,7 +81,7 @@ npm.cmd --prefix frontend run build
 
 On a server use its Python executable/environment. Omitting `--publish` creates unpublished drafts. The command creates only missing program slugs, never overwrites an existing program and never edits old enrollments or prices. If a different flagship already exists, the new record is created without replacing that flag; select the desired flagship deliberately in admin.
 
-Media is copied from the bundled course artwork where available. Ship `frontend/public/course-art/` with the release; admin uploads take precedence and bundled assets provide a fallback.
+Existing thumbnail records and uploaded media are preserved. New program records do not receive decorative fallback artwork. Upload a course-context image in admin and enable `Show course image` only when it is genuinely useful to the student.
 
 ## Validation evidence
 
@@ -108,6 +108,4 @@ Run the deployment only outside a live class:
 RELEASE_COMMIT="<full-approved-sha>" ./infra/hostinger/deploy-course-v2.sh
 ```
 
-The script creates a PostgreSQL and media recovery point, verifies it, applies only forward migrations, updates the existing pooled services, and creates only missing program slugs. It never overwrites matching courses or admin edits. In Docker, the frontend ships the bundled artwork as the fallback; thumbnails can subsequently be uploaded through admin. Set OSINT pricing in admin, and check an existing student's video playback, login, the new cards and registration before considering the release verified.
-
-See `course-program-artwork.md` for the built-in image-generation prompts and saved asset paths.
+The script creates a PostgreSQL and media recovery point, verifies it, applies only forward migrations, updates the existing pooled services, and creates only missing program slugs. It never overwrites matching courses or admin edits. Existing thumbnails remain stored but are not presented unless an administrator enables their display toggle. Set OSINT pricing in admin, and check an existing student's video playback, login, the new cards and registration before considering the release verified.

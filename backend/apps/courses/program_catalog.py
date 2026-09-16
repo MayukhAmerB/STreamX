@@ -65,8 +65,7 @@ PROGRAMS = [
         "full_payment_enabled": False,
         "installment_payment_enabled": False,
         "installments_required": 3,
-        "image_alt": "Intelligence research workstation with a world map and globe",
-        "image_asset": "osint-program-v2.png",
+        "image_alt": "",
         "modules": [
             (
                 "Introduction to OSINT",
@@ -180,8 +179,7 @@ PROGRAMS = [
         "bundle_price": Decimal("10999"),
         "bundle_installments": 2,
         "bundle_access_days": 90,
-        "image_alt": "Security analyst testing web applications and APIs in a dark workstation",
-        "image_asset": "pentesting-program-v2.png",
+        "image_alt": "",
         "modules": [
             (
                 "Phase 1 — Cybersecurity & Linux Foundations",

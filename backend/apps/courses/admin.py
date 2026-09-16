@@ -208,10 +208,13 @@ class CourseAdminForm(forms.ModelForm):
         )
         self.fields["course_overview"].label = "Course Overview"
         self.fields["course_overview"].help_text = (
-            "Frontend container: Course Overview overlay card on thumbnail."
+            "Public course overview copy shown below the program header."
+        )
+        self.fields["show_course_image"].help_text = (
+            "Keep disabled unless the image has a direct instructional or course-context purpose."
         )
         self.fields["thumbnail_file"].help_text = (
-            "Upload image file (recommended). Uploaded file is used first on frontend and admin preview."
+            "Optional course-context image. It is displayed only when 'Show course image' is enabled."
         )
         self.fields["thumbnail"].help_text = (
             "Optional public image URL fallback if no uploaded thumbnail file is available."
@@ -470,7 +473,23 @@ class CourseAdmin(admin.ModelAdmin):
         "unpublish_courses",
     )
     fieldsets = (
-        ("Homepage card", {"description": "Controls the public program card. Thumbnail upload below also controls the course hero image.", "fields": ("card_title", "card_subtitle", "card_summary", "card_highlights", "image_alt")}),
+        (
+            "Homepage card",
+            {
+                "description": (
+                    "Controls the public program card. Keep the default information-led layout; "
+                    "optional images must be course-contextual."
+                ),
+                "fields": (
+                    "card_title",
+                    "card_subtitle",
+                    "card_summary",
+                    "card_highlights",
+                    "image_alt",
+                    "show_course_image",
+                ),
+            },
+        ),
         ("Batch and extended facts", {"fields": ("start_date", "total_hours_label", "batch_size_label")}),
         ("Three-month bundle pricing", {"fields": ("bundle_payment_enabled", "bundle_price", "bundle_installments", "bundle_access_days")}),
         ("Course facts", {"fields": ("is_flagship", "batch", "duration", "schedule", "class_length", "total_classes", "total_hours", "batch_size", "confirmed_statistics")}),
@@ -511,7 +530,7 @@ class CourseAdmin(admin.ModelAdmin):
             },
         ),
         (
-            "Container 3: Hero Right Media Card",
+            "Optional course-context image",
             {
                 "fields": (
                     "thumbnail",
@@ -707,7 +726,7 @@ class CourseAdmin(admin.ModelAdmin):
             <div style="line-height:1.5;">
               <div><strong>1. Hero Header:</strong> category, level, launch status, title, short description</div>
               <div><strong>2. Hero Left Cards:</strong> price + About This Course</div>
-              <div><strong>3. Hero Right Media Card:</strong> thumbnail + Course Overview overlay</div>
+              <div><strong>3. Optional course image:</strong> use only with an informational image and enable its display toggle</div>
               <div><strong>4. What You Will Cover:</strong> one line = one chip</div>
               <div><strong>5. Expected Outcomes:</strong> one line = one outcome card</div>
               <div><strong>6. Enrollment Panel:</strong> Enrollment note + launch/price source</div>

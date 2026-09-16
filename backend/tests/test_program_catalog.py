@@ -27,12 +27,15 @@ class ProgramCatalogTests(TestCase):
         self.assertEqual(osint.duration, "3 months")
         self.assertEqual(osint.price, 0)
         self.assertFalse(osint.full_payment_enabled)
+        self.assertFalse(osint.show_course_image)
+        self.assertFalse(bool(osint.thumbnail_file))
         self.assertEqual(pentesting.sections.count(), 6)
         self.assertEqual(pentesting.total_classes, 48)
         self.assertEqual(pentesting.start_date, date(2027, 1, 1))
         self.assertEqual(pentesting.monthly_price * pentesting.installments_required, Decimal("25794"))
         osint.price = 4999
         osint.card_title = "Admin course title"
+        osint.show_course_image = True
         osint.save()
         call_command("setup_course_experience", publish=True, stdout=StringIO())
         osint.refresh_from_db()
@@ -40,6 +43,7 @@ class ProgramCatalogTests(TestCase):
         enrollment.refresh_from_db()
         self.assertEqual(osint.price, 4999)
         self.assertEqual(osint.card_title, "Admin course title")
+        self.assertTrue(osint.show_course_image)
         self.assertEqual(original.price, 777)
         self.assertEqual(enrollment.payment_status, "paid")
 
@@ -61,6 +65,7 @@ class ProgramCatalogTests(TestCase):
         self.assertEqual(data["bundle_price"], "3000.00")
         self.assertEqual(data["card_title"], "Research")
         self.assertEqual(data["card_highlights"], ["Admin bullet"])
+        self.assertFalse(data["show_course_image"])
         self.assertEqual(CourseAdminForm(instance=course).fields["card_highlights"].initial, "Admin bullet")
 
     def test_bundle_snapshots_terms_handles_future_start_and_retries(self):

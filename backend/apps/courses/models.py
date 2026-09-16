@@ -157,6 +157,10 @@ class Course(models.Model):
     card_summary = models.TextField(blank=True, default="")
     card_highlights = models.JSONField(default=list, blank=True)
     image_alt = models.CharField(max_length=240, blank=True, default="")
+    show_course_image = models.BooleanField(
+        default=False,
+        help_text="Show the optional course image only when it directly explains the program.",
+    )
     start_date = models.DateField(null=True, blank=True)
     total_hours_label = models.CharField(max_length=80, blank=True, default="")
     batch_size_label = models.CharField(max_length=80, blank=True, default="")

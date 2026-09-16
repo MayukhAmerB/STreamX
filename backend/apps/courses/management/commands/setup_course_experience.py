@@ -1,7 +1,3 @@
-from pathlib import Path
-
-from django.conf import settings
-from django.core.files import File
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
@@ -23,14 +19,10 @@ class Command(BaseCommand):
                 continue
             values = dict(source)
             modules = values.pop("modules")
-            asset = values.pop("image_asset")
+            values.pop("image_asset", None)
             values["is_flagship"] = not Course.objects.filter(category=values["category"], is_flagship=True).exists()
             values["is_published"] = options["publish"]
             course = Course(**values)
-            image_path = Path(settings.BASE_DIR).parent / "frontend" / "public" / "course-art" / asset
-            if image_path.exists():
-                with image_path.open("rb") as handle:
-                    course.thumbnail_file.save(asset, File(handle), save=False)
             course.full_clean()
             course.save()
             for order, (title, description, topics) in enumerate(modules, 1):

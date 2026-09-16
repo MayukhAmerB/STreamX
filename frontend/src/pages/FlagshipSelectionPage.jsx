@@ -5,9 +5,24 @@ import { apiData, apiMessage } from "../utils/api";
 import "../components/CourseExperience.css";
 
 const tracks = [
-  { category: "osint", title: "OSINT", image: "/course-art/osint-program-v2.png" },
-  { category: "web_pentesting", title: "PENTESTING", image: "/course-art/pentesting-program-v2.png" },
+  { category: "osint", title: "OSINT" },
+  { category: "web_pentesting", title: "PENTESTING" },
 ];
+
+function ProgramBrief({ course, index, title }) {
+  const showImage = Boolean(course?.show_course_image && course?.thumbnail);
+  if (showImage) {
+    return <div className="course-art"><img src={course.thumbnail} alt={course.image_alt || ""} loading="eager" /><span className="art-label">0{index + 1} / {course.duration || "Professional program"}</span></div>;
+  }
+  return <div className="course-art course-context">
+    <span className="art-label">0{index + 1} / Program brief</span>
+    <strong>{course?.card_subtitle || title}</strong>
+    <dl>
+      <div><dt>Duration</dt><dd>{course?.duration || "To be announced"}</dd></div>
+      <div><dt>Curriculum</dt><dd>{course?.section_count ? `${course.section_count} modules` : "Structured modules"}</dd></div>
+    </dl>
+  </div>;
+}
 
 export default function FlagshipSelectionPage() {
   const [courses, setCourses] = useState([]);
@@ -35,7 +50,7 @@ export default function FlagshipSelectionPage() {
       const course = candidates.find((item) => item.is_flagship) || candidates.find((item) => item.launch_status === "live" && !item.registration_closed) || candidates[0];
       const Card = course ? Link : "article";
       return <Card className="panel flagship" key={track.category} to={course ? `/courses/${course.id}` : undefined} aria-label={course ? `Explore ${track.title} course` : undefined}>
-        <div className="course-art"><img src={course?.thumbnail || track.image} alt={course?.image_alt || ""} loading="eager" onError={(event) => { if (!event.currentTarget.dataset.fallback) { event.currentTarget.dataset.fallback = "true"; event.currentTarget.src = track.image; } }} /><span className="art-label">0{index + 1} / {course?.duration || "Professional program"}</span></div>
+        <ProgramBrief course={course} index={index} title={track.title} />
         <div className="flagship-content"><h2>{course?.card_title || track.title}</h2>
         <div className="eyebrow">{course?.card_subtitle || "Professional training"}</div><p className="card-description">{course?.card_summary || course?.description || "Explore the course curriculum and learning outcomes."}</p>
         <ul>{(course?.card_highlights || []).map((topic) => <li key={topic}>{topic}</li>)}</ul>
