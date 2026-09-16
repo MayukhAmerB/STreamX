@@ -25,7 +25,7 @@ function renderCatalog(courses) {
 }
 
 describe("CourseListPage catalog rendering", () => {
-  it("renders Access Course from authenticated course-list access data", () => {
+  it("keeps authenticated catalog cards details-first without prices or direct actions", () => {
     const html = renderCatalog([
       {
         id: 11,
@@ -55,12 +55,17 @@ describe("CourseListPage catalog rendering", () => {
       },
     ]);
 
-    expect(html).toContain("Access Course");
-    expect(html).toContain('href="/learn/11"');
+    expect(html).toContain("See Details");
+    expect(html).toContain('href="/courses/11"');
+    expect(html).toContain('href="/courses/12"');
+    expect(html).not.toContain('href="/learn/11"');
+    expect(html).not.toContain('href="/courses/12/register"');
+    expect(html).not.toContain("3,500");
+    expect(html).not.toContain("2,000");
     expect(html).toContain("Live");
   });
 
-  it("does not over-render Access Course for pending or coming soon catalog items", () => {
+  it("keeps pending and coming-soon catalog items available for details", () => {
     const html = renderCatalog([
       {
         id: 21,
@@ -92,6 +97,9 @@ describe("CourseListPage catalog rendering", () => {
 
     expect(html).not.toContain('href="/learn/21"');
     expect(html).not.toContain('href="/learn/22"');
+    expect(html).toContain('href="/courses/21"');
+    expect(html).toContain('href="/courses/22"');
+    expect(html).toContain("See Details");
     expect(html).toContain("Coming Soon");
   });
 });

@@ -627,7 +627,7 @@ function HeroCourseCard({ course }) {
 
         <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-2.5">
           <span className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#98A2A9]">
-            View full program
+            See Details
           </span>
           <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/30 text-sm text-white transition group-hover:bg-white group-hover:text-black">
             -&gt;
@@ -977,8 +977,8 @@ export default function LandingPage() {
                 Bestsellers
               </h2>
               <p className="course-showcase-summary mt-3 max-w-2xl text-sm leading-7 text-[#A7A7A7] sm:text-base">
-                Compare active professional programs, verified learner ratings, learning scope,
-                fees, and access options before opening the full course page.
+                Compare active professional programs, verified learner ratings, curriculum depth,
+                and learning formats before opening the full course page.
               </p>
             </div>
 

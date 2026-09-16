@@ -251,7 +251,7 @@ export default function CourseDetailPage() {
         </Link>
       ) : purchaseAvailable ? (
         <Link to={`/courses/${course.id}/payment`} className="block">
-          <Button className={className}>Buy Course</Button>
+          <Button className={className}>Buy Now</Button>
         </Link>
       ) : normalizedEnrollmentStatus === "pending" ? (
         <Button className={className} disabled>

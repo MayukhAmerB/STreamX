@@ -1,20 +1,11 @@
 import { memo, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { getPurchaseUnavailableMessage } from "../utils/courseAccess";
 import {
   resolveCourseArtwork,
   resolveCourseArtworkFallback,
 } from "../utils/courseArtwork";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
-import { formatINR } from "../utils/currency";
-
-function normalizeEnrollmentStatus(value) {
-  const raw = String(value || "none").toLowerCase();
-  if (raw === "paid" || raw === "approved") return "approved";
-  if (raw === "pending") return "pending";
-  return "none";
-}
 
 function formatCategory(category) {
   return category === "web_pentesting" ? "Pentesting" : "OSINT";
@@ -23,30 +14,6 @@ function formatCategory(category) {
 function formatLevel(level) {
   const value = String(level || "").trim();
   return value ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : "All levels";
-}
-
-function getPrimaryAction(course, status, hasCourseAccess) {
-  const id = Number(course?.id || 0);
-  if (status.isComingSoon || id <= 0) return { label: "Coming Soon", disabled: true };
-  if (hasCourseAccess) return { label: "Access Course", to: `/learn/${id}` };
-  if (course?.registration_closed) return { label: "Registration Closed", disabled: true };
-  if (course?.category === "web_pentesting") {
-    return { label: "Apply for Course", to: `/courses/${id}/register` };
-  }
-  if (course?.purchase_available) return { label: "Buy Course", to: `/courses/${id}/payment` };
-  return { label: "Purchase Unavailable", disabled: true };
-}
-
-function getCompactActionLabel(action) {
-  const labels = {
-    "Access Course": "Access",
-    "Apply for Course": "Apply",
-    "Buy Course": "Buy Course",
-    "Registration Closed": "Closed",
-    "Purchase Unavailable": "Unavailable",
-    "Coming Soon": "Coming Soon",
-  };
-  return labels[action?.label] || action?.label;
 }
 
 function StarIcon() {
@@ -66,12 +33,6 @@ function CourseCard({ course }) {
   const [thumbnailSrc, setThumbnailSrc] = useState(() => resolveCourseArtwork(course));
   const safeTitle = course?.card_title || course?.title || "Untitled course";
   const detailPath = courseId > 0 ? `/courses/${courseId}` : "/courses";
-  const hasCourseAccess =
-    Boolean(course?.is_enrolled) ||
-    normalizeEnrollmentStatus(course?.enrollment_status) === "approved";
-  const primaryAction = getPrimaryAction(course, status, hasCourseAccess);
-  const compactActionLabel = getCompactActionLabel(primaryAction);
-  const numericPrice = Number(course?.price || 0);
   const parsedReviewCount = Number(course?.review_count || 0);
   const reviewCount = Number.isFinite(parsedReviewCount)
     ? Math.max(0, Math.trunc(parsedReviewCount))
@@ -88,7 +49,6 @@ function CourseCard({ course }) {
         ? `${course.section_count} modules`
         : "";
   const learningFacts = [hoursLabel, unitLabel, formatLevel(course?.level)].filter(Boolean);
-  const unavailableMessage = getPurchaseUnavailableMessage(course);
 
   useEffect(() => {
     setThumbnailSrc(
@@ -165,28 +125,16 @@ function CourseCard({ course }) {
         </p>
 
         <div className="mt-auto flex items-center justify-between gap-2 border-t border-white/10 pt-2.5">
-          <div className="min-w-0">
-            <p className="owlcognito-course-card-price truncate font-reference text-base font-semibold leading-none text-white">
-              {numericPrice > 0 ? formatINR(numericPrice) : "Price on request"}
-            </p>
-          </div>
-          {primaryAction.to ? (
-            <Link
-              to={primaryAction.to}
-              aria-label={primaryAction.label}
-              className="owlcognito-course-card-action relative z-20 inline-flex min-h-8 shrink-0 items-center justify-center rounded-md border border-white bg-white px-2.5 text-[8px] font-bold uppercase tracking-[0.08em] text-black transition hover:bg-[#E7E7E7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-            >
-              {compactActionLabel}
-            </Link>
-          ) : (
-            <span
-              className="owlcognito-course-card-action-disabled relative z-20 inline-flex min-h-8 max-w-[92px] shrink-0 cursor-not-allowed items-center justify-center rounded-md border border-white/10 bg-white/[0.06] px-2 text-center text-[7px] font-bold uppercase leading-3 tracking-[0.06em] text-[#7F888F]"
-              aria-label={primaryAction.label}
-              title={unavailableMessage}
-            >
-              {compactActionLabel}
-            </span>
-          )}
+          <span className="owlcognito-course-card-note truncate text-[9px] font-semibold uppercase tracking-[0.1em] text-[#8F989F]">
+            Curriculum &amp; reviews
+          </span>
+          <Link
+            to={detailPath}
+            aria-label={`See details for ${safeTitle}`}
+            className="owlcognito-course-card-action relative z-20 inline-flex min-h-8 shrink-0 items-center justify-center rounded-md border border-white bg-white px-2.5 text-[8px] font-bold uppercase tracking-[0.08em] text-black transition hover:bg-[#E7E7E7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+          >
+            See Details
+          </Link>
         </div>
       </div>
     </article>

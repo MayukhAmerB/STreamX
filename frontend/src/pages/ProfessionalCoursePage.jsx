@@ -4,8 +4,14 @@ import { getCourse } from "../api/courses";
 import apiClient from "../api/client";
 import { apiData, apiMessage } from "../utils/api";
 import { useAuth } from "../hooks/useAuth";
+import { formatINR } from "../utils/currency";
 import CourseReviews from "../components/CourseReviews";
 import "../components/CourseExperience.css";
+
+export function getCourseDetailPriceLabel(course) {
+  const amount = Number(course?.price || 0);
+  return Number.isFinite(amount) && amount > 0 ? formatINR(amount) : "To be announced";
+}
 
 export default function ProfessionalCoursePage() {
   const { id } = useParams();
@@ -31,9 +37,10 @@ export default function ProfessionalCoursePage() {
   const factItems = [["Duration", facts.duration], ["Schedule", facts.schedule], ["Class length", facts.class_length], ["Total classes", facts.total_classes], ["Total hours", facts.total_hours_label || facts.total_hours], ["Batch size", facts.batch_size_label || facts.batch_size]];
   const showImage = Boolean(course.show_course_image && course.thumbnail);
   const open = course.launch_status === "live" && !course.registration_closed;
+  const priceLabel = getCourseDetailPriceLabel(course);
   const action = course.is_enrolled ? <Link className="action full" to={`/learn/${id}`}>Continue learning →</Link>
-    : open && (pentesting || course.purchase_available) ? <Link className="action full" to={`/courses/${id}/${pentesting ? "register" : "payment"}`}>{pentesting ? "Register now" : "Enroll now"} →</Link>
-      : <><button className="action full" disabled>{course.registration_closed ? "Registration closed" : "Enroll now - opening soon"}</button><Link className="muted" to="/contact">Contact the team for updates</Link></>;
+    : open && (pentesting || course.purchase_available) ? <Link className="action full" to={`/courses/${id}/${pentesting ? "register" : "payment"}`}>{pentesting ? "Apply Now" : "Buy Now"} →</Link>
+      : <><button className="action full" disabled>{course.registration_closed ? "Registration closed" : pentesting ? "Applications opening soon" : "Buy Now - opening soon"}</button><Link className="muted" to="/contact">Contact the team for updates</Link></>;
   return <div className="course-experience">
     <Link className="eyebrow" to="/">← All programs</Link>
     <header className={`course-heading visual-course-heading${showImage ? " has-image" : ""}`}>
@@ -56,8 +63,10 @@ export default function ProfessionalCoursePage() {
       </section>
       {!!course.expected_outcomes?.length && <section className="panel"><h2>Expected outcomes</h2><ul>{course.expected_outcomes.map((item, index) => <li key={index}>{item}</li>)}</ul></section>}
       <CourseReviews key={`${id}-${isAuthenticated}`} courseId={id} experience={experience} refresh={refresh} />
-    </div><aside className="panel enroll-panel"><div className="eyebrow">Your next step</div><h2>{course.is_enrolled ? "Your course" : pentesting ? "Register your interest" : "Join the program"}</h2>
-      <p>{course.enrollment_message || (pentesting ? "Complete a short application. Review your details before continuing to the fee and payment stage." : "Confirm your details and choose an available payment plan in the enrollment process.")}</p>{action}
+    </div><aside className="panel enroll-panel"><div className="eyebrow">Your next step</div><h2>{course.is_enrolled ? "Your course" : pentesting ? "Apply for the program" : "Buy the course"}</h2>
+      <p>{course.enrollment_message || (pentesting ? "Complete a short application. Review your details before continuing to the fee and payment stage." : "Review the course fee, then continue securely to choose an available payment plan.")}</p>
+      {!course.is_enrolled ? <div className="course-detail-price"><span>Course fee</span><strong>{priceLabel}</strong></div> : null}
+      {action}
       {course.is_enrolled && <Link className="action secondary full" to={`/courses/${id}/live`}>Live classes</Link>}
       <p className="muted" style={{ marginTop: 24 }}>Questions before joining? <Link to="/contact" style={{ textDecoration: "underline" }}>Contact our team</Link>.</p>
       <a className="muted" href="#reviews">{experience.review_count ? `${experience.average_rating} / 5 · ${experience.review_count} reviews` : "Read student reviews"}</a>

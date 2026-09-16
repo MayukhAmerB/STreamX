@@ -112,6 +112,29 @@
   position:sticky;
   top:92px
 }
+.course-experience .course-detail-price {
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:16px;
+  margin-top:20px;
+  padding:16px 0;
+  border-top:1px solid #303640;
+  border-bottom:1px solid #303640
+}
+.course-experience .course-detail-price span {
+  color:#a3adb9;
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:.14em;
+  text-transform:uppercase
+}
+.course-experience .course-detail-price strong {
+  color:#f2f3f5;
+  font-size:24px;
+  line-height:1;
+  text-align:right
+}
 .course-experience .action {
   display:inline-flex;
   justify-content:center;
