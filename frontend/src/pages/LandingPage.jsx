@@ -555,12 +555,13 @@ function HeroCourseCard({ course }) {
   const fallbackHighlights = HERO_COURSE_FALLBACKS.find(
     (item) => item.category === course?.category,
   )?.card_highlights || [];
-  const highlights = (configuredHighlights.length
-    ? configuredHighlights
-    : featureHighlights.length
-      ? featureHighlights
-      : fallbackHighlights
-  ).slice(0, 2);
+  const highlights = [
+    ...featureHighlights,
+    ...configuredHighlights,
+    ...fallbackHighlights,
+  ]
+    .filter((highlight, index, items) => items.indexOf(highlight) === index)
+    .slice(0, 4);
   const detailPath = Number(course?.id || 0) > 0
     ? `/courses/${course.id}`
     : course?._fallbackLink || "/courses";
@@ -568,7 +569,7 @@ function HeroCourseCard({ course }) {
   return (
     <Link
       to={detailPath}
-      className="hero-course-card group relative flex min-h-[252px] min-w-0 flex-col overflow-hidden rounded-[18px] border border-white/15 bg-[#080B0D] p-4 shadow-[0_18px_48px_rgba(0,0,0,0.42)] transition duration-300 hover:-translate-y-0.5 hover:border-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:min-h-[278px] sm:p-5"
+      className="hero-course-card group relative flex min-h-[360px] min-w-0 flex-col overflow-hidden rounded-[18px] border border-white/15 bg-[#0B0B0B] p-4 shadow-[0_18px_48px_rgba(0,0,0,0.42)] transition duration-300 hover:-translate-y-0.5 hover:border-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:min-h-[302px] sm:p-5"
     >
       <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full border border-white/[0.055]" />
       <div aria-hidden="true" className="pointer-events-none absolute -right-2 top-4 h-20 w-20 rounded-full border border-white/[0.04]" />
@@ -577,7 +578,7 @@ function HeroCourseCard({ course }) {
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/25 bg-white/[0.025] text-white sm:h-14 sm:w-14">
           <HeroCourseIcon category={course?.category} />
         </span>
-        <span className="hidden rounded-full border border-white/15 px-2.5 py-1 text-[7px] font-bold uppercase tracking-[0.16em] text-[#9BA4AA] min-[420px]:inline-flex sm:text-[8px]">
+        <span className="hidden rounded-full border border-white/15 bg-[#111111] px-2.5 py-1 text-[7px] font-bold uppercase tracking-[0.16em] text-[#A3A3A3] min-[420px]:inline-flex sm:text-[8px]">
           Professional track
         </span>
       </div>
@@ -587,23 +588,33 @@ function HeroCourseCard({ course }) {
           <h2 className="hero-course-card-title line-clamp-2 font-reference text-lg font-semibold uppercase leading-[1.02] tracking-[-0.03em] text-white sm:text-[1.35rem]">
             {title}
           </h2>
-          <p className="hero-course-card-subtitle mt-1.5 line-clamp-2 text-[8px] font-semibold uppercase leading-4 tracking-[0.18em] text-[#8F9AA2] sm:text-[9px] sm:tracking-[0.2em]">
+          <p className="hero-course-card-subtitle mt-1.5 line-clamp-2 text-[8px] font-semibold uppercase leading-4 tracking-[0.18em] text-[#999999] sm:text-[9px] sm:tracking-[0.2em]">
             {subtitle}
           </p>
         </div>
 
-        <p className="hero-course-card-summary mt-3 line-clamp-2 text-[10px] leading-[1.55] text-[#A9B0B5] sm:text-[11px]">{summary}</p>
-        <ul className="mt-2 space-y-1.5">
+        <p className="hero-course-card-summary mt-3 line-clamp-2 text-[10px] leading-[1.55] text-[#A8A8A8] sm:text-[11px]">{summary}</p>
+
+        <p className="mt-3 text-[7px] font-bold uppercase tracking-[0.16em] text-[#777777] sm:text-[8px]">
+          Program includes
+        </p>
+        <ul className="mt-1.5 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
           {highlights.map((highlight) => (
-            <li key={highlight} className="flex min-w-0 items-center gap-2 text-[9px] leading-4 text-[#D4D9DC] sm:text-[10px]">
-              <span className="h-1 w-1 shrink-0 bg-white/70" />
-              <span className="truncate">{highlight}</span>
+            <li
+              key={highlight}
+              title={highlight}
+              className="flex min-h-7 min-w-0 items-start gap-1.5 rounded-md border border-white/10 bg-[#111111] px-2 py-1.5 text-[8px] leading-[1.25] text-[#D0D0D0] sm:min-h-8 sm:text-[9px]"
+            >
+              <span className="mt-0.5 flex h-3 w-3 shrink-0 items-center justify-center rounded-full border border-white/20 text-[7px] text-white" aria-hidden="true">
+                +
+              </span>
+              <span className="sm:line-clamp-2">{highlight}</span>
             </li>
           ))}
         </ul>
 
         <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-3">
-          <span className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#98A2A9]">
+          <span className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#969696]">
             See Details
           </span>
           <span className="flex h-8 w-8 items-center justify-center rounded-full border border-white/30 text-sm text-white transition group-hover:bg-white group-hover:text-black">
