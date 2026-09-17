@@ -46,6 +46,25 @@ export function filterCourseCatalog(courses, search = "") {
   });
 }
 
+export function filterCoursesByCategory(courses, category) {
+  const normalizedCategory = String(category || "").trim().toLowerCase();
+  if (!normalizedCategory) {
+    return [];
+  }
+
+  return normalizeCourseArray(courses).filter(
+    (course) => String(course?.category || "").toLowerCase() === normalizedCategory
+  );
+}
+
+export function getCourseCategoryCounts(courses) {
+  const normalizedCourses = normalizeCourseArray(courses);
+  return {
+    osint: filterCoursesByCategory(normalizedCourses, "osint").length,
+    web_pentesting: filterCoursesByCategory(normalizedCourses, "web_pentesting").length,
+  };
+}
+
 export function readCachedCourseCatalog({ maxAgeMs = COURSE_CATALOG_CACHE_MAX_AGE_MS } = {}) {
   if (!canUseStorage()) {
     return [];

@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { listCourses } from "../api/courses";
+import CourseCategorySelector from "../components/CourseCategorySelector";
 import CourseCard from "../components/CourseCard";
 import PageShell from "../components/PageShell";
-import { useAuth } from "../hooks/useAuth";
 import { apiData } from "../utils/api";
 import { hasApprovedCourseAccess } from "../utils/courseAccess";
 import {
   filterCourseCatalog,
+  filterCoursesByCategory,
+  getCourseCategoryCounts,
   readCachedCourseCatalog,
   writeCachedCourseCatalog,
 } from "../utils/courseCatalog";
@@ -15,6 +18,11 @@ import { getCourseLaunchStatus } from "../utils/courseStatus";
 
 const pageBackgroundImage =
   "https://i.pinimg.com/736x/8d/ad/8a/8dad8ae3fa8915b93754dfffdd421b62.jpg";
+
+const COURSE_CATEGORY_LABELS = {
+  osint: "OSINT",
+  web_pentesting: "Pentesting",
+};
 
 export function getCourseCatalogSummary(courses) {
   return {
@@ -46,13 +54,19 @@ export function CourseCatalogContent({
   setSearch = () => {},
   summary = getCourseCatalogSummary(courses),
   levelSummary = getCourseLevelSummary(courses),
+  catalogLabel = "Course",
 }) {
   return (
-    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+    <div
+      id="course-category-results"
+      className="grid scroll-mt-24 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]"
+    >
       <div className="min-w-0">
         <div className="mb-4 flex flex-col items-start gap-2 min-[430px]:flex-row min-[430px]:items-end min-[430px]:justify-between">
           <div>
-            <h3 className="font-reference text-lg font-semibold text-white">Available Tracks</h3>
+            <h3 className="font-reference text-lg font-semibold text-white">
+              {catalogLabel} Courses
+            </h3>
             <p className="mt-1 text-xs text-[#949494]">
               Explore the catalog and open any course to view modules, lessons, and enrollment
               status.
@@ -107,11 +121,13 @@ export function CourseCatalogContent({
                 CATALOG DETAILS
               </div>
               <h2 className="mt-3 font-reference text-xl font-semibold tracking-tight text-white sm:text-2xl">
-                {loading ? "Loading courses..." : `${courses.length} courses across OSINT and Web Pentesting`}
+                {loading
+                  ? "Loading courses..."
+                  : `${courses.length} ${catalogLabel} course${courses.length === 1 ? "" : "s"}`}
               </h2>
               <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
-                Search the catalog, review the current mix of live and upcoming tracks, and jump
-                directly into the course you need.
+                Search this training path, compare live and upcoming programs, and open the full
+                course information before enrolling.
               </p>
             </div>
 
@@ -188,11 +204,16 @@ export function CourseCatalogContent({
 }
 
 export default function CourseListPage() {
-  const { isAuthenticated } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [courses, setCourses] = useState(() => readCachedCourseCatalog());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+
+  const requestedCategory = searchParams.get("category") || "";
+  const selectedCategory = Object.hasOwn(COURSE_CATEGORY_LABELS, requestedCategory)
+    ? requestedCategory
+    : "";
 
   useEffect(() => {
     let active = true;
@@ -204,7 +225,7 @@ export default function CourseListPage() {
 
         for (let attempt = 0; attempt < 2; attempt += 1) {
           try {
-            const response = await listCourses(search ? { search } : {});
+            const response = await listCourses();
             const apiCourses = apiData(response, []);
             return Array.isArray(apiCourses) ? apiCourses : [];
           } catch (err) {
@@ -223,15 +244,13 @@ export default function CourseListPage() {
       try {
         const apiCourses = await fetchCourses();
         if (active) {
-          if (!search) {
-            writeCachedCourseCatalog(apiCourses);
-          }
+          writeCachedCourseCatalog(apiCourses);
           setCourses(apiCourses);
           setError("");
         }
       } catch {
         if (active) {
-          const cachedCourses = filterCourseCatalog(readCachedCourseCatalog(), search);
+          const cachedCourses = readCachedCourseCatalog();
           setCourses(cachedCourses);
           setError(
             cachedCourses.length
@@ -248,74 +267,75 @@ export default function CourseListPage() {
       active = false;
       clearTimeout(timer);
     };
-  }, [search]);
+  }, []);
 
-  const ownedCourses = useMemo(
-    () => (isAuthenticated ? courses.filter(hasApprovedCourseAccess) : []),
-    [courses, isAuthenticated]
+  const categoryCounts = useMemo(() => getCourseCategoryCounts(courses), [courses]);
+  const categoryCourses = useMemo(
+    () => filterCoursesByCategory(courses, selectedCategory),
+    [courses, selectedCategory]
   );
-  const catalogCourses = useMemo(
-    () => (isAuthenticated ? courses.filter((course) => !hasApprovedCourseAccess(course)) : courses),
-    [courses, isAuthenticated]
+  const visibleCourses = useMemo(
+    () => filterCourseCatalog(categoryCourses, search),
+    [categoryCourses, search]
   );
-  const summary = useMemo(() => getCourseCatalogSummary(catalogCourses), [catalogCourses]);
-  const levelSummary = useMemo(() => getCourseLevelSummary(catalogCourses), [catalogCourses]);
+  const summary = useMemo(() => getCourseCatalogSummary(visibleCourses), [visibleCourses]);
+  const levelSummary = useMemo(() => getCourseLevelSummary(visibleCourses), [visibleCourses]);
+
+  const handleCategorySelect = (category) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("category", category);
+    nextParams.delete("view");
+    setSearch("");
+    setSearchParams(nextParams);
+
+    window.requestAnimationFrame(() => {
+      document.getElementById("course-category-results")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  };
 
   return (
     <PageShell
-      title={isAuthenticated ? "Courses & Live Learning" : "Course Catalog"}
-      subtitle={
-        isAuthenticated
-          ? "Continue approved courses, enter their live classrooms, or explore another track."
-          : "Browse OSINT and web application pentesting tracks."
-      }
+      title="Professional Courses"
+      subtitle="Choose OSINT or Pentesting, then explore every available course in that training path."
       decryptTitle
     >
-      {isAuthenticated ? (
-        <>
-        <section className="mb-6 rounded-[24px] border border-white/15 bg-[#101010] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.32)] sm:p-6">
-          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#A5A5A5]">
-                Your Learning
-              </div>
-              <h2 className="mt-2 font-reference text-2xl font-semibold text-white">
-                Approved courses
-              </h2>
-              <p className="mt-1 text-sm text-[#A5A5A5]">
-                Course lessons and bundled live classrooms are available from the same course.
-              </p>
-            </div>
-            <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs text-[#D8D8D8]">
-              {ownedCourses.length} approved
-            </span>
-          </div>
-
-          {ownedCourses.length ? (
-            <div className="grid auto-rows-fr gap-4 sm:gap-6 lg:grid-cols-2">
-              {ownedCourses.map((course) => (
-                <CourseCard key={course.id} course={course} />
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-white/10 bg-black/35 px-5 py-6 text-sm leading-6 text-[#B5B5B5]">
-              No approved courses yet. Your course will appear here automatically after admin
-              approval.
-            </div>
-          )}
-        </section>
-        </>
-      ) : null}
-
-      <CourseCatalogContent
-        courses={catalogCourses}
-        loading={loading}
-        error={error}
-        search={search}
-        setSearch={setSearch}
-        summary={summary}
-        levelSummary={levelSummary}
+      <CourseCategorySelector
+        selectedCategory={selectedCategory}
+        counts={categoryCounts}
+        onSelect={handleCategorySelect}
       />
+
+      {selectedCategory ? (
+        <CourseCatalogContent
+          courses={visibleCourses}
+          loading={loading}
+          error={error}
+          search={search}
+          setSearch={setSearch}
+          summary={summary}
+          levelSummary={levelSummary}
+          catalogLabel={COURSE_CATEGORY_LABELS[selectedCategory]}
+        />
+      ) : (
+        <section
+          id="course-category-results"
+          className="scroll-mt-24 rounded-[24px] border border-white/15 bg-[#0A0A0A] px-5 py-8 text-center sm:px-8"
+          aria-live="polite"
+        >
+          <div className="mx-auto max-w-2xl">
+            <h2 className="font-reference text-2xl font-semibold text-white">
+              {loading ? "Loading the course catalog..." : "Select a professional track"}
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-[#AFAFAF]">
+              {error ||
+                "Choose OSINT or Pentesting above to see every course available in that category."}
+            </p>
+          </div>
+        </section>
+      )}
     </PageShell>
   );
 }

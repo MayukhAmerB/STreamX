@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { readCachedCourseCatalog, writeCachedCourseCatalog } from "./courseCatalog";
+import {
+  filterCoursesByCategory,
+  getCourseCategoryCounts,
+  readCachedCourseCatalog,
+  writeCachedCourseCatalog,
+} from "./courseCatalog";
 
 function createLocalStorageMock() {
   let store = {};
@@ -57,5 +62,33 @@ describe("course catalog cache", () => {
     expect(cachedCourses[0]).not.toHaveProperty("enrolled_at");
     expect(cachedCourses[0]).not.toHaveProperty("access_source");
     expect(cachedCourses[0]).not.toHaveProperty("access_label");
+  });
+});
+
+describe("course catalog categories", () => {
+  const courses = [
+    { id: 1, category: "osint", title: "OSINT Foundations" },
+    { id: 2, category: "web_pentesting", title: "Web Pentesting" },
+    { id: 3, category: "osint", title: "Advanced OSINT" },
+    { id: 4, category: "other", title: "Other" },
+  ];
+
+  it("returns every course in the selected category without mixing tracks", () => {
+    expect(filterCoursesByCategory(courses, "osint").map((course) => course.id)).toEqual([1, 3]);
+    expect(filterCoursesByCategory(courses, "web_pentesting").map((course) => course.id)).toEqual([
+      2,
+    ]);
+  });
+
+  it("reports category counts from backend course data", () => {
+    expect(getCourseCategoryCounts(courses)).toEqual({
+      osint: 2,
+      web_pentesting: 1,
+    });
+  });
+
+  it("shows no catalog until a valid category is selected", () => {
+    expect(filterCoursesByCategory(courses, "")).toEqual([]);
+    expect(filterCoursesByCategory(courses, "invalid")).toEqual([]);
   });
 });
