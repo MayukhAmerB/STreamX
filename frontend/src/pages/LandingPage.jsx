@@ -8,7 +8,6 @@ import CourseCardRail from "../components/CourseCardRail";
 import HeroCountdown from "../components/HeroCountdown";
 import StoryJourneySection from "../components/StoryJourneySection";
 import { useAuth } from "../hooks/useAuth";
-import { resolveCourseArtwork, resolveCourseArtworkFallback } from "../utils/courseArtwork";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
 import { selectHeroCategoryCourses, selectLandingCourses } from "../utils/landingCourses";
 import { apiData } from "../utils/api";
@@ -542,11 +541,6 @@ function HeroCourseIcon({ category }) {
 }
 
 function HeroCourseCard({ course }) {
-  const courseCategory = course?.category;
-  const courseId = course?.id;
-  const courseThumbnail = course?.thumbnail;
-  const fallbackArtwork = resolveCourseArtworkFallback(courseCategory);
-  const [artwork, setArtwork] = useState(() => resolveCourseArtwork(course));
   const title = course?.card_title || (course?.category === "web_pentesting" ? "Pentesting" : "OSINT");
   const subtitle =
     course?.card_subtitle ||
@@ -571,65 +565,48 @@ function HeroCourseCard({ course }) {
     ? `/courses/${course.id}`
     : course?._fallbackLink || "/courses";
 
-  useEffect(() => {
-    setArtwork(resolveCourseArtwork({ category: courseCategory, thumbnail: courseThumbnail }));
-  }, [courseCategory, courseId, courseThumbnail]);
-
   return (
     <Link
       to={detailPath}
-      className="hero-course-card group grid min-h-[168px] grid-cols-[126px_minmax(0,1fr)] overflow-hidden rounded-[18px] border border-white/15 bg-[#080B0D] shadow-[0_18px_48px_rgba(0,0,0,0.42)] transition duration-300 hover:-translate-y-0.5 hover:border-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:grid-cols-[170px_minmax(0,1fr)]"
+      className="hero-course-card group relative flex min-h-[252px] min-w-0 flex-col overflow-hidden rounded-[18px] border border-white/15 bg-[#080B0D] p-4 shadow-[0_18px_48px_rgba(0,0,0,0.42)] transition duration-300 hover:-translate-y-0.5 hover:border-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:min-h-[278px] sm:p-5"
     >
-      <div className="relative min-h-[168px] overflow-hidden border-r border-white/15 bg-[#11161A]">
-        {artwork ? (
-          <img
-            src={artwork}
-            alt={course?.image_alt || `${title} training program`}
-            className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
-            onError={() => {
-              if (fallbackArtwork && artwork !== fallbackArtwork) setArtwork(fallbackArtwork);
-              else setArtwork("");
-            }}
-          />
-        ) : null}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#080B0D] via-transparent to-black/20" />
-        <span className="absolute left-3 top-3 rounded-full border border-white/20 bg-black/70 px-2.5 py-1 text-[8px] font-bold uppercase tracking-[0.16em] text-white backdrop-blur-md">
-          {title}
+      <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full border border-white/[0.055]" />
+      <div aria-hidden="true" className="pointer-events-none absolute -right-2 top-4 h-20 w-20 rounded-full border border-white/[0.04]" />
+
+      <div className="relative flex items-start justify-between gap-3">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/25 bg-white/[0.025] text-white sm:h-14 sm:w-14">
+          <HeroCourseIcon category={course?.category} />
+        </span>
+        <span className="hidden rounded-full border border-white/15 px-2.5 py-1 text-[7px] font-bold uppercase tracking-[0.16em] text-[#9BA4AA] min-[420px]:inline-flex sm:text-[8px]">
+          Professional track
         </span>
       </div>
 
-      <div className="hero-course-card-body flex min-w-0 flex-1 flex-col p-4">
-        <div className="flex items-center gap-3 border-b border-white/10 pb-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/25 text-white">
-            <HeroCourseIcon category={course?.category} />
-          </span>
-          <div className="min-w-0">
-            <h2 className="hero-course-card-title truncate font-reference text-lg font-semibold uppercase tracking-[-0.02em] text-white sm:text-xl">
-              {title}
-            </h2>
-            <p className="hero-course-card-subtitle mt-1 text-[9px] font-semibold uppercase tracking-[0.22em] text-[#8F9AA2]">
-              {subtitle}
-            </p>
-          </div>
+      <div className="hero-course-card-body relative mt-4 flex min-w-0 flex-1 flex-col">
+        <div className="border-b border-white/10 pb-3">
+          <h2 className="hero-course-card-title line-clamp-2 font-reference text-lg font-semibold uppercase leading-[1.02] tracking-[-0.03em] text-white sm:text-[1.35rem]">
+            {title}
+          </h2>
+          <p className="hero-course-card-subtitle mt-1.5 line-clamp-2 text-[8px] font-semibold uppercase leading-4 tracking-[0.18em] text-[#8F9AA2] sm:text-[9px] sm:tracking-[0.2em]">
+            {subtitle}
+          </p>
         </div>
 
-        <p className="hero-course-card-summary mt-3 line-clamp-2 text-[11px] leading-5 text-[#A9B0B5] sm:text-xs">{summary}</p>
-        <ul className="mt-2 hidden space-y-1.5 sm:block">
+        <p className="hero-course-card-summary mt-3 line-clamp-2 text-[10px] leading-[1.55] text-[#A9B0B5] sm:text-[11px]">{summary}</p>
+        <ul className="mt-2 space-y-1.5">
           {highlights.map((highlight) => (
-            <li key={highlight} className="flex items-center gap-2 text-[10px] leading-4 text-[#D4D9DC]">
-              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-white/15 text-[8px] text-white">
-                +
-              </span>
-              <span>{highlight}</span>
+            <li key={highlight} className="flex min-w-0 items-center gap-2 text-[9px] leading-4 text-[#D4D9DC] sm:text-[10px]">
+              <span className="h-1 w-1 shrink-0 bg-white/70" />
+              <span className="truncate">{highlight}</span>
             </li>
           ))}
         </ul>
 
-        <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-2.5">
+        <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-3">
           <span className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#98A2A9]">
             See Details
           </span>
-          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/30 text-sm text-white transition group-hover:bg-white group-hover:text-black">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full border border-white/30 text-sm text-white transition group-hover:bg-white group-hover:text-black">
             -&gt;
           </span>
         </div>
@@ -874,9 +851,9 @@ export default function LandingPage() {
           <div className="absolute right-[4%] top-[4%] h-80 w-80 bg-white/[0.04] blur-[120px]" />
         </div>
 
-        <div className="relative mx-auto max-w-[1320px] pt-9 sm:pt-12 lg:pt-14">
-          <div className="grid min-h-[540px] items-center gap-9 pb-9 lg:grid-cols-[0.92fr_1.08fr] lg:gap-12 xl:gap-16">
-            <div className="reveal-up py-3 lg:py-6">
+        <div className="relative mx-auto max-w-[1320px] pt-7 sm:pt-9 lg:pt-10">
+          <div className="grid min-h-[470px] items-center gap-7 pb-7 lg:grid-cols-[0.78fr_1.22fr] lg:gap-9 xl:gap-12">
+            <div className="reveal-up py-2 lg:py-4">
               <p className="hero-eyebrow flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.24em] text-[#B8C0C5] sm:text-xs">
                 <span className="h-px w-10 bg-white/65" aria-hidden="true" />
                 Professional cybersecurity training
@@ -889,18 +866,18 @@ export default function LandingPage() {
                 </div>
               ) : null}
 
-              <h1 className="hero-heading mt-6 max-w-[640px] font-reference text-[clamp(2.8rem,11vw,4.7rem)] font-semibold leading-[0.92] tracking-[-0.055em] text-white sm:text-[clamp(3.35rem,5.4vw,4.7rem)]">
+              <h1 className="hero-heading mt-5 max-w-[570px] font-reference text-[clamp(2.35rem,10vw,4rem)] font-semibold leading-[0.94] tracking-[-0.05em] text-white sm:text-[clamp(3rem,4.8vw,4rem)]">
                 <span className="block">Learn practical</span>
                 <span className="block">cyber skills.</span>
                 <span className="mt-2 block text-[0.56em] leading-[1.02] tracking-[-0.035em] text-[#AEB7BD]">Build real capability.</span>
               </h1>
 
-              <p className="hero-summary mt-6 max-w-xl text-sm leading-7 text-[#9CA4AA] sm:text-base">
+              <p className="hero-summary mt-5 max-w-xl text-sm leading-6 text-[#9CA4AA] sm:text-[0.95rem] sm:leading-7">
                 Learn OSINT, reconnaissance, and web application testing through structured live
                 programs, protected recordings, and practical instructor guidance.
               </p>
 
-              <ul className="hero-trust mt-6 flex max-w-xl flex-wrap gap-x-5 gap-y-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#C6CCD0]">
+              <ul className="hero-trust mt-5 flex max-w-xl flex-wrap gap-x-5 gap-y-2 text-[9px] font-bold uppercase tracking-[0.14em] text-[#C6CCD0] sm:text-[10px]">
                 {["Live mentorship", "Protected recordings", "Verified certificates"].map((label) => (
                   <li key={label} className="flex items-center gap-2">
                     <span className="h-1.5 w-1.5 bg-white" aria-hidden="true" />
@@ -929,7 +906,7 @@ export default function LandingPage() {
                 </Link>
               ) : null}
 
-              <div className="mt-7 flex flex-wrap gap-3">
+              <div className="mt-6 flex flex-wrap gap-3">
                 <Link
                   to="/courses"
                   className="hero-primary-action inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-6 text-sm font-semibold text-black transition hover:bg-[#E5E5E5]"
@@ -945,15 +922,15 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="hero-program-panel reveal-up reveal-delay-1 relative rounded-[24px] border border-white/12 bg-white/[0.035] p-4 shadow-[0_30px_90px_rgba(0,0,0,0.38)] backdrop-blur-sm sm:p-5">
-              <div className="mb-4 flex items-end justify-between gap-4 border-b border-white/10 pb-4">
+            <div className="hero-program-panel reveal-up reveal-delay-1 relative rounded-[22px] border border-white/12 bg-white/[0.035] p-3.5 shadow-[0_30px_90px_rgba(0,0,0,0.38)] backdrop-blur-sm sm:p-4">
+              <div className="mb-3 flex items-end justify-between gap-4 border-b border-white/10 pb-3">
                 <div>
                   <p className="hero-program-kicker text-[9px] font-bold uppercase tracking-[0.22em] text-[#8F9AA2]">Featured programs</p>
-                  <h2 className="hero-program-title mt-1.5 font-reference text-xl font-semibold tracking-[-0.025em] text-white sm:text-2xl">Choose your training path</h2>
+                  <h2 className="hero-program-title mt-1 font-reference text-lg font-semibold tracking-[-0.025em] text-white sm:text-xl">Choose your training path</h2>
                 </div>
-                <span className="hero-program-count shrink-0 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#788188]">2 professional tracks</span>
+                <span className="hero-program-count hidden shrink-0 text-[8px] font-semibold uppercase tracking-[0.14em] text-[#788188] min-[500px]:block">2 professional tracks</span>
               </div>
-              <div className="grid gap-3">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 {heroCourses.map((course) => (
                   <HeroCourseCard key={course.id || course.category} course={course} />
                 ))}
