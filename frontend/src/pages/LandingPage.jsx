@@ -524,15 +524,14 @@ function _GuestAccessPanel({ courses, liveClasses, liveClassesError }) {
 function HeroCourseIcon({ category }) {
   if (category === "web_pentesting") {
     return (
-      <svg viewBox="0 0 32 32" aria-hidden="true" className="h-7 w-7 fill-none stroke-current stroke-[1.6]">
-        <path d="M16 3 27 7v8c0 7-4.5 11.5-11 14C9.5 26.5 5 22 5 15V7l11-4Z" />
-        <path d="M16 8v15M10 14h12" />
+      <svg viewBox="0 0 48 48" aria-hidden="true" className="h-16 w-16 fill-none stroke-current stroke-[1.8] sm:h-7 sm:w-7 sm:stroke-[1.6]">
+        <path d="m17 13-10 11 10 11M31 13l10 11-10 11M27 8l-6 32" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
   }
 
   return (
-    <svg viewBox="0 0 32 32" aria-hidden="true" className="h-7 w-7 fill-none stroke-current stroke-[1.6]">
+    <svg viewBox="0 0 32 32" aria-hidden="true" className="h-16 w-16 fill-none stroke-current stroke-[1.2] sm:h-7 sm:w-7 sm:stroke-[1.6]">
       <circle cx="16" cy="16" r="8" />
       <circle cx="16" cy="16" r="3" />
       <path d="M16 2v6M16 24v6M2 16h6M24 16h6M6 6l4 4M22 22l4 4M26 6l-4 4M10 22l-4 4" />
@@ -569,13 +568,13 @@ function HeroCourseCard({ course }) {
   return (
     <Link
       to={detailPath}
-      className="hero-course-card group relative flex min-h-[168px] min-w-0 flex-col items-center justify-center overflow-hidden rounded-[18px] border border-white/15 bg-[#0B0B0B] p-4 text-center shadow-[0_18px_48px_rgba(0,0,0,0.42)] transition duration-300 hover:-translate-y-0.5 hover:border-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:min-h-[302px] sm:items-stretch sm:justify-start sm:p-5 sm:text-left"
+      className="hero-course-card group relative flex min-h-[372px] min-w-0 flex-col items-stretch justify-start overflow-hidden rounded-[18px] border border-white/20 bg-[#0B0B0B] p-4 text-left shadow-[0_18px_48px_rgba(0,0,0,0.42)] transition duration-300 hover:-translate-y-0.5 hover:border-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:min-h-[302px] sm:p-5"
     >
       <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full border border-white/[0.055]" />
       <div aria-hidden="true" className="pointer-events-none absolute -right-2 top-4 h-20 w-20 rounded-full border border-white/[0.04]" />
 
       <div className="relative flex items-start justify-center gap-3 sm:justify-between">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/25 bg-white/[0.025] text-white sm:h-14 sm:w-14">
+        <span className="flex h-24 w-24 shrink-0 items-center justify-center text-white sm:h-14 sm:w-14 sm:rounded-full sm:border sm:border-white/25 sm:bg-white/[0.025]">
           <HeroCourseIcon category={course?.category} />
         </span>
         <span className="hidden rounded-full border border-white/15 bg-[#111111] px-2.5 py-1 text-[8px] font-bold uppercase tracking-[0.16em] text-[#A3A3A3] sm:inline-flex">
@@ -583,17 +582,17 @@ function HeroCourseCard({ course }) {
         </span>
       </div>
 
-      <div className="hero-course-card-body relative mt-4 flex min-w-0 flex-col sm:flex-1">
-        <div className="sm:border-b sm:border-white/10 sm:pb-3">
-          <h2 className="hero-course-card-title line-clamp-2 font-reference text-lg font-semibold uppercase leading-[1.02] tracking-[-0.03em] text-white sm:text-[1.35rem]">
+      <div className="hero-course-card-body relative mt-3 flex min-w-0 flex-1 flex-col sm:mt-4">
+        <div className="border-b border-white/10 pb-4 text-center sm:pb-3 sm:text-left">
+          <h2 className="hero-course-card-title line-clamp-2 font-reference text-[1.05rem] font-semibold uppercase leading-[1.05] tracking-[0.12em] text-white sm:text-[1.35rem] sm:tracking-[-0.03em]">
             {title}
           </h2>
-          <p className="hero-course-card-subtitle mt-1.5 hidden line-clamp-2 text-[9px] font-semibold uppercase leading-4 tracking-[0.2em] text-[#999999] sm:block">
+          <p className="hero-course-card-subtitle mt-2 line-clamp-2 text-[8px] font-semibold uppercase leading-4 tracking-[0.18em] text-[#999999] sm:mt-1.5 sm:text-[9px] sm:tracking-[0.2em]">
             {subtitle}
           </p>
         </div>
 
-        <p className="hero-course-card-summary mt-3 hidden line-clamp-2 text-[11px] leading-[1.55] text-[#A8A8A8] sm:block">{summary}</p>
+        <p className="hero-course-card-summary mt-4 line-clamp-4 text-[10px] leading-[1.55] text-[#A8A8A8] sm:mt-3 sm:line-clamp-2 sm:text-[11px]">{summary}</p>
 
         <p className="mt-3 hidden text-[8px] font-bold uppercase tracking-[0.16em] text-[#777777] sm:block">
           Program includes
@@ -613,7 +612,7 @@ function HeroCourseCard({ course }) {
           ))}
         </ul>
 
-        <div className="mt-auto hidden items-center justify-between border-t border-white/10 pt-3 sm:flex">
+        <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-3">
           <span className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#969696]">
             See Details
           </span>
@@ -863,8 +862,8 @@ export default function LandingPage() {
         </div>
 
         <div className="relative mx-auto max-w-[1320px] pt-7 sm:pt-9 lg:pt-10">
-          <div className="grid min-h-[470px] items-center gap-7 pb-7 lg:grid-cols-[0.78fr_1.22fr] lg:gap-9 xl:gap-12">
-            <div className="reveal-up py-2 lg:py-4">
+          <div className="grid min-h-0 items-center gap-7 pb-7 sm:min-h-[470px] lg:grid-cols-[0.78fr_1.22fr] lg:gap-9 xl:gap-12">
+            <div className="reveal-up hidden py-2 sm:block lg:py-4">
               <p className="hero-eyebrow flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.24em] text-[#B8C0C5] sm:text-xs">
                 <span className="h-px w-10 bg-white/65" aria-hidden="true" />
                 Professional cybersecurity training
@@ -933,18 +932,37 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="hero-program-panel reveal-up reveal-delay-1 relative rounded-[22px] border border-white/12 bg-white/[0.035] p-3.5 shadow-[0_30px_90px_rgba(0,0,0,0.38)] backdrop-blur-sm sm:p-4">
-              <div className="mb-3 flex items-end justify-between gap-4 border-b border-white/10 pb-3">
+            <div className="hero-program-panel reveal-up reveal-delay-1 relative bg-transparent p-0 sm:rounded-[22px] sm:border sm:border-white/12 sm:bg-white/[0.035] sm:p-4 sm:shadow-[0_30px_90px_rgba(0,0,0,0.38)] sm:backdrop-blur-sm">
+              {heroLiveBroadcast ? (
+                <Link
+                  to={isAuthenticated ? heroLiveBroadcastJoinPath : "/login"}
+                  className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-red-400/45 bg-red-600 px-4 py-3 text-white shadow-[0_16px_36px_rgba(220,38,38,0.24)] sm:hidden"
+                >
+                  <span className="text-[10px] font-extrabold uppercase tracking-[0.16em]">
+                    Class is live
+                  </span>
+                  <span className="text-xs font-extrabold uppercase">Join now -&gt;</span>
+                </Link>
+              ) : null}
+
+              <div className="mb-5 sm:mb-3 sm:flex sm:items-end sm:justify-between sm:gap-4 sm:border-b sm:border-white/10 sm:pb-3">
                 <div>
-                  <p className="hero-program-kicker text-[9px] font-bold uppercase tracking-[0.22em] text-[#8F9AA2]">Featured programs</p>
-                  <h2 className="hero-program-title mt-1 font-reference text-lg font-semibold tracking-[-0.025em] text-white sm:text-xl">Choose your training path</h2>
+                  <p className="hero-program-kicker text-[11px] font-bold uppercase tracking-[0.28em] text-[#A3A3A3] sm:text-[9px] sm:tracking-[0.22em]">Featured programs</p>
+                  <h2 className="hero-program-title mt-4 max-w-[430px] font-reference text-[clamp(2.35rem,11vw,3.4rem)] font-semibold leading-[0.98] tracking-[-0.04em] text-white sm:mt-1 sm:max-w-none sm:text-xl sm:leading-normal sm:tracking-[-0.025em]">Choose your training path</h2>
                 </div>
-                <span className="hero-program-count hidden shrink-0 text-[8px] font-semibold uppercase tracking-[0.14em] text-[#788188] min-[500px]:block">2 professional tracks</span>
+                <div className="mt-5 flex items-center gap-4 sm:mt-0 sm:block">
+                  <span className="hero-program-count shrink-0 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#999999] sm:text-[8px] sm:tracking-[0.14em]">2 professional tracks</span>
+                  <span className="h-px flex-1 bg-white/25 sm:hidden" aria-hidden="true" />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 {heroCourses.map((course) => (
                   <HeroCourseCard key={course.id || course.category} course={course} />
                 ))}
+              </div>
+              <div className="mt-7 flex items-center justify-center gap-3 sm:hidden" aria-hidden="true">
+                <span className="h-2.5 w-2.5 rounded-full bg-white" />
+                <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
               </div>
             </div>
           </div>
