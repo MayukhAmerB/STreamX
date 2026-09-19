@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 from decimal import Decimal
+from importlib import import_module
 from io import StringIO
 
 from apps.courses.admin import CourseAdminForm
@@ -9,6 +10,7 @@ from apps.payments.models import Payment
 from apps.payments.order_service import create_payment_order
 from apps.payments.provisioning import provision_paid_payment
 from apps.users.models import User
+from django.apps import apps
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -32,6 +34,7 @@ class ProgramCatalogTests(TestCase):
         self.assertEqual(pentesting.sections.count(), 6)
         self.assertEqual(pentesting.total_classes, 48)
         self.assertEqual(pentesting.start_date, date(2027, 1, 1))
+        self.assertEqual(pentesting.launch_status, Course.STATUS_COMING_SOON)
         self.assertEqual(pentesting.monthly_price * pentesting.installments_required, Decimal("25794"))
         osint.price = 4999
         osint.card_title = "Admin course title"
@@ -46,6 +49,34 @@ class ProgramCatalogTests(TestCase):
         self.assertTrue(osint.show_course_image)
         self.assertEqual(original.price, 777)
         self.assertEqual(enrollment.payment_status, "paid")
+
+    def test_pentesting_status_migration_only_updates_the_named_program(self):
+        pentesting = Course.objects.create(
+            slug="web-api-pentesting-six-month-2027",
+            title="Pentesting",
+            description="Web security",
+            price=18999,
+            category=Course.CATEGORY_WEB_PENTESTING,
+            launch_status=Course.STATUS_LIVE,
+        )
+        other_course = Course.objects.create(
+            slug="another-pentesting-course",
+            title="Another Pentesting Course",
+            description="Another web security program",
+            price=5000,
+            category=Course.CATEGORY_WEB_PENTESTING,
+            launch_status=Course.STATUS_LIVE,
+        )
+
+        migration = import_module(
+            "apps.courses.migrations.0030_mark_pentesting_program_coming_soon"
+        )
+        migration.mark_pentesting_program_coming_soon(apps, None)
+
+        pentesting.refresh_from_db()
+        other_course.refresh_from_db()
+        self.assertEqual(pentesting.launch_status, Course.STATUS_COMING_SOON)
+        self.assertEqual(other_course.launch_status, Course.STATUS_LIVE)
 
     @override_settings(DIRECT_COURSE_PAYMENTS_ENABLED=True)
     def test_admin_prices_and_card_content_reach_course_api(self):

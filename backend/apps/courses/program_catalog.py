@@ -101,6 +101,7 @@ PROGRAMS = [
     {
         "slug": "web-api-pentesting-six-month-2027",
         "category": "web_pentesting",
+        "launch_status": "coming_soon",
         "title": "6-MONTH WEB & API PENTESTING COURSE",
         "batch": "January 2027",
         "card_title": "PENTESTING",

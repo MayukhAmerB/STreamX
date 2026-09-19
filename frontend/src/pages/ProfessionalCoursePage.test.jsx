@@ -5,6 +5,7 @@ import {
   getCourseCatalogPath,
   getCourseDetailArtwork,
   getCourseDetailPriceLabel,
+  shouldShowCoursePrice,
 } from "./ProfessionalCoursePage";
 
 describe("getCourseDetailPriceLabel", () => {
@@ -14,6 +15,18 @@ describe("getCourseDetailPriceLabel", () => {
 
   it("does not present a zero price as purchasable", () => {
     expect(getCourseDetailPriceLabel({ price: 0 })).toBe("To be announced");
+  });
+
+  it("hides fees for coming-soon and closed courses", () => {
+    expect(
+      shouldShowCoursePrice({ launch_status: "coming_soon", price: 18999 })
+    ).toBe(false);
+    expect(
+      shouldShowCoursePrice({ launch_status: "live", registration_closed: true, price: 18999 })
+    ).toBe(false);
+    expect(
+      shouldShowCoursePrice({ launch_status: "live", registration_closed: false, price: 18999 })
+    ).toBe(true);
   });
 
   it("returns students to the matching course category", () => {

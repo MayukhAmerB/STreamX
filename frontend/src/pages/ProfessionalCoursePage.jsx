@@ -35,6 +35,14 @@ export function getCourseDetailPriceLabel(course) {
   return Number.isFinite(amount) && amount > 0 ? formatINR(amount) : "To be announced";
 }
 
+export function shouldShowCoursePrice(course) {
+  return (
+    !course?.is_enrolled &&
+    course?.launch_status === "live" &&
+    !course?.registration_closed
+  );
+}
+
 export function getCourseCatalogPath(course) {
   const category = String(course?.category || "");
   return CATEGORY_META[category] ? `/courses?category=${category}` : "/courses";
@@ -502,7 +510,7 @@ export default function ProfessionalCoursePage() {
                 : "Review the course fee and continue securely to the available payment options.")}
           </p>
 
-          {!course.is_enrolled ? (
+          {shouldShowCoursePrice(course) ? (
             <div className="course-detail-price">
               <span>Course fee</span>
               <strong>{priceLabel}</strong>

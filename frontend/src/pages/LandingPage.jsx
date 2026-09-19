@@ -4,12 +4,13 @@ import certificateExcellenceImage from "../assets/certificate-excellence.png";
 import { getMyCourses, listCourses, listLiveClasses } from "../api/courses";
 import { listRealtimeSessions } from "../api/realtime";
 import Button from "../components/Button";
+import { CourseTrackCards } from "../components/CourseCategorySelector";
 import CourseCardRail from "../components/CourseCardRail";
 import HeroCountdown from "../components/HeroCountdown";
 import StoryJourneySection from "../components/StoryJourneySection";
 import { useAuth } from "../hooks/useAuth";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
-import { selectHeroCategoryCourses, selectLandingCourses } from "../utils/landingCourses";
+import { selectLandingCourses } from "../utils/landingCourses";
 import { apiData } from "../utils/api";
 import { readCachedCourseCatalog, writeCachedCourseCatalog } from "../utils/courseCatalog";
 import { formatINR } from "../utils/currency";
@@ -134,37 +135,6 @@ const monthByLevel = {
 };
 const cornerGlowPanelBg = "bg-[#070707]";
 const cornerGlowCardBg = "bg-[#0A0A0A]";
-const HERO_COURSE_FALLBACKS = [
-  {
-    category: "osint",
-    card_title: "OSINT",
-    card_subtitle: "Open Source Intelligence",
-    card_summary:
-      "Find, verify, and analyse open-source information through professional investigation workflows.",
-    card_highlights: [
-      "Digital footprint analysis",
-      "Identity and social intelligence",
-      "Advanced research techniques",
-      "Practical case studies",
-    ],
-    _fallbackLink: "/courses",
-  },
-  {
-    category: "web_pentesting",
-    card_title: "Pentesting",
-    card_subtitle: "Web & API Security",
-    card_summary:
-      "Build hands-on skills for identifying vulnerabilities, validating risk, and strengthening systems.",
-    card_highlights: [
-      "Web application testing",
-      "API security assessment",
-      "Vulnerability validation",
-      "Reporting and remediation",
-    ],
-    _fallbackLink: "/courses",
-  },
-];
-
 function sortCatalogCourses(courses) {
   return [...courses].sort((a, b) => {
     const aCategory = categoryOrder[a?.category] ?? 99;
@@ -521,107 +491,31 @@ function _GuestAccessPanel({ courses, liveClasses, liveClassesError }) {
   );
 }
 
-function HeroCourseIcon({ category }) {
-  if (category === "web_pentesting") {
-    return (
-      <svg viewBox="0 0 48 48" aria-hidden="true" className="h-16 w-16 fill-none stroke-current stroke-[1.8] sm:h-7 sm:w-7 sm:stroke-[1.6]">
-        <path d="m17 13-10 11 10 11M31 13l10 11-10 11M27 8l-6 32" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-
+function BestsellersSection({ courses }) {
   return (
-    <svg viewBox="0 0 32 32" aria-hidden="true" className="h-16 w-16 fill-none stroke-current stroke-[1.2] sm:h-7 sm:w-7 sm:stroke-[1.6]">
-      <circle cx="16" cy="16" r="8" />
-      <circle cx="16" cy="16" r="3" />
-      <path d="M16 2v6M16 24v6M2 16h6M24 16h6M6 6l4 4M22 22l4 4M26 6l-4 4M10 22l-4 4" />
-    </svg>
-  );
-}
-
-function HeroCourseCard({ course }) {
-  const title = course?.card_title || (course?.category === "web_pentesting" ? "Pentesting" : "OSINT");
-  const subtitle =
-    course?.card_subtitle ||
-    (course?.category === "web_pentesting" ? "Web & API Security" : "Open Source Intelligence");
-  const summary = course?.card_summary || course?.description || "Explore the complete professional training program.";
-  const configuredHighlights = Array.isArray(course?.card_highlights)
-    ? course.card_highlights.map((item) => String(item || "").trim()).filter(Boolean)
-    : [];
-  const featureHighlights = Array.isArray(course?.course_card_features)
-    ? course.course_card_features.map((item) => String(item?.title || "").trim()).filter(Boolean)
-    : [];
-  const fallbackHighlights = HERO_COURSE_FALLBACKS.find(
-    (item) => item.category === course?.category,
-  )?.card_highlights || [];
-  const highlights = [
-    ...featureHighlights,
-    ...configuredHighlights,
-    ...fallbackHighlights,
-  ]
-    .filter((highlight, index, items) => items.indexOf(highlight) === index)
-    .slice(0, 4);
-  const detailPath = Number(course?.id || 0) > 0
-    ? `/courses/${course.id}`
-    : course?._fallbackLink || "/courses";
-
-  return (
-    <Link
-      to={detailPath}
-      className="hero-course-card group relative flex min-h-[372px] min-w-0 flex-col items-stretch justify-start overflow-hidden rounded-[18px] border border-white/20 bg-[#0B0B0B] p-4 text-left shadow-[0_18px_48px_rgba(0,0,0,0.42)] transition duration-300 hover:-translate-y-0.5 hover:border-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:min-h-[302px] sm:p-5"
-    >
-      <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full border border-white/[0.055]" />
-      <div aria-hidden="true" className="pointer-events-none absolute -right-2 top-4 h-20 w-20 rounded-full border border-white/[0.04]" />
-
-      <div className="relative flex items-start justify-center gap-3 sm:justify-between">
-        <span className="flex h-24 w-24 shrink-0 items-center justify-center text-white sm:h-14 sm:w-14 sm:rounded-full sm:border sm:border-white/25 sm:bg-white/[0.025]">
-          <HeroCourseIcon category={course?.category} />
-        </span>
-        <span className="hidden rounded-full border border-white/15 bg-[#111111] px-2.5 py-1 text-[8px] font-bold uppercase tracking-[0.16em] text-[#A3A3A3] sm:inline-flex">
-          Professional track
-        </span>
-      </div>
-
-      <div className="hero-course-card-body relative mt-3 flex min-w-0 flex-1 flex-col sm:mt-4">
-        <div className="border-b border-white/10 pb-4 text-center sm:pb-3 sm:text-left">
-          <h2 className="hero-course-card-title line-clamp-2 font-reference text-[1.05rem] font-semibold uppercase leading-[1.05] tracking-[0.12em] text-white sm:text-[1.35rem] sm:tracking-[-0.03em]">
-            {title}
-          </h2>
-          <p className="hero-course-card-subtitle mt-2 line-clamp-2 text-[8px] font-semibold uppercase leading-4 tracking-[0.18em] text-[#999999] sm:mt-1.5 sm:text-[9px] sm:tracking-[0.2em]">
-            {subtitle}
-          </p>
-        </div>
-
-        <p className="hero-course-card-summary mt-4 line-clamp-4 text-[10px] leading-[1.55] text-[#A8A8A8] sm:mt-3 sm:line-clamp-2 sm:text-[11px]">{summary}</p>
-
-        <p className="mt-3 hidden text-[8px] font-bold uppercase tracking-[0.16em] text-[#777777] sm:block">
-          Program includes
+    <SectionCard className="course-showcase-section p-5 sm:p-7">
+      <div className="max-w-3xl">
+        <p className="course-showcase-eyebrow flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.24em] text-[#969EA4] sm:text-xs">
+          <span className="h-px w-10 bg-white/65" aria-hidden="true" />
+          Our training program
         </p>
-        <ul className="mt-1.5 hidden grid-cols-2 gap-1.5 sm:grid">
-          {highlights.map((highlight) => (
-            <li
-              key={highlight}
-              title={highlight}
-              className="flex min-h-7 min-w-0 items-start gap-1.5 rounded-md border border-white/10 bg-[#111111] px-2 py-1.5 text-[8px] leading-[1.25] text-[#D0D0D0] sm:min-h-8 sm:text-[9px]"
-            >
-              <span className="mt-0.5 flex h-3 w-3 shrink-0 items-center justify-center rounded-full border border-white/20 text-[7px] text-white" aria-hidden="true">
-                +
-              </span>
-              <span className="sm:line-clamp-2">{highlight}</span>
-            </li>
-          ))}
-        </ul>
-
-        <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-3">
-          <span className="text-[8px] font-bold uppercase tracking-[0.14em] text-[#969696]">
-            See Details
-          </span>
-          <span className="flex h-8 w-8 items-center justify-center rounded-full border border-white/30 text-sm text-white transition group-hover:bg-white group-hover:text-black">
-            -&gt;
-          </span>
-        </div>
+        <h2 className="course-showcase-heading mt-5 font-reference text-3xl font-semibold tracking-[-0.035em] text-white sm:text-4xl lg:text-5xl">
+          Bestsellers
+        </h2>
+        <p className="course-showcase-summary mt-3 max-w-2xl text-sm leading-7 text-[#A7A7A7] sm:text-base">
+          Compare active professional programs, verified learner ratings, curriculum depth,
+          and learning formats before opening the full course page.
+        </p>
       </div>
-    </Link>
+
+      {courses.length ? (
+        <CourseCardRail courses={courses} />
+      ) : (
+        <p className="mt-6 rounded-xl border border-white/10 bg-[#090909] px-4 py-3 text-sm text-[#AAAAAA]">
+          Live courses are being updated. Submit an enrollment enquiry and our team will contact you.
+        </p>
+      )}
+    </SectionCard>
   );
 }
 
@@ -792,16 +686,19 @@ export default function LandingPage() {
     );
   }, [catalogCourses]);
 
-  const heroCourses = useMemo(
+  const heroCourseCounts = useMemo(
     () =>
-      selectHeroCategoryCourses({
-        catalogCourses,
-        studentCourses,
-        fallbackCourses: HERO_COURSE_FALLBACKS,
-      }),
-    [catalogCourses, studentCourses],
+      catalogCourses.reduce(
+        (counts, course) => {
+          if (course?.is_published !== false && course?.category in counts) {
+            counts[course.category] += 1;
+          }
+          return counts;
+        },
+        { osint: 0, web_pentesting: 0 },
+      ),
+    [catalogCourses],
   );
-
   const featuredLiveCourseLink = featuredLiveCourse?._fallbackLink || `/courses/${featuredLiveCourse.id}`;
   const heroLiveBroadcastCourseId = Number(
     heroLiveBroadcast?.linked_course?.id
@@ -955,15 +852,10 @@ export default function LandingPage() {
                   <span className="h-px flex-1 bg-white/25 sm:hidden" aria-hidden="true" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                {heroCourses.map((course) => (
-                  <HeroCourseCard key={course.id || course.category} course={course} />
-                ))}
-              </div>
-              <div className="mt-7 flex items-center justify-center gap-3 sm:hidden" aria-hidden="true">
-                <span className="h-2.5 w-2.5 rounded-full bg-white" />
-                <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
-              </div>
+              <CourseTrackCards
+                counts={heroCourseCounts}
+                getHref={(category) => `/courses?category=${category}`}
+              />
             </div>
           </div>
 
@@ -973,30 +865,6 @@ export default function LandingPage() {
 
       <div className="relative z-10 px-4 pb-20 pt-8">
         <div className="mx-auto max-w-6xl space-y-8">
-          <SectionCard className="course-showcase-section p-5 sm:p-7">
-            <div className="max-w-3xl">
-              <p className="course-showcase-eyebrow flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.24em] text-[#969EA4] sm:text-xs">
-                <span className="h-px w-10 bg-white/65" aria-hidden="true" />
-                Our training program
-              </p>
-              <h2 className="course-showcase-heading mt-5 font-reference text-3xl font-semibold tracking-[-0.035em] text-white sm:text-4xl lg:text-5xl">
-                Bestsellers
-              </h2>
-              <p className="course-showcase-summary mt-3 max-w-2xl text-sm leading-7 text-[#A7A7A7] sm:text-base">
-                Compare active professional programs, verified learner ratings, curriculum depth,
-                and learning formats before opening the full course page.
-              </p>
-            </div>
-
-            {landingLiveCourses.length ? (
-              <CourseCardRail courses={landingLiveCourses} />
-            ) : (
-              <p className="mt-6 rounded-xl border border-white/10 bg-[#090909] px-4 py-3 text-sm text-[#AAAAAA]">
-                Live courses are being updated. Submit an enrollment enquiry and our team will contact you.
-              </p>
-            )}
-          </SectionCard>
-
           <SectionCard className="!p-0">
             <div className="grid gap-0 lg:grid-cols-[0.72fr_1.28fr]">
               <div className="flex flex-col justify-center border-b border-white/10 p-5 sm:p-7 lg:border-b-0 lg:border-r lg:p-8">
@@ -1131,6 +999,8 @@ export default function LandingPage() {
               ))}
             </div>
           </SectionCard>
+
+          <BestsellersSection courses={landingLiveCourses} />
 
           <SectionCard className="p-5 sm:p-6">
             <SectionTitle
