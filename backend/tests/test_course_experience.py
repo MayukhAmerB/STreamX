@@ -1,4 +1,6 @@
+from datetime import timedelta
 from decimal import Decimal
+from importlib import import_module
 from unittest.mock import patch
 
 from apps.courses.admin import CourseReviewAdmin
@@ -6,9 +8,11 @@ from apps.courses.models import Course, CourseReview, Enrollment, Lecture, Pente
 from apps.payments.models import Payment
 from apps.payments.provisioning import provision_paid_payment
 from apps.users.models import User
+from django.apps import apps
 from django.contrib import admin
 from django.core.cache import cache
 from django.test import RequestFactory, override_settings
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from tests.test_api import mark_terms_accepted
@@ -104,7 +108,7 @@ class CourseExperienceTests(APITestCase):
         self.course.refresh_from_db()
         self.assertEqual(self.course.title, "OSINT")
 
-    def test_review_auth_enrollment_duplicate_and_moderation(self):
+    def test_review_requires_active_access_and_publishes_immediately(self):
         url = f"/api/courses/{self.course.pk}/reviews/"
         payload = {"rating": 5, "text": "Useful practical instruction."}
         self.assertIn(self.client.post(url, payload).status_code, (401, 403))
@@ -113,14 +117,19 @@ class CourseExperienceTests(APITestCase):
         enrollment = Enrollment.objects.create(course=self.course, user=self.student, payment_status="pending")
         self.assertEqual(self.client.post(url, payload).status_code, 403)
         enrollment.payment_status = "paid"
+        enrollment.access_type = Enrollment.ACCESS_INSTALLMENT
+        enrollment.access_expires_at = timezone.now() - timedelta(minutes=1)
         enrollment.save()
+        self.assertEqual(self.client.post(url, payload).status_code, 403)
+        enrollment.access_expires_at = timezone.now() + timedelta(days=30)
+        enrollment.save(update_fields=["access_expires_at"])
         self.assertEqual(self.client.post(url, {**payload, "rating": 6}).status_code, 400)
-        self.assertEqual(self.client.post(url, payload).status_code, 201)
+        response = self.client.post(url, payload)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["message"], "Your review has been published.")
         self.assertEqual(self.client.post(url, payload).status_code, 400)
-        self.assertEqual(self.experience().data["data"]["review_count"], 0)
         review = CourseReview.objects.get()
-        review.status = "approved"
-        review.save()
+        self.assertEqual(review.status, CourseReview.STATUS_APPROVED)
         self.client.force_authenticate(None)
         data = self.experience().data["data"]
         self.assertEqual(data["average_rating"], 5)
@@ -133,7 +142,7 @@ class CourseExperienceTests(APITestCase):
         self.client.force_authenticate(self.student)
         self.assertEqual(self.client.post(url, {**payload, "rating": 4}).status_code, 201)
         review.refresh_from_db()
-        self.assertEqual(review.status, "pending")
+        self.assertEqual(review.status, CourseReview.STATUS_APPROVED)
         self.assertFalse(review.edit_allowed)
 
     def test_hidden_and_unconfirmed_reviews_excluded_and_page_validated(self):
@@ -192,7 +201,7 @@ class CourseExperienceTests(APITestCase):
         self.assertIsNone(course_data["average_rating"])
         self.assertEqual(course_data["review_count"], 0)
 
-    def test_admin_can_moderate_and_delete_reviews(self):
+    def test_admin_can_delete_reviews_without_a_moderation_queue(self):
         self.student.is_staff = True
         self.student.is_superuser = True
         self.student.save(update_fields=["is_staff", "is_superuser"])
@@ -203,8 +212,76 @@ class CourseExperienceTests(APITestCase):
         self.assertTrue(review_admin.has_delete_permission(request))
         actions = review_admin.get_actions(request)
         self.assertIn("delete_selected", actions)
-        self.assertIn("approve_reviews", actions)
-        self.assertIn("hide_reviews", actions)
+        self.assertNotIn("approve_reviews", actions)
+        self.assertNotIn("hide_reviews", actions)
+
+        enrollment = Enrollment.objects.create(
+            course=self.course,
+            user=self.student,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        review = CourseReview.objects.create(
+            course=self.course,
+            student=self.student,
+            rating=4,
+            text="A published review that an administrator can remove.",
+        )
+        review_admin.delete_queryset(request, CourseReview.objects.filter(pk=review.pk))
+        self.assertFalse(CourseReview.objects.filter(pk=review.pk).exists())
+        self.assertTrue(Enrollment.objects.filter(pk=enrollment.pk).exists())
+
+    def test_review_migration_publishes_only_pending_reviews_with_active_access(self):
+        active_review = CourseReview.objects.create(
+            course=self.course,
+            student=self.student,
+            rating=5,
+            text="Eligible pending review.",
+            status=CourseReview.STATUS_PENDING,
+        )
+        Enrollment.objects.create(
+            course=self.course,
+            user=self.student,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        inactive_student = User.objects.create_user(
+            email="inactive-reviewer@example.com",
+            password="Strong-test-123!",
+        )
+        inactive_review = CourseReview.objects.create(
+            course=self.course,
+            student=inactive_student,
+            rating=3,
+            text="Ineligible pending review.",
+            status=CourseReview.STATUS_PENDING,
+        )
+        hidden_student = User.objects.create_user(
+            email="hidden-reviewer@example.com",
+            password="Strong-test-123!",
+        )
+        hidden_review = CourseReview.objects.create(
+            course=self.course,
+            student=hidden_student,
+            rating=2,
+            text="Previously hidden review.",
+            status=CourseReview.STATUS_HIDDEN,
+        )
+        Enrollment.objects.create(
+            course=self.course,
+            user=hidden_student,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+
+        migration = import_module(
+            "apps.courses.migrations.0031_publish_authorized_course_reviews"
+        )
+        migration.publish_authorized_pending_reviews(apps, None)
+
+        active_review.refresh_from_db()
+        inactive_review.refresh_from_db()
+        hidden_review.refresh_from_db()
+        self.assertEqual(active_review.status, CourseReview.STATUS_APPROVED)
+        self.assertEqual(inactive_review.status, CourseReview.STATUS_PENDING)
+        self.assertEqual(hidden_review.status, CourseReview.STATUS_HIDDEN)
 
     def test_application_conditional_validation_and_separate_storage(self):
         url = f"/api/courses/{self.pentesting.pk}/applications/"

@@ -32,11 +32,12 @@ describe("CourseCategorySelector", () => {
     expect(html).toContain('aria-pressed="true"');
   });
 
-  it("reuses the same logo cards as links on the landing page", () => {
+  it("reuses the same logo cards as compact mobile links on the landing page", () => {
     const html = renderToStaticMarkup(
       <CourseTrackCards
         counts={{ osint: 2, web_pentesting: 1 }}
         getHref={(category) => `/courses?category=${category}`}
+        compactMobile
       />
     );
 
@@ -44,5 +45,18 @@ describe("CourseCategorySelector", () => {
     expect(html).toContain('href="/courses?category=web_pentesting"');
     expect(html).toContain("course-track-osint.png");
     expect(html).toContain("course-track-pentesting.png");
+    expect(html).toContain("min-w-[72%]");
+    expect(html).toContain("min-h-[310px]");
+    expect(html).toContain("sm:min-h-[420px]");
+  });
+
+  it("keeps the full-size mobile cards for the course catalog", () => {
+    const html = renderToStaticMarkup(
+      <CourseTrackCards counts={{ osint: 2, web_pentesting: 1 }} />
+    );
+
+    expect(html).toContain("min-w-[82%]");
+    expect(html).toContain("min-h-[390px]");
+    expect(html).not.toContain("min-w-[72%]");
   });
 });

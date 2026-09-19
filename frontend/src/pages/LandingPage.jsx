@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import certificateExcellenceImage from "../assets/certificate-excellence.png";
-import { getMyCourses, listCourses, listLiveClasses } from "../api/courses";
+import { listCourses, listLiveClasses } from "../api/courses";
 import { listRealtimeSessions } from "../api/realtime";
 import Button from "../components/Button";
 import { CourseTrackCards } from "../components/CourseCategorySelector";
@@ -523,7 +523,6 @@ export default function LandingPage() {
   const isOwlCognito = siteBrand.id === "owlcognito";
   const { isAuthenticated } = useAuth();
   const [catalogCourses, setCatalogCourses] = useState([]);
-  const [studentCourses, setStudentCourses] = useState([]);
   const [landingLiveClasses, setLandingLiveClasses] = useState([]);
   const [landingLiveClassesError, setLandingLiveClassesError] = useState("");
   const [heroLiveBroadcast, setHeroLiveBroadcast] = useState(null);
@@ -546,33 +545,6 @@ export default function LandingPage() {
       active = false;
     };
   }, []);
-
-  useEffect(() => {
-    let active = true;
-
-    if (!isAuthenticated) {
-      setStudentCourses([]);
-      return () => {
-        active = false;
-      };
-    }
-
-    (async () => {
-      try {
-        const response = await getMyCourses();
-        if (!active) return;
-        const courses = apiData(response, []);
-        setStudentCourses(Array.isArray(courses) ? courses : []);
-      } catch {
-        if (!active) return;
-        setStudentCourses([]);
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [isAuthenticated]);
 
   useEffect(() => {
     let active = true;
@@ -855,6 +827,7 @@ export default function LandingPage() {
               <CourseTrackCards
                 counts={heroCourseCounts}
                 getHref={(category) => `/courses?category=${category}`}
+                compactMobile
               />
             </div>
           </div>

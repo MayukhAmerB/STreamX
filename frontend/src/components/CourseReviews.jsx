@@ -27,7 +27,7 @@ export default function CourseReviews({ courseId, experience, refresh }) {
         text,
       });
       setWriting(false);
-      setMessage("Thank you. Your review is pending moderation.");
+      setMessage("Thank you. Your review is now published.");
       await refresh();
     } catch (err) {
       setMessage(apiMessage(err, "Your review could not be submitted."));
@@ -67,7 +67,7 @@ export default function CourseReviews({ courseId, experience, refresh }) {
           <div className="eyebrow">Student perspectives</div>
           <h2>Verified course reviews</h2>
           <p className="detail-section-description">
-            Reviews come from confirmed students and are moderated before publication.
+            Reviews are published instantly from students with access to this course. Administrators can remove inappropriate reviews.
           </p>
         </div>
       </div>
@@ -96,7 +96,9 @@ export default function CourseReviews({ courseId, experience, refresh }) {
         <p className="message">Reviewing is available to confirmed students of this course.</p>
       ) : own && !own.edit_allowed ? (
         <p className="message">
-          Your review is {own.status}. Contact support to request an edit.
+          {own.status === "approved"
+            ? "Your review is published. Contact support to request an edit."
+            : "Your review is not currently public. Contact support if you need help."}
         </p>
       ) : (
         <button className="action secondary full" onClick={() => setWriting(!writing)}>
@@ -130,7 +132,7 @@ export default function CourseReviews({ courseId, experience, refresh }) {
             Published as "Verified student". Avoid personal contact information in your review.
           </p>
           <button className="action" disabled={busy}>
-            {busy ? "Submitting..." : "Submit for moderation"}
+            {busy ? "Publishing..." : "Publish review"}
           </button>
         </form>
       ) : null}

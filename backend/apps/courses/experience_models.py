@@ -8,18 +8,23 @@ from django.db import models
 
 
 class CourseReview(models.Model):
+    STATUS_PENDING = "pending"
+    STATUS_APPROVED = "approved"
+    STATUS_HIDDEN = "hidden"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_APPROVED, "Published"),
+        (STATUS_HIDDEN, "Hidden"),
+    ]
+
     course = models.ForeignKey("courses.Course", on_delete=models.CASCADE, related_name="reviews")
     student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     rating = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)])
     text = models.TextField(max_length=3000)
     status = models.CharField(
         max_length=12,
-        default="pending",
-        choices=[
-            ("pending", "Pending"),
-            ("approved", "Approved"),
-            ("hidden", "Hidden"),
-        ],
+        default=STATUS_APPROVED,
+        choices=STATUS_CHOICES,
     )
     edit_allowed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -9,6 +9,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
 
+from .access import user_has_course_access
 from .models import Course, CourseReview, Enrollment, PentestingApplication
 
 
@@ -63,7 +64,7 @@ class CourseExperienceView(APIView):
         own = None
         eligible = False
         if request.user.is_authenticated:
-            eligible = course.enrollments.filter(user=request.user, payment_status=Enrollment.STATUS_PAID).exists()
+            eligible = user_has_course_access(request.user, course.pk)
             own = (
                 CourseReview.objects.filter(course=course, student=request.user)
                 .values(
@@ -123,8 +124,8 @@ class CourseReviewView(APIView):
 
     def post(self, request, pk):
         course = get_object_or_404(Course, pk=pk, is_published=True)
-        if not course.enrollments.filter(user=request.user, payment_status=Enrollment.STATUS_PAID).exists():
-            raise PermissionDenied("Only confirmed students of this course may review it.")
+        if not user_has_course_access(request.user, course.pk):
+            raise PermissionDenied("Only students with active access to this course may review it.")
         serializer = ReviewInput(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
@@ -135,14 +136,19 @@ class CourseReviewView(APIView):
                 if review:
                     review.rating = serializer.validated_data["rating"]
                     review.text = serializer.validated_data["text"]
-                    review.status = "pending"
+                    review.status = CourseReview.STATUS_APPROVED
                     review.edit_allowed = False
                     review.save()
                 else:
-                    CourseReview.objects.create(course=course, student=request.user, **serializer.validated_data)
+                    CourseReview.objects.create(
+                        course=course,
+                        student=request.user,
+                        status=CourseReview.STATUS_APPROVED,
+                        **serializer.validated_data,
+                    )
         except IntegrityError as exc:
             raise ValidationError("You have already reviewed this course.") from exc
-        return api_response(message="Your review is pending moderation.", status_code=201)
+        return api_response(message="Your review has been published.", status_code=201)
 
 
 class ApplicationInput(serializers.ModelSerializer):
