@@ -653,7 +653,7 @@
   display: grid;
   grid-template-columns: minmax(360px,.8fr) minmax(0,1.2fr);
   overflow: hidden;
-  margin-bottom: 28px;
+  margin-top: 28px;
   border: 1px solid var(--detail-border);
   border-radius: 26px;
   background: #090909;

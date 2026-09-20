@@ -307,75 +307,6 @@ export default function ProfessionalCoursePage() {
         </dl>
       </header>
 
-      <section className="detail-program-dashboard" aria-label="Program at a glance">
-        <figure className="detail-program-visual">
-          <img
-            src={category.supportImage}
-            alt={`${category.label} course learning environment`}
-          />
-          <div className="detail-program-visual-scrim" />
-          <figcaption>
-            <span>{category.visualEyebrow}</span>
-            <strong>{category.visualTitle}</strong>
-          </figcaption>
-        </figure>
-
-        <div className="detail-program-intelligence">
-          <div className="detail-intelligence-heading">
-            <div>
-              <span className="eyebrow">Program intelligence</span>
-              <h2>A complete view before you enroll</h2>
-            </div>
-            <span className="detail-program-code">{category.shortMark} / {facts.batch || "Current"}</span>
-          </div>
-
-          <div className="detail-intelligence-metrics">
-            <div>
-              <strong>{modules.length}</strong>
-              <span>Published modules</span>
-            </div>
-            <div>
-              <strong>{totalTopics}</strong>
-              <span>Curriculum items</span>
-            </div>
-            <div>
-              <strong>{learningOutcomes.length}</strong>
-              <span>Learning outcomes</span>
-            </div>
-            <div>
-              <strong>{facts.total_classes || "TBA"}</strong>
-              <span>Live classes</span>
-            </div>
-          </div>
-
-          <div className="detail-program-context">
-            <div>
-              <span>Instructor</span>
-              <strong>{instructorName}</strong>
-            </div>
-            <div>
-              <span>Next start</span>
-              <strong>{formatCourseStartDate(facts.start_date)}</strong>
-            </div>
-            <div>
-              <span>Learning level</span>
-              <strong>{course.snapshot_level || course.level || "Professional"}</strong>
-            </div>
-          </div>
-
-          {focusAreas.length ? (
-            <div className="detail-focus-areas">
-              <span className="eyebrow">Key focus areas</span>
-              <div>
-                {focusAreas.map((area, index) => (
-                  <span key={`${area}-${index}`}>{area}</span>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </div>
-      </section>
-
       <div className="course-grid detail-layout">
         <div className="stack detail-content-stack">
           <section className="panel detail-section detail-overview-panel">
@@ -581,6 +512,75 @@ export default function ProfessionalCoursePage() {
           </div>
         </aside>
       </div>
+
+      <section className="detail-program-dashboard" aria-label="Program at a glance">
+        <figure className="detail-program-visual">
+          <img
+            src={category.supportImage}
+            alt={`${category.label} course learning environment`}
+          />
+          <div className="detail-program-visual-scrim" />
+          <figcaption>
+            <span>{category.visualEyebrow}</span>
+            <strong>{category.visualTitle}</strong>
+          </figcaption>
+        </figure>
+
+        <div className="detail-program-intelligence">
+          <div className="detail-intelligence-heading">
+            <div>
+              <span className="eyebrow">Program intelligence</span>
+              <h2>A complete view before you enroll</h2>
+            </div>
+            <span className="detail-program-code">{category.shortMark} / {facts.batch || "Current"}</span>
+          </div>
+
+          <div className="detail-intelligence-metrics">
+            <div>
+              <strong>{modules.length}</strong>
+              <span>Published modules</span>
+            </div>
+            <div>
+              <strong>{totalTopics}</strong>
+              <span>Curriculum items</span>
+            </div>
+            <div>
+              <strong>{learningOutcomes.length}</strong>
+              <span>Learning outcomes</span>
+            </div>
+            <div>
+              <strong>{facts.total_classes || "TBA"}</strong>
+              <span>Live classes</span>
+            </div>
+          </div>
+
+          <div className="detail-program-context">
+            <div>
+              <span>Instructor</span>
+              <strong>{instructorName}</strong>
+            </div>
+            <div>
+              <span>Next start</span>
+              <strong>{formatCourseStartDate(facts.start_date)}</strong>
+            </div>
+            <div>
+              <span>Learning level</span>
+              <strong>{course.snapshot_level || course.level || "Professional"}</strong>
+            </div>
+          </div>
+
+          {focusAreas.length ? (
+            <div className="detail-focus-areas">
+              <span className="eyebrow">Key focus areas</span>
+              <div>
+                {focusAreas.map((area, index) => (
+                  <span key={`${area}-${index}`}>{area}</span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </section>
     </main>
   );
 }
