@@ -274,8 +274,8 @@ RELEASE_COMMIT="$(git rev-parse HEAD)" ./infra/hostinger/release-production.sh
 ```
 
 To explicitly reuse the latest verified recovery point instead of creating a
-new large archive, set `ALLOW_UNBACKED_RELEASE=1`. All other release gates and
-readiness checks remain enabled:
+new large archive, set `ALLOW_UNBACKED_RELEASE=1`. The backup-freshness check is
+also waived; all application release gates and readiness checks remain enabled:
 
 ```bash
 ALLOW_UNBACKED_RELEASE=1 \

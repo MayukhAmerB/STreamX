@@ -29,8 +29,8 @@ It does not edit DNS, Cloudflare, firewall, or environment files.
 
 The backup remains the default. When an operator explicitly accepts deploying
 without a new recovery point, set `ALLOW_UNBACKED_RELEASE=1`. This skips only
-the data backup and verification step; commit, migration, topology, Nginx, and
-post-deployment readiness guards still run.
+the data backup and backup-freshness verification steps; commit, migration,
+topology, Nginx, and all application readiness guards still run.
 
 Set `HOSTINGER_DEPLOY_PHASE=phase5` and set `RELEASE_BASE_REF` to the commit that
 was running before the pull on servers using the backend pool and PgBouncer

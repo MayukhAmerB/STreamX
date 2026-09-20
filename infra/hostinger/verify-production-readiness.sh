@@ -6,6 +6,7 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 ENV_FILE="${HOSTINGER_ENV_FILE:-$REPO_ROOT/backend/.env.hostinger.production}"
 COMPOSE_FILE="${HOSTINGER_COMPOSE_FILE:-$REPO_ROOT/docker-compose.hostinger.yml}"
 EXPECTED_COMMIT="${RELEASE_COMMIT:-}"
+ALLOW_UNBACKED_RELEASE="${ALLOW_UNBACKED_RELEASE:-0}"
 API_HEALTH_URL="${STREAMX_API_HEALTH_URL:-https://api.alsyedinitiative.com/health/ready}"
 FRONTEND_HEALTH_URL="${STREAMX_FRONTEND_HEALTH_URL:-https://alsyedinitiative.com/}"
 ORIGIN_DOMAINS="${STREAMX_ORIGIN_DOMAINS:-alsyedinitiative.com api.alsyedinitiative.com adlfront.com}"
@@ -22,6 +23,10 @@ fail() {
 
 pass() {
   log "PASS: $*"
+}
+
+warn() {
+  log "WARNING: $*"
 }
 
 compose() {
@@ -177,7 +182,9 @@ for pooled_service in backend-2 backend-3 backend-4 payment-backend-1 payment-ba
   fi
 done
 
-if "$SCRIPT_DIR/verify-backup.sh" latest; then
+if [[ "$ALLOW_UNBACKED_RELEASE" == "1" ]]; then
+  warn "Backup freshness verification was explicitly skipped for this release."
+elif "$SCRIPT_DIR/verify-backup.sh" latest; then
   pass "Latest backup is fresh and valid."
 else
   fail "Latest backup verification failed."

@@ -67,6 +67,8 @@ if command -v fail2ban-client >/dev/null 2>&1; then
 fi
 
 log "Running post-deployment readiness verification."
-RELEASE_COMMIT="$RELEASE_COMMIT" "$SCRIPT_DIR/verify-production-readiness.sh"
+ALLOW_UNBACKED_RELEASE="$ALLOW_UNBACKED_RELEASE" \
+  RELEASE_COMMIT="$RELEASE_COMMIT" \
+  "$SCRIPT_DIR/verify-production-readiness.sh"
 
 log "Release completed for $RELEASE_COMMIT."
