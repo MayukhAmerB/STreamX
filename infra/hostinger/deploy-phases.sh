@@ -131,9 +131,34 @@ reload_prometheus_config() {
   return 1
 }
 
+prometheus_has_livekit_job() {
+  curl -fsS --max-time 8 http://127.0.0.1:9090/api/v1/status/config 2>/dev/null |
+    python3 -c 'import json,sys; config=json.load(sys.stdin).get("data", {}).get("yaml", ""); raise SystemExit(0 if "job_name: livekit" in config else 1)' \
+      >/dev/null 2>&1
+}
+
 start_observability() {
   compose_observability up -d --remove-orphans
   reload_prometheus_config
+
+  if prometheus_has_livekit_job; then
+    log "Prometheus loaded the LiveKit scrape job."
+    return 0
+  fi
+
+  # A long-running Prometheus container can retain an obsolete bind mount even
+  # after a successful lifecycle reload. Recreate only Prometheus so the
+  # current tracked configuration is mounted without touching application data.
+  log "Prometheus did not load the LiveKit job; recreating only Prometheus."
+  compose_observability up -d --no-deps --force-recreate prometheus
+  reload_prometheus_config
+
+  if ! prometheus_has_livekit_job; then
+    log "Prometheus still does not expose the LiveKit scrape job after recreation."
+    return 1
+  fi
+
+  log "Prometheus loaded the LiveKit scrape job after recreation."
 }
 
 ensure_redis_url() {
