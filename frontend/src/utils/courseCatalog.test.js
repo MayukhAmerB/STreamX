@@ -84,12 +84,12 @@ describe("course catalog categories", () => {
 
   it("reports category counts from backend course data", () => {
     expect(getCourseCategoryCounts(courses)).toEqual({
-      osint: 1,
+      osint: 2,
       web_pentesting: 1,
     });
   });
 
-  it("keeps only upcoming or open-registration courses with a real batch identity", () => {
+  it("keeps upcoming or open-registration courses even when optional batch metadata is blank", () => {
     const visible = selectPublicCatalogCourses([
       { id: 1, batch: "Batch IV", launch_status: "live", registration_closed: false },
       { id: 2, batch: "Batch III", launch_status: "live", registration_closed: true },
@@ -99,7 +99,7 @@ describe("course catalog categories", () => {
       { id: 6, batch: "Draft", launch_status: "live", is_published: false },
     ]);
 
-    expect(visible.map((course) => course.id)).toEqual([1, 3, 5]);
+    expect(visible.map((course) => course.id)).toEqual([1, 3, 4, 5]);
   });
 
   it("uses one category-results URL from landing and course selectors", () => {

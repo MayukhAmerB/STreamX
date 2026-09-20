@@ -21,11 +21,6 @@ function normalizeCourseArray(courses) {
 export function isPublicCatalogCourse(course) {
   if (!course || course.is_published === false) return false;
 
-  const hasBatchIdentity = Boolean(
-    course.is_flagship || String(course.batch || "").trim()
-  );
-  if (!hasBatchIdentity) return false;
-
   const status = getCourseLaunchStatus(course);
   return status.isComingSoon || (status.isLive && !course.registration_closed);
 }

@@ -284,8 +284,6 @@ class CourseListCreateView(APIView):
         base_queryset = Course.objects.filter(is_published=True).select_related("instructor")
         if catalog == "current":
             base_queryset = base_queryset.filter(
-                Q(is_flagship=True) | ~Q(batch="")
-            ).filter(
                 Q(launch_status=Course.STATUS_COMING_SOON)
                 | Q(
                     launch_status=Course.STATUS_LIVE,

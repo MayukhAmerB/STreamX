@@ -2767,9 +2767,9 @@ class CourseListAccessTests(BaseAPITestCase):
     def test_current_catalog_only_shows_upcoming_or_open_registration_batches(self):
         self.course.batch = "Batch IV"
         self.course.save(update_fields=["batch"])
-        template_course = Course.objects.create(
-            title="Legacy OSINT Template",
-            description="Published template without a batch identity.",
+        open_course_without_batch_metadata = Course.objects.create(
+            title="Open OSINT Course",
+            description="Published open course whose batch metadata has not been populated.",
             price=Decimal("199.00"),
             instructor=self.instructor,
             is_published=True,
@@ -2804,7 +2804,7 @@ class CourseListAccessTests(BaseAPITestCase):
         returned_ids = {item["id"] for item in response.data["data"]}
         self.assertIn(self.course.id, returned_ids)
         self.assertIn(upcoming_batch.id, returned_ids)
-        self.assertNotIn(template_course.id, returned_ids)
+        self.assertIn(open_course_without_batch_metadata.id, returned_ids)
         self.assertNotIn(closed_batch.id, returned_ids)
 
         Enrollment.objects.create(
