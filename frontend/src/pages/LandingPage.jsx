@@ -12,7 +12,12 @@ import { useAuth } from "../hooks/useAuth";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
 import { selectLandingCourses } from "../utils/landingCourses";
 import { apiData } from "../utils/api";
-import { readCachedCourseCatalog, writeCachedCourseCatalog } from "../utils/courseCatalog";
+import {
+  getCourseCategoryPath,
+  readCachedCourseCatalog,
+  selectPublicCatalogCourses,
+  writeCachedCourseCatalog,
+} from "../utils/courseCatalog";
 import { formatINR } from "../utils/currency";
 import { featuredCourse } from "../utils/featuredCourse";
 import { brandText, siteBrand } from "../config/siteBrand";
@@ -531,14 +536,16 @@ export default function LandingPage() {
     let active = true;
     (async () => {
       try {
-        const response = await listCourses();
+        const response = await listCourses({ catalog: "current" });
         if (!active) return;
-        const apiCourses = Array.isArray(apiData(response, [])) ? apiData(response, []) : [];
+        const apiCourses = selectPublicCatalogCourses(apiData(response, []));
         writeCachedCourseCatalog(apiCourses);
         setCatalogCourses(sortCatalogCourses(apiCourses));
       } catch {
         if (!active) return;
-        setCatalogCourses(sortCatalogCourses(readCachedCourseCatalog()));
+        setCatalogCourses(
+          sortCatalogCourses(selectPublicCatalogCourses(readCachedCourseCatalog()))
+        );
       }
     })();
     return () => {
@@ -826,7 +833,7 @@ export default function LandingPage() {
               </div>
               <CourseTrackCards
                 counts={heroCourseCounts}
-                getHref={(category) => `/courses?category=${category}`}
+                getHref={getCourseCategoryPath}
                 compactMobile
               />
             </div>

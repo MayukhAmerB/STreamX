@@ -1,4 +1,6 @@
-const COURSE_CATALOG_CACHE_KEY = "course-catalog-cache:v1";
+import { getCourseLaunchStatus } from "./courseStatus";
+
+const COURSE_CATALOG_CACHE_KEY = "course-catalog-cache:v2";
 const COURSE_CATALOG_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const USER_SCOPED_COURSE_FIELDS = [
   "is_enrolled",
@@ -14,6 +16,27 @@ function canUseStorage() {
 
 function normalizeCourseArray(courses) {
   return Array.isArray(courses) ? courses.filter(Boolean) : [];
+}
+
+export function isPublicCatalogCourse(course) {
+  if (!course || course.is_published === false) return false;
+
+  const hasBatchIdentity = Boolean(
+    course.is_flagship || String(course.batch || "").trim()
+  );
+  if (!hasBatchIdentity) return false;
+
+  const status = getCourseLaunchStatus(course);
+  return status.isComingSoon || (status.isLive && !course.registration_closed);
+}
+
+export function selectPublicCatalogCourses(courses) {
+  return normalizeCourseArray(courses).filter(isPublicCatalogCourse);
+}
+
+export function getCourseCategoryPath(category) {
+  const normalizedCategory = String(category || "").trim().toLowerCase();
+  return `/courses?category=${encodeURIComponent(normalizedCategory)}#course-category-results`;
 }
 
 function stripUserScopedCourseFields(course) {
@@ -58,7 +81,7 @@ export function filterCoursesByCategory(courses, category) {
 }
 
 export function getCourseCategoryCounts(courses) {
-  const normalizedCourses = normalizeCourseArray(courses);
+  const normalizedCourses = selectPublicCatalogCourses(courses);
   return {
     osint: filterCoursesByCategory(normalizedCourses, "osint").length,
     web_pentesting: filterCoursesByCategory(normalizedCourses, "web_pentesting").length,

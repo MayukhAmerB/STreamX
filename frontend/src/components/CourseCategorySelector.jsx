@@ -148,6 +148,7 @@ export default function CourseCategorySelector({
   selectedCategory = "",
   counts = {},
   onSelect = () => {},
+  getHref,
 }) {
   return (
     <section className="mb-8 overflow-hidden rounded-[28px] border border-white/10 bg-[#050505] px-4 py-7 shadow-[0_30px_90px_rgba(0,0,0,0.34)] sm:px-7 sm:py-9 lg:px-10">
@@ -169,6 +170,7 @@ export default function CourseCategorySelector({
           selectedCategory={selectedCategory}
           counts={counts}
           onSelect={onSelect}
+          getHref={getHref}
         />
 
         <div className="mt-5 flex justify-center gap-2 sm:hidden" aria-hidden="true">

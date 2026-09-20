@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import CourseCategorySelector, { CourseTrackCards } from "./CourseCategorySelector";
+import { getCourseCategoryPath } from "../utils/courseCatalog";
 
 vi.mock("react-router-dom", () => ({
   Link: ({ children, to, ...props }) => (
@@ -36,13 +37,13 @@ describe("CourseCategorySelector", () => {
     const html = renderToStaticMarkup(
       <CourseTrackCards
         counts={{ osint: 2, web_pentesting: 1 }}
-        getHref={(category) => `/courses?category=${category}`}
+        getHref={getCourseCategoryPath}
         compactMobile
       />
     );
 
-    expect(html).toContain('href="/courses?category=osint"');
-    expect(html).toContain('href="/courses?category=web_pentesting"');
+    expect(html).toContain('href="/courses?category=osint#course-category-results"');
+    expect(html).toContain('href="/courses?category=web_pentesting#course-category-results"');
     expect(html).toContain("course-track-osint.png");
     expect(html).toContain("course-track-pentesting.png");
     expect(html).toContain("min-w-[72%]");
@@ -58,5 +59,20 @@ describe("CourseCategorySelector", () => {
     expect(html).toContain("min-w-[82%]");
     expect(html).toContain("min-h-[390px]");
     expect(html).not.toContain("min-w-[72%]");
+  });
+
+  it("uses the same one-click category links in the full course selector", () => {
+    const html = renderToStaticMarkup(
+      <CourseCategorySelector
+        selectedCategory="osint"
+        counts={{ osint: 1, web_pentesting: 1 }}
+        getHref={getCourseCategoryPath}
+      />
+    );
+
+    expect(html).toContain('href="/courses?category=osint#course-category-results"');
+    expect(html).toContain(
+      'href="/courses?category=web_pentesting#course-category-results"'
+    );
   });
 });

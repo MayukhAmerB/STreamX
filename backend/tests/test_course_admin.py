@@ -1,8 +1,15 @@
+from apps.courses.admin import (
+    _parse_admin_list_field,
+    _parse_course_card_features,
+    _parse_public_curriculum,
+)
+from apps.courses.models import (
+    default_course_card_features,
+    sanitize_course_card_features,
+    sanitize_public_curriculum,
+)
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
-
-from apps.courses.admin import _parse_admin_list_field, _parse_course_card_features
-from apps.courses.models import default_course_card_features, sanitize_course_card_features
 
 
 class CourseAdminListParsingTests(SimpleTestCase):
@@ -62,6 +69,30 @@ class CourseCardFeatureParsingTests(SimpleTestCase):
                         "icon": "check",
                         "title": "<script>alert(1)</script>",
                         "description": "Unsafe title",
+                    }
+                ]
+            )
+
+
+class PublicCurriculumParsingTests(SimpleTestCase):
+    def test_admin_lines_create_public_modules_without_touching_lessons(self):
+        modules = _parse_public_curriculum(
+            "Search Intelligence | Search-engine research | Google Dorking; Yandex Dorking\n"
+            "Reporting | Evidence-led reporting | Source notes; Final report"
+        )
+
+        self.assertEqual(len(modules), 2)
+        self.assertEqual(modules[0]["title"], "Search Intelligence")
+        self.assertEqual(modules[0]["topics"], ["Google Dorking", "Yandex Dorking"])
+
+    def test_public_curriculum_rejects_active_content(self):
+        with self.assertRaises(ValidationError):
+            sanitize_public_curriculum(
+                [
+                    {
+                        "title": "Unsafe",
+                        "description": "Public details",
+                        "topics": ["<script>alert(1)</script>"],
                     }
                 ]
             )

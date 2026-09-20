@@ -65,6 +65,34 @@ class CourseExperienceTests(APITestCase):
         self.assertEqual(module["topics"], ["Search operators", "Evidence capture"])
         self.assertNotIn("video", str(module))
 
+    def test_public_curriculum_enriches_details_without_replacing_lesson_modules(self):
+        section = Section.objects.create(
+            course=self.course,
+            title="Private lesson module",
+            topics=["Student lesson topic"],
+        )
+        lecture = Lecture.objects.create(
+            section=section,
+            title="Existing student video",
+            video_key="courses/existing-video.mp4",
+        )
+        self.course.public_curriculum = [
+            {
+                "title": "Public OSINT roadmap",
+                "description": "A detailed public syllabus.",
+                "topics": ["Google Dorking", "Operational privacy"],
+            }
+        ]
+        self.course.save(update_fields=["public_curriculum"])
+
+        modules = self.experience().data["data"]["modules"]
+
+        self.assertEqual(modules[0]["title"], "Public OSINT roadmap")
+        self.assertEqual(modules[0]["topics"], ["Google Dorking", "Operational privacy"])
+        self.assertEqual(modules[0]["lessons"], [])
+        self.assertTrue(Section.objects.filter(pk=section.pk).exists())
+        self.assertTrue(Lecture.objects.filter(pk=lecture.pk, video_key=lecture.video_key).exists())
+
     def test_application_throttle_is_independent_of_general_user_traffic(self):
         import time
 

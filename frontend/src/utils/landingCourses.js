@@ -1,4 +1,5 @@
 import { getCourseLaunchStatus } from "./courseStatus";
+import { isPublicCatalogCourse } from "./courseCatalog";
 
 function courseTimestamp(course) {
   const timestamp = new Date(course?.created_at || course?.updated_at || 0).getTime();
@@ -23,10 +24,7 @@ function isOpenLiveCourse(course) {
 
 export function selectLandingCourses(courses = []) {
   return courses
-    .filter((course) => {
-      const status = getCourseLaunchStatus(course);
-      return status.isLive || Boolean(course?.registration_closed);
-    })
+    .filter(isPublicCatalogCourse)
     .sort((left, right) => {
       const leftCreatedAt = new Date(left?.created_at || "").getTime();
       const rightCreatedAt = new Date(right?.created_at || "").getTime();
@@ -48,7 +46,7 @@ export function selectHeroCategoryCourses({
 } = {}) {
   return ["osint", "web_pentesting"].map((category) => {
     const categoryCourses = catalogCourses.filter(
-      (course) => course?.category === category && course?.is_published !== false,
+      (course) => course?.category === category && isPublicCatalogCourse(course),
     );
     const selectedCourse =
       categoryCourses.find((course) => course?.is_flagship) ||

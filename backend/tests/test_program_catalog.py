@@ -4,7 +4,7 @@ from importlib import import_module
 from io import StringIO
 
 from apps.courses.admin import CourseAdminForm
-from apps.courses.models import Course, Enrollment
+from apps.courses.models import Course, Enrollment, Lecture, LectureProgress, Section
 from apps.courses.serializers import CourseDetailSerializer, CourseListSerializer
 from apps.payments.models import Payment
 from apps.payments.order_service import create_payment_order
@@ -27,6 +27,8 @@ class ProgramCatalogTests(TestCase):
         osint = Course.objects.get(slug="osint-professional-training-batch-iv")
         pentesting = Course.objects.get(slug="web-api-pentesting-six-month-2027")
         self.assertEqual(osint.duration, "3 months")
+        self.assertEqual(len(osint.public_curriculum), 10)
+        self.assertEqual(len(osint.expected_outcomes), 6)
         self.assertEqual(osint.price, 0)
         self.assertFalse(osint.full_payment_enabled)
         self.assertFalse(osint.show_course_image)
@@ -77,6 +79,50 @@ class ProgramCatalogTests(TestCase):
         other_course.refresh_from_db()
         self.assertEqual(pentesting.launch_status, Course.STATUS_COMING_SOON)
         self.assertEqual(other_course.launch_status, Course.STATUS_LIVE)
+
+    def test_osint_enrichment_migration_preserves_videos_progress_access_and_prices(self):
+        osint = Course.objects.create(
+            slug="osint-professional-training-batch-iv",
+            title="OSINT Batch IV",
+            description="Short description",
+            price=Decimal("4321.00"),
+            monthly_price=Decimal("987.00"),
+            is_published=True,
+        )
+        section = Section.objects.create(course=osint, title="Existing video module", order=1)
+        lecture = Lecture.objects.create(
+            section=section,
+            title="Existing production video",
+            video_key="courses/existing-production-video.mp4",
+        )
+        enrollment = Enrollment.objects.create(
+            user=self.user,
+            course=osint,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        progress = LectureProgress.objects.create(
+            user=self.user,
+            lecture=lecture,
+            last_position_seconds=918,
+            max_position_seconds=918,
+            duration_seconds=2481,
+        )
+
+        migration = import_module("apps.courses.migrations.0032_course_public_curriculum")
+        migration.enrich_osint_batch_four(apps, None)
+
+        osint.refresh_from_db()
+        lecture.refresh_from_db()
+        progress.refresh_from_db()
+        self.assertEqual(len(osint.public_curriculum), 10)
+        self.assertEqual(len(osint.expected_outcomes), 6)
+        self.assertEqual(osint.price, Decimal("4321.00"))
+        self.assertEqual(osint.monthly_price, Decimal("987.00"))
+        self.assertEqual(lecture.video_key, "courses/existing-production-video.mp4")
+        self.assertEqual(progress.last_position_seconds, 918)
+        self.assertEqual(progress.max_position_seconds, 918)
+        self.assertEqual(progress.duration_seconds, 2481)
+        self.assertTrue(Enrollment.objects.filter(pk=enrollment.pk).exists())
 
     @override_settings(DIRECT_COURSE_PAYMENTS_ENABLED=True)
     def test_admin_prices_and_card_content_reach_course_api(self):

@@ -178,12 +178,11 @@ export default function ProfessionalCoursePage() {
       : course.title;
   const ratingLabel =
     experience.average_rating === null ? "New course" : `${experience.average_rating} / 5`;
-  const totalLessons = modules.reduce(
-    (total, module) => total + (Array.isArray(module.lessons) ? module.lessons.length : 0),
-    0
-  );
   const totalTopics = modules.reduce(
-    (total, module) => total + (Array.isArray(module.topics) ? module.topics.length : 0),
+    (total, module) =>
+      total +
+      (Array.isArray(module.topics) ? module.topics.length : 0) +
+      (Array.isArray(module.lessons) ? module.lessons.length : 0),
     0
   );
   const focusAreas = (
@@ -247,6 +246,27 @@ export default function ProfessionalCoursePage() {
           <p className="detail-program-name">{category.longLabel}</p>
           <h1>{courseTitle}</h1>
           <p className="detail-hero-description">{course.description}</p>
+
+          <section className="detail-mobile-enrollment" aria-label="Course enrollment">
+            <div className="detail-mobile-enrollment-meta">
+              {shouldShowCoursePrice(course) ? (
+                <div>
+                  <span>Course fee</span>
+                  <strong>{priceLabel}</strong>
+                </div>
+              ) : null}
+              <div>
+                <span>Starts</span>
+                <strong>{formatCourseStartDate(facts.start_date)}</strong>
+              </div>
+            </div>
+            {action}
+            {course.is_enrolled ? (
+              <Link className="action secondary full" to={`/courses/${id}/live`}>
+                Live classes
+              </Link>
+            ) : null}
+          </section>
 
           <div className="detail-proof-row" aria-label="Course trust indicators">
             <div>
@@ -315,12 +335,12 @@ export default function ProfessionalCoursePage() {
               <span>Published modules</span>
             </div>
             <div>
-              <strong>{totalLessons}</strong>
-              <span>Detailed lessons</span>
+              <strong>{totalTopics}</strong>
+              <span>Curriculum items</span>
             </div>
             <div>
-              <strong>{totalTopics}</strong>
-              <span>Mapped topics</span>
+              <strong>{learningOutcomes.length}</strong>
+              <span>Learning outcomes</span>
             </div>
             <div>
               <strong>{facts.total_classes || "TBA"}</strong>

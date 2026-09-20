@@ -10,8 +10,10 @@ import { hasApprovedCourseAccess } from "../utils/courseAccess";
 import {
   filterCourseCatalog,
   filterCoursesByCategory,
+  getCourseCategoryPath,
   getCourseCategoryCounts,
   readCachedCourseCatalog,
+  selectPublicCatalogCourses,
   writeCachedCourseCatalog,
 } from "../utils/courseCatalog";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
@@ -204,8 +206,10 @@ export function CourseCatalogContent({
 }
 
 export default function CourseListPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [courses, setCourses] = useState(() => readCachedCourseCatalog());
+  const [searchParams] = useSearchParams();
+  const [courses, setCourses] = useState(() =>
+    selectPublicCatalogCourses(readCachedCourseCatalog())
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -225,9 +229,9 @@ export default function CourseListPage() {
 
         for (let attempt = 0; attempt < 2; attempt += 1) {
           try {
-            const response = await listCourses();
+            const response = await listCourses({ catalog: "current" });
             const apiCourses = apiData(response, []);
-            return Array.isArray(apiCourses) ? apiCourses : [];
+            return selectPublicCatalogCourses(apiCourses);
           } catch (err) {
             lastError = err;
             if (attempt === 0) {
@@ -250,7 +254,7 @@ export default function CourseListPage() {
         }
       } catch {
         if (active) {
-          const cachedCourses = readCachedCourseCatalog();
+          const cachedCourses = selectPublicCatalogCourses(readCachedCourseCatalog());
           setCourses(cachedCourses);
           setError(
             cachedCourses.length
@@ -269,6 +273,18 @@ export default function CourseListPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!selectedCategory || window.location.hash !== "#course-category-results") return undefined;
+
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById("course-category-results")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [selectedCategory]);
+
   const categoryCounts = useMemo(() => getCourseCategoryCounts(courses), [courses]);
   const categoryCourses = useMemo(
     () => filterCoursesByCategory(courses, selectedCategory),
@@ -281,31 +297,16 @@ export default function CourseListPage() {
   const summary = useMemo(() => getCourseCatalogSummary(visibleCourses), [visibleCourses]);
   const levelSummary = useMemo(() => getCourseLevelSummary(visibleCourses), [visibleCourses]);
 
-  const handleCategorySelect = (category) => {
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("category", category);
-    nextParams.delete("view");
-    setSearch("");
-    setSearchParams(nextParams);
-
-    window.requestAnimationFrame(() => {
-      document.getElementById("course-category-results")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    });
-  };
-
   return (
     <PageShell
       title="Professional Courses"
-      subtitle="Choose OSINT or Pentesting, then explore every available course in that training path."
+      subtitle="Choose OSINT or Pentesting to view upcoming batches and courses with registration open."
       decryptTitle
     >
       <CourseCategorySelector
         selectedCategory={selectedCategory}
         counts={categoryCounts}
-        onSelect={handleCategorySelect}
+        getHref={getCourseCategoryPath}
       />
 
       {selectedCategory ? (
@@ -331,7 +332,7 @@ export default function CourseListPage() {
             </h2>
             <p className="mt-3 text-sm leading-6 text-[#AFAFAF]">
               {error ||
-                "Choose OSINT or Pentesting above to see every course available in that category."}
+                "Choose OSINT or Pentesting above to see the upcoming or open-registration batch."}
             </p>
           </div>
         </section>

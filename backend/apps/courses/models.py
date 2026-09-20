@@ -3,6 +3,13 @@ from decimal import Decimal
 from io import BytesIO
 from urllib.parse import urlparse
 
+from config.model_validators import validate_no_active_content, validate_safe_public_url
+from config.upload_validators import (
+    validate_profile_image_upload,
+    validate_resource_upload,
+    validate_video_upload,
+)
+from config.url_utils import get_media_public_url
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
@@ -13,13 +20,6 @@ from django.utils import timezone
 from django.utils.text import slugify
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from config.model_validators import validate_no_active_content, validate_safe_public_url
-from config.upload_validators import (
-    validate_profile_image_upload,
-    validate_resource_upload,
-    validate_video_upload,
-)
-from config.url_utils import get_media_public_url
 from .cache_utils import bump_course_list_cache_version, bump_live_class_list_cache_version
 
 MAX_GUIDE_VIDEO_UPLOAD_BYTES = 500 * 1024 * 1024
@@ -126,6 +126,57 @@ def sanitize_course_card_features(value):
     return cleaned or default_course_card_features()
 
 
+def sanitize_public_curriculum(value):
+    if value in (None, "", []):
+        return []
+    if not isinstance(value, list):
+        raise ValidationError("Enter a valid list of public curriculum modules.")
+    if len(value) > 16:
+        raise ValidationError("The public curriculum can contain at most 16 modules.")
+
+    cleaned = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ValidationError(
+                f"Public curriculum module {index + 1} must contain a title, description, and topics."
+            )
+
+        title = str(item.get("title") or "").strip()
+        description = str(item.get("description") or "").strip()
+        topics = _sanitize_string_list(item.get("topics"))
+        if not title:
+            raise ValidationError(f"Public curriculum module {index + 1} requires a title.")
+        if len(title) > 180:
+            raise ValidationError(f"Public curriculum module {index + 1} title is too long.")
+        if len(description) > 500:
+            raise ValidationError(f"Public curriculum module {index + 1} description is too long.")
+        if len(topics) > 20:
+            raise ValidationError(
+                f"Public curriculum module {index + 1} can contain at most 20 topics."
+            )
+
+        validate_no_active_content(title, f"public_curriculum[{index}].title")
+        validate_no_active_content(description, f"public_curriculum[{index}].description")
+        for topic_index, topic in enumerate(topics):
+            if len(topic) > 300:
+                raise ValidationError(
+                    f"Public curriculum module {index + 1}, topic {topic_index + 1} is too long."
+                )
+            validate_no_active_content(
+                topic,
+                f"public_curriculum[{index}].topics[{topic_index}]",
+            )
+
+        cleaned.append(
+            {
+                "title": title,
+                "description": description,
+                "topics": topics,
+            }
+        )
+    return cleaned
+
+
 class Course(models.Model):
     CATEGORY_OSINT = "osint"
     CATEGORY_WEB_PENTESTING = "web_pentesting"
@@ -193,6 +244,14 @@ class Course(models.Model):
     description = models.TextField()
     about_the_course = models.TextField(blank=True, default="")
     course_overview = models.TextField(blank=True, default="")
+    public_curriculum = models.JSONField(
+        blank=True,
+        default=list,
+        help_text=(
+            "Optional public course-detail roadmap. It is separate from lesson modules and never "
+            "changes videos, progress, or student access."
+        ),
+    )
     what_you_will_learn = models.JSONField(blank=True, default=list)
     expected_outcomes = models.JSONField(blank=True, default=list)
     course_card_features = models.JSONField(blank=True, default=default_course_card_features)
@@ -255,6 +314,7 @@ class Course(models.Model):
         self.what_you_will_learn = _sanitize_string_list(self.what_you_will_learn)
         self.expected_outcomes = _sanitize_string_list(self.expected_outcomes)
         self.course_card_features = sanitize_course_card_features(self.course_card_features)
+        self.public_curriculum = sanitize_public_curriculum(self.public_curriculum)
         for index, item in enumerate(self.what_you_will_learn):
             validate_no_active_content(item, f"what_you_will_learn[{index}]")
         for index, item in enumerate(self.expected_outcomes):

@@ -4,14 +4,13 @@ import json
 from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
-from .experience_models import CourseReview, PentestingApplication
-
-
 from django.db.models import Count
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import ngettext
 
+from .cache_utils import bump_course_list_cache_version
+from .experience_models import CourseReview, PentestingApplication
 from .models import (
     Course,
     Enrollment,
@@ -26,8 +25,8 @@ from .models import (
     Section,
     default_course_card_features,
     sanitize_course_card_features,
+    sanitize_public_curriculum,
 )
-from .cache_utils import bump_course_list_cache_version
 from .services import VideoTranscodeError, transcode_lecture_to_hls
 
 
@@ -128,6 +127,50 @@ def _parse_course_card_features(value):
         raise forms.ValidationError(messages or str(exc)) from exc
 
 
+def _format_public_curriculum(value):
+    return "\n".join(
+        " | ".join(
+            (
+                str(item.get("title") or "").strip(),
+                str(item.get("description") or "").strip(),
+                "; ".join(str(topic).strip() for topic in item.get("topics", []) if str(topic).strip()),
+            )
+        )
+        for item in (value or [])
+    )
+
+
+def _parse_public_curriculum(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return []
+
+    modules = []
+    for line_number, line in enumerate(raw.splitlines(), start=1):
+        line = line.strip()
+        if not line:
+            continue
+        parts = [part.strip() for part in line.split("|", 2)]
+        if len(parts) != 3:
+            raise forms.ValidationError(
+                f"Line {line_number}: use module title | description | topic 1; topic 2."
+            )
+        title, description, topics = parts
+        modules.append(
+            {
+                "title": title,
+                "description": description,
+                "topics": [topic.strip() for topic in topics.split(";") if topic.strip()],
+            }
+        )
+
+    try:
+        return sanitize_public_curriculum(modules)
+    except Exception as exc:
+        messages = getattr(exc, "messages", None)
+        raise forms.ValidationError(messages or str(exc)) from exc
+
+
 class CourseAdminForm(forms.ModelForm):
     card_highlights = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 5}), help_text="One course-card bullet per line.")
 
@@ -174,6 +217,20 @@ class CourseAdminForm(forms.ModelForm):
             }
         ),
     )
+    public_curriculum = forms.CharField(
+        required=False,
+        label="Public Course Roadmap",
+        help_text=(
+            "One module per line: module title | description | topic 1; topic 2. "
+            "This controls only the public details page and never changes lesson videos."
+        ),
+        widget=forms.Textarea(
+            attrs={
+                "rows": 16,
+                "placeholder": "OSINT Foundations | Core investigation concepts | What is OSINT?; Ethics and source verification",
+            }
+        ),
+    )
 
     class Meta:
         model = Course
@@ -189,6 +246,9 @@ class CourseAdminForm(forms.ModelForm):
             self.fields["expected_outcomes"].initial = "\n".join(instance.expected_outcomes or [])
             self.fields["course_card_features"].initial = _format_course_card_features(
                 instance.course_card_features
+            )
+            self.fields["public_curriculum"].initial = _format_public_curriculum(
+                instance.public_curriculum
             )
         else:
             self.fields["course_card_features"].initial = _format_course_card_features(
@@ -279,6 +339,9 @@ class CourseAdminForm(forms.ModelForm):
 
     def clean_course_card_features(self):
         return _parse_course_card_features(self.cleaned_data.get("course_card_features"))
+
+    def clean_public_curriculum(self):
+        return _parse_public_curriculum(self.cleaned_data.get("public_curriculum"))
 
 
 class LectureInlineForm(forms.ModelForm):
@@ -622,9 +685,15 @@ class CourseAdmin(admin.ModelAdmin):
             "Container 8: Course Roadmap (Modules/Lectures)",
             {
                 "description": (
-                    "Roadmap content is controlled from Modules page. Keep module-edit workflow unchanged."
+                    "The public roadmap enriches the sales page without changing lesson modules or videos. "
+                    "Student lesson content remains controlled from Modules page."
                 ),
-                "fields": ("section_count_display", "lecture_count_display", "module_admin_link"),
+                "fields": (
+                    "public_curriculum",
+                    "section_count_display",
+                    "lecture_count_display",
+                    "module_admin_link",
+                ),
             },
         ),
         ("Publishing", {"fields": ("is_published",)}),

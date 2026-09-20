@@ -75,6 +75,30 @@ class CourseExperienceView(APIView):
                 )
                 .first()
             )
+        public_curriculum = course.public_curriculum or []
+        if public_curriculum:
+            modules = [
+                {
+                    "id": f"public-{index}",
+                    "title": module["title"],
+                    "description": module.get("description", ""),
+                    "topics": module.get("topics", []),
+                    "lessons": [],
+                }
+                for index, module in enumerate(public_curriculum, start=1)
+            ]
+        else:
+            modules = [
+                {
+                    "id": section.pk,
+                    "title": section.title,
+                    "description": section.description,
+                    "topics": section.topics,
+                    "lessons": list(section.lectures.values("title", "description")),
+                }
+                for section in course.sections.prefetch_related("lectures").all()
+            ]
+
         data = {
             **course_statistics(course),
             "facts": {
@@ -89,16 +113,7 @@ class CourseExperienceView(APIView):
                     "batch_size", "batch_size_label", "total_hours_label", "start_date",
                 )
             },
-            "modules": [
-                {
-                    "id": section.pk,
-                    "title": section.title,
-                    "description": section.description,
-                    "topics": section.topics,
-                    "lessons": list(section.lectures.values("title", "description")),
-                }
-                for section in course.sections.prefetch_related("lectures").all()
-            ],
+            "modules": modules,
             "reviews": [
                 {
                     "rating": review.rating,

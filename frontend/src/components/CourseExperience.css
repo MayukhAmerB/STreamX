@@ -498,6 +498,9 @@
   font-size: 16px;
   line-height: 1.7;
 }
+.course-detail-v2 .detail-mobile-enrollment {
+  display: none;
+}
 .course-detail-v2 .detail-proof-row {
   display: grid;
   grid-template-columns: repeat(3,minmax(0,1fr));
@@ -1345,6 +1348,53 @@
     min-height: auto;
     padding: 42px 34px;
   }
+  .course-detail-v2 .detail-mobile-enrollment {
+    display: block;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--detail-border);
+  }
+  .course-detail-v2 .detail-mobile-enrollment-meta {
+    display: grid;
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    gap: 12px;
+  }
+  .course-detail-v2 .detail-mobile-enrollment-meta > div {
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--detail-border);
+    border-radius: 12px;
+    background: rgba(255,255,255,.025);
+  }
+  .course-detail-v2 .detail-mobile-enrollment-meta > div:only-child {
+    grid-column: 1 / -1;
+  }
+  .course-detail-v2 .detail-mobile-enrollment-meta span,
+  .course-detail-v2 .detail-mobile-enrollment-meta strong {
+    display: block;
+  }
+  .course-detail-v2 .detail-mobile-enrollment-meta span {
+    color: #858585;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+  .course-detail-v2 .detail-mobile-enrollment-meta strong {
+    overflow-wrap: anywhere;
+    margin-top: 6px;
+    color: #f4f4f4;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  .course-detail-v2 .detail-mobile-enrollment .action.full {
+    min-height: 56px;
+    margin-top: 14px;
+    font-size: 13px;
+  }
+  .course-detail-v2 .detail-mobile-enrollment .detail-contact-link {
+    margin-top: 12px;
+  }
   .course-detail-v2 .detail-hero-copy::after {
     display: none;
   }
@@ -1364,8 +1414,7 @@
     border-bottom: 1px solid var(--detail-border);
   }
   .course-detail-v2 .detail-enroll-panel {
-    position: static;
-    order: -1;
+    display: none;
   }
 }
 
@@ -1387,13 +1436,27 @@
     border-radius: 22px;
   }
   .course-detail-v2 .detail-hero-copy {
-    padding: 32px 22px;
+    padding: 24px 20px 28px;
+  }
+  .course-detail-v2 .detail-program-name {
+    margin-top: 18px;
   }
   .course-detail-v2 .detail-hero h1 {
-    font-size: clamp(34px,11vw,48px);
+    margin: 10px 0 12px;
+    font-size: clamp(30px,9.5vw,42px);
+    line-height: 1.04;
   }
   .course-detail-v2 .detail-hero-description {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
     font-size: 14px;
+    line-height: 1.58;
+  }
+  .course-detail-v2 .detail-mobile-enrollment {
+    margin-top: 20px;
+    padding-top: 16px;
   }
   .course-detail-v2 .detail-proof-row {
     gap: 10px;

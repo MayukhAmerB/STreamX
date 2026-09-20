@@ -2764,6 +2764,65 @@ class MyCoursesViewTests(BaseAPITestCase):
 
 
 class CourseListAccessTests(BaseAPITestCase):
+    def test_current_catalog_only_shows_upcoming_or_open_registration_batches(self):
+        self.course.batch = "Batch IV"
+        self.course.save(update_fields=["batch"])
+        template_course = Course.objects.create(
+            title="Legacy OSINT Template",
+            description="Published template without a batch identity.",
+            price=Decimal("199.00"),
+            instructor=self.instructor,
+            is_published=True,
+            launch_status=Course.STATUS_LIVE,
+            registration_closed=False,
+        )
+        closed_batch = Course.objects.create(
+            title="OSINT Batch III",
+            batch="Batch III",
+            description="A completed historical batch.",
+            price=Decimal("299.00"),
+            instructor=self.instructor,
+            is_published=True,
+            launch_status=Course.STATUS_LIVE,
+            registration_closed=True,
+        )
+        upcoming_batch = Course.objects.create(
+            title="Pentesting January 2027",
+            batch="January 2027",
+            description="An upcoming professional batch.",
+            price=Decimal("399.00"),
+            instructor=self.instructor,
+            is_published=True,
+            launch_status=Course.STATUS_COMING_SOON,
+            registration_closed=True,
+            category=Course.CATEGORY_WEB_PENTESTING,
+        )
+
+        response = self.client.get(reverse("course-list-create"), {"catalog": "current"})
+
+        self.assertEqual(response.status_code, 200)
+        returned_ids = {item["id"] for item in response.data["data"]}
+        self.assertIn(self.course.id, returned_ids)
+        self.assertIn(upcoming_batch.id, returned_ids)
+        self.assertNotIn(template_course.id, returned_ids)
+        self.assertNotIn(closed_batch.id, returned_ids)
+
+        Enrollment.objects.create(
+            user=self.student,
+            course=closed_batch,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        self.login(self.student.email)
+        library_response = self.client.get(reverse("my-courses"))
+        library_ids = {item["id"] for item in library_response.data["data"]}
+        self.assertIn(closed_batch.id, library_ids)
+
+    def test_current_catalog_rejects_unknown_catalog_modes(self):
+        response = self.client.get(reverse("course-list-create"), {"catalog": "archive"})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("catalog", response.data["errors"])
+
     def test_purchase_eligibility_cache_is_isolated_by_feature_flag(self):
         disabled_response = self.client.get(reverse("course-list-create"))
 

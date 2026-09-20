@@ -239,7 +239,7 @@ class CourseListCreateView(APIView):
     def get(self, request):
         disallowed_query_params = find_disallowed_query_params(
             request,
-            {"search", "paginate", "page", "page_size"},
+            {"search", "catalog", "paginate", "page", "page_size"},
         )
         if disallowed_query_params:
             log_security_event(
@@ -256,6 +256,14 @@ class CourseListCreateView(APIView):
             )
 
         search = (request.query_params.get("search") or "").strip()
+        catalog = (request.query_params.get("catalog") or "").strip().lower()
+        if catalog not in {"", "current"}:
+            return api_response(
+                success=False,
+                message="Invalid request query.",
+                errors={"catalog": "Use 'current' to request upcoming and open-registration batches."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
         cache_key = None
         if not request.user.is_authenticated:
             cache_version = get_course_list_cache_version()
@@ -264,6 +272,7 @@ class CourseListCreateView(APIView):
                 f"v={cache_version}:"
                 f"direct_pay={int(bool(getattr(settings, 'DIRECT_COURSE_PAYMENTS_ENABLED', False)))}:"
                 f"search={search.lower()}:"
+                f"catalog={catalog}:"
                 f"paginate={request.query_params.get('paginate','')}:"
                 f"page={request.query_params.get('page','')}:"
                 f"page_size={request.query_params.get('page_size','')}"
@@ -272,10 +281,18 @@ class CourseListCreateView(APIView):
             if cached is not None:
                 return api_response(success=True, message="Courses fetched.", data=cached)
 
-        queryset = _with_course_catalog_metrics(
-            Course.objects.filter(is_published=True)
-            .select_related("instructor")
-        )
+        base_queryset = Course.objects.filter(is_published=True).select_related("instructor")
+        if catalog == "current":
+            base_queryset = base_queryset.filter(
+                Q(is_flagship=True) | ~Q(batch="")
+            ).filter(
+                Q(launch_status=Course.STATUS_COMING_SOON)
+                | Q(
+                    launch_status=Course.STATUS_LIVE,
+                    registration_closed=False,
+                )
+            )
+        queryset = _with_course_catalog_metrics(base_queryset)
         if search:
             queryset = queryset.filter(
                 Q(title__icontains=search) | Q(description__icontains=search)
