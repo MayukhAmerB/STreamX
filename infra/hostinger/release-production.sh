@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 RELEASE_COMMIT="${RELEASE_COMMIT:-}"
 BASE_REF="${RELEASE_BASE_REF:-HEAD^}"
+ALLOW_UNBACKED_RELEASE="${ALLOW_UNBACKED_RELEASE:-0}"
 
 log() {
   printf '[production-release] %s\n' "$*"
@@ -12,6 +13,10 @@ log() {
 
 if [[ ! "$RELEASE_COMMIT" =~ ^[0-9a-fA-F]{40}$ ]]; then
   log "RELEASE_COMMIT must contain the full approved 40-character Git SHA."
+  exit 1
+fi
+if [[ "$ALLOW_UNBACKED_RELEASE" != "0" && "$ALLOW_UNBACKED_RELEASE" != "1" ]]; then
+  log "ALLOW_UNBACKED_RELEASE must be either 0 or 1."
   exit 1
 fi
 
@@ -33,9 +38,13 @@ HOSTINGER_ENV_FILE="${HOSTINGER_ENV_FILE:-$REPO_ROOT/backend/.env.hostinger.prod
 log "Running migration safety gate."
 "$SCRIPT_DIR/check-migration-safety.sh" "$BASE_REF"
 
-log "Creating deployment recovery point."
-"$SCRIPT_DIR/backup-data.sh"
-"$SCRIPT_DIR/verify-backup.sh" latest
+if [[ "$ALLOW_UNBACKED_RELEASE" == "1" ]]; then
+  log "WARNING: No new backup will be created because ALLOW_UNBACKED_RELEASE=1."
+else
+  log "Creating deployment recovery point."
+  "$SCRIPT_DIR/backup-data.sh"
+  "$SCRIPT_DIR/verify-backup.sh" latest
+fi
 
 log "Deploying through the existing safe deployment path."
 HOSTINGER_BACKUP_SCRIPT=/bin/true "$SCRIPT_DIR/deploy-safe.sh"

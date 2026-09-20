@@ -273,6 +273,16 @@ Formal releases use an approved immutable commit:
 RELEASE_COMMIT="$(git rev-parse HEAD)" ./infra/hostinger/release-production.sh
 ```
 
+To explicitly reuse the latest verified recovery point instead of creating a
+new large archive, set `ALLOW_UNBACKED_RELEASE=1`. All other release gates and
+readiness checks remain enabled:
+
+```bash
+ALLOW_UNBACKED_RELEASE=1 \
+RELEASE_COMMIT="$(git rev-parse HEAD)" \
+./infra/hostinger/release-production.sh
+```
+
 The complete release, incident, SLO, migration, DR, and secret-rotation policies
 are indexed in `docs/operations/README.md`.
 

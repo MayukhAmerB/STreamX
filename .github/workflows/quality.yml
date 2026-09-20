@@ -99,6 +99,8 @@ jobs:
         run: bash infra/hostinger/tests/test-monitor-nginx-config.sh
       - name: Verify course release commit guard
         run: bash infra/hostinger/tests/test-deploy-course-v2.sh
+      - name: Verify formal release backup policy
+        run: bash infra/hostinger/tests/test-release-production-policy.sh
       - name: Verify shared-network-safe Fail2ban policy
         run: bash infra/hostinger/tests/test-fail2ban-nginx-policy.sh
       - name: Verify LiveKit runtime secret preparation
