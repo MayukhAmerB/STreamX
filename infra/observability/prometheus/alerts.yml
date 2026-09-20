@@ -39,7 +39,7 @@ groups:
           description: "More than 10 join failures observed over 10 minutes."
 
       - alert: StreamXLiveKitDown
-        expr: up{job="livekit"} == 0
+        expr: absent(up{job="livekit"}) or max(up{job="livekit"}) == 0
         for: 2m
         labels:
           severity: critical

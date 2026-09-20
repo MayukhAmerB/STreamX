@@ -6,6 +6,7 @@ import {
   CourseCatalogContent,
   getCourseCatalogSummary,
   getCourseLevelSummary,
+  resolveCourseCategory,
 } from "./CourseListPage";
 
 function renderCatalog(courses) {
@@ -25,6 +26,12 @@ function renderCatalog(courses) {
 }
 
 describe("CourseListPage catalog rendering", () => {
+  it("opens directly on OSINT while honoring a hero-selected Pentesting section", () => {
+    expect(resolveCourseCategory("")).toBe("osint");
+    expect(resolveCourseCategory("invalid")).toBe("osint");
+    expect(resolveCourseCategory("web_pentesting")).toBe("web_pentesting");
+  });
+
   it("keeps authenticated catalog cards details-first without prices or direct actions", () => {
     const html = renderCatalog([
       {

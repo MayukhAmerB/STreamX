@@ -13,7 +13,7 @@ vi.mock("react-router-dom", () => ({
 }));
 
 describe("CourseCategorySelector", () => {
-  it("renders the two professional tracks with their supplied artwork and course totals", () => {
+  it("renders compact discipline sections without duplicating the hero artwork", () => {
     const html = renderToStaticMarkup(
       <CourseCategorySelector
         selectedCategory="osint"
@@ -21,15 +21,15 @@ describe("CourseCategorySelector", () => {
       />
     );
 
-    expect(html).toContain("Choose your training path");
+    expect(html).toContain("Explore by discipline");
     expect(html).toContain("OSINT");
     expect(html).toContain("Pentesting");
     expect(html).toContain("Open Source Intelligence");
     expect(html).toContain("Web Application &amp; API Security");
-    expect(html).toContain("4 courses");
-    expect(html).toContain("3 courses");
-    expect(html).toContain("course-track-osint.png");
-    expect(html).toContain("course-track-pentesting.png");
+    expect(html).toContain("4 available");
+    expect(html).toContain("3 available");
+    expect(html).not.toContain("course-track-osint.png");
+    expect(html).not.toContain("course-track-pentesting.png");
     expect(html).toContain('aria-pressed="true"');
   });
 
@@ -61,7 +61,7 @@ describe("CourseCategorySelector", () => {
     expect(html).not.toContain("min-w-[72%]");
   });
 
-  it("uses the same one-click category links in the full course selector", () => {
+  it("uses one-click category links in the course directory", () => {
     const html = renderToStaticMarkup(
       <CourseCategorySelector
         selectedCategory="osint"

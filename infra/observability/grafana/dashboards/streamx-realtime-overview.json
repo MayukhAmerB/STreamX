@@ -662,7 +662,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "max(up{job=\"livekit\"})",
+          "expr": "max(up{job=\"livekit\"}) or vector(0)",
           "legendFormat": "LiveKit",
           "range": true,
           "refId": "A"

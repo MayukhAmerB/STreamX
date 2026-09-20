@@ -218,20 +218,20 @@ done
 if curl -fsS --max-time 5 http://127.0.0.1:9090/-/ready >/dev/null 2>&1; then
   # Prometheus starts scraping asynchronously after a container restart. Wait
   # briefly so a newly started but healthy monitoring stack is not a false fail.
-  unhealthy_targets="unknown"
+  target_summary="unknown"
   for attempt in 1 2 3 4 5 6; do
-    unhealthy_targets="$(curl -fsS --max-time 8 http://127.0.0.1:9090/api/v1/targets 2>/dev/null | python3 -c 'import json,sys; data=json.load(sys.stdin); print(sum(1 for target in data["data"]["activeTargets"] if target["health"] != "up"))' 2>/dev/null || printf unknown)"
-    if [[ "$unhealthy_targets" == "0" ]]; then
+    target_summary="$(curl -fsS --max-time 8 http://127.0.0.1:9090/api/v1/targets 2>/dev/null | python3 -c 'import json,sys; targets=json.load(sys.stdin)["data"]["activeTargets"]; livekit=[target for target in targets if target.get("labels", {}).get("job") == "livekit"]; print(sum(1 for target in targets if target.get("health") != "up"), len(livekit), sum(1 for target in livekit if target.get("health") == "up"))' 2>/dev/null || printf unknown)"
+    if [[ "$target_summary" =~ ^0[[:space:]]+[1-9][0-9]*[[:space:]]+[1-9][0-9]*$ ]]; then
       break
     fi
     if [[ "$attempt" != "6" ]]; then
       sleep 5
     fi
   done
-  if [[ "$unhealthy_targets" == "0" ]]; then
-    pass "All Prometheus targets are healthy."
+  if [[ "$target_summary" =~ ^0[[:space:]]+[1-9][0-9]*[[:space:]]+[1-9][0-9]*$ ]]; then
+    pass "All Prometheus targets, including LiveKit, are present and healthy."
   else
-    fail "Prometheus has unhealthy targets: $unhealthy_targets"
+    fail "Prometheus target verification failed (unhealthy livekit_seen livekit_up): $target_summary"
   fi
 else
   fail "Prometheus readiness endpoint is unavailable."

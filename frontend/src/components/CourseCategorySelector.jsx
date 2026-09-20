@@ -144,46 +144,91 @@ export function CourseTrackCards({
   );
 }
 
-export default function CourseCategorySelector({
+export function CourseCategorySections({
   selectedCategory = "",
   counts = {},
   onSelect = () => {},
   getHref,
 }) {
   return (
-    <section className="mb-8 overflow-hidden rounded-[28px] border border-white/10 bg-[#050505] px-4 py-7 shadow-[0_30px_90px_rgba(0,0,0,0.34)] sm:px-7 sm:py-9 lg:px-10">
-      <div className="relative">
-        <div className="max-w-3xl">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#9B9B9B]">
-            Featured Programs
+    <section className="mb-8 overflow-hidden rounded-[24px] border border-white/10 bg-[#070707] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.3)] sm:p-6">
+      <div className="mb-4 flex flex-col gap-2 border-b border-white/10 pb-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#8F8F8F]">
+            Course directory
           </div>
-          <h2 className="mt-3 font-reference text-3xl font-semibold tracking-[-0.03em] text-white sm:text-4xl lg:text-5xl">
-            Choose your training path
+          <h2 className="mt-2 font-reference text-2xl font-semibold tracking-[-0.03em] text-white sm:text-3xl">
+            Explore by discipline
           </h2>
-          <div className="mt-5 flex items-center gap-4 text-[11px] font-semibold uppercase tracking-[0.24em] text-[#A8A8A8]">
-            <span>2 professional tracks</span>
-            <span className="h-px flex-1 bg-gradient-to-r from-white/35 to-transparent" />
-          </div>
         </div>
-
-        <CourseTrackCards
-          selectedCategory={selectedCategory}
-          counts={counts}
-          onSelect={onSelect}
-          getHref={getHref}
-        />
-
-        <div className="mt-5 flex justify-center gap-2 sm:hidden" aria-hidden="true">
-          {COURSE_TRACKS.map((track) => (
-            <span
-              key={track.category}
-              className={`h-2 rounded-full transition-all ${
-                selectedCategory === track.category ? "w-6 bg-white" : "w-2 bg-white/20"
-              }`}
-            />
-          ))}
-        </div>
+        <p className="max-w-md text-xs leading-5 text-[#8F8F8F]">
+          Choose a section to view its upcoming courses and batches currently accepting registration.
+        </p>
       </div>
+
+      <nav className="grid gap-3 sm:grid-cols-2" aria-label="Course disciplines">
+        {COURSE_TRACKS.map((track, index) => {
+          const selected = selectedCategory === track.category;
+          const count = Number(counts[track.category] || 0);
+          const href = typeof getHref === "function" ? getHref(track.category) : "";
+          const className = `group flex min-h-[132px] items-stretch justify-between gap-4 rounded-2xl border p-4 text-left transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white sm:p-5 ${
+            selected
+              ? "border-white/55 bg-[#151515] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+              : "border-white/10 bg-[#0B0B0B] hover:border-white/30 hover:bg-[#111111]"
+          }`;
+          const content = (
+            <>
+              <div className="min-w-0">
+                <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[#737373]">
+                  {String(index + 1).padStart(2, "0")} / {count} available
+                </span>
+                <h3 className="mt-3 font-reference text-xl font-semibold text-white sm:text-2xl">
+                  {track.title}
+                </h3>
+                <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9E9E9E]">
+                  {track.subtitle}
+                </p>
+                <p className="mt-3 line-clamp-2 text-xs leading-5 text-[#8E8E8E]">
+                  {track.description}
+                </p>
+              </div>
+              <span
+                className={`mt-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-lg transition ${
+                  selected
+                    ? "border-white bg-white text-black"
+                    : "border-white/25 text-white group-hover:border-white/60"
+                }`}
+                aria-hidden="true"
+              >
+                &rarr;
+              </span>
+            </>
+          );
+
+          return href ? (
+            <Link
+              key={track.category}
+              to={href}
+              aria-current={selected ? "page" : undefined}
+              className={className}
+            >
+              {content}
+            </Link>
+          ) : (
+            <button
+              key={track.category}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onSelect(track.category)}
+              className={className}
+            >
+              {content}
+            </button>
+          );
+        })}
+      </nav>
     </section>
   );
 }
+
+export default CourseCategorySections;

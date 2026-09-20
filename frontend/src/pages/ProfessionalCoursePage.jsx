@@ -7,6 +7,7 @@ import CourseReviews from "../components/CourseReviews";
 import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
 import { formatINR } from "../utils/currency";
+import { normalizeTextList } from "../utils/textList";
 import "../components/CourseExperience.css";
 
 const CATEGORY_META = {
@@ -154,12 +155,8 @@ export default function ProfessionalCoursePage() {
   const facts = experience.facts || {};
   const modules = Array.isArray(experience.modules) ? experience.modules : [];
   const benefits = Array.isArray(course.course_card_features) ? course.course_card_features : [];
-  const learningOutcomes = Array.isArray(course.what_you_will_learn)
-    ? course.what_you_will_learn
-    : [];
-  const expectedOutcomes = Array.isArray(course.expected_outcomes)
-    ? course.expected_outcomes
-    : [];
+  const learningOutcomes = normalizeTextList(course.what_you_will_learn);
+  const expectedOutcomes = normalizeTextList(course.expected_outcomes);
   const showImage = Boolean(course.show_course_image && course.thumbnail);
   const open = course.launch_status === "live" && !course.registration_closed;
   const courseStatusLabel = course.is_enrolled
@@ -181,15 +178,12 @@ export default function ProfessionalCoursePage() {
   const totalTopics = modules.reduce(
     (total, module) =>
       total +
-      (Array.isArray(module.topics) ? module.topics.length : 0) +
+      normalizeTextList(module.topics).length +
       (Array.isArray(module.lessons) ? module.lessons.length : 0),
     0
   );
-  const focusAreas = (
-    Array.isArray(course.card_highlights) && course.card_highlights.length
-      ? course.card_highlights
-      : learningOutcomes
-  ).slice(0, 4);
+  const cardHighlights = normalizeTextList(course.card_highlights);
+  const focusAreas = (cardHighlights.length ? cardHighlights : learningOutcomes).slice(0, 4);
   const factItems = [
     ["Duration", facts.duration],
     ["Schedule", facts.schedule],
@@ -313,21 +307,31 @@ export default function ProfessionalCoursePage() {
             <SectionHeading
               number="01"
               eyebrow="Course overview"
-              title="Build knowledge. Put it into practice."
-              description="A focused learning path designed around useful, repeatable professional skills."
+              title="Understand the program before you begin"
+              description="A clear overview first, followed by the practical capabilities configured by the academic team."
             />
             <div className="detail-overview-grid">
-              <p className="detail-long-copy" style={{ whiteSpace: "pre-line" }}>
-                {course.course_overview || course.about_the_course || course.description}
-              </p>
+              <div className="detail-overview-copy">
+                <span className="detail-copy-label">About this course</span>
+                <p className="detail-long-copy" style={{ whiteSpace: "pre-line" }}>
+                  {course.course_overview || course.about_the_course || course.description}
+                </p>
+              </div>
               <div className="detail-learning-list">
-                <h3>What you will learn</h3>
+                <div className="detail-learning-heading">
+                  <span>Learning outcomes</span>
+                  <h3>What you will learn</h3>
+                  <p>Practical skills and workflows covered throughout the program.</p>
+                </div>
                 {learningOutcomes.length ? (
                   <ul>
                     {learningOutcomes.map((topic, index) => (
                       <li key={index}>
-                        <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-                        {topic}
+                        <span className="detail-learning-check" aria-hidden="true">&#10003;</span>
+                        <div>
+                          <small>Outcome {String(index + 1).padStart(2, "0")}</small>
+                          <p>{topic}</p>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -368,7 +372,9 @@ export default function ProfessionalCoursePage() {
             <div className="detail-module-list">
               {modules.length ? (
                 modules.map((module, index) => {
-                  const lessonCount = module.topics.length + module.lessons.length;
+                  const moduleTopics = normalizeTextList(module.topics);
+                  const moduleLessons = Array.isArray(module.lessons) ? module.lessons : [];
+                  const lessonCount = moduleTopics.length + moduleLessons.length;
                   return (
                     <details key={module.id}>
                       <summary>
@@ -386,10 +392,10 @@ export default function ProfessionalCoursePage() {
                       <div className="module-body">
                         {module.description ? <p>{module.description}</p> : null}
                         <ul>
-                          {module.topics.map((topic, topicIndex) => (
+                          {moduleTopics.map((topic, topicIndex) => (
                             <li key={topicIndex}>{topic}</li>
                           ))}
-                          {module.lessons.map((lesson, lessonIndex) => (
+                          {moduleLessons.map((lesson, lessonIndex) => (
                             <li key={`lesson-${lessonIndex}`}>
                               <strong>{lesson.title}</strong>
                               {lesson.description ? (
@@ -398,7 +404,7 @@ export default function ProfessionalCoursePage() {
                             </li>
                           ))}
                         </ul>
-                        {!module.topics.length && !module.lessons.length ? (
+                        {!moduleTopics.length && !moduleLessons.length ? (
                           <p className="muted">Detailed lesson topics will be announced.</p>
                         ) : null}
                       </div>

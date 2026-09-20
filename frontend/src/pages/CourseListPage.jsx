@@ -26,6 +26,12 @@ const COURSE_CATEGORY_LABELS = {
   web_pentesting: "Pentesting",
 };
 
+export function resolveCourseCategory(value) {
+  return Object.hasOwn(COURSE_CATEGORY_LABELS, String(value || ""))
+    ? String(value)
+    : "osint";
+}
+
 export function getCourseCatalogSummary(courses) {
   return {
     live: courses.filter((course) => getCourseLaunchStatus(course).isLive).length,
@@ -215,9 +221,7 @@ export default function CourseListPage() {
   const [search, setSearch] = useState("");
 
   const requestedCategory = searchParams.get("category") || "";
-  const selectedCategory = Object.hasOwn(COURSE_CATEGORY_LABELS, requestedCategory)
-    ? requestedCategory
-    : "";
+  const selectedCategory = resolveCourseCategory(requestedCategory);
 
   useEffect(() => {
     let active = true;
@@ -309,34 +313,16 @@ export default function CourseListPage() {
         getHref={getCourseCategoryPath}
       />
 
-      {selectedCategory ? (
-        <CourseCatalogContent
-          courses={visibleCourses}
-          loading={loading}
-          error={error}
-          search={search}
-          setSearch={setSearch}
-          summary={summary}
-          levelSummary={levelSummary}
-          catalogLabel={COURSE_CATEGORY_LABELS[selectedCategory]}
-        />
-      ) : (
-        <section
-          id="course-category-results"
-          className="scroll-mt-24 rounded-[24px] border border-white/15 bg-[#0A0A0A] px-5 py-8 text-center sm:px-8"
-          aria-live="polite"
-        >
-          <div className="mx-auto max-w-2xl">
-            <h2 className="font-reference text-2xl font-semibold text-white">
-              {loading ? "Loading the course catalog..." : "Select a professional track"}
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-[#AFAFAF]">
-              {error ||
-                "Choose OSINT or Pentesting above to see the upcoming or open-registration batch."}
-            </p>
-          </div>
-        </section>
-      )}
+      <CourseCatalogContent
+        courses={visibleCourses}
+        loading={loading}
+        error={error}
+        search={search}
+        setSearch={setSearch}
+        summary={summary}
+        levelSummary={levelSummary}
+        catalogLabel={COURSE_CATEGORY_LABELS[selectedCategory]}
+      />
     </PageShell>
   );
 }

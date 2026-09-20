@@ -116,6 +116,26 @@ compose_observability() {
   docker compose --env-file "$ENV_FILE" -f "$OBS_COMPOSE" "$@"
 }
 
+reload_prometheus_config() {
+  local attempt
+  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    if curl -fsS --max-time 5 http://127.0.0.1:9090/-/ready >/dev/null 2>&1; then
+      curl -fsS --max-time 10 -X POST http://127.0.0.1:9090/-/reload >/dev/null
+      log "Prometheus configuration reloaded."
+      return 0
+    fi
+    sleep 2
+  done
+
+  log "Prometheus did not become ready; configuration reload failed."
+  return 1
+}
+
+start_observability() {
+  compose_observability up -d --remove-orphans
+  reload_prometheus_config
+}
+
 ensure_redis_url() {
   local redis_url_value
   redis_url_value="$(grep '^REDIS_URL=' "$ENV_FILE" | tail -n1 | cut -d= -f2- || true)"
@@ -170,7 +190,7 @@ phase1() {
   compose_main -f "$BASE_COMPOSE" -f "$ASYNC_COMPOSE" up -d --build --remove-orphans
   scale_async_workers -f "$BASE_COMPOSE" -f "$ASYNC_COMPOSE"
   compose_main -f "$BASE_COMPOSE" exec -T backend python manage.py migrate
-  compose_observability up -d --remove-orphans
+  start_observability
 }
 
 phase2() {
@@ -178,7 +198,7 @@ phase2() {
   compose_main -f "$BASE_COMPOSE" -f "$LIMITS_COMPOSE" -f "$ASYNC_COMPOSE" up -d --build --remove-orphans
   scale_async_workers -f "$BASE_COMPOSE" -f "$LIMITS_COMPOSE" -f "$ASYNC_COMPOSE"
   compose_main -f "$BASE_COMPOSE" exec -T backend python manage.py migrate
-  compose_observability up -d --remove-orphans
+  start_observability
 }
 
 phase3() {
@@ -199,7 +219,7 @@ phase3() {
     -f "$POOL_COMPOSE" \
     -f "$GATEWAY_COMPOSE"
   compose_main -f "$BASE_COMPOSE" exec -T backend python manage.py migrate
-  compose_observability up -d --remove-orphans
+  start_observability
   log "If you want host-nginx to use gateway LB, proxy to 127.0.0.1:8088."
 }
 
@@ -221,7 +241,7 @@ phase4() {
     -f "$PGBOUNCER_COMPOSE" \
     -f "$POSTGRES_TUNING_COMPOSE"
   compose_main -f "$BASE_COMPOSE" exec -T backend python manage.py migrate
-  compose_observability up -d --remove-orphans
+  start_observability
 }
 
 phase5() {
@@ -250,7 +270,7 @@ phase5() {
     -f "$PGBOUNCER_POOL_COMPOSE" \
     -f "$POSTGRES_TUNING_COMPOSE"
   compose_main -f "$BASE_COMPOSE" exec -T backend python manage.py migrate
-  compose_observability up -d --remove-orphans
+  start_observability
   log "If you want host-nginx to use gateway LB, proxy to 127.0.0.1:8088."
 }
 
