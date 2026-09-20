@@ -102,7 +102,9 @@ export function CourseTrackCards({
       {COURSE_TRACKS.map((track) => {
         const selected = selectedCategory === track.category;
         const count = Number(counts[track.category] || 0);
-        const mobileWidthClass = compactMobile ? "min-w-[72%] rounded-[20px]" : "min-w-[82%] rounded-[24px]";
+        const mobileWidthClass = compactMobile
+          ? "min-w-[72%] rounded-[20px] last:mr-[28%] sm:last:mr-0"
+          : "min-w-[82%] rounded-[24px]";
         const className = `group relative ${mobileWidthClass} snap-start overflow-hidden border bg-[#090A0B] text-left transition duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white sm:min-w-0 sm:rounded-[24px] ${
           selected
             ? "border-white/75 shadow-[0_22px_55px_rgba(0,0,0,0.55)]"

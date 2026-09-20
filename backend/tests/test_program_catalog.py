@@ -124,6 +124,60 @@ class ProgramCatalogTests(TestCase):
         self.assertEqual(progress.duration_seconds, 2481)
         self.assertTrue(Enrollment.objects.filter(pk=enrollment.pk).exists())
 
+    def test_curriculum_repair_only_fills_empty_osint_batch_four_records(self):
+        empty_course = Course.objects.create(
+            slug="production-osint-batch-four",
+            title="OSINT PROFESSIONAL TRAINING PROGRAM (BATCH IV)",
+            batch="Batch IV",
+            category=Course.CATEGORY_OSINT,
+            description="Existing production description",
+            price=Decimal("3500.00"),
+            public_curriculum=[],
+        )
+        preserved_course = Course.objects.create(
+            slug="admin-managed-osint-batch-four",
+            title="OSINT Batch IV Admin Curriculum",
+            batch="Batch IV",
+            category=Course.CATEGORY_OSINT,
+            description="Admin managed",
+            price=Decimal("3500.00"),
+            public_curriculum=[
+                {
+                    "title": "Admin module",
+                    "description": "Keep this content",
+                    "topics": ["Admin topic"],
+                }
+            ],
+        )
+        section = Section.objects.create(course=empty_course, title="Existing videos", order=1)
+        lecture = Lecture.objects.create(
+            section=section,
+            title="Existing production recording",
+            video_key="courses/keep-this-video.mp4",
+        )
+
+        migration = import_module(
+            "apps.courses.migrations.0033_fill_empty_osint_batch_four_curriculum"
+        )
+        migration.fill_empty_osint_batch_four_curriculum(apps, None)
+
+        empty_course.refresh_from_db()
+        preserved_course.refresh_from_db()
+        lecture.refresh_from_db()
+        self.assertEqual(len(empty_course.public_curriculum), 10)
+        self.assertEqual(empty_course.price, Decimal("3500.00"))
+        self.assertEqual(
+            preserved_course.public_curriculum,
+            [
+                {
+                    "title": "Admin module",
+                    "description": "Keep this content",
+                    "topics": ["Admin topic"],
+                }
+            ],
+        )
+        self.assertEqual(lecture.video_key, "courses/keep-this-video.mp4")
+
     @override_settings(DIRECT_COURSE_PAYMENTS_ENABLED=True)
     def test_admin_prices_and_card_content_reach_course_api(self):
         countdown_end = timezone.now() + timedelta(days=14)

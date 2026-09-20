@@ -47,6 +47,8 @@ describe("CourseCategorySelector", () => {
     expect(html).toContain("course-track-osint.png");
     expect(html).toContain("course-track-pentesting.png");
     expect(html).toContain("min-w-[72%]");
+    expect(html).toContain("last:mr-[28%]");
+    expect(html).toContain("sm:last:mr-0");
     expect(html).toContain("min-h-[310px]");
     expect(html).toContain("sm:min-h-[420px]");
   });
