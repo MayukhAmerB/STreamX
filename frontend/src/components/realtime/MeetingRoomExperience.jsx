@@ -10,6 +10,7 @@ import {
   listRealtimeRecordings,
   revokeRealtimePresenter,
   revokeRealtimeSpeaker,
+  reportRealtimeConnectionEvent,
   startRealtimeRecording,
   stopRealtimeRecording,
   uploadRealtimeBrowserRecording,
@@ -20,6 +21,13 @@ import { ScreenityFallbackRecorder } from "../../services/recording/ScreenityFal
 import { resolveBroadcastEmbedUrls } from "../../utils/broadcastUrls";
 import { apiData, apiMessage } from "../../utils/api";
 import { copyTextToClipboard } from "../../utils/clipboard";
+import {
+  disconnectMessage,
+  normalizeConnectionQuality,
+  normalizeDisconnectReason,
+  resolveMeetingConnectionStrategy,
+  shouldAutomaticallyReconnect,
+} from "../../utils/realtimeConnection";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -57,50 +65,6 @@ const MOBILE_LISTENER_RECONNECT_DELAYS_MS = [
   7000,
 ];
 const MEETING_REJOIN_DELAYS_MS = [0, 1500, 4000, 8000, 12000, 15000];
-
-function resolveMeetingConnectionStrategy({
-  audienceFocusMode = false,
-  canPresent = false,
-  canSpeak = false,
-} = {}) {
-  if (typeof window === "undefined" || typeof navigator === "undefined") {
-    return {
-      isMobileDevice: false,
-      mobileListener: false,
-      saveData: false,
-      effectiveType: "",
-      preferRelayTransport: false,
-      conservativeReceiveProfile: false,
-    };
-  }
-
-  const userAgent = String(navigator.userAgent || "").toLowerCase();
-  const viewportWidth = Number(window.innerWidth || 0);
-  const touchCapable = Number(navigator.maxTouchPoints || 0) > 1;
-  const mobileUserAgent = /android|iphone|ipad|ipod|mobile|iemobile|opera mini/i.test(userAgent);
-  const isMobileDevice =
-    mobileUserAgent || (touchCapable && viewportWidth > 0 && viewportWidth <= 1024);
-
-  const connection =
-    navigator.connection || navigator.mozConnection || navigator.webkitConnection || null;
-  const effectiveType = String(connection?.effectiveType || "").trim().toLowerCase();
-  const saveData = connection?.saveData === true;
-  const weakNetwork = ["slow-2g", "2g", "3g"].includes(effectiveType);
-  const mobileListener = Boolean(isMobileDevice && !canPresent && !canSpeak);
-  const preferRelayTransport = Boolean(mobileListener || saveData || weakNetwork);
-  const conservativeReceiveProfile = Boolean(
-    mobileListener || audienceFocusMode || saveData || weakNetwork
-  );
-
-  return {
-    isMobileDevice,
-    mobileListener,
-    saveData,
-    effectiveType,
-    preferRelayTransport,
-    conservativeReceiveProfile,
-  };
-}
 
 function clampWholeNumber(value, min, max, fallback) {
   const numeric = Number(value);
@@ -749,6 +713,7 @@ export default function MeetingRoomExperience({
     meeting?.permissions?.can_manage_participants ?? meeting?.permissions?.can_manage_presenters
   );
   const audienceFocusMode = Boolean(audiencePanel && !canManageParticipants);
+  const [forceRelayTransport, setForceRelayTransport] = useState(false);
   const mediaProfile = useMemo(() => normalizeMeetingMediaProfile(meeting?.media_profile || {}), [meeting?.media_profile]);
   const premiumProfileEnabled = useMemo(
     () =>
@@ -768,15 +733,16 @@ export default function MeetingRoomExperience({
         audienceFocusMode,
         canPresent: canPresentFromPayload,
         canSpeak: canSpeakFromPayload,
+        forceRelayTransport,
       }),
-    [audienceFocusMode, canPresentFromPayload, canSpeakFromPayload]
+    [audienceFocusMode, canPresentFromPayload, canSpeakFromPayload, forceRelayTransport]
   );
   const reconnectPolicy = useMemo(() => {
-    if (connectionStrategy.preferRelayTransport) {
+    if (connectionStrategy.mobileListener || connectionStrategy.preferRelayTransport) {
       return new DefaultReconnectPolicy(MOBILE_LISTENER_RECONNECT_DELAYS_MS);
     }
     return new DefaultReconnectPolicy();
-  }, [connectionStrategy.preferRelayTransport]);
+  }, [connectionStrategy.mobileListener, connectionStrategy.preferRelayTransport]);
 
   const [meetingError, setMeetingError] = useState("");
   const [meetingInfo, setMeetingInfo] = useState("");
@@ -826,6 +792,7 @@ export default function MeetingRoomExperience({
   const rejoinTimerRef = useRef(null);
   const manualLeaveRef = useRef(false);
   const reconnectingRef = useRef(false);
+  const reconnectAttemptRef = useRef(0);
   const previousSessionIdRef = useRef(session?.id || null);
   const [isStageFullscreen, setIsStageFullscreen] = useState(false);
   const defaultModeratorUserIds = useMemo(
@@ -910,6 +877,37 @@ export default function MeetingRoomExperience({
     },
     []
   );
+
+  const reportConnectionEvent = useCallback(
+    (event, details = {}) => {
+      if (!session?.id) {
+        return;
+      }
+      reportRealtimeConnectionEvent(session.id, {
+        event,
+        reason: details.reason || "none",
+        transport: details.transport || (connectionStrategy.preferRelayTransport ? "relay" : "auto"),
+        network: connectionStrategy.network || "unknown",
+        platform: connectionStrategy.platform || "unknown",
+        quality: details.quality || "unknown",
+        retry_attempt: Math.max(0, Number(details.retryAttempt ?? reconnectAttemptRef.current) || 0),
+        elapsed_ms: Math.max(0, Number(details.elapsedMs || 0) || 0),
+      }).catch(() => {
+        // Diagnostics must never interrupt a live class.
+      });
+    },
+    [
+      connectionStrategy.network,
+      connectionStrategy.platform,
+      connectionStrategy.preferRelayTransport,
+      session?.id,
+    ]
+  );
+
+  useEffect(() => {
+    setForceRelayTransport(false);
+    reconnectAttemptRef.current = 0;
+  }, [session?.id]);
 
   useEffect(() => {
     if (
@@ -1140,6 +1138,7 @@ export default function MeetingRoomExperience({
         });
         return;
       }
+      reconnectAttemptRef.current = attemptIndex + 1;
       if (reconnectingRef.current) {
         return;
       }
@@ -1185,7 +1184,7 @@ export default function MeetingRoomExperience({
         isRecoverableConnectionState(connectionLabel) &&
         !manualLeaveRef.current
       ) {
-        scheduleMeetingReconnectAttempt(0);
+        scheduleMeetingReconnectAttempt(reconnectAttemptRef.current);
       }
     };
     window.addEventListener("online", handleOnline);
@@ -1210,7 +1209,7 @@ export default function MeetingRoomExperience({
         return;
       }
       clearPendingRejoinTimer();
-      scheduleMeetingReconnectAttempt(0);
+      scheduleMeetingReconnectAttempt(reconnectAttemptRef.current);
     };
     document.addEventListener("visibilitychange", recoverVisibleMeeting);
     window.addEventListener("pageshow", recoverVisibleMeeting);
@@ -1238,6 +1237,7 @@ export default function MeetingRoomExperience({
 
     let disposed = false;
     let allowUnexpectedDisconnectRecovery = true;
+    const connectionStartedAt = Date.now();
     const isSameSessionRefresh = previousSessionIdRef.current === session?.id;
     previousSessionIdRef.current = session?.id || null;
     const room = new Room({
@@ -1253,6 +1253,7 @@ export default function MeetingRoomExperience({
     setConnected(false);
     setConnectionLabel("Connecting");
     setParticipants([]);
+    reportConnectionEvent("connecting");
     if (!isSameSessionRefresh) {
       setMessages([]);
       setPinnedIdentity("");
@@ -1303,22 +1304,49 @@ export default function MeetingRoomExperience({
     room.on(RoomEvent.Reconnecting, () => {
       setMeetingInfo("Reconnecting...");
       setConnectionLabel("reconnecting");
+      reportConnectionEvent("reconnecting", {
+        elapsedMs: Date.now() - connectionStartedAt,
+      });
     });
     room.on(RoomEvent.Reconnected, () => {
       clearPendingRejoinTimer();
+      reconnectAttemptRef.current = 0;
       setRejoinState({ loading: false, error: "", info: "" });
       setMeetingInfo("Connection restored.");
       setConnectionLabel("connected");
+      reportConnectionEvent("reconnected", {
+        elapsedMs: Date.now() - connectionStartedAt,
+      });
     });
-    room.on(RoomEvent.Disconnected, () => {
+    room.on(RoomEvent.ConnectionQualityChanged, (quality, participant) => {
+      if (participant?.identity !== room.localParticipant?.identity) {
+        return;
+      }
+      reportConnectionEvent("quality_changed", {
+        quality: normalizeConnectionQuality(quality),
+        elapsedMs: Date.now() - connectionStartedAt,
+      });
+    });
+    room.on(RoomEvent.Disconnected, (reason) => {
+      const normalizedReason = normalizeDisconnectReason(reason);
       setConnected(false);
       setConnectionLabel("disconnected");
       flushRoomStateRefresh();
+      reportConnectionEvent("disconnected", {
+        reason: normalizedReason,
+        elapsedMs: Date.now() - connectionStartedAt,
+      });
       if (!allowUnexpectedDisconnectRecovery || manualLeaveRef.current || disposed) {
         setConnecting(false);
         return;
       }
-      scheduleMeetingReconnectAttempt(0);
+      if (!shouldAutomaticallyReconnect(reason)) {
+        setConnecting(false);
+        setMeetingError(disconnectMessage(reason));
+        setRejoinState({ loading: false, error: disconnectMessage(reason), info: "" });
+        return;
+      }
+      scheduleMeetingReconnectAttempt(reconnectAttemptRef.current);
     });
     const permissionsChangedEvent =
       RoomEvent.ParticipantPermissionsChanged || "participantPermissionsChanged";
@@ -1492,6 +1520,7 @@ export default function MeetingRoomExperience({
           : undefined;
         await room.connect(meeting.livekit_url, meeting.token, connectOptions);
         clearPendingRejoinTimer();
+        reconnectAttemptRef.current = 0;
         setRejoinState({ loading: false, error: "", info: "" });
         const audioStarted = await startRoomAudio(room);
         for (const remoteParticipant of room.remoteParticipants.values()) {
@@ -1537,6 +1566,9 @@ export default function MeetingRoomExperience({
         setConnecting(false);
         setConnected(true);
         setConnectionLabel("connected");
+        reportConnectionEvent("connected", {
+          elapsedMs: Date.now() - connectionStartedAt,
+        });
         if (canPresentFromPayload) {
           const actualCamera = getLocalCameraCaptureSummary(room.localParticipant);
           setMeetingInfo(
@@ -1569,10 +1601,27 @@ export default function MeetingRoomExperience({
         if (disposed) {
           return;
         }
-        setConnecting(false);
         setConnected(false);
         setConnectionLabel("failed");
-        setMeetingError(err?.message || "Unable to connect to meeting.");
+        reportConnectionEvent("connection_failed", {
+          reason: "connect_error",
+          elapsedMs: Date.now() - connectionStartedAt,
+        });
+        if (connectionStrategy.relayFallbackEligible && !connectionStrategy.preferRelayTransport) {
+          setConnecting(true);
+          setMeetingError("");
+          setMeetingInfo("Direct connection failed. Trying compatibility relay...");
+          reportConnectionEvent("relay_fallback", {
+            reason: "connect_error",
+            transport: "relay",
+            elapsedMs: Date.now() - connectionStartedAt,
+          });
+          setForceRelayTransport(true);
+          return;
+        }
+        setConnecting(false);
+        setMeetingError(err?.message || "Unable to connect to meeting. Retrying...");
+        scheduleMeetingReconnectAttempt(reconnectAttemptRef.current);
       }
     };
 
@@ -1597,6 +1646,7 @@ export default function MeetingRoomExperience({
     canManageParticipants,
     connectionStrategy.mobileListener,
     connectionStrategy.preferRelayTransport,
+    connectionStrategy.relayFallbackEligible,
     connectionStrategy.conservativeReceiveProfile,
     enforceRemotePublicationQuality,
     mediaProfile.cameraCaptureHeight,
@@ -1609,6 +1659,7 @@ export default function MeetingRoomExperience({
     clearPendingRejoinTimer,
     premiumProfileEnabled,
     reconnectPolicy,
+    reportConnectionEvent,
     scheduleMeetingReconnectAttempt,
     startRoomAudio,
     syncLocalControls,

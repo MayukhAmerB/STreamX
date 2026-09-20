@@ -26,6 +26,10 @@ if ! git -C "$REPO_ROOT" diff --quiet --ignore-submodules -- || \
   exit 1
 fi
 
+log "Preparing the root-only LiveKit runtime configuration."
+HOSTINGER_ENV_FILE="${HOSTINGER_ENV_FILE:-$REPO_ROOT/backend/.env.hostinger.production}" \
+  bash "$SCRIPT_DIR/prepare-livekit-config.sh"
+
 log "Running migration safety gate."
 "$SCRIPT_DIR/check-migration-safety.sh" "$BASE_REF"
 

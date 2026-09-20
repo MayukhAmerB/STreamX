@@ -128,6 +128,7 @@ ensure_redis_url() {
 ensure_redis_url
 apply_phase_runtime_profile
 apply_phase_resource_profile
+HOSTINGER_ENV_FILE="$ENV_FILE" bash "$SCRIPT_DIR/prepare-livekit-config.sh"
 
 resolve_async_worker_replicas() {
   local replicas_raw

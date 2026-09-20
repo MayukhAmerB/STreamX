@@ -1,4 +1,5 @@
 port: 7880
+prometheus_port: 6789
 bind_addresses:
   - "0.0.0.0"
 
@@ -21,8 +22,5 @@ turn:
 redis:
   address: redis:6379
 
-# IMPORTANT:
-# Keep these values in sync with backend/.env.hostinger.production:
-# LIVEKIT_API_KEY and LIVEKIT_API_SECRET.
-keys:
-  lk_4QBORTR5B1Y0F190FLPB: ITxAoIvZl8qKW00zrAZs2kJ7YYG3Jn0QdJrNs2mzSQj6kgFn
+# API credentials are appended to a root-only runtime copy by
+# infra/hostinger/prepare-livekit-config.sh. Never commit them here.

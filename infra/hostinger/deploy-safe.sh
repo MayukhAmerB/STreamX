@@ -16,6 +16,8 @@ log() {
   printf '[hostinger-deploy] %s\n' "$*"
 }
 
+HOSTINGER_ENV_FILE="$ENV_FILE" bash "$SCRIPT_DIR/prepare-livekit-config.sh"
+
 wait_for_backend_health() {
   local attempts=0
   local backend_container

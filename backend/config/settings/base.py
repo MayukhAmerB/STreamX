@@ -231,6 +231,7 @@ REST_FRAMEWORK = {
         "lecture_playback": "120/minute",
         "realtime_session_create": "30/hour",
         "realtime_session_join": "240/hour",
+        "realtime_connection_telemetry": "600/hour",
     },
 }
 

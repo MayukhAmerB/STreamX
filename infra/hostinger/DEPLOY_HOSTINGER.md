@@ -42,10 +42,8 @@ Important:
 - The cases subdomain is a standalone service. The main `alsyedinitiative.com` frontend does not link to it.
 - The OSINT CTF lab is a standalone service at `labs.alsyedinitiative.com`. Its answer validation runs inside the labs container; the solutions guide and repository setup sources are not copied into the public image.
 - `CASE_CONTROL_USERNAME` and `CASE_CONTROL_PASSWORD` protect `https://cases.alsyedinitiative.com/case-control/`. Set them to the same username/password you use for your normal admin panel if you want matching credentials; without `CASE_CONTROL_PASSWORD`, Case Control is intentionally disabled.
-- Keep LiveKit keys in sync in all three files:
-  - `backend/.env.hostinger.production`
-  - `infra/hostinger/livekit.yaml`
-  - `infra/hostinger/egress.yaml`
+- Store LiveKit credentials only in `backend/.env.hostinger.production`. Deployment renders restricted runtime files at `LIVEKIT_RUNTIME_CONFIG_PATH` and `LIVEKIT_EGRESS_RUNTIME_CONFIG_PATH`; the tracked LiveKit and egress YAML files must remain credential-free.
+- If a LiveKit credential has ever been committed or exposed, rotate it before deployment. The release guard rejects the known historical credential pair.
 - By default the LiveKit TURN cert mounts expect `/etc/letsencrypt/live/alsyedinitiative.com/fullchain.pem` and `/etc/letsencrypt/live/alsyedinitiative.com/privkey.pem`. If Certbot created a different lineage such as `alsyedinitiative.com-0001`, set `LIVEKIT_TURN_CERT_PATH` and `LIVEKIT_TURN_KEY_PATH` in `backend/.env.hostinger.production` before deploying.
 
 ## 4) Build and start stack

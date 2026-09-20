@@ -83,6 +83,8 @@ Safe behavior:
 - installs Cloudflare real-IP restore for host nginx
 - installs a daily timer to refresh trusted Cloudflare proxy ranges
 - creates custom jails under `/etc/fail2ban/jail.d/streamx.local`
+- limits Nginx denylist enforcement to login and password-reset routes, so a
+  shared classroom or carrier NAT address cannot lose course or live-class access
 
 Useful commands:
 

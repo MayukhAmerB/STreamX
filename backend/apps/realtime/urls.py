@@ -6,6 +6,7 @@ from .views import (
     RealtimeOwncastStreamBridgeView,
     RealtimeSessionBrowserRecordingUploadView,
     RealtimeSessionBroadcastPlaybackIssueView,
+    RealtimeSessionConnectionEventView,
     RealtimeSessionDetailView,
     RealtimeSessionEndView,
     RealtimeSessionHostTokenView,
@@ -30,6 +31,11 @@ urlpatterns = [
     path("sessions/", RealtimeSessionListCreateView.as_view(), name="realtime-session-list-create"),
     path("sessions/<int:pk>/", RealtimeSessionDetailView.as_view(), name="realtime-session-detail"),
     path("sessions/<int:pk>/join/", RealtimeSessionJoinView.as_view(), name="realtime-session-join"),
+    path(
+        "sessions/<int:pk>/connection-events/",
+        RealtimeSessionConnectionEventView.as_view(),
+        name="realtime-session-connection-event",
+    ),
     path(
         "sessions/<int:pk>/broadcast-playback/issues/",
         RealtimeSessionBroadcastPlaybackIssueView.as_view(),

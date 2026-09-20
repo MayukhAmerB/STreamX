@@ -501,6 +501,70 @@ export interface paths {
         patch: operations["courses_partial_update_by_id"];
         trace?: never;
     };
+    "/courses/{id}/application-checkout/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["courses_application_checkout_create_by_id"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{id}/applications/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["courses_applications_create_by_id"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{id}/experience/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["courses_experience_retrieve_by_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{id}/reviews/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["courses_reviews_create_by_id"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/courses/{id}/thumbnail/": {
         parameters: {
             query?: never;
@@ -1094,6 +1158,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/realtime/sessions/{id}/connection-events/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Accept bounded client connection diagnostics for authorized attendees. */
+        post: operations["realtime_sessions_connection_events_create_by_id"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/realtime/sessions/{id}/end/": {
         parameters: {
             query?: never;
@@ -1322,12 +1403,45 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        RealtimeBroadcastPlaybackIssueRequest: {
-            reason: components["schemas"]["ReasonEnum"];
-            hls_error_type?: string;
-            http_status?: number;
-            retry_attempt?: number;
-        };
+        /**
+         * @description * `connecting` - connecting
+         *     * `connected` - connected
+         *     * `reconnecting` - reconnecting
+         *     * `reconnected` - reconnected
+         *     * `disconnected` - disconnected
+         *     * `connection_failed` - connection_failed
+         *     * `quality_changed` - quality_changed
+         *     * `relay_fallback` - relay_fallback
+         * @enum {string}
+         */
+        EventEnum: "connecting" | "connected" | "reconnecting" | "reconnected" | "disconnected" | "connection_failed" | "quality_changed" | "relay_fallback";
+        /**
+         * @description * `slow_2g` - slow_2g
+         *     * `2g` - 2g
+         *     * `3g` - 3g
+         *     * `4g` - 4g
+         *     * `wifi` - wifi
+         *     * `ethernet` - ethernet
+         *     * `unknown` - unknown
+         * @enum {string}
+         */
+        NetworkEnum: "slow_2g" | "2g" | "3g" | "4g" | "wifi" | "ethernet" | "unknown";
+        /**
+         * @description * `mobile` - mobile
+         *     * `desktop` - desktop
+         *     * `unknown` - unknown
+         * @enum {string}
+         */
+        PlatformEnum: "mobile" | "desktop" | "unknown";
+        /**
+         * @description * `excellent` - excellent
+         *     * `good` - good
+         *     * `poor` - poor
+         *     * `lost` - lost
+         *     * `unknown` - unknown
+         * @enum {string}
+         */
+        QualityEnum: "excellent" | "good" | "poor" | "lost" | "unknown";
         /**
          * @description * `network` - network
          *     * `authorization` - authorization
@@ -1336,7 +1450,59 @@ export interface components {
          *     * `unknown` - unknown
          * @enum {string}
          */
-        ReasonEnum: "network" | "authorization" | "upstream" | "media" | "unknown";
+        RealtimeBroadcastPlaybackIssueReasonEnum: "network" | "authorization" | "upstream" | "media" | "unknown";
+        RealtimeBroadcastPlaybackIssueRequest: {
+            reason: components["schemas"]["RealtimeBroadcastPlaybackIssueReasonEnum"];
+            hls_error_type?: string;
+            http_status?: number;
+            retry_attempt?: number;
+        };
+        /**
+         * @description * `none` - none
+         *     * `unknown` - unknown
+         *     * `client_initiated` - client_initiated
+         *     * `duplicate_identity` - duplicate_identity
+         *     * `server_shutdown` - server_shutdown
+         *     * `participant_removed` - participant_removed
+         *     * `room_deleted` - room_deleted
+         *     * `state_mismatch` - state_mismatch
+         *     * `join_failure` - join_failure
+         *     * `migration` - migration
+         *     * `signal_close` - signal_close
+         *     * `room_closed` - room_closed
+         *     * `user_unavailable` - user_unavailable
+         *     * `user_rejected` - user_rejected
+         *     * `sip_trunk_failure` - sip_trunk_failure
+         *     * `connection_timeout` - connection_timeout
+         *     * `media_failure` - media_failure
+         *     * `connect_error` - connect_error
+         * @enum {string}
+         */
+        RealtimeConnectionEventReasonEnum: "none" | "unknown" | "client_initiated" | "duplicate_identity" | "server_shutdown" | "participant_removed" | "room_deleted" | "state_mismatch" | "join_failure" | "migration" | "signal_close" | "room_closed" | "user_unavailable" | "user_rejected" | "sip_trunk_failure" | "connection_timeout" | "media_failure" | "connect_error";
+        RealtimeConnectionEventRequest: {
+            event: components["schemas"]["EventEnum"];
+            /** @default none */
+            reason: components["schemas"]["RealtimeConnectionEventReasonEnum"];
+            /** @default unknown */
+            transport: components["schemas"]["TransportEnum"];
+            /** @default unknown */
+            network: components["schemas"]["NetworkEnum"];
+            /** @default unknown */
+            platform: components["schemas"]["PlatformEnum"];
+            /** @default unknown */
+            quality: components["schemas"]["QualityEnum"];
+            /** @default 0 */
+            retry_attempt: number;
+            /** @default 0 */
+            elapsed_ms: number;
+        };
+        /**
+         * @description * `auto` - auto
+         *     * `relay` - relay
+         *     * `unknown` - unknown
+         * @enum {string}
+         */
+        TransportEnum: "auto" | "relay" | "unknown";
     };
     responses: never;
     parameters: never;
@@ -2367,6 +2533,134 @@ export interface operations {
         };
     };
     courses_partial_update_by_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+                "application/x-www-form-urlencoded": {
+                    [key: string]: unknown;
+                };
+                "multipart/form-data": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    courses_application_checkout_create_by_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+                "application/x-www-form-urlencoded": {
+                    [key: string]: unknown;
+                };
+                "multipart/form-data": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    courses_applications_create_by_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+                "application/x-www-form-urlencoded": {
+                    [key: string]: unknown;
+                };
+                "multipart/form-data": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    courses_experience_retrieve_by_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    courses_reviews_create_by_id: {
         parameters: {
             query?: never;
             header?: never;
@@ -3650,6 +3944,32 @@ export interface operations {
                         [key: string]: unknown;
                     };
                 };
+            };
+        };
+    };
+    realtime_sessions_connection_events_create_by_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RealtimeConnectionEventRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["RealtimeConnectionEventRequest"];
+                "multipart/form-data": components["schemas"]["RealtimeConnectionEventRequest"];
+            };
+        };
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

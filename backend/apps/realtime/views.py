@@ -27,7 +27,11 @@ from drf_spectacular.utils import extend_schema
 from config.audit import log_security_event
 from config.authentication import CookieJWTAuthentication
 from config.client_ip import resolve_client_ip
-from config.metrics import record_realtime_join, record_realtime_recording_operation
+from config.metrics import (
+    record_realtime_connection_event,
+    record_realtime_join,
+    record_realtime_recording_operation,
+)
 from config.pagination import apply_optional_pagination
 from config.request_security import find_disallowed_query_params
 from config.response import api_response
@@ -43,6 +47,7 @@ from .models import OwncastChatIdentity, RealtimeConfiguration, RealtimeSession,
 from .serializers import (
     RealtimeOwncastChatModerationActionSerializer,
     RealtimeBroadcastPlaybackIssueSerializer,
+    RealtimeConnectionEventSerializer,
     RealtimeSessionBrowserRecordingUploadSerializer,
     RealtimeSessionCreateSerializer,
     RealtimeSessionJoinSerializer,
@@ -1043,6 +1048,56 @@ class RealtimeSessionBroadcastPlaybackIssueView(APIView):
                 "retry_attempt": payload.get("retry_attempt", 0),
             },
         )
+        return HttpResponse(status=status.HTTP_204_NO_CONTENT)
+
+
+class RealtimeSessionConnectionEventView(APIView):
+    """Accept bounded client connection diagnostics for authorized attendees."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "realtime_connection_telemetry"
+
+    @extend_schema(request=RealtimeConnectionEventSerializer, responses={204: None})
+    def post(self, request, pk):
+        session = get_object_or_404(RealtimeSession.objects.with_related(), pk=pk)
+        access_decision = get_access_decision(session, request.user)
+        if not access_decision.allowed:
+            return api_response(
+                success=False,
+                message=access_decision.message,
+                errors={"detail": access_decision.detail},
+                status_code=access_decision.status_code,
+            )
+
+        serializer = RealtimeConnectionEventSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+        record_realtime_connection_event(
+            event=payload["event"],
+            reason=payload["reason"],
+            transport=payload["transport"],
+            network=payload["network"],
+            platform=payload["platform"],
+            quality=payload["quality"],
+        )
+        if payload["event"] in {"disconnected", "connection_failed", "relay_fallback"}:
+            realtime_ops_logger.warning(
+                "REALTIME_CONNECTION_EVENT %s",
+                {
+                    "event": payload["event"],
+                    "request_id": getattr(request, "request_id", None),
+                    "session_id": session.id,
+                    "user_id": request.user.id,
+                    "reason": payload["reason"],
+                    "transport": payload["transport"],
+                    "network": payload["network"],
+                    "platform": payload["platform"],
+                    "quality": payload["quality"],
+                    "retry_attempt": payload["retry_attempt"],
+                    "elapsed_ms": payload["elapsed_ms"],
+                },
+            )
         return HttpResponse(status=status.HTTP_204_NO_CONTENT)
 
 

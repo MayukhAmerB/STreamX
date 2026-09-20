@@ -23,7 +23,9 @@ ufw allow 80/tcp
 ufw allow 443/tcp
 
 # LiveKit ports (meeting traffic)
-ufw allow 7880/tcp
+# LiveKit signaling is published only on 127.0.0.1:7880 and reached publicly
+# through the TLS-terminating Nginx virtual host.
+ufw delete allow 7880/tcp 2>/dev/null || true
 ufw allow 7881/tcp
 ufw allow "${LIVEKIT_UDP_PORT}/udp"
 ufw allow "${LIVEKIT_TURN_UDP_PORT}/udp"

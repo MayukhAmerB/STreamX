@@ -194,15 +194,17 @@ services:
         condition: service_healthy
     command: ["--config", "/etc/livekit.yaml"]
     volumes:
-      - ./infra/hostinger/livekit.yaml:/etc/livekit.yaml:ro
+      - ${LIVEKIT_RUNTIME_CONFIG_PATH:-/etc/streamx/livekit.yaml}:/etc/livekit.yaml:ro
       - ${LIVEKIT_TURN_CERT_PATH:-/etc/letsencrypt/live/alsyedinitiative.com/fullchain.pem}:/run/livekit-turn/fullchain.pem:ro
       - ${LIVEKIT_TURN_KEY_PATH:-/etc/letsencrypt/live/alsyedinitiative.com/privkey.pem}:/run/livekit-turn/privkey.pem:ro
     ports:
-      - "7880:7880/tcp"
+      - "127.0.0.1:7880:7880/tcp"
       - "7881:7881/tcp"
       - "${LIVEKIT_UDP_PORT:-7882}:${LIVEKIT_UDP_PORT:-7882}/udp"
       - "${LIVEKIT_TURN_UDP_PORT:-443}:${LIVEKIT_TURN_UDP_PORT:-443}/udp"
       - "${LIVEKIT_TURN_TLS_PORT:-5349}:${LIVEKIT_TURN_TLS_PORT:-5349}/tcp"
+    expose:
+      - "6789"
     healthcheck:
       test:
         [
@@ -228,7 +230,7 @@ services:
     environment:
       EGRESS_CONFIG_FILE: /out/egress.yaml
     volumes:
-      - ./infra/hostinger/egress.yaml:/out/egress.yaml:ro
+      - ${LIVEKIT_EGRESS_RUNTIME_CONFIG_PATH:-/etc/streamx/egress.yaml}:/out/egress.yaml:ro
       - recordings_data:/recordings
     healthcheck:
       test:

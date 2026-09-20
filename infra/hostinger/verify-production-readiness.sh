@@ -43,6 +43,47 @@ else
   fi
 fi
 
+livekit_runtime_config="$(grep '^LIVEKIT_RUNTIME_CONFIG_PATH=' "$ENV_FILE" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+livekit_runtime_config="${livekit_runtime_config%\"}"
+livekit_runtime_config="${livekit_runtime_config#\"}"
+livekit_runtime_config="${livekit_runtime_config%\'}"
+livekit_runtime_config="${livekit_runtime_config#\'}"
+livekit_runtime_config="${livekit_runtime_config:-/etc/streamx/livekit.yaml}"
+if [[ ! -f "$livekit_runtime_config" ]]; then
+  fail "LiveKit runtime configuration is missing: $livekit_runtime_config"
+else
+  livekit_config_mode="$(stat -c %a "$livekit_runtime_config" 2>/dev/null || printf 777)"
+  if (( (8#$livekit_config_mode & 077) != 0 )); then
+    fail "LiveKit runtime configuration permissions are too broad ($livekit_config_mode)."
+  elif ! grep -Eq '^[[:space:]]*keys:[[:space:]]*$' "$livekit_runtime_config" || \
+    ! grep -Eq '^[[:space:]]+"[A-Za-z0-9_-]{8,128}":[[:space:]]+"[A-Za-z0-9_-]{24,256}"[[:space:]]*$' "$livekit_runtime_config"; then
+    fail "LiveKit runtime configuration has no valid credential pair."
+  else
+    pass "LiveKit runtime configuration exists with restricted permissions."
+  fi
+fi
+
+egress_runtime_config="$(grep '^LIVEKIT_EGRESS_RUNTIME_CONFIG_PATH=' "$ENV_FILE" 2>/dev/null | tail -n1 | cut -d= -f2- || true)"
+egress_runtime_config="${egress_runtime_config%\"}"
+egress_runtime_config="${egress_runtime_config#\"}"
+egress_runtime_config="${egress_runtime_config%\'}"
+egress_runtime_config="${egress_runtime_config#\'}"
+egress_runtime_config="${egress_runtime_config:-/etc/streamx/egress.yaml}"
+if [[ ! -f "$egress_runtime_config" ]]; then
+  fail "LiveKit egress runtime configuration is missing: $egress_runtime_config"
+else
+  egress_config_mode="$(stat -c %a "$egress_runtime_config" 2>/dev/null || printf 777)"
+  egress_config_owner="$(stat -c %u:%g "$egress_runtime_config" 2>/dev/null || printf unknown)"
+  if [[ "$egress_config_mode" != "640" || "$egress_config_owner" != "0:0" ]]; then
+    fail "LiveKit egress runtime configuration must be mode 640 and owned by root:root (found: $egress_config_mode $egress_config_owner)."
+  elif ! grep -Eq '^[[:space:]]*api_key:[[:space:]]*"[A-Za-z0-9_-]{8,128}"[[:space:]]*$' "$egress_runtime_config" || \
+    ! grep -Eq '^[[:space:]]*api_secret:[[:space:]]*"[A-Za-z0-9_-]{24,256}"[[:space:]]*$' "$egress_runtime_config"; then
+    fail "LiveKit egress runtime configuration has no valid credential pair."
+  else
+    pass "LiveKit egress runtime configuration exists with restricted permissions."
+  fi
+fi
+
 current_commit="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
 if [[ -n "$EXPECTED_COMMIT" && "$current_commit" != "$EXPECTED_COMMIT" ]]; then
   fail "Current commit does not match RELEASE_COMMIT."
@@ -101,6 +142,20 @@ else
     fail "Pending database migrations detected."
   else
     pass "No pending database migrations detected."
+  fi
+fi
+
+livekit_id="$(compose ps -q livekit 2>/dev/null || true)"
+if [[ -z "$livekit_id" || "$(docker inspect -f '{{.State.Running}}' "$livekit_id" 2>/dev/null)" != "true" ]]; then
+  fail "LiveKit container is not running."
+else
+  livekit_binding="$(docker port "$livekit_id" 7880/tcp 2>/dev/null || true)"
+  if [[ "$livekit_binding" != "127.0.0.1:7880" ]]; then
+    fail "LiveKit signaling port is not restricted to 127.0.0.1:7880 (found: ${livekit_binding:-none})."
+  elif curl -fsS --max-time 5 http://127.0.0.1:7880/ >/dev/null; then
+    pass "LiveKit signaling is healthy and restricted to localhost."
+  else
+    fail "LiveKit signaling health check failed on localhost."
   fi
 fi
 

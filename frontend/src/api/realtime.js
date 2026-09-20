@@ -6,7 +6,10 @@ export const listRealtimeSessions = (params = {}) =>
 export const getRealtimeSession = (id) =>
   dedupedGet(`/realtime/sessions/${id}/`, {}, () => apiClient.get(`/realtime/sessions/${id}/`));
 export const createRealtimeSession = (payload) => apiClient.post("/realtime/sessions/", payload);
-export const joinRealtimeSession = (id, payload = {}) => apiClient.post(`/realtime/sessions/${id}/join/`, payload);
+export const joinRealtimeSession = (id, payload = {}) =>
+  apiClient.post(`/realtime/sessions/${id}/join/`, payload, { timeout: 20000 });
+export const reportRealtimeConnectionEvent = (id, payload) =>
+  apiClient.post(`/realtime/sessions/${id}/connection-events/`, payload, { timeout: 5000 });
 export const createRealtimeOwncastStreamLaunch = (id) =>
   apiClient.post(`/realtime/sessions/${id}/broadcast-stream/launch/`);
 export const reportRealtimeBroadcastPlaybackIssue = (id, payload) =>

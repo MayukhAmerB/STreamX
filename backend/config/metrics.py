@@ -71,6 +71,11 @@ if _PROMETHEUS_AVAILABLE:
         "Realtime join attempts by result/mode.",
         labelnames=("result", "mode", "reason"),
     )
+    REALTIME_CONNECTION_EVENT_TOTAL = Counter(
+        "streamx_realtime_connection_events_total",
+        "Bounded client-side LiveKit connection lifecycle events.",
+        labelnames=("event", "reason", "transport", "network", "platform", "quality"),
+    )
     REALTIME_RECORDING_OP_TOTAL = Counter(
         "streamx_realtime_recording_operations_total",
         "Realtime recording operations by action/result.",
@@ -85,6 +90,7 @@ else:
     HTTP_REQUEST_TOTAL = None
     HTTP_REQUEST_LATENCY_SECONDS = None
     REALTIME_JOIN_TOTAL = None
+    REALTIME_CONNECTION_EVENT_TOTAL = None
     REALTIME_RECORDING_OP_TOTAL = None
     ASYNC_JOB_TOTAL = None
 
@@ -107,6 +113,19 @@ def record_realtime_join(*, result, mode, reason):
         result=_sanitize_label(result, fallback="unknown"),
         mode=_sanitize_label(mode, fallback="unknown"),
         reason=_sanitize_label(reason, fallback="unknown"),
+    ).inc()
+
+
+def record_realtime_connection_event(*, event, reason, transport, network, platform, quality):
+    if not _metrics_enabled():
+        return
+    REALTIME_CONNECTION_EVENT_TOTAL.labels(
+        event=_sanitize_label(event, fallback="unknown"),
+        reason=_sanitize_label(reason, fallback="unknown"),
+        transport=_sanitize_label(transport, fallback="unknown"),
+        network=_sanitize_label(network, fallback="unknown"),
+        platform=_sanitize_label(platform, fallback="unknown"),
+        quality=_sanitize_label(quality, fallback="unknown"),
     ).inc()
 
 

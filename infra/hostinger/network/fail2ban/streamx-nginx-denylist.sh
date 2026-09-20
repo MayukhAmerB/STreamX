@@ -7,6 +7,7 @@ NGINX_FAIL2BAN_GEO_CONF="${NGINX_FAIL2BAN_GEO_CONF:-/etc/nginx/conf.d/12-streamx
 NGINX_FAIL2BAN_SNIPPET="${NGINX_FAIL2BAN_SNIPPET:-/etc/nginx/snippets/streamx_fail2ban_block.conf}"
 NGINX_FAIL2BAN_BACKUP_DIR="${NGINX_FAIL2BAN_BACKUP_DIR:-$NGINX_FAIL2BAN_DIR/backups}"
 NGINX_SITE_FILE="${NGINX_SITE_FILE:-/etc/nginx/sites-enabled/alsyedinitiative.conf}"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 log() {
   printf '[streamx-nginx-denylist] %s\n' "$*"
@@ -37,7 +38,7 @@ discover_site_file() {
 
 validate_ip() {
   local candidate="$1"
-  python3 - "$candidate" <<'PY'
+  "$PYTHON_BIN" - "$candidate" <<'PY'
 import ipaddress
 import sys
 
@@ -46,7 +47,11 @@ PY
 }
 
 write_static_nginx_files() {
-  install -d "$NGINX_FAIL2BAN_DIR" "$NGINX_FAIL2BAN_BACKUP_DIR" /etc/nginx/conf.d /etc/nginx/snippets
+  install -d \
+    "$NGINX_FAIL2BAN_DIR" \
+    "$NGINX_FAIL2BAN_BACKUP_DIR" \
+    "$(dirname -- "$NGINX_FAIL2BAN_GEO_CONF")" \
+    "$(dirname -- "$NGINX_FAIL2BAN_SNIPPET")"
   if [[ ! -f "$NGINX_FAIL2BAN_LIST" ]]; then
     install -m 0644 /dev/null "$NGINX_FAIL2BAN_LIST"
   fi
@@ -55,10 +60,18 @@ geo \$streamx_fail2ban_banned {
     default 0;
     include $NGINX_FAIL2BAN_LIST;
 }
+
+# Keep shared classroom, office, and carrier NAT addresses able to load the
+# site and reconnect to a class. A ban applies only to sensitive auth routes.
+map "\$streamx_fail2ban_banned:\$uri" \$streamx_fail2ban_block_auth_request {
+    default 0;
+    ~^1:/api/auth/(login|password-reset|password-reset-confirm)/?\$ 1;
+    ~^1:/admin/login/?\$ 1;
+}
 EOF
   cat >"$NGINX_FAIL2BAN_SNIPPET" <<'EOF'
-if ($streamx_fail2ban_banned) {
-    return 403;
+if ($streamx_fail2ban_block_auth_request) {
+    return 429;
 }
 EOF
 }
@@ -66,7 +79,7 @@ EOF
 patch_site_file() {
   local site_file="$1"
 
-  python3 - "$site_file" <<'PY'
+  "$PYTHON_BIN" - "$site_file" <<'PY'
 from pathlib import Path
 import sys
 
@@ -160,7 +173,7 @@ ensure() {
   require_cmd install
   require_cmd nginx
   require_cmd systemctl
-  require_cmd python3
+  require_cmd "$PYTHON_BIN"
 
   local site_file
   site_file="$(discover_site_file)" || {
@@ -215,7 +228,7 @@ unban_ip() {
 
   local backup_file="${NGINX_FAIL2BAN_LIST}.bak.$(date +%F-%H%M%S)"
   cp "$NGINX_FAIL2BAN_LIST" "$backup_file"
-  python3 - "$NGINX_FAIL2BAN_LIST" "$ip" <<'PY'
+  "$PYTHON_BIN" - "$NGINX_FAIL2BAN_LIST" "$ip" <<'PY'
 from pathlib import Path
 import sys
 

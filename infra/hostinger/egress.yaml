@@ -1,6 +1,7 @@
-api_key: lk_4QBORTR5B1Y0F190FLPB
-api_secret: ITxAoIvZl8qKW00zrAZs2kJ7YYG3Jn0QdJrNs2mzSQj6kgFn
 ws_url: ws://127.0.0.1:7880
+
+# API credentials are appended to a restricted runtime copy by
+# infra/hostinger/prepare-livekit-config.sh. Never commit them here.
 
 redis:
   address: redis:6379

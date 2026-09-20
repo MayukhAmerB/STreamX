@@ -38,6 +38,33 @@ groups:
           summary: "Realtime join failures are spiking"
           description: "More than 10 join failures observed over 10 minutes."
 
+      - alert: StreamXLiveKitDown
+        expr: up{job="livekit"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "StreamX LiveKit is down"
+          description: "Prometheus cannot scrape the LiveKit media server for 2 minutes."
+
+      - alert: StreamXRealtimeDisconnectsSpiking
+        expr: sum(increase(streamx_realtime_connection_events_total{event="disconnected",reason!~"client_initiated|participant_removed|room_deleted|room_closed"}[10m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Realtime client disconnects are spiking"
+          description: "More than 10 unexpected LiveKit disconnects were reported over 10 minutes."
+
+      - alert: StreamXRealtimeConnectionFailuresSpiking
+        expr: sum(increase(streamx_realtime_connection_events_total{event="connection_failed"}[10m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Realtime client connection failures are spiking"
+          description: "More than 10 LiveKit connection failures were reported over 10 minutes."
+
       - alert: StreamXRecordingFailuresSpiking
         expr: sum(increase(streamx_realtime_recording_operations_total{result="failure"}[10m])) > 5
         for: 5m

@@ -2201,6 +2201,36 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /realtime/sessions/{id}/connection-events/:
+    post:
+      operationId: realtime_sessions_connection_events_create_by_id
+      description: Accept bounded client connection diagnostics for authorized attendees.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - realtime
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RealtimeConnectionEventRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RealtimeConnectionEventRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RealtimeConnectionEventRequest'
+        required: true
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '204':
+          description: No response body
   /realtime/sessions/{id}/end/:
     post:
       operationId: realtime_sessions_end_create_by_id
@@ -2713,11 +2743,87 @@ paths:
           description: No response body
 components:
   schemas:
+    EventEnum:
+      enum:
+      - connecting
+      - connected
+      - reconnecting
+      - reconnected
+      - disconnected
+      - connection_failed
+      - quality_changed
+      - relay_fallback
+      type: string
+      description: |-
+        * `connecting` - connecting
+        * `connected` - connected
+        * `reconnecting` - reconnecting
+        * `reconnected` - reconnected
+        * `disconnected` - disconnected
+        * `connection_failed` - connection_failed
+        * `quality_changed` - quality_changed
+        * `relay_fallback` - relay_fallback
+    NetworkEnum:
+      enum:
+      - slow_2g
+      - 2g
+      - 3g
+      - 4g
+      - wifi
+      - ethernet
+      - unknown
+      type: string
+      description: |-
+        * `slow_2g` - slow_2g
+        * `2g` - 2g
+        * `3g` - 3g
+        * `4g` - 4g
+        * `wifi` - wifi
+        * `ethernet` - ethernet
+        * `unknown` - unknown
+    PlatformEnum:
+      enum:
+      - mobile
+      - desktop
+      - unknown
+      type: string
+      description: |-
+        * `mobile` - mobile
+        * `desktop` - desktop
+        * `unknown` - unknown
+    QualityEnum:
+      enum:
+      - excellent
+      - good
+      - poor
+      - lost
+      - unknown
+      type: string
+      description: |-
+        * `excellent` - excellent
+        * `good` - good
+        * `poor` - poor
+        * `lost` - lost
+        * `unknown` - unknown
+    RealtimeBroadcastPlaybackIssueReasonEnum:
+      enum:
+      - network
+      - authorization
+      - upstream
+      - media
+      - unknown
+      type: string
+      description: |-
+        * `network` - network
+        * `authorization` - authorization
+        * `upstream` - upstream
+        * `media` - media
+        * `unknown` - unknown
     RealtimeBroadcastPlaybackIssueRequest:
       type: object
       properties:
         reason:
-          $ref: '#/components/schemas/ReasonEnum'
+          $ref: '#/components/schemas/RealtimeBroadcastPlaybackIssueReasonEnum'
         hls_error_type:
           type: string
           maxLength: 80
@@ -2731,19 +2837,92 @@ components:
           minimum: 0
       required:
       - reason
-    ReasonEnum:
+    RealtimeConnectionEventReasonEnum:
       enum:
-      - network
-      - authorization
-      - upstream
-      - media
+      - none
+      - unknown
+      - client_initiated
+      - duplicate_identity
+      - server_shutdown
+      - participant_removed
+      - room_deleted
+      - state_mismatch
+      - join_failure
+      - migration
+      - signal_close
+      - room_closed
+      - user_unavailable
+      - user_rejected
+      - sip_trunk_failure
+      - connection_timeout
+      - media_failure
+      - connect_error
+      type: string
+      description: |-
+        * `none` - none
+        * `unknown` - unknown
+        * `client_initiated` - client_initiated
+        * `duplicate_identity` - duplicate_identity
+        * `server_shutdown` - server_shutdown
+        * `participant_removed` - participant_removed
+        * `room_deleted` - room_deleted
+        * `state_mismatch` - state_mismatch
+        * `join_failure` - join_failure
+        * `migration` - migration
+        * `signal_close` - signal_close
+        * `room_closed` - room_closed
+        * `user_unavailable` - user_unavailable
+        * `user_rejected` - user_rejected
+        * `sip_trunk_failure` - sip_trunk_failure
+        * `connection_timeout` - connection_timeout
+        * `media_failure` - media_failure
+        * `connect_error` - connect_error
+    RealtimeConnectionEventRequest:
+      type: object
+      properties:
+        event:
+          $ref: '#/components/schemas/EventEnum'
+        reason:
+          allOf:
+          - $ref: '#/components/schemas/RealtimeConnectionEventReasonEnum'
+          default: none
+        transport:
+          allOf:
+          - $ref: '#/components/schemas/TransportEnum'
+          default: unknown
+        network:
+          allOf:
+          - $ref: '#/components/schemas/NetworkEnum'
+          default: unknown
+        platform:
+          allOf:
+          - $ref: '#/components/schemas/PlatformEnum'
+          default: unknown
+        quality:
+          allOf:
+          - $ref: '#/components/schemas/QualityEnum'
+          default: unknown
+        retry_attempt:
+          type: integer
+          maximum: 20
+          minimum: 0
+          default: 0
+        elapsed_ms:
+          type: integer
+          maximum: 86400000
+          minimum: 0
+          default: 0
+      required:
+      - event
+    TransportEnum:
+      enum:
+      - auto
+      - relay
       - unknown
       type: string
       description: |-
-        * `network` - network
-        * `authorization` - authorization
-        * `upstream` - upstream
-        * `media` - media
+        * `auto` - auto
+        * `relay` - relay
         * `unknown` - unknown
   securitySchemes:
     bearerJWT:

@@ -389,6 +389,57 @@ class RealtimeBroadcastPlaybackIssueSerializer(serializers.Serializer):
     retry_attempt = serializers.IntegerField(required=False, min_value=0, max_value=100)
 
 
+class RealtimeConnectionEventSerializer(serializers.Serializer):
+    event = serializers.ChoiceField(
+        choices=(
+            "connecting",
+            "connected",
+            "reconnecting",
+            "reconnected",
+            "disconnected",
+            "connection_failed",
+            "quality_changed",
+            "relay_fallback",
+        )
+    )
+    reason = serializers.ChoiceField(
+        choices=(
+            "none",
+            "unknown",
+            "client_initiated",
+            "duplicate_identity",
+            "server_shutdown",
+            "participant_removed",
+            "room_deleted",
+            "state_mismatch",
+            "join_failure",
+            "migration",
+            "signal_close",
+            "room_closed",
+            "user_unavailable",
+            "user_rejected",
+            "sip_trunk_failure",
+            "connection_timeout",
+            "media_failure",
+            "connect_error",
+        ),
+        required=False,
+        default="none",
+    )
+    transport = serializers.ChoiceField(choices=("auto", "relay", "unknown"), default="unknown")
+    network = serializers.ChoiceField(
+        choices=("slow_2g", "2g", "3g", "4g", "wifi", "ethernet", "unknown"),
+        default="unknown",
+    )
+    platform = serializers.ChoiceField(choices=("mobile", "desktop", "unknown"), default="unknown")
+    quality = serializers.ChoiceField(
+        choices=("excellent", "good", "poor", "lost", "unknown"),
+        default="unknown",
+    )
+    retry_attempt = serializers.IntegerField(required=False, min_value=0, max_value=20, default=0)
+    elapsed_ms = serializers.IntegerField(required=False, min_value=0, max_value=86400000, default=0)
+
+
 class RealtimePresenterPermissionSerializer(serializers.Serializer):
     user_id = serializers.IntegerField(min_value=1)
 
