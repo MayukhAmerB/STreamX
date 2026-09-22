@@ -58,7 +58,7 @@ export default function CourseReviews({ courseId, experience, refresh }) {
   const reviews = [...experience.reviews, ...extra];
 
   return (
-    <section className="panel course-reviews-panel" id="reviews">
+    <section className="panel course-reviews-panel" id="reviews" tabIndex={-1}>
       <div className="detail-section-heading">
         <span className="detail-section-number" aria-hidden="true">
           05

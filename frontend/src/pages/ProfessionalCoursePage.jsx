@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 
 import apiClient from "../api/client";
 import { getCourse } from "../api/courses";
@@ -68,6 +68,21 @@ export function getCourseDetailArtwork(course) {
   return category.heroImage;
 }
 
+export function scrollToCourseHash(hash, documentRef = document) {
+  let targetId = "";
+  try {
+    targetId = decodeURIComponent(String(hash || "").replace(/^#/, ""));
+  } catch {
+    return false;
+  }
+  if (!targetId) return false;
+  const target = documentRef.getElementById(targetId);
+  if (!target) return false;
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+  target.focus?.({ preventScroll: true });
+  return true;
+}
+
 function SectionHeading({ number, eyebrow, title, description }) {
   return (
     <div className="detail-section-heading">
@@ -99,6 +114,7 @@ function CourseArtwork({ course, category, showImage }) {
 
 export default function ProfessionalCoursePage() {
   const { id } = useParams();
+  const { hash } = useLocation();
   const { isAuthenticated } = useAuth();
   const [course, setCourse] = useState(null);
   const [experience, setExperience] = useState(null);
@@ -130,6 +146,12 @@ export default function ProfessionalCoursePage() {
       active = false;
     };
   }, [id, isAuthenticated]);
+
+  useEffect(() => {
+    if (!course || !experience || !hash) return undefined;
+    const frame = window.requestAnimationFrame(() => scrollToCourseHash(hash));
+    return () => window.cancelAnimationFrame(frame);
+  }, [course, experience, hash]);
 
   if (error) {
     return (

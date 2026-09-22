@@ -9,13 +9,20 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
 
-from .access import user_has_course_access
 from .models import Course, CourseReview, Enrollment, PentestingApplication
-from .review_queries import confirmed_reviews_for_course
+from .review_queries import (
+    active_review_course_for_user,
+    confirmed_reviews_for_course,
+    student_review_for_course_track,
+)
 
 
 def confirmed_reviews(course):
     return confirmed_reviews_for_course(course)
+
+
+def review_author_name(review):
+    return str(getattr(review.student, "full_name", "") or "").strip() or "Verified student"
 
 
 def course_statistics(course):
@@ -60,17 +67,15 @@ class CourseExperienceView(APIView):
         own = None
         eligible = False
         if request.user.is_authenticated:
-            eligible = user_has_course_access(request.user, course.pk)
-            own = (
-                CourseReview.objects.filter(course=course, student=request.user)
-                .values(
-                    "rating",
-                    "text",
-                    "status",
-                    "edit_allowed",
-                )
-                .first()
-            )
+            eligible = active_review_course_for_user(request.user, course) is not None
+            review = student_review_for_course_track(request.user, course)
+            if review:
+                own = {
+                    "rating": review.rating,
+                    "text": review.text,
+                    "status": review.status,
+                    "edit_allowed": review.edit_allowed,
+                }
         public_curriculum = course.public_curriculum or []
         if public_curriculum:
             modules = [
@@ -114,7 +119,7 @@ class CourseExperienceView(APIView):
                 {
                     "rating": review.rating,
                     "text": review.text,
-                    "author": "Verified student",
+                    "author": review_author_name(review),
                     "verified": True,
                     "date": review.created_at,
                 }
@@ -135,15 +140,20 @@ class CourseReviewView(APIView):
 
     def post(self, request, pk):
         course = get_object_or_404(Course, pk=pk, is_published=True)
-        if not user_has_course_access(request.user, course.pk):
-            raise PermissionDenied("Only students with active access to this course may review it.")
         serializer = ReviewInput(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
             with transaction.atomic():
-                review = CourseReview.objects.select_for_update().filter(course=course, student=request.user).first()
+                review_course = active_review_course_for_user(request.user, course, for_update=True)
+                if not review_course:
+                    raise PermissionDenied(
+                        "Only students with active access to this training track may review it."
+                    )
+                review = student_review_for_course_track(request.user, course, for_update=True)
                 if review and not review.edit_allowed:
-                    raise ValidationError("You have already reviewed this course. Contact support to request an edit.")
+                    raise ValidationError(
+                        "You have already reviewed this training track. Contact support to request an edit."
+                    )
                 if review:
                     review.rating = serializer.validated_data["rating"]
                     review.text = serializer.validated_data["text"]
@@ -152,7 +162,7 @@ class CourseReviewView(APIView):
                     review.save()
                 else:
                     CourseReview.objects.create(
-                        course=course,
+                        course=review_course,
                         student=request.user,
                         status=CourseReview.STATUS_APPROVED,
                         **serializer.validated_data,

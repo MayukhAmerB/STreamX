@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   formatCourseStartDate,
   getCourseCatalogPath,
   getCourseDetailArtwork,
   getCourseDetailPriceLabel,
+  scrollToCourseHash,
   shouldShowCoursePrice,
 } from "./ProfessionalCoursePage";
 
@@ -57,5 +58,25 @@ describe("getCourseDetailPriceLabel", () => {
         thumbnail: "https://example.com/admin-course.jpg",
       })
     ).toBe("https://example.com/admin-course.jpg");
+  });
+
+  it("scrolls and focuses a requested course section after async content is available", () => {
+    const target = {
+      scrollIntoView: vi.fn(),
+      focus: vi.fn(),
+    };
+    const documentRef = {
+      getElementById: vi.fn(() => target),
+    };
+
+    expect(scrollToCourseHash("#reviews", documentRef)).toBe(true);
+    expect(documentRef.getElementById).toHaveBeenCalledWith("reviews");
+    expect(target.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    expect(target.focus).toHaveBeenCalledWith({ preventScroll: true });
+  });
+
+  it("does not scroll when the requested section is unavailable", () => {
+    expect(scrollToCourseHash("#reviews", { getElementById: () => null })).toBe(false);
+    expect(scrollToCourseHash("#%E0%A4%A", { getElementById: () => null })).toBe(false);
   });
 });

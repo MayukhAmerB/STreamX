@@ -163,7 +163,7 @@ class CourseExperienceTests(APITestCase):
         self.assertEqual(data["average_rating"], 5)
         self.assertEqual(data["review_count"], 1)
         self.assertNotIn(self.student.email, str(data))
-        self.assertNotIn(self.student.full_name, str(data))
+        self.assertEqual(data["reviews"][0]["author"], self.student.full_name)
         self.assertEqual(set(data["reviews"][0]), {"rating", "text", "author", "verified", "date"})
         review.edit_allowed = True
         review.save()
@@ -203,6 +203,7 @@ class CourseExperienceTests(APITestCase):
         pentesting_student = User.objects.create_user(
             email="pentesting-reviewer@example.com",
             password="Strong-test-123!",
+            full_name="Pentesting Student",
         )
         Enrollment.objects.create(
             course=self.pentesting,
@@ -240,10 +241,12 @@ class CourseExperienceTests(APITestCase):
         for data in (current_osint_data, future_osint_data):
             self.assertEqual(data["average_rating"], 5)
             self.assertEqual(data["review_count"], 1)
+            self.assertEqual(data["reviews"][0]["author"], self.student.full_name)
             self.assertEqual(data["reviews"][0]["text"], "A verified OSINT review shared with future batches.")
         for data in (current_pentesting_data, future_pentesting_data):
             self.assertEqual(data["average_rating"], 4)
             self.assertEqual(data["review_count"], 1)
+            self.assertEqual(data["reviews"][0]["author"], pentesting_student.full_name)
             self.assertEqual(
                 data["reviews"][0]["text"],
                 "A verified Pentesting review shared with future batches.",
@@ -257,6 +260,45 @@ class CourseExperienceTests(APITestCase):
         for course in (self.pentesting, future_pentesting):
             self.assertEqual(catalog[course.pk]["average_rating"], 4.0)
             self.assertEqual(catalog[course.pk]["review_count"], 1)
+
+    def test_student_can_review_training_track_from_another_batch_page(self):
+        future_osint = Course.objects.create(
+            title="OSINT Batch V",
+            description="Future investigations batch",
+            price=4000,
+            category=Course.CATEGORY_OSINT,
+            is_published=True,
+        )
+        Enrollment.objects.create(
+            course=self.course,
+            user=self.student,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        self.client.force_authenticate(self.student)
+
+        experience = self.experience(future_osint).data["data"]
+        self.assertTrue(experience["can_review"])
+        self.assertIsNone(experience["own_review"])
+
+        payload = {"rating": 5, "text": "Practical OSINT training across every batch."}
+        response = self.client.post(f"/api/courses/{future_osint.pk}/reviews/", payload)
+
+        self.assertEqual(response.status_code, 201)
+        review = CourseReview.objects.get(student=self.student)
+        self.assertEqual(review.course, self.course)
+        experience = self.experience(future_osint).data["data"]
+        self.assertEqual(experience["review_count"], 1)
+        self.assertEqual(experience["own_review"]["text"], payload["text"])
+
+        self.assertEqual(
+            self.client.post(f"/api/courses/{self.course.pk}/reviews/", payload).status_code,
+            400,
+        )
+        self.assertFalse(self.experience(self.pentesting).data["data"]["can_review"])
+        self.assertEqual(
+            self.client.post(f"/api/courses/{self.pentesting.pk}/reviews/", payload).status_code,
+            403,
+        )
 
     def test_hidden_and_unconfirmed_reviews_excluded_and_page_validated(self):
         CourseReview.objects.create(
