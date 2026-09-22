@@ -173,6 +173,91 @@ class CourseExperienceTests(APITestCase):
         self.assertEqual(review.status, CourseReview.STATUS_APPROVED)
         self.assertFalse(review.edit_allowed)
 
+    def test_reviews_and_rating_metrics_are_shared_within_each_course_category(self):
+        future_osint = Course.objects.create(
+            title="OSINT Batch V",
+            description="Future investigations batch",
+            price=4000,
+            category=Course.CATEGORY_OSINT,
+            is_published=True,
+        )
+        future_pentesting = Course.objects.create(
+            title="Pentesting Batch II",
+            description="Future application security batch",
+            price=6000,
+            category=Course.CATEGORY_WEB_PENTESTING,
+            is_published=True,
+        )
+        Enrollment.objects.create(
+            course=self.course,
+            user=self.student,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        CourseReview.objects.create(
+            course=self.course,
+            student=self.student,
+            rating=5,
+            text="A verified OSINT review shared with future batches.",
+        )
+
+        pentesting_student = User.objects.create_user(
+            email="pentesting-reviewer@example.com",
+            password="Strong-test-123!",
+        )
+        Enrollment.objects.create(
+            course=self.pentesting,
+            user=pentesting_student,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        CourseReview.objects.create(
+            course=self.pentesting,
+            student=pentesting_student,
+            rating=4,
+            text="A verified Pentesting review shared with future batches.",
+        )
+
+        mismatched_student = User.objects.create_user(
+            email="mismatched-reviewer@example.com",
+            password="Strong-test-123!",
+        )
+        Enrollment.objects.create(
+            course=self.course,
+            user=mismatched_student,
+            payment_status=Enrollment.STATUS_PAID,
+        )
+        CourseReview.objects.create(
+            course=future_osint,
+            student=mismatched_student,
+            rating=1,
+            text="This review has no enrollment for its originating batch.",
+        )
+
+        current_osint_data = self.experience(self.course).data["data"]
+        future_osint_data = self.experience(future_osint).data["data"]
+        current_pentesting_data = self.experience(self.pentesting).data["data"]
+        future_pentesting_data = self.experience(future_pentesting).data["data"]
+
+        for data in (current_osint_data, future_osint_data):
+            self.assertEqual(data["average_rating"], 5)
+            self.assertEqual(data["review_count"], 1)
+            self.assertEqual(data["reviews"][0]["text"], "A verified OSINT review shared with future batches.")
+        for data in (current_pentesting_data, future_pentesting_data):
+            self.assertEqual(data["average_rating"], 4)
+            self.assertEqual(data["review_count"], 1)
+            self.assertEqual(
+                data["reviews"][0]["text"],
+                "A verified Pentesting review shared with future batches.",
+            )
+
+        response = self.client.get("/api/courses/")
+        catalog = {item["id"]: item for item in response.data["data"]}
+        for course in (self.course, future_osint):
+            self.assertEqual(catalog[course.pk]["average_rating"], 5.0)
+            self.assertEqual(catalog[course.pk]["review_count"], 1)
+        for course in (self.pentesting, future_pentesting):
+            self.assertEqual(catalog[course.pk]["average_rating"], 4.0)
+            self.assertEqual(catalog[course.pk]["review_count"], 1)
+
     def test_hidden_and_unconfirmed_reviews_excluded_and_page_validated(self):
         CourseReview.objects.create(
             course=self.course, student=self.student, rating=1, text="Unconfirmed", status="approved"

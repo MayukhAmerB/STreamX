@@ -67,7 +67,7 @@ export default function CourseReviews({ courseId, experience, refresh }) {
           <div className="eyebrow">Student perspectives</div>
           <h2>Verified course reviews</h2>
           <p className="detail-section-description">
-            Reviews are published instantly from students with access to this course. Administrators can remove inappropriate reviews.
+            Verified reviews are shared across every batch in this training track and published instantly. Administrators can remove inappropriate reviews.
           </p>
         </div>
       </div>

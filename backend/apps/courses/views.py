@@ -3,7 +3,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db.models import Avg, Count, F, Prefetch, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import FileResponse, HttpResponse, HttpResponseNotFound
 from django.shortcuts import redirect
 from rest_framework import generics, permissions, status
@@ -45,6 +45,7 @@ from .permissions import (
     IsInstructor,
     PublicReadInstructorWrite,
 )
+from .review_queries import annotate_shared_review_metrics
 from .serializers import (
     CourseEnrollSerializer,
     CourseDetailSerializer,
@@ -144,17 +145,11 @@ def _course_prefetch_queryset():
 
 
 def _with_course_catalog_metrics(queryset):
-    verified_review_filter = Q(
-        reviews__status="approved",
-        reviews__student__enrollments__payment_status=Enrollment.STATUS_PAID,
-        reviews__student__enrollments__course=F("pk"),
-    )
-    return queryset.annotate(
+    queryset = queryset.annotate(
         section_count=Count("sections", distinct=True),
         lecture_count=Count("sections__lectures", distinct=True),
-        average_rating=Avg("reviews__rating", filter=verified_review_filter),
-        review_count=Count("reviews", filter=verified_review_filter, distinct=True),
     )
+    return annotate_shared_review_metrics(queryset)
 
 
 def _get_lecture_access_context(lecture, user):

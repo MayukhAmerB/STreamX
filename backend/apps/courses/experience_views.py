@@ -11,22 +11,18 @@ from rest_framework.views import APIView
 
 from .access import user_has_course_access
 from .models import Course, CourseReview, Enrollment, PentestingApplication
+from .review_queries import confirmed_reviews_for_course
 
 
 def confirmed_reviews(course):
-    return CourseReview.objects.filter(
-        course=course,
-        status="approved",
-        student__enrollments__course=course,
-        student__enrollments__payment_status=Enrollment.STATUS_PAID,
-    )
+    return confirmed_reviews_for_course(course)
 
 
 def course_statistics(course):
     stats = confirmed_reviews(course).aggregate(average=Avg("rating"), count=Count("pk"))
     return {
         "enrolled_students": course.enrollments.filter(payment_status=Enrollment.STATUS_PAID).count(),
-        "count_scope": "Confirmed students across this course record's history",
+        "count_scope": "Confirmed students for this course; reviews shared across its training track",
         "average_rating": round(stats["average"], 1) if stats["average"] is not None else None,
         "review_count": stats["count"],
     }
