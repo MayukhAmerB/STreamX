@@ -1351,6 +1351,41 @@
 .course-detail-v2 .review + .review {
   margin-top: 12px;
 }
+.course-detail-v2 .review-meta {
+  align-items: center;
+  gap: 10px 14px;
+}
+.course-detail-v2 .detail-review-rating {
+  padding: 7px 10px;
+  border: 1px solid var(--detail-border);
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 800;
+}
+.course-detail-v2 .detail-review-identity,
+.course-detail-v2 .detail-review-date {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 112px;
+}
+.course-detail-v2 .detail-review-identity strong,
+.course-detail-v2 .detail-review-date time {
+  color: #e8e8e8;
+  font-size: 12px;
+  font-weight: 700;
+}
+.course-detail-v2 .detail-review-meta-label {
+  color: #707070;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+.course-detail-v2 .detail-review-date {
+  margin-left: auto;
+  text-align: right;
+}
 .course-detail-v2 .detail-verified-label {
   padding: 3px 7px;
   border: 1px solid var(--detail-border);
@@ -1602,6 +1637,13 @@
   }
   .course-detail-v2 .detail-learning-heading {
     padding: 18px;
+  }
+  .course-detail-v2 .detail-review-date {
+    width: 100%;
+    margin-left: 0;
+    padding-top: 10px;
+    border-top: 1px solid var(--detail-border);
+    text-align: left;
   }
   .course-detail-v2 .detail-learning-list li {
     padding: 17px 16px;

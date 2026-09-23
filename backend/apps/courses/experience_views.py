@@ -21,8 +21,8 @@ def confirmed_reviews(course):
     return confirmed_reviews_for_course(course)
 
 
-def review_author_name(review):
-    return str(getattr(review.student, "full_name", "") or "").strip() or "Verified student"
+def review_roll_number(review):
+    return f"AL-SYD-{review.student_id:05d}"
 
 
 def course_statistics(course):
@@ -119,7 +119,7 @@ class CourseExperienceView(APIView):
                 {
                     "rating": review.rating,
                     "text": review.text,
-                    "author": review_author_name(review),
+                    "author": review_roll_number(review),
                     "verified": True,
                     "date": review.created_at,
                 }

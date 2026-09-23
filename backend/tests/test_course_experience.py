@@ -163,7 +163,8 @@ class CourseExperienceTests(APITestCase):
         self.assertEqual(data["average_rating"], 5)
         self.assertEqual(data["review_count"], 1)
         self.assertNotIn(self.student.email, str(data))
-        self.assertEqual(data["reviews"][0]["author"], self.student.full_name)
+        self.assertEqual(data["reviews"][0]["author"], f"AL-SYD-{self.student.pk:05d}")
+        self.assertNotIn(self.student.full_name, str(data))
         self.assertEqual(set(data["reviews"][0]), {"rating", "text", "author", "verified", "date"})
         review.edit_allowed = True
         review.save()
@@ -241,12 +242,12 @@ class CourseExperienceTests(APITestCase):
         for data in (current_osint_data, future_osint_data):
             self.assertEqual(data["average_rating"], 5)
             self.assertEqual(data["review_count"], 1)
-            self.assertEqual(data["reviews"][0]["author"], self.student.full_name)
+            self.assertEqual(data["reviews"][0]["author"], f"AL-SYD-{self.student.pk:05d}")
             self.assertEqual(data["reviews"][0]["text"], "A verified OSINT review shared with future batches.")
         for data in (current_pentesting_data, future_pentesting_data):
             self.assertEqual(data["average_rating"], 4)
             self.assertEqual(data["review_count"], 1)
-            self.assertEqual(data["reviews"][0]["author"], pentesting_student.full_name)
+            self.assertEqual(data["reviews"][0]["author"], f"AL-SYD-{pentesting_student.pk:05d}")
             self.assertEqual(
                 data["reviews"][0]["text"],
                 "A verified Pentesting review shared with future batches.",

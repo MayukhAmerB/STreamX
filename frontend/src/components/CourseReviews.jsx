@@ -5,6 +5,17 @@ import apiClient from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
 
+export function formatReviewDate(value) {
+  if (!value) return "Date unavailable";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Date unavailable";
+  return parsed.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export default function CourseReviews({ courseId, experience, refresh }) {
   const { isAuthenticated } = useAuth();
   const location = useLocation();
@@ -93,7 +104,7 @@ export default function CourseReviews({ courseId, experience, refresh }) {
           Sign in to write a review
         </Link>
       ) : !experience.can_review ? (
-        <p className="message">Reviewing is available to confirmed students of this course.</p>
+        <p className="message">Reviewing is available to confirmed students of this training track.</p>
       ) : own && !own.edit_allowed ? (
         <p className="message">
           {own.status === "approved"
@@ -129,7 +140,7 @@ export default function CourseReviews({ courseId, experience, refresh }) {
             />
           </label>
           <p className="muted">
-            Published as "Verified student". Avoid personal contact information in your review.
+            Published using your registered roll number. Avoid personal contact information in your review.
           </p>
           <button className="action" disabled={busy}>
             {busy ? "Publishing..." : "Publish review"}
@@ -147,12 +158,18 @@ export default function CourseReviews({ courseId, experience, refresh }) {
         {reviews.map((review, index) => (
           <article className="review" key={`${review.date}-${index}`}>
             <div className="review-meta">
-              <span aria-label={`${review.rating} out of 5 stars`}>
+              <span className="detail-review-rating" aria-label={`${review.rating} out of 5 stars`}>
                 {review.rating} / 5
               </span>
-              <span>{review.author}</span>
+              <span className="detail-review-identity">
+                <span className="detail-review-meta-label">Roll number</span>
+                <strong>{review.author}</strong>
+              </span>
               <span className="detail-verified-label">Verified</span>
-              <time dateTime={review.date}>{new Date(review.date).toLocaleDateString()}</time>
+              <span className="detail-review-date">
+                <span className="detail-review-meta-label">Posted</span>
+                <time dateTime={review.date}>{formatReviewDate(review.date)}</time>
+              </span>
             </div>
             <p style={{ whiteSpace: "pre-wrap" }}>{review.text}</p>
           </article>
