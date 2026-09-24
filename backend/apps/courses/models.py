@@ -311,6 +311,34 @@ class Course(models.Model):
         validate_no_active_content(self.snapshot_level, "snapshot_level")
         validate_no_active_content(self.snapshot_instructor, "snapshot_instructor")
 
+        for field in (
+            "card_title",
+            "card_subtitle",
+            "card_summary",
+            "image_alt",
+            "total_hours_label",
+            "batch_size_label",
+        ):
+            validate_no_active_content(getattr(self, field), field)
+        self.card_highlights = _sanitize_string_list(self.card_highlights)
+        for item in self.card_highlights:
+            validate_no_active_content(item, "card_highlights")
+        if any(
+            value is not None and value < 0
+            for value in (self.price, self.monthly_price, self.bundle_price)
+        ):
+            raise ValidationError("Course prices cannot be negative.")
+        if any(
+            value is None or value <= 0
+            for value in (
+                self.installments_required,
+                self.installment_access_days,
+                self.bundle_installments,
+                self.bundle_access_days,
+            )
+        ):
+            raise ValidationError("Installment counts and access days must be greater than zero.")
+
         self.what_you_will_learn = _sanitize_string_list(self.what_you_will_learn)
         self.expected_outcomes = _sanitize_string_list(self.expected_outcomes)
         self.course_card_features = sanitize_course_card_features(self.course_card_features)
@@ -454,15 +482,6 @@ class Section(models.Model):
     def clean(self):
         super().clean()
         validate_no_active_content(self.title, "title")
-        for field in ("card_title", "card_subtitle", "card_summary", "image_alt", "total_hours_label", "batch_size_label"):
-            validate_no_active_content(getattr(self, field), field)
-        self.card_highlights = _sanitize_string_list(self.card_highlights)
-        for item in self.card_highlights:
-            validate_no_active_content(item, "card_highlights")
-        if any(value < 0 for value in (self.price, self.monthly_price, self.bundle_price)):
-            raise ValidationError("Course prices cannot be negative.")
-        if not all((self.installments_required, self.installment_access_days, self.bundle_installments, self.bundle_access_days)):
-            raise ValidationError("Installment counts and access days must be greater than zero.")
         validate_no_active_content(self.description, "description")
         self.topics = _sanitize_string_list(self.topics)
         for topic in self.topics:

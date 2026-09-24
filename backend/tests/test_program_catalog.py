@@ -11,6 +11,7 @@ from apps.payments.order_service import create_payment_order
 from apps.payments.provisioning import provision_paid_payment
 from apps.users.models import User
 from django.apps import apps
+from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -19,6 +20,34 @@ from django.utils import timezone
 class ProgramCatalogTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(email="program-test@example.com", password="test-only-password")
+
+    def test_section_full_clean_only_validates_section_fields(self):
+        course = Course.objects.create(
+            title="OSINT",
+            description="Investigation training",
+            price=Decimal("3500.00"),
+        )
+        section = Section(
+            course=course,
+            title="Search intelligence",
+            description="Practical search workflows",
+            topics=[" Search operators ", "Evidence capture"],
+        )
+
+        section.full_clean()
+
+        self.assertEqual(section.topics, ["Search operators", "Evidence capture"])
+
+    def test_course_full_clean_rejects_invalid_card_and_pricing_values(self):
+        course = Course(
+            title="OSINT",
+            description="Investigation training",
+            card_title="<script>alert(1)</script>",
+            price=Decimal("-1.00"),
+        )
+
+        with self.assertRaises(ValidationError):
+            course.full_clean()
 
     def test_setup_preserves_existing_rows_and_admin_edits(self):
         original = Course.objects.create(title="Existing OSINT", description="Existing material", price=777)
