@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+    "/as-accounts/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["social_accounts_directory_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/2fa/disable/": {
         parameters: {
             query?: never;
@@ -1416,6 +1432,15 @@ export interface components {
          */
         EventEnum: "connecting" | "connected" | "reconnecting" | "reconnected" | "disconnected" | "connection_failed" | "quality_changed" | "relay_fallback";
         /**
+         * @description * `youtube` - YouTube
+         *     * `instagram` - Instagram
+         *     * `x` - X
+         *     * `facebook` - Facebook
+         *     * `link` - Generic link
+         * @enum {string}
+         */
+        IconKeyEnum: "youtube" | "instagram" | "x" | "facebook" | "link";
+        /**
          * @description * `slow_2g` - slow_2g
          *     * `2g` - 2g
          *     * `3g` - 3g
@@ -1496,6 +1521,31 @@ export interface components {
             /** @default 0 */
             elapsed_ms: number;
         };
+        SocialAccount: {
+            readonly id: number;
+            account_name: string;
+            handle?: string;
+            /** Format: uri */
+            url: string;
+            managed_by?: string;
+            description?: string;
+            status_label?: string;
+        };
+        SocialAccountCategory: {
+            readonly id: number;
+            name: string;
+            slug?: string;
+            description?: string;
+            icon_key?: components["schemas"]["IconKeyEnum"];
+            readonly account_count: number;
+            readonly accounts: components["schemas"]["SocialAccount"][];
+        };
+        SocialAccountDirectoryResponse: {
+            success: boolean;
+            message: string;
+            data: components["schemas"]["SocialAccountCategory"][];
+            errors: unknown;
+        };
         /**
          * @description * `auto` - auto
          *     * `relay` - relay
@@ -1512,6 +1562,25 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    social_accounts_directory_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialAccountDirectoryResponse"];
+                };
+            };
+        };
+    };
     auth_2fa_disable_create: {
         parameters: {
             query?: never;

@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "apps.payments",
     "apps.realtime",
     "apps.campaigns",
+    "apps.social_accounts.apps.SocialAccountsConfig",
     "apps.notifications.apps.NotificationsConfig",
 ]
 

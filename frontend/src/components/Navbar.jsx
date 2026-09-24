@@ -72,6 +72,11 @@ export default function Navbar() {
             About Us
           </NavLink>
           {!isOwlCognito ? (
+            <NavLink to="/as-accounts" className={navClass}>
+              AS-Accounts
+            </NavLink>
+          ) : null}
+          {!isOwlCognito ? (
             <NavLink to="/hall-of-fame" className={navClass}>
               Hall of Fame
             </NavLink>
@@ -237,6 +242,11 @@ export default function Navbar() {
             <NavLink to="/about" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
               About Us
             </NavLink>
+            {!isOwlCognito ? (
+              <NavLink to="/as-accounts" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+                AS-Accounts
+              </NavLink>
+            ) : null}
             {!isOwlCognito ? (
               <NavLink to="/hall-of-fame" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                 Hall of Fame

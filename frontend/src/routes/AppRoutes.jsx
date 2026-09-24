@@ -7,6 +7,7 @@ import AppLayout from "../layouts/AppLayout";
 
 const AdminControlCenterPage = lazy(() => import("../pages/AdminControlCenterPage"));
 const AboutPage = lazy(() => import("../pages/AboutPage"));
+const AccountsDirectoryPage = lazy(() => import("../pages/AccountsDirectoryPage"));
 const BroadcastingPage = lazy(() => import("../pages/BroadcastingPage"));
 const ContactPage = lazy(() => import("../pages/ContactPage"));
 const LegacyCourseDetailPage = lazy(() => import("../pages/CourseDetailPage"));
@@ -43,6 +44,7 @@ export default function AppRoutes() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/live-classes" element={<Navigate to="/courses?view=live" replace />} />
           <Route path="/about" element={<AboutPage />} />
+          {siteBrand.id !== "owlcognito" ? <Route path="/as-accounts" element={<AccountsDirectoryPage />} /> : null}
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/faqs" element={<FaqPage />} />
           {siteBrand.id !== "owlcognito" ? <Route path="/hall-of-fame" element={<HallOfFamePage />} /> : null}

@@ -4,6 +4,22 @@ info:
   version: 1.0.0
   description: Versioned API contract for StreamX frontends and operational clients.
 paths:
+  /as-accounts/:
+    get:
+      operationId: social_accounts_directory_list
+      tags:
+      - AS Accounts
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialAccountDirectoryResponse'
+          description: ''
   /auth/2fa/disable/:
     post:
       operationId: auth_2fa_disable_create
@@ -2763,6 +2779,20 @@ components:
         * `connection_failed` - connection_failed
         * `quality_changed` - quality_changed
         * `relay_fallback` - relay_fallback
+    IconKeyEnum:
+      enum:
+      - youtube
+      - instagram
+      - x
+      - facebook
+      - link
+      type: string
+      description: |-
+        * `youtube` - YouTube
+        * `instagram` - Instagram
+        * `x` - X
+        * `facebook` - Facebook
+        * `link` - Generic link
     NetworkEnum:
       enum:
       - slow_2g
@@ -2914,6 +2944,87 @@ components:
           default: 0
       required:
       - event
+    SocialAccount:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        account_name:
+          type: string
+          maxLength: 120
+        handle:
+          type: string
+          maxLength: 120
+        url:
+          type: string
+          format: uri
+          maxLength: 500
+        managed_by:
+          type: string
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 500
+        status_label:
+          type: string
+          maxLength: 40
+      required:
+      - account_name
+      - id
+      - url
+    SocialAccountCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 80
+        slug:
+          oneOf:
+          - type: string
+            maxLength: 90
+            pattern: ^[-a-zA-Z0-9_]+$
+          - type: string
+            maxLength: 0
+        description:
+          type: string
+          maxLength: 600
+        icon_key:
+          $ref: '#/components/schemas/IconKeyEnum'
+        account_count:
+          type: integer
+          readOnly: true
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SocialAccount'
+          readOnly: true
+      required:
+      - account_count
+      - accounts
+      - id
+      - name
+    SocialAccountDirectoryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/SocialAccountCategory'
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
     TransportEnum:
       enum:
       - auto
