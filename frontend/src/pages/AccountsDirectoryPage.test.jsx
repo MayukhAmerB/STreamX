@@ -47,7 +47,7 @@ const categories = [
 ];
 
 describe("AccountsDirectoryPage", () => {
-  it("renders Instagram first with coherent category and account numbering", () => {
+  it("renders Instagram first with numbered headings and bulleted accounts", () => {
     const html = renderToStaticMarkup(<AccountsDirectoryContent categories={categories} />);
 
     expect(html).toContain("Official presence,");
@@ -59,8 +59,10 @@ describe("AccountsDirectoryPage", () => {
     expect(html).toContain('href="https://instagram.com/alsyedinitiative"');
     expect(html).toContain('rel="noopener noreferrer"');
     expect(html.indexOf("Instagram accounts")).toBeLessThan(html.indexOf("YouTube accounts"));
-    expect(html.match(/class="as-account-index">01/g)).toHaveLength(1);
-    expect(html.match(/class="as-account-index">02/g)).toHaveLength(1);
+    expect(html).toContain('class="as-section-number">01');
+    expect(html).toContain('class="as-section-number">02');
+    expect(html.match(/class="as-account-bullet"/g)).toHaveLength(2);
+    expect(html).not.toContain("as-account-index");
     expect(html).toContain("Search the directory");
     expect(html).toContain("No accounts published yet");
   });

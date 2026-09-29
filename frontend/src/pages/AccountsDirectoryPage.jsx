@@ -64,7 +64,7 @@ function PlatformIcon({ iconKey }) {
   );
 }
 
-function AccountRow({ account, category, number }) {
+function AccountRow({ account, category }) {
   const platformLabel = PLATFORM_LABELS[category.icon_key] || category.name;
   return (
     <a
@@ -74,7 +74,7 @@ function AccountRow({ account, category, number }) {
       rel="noopener noreferrer"
       aria-label={`Open verified ${platformLabel} account ${account.account_name}`}
     >
-      <span className="as-account-index">{String(number).padStart(2, "0")}</span>
+      <span className="as-account-bullet" aria-hidden="true">&bull;</span>
       <span className="as-platform-icon">
         <PlatformIcon iconKey={category.icon_key} />
       </span>
@@ -107,14 +107,6 @@ export function AccountsDirectoryContent({ categories, loading = false, error = 
   const normalized = normalizeAccountDirectory(categories);
   const totalAccounts = normalized.reduce((total, category) => total + category.accounts.length, 0);
   const normalizedQuery = query.trim().toLocaleLowerCase();
-  const accountNumbers = new Map();
-  let nextAccountNumber = 1;
-  normalized.forEach((category) => {
-    category.accounts.forEach((account) => {
-      accountNumbers.set(`${category.id}:${account.id}`, nextAccountNumber);
-      nextAccountNumber += 1;
-    });
-  });
   const visibleCategories = normalizedQuery
     ? normalized
         .map((category) => ({
@@ -233,7 +225,6 @@ export function AccountsDirectoryContent({ categories, loading = false, error = 
                       <AccountRow
                         account={account}
                         category={category}
-                        number={accountNumbers.get(`${category.id}:${account.id}`)}
                         key={account.id}
                       />
                     ))
