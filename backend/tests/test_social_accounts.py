@@ -17,7 +17,7 @@ class SocialAccountDirectoryTests(APITestCase):
             .order_by("sort_order")
             .values_list("slug", flat=True)
         )
-        self.assertEqual(categories, ["youtube", "instagram", "x", "facebook"])
+        self.assertEqual(categories, ["instagram", "youtube", "x", "facebook"])
 
     @patch("apps.social_accounts.models.validate_safe_public_url", return_value=None)
     def test_public_directory_is_ordered_and_excludes_inactive_records(self, _validate_url):

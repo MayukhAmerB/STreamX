@@ -26,21 +26,42 @@ const categories = [
     name: "YouTube",
     slug: "youtube",
     icon_key: "youtube",
+    accounts: [
+      {
+        id: 11,
+        account_name: "Al Syed Learning",
+        handle: "@alsyedlearning",
+        url: "https://youtube.com/@alsyedlearning",
+        managed_by: "Education team",
+        status_label: "Active",
+      },
+    ],
+  },
+  {
+    id: 3,
+    name: "X",
+    slug: "x",
+    icon_key: "x",
     accounts: [],
   },
 ];
 
 describe("AccountsDirectoryPage", () => {
-  it("renders verified account details, links, and empty category states", () => {
+  it("renders Instagram first with coherent category and account numbering", () => {
     const html = renderToStaticMarkup(<AccountsDirectoryContent categories={categories} />);
 
-    expect(html).toContain("Know which accounts are actually affiliated.");
+    expect(html).toContain("Official presence,");
+    expect(html).toContain("Primary verification channel");
     expect(html).toContain("Account name");
     expect(html).toContain("Al Syed Initiative");
     expect(html).toContain("@alsyedinitiative");
     expect(html).toContain("Al Syed team");
     expect(html).toContain('href="https://instagram.com/alsyedinitiative"');
     expect(html).toContain('rel="noopener noreferrer"');
+    expect(html.indexOf("Instagram accounts")).toBeLessThan(html.indexOf("YouTube accounts"));
+    expect(html.match(/class="as-account-index">01/g)).toHaveLength(1);
+    expect(html.match(/class="as-account-index">02/g)).toHaveLength(1);
+    expect(html).toContain("Search the directory");
     expect(html).toContain("No accounts published yet");
   });
 

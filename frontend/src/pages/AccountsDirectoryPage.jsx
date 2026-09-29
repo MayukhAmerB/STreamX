@@ -64,7 +64,7 @@ function PlatformIcon({ iconKey }) {
   );
 }
 
-function AccountRow({ account, category, index }) {
+function AccountRow({ account, category, number }) {
   const platformLabel = PLATFORM_LABELS[category.icon_key] || category.name;
   return (
     <a
@@ -74,7 +74,7 @@ function AccountRow({ account, category, index }) {
       rel="noopener noreferrer"
       aria-label={`Open verified ${platformLabel} account ${account.account_name}`}
     >
-      <span className="as-account-index">{String(index + 1).padStart(2, "0")}</span>
+      <span className="as-account-index">{String(number).padStart(2, "0")}</span>
       <span className="as-platform-icon">
         <PlatformIcon iconKey={category.icon_key} />
       </span>
@@ -92,6 +92,7 @@ function AccountRow({ account, category, index }) {
         {account.status_label || "Active"}
       </span>
       <span className="as-account-arrow" aria-hidden="true">
+        <span>Visit profile</span>
         <svg viewBox="0 0 24 24">
           <path d="M7 17 17 7M9 7h8v8" />
         </svg>
@@ -102,16 +103,42 @@ function AccountRow({ account, category, index }) {
 }
 
 export function AccountsDirectoryContent({ categories, loading = false, error = "", onRetry }) {
+  const [query, setQuery] = useState("");
   const normalized = normalizeAccountDirectory(categories);
   const totalAccounts = normalized.reduce((total, category) => total + category.accounts.length, 0);
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const accountNumbers = new Map();
+  let nextAccountNumber = 1;
+  normalized.forEach((category) => {
+    category.accounts.forEach((account) => {
+      accountNumbers.set(`${category.id}:${account.id}`, nextAccountNumber);
+      nextAccountNumber += 1;
+    });
+  });
+  const visibleCategories = normalizedQuery
+    ? normalized
+        .map((category) => ({
+          ...category,
+          accounts: category.accounts.filter((account) =>
+            [account.account_name, account.handle, account.managed_by, account.description, category.name]
+              .filter(Boolean)
+              .some((value) => String(value).toLocaleLowerCase().includes(normalizedQuery))
+          ),
+        }))
+        .filter((category) => category.accounts.length)
+    : normalized;
+  const visibleAccountCount = visibleCategories.reduce(
+    (total, category) => total + category.accounts.length,
+    0
+  );
 
   return (
     <section className="as-directory-shell">
       <div className="as-directory-grid" aria-hidden="true" />
       <header className="as-directory-hero">
-        <div className="as-section-number">01</div>
+        <div className="as-directory-stamp"><span aria-hidden="true" /> AS / Verified directory</div>
         <p className="as-kicker">Official account verification</p>
-        <h1>Know which accounts are actually affiliated.</h1>
+        <h1>Official presence,<br /><span>clearly verified.</span></h1>
         <p className="as-hero-copy">
           A verified directory of public accounts associated with Al Syed Initiative. Check the account name,
           manager, and destination before following links or responding to messages.
@@ -119,7 +146,7 @@ export function AccountsDirectoryContent({ categories, loading = false, error = 
         <div className="as-directory-metrics" aria-label="Directory summary">
           <div><strong>{normalized.length}</strong><span>Categories</span></div>
           <div><strong>{totalAccounts}</strong><span>Verified accounts</span></div>
-          <div><strong>Admin</strong><span>Controlled directory</span></div>
+          <div><strong>Live</strong><span>Admin-controlled directory</span></div>
         </div>
       </header>
 
@@ -137,29 +164,63 @@ export function AccountsDirectoryContent({ categories, loading = false, error = 
         </div>
       ) : normalized.length ? (
         <>
+          <div className="as-directory-toolbar">
+            <div className="as-search-heading">
+              <span className="as-search-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></svg>
+              </span>
+              <div><strong>Find an official account</strong><small>Search by account, handle, platform, or manager</small></div>
+            </div>
+            <label className="as-account-search">
+              <span className="sr-only">Search verified accounts</span>
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search the directory"
+              />
+              {query ? <button type="button" onClick={() => setQuery("")}>Clear</button> : null}
+            </label>
+            <div className="as-search-result" aria-live="polite">
+              <strong>{visibleAccountCount}</strong>
+              <span>{normalizedQuery ? "matches" : "official profiles"}</span>
+            </div>
+          </div>
+
           <nav className="as-category-nav" aria-label="Account categories">
-            {normalized.map((category) => (
-              <a key={category.id} href={`#accounts-${category.slug}`}>
+            {normalized.map((category, categoryIndex) => (
+              <a key={category.id} href={`#accounts-${category.slug}`} onClick={() => setQuery("")}>
+                <span className="as-category-nav-number">
+                  {String(categoryIndex + 1).padStart(2, "0")}
+                </span>
                 <span className="as-category-nav-icon"><PlatformIcon iconKey={category.icon_key} /></span>
-                <span><strong>{category.name}</strong><small>{category.accounts.length} accounts</small></span>
+                <span>
+                  <strong>{category.name}</strong>
+                  <small>{category.accounts.length} {category.accounts.length === 1 ? "account" : "accounts"}</small>
+                </span>
               </a>
             ))}
           </nav>
 
           <div className="as-category-stack">
-            {normalized.map((category, categoryIndex) => (
+            {visibleCategories.length ? visibleCategories.map((category) => {
+              const categoryIndex = normalized.findIndex((item) => item.id === category.id);
+              const isInstagram = category.slug === "instagram";
+              return (
               <section
-                className="as-category-section"
+                className={`as-category-section${isInstagram ? " as-category-primary" : ""}`}
                 id={`accounts-${category.slug}`}
                 key={category.id}
                 aria-labelledby={`accounts-${category.slug}-title`}
               >
                 <div className="as-category-heading">
-                  <div className="as-section-number">{String(categoryIndex + 2).padStart(2, "0")}</div>
+                  <div className="as-section-number">{String(categoryIndex + 1).padStart(2, "0")}</div>
                   <div className="as-category-title">
                     <span className="as-category-title-icon"><PlatformIcon iconKey={category.icon_key} /></span>
                     <div>
-                      <p className="as-kicker">Verified {category.name} presence</p>
+                      <p className="as-kicker">
+                        {isInstagram ? "Primary verification channel" : `Verified ${category.name} presence`}
+                      </p>
                       <h2 id={`accounts-${category.slug}-title`}>{category.name} accounts</h2>
                     </div>
                   </div>
@@ -168,8 +229,13 @@ export function AccountsDirectoryContent({ categories, loading = false, error = 
 
                 <div className="as-account-list">
                   {category.accounts.length ? (
-                    category.accounts.map((account, index) => (
-                      <AccountRow account={account} category={category} index={index} key={account.id} />
+                    category.accounts.map((account) => (
+                      <AccountRow
+                        account={account}
+                        category={category}
+                        number={accountNumbers.get(`${category.id}:${account.id}`)}
+                        key={account.id}
+                      />
                     ))
                   ) : (
                     <div className="as-empty-category">
@@ -179,7 +245,13 @@ export function AccountsDirectoryContent({ categories, loading = false, error = 
                   )}
                 </div>
               </section>
-            ))}
+              );
+            }) : (
+              <div className="as-directory-state as-no-results" role="status">
+                <div><strong>No verified accounts match "{query.trim()}"</strong><p>Try a handle, platform name, or account manager.</p></div>
+                <button type="button" onClick={() => setQuery("")}>Clear search</button>
+              </div>
+            )}
           </div>
         </>
       ) : (
