@@ -1,12 +1,15 @@
-import json
 import hashlib
+import json
 import re
 from datetime import timedelta
 from decimal import Decimal
 from urllib.parse import urlencode
 
+from config.audit import log_security_event
+from config.response import api_response
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect
@@ -16,20 +19,16 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.courses.models import Course, Enrollment
-from apps.courses.access import user_has_course_access
-from apps.realtime.domain import invalidate_course_join_access_cache
-from config.audit import log_security_event
-from config.response import api_response
 
-from .models import Payment, PaymentWebhookEvent
-from .gateway_audit import safe_gateway_entity as _safe_gateway_entity
 from .gateway_audit import set_gateway_audit as _set_gateway_audit
 from .idempotency import (
     IdempotencyConflict,
     InvalidIdempotencyKey,
     claim_create_order,
     complete_claim,
+    find_completed_create_order_replay,
 )
+from .models import Payment, PaymentWebhookEvent
 from .order_service import create_payment_order
 from .pricing import get_plan_amount, get_plan_amount_paise
 from .provisioning import provision_paid_payment
@@ -37,7 +36,10 @@ from .serializers import CreateOrderSerializer, VerifyPaymentSerializer
 from .services import (
     RazorpayServiceError,
     create_razorpay_order,
+    fetch_razorpay_order,
+    fetch_razorpay_order_payments,
     fetch_razorpay_payment,
+    validate_existing_razorpay_order,
     verify_razorpay_signature,
     verify_razorpay_webhook_signature,
 )
@@ -119,6 +121,321 @@ def _gateway_payment_validation_error(*, payment, callback_data, gateway_payment
     if currency != str(payment.currency or "").strip().upper():
         return "Razorpay payment currency does not match the course order."
     return None
+
+
+def _owned_open_payments(*, user, buyer_email, course):
+    queryset = Payment.objects.filter(
+        Q(course=course) | Q(course_id_snapshot=course.id),
+        status=Payment.STATUS_CREATED,
+    ).order_by("created_at")
+    if user and user.is_authenticated:
+        return queryset.filter(user=user)
+    return queryset.filter(
+        user__isnull=True,
+        buyer_email__iexact=str(buyer_email or "").strip().lower(),
+    )
+
+
+def _resumed_order_payload(*, payment, order, checkout_profile):
+    return {
+        "success": True,
+        "message": "Existing Razorpay order resumed.",
+        "data": {
+            "payment_id": payment.id,
+            "checkout_reference": str(payment.internal_reference),
+            "razorpay_order_id": order["id"],
+            "amount": order["amount"],
+            "currency": order["currency"],
+            "key_id": settings.RAZORPAY_KEY_ID,
+            "plan": payment.plan,
+            "resumed": True,
+            # Use the values supplied by this request. In particular, never
+            # disclose a guest's stored name or phone merely by knowing email.
+            "checkout_profile": {
+                "name": checkout_profile["buyer_name"],
+                "email": checkout_profile["buyer_email"],
+                "contact": checkout_profile["whatsapp_number"],
+            },
+        },
+    }
+
+
+def _reconcile_open_payment(
+    *,
+    request,
+    course,
+    checkout_profile,
+    requested_plan,
+    requested_amount,
+    requested_application=None,
+    allow_guest_recovery=False,
+    allow_unpaid_resume=True,
+    known_payment=None,
+):
+    """Resume or finalize one canonical open order; never create past ambiguity."""
+    open_payments = (
+        [known_payment]
+        if known_payment is not None
+        else list(
+            _owned_open_payments(
+                user=request.user,
+                buyer_email=checkout_profile["buyer_email"],
+                course=course,
+            )[:2]
+        )
+    )
+    if not open_payments:
+        return None
+    if not request.user.is_authenticated and not allow_guest_recovery:
+        return {
+            "payload": {
+                "success": False,
+                "message": "Payment recovery requires the original checkout.",
+                "errors": {
+                    "detail": "An unfinished payment exists. Use the original browser checkout or contact support; do not pay again.",
+                },
+            },
+            "status_code": status.HTTP_409_CONFLICT,
+            "payment": None,
+        }
+    if len(open_payments) != 1:
+        return {
+            "payload": {
+                "success": False,
+                "message": "Payment recovery requires support.",
+                "errors": {
+                    "detail": "Multiple unfinished payment orders were found. Do not pay again; contact support.",
+                },
+            },
+            "status_code": status.HTTP_409_CONFLICT,
+            "payment": None,
+        }
+
+    payment = open_payments[0]
+    if not payment.razorpay_order_id:
+        if not allow_unpaid_resume:
+            return {
+                "payload": {
+                    "success": False,
+                    "message": "Existing checkout is no longer available.",
+                    "errors": {
+                        "detail": "The course or payment plan changed after this order was started. Do not pay this order; contact support if a payment was already attempted.",
+                    },
+                },
+                "status_code": status.HTTP_409_CONFLICT,
+                "payment": payment,
+            }
+        return {
+            "payload": {
+                "success": False,
+                "message": "Payment recovery is pending.",
+                "data": {"retry_same_checkout": True},
+                "errors": {
+                    "detail": "An unfinished payment request is being reconciled. Do not pay again; retry shortly.",
+                },
+            },
+            "status_code": status.HTTP_503_SERVICE_UNAVAILABLE,
+            "payment": payment,
+        }
+
+    try:
+        order = validate_existing_razorpay_order(
+            fetch_razorpay_order(razorpay_order_id=payment.razorpay_order_id),
+            expected_order_id=payment.razorpay_order_id,
+            expected_amount_paise=int(Decimal(payment.amount) * 100),
+            expected_currency=payment.currency,
+            expected_receipt=f"p-{payment.internal_reference.hex[:24]}",
+        )
+    except RazorpayServiceError as exc:
+        return {
+            "payload": {
+                "success": False,
+                "message": "Payment recovery is pending.",
+                "data": {"retry_same_checkout": True},
+                "errors": {
+                    "detail": f"{exc} Do not pay again; retry shortly.",
+                },
+            },
+            "status_code": status.HTTP_503_SERVICE_UNAVAILABLE,
+            "payment": payment,
+        }
+
+    if order["status"] in {"created", "attempted"}:
+        if not allow_unpaid_resume:
+            return {
+                "payload": {
+                    "success": False,
+                    "message": "Existing checkout is no longer available.",
+                    "errors": {
+                        "detail": "The course or payment plan changed after this order was started. Do not pay this order; contact support if a payment was already attempted.",
+                    },
+                },
+                "status_code": status.HTTP_409_CONFLICT,
+                "payment": payment,
+            }
+        quote_expired = payment.created_at < timezone.now() - timedelta(
+            seconds=int(getattr(settings, "PAYMENT_ORDER_RESUME_MAX_AGE_SECONDS", 3600))
+        )
+        quote_mismatch = (
+            payment.plan != requested_plan
+            or Decimal(payment.amount) != Decimal(requested_amount)
+            or payment.application_id
+            != getattr(requested_application, "id", None)
+        )
+        if quote_expired or quote_mismatch:
+            return {
+                "payload": {
+                    "success": False,
+                    "message": "Existing checkout no longer matches the current quote.",
+                    "errors": {
+                        "detail": "Do not pay this older order. Contact support to close it before starting a new checkout.",
+                    },
+                },
+                "status_code": status.HTTP_409_CONFLICT,
+                "payment": payment,
+            }
+        return {
+            "payload": _resumed_order_payload(
+                payment=payment,
+                order=order,
+                checkout_profile=checkout_profile,
+            ),
+            "status_code": status.HTTP_200_OK,
+            "payment": payment,
+        }
+
+    try:
+        payments_payload = fetch_razorpay_order_payments(
+            razorpay_order_id=payment.razorpay_order_id,
+        )
+        items = payments_payload.get("items") if isinstance(payments_payload, dict) else None
+        captured = [
+            item
+            for item in (items if isinstance(items, list) else [])
+            if isinstance(item, dict) and str(item.get("status") or "").lower() == "captured"
+        ]
+        if len(captured) != 1:
+            raise RazorpayServiceError("The captured payment could not be identified safely.")
+        gateway_error = _gateway_payment_validation_error(
+            payment=payment,
+            callback_data={"razorpay_payment_id": str(captured[0].get("id") or "")},
+            gateway_payment=captured[0],
+        )
+        if gateway_error:
+            raise RazorpayServiceError(gateway_error)
+    except RazorpayServiceError as exc:
+        return {
+            "payload": {
+                "success": False,
+                "message": "Payment recovery requires support.",
+                "errors": {
+                    "detail": f"{exc} Do not pay again; contact support.",
+                },
+            },
+            "status_code": status.HTTP_409_CONFLICT,
+            "payment": payment,
+        }
+
+    reconciliation = process_payment_webhook_payload(
+        payload={
+            "event": "payment.captured",
+            "payload": {"payment": {"entity": captured[0]}},
+        },
+        request=request,
+        source="checkout_reconciliation",
+    )
+    payment.refresh_from_db()
+    if not reconciliation.get("success") or payment.status != Payment.STATUS_PAID:
+        return {
+            "payload": {
+                "success": False,
+                "message": "Payment recovery requires support.",
+                "errors": {
+                    "detail": "The captured payment could not be finalized. Do not pay again; contact support.",
+                },
+            },
+            "status_code": status.HTTP_409_CONFLICT,
+            "payment": payment,
+        }
+    return {
+        "payload": {
+            "success": True,
+            "message": "Captured payment recovered and verified.",
+            "data": {**_payment_success_data(payment), "payment_verified": True},
+        },
+        "status_code": status.HTTP_200_OK,
+        "payment": payment,
+    }
+
+
+def _create_order_replay_response(
+    *,
+    request,
+    claim,
+    course,
+    checkout_profile,
+    plan,
+    amount,
+    application,
+    allow_unpaid_resume,
+):
+    replay = claim.record
+    replay_payment = replay.payment
+    if replay_payment and replay_payment.status == Payment.STATUS_PAID:
+        _grant_paid_course_access(replay_payment)
+        replay_payment.refresh_from_db()
+        return api_response(
+            success=True,
+            message="Payment already verified.",
+            data={
+                **_payment_success_data(replay_payment),
+                "payment_verified": True,
+            },
+        )
+    if replay_payment:
+        payment_course_ids = {
+            replay_payment.course_id,
+            replay_payment.course_id_snapshot,
+        }
+        if course.id not in payment_course_ids:
+            return api_response(
+                success=False,
+                message="Payment request conflict.",
+                errors={
+                    "detail": "The original checkout no longer matches this course. Do not pay again; contact support.",
+                },
+                status_code=status.HTTP_409_CONFLICT,
+            )
+        if replay_payment.razorpay_order_id:
+            replay_recovery = _reconcile_open_payment(
+                request=request,
+                course=course,
+                checkout_profile=checkout_profile,
+                requested_plan=plan,
+                requested_amount=amount,
+                requested_application=application,
+                allow_guest_recovery=True,
+                allow_unpaid_resume=allow_unpaid_resume,
+                known_payment=replay_payment,
+            )
+            if replay_recovery:
+                return api_response(
+                    **replay_recovery["payload"],
+                    status_code=replay_recovery["status_code"],
+                )
+    if not allow_unpaid_resume:
+        return api_response(
+            success=False,
+            message="Existing checkout is no longer available.",
+            errors={
+                "detail": "The course or payment plan changed after this order was started. Do not pay this order; contact support if a payment was already attempted.",
+            },
+            status_code=status.HTTP_409_CONFLICT,
+        )
+    return api_response(
+        **replay.response_payload,
+        status_code=replay.response_status or status.HTTP_200_OK,
+    )
 
 
 def process_payment_webhook_payload(
@@ -412,12 +729,7 @@ class CreateOrderView(APIView):
             )
 
         course = Course.objects.filter(pk=serializer.validated_data["course_id"]).first()
-        if (
-            not course
-            or not course.is_published
-            or course.launch_status != Course.STATUS_LIVE
-            or course.registration_closed
-        ):
+        if not course:
             log_security_event("payment.create_order_course_unavailable", request=request)
             return api_response(
                 success=False,
@@ -426,53 +738,49 @@ class CreateOrderView(APIView):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        if request.user.is_authenticated and request.user.id == course.instructor_id:
-            log_security_event("payment.create_order_instructor_self_purchase_blocked", request=request, course_id=course.id)
-            return api_response(
-                success=False,
-                message="Invalid purchase request.",
-                errors={"detail": "Instructors cannot purchase their own courses."},
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-
+        plan = serializer.validated_data["plan"]
         application = None
+        application_valid = True
         if course.category == Course.CATEGORY_WEB_PENTESTING:
             from apps.courses.models import PentestingApplication
+
             reference = serializer.validated_data.get("application_reference")
             application = PentestingApplication.objects.filter(
-                reference=reference, course=course,
+                reference=reference,
+                course=course,
                 email__iexact=serializer.validated_data["buyer_email"],
                 status__in=["submitted", "enrolled"],
             ).first() if reference else None
-            if not application or (application.student_id and (
-                not request.user.is_authenticated or application.student_id != request.user.pk
-            )):
-                return api_response(success=False, message="Complete your Pentesting registration first.",
-                                    status_code=403)
+            application_valid = bool(
+                application
+                and (
+                    not application.student_id
+                    or (
+                        request.user.is_authenticated
+                        and application.student_id == request.user.pk
+                    )
+                )
+            )
 
-        plan = serializer.validated_data["plan"]
-        if plan == Payment.PLAN_FULL and not course.full_payment_enabled:
-            return api_response(
-                success=False,
-                message="Payment plan unavailable.",
-                errors={"detail": "Full payment is not enabled for this course."},
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-        if plan == Payment.PLAN_MONTHLY and not course.installment_payment_enabled:
-            return api_response(
-                success=False,
-                message="Payment plan unavailable.",
-                errors={"detail": "Monthly payment is not enabled for this course."},
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-        if plan == Payment.PLAN_BUNDLE and not course.bundle_payment_enabled:
-            return api_response(success=False, message="Bundle payment is not enabled for this course.", status_code=400)
+        course_available = bool(
+            course.is_published
+            and course.launch_status == Course.STATUS_LIVE
+            and not course.registration_closed
+        )
+        instructor_self_purchase = bool(
+            request.user.is_authenticated and request.user.id == course.instructor_id
+        )
+        plan_enabled = {
+            Payment.PLAN_FULL: course.full_payment_enabled,
+            Payment.PLAN_MONTHLY: course.installment_payment_enabled,
+            Payment.PLAN_BUNDLE: course.bundle_payment_enabled,
+        }[plan]
         existing_enrollment = (
             Enrollment.objects.filter(user=request.user, course=course).first()
             if request.user.is_authenticated
             else None
         )
-        if (
+        already_enrolled = bool(
             existing_enrollment
             and existing_enrollment.has_active_access()
             and (
@@ -480,7 +788,97 @@ class CreateOrderView(APIView):
                 or existing_enrollment.access_type
                 in (Enrollment.ACCESS_LEGACY, Enrollment.ACCESS_LIFETIME)
             )
-        ):
+        )
+        amount = get_plan_amount(course, plan)
+        checkout_currently_allowed = bool(
+            course_available
+            and not instructor_self_purchase
+            and application_valid
+            and plan_enabled
+            and not already_enrolled
+            and Decimal(amount) > 0
+        )
+
+        # A completed idempotency record is proof of the original checkout.
+        # Consult it before mutable catalog gates so a provider-captured order
+        # can still be finalized after a course closes or its quote changes.
+        # Unpaid replays remain blocked by allow_unpaid_resume below.
+        try:
+            completed_replay = find_completed_create_order_replay(
+                raw_key=request.headers.get("Idempotency-Key", ""),
+                user=request.user,
+                buyer_email=serializer.validated_data["buyer_email"],
+                request_payload=serializer.validated_data,
+            )
+        except IdempotencyConflict as exc:
+            return api_response(
+                success=False,
+                message="Payment request conflict.",
+                errors={"detail": str(exc)},
+                status_code=status.HTTP_409_CONFLICT,
+            )
+        if completed_replay:
+            return _create_order_replay_response(
+                request=request,
+                claim=completed_replay,
+                course=course,
+                checkout_profile=serializer.validated_data,
+                plan=plan,
+                amount=amount,
+                application=application,
+                allow_unpaid_resume=checkout_currently_allowed,
+            )
+
+        if not course_available:
+            log_security_event(
+                "payment.create_order_course_unavailable",
+                request=request,
+                course_id=course.id,
+            )
+            return api_response(
+                success=False,
+                message="Course unavailable.",
+                errors={"detail": "Course is not currently available for purchase."},
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        if instructor_self_purchase:
+            log_security_event(
+                "payment.create_order_instructor_self_purchase_blocked",
+                request=request,
+                course_id=course.id,
+            )
+            return api_response(
+                success=False,
+                message="Invalid purchase request.",
+                errors={"detail": "Instructors cannot purchase their own courses."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not application_valid:
+            return api_response(
+                success=False,
+                message="Complete your Pentesting registration first.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        if plan == Payment.PLAN_FULL and not plan_enabled:
+            return api_response(
+                success=False,
+                message="Payment plan unavailable.",
+                errors={"detail": "Full payment is not enabled for this course."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        if plan == Payment.PLAN_MONTHLY and not plan_enabled:
+            return api_response(
+                success=False,
+                message="Payment plan unavailable.",
+                errors={"detail": "Monthly payment is not enabled for this course."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        if plan == Payment.PLAN_BUNDLE and not plan_enabled:
+            return api_response(success=False, message="Bundle payment is not enabled for this course.", status_code=400)
+        if already_enrolled:
             log_security_event("payment.create_order_already_enrolled", request=request, course_id=course.id)
             return api_response(
                 success=True,
@@ -488,7 +886,6 @@ class CreateOrderView(APIView):
                 data={"already_enrolled": True, "course_id": course.id},
             )
 
-        amount = get_plan_amount(course, plan)
         if Decimal(amount) <= 0:
             return api_response(
                 success=False,
@@ -502,11 +899,10 @@ class CreateOrderView(APIView):
                 raw_key=request.headers.get("Idempotency-Key", ""),
                 user=request.user,
                 buyer_email=serializer.validated_data["buyer_email"],
-                request_payload={
-                    **serializer.validated_data,
-                    "server_amount": str(amount),
-                    "currency": "INR",
-                },
+                # Fingerprint the buyer's immutable checkout intent. Current
+                # server pricing is deliberately excluded so the same key can
+                # reconcile a captured order after a later catalog price edit.
+                request_payload=serializer.validated_data,
             )
         except InvalidIdempotencyKey as exc:
             return api_response(
@@ -524,10 +920,44 @@ class CreateOrderView(APIView):
             )
 
         if idempotency_claim and idempotency_claim.replay:
-            replay = idempotency_claim.record
+            return _create_order_replay_response(
+                request=request,
+                claim=idempotency_claim,
+                course=course,
+                checkout_profile=serializer.validated_data,
+                plan=plan,
+                amount=amount,
+                application=application,
+                allow_unpaid_resume=True,
+            )
+
+        recovery = _reconcile_open_payment(
+            request=request,
+            course=course,
+            checkout_profile=serializer.validated_data,
+            requested_plan=plan,
+            requested_amount=amount,
+            requested_application=application,
+        )
+        if recovery:
+            claim_completed = complete_claim(
+                idempotency_claim,
+                payment=recovery["payment"],
+                response_payload=recovery["payload"],
+                response_status=recovery["status_code"],
+            )
+            if not claim_completed:
+                return api_response(
+                    success=False,
+                    message="Payment request conflict.",
+                    errors={
+                        "detail": "This payment request was superseded while processing. Do not pay again; retry with the same checkout.",
+                    },
+                    status_code=status.HTTP_409_CONFLICT,
+                )
             return api_response(
-                **replay.response_payload,
-                status_code=replay.response_status or status.HTTP_200_OK,
+                **recovery["payload"],
+                status_code=recovery["status_code"],
             )
 
         order_result = create_payment_order(
@@ -542,23 +972,47 @@ class CreateOrderView(APIView):
         )
         payment = order_result.payment
         if not order_result.succeeded:
-            log_security_event(
-                "payment.create_order_gateway_error",
-                request=request,
-                course_id=course.id,
-                payment_id=payment.id,
-            )
-            response_payload = {
-                "success": False,
-                "message": "Order creation failed.",
-                "errors": {"detail": order_result.error},
-            }
-            complete_claim(
+            if order_result.blocked_by_existing:
+                log_security_event(
+                    "payment.create_order_concurrent_checkout_blocked",
+                    request=request,
+                    course_id=course.id,
+                    payment_id=payment.id,
+                )
+                response_payload = {
+                    "success": False,
+                    "message": "Payment recovery is pending.",
+                    "data": {"retry_same_checkout": True},
+                    "errors": {"detail": order_result.error},
+                }
+            else:
+                log_security_event(
+                    "payment.create_order_gateway_error",
+                    request=request,
+                    course_id=course.id,
+                    payment_id=payment.id,
+                )
+                response_payload = {
+                    "success": False,
+                    "message": "Order creation failed.",
+                    "data": {"rotate_checkout_key": True},
+                    "errors": {"detail": order_result.error},
+                }
+            claim_completed = complete_claim(
                 idempotency_claim,
                 payment=payment,
                 response_payload=response_payload,
                 response_status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
+            if not claim_completed:
+                return api_response(
+                    success=False,
+                    message="Payment request conflict.",
+                    errors={
+                        "detail": "This payment request was superseded while processing. Do not pay again; retry with the same checkout.",
+                    },
+                    status_code=status.HTTP_409_CONFLICT,
+                )
             return api_response(
                 **response_payload,
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -581,6 +1035,8 @@ class CreateOrderView(APIView):
                 "amount": order["amount"],
                 "currency": order.get("currency", "INR"),
                 "key_id": settings.RAZORPAY_KEY_ID,
+                "plan": payment.plan,
+                "resumed": False,
                 "checkout_profile": {
                     "name": payment.buyer_name,
                     "email": payment.buyer_email,
@@ -588,12 +1044,21 @@ class CreateOrderView(APIView):
                 },
             },
         }
-        complete_claim(
+        claim_completed = complete_claim(
             idempotency_claim,
             payment=payment,
             response_payload=response_payload,
             response_status=status.HTTP_201_CREATED,
         )
+        if not claim_completed:
+            return api_response(
+                success=False,
+                message="Payment request conflict.",
+                errors={
+                    "detail": "This payment request was superseded while processing. Do not pay again; retry with the same checkout.",
+                },
+                status_code=status.HTTP_409_CONFLICT,
+            )
         return api_response(
             **response_payload,
             status_code=status.HTTP_201_CREATED,

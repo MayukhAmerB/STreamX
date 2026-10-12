@@ -23,8 +23,14 @@ export interface VerifyPaymentPayload {
   checkout_reference?: string;
 }
 
-export const createPaymentOrder = (payload: CreatePaymentOrderPayload) =>
-  typedApiRequest("post", "/payment/create-order/", { data: payload });
+export const createPaymentOrder = (
+  payload: CreatePaymentOrderPayload,
+  idempotencyKey: string,
+) =>
+  typedApiRequest("post", "/payment/create-order/", {
+    data: payload,
+    headers: { "Idempotency-Key": idempotencyKey },
+  });
 
 export const verifyPayment = (payload: VerifyPaymentPayload) =>
   typedApiRequest("post", "/payment/verify/", { data: payload });

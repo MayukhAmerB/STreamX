@@ -456,7 +456,16 @@ class CourseExperienceTests(APITestCase):
 
     @patch("apps.payments.views.create_razorpay_order")
     def test_payment_requires_matching_application_and_verified_payment_enrolls(self, gateway):
-        gateway.return_value = {"id": "order_application123", "currency": "INR", "amount": 500000}
+        gateway.side_effect = lambda **kwargs: {
+            "id": "order_application123",
+            "entity": "order",
+            "amount": kwargs["amount_paise"],
+            "amount_paid": 0,
+            "amount_due": kwargs["amount_paise"],
+            "currency": kwargs["currency"],
+            "receipt": kwargs["receipt"],
+            "status": "created",
+        }
         payload = {
             "course_id": self.pentesting.pk,
             "plan": "full",
@@ -474,7 +483,12 @@ class CourseExperienceTests(APITestCase):
         self.assertEqual(
             self.client.post(url, {**payload, "buyer_email": "other@example.com"}, format="json").status_code, 403
         )
-        response = self.client.post(url, payload, format="json")
+        response = self.client.post(
+            url,
+            payload,
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="checkout-course-experience-0001",
+        )
         self.assertEqual(response.status_code, 201, response.data)
         payment = Payment.objects.get()
         self.assertEqual(payment.amount, Decimal("5000"))

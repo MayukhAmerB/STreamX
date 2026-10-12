@@ -186,6 +186,7 @@ class PaymentIdempotencyRecord(models.Model):
     identity_hash = models.CharField(max_length=64)
     key_hash = models.CharField(max_length=64)
     request_fingerprint = models.CharField(max_length=64)
+    lease_token = models.UUIDField(default=uuid.uuid4, editable=False)
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
@@ -216,3 +217,27 @@ class PaymentIdempotencyRecord(models.Model):
 
     def __str__(self):
         return f"{self.scope}:{self.status}:{self.created_at.isoformat()}"
+
+
+class PaymentCheckoutLock(models.Model):
+    """Database mutex serializing one buyer/course checkout at a time."""
+
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        related_name="checkout_locks",
+    )
+    identity_hash = models.CharField(max_length=64)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["course", "identity_hash"],
+                name="payments_checkout_course_identity_uniq",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.course_id}:{self.identity_hash[:12]}"

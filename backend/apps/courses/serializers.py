@@ -1,31 +1,31 @@
 import re
 
+from config.request_security import contains_active_content, contains_suspicious_sqli, is_safe_public_http_url
+from config.upload_validators import validate_profile_image_upload, validate_video_upload
+from config.url_utils import build_public_url
 from django.conf import settings
 from django.urls import reverse
 from rest_framework import serializers
 
-from config.request_security import contains_active_content, contains_suspicious_sqli, is_safe_public_http_url
-from config.upload_validators import validate_profile_image_upload, validate_video_upload
-from config.url_utils import build_public_url, get_media_public_url
 from apps.payments.pricing import FULL_PLAN, MONTHLY_PLAN, get_plan_amount
 
-from .services import ProtectedMediaError, build_protected_lecture_playback_url, resolve_lecture_playback_expires_in
+from .access import user_has_course_access
 from .models import (
     Course,
     Enrollment,
     GuideVideo,
     Lecture,
     LectureNote,
+    LectureProgress,
     LectureQuestion,
     LectureResource,
-    LectureProgress,
     LiveClass,
     LiveClassEnrollment,
     PublicEnrollmentLead,
     Section,
     sanitize_course_card_features,
 )
-from .access import user_has_course_access
+from .services import ProtectedMediaError, build_protected_lecture_playback_url, resolve_lecture_playback_expires_in
 
 
 def _normalize_text_list(value):
@@ -98,7 +98,7 @@ class LectureSerializer(serializers.ModelSerializer):
             except Exception as exc:
                 # normalize django ValidationError into DRF validation errors
                 detail = getattr(exc, "message_dict", None) or getattr(exc, "message", None) or exc
-                raise serializers.ValidationError(detail)
+                raise serializers.ValidationError(detail) from exc
 
         has_video_key = bool(video_key if video_key is not None else getattr(instance, "video_key", ""))
         has_video_file = bool(video_file if video_file is not None else getattr(instance, "video_file", None))
@@ -393,6 +393,14 @@ class CourseEnrollmentStatusMixin:
     def get_is_enrolled(self, obj):
         return self.get_enrollment_status(obj) == "approved"
 
+    def get_enrollment_access_type(self, obj):
+        enrollment = self._get_cached_enrollment(obj)
+        return enrollment.access_type if enrollment else ""
+
+    def get_installments_paid(self, obj):
+        enrollment = self._get_cached_enrollment(obj)
+        return enrollment.installments_paid if enrollment else 0
+
 
 class CourseListSerializer(CourseEnrollmentStatusMixin, serializers.ModelSerializer):
     thumbnail = serializers.SerializerMethodField()
@@ -483,6 +491,8 @@ class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeria
     sections = SectionNestedSerializer(many=True, read_only=True)
     is_enrolled = serializers.SerializerMethodField()
     enrollment_status = serializers.SerializerMethodField()
+    enrollment_access_type = serializers.SerializerMethodField()
+    installments_paid = serializers.SerializerMethodField()
     purchase_available = serializers.SerializerMethodField()
     purchase_unavailable_reason = serializers.SerializerMethodField()
     live_classes = serializers.SerializerMethodField()
@@ -525,6 +535,8 @@ class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeria
             "sections",
             "is_enrolled",
             "enrollment_status",
+            "enrollment_access_type",
+            "installments_paid",
             "purchase_available",
             "purchase_unavailable_reason",
             "live_classes",
@@ -644,7 +656,7 @@ class CourseWriteSerializer(serializers.ModelSerializer):
             validate_profile_image_upload(value, "thumbnail_file")
         except Exception as exc:
             detail = getattr(exc, "message_dict", None) or getattr(exc, "message", None) or exc
-            raise serializers.ValidationError(detail)
+            raise serializers.ValidationError(detail) from exc
         return value
 
     class Meta:

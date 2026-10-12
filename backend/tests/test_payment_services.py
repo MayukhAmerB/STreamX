@@ -3,14 +3,14 @@ import hmac
 from unittest.mock import patch
 
 import requests
-from django.test import SimpleTestCase, override_settings
-
 from apps.payments.services import (
     RazorpayServiceError,
     create_razorpay_order,
     fetch_razorpay_payment,
+    validate_created_razorpay_order,
     verify_razorpay_signature,
 )
+from django.test import SimpleTestCase, override_settings
 
 
 @override_settings(
@@ -102,3 +102,76 @@ class RazorpayServiceTests(SimpleTestCase):
             "temporarily unavailable",
         ):
             create_razorpay_order(amount_paise=350000)
+
+    def test_created_order_must_match_server_amount_and_currency(self):
+        with self.assertRaisesRegex(
+            RazorpayServiceError,
+            "invalid order",
+        ):
+            validate_created_razorpay_order(
+                {"id": "order_wrong_amount", "amount": 1, "currency": "INR"},
+                expected_amount_paise=350000,
+                expected_currency="INR",
+                expected_receipt="p-test-receipt",
+            )
+
+        with self.assertRaisesRegex(
+            RazorpayServiceError,
+            "invalid order",
+        ):
+            validate_created_razorpay_order(
+                {"id": "order_wrong_currency", "amount": 350000, "currency": "USD"},
+                expected_amount_paise=350000,
+                expected_currency="INR",
+                expected_receipt="p-test-receipt",
+            )
+
+    def test_created_order_requires_a_valid_provider_identifier(self):
+        with self.assertRaisesRegex(
+            RazorpayServiceError,
+            "invalid order",
+        ):
+            validate_created_razorpay_order(
+                {"amount": 350000, "currency": "INR"},
+                expected_amount_paise=350000,
+                expected_currency="INR",
+                expected_receipt="p-test-receipt",
+            )
+
+    def test_created_order_requires_canonical_new_unpaid_order_for_exact_receipt(self):
+        valid_order = {
+            "id": "order_created_123",
+            "entity": "order",
+            "amount": 350000,
+            "amount_paid": 0,
+            "amount_due": 350000,
+            "currency": "INR",
+            "receipt": "p-test-receipt",
+            "status": "created",
+        }
+
+        self.assertIs(
+            validate_created_razorpay_order(
+                valid_order,
+                expected_amount_paise=350000,
+                expected_currency="INR",
+                expected_receipt="p-test-receipt",
+            ),
+            valid_order,
+        )
+
+        invalid_variants = (
+            {**valid_order, "status": "paid", "amount_paid": 350000, "amount_due": 0},
+            {**valid_order, "receipt": "p-another-payment"},
+            {**valid_order, "id": " order_created_123 "},
+            {**valid_order, "currency": "inr"},
+        )
+        for invalid_order in invalid_variants:
+            with self.subTest(invalid_order=invalid_order):
+                with self.assertRaisesRegex(RazorpayServiceError, "invalid order"):
+                    validate_created_razorpay_order(
+                        invalid_order,
+                        expected_amount_paise=350000,
+                        expected_currency="INR",
+                        expected_receipt="p-test-receipt",
+                    )

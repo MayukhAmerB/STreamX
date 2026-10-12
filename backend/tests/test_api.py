@@ -61,6 +61,20 @@ from apps.users.serializers import ProfileUpdateSerializer
 from apps.users.terms import TERMS_BODY, TERMS_VERSION
 
 
+def razorpay_created_order(order_id, *, amount_paise, currency, receipt, response_amount=None):
+    amount = amount_paise if response_amount is None else response_amount
+    return {
+        "id": order_id,
+        "entity": "order",
+        "amount": amount,
+        "amount_paid": 0,
+        "amount_due": amount,
+        "currency": currency,
+        "receipt": receipt,
+        "status": "created",
+    }
+
+
 def mark_terms_accepted(*users):
     accepted_at = timezone.now()
     for user in users:
@@ -1617,6 +1631,9 @@ class InstructorDeletionSafetyTests(APITestCase):
 class PaymentVerificationTests(BaseAPITestCase):
     def setUp(self):
         super().setUp()
+        self.client.defaults["HTTP_IDEMPOTENCY_KEY"] = (
+            f"test-checkout-{self._testMethodName}"
+        )
         self.course.price = Decimal("3500.00")
         self.course.monthly_price = Decimal("1500.00")
         self.course.save(update_fields=("price", "monthly_price"))
@@ -1636,6 +1653,34 @@ class PaymentVerificationTests(BaseAPITestCase):
         }
         payload.update(overrides)
         return payload
+
+    def test_create_order_cors_preflight_allows_idempotency_header(self):
+        response = self.client.options(
+            reverse("payment-create-order"),
+            HTTP_ORIGIN="http://localhost:5173",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS="content-type,idempotency-key,x-csrftoken",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        allowed_headers = {
+            value.strip().lower()
+            for value in response["Access-Control-Allow-Headers"].split(",")
+        }
+        self.assertIn("idempotency-key", allowed_headers)
+
+    def test_create_order_requires_idempotency_key(self):
+        client_without_checkout_key = APIClient()
+
+        response = client_without_checkout_key.post(
+            reverse("payment-create-order"),
+            self.checkout_payload(),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["message"], "Invalid idempotency key.")
+        self.assertFalse(Payment.objects.exists())
 
     def test_guest_monthly_payments_create_controlled_account_and_become_lifetime(self):
         unrelated = User.objects.create_user(
@@ -1704,11 +1749,9 @@ class PaymentVerificationTests(BaseAPITestCase):
 
     @patch("apps.payments.views.create_razorpay_order")
     def test_create_order_uses_admin_course_price_and_returns_public_key(self, mock_create_order):
-        mock_create_order.return_value = {
-            "id": "order_server_priced",
-            "amount": 350000,
-            "currency": "INR",
-        }
+        mock_create_order.side_effect = lambda **kwargs: razorpay_created_order(
+            "order_server_priced", **kwargs
+        )
         self.login(self.student.email)
 
         response = self.client.post(
@@ -1746,13 +1789,16 @@ class PaymentVerificationTests(BaseAPITestCase):
         )
         self.assertEqual(mock_create_order.call_args.kwargs["amount_paise"], 350000)
 
+    @patch("apps.payments.views.fetch_razorpay_order")
     @patch("apps.payments.views.create_razorpay_order")
-    def test_create_order_idempotency_key_replays_without_duplicate_gateway_order(self, mock_create_order):
-        mock_create_order.return_value = {
-            "id": "order_idempotent_once",
-            "amount": 350000,
-            "currency": "INR",
-        }
+    def test_create_order_idempotency_key_replays_without_duplicate_gateway_order(
+        self,
+        mock_create_order,
+        mock_fetch_order,
+    ):
+        mock_create_order.side_effect = lambda **kwargs: razorpay_created_order(
+            "order_idempotent_once", **kwargs
+        )
         self.login(self.student.email)
         request_kwargs = {"HTTP_IDEMPOTENCY_KEY": "checkout-idempotency-0001"}
 
@@ -1762,6 +1808,13 @@ class PaymentVerificationTests(BaseAPITestCase):
             format="json",
             **request_kwargs,
         )
+        payment = Payment.objects.get()
+        mock_fetch_order.return_value = razorpay_created_order(
+            payment.razorpay_order_id,
+            amount_paise=int(payment.amount * 100),
+            currency=payment.currency,
+            receipt=f"p-{payment.internal_reference.hex[:24]}",
+        )
         second = self.client.post(
             reverse("payment-create-order"),
             self.checkout_payload(),
@@ -1770,18 +1823,25 @@ class PaymentVerificationTests(BaseAPITestCase):
         )
 
         self.assertEqual(first.status_code, 201)
-        self.assertEqual(second.status_code, 201)
-        self.assertEqual(first.data, second.data)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(
+            first.data["data"]["razorpay_order_id"],
+            second.data["data"]["razorpay_order_id"],
+        )
+        self.assertEqual(
+            first.data["data"]["checkout_reference"],
+            second.data["data"]["checkout_reference"],
+        )
+        self.assertFalse(first.data["data"]["resumed"])
+        self.assertTrue(second.data["data"]["resumed"])
         self.assertEqual(Payment.objects.count(), 1)
         mock_create_order.assert_called_once()
 
     @patch("apps.payments.views.create_razorpay_order")
     def test_create_order_idempotency_key_rejects_different_payload(self, mock_create_order):
-        mock_create_order.return_value = {
-            "id": "order_idempotency_conflict",
-            "amount": 350000,
-            "currency": "INR",
-        }
+        mock_create_order.side_effect = lambda **kwargs: razorpay_created_order(
+            "order_idempotency_conflict", **kwargs
+        )
         self.login(self.student.email)
         request_kwargs = {"HTTP_IDEMPOTENCY_KEY": "checkout-idempotency-0002"}
 
@@ -1827,11 +1887,9 @@ class PaymentVerificationTests(BaseAPITestCase):
             full_name="Existing User",
             role=User.ROLE_STUDENT,
         )
-        mock_create_order.return_value = {
-            "id": "order_guest_monthly",
-            "amount": 150000,
-            "currency": "INR",
-        }
+        mock_create_order.side_effect = lambda **kwargs: razorpay_created_order(
+            "order_guest_monthly", **kwargs
+        )
 
         response = self.client.post(
             reverse("payment-create-order"),
@@ -1897,11 +1955,9 @@ class PaymentVerificationTests(BaseAPITestCase):
 
     @patch("apps.payments.views.create_razorpay_order")
     def test_guest_short_checkout_profile_keeps_legacy_fields_blank(self, mock_create_order):
-        mock_create_order.return_value = {
-            "id": "order_short_profile",
-            "amount": 350000,
-            "currency": "INR",
-        }
+        mock_create_order.side_effect = lambda **kwargs: razorpay_created_order(
+            "order_short_profile", **kwargs
+        )
 
         response = self.client.post(
             reverse("payment-create-order"),
@@ -1944,6 +2000,29 @@ class PaymentVerificationTests(BaseAPITestCase):
         self.assertEqual(payment.failure_reason, "Gateway unavailable.")
         self.assertEqual(payment.user_email_snapshot, self.student.email)
         self.assertEqual(payment.course_title_snapshot, self.course.title)
+        self.assertEqual(payment.razorpay_order_id, "")
+
+    @patch("apps.payments.views.create_razorpay_order")
+    def test_gateway_order_amount_mismatch_fails_closed(self, mock_create_order):
+        mock_create_order.side_effect = lambda **kwargs: razorpay_created_order(
+            "order_wrong_gateway_amount", response_amount=1, **kwargs
+        )
+        self.login(self.student.email)
+
+        response = self.client.post(
+            reverse("payment-create-order"),
+            self.checkout_payload(),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.data["errors"]["detail"],
+            "The payment gateway returned an invalid order.",
+        )
+        payment = Payment.objects.get()
+        self.assertEqual(payment.status, Payment.STATUS_FAILED)
+        self.assertEqual(payment.gateway_status, "order_creation_failed")
         self.assertEqual(payment.razorpay_order_id, "")
 
     @patch("apps.payments.views.create_razorpay_order")
@@ -2022,11 +2101,9 @@ class PaymentVerificationTests(BaseAPITestCase):
 
     @patch("apps.payments.views.create_razorpay_order")
     def test_create_order_requires_csrf_for_browser_requests(self, mock_create_order):
-        mock_create_order.return_value = {
-            "id": "order_csrf_protected",
-            "amount": 350000,
-            "currency": "INR",
-        }
+        mock_create_order.side_effect = lambda **kwargs: razorpay_created_order(
+            "order_csrf_protected", **kwargs
+        )
         csrf_client = APIClient(enforce_csrf_checks=True)
 
         blocked = csrf_client.post(
@@ -2044,6 +2121,7 @@ class PaymentVerificationTests(BaseAPITestCase):
             self.checkout_payload(),
             format="json",
             HTTP_X_CSRFTOKEN=csrf_token,
+            HTTP_IDEMPOTENCY_KEY="checkout-csrf-protected-0001",
         )
         self.assertEqual(allowed.status_code, 201)
         self.assertTrue(Payment.objects.exists())

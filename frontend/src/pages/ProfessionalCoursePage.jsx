@@ -205,6 +205,7 @@ export default function ProfessionalCoursePage() {
     0
   );
   const cardHighlights = normalizeTextList(course.card_highlights);
+  const hasInstallmentAccess = course.enrollment_access_type === "installment";
   const focusAreas = (cardHighlights.length ? cardHighlights : learningOutcomes).slice(0, 4);
   const factItems = [
     ["Duration", facts.duration],
@@ -216,9 +217,16 @@ export default function ProfessionalCoursePage() {
   ];
 
   const action = course.is_enrolled ? (
-    <Link className="action full" to={`/learn/${id}`}>
-      Continue learning <span aria-hidden="true">&rarr;</span>
-    </Link>
+    <>
+      <Link className="action full" to={`/learn/${id}`}>
+        Continue learning <span aria-hidden="true">&rarr;</span>
+      </Link>
+      {hasInstallmentAccess ? (
+        <Link className="action secondary full" to={`/courses/${id}/payment`}>
+          Pay next installment <span aria-hidden="true">&rarr;</span>
+        </Link>
+      ) : null}
+    </>
   ) : open && (pentesting || course.purchase_available) ? (
     <Link
       className="action full"

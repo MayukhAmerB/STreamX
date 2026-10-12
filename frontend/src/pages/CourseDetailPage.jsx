@@ -139,6 +139,7 @@ export default function CourseDetailPage() {
     [course?.enrollment_status]
   );
   const hasApprovedEnrollment = Boolean(course?.is_enrolled) || normalizedEnrollmentStatus === "approved";
+  const hasInstallmentAccess = course?.enrollment_access_type === "installment";
   const purchaseAvailable = Boolean(course?.purchase_available);
 
   useEffect(() => {
@@ -246,9 +247,16 @@ export default function CourseDetailPage() {
           <Button className={className}>Sign In to Continue</Button>
         </Link>
       ) : hasApprovedEnrollment ? (
-        <Link to={`/learn/${course.id}`} className="block">
-          <Button className={className}>Continue Course</Button>
-        </Link>
+        <>
+          <Link to={`/learn/${course.id}`} className="block">
+            <Button className={className}>Continue Course</Button>
+          </Link>
+          {hasInstallmentAccess ? (
+            <Link to={`/courses/${course.id}/payment`} className="block">
+              <Button className={className} variant="secondary">Pay next installment</Button>
+            </Link>
+          ) : null}
+        </>
       ) : purchaseAvailable ? (
         <Link to={`/courses/${course.id}/payment`} className="block">
           <Button className={className}>Buy Now</Button>

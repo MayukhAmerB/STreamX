@@ -1,8 +1,9 @@
-from datetime import timedelta
 import logging
+from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
+from corsheaders.defaults import default_headers
 
 from config.env import env, env_bool, env_int, env_list
 
@@ -279,6 +280,7 @@ SESSION_CACHE_ALIAS = "default"
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", ["http://localhost:5173"])
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_HEADERS = (*default_headers, "idempotency-key")
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", ["http://localhost:5173"])
 
 if DEBUG:
@@ -339,6 +341,14 @@ try:
     )
 except (TypeError, ValueError):
     RAZORPAY_HTTP_TIMEOUT_SECONDS = 12.0
+PAYMENT_IDEMPOTENCY_LEASE_SECONDS = max(
+    env_int("PAYMENT_IDEMPOTENCY_LEASE_SECONDS", 60),
+    int(RAZORPAY_HTTP_TIMEOUT_SECONDS) + 5,
+)
+PAYMENT_ORDER_RESUME_MAX_AGE_SECONDS = max(
+    env_int("PAYMENT_ORDER_RESUME_MAX_AGE_SECONDS", 3600),
+    60,
+)
 DIRECT_COURSE_PAYMENTS_ENABLED = env_bool("DIRECT_COURSE_PAYMENTS_ENABLED", False)
 PAYMENT_SUPPORT_WHATSAPP_NUMBER = env(
     "PAYMENT_SUPPORT_WHATSAPP_NUMBER",

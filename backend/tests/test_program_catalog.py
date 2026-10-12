@@ -13,7 +13,7 @@ from apps.users.models import User
 from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
-from django.test import TestCase, override_settings
+from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 
 
@@ -48,6 +48,29 @@ class ProgramCatalogTests(TestCase):
 
         with self.assertRaises(ValidationError):
             course.full_clean()
+
+    def test_course_detail_exposes_installment_state_for_follow_up_payments(self):
+        course = Course.objects.create(
+            title="Installment Course",
+            description="Installment access",
+            price=Decimal("3500.00"),
+        )
+        Enrollment.objects.create(
+            user=self.user,
+            course=course,
+            payment_status=Enrollment.STATUS_PAID,
+            access_type=Enrollment.ACCESS_INSTALLMENT,
+            installments_paid=2,
+            access_expires_at=timezone.now() + timedelta(days=30),
+        )
+        request = RequestFactory().get(f"/api/courses/{course.id}/")
+        request.user = self.user
+
+        data = CourseDetailSerializer(course, context={"request": request}).data
+
+        self.assertTrue(data["is_enrolled"])
+        self.assertEqual(data["enrollment_access_type"], Enrollment.ACCESS_INSTALLMENT)
+        self.assertEqual(data["installments_paid"], 2)
 
     def test_setup_preserves_existing_rows_and_admin_edits(self):
         original = Course.objects.create(title="Existing OSINT", description="Existing material", price=777)
@@ -258,7 +281,16 @@ class ProgramCatalogTests(TestCase):
                 "buyer_email": self.user.email,
                 "whatsapp_number": "+919876543210",
             },
-            gateway_create_order=lambda **kwargs: {"id": "order_bundle1", "currency": "INR"},
+            gateway_create_order=lambda **kwargs: {
+                "id": "order_bundle1",
+                "entity": "order",
+                "amount": kwargs["amount_paise"],
+                "amount_paid": 0,
+                "amount_due": kwargs["amount_paise"],
+                "currency": kwargs["currency"],
+                "receipt": kwargs["receipt"],
+                "status": "created",
+            },
         )
         payment = result.payment
         self.assertEqual(payment.terms_snapshot["installments"], 2)
