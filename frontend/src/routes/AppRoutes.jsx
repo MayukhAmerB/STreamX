@@ -30,6 +30,7 @@ const LectureQuestionsPage = lazy(() => import("../pages/LectureQuestionsPage"))
 const LiveClassesPage = lazy(() => import("../pages/LiveClassesPage"));
 const LoginPage = lazy(() => import("../pages/LoginPage"));
 const MeetingPage = lazy(() => import("../pages/MeetingPage"));
+const NationalDeskPage = lazy(() => import("../pages/NationalDeskPage"));
 const OsintToolsPage = lazy(() => import("../pages/OsintToolsPage"));
 const ProfilePage = lazy(() => import("../pages/ProfilePage"));
 const TermsPage = lazy(() => import("../pages/TermsPage"));
@@ -45,6 +46,7 @@ export default function AppRoutes() {
           <Route path="/live-classes" element={<Navigate to="/courses?view=live" replace />} />
           <Route path="/about" element={<AboutPage />} />
           {siteBrand.id !== "owlcognito" ? <Route path="/as-accounts" element={<AccountsDirectoryPage />} /> : null}
+          {siteBrand.id !== "owlcognito" ? <Route path="/national-desk" element={<NationalDeskPage />} /> : null}
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/faqs" element={<FaqPage />} />
           {siteBrand.id !== "owlcognito" ? <Route path="/hall-of-fame" element={<HallOfFamePage />} /> : null}
