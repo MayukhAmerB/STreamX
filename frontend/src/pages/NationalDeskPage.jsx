@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import IndiaMap from "../components/IndiaMap";
+import { SupremeCourtHero } from "../components/NationalDeskArt";
+import heroFir from "../assets/nd-hero-fir.jpg";
+import heroLaws from "../assets/nd-hero-laws.jpg";
 
 const INSTAGRAM_URL = "https://www.instagram.com/adlfrontofficial?igsh=MTgwN3Z2ZXZ4aGswYg==";
 
@@ -121,11 +125,11 @@ function InstagramIcon({ className = "h-5 w-5" }) {
   );
 }
 
-function PinIcon({ className = "h-5 w-5" }) {
+function PinFilledIcon({ className = "h-5 w-5" }) {
   return (
-    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z" />
-      <circle cx="12" cy="10" r="2.6" />
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <path d="M12 21.5s7-6.6 7-11.5a7 7 0 1 0-14 0c0 4.9 7 11.5 7 11.5Z" />
+      <circle cx="12" cy="10" r="2.5" fill="#070707" />
     </svg>
   );
 }
@@ -139,23 +143,13 @@ function ExternalIcon({ className = "h-5 w-5" }) {
   );
 }
 
-function CompassIcon({ className = "h-7 w-7" }) {
-  return (
-    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
-      <path d="M24 4v10M24 34v10M4 24h10M34 24h10" stroke="rgba(255,255,255,0.35)" strokeWidth="1.2" strokeLinecap="round" />
-      <path d="M24 10 28 24 24 20 20 24 24 10Z" fill="rgba(255,255,255,0.85)" />
-      <path d="M24 38 20 24 24 28 28 24 24 38Z" fill="rgba(255,255,255,0.3)" />
-    </svg>
-  );
-}
-
 /* ------------------------------------------------------------------ */
 /* Shared pieces                                                       */
 /* ------------------------------------------------------------------ */
 
-function Kicker({ children }) {
+function Kicker({ children, className = "" }) {
   return (
-    <span className="inline-flex items-center rounded-full border border-white/15 bg-white/[0.04] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#B9B9B9]">
+    <span className={`inline-flex items-center rounded-full border border-white/15 bg-white/[0.04] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#B9B9B9] ${className}`}>
       {children}
     </span>
   );
@@ -185,77 +179,50 @@ function Waveform({ bars = 42, className = "" }) {
 
 function FileFirView() {
   return (
-    <article className="nd-view overflow-hidden rounded-[26px] border border-white/10 bg-[#070707] shadow-[0_30px_90px_rgba(0,0,0,0.55)]">
+    <article className="nd-view overflow-hidden rounded-[28px] border border-white/10 bg-[#070707] shadow-[0_30px_90px_rgba(0,0,0,0.55)]">
       {/* Hero */}
-      <div className="relative h-[300px] overflow-hidden sm:h-[360px]">
-        <div className="absolute inset-0 bg-[radial-gradient(130%_120%_at_30%_10%,#2b2b2b_0%,#141414_42%,#050505_100%)]" />
-        <div className="absolute inset-0 opacity-[0.5] bg-[linear-gradient(115deg,transparent_0%,rgba(255,255,255,0.05)_38%,transparent_60%)]" />
-        {/* police cap suggestion */}
-        <div className="absolute right-6 top-6 h-20 w-28 rounded-[40%] bg-[radial-gradient(circle_at_50%_30%,#333_0%,#111_70%,#050505_100%)] opacity-70 blur-[1px] sm:h-24 sm:w-36" />
-        {/* POLICE strip */}
-        <div className="absolute left-5 top-8 -rotate-6 rounded bg-black/55 px-3 py-1 text-[13px] font-bold uppercase tracking-[0.3em] text-white/55">
-          Police
-        </div>
-
-        {/* FIR paper */}
-        <div className="absolute left-1/2 top-1/2 w-[260px] -translate-x-1/2 -translate-y-1/2 rotate-[-3deg] rounded-sm bg-gradient-to-b from-[#d8d6cf] to-[#b7b4aa] p-4 text-[#1b1b1b] shadow-[0_24px_60px_rgba(0,0,0,0.6)] sm:w-[320px] sm:p-5">
-          <div className="text-center">
-            <div className="mx-auto mb-1 h-6 w-6 rounded-full border border-[#1b1b1b]/60 sm:h-7 sm:w-7" />
-            <div className="text-[7px] font-semibold tracking-[0.2em] text-[#1b1b1b]/70">सत्यमेव जयते</div>
-            <div className="mt-1 text-xl font-black tracking-[0.12em] sm:text-2xl">FIR</div>
-            <div className="text-[8px] font-bold uppercase tracking-[0.14em] sm:text-[9px]">First Information Report</div>
-          </div>
-          <div className="mt-3 space-y-[7px] text-[8px] font-medium text-[#1b1b1b]/80 sm:text-[9px]">
-            {["Police Station :", "District :", "Date & Time of Registration :", "FIR No. :", "Acts / Sections :"].map((line) => (
-              <div key={line} className="flex items-end gap-1">
-                <span className="whitespace-nowrap">{line}</span>
-                <span className="mb-[2px] h-px flex-1 bg-[#1b1b1b]/35" />
-              </div>
-            ))}
-            <div className="mb-[2px] h-px w-full bg-[#1b1b1b]/35" />
-          </div>
-        </div>
-        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#070707] to-transparent" />
-        <div className="absolute left-5 bottom-5 sm:left-8">
-          <span className="inline-flex items-center rounded-full border border-white/20 bg-black/50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-white/80 backdrop-blur">
-            Practical Guide
-          </span>
-        </div>
+      <div className="relative">
+        <img
+          src={heroFir}
+          alt="FIR (First Information Report) form on a desk with a police cap and pen"
+          className="block w-full"
+        />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#070707] to-transparent" />
       </div>
 
       {/* Body */}
-      <div className="px-5 pb-7 pt-6 sm:px-9 sm:pb-10 sm:pt-8">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.32em] text-[#8c8c8c]">Section 01</p>
-        <h2 className="mt-3 text-[2.4rem] font-black leading-[1.02] tracking-[-0.03em] text-white sm:text-[3.4rem]">
+      <div className="px-5 pb-8 pt-2 sm:px-10 sm:pb-11">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.34em] text-[#8c8c8c]">Section 01</p>
+        <h2 className="mt-3 text-[2.6rem] font-black leading-[0.98] tracking-[-0.035em] text-white sm:text-[3.8rem]">
           How to File an FIR
         </h2>
-        <p className="mt-4 max-w-xl text-[15px] leading-7 text-[#9a9a9a] sm:text-base">
+        <p className="mt-5 max-w-xl text-[15px] leading-7 text-[#9a9a9a] sm:text-lg sm:leading-8">
           Step-by-step guide to filing an FIR, from the complaint letter to the final process.
         </p>
 
         {/* Audio guide */}
-        <div className="mt-8 rounded-[20px] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+        <div className="mt-8 rounded-[22px] border border-white/10 bg-white/[0.03] p-5 sm:p-7">
           <div className="flex items-center gap-2 text-[#9a9a9a]">
             <HeadphonesIcon className="h-4 w-4" />
             <span className="text-[11px] font-semibold uppercase tracking-[0.3em]">Audio Guide</span>
           </div>
-          <h3 className="mt-3 text-lg font-bold text-white sm:text-xl">FIR Filing Process &ndash; Step by Step</h3>
+          <h3 className="mt-3 text-xl font-bold text-white sm:text-2xl">FIR Filing Process &ndash; Step by Step</h3>
           <div className="mt-2 flex items-center gap-2 text-sm text-[#9a9a9a]">
             <ClockIcon className="h-4 w-4" />
             <span>12:48</span>
           </div>
-          <div className="mt-5 flex items-center gap-4">
+          <div className="mt-6 flex items-center gap-4">
             <button
               type="button"
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/25 bg-white/5 text-white transition hover:bg-white/15"
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/25 bg-white/5 text-white transition hover:bg-white/15"
               aria-label="Play FIR filing audio guide"
             >
-              <PlayIcon className="h-5 w-5 translate-x-[1px]" />
+              <PlayIcon className="h-6 w-6 translate-x-[1px]" />
             </button>
-            <Waveform className="h-9 flex-1" bars={46} />
+            <Waveform className="h-10 flex-1" bars={54} />
             <button
               type="button"
-              className="hidden shrink-0 items-center gap-2 rounded-full border border-white/20 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10 sm:inline-flex"
+              className="hidden shrink-0 items-center gap-2 rounded-full border border-white/20 px-5 py-3 text-sm font-medium text-white transition hover:bg-white/10 sm:inline-flex"
             >
               <HeadphonesIcon className="h-4 w-4" />
               Listen Now
@@ -306,37 +273,24 @@ const LAW_ROWS = [
 
 function LawsView() {
   return (
-    <article className="nd-view overflow-hidden rounded-[26px] border border-white/10 bg-[#070707] p-5 shadow-[0_30px_90px_rgba(0,0,0,0.55)] sm:p-9">
+    <article className="nd-view overflow-hidden rounded-[28px] border border-white/10 bg-[#070707] p-5 shadow-[0_30px_90px_rgba(0,0,0,0.55)] sm:p-10">
       {/* Header */}
-      <div className="relative grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+      <div className="relative grid gap-6 lg:grid-cols-[1fr_0.82fr] lg:items-start">
         <div>
           <Kicker>Section 05</Kicker>
-          <h2 className="mt-5 text-[2.1rem] font-black leading-[1.04] tracking-[-0.03em] text-white sm:text-[3rem]">
+          <h2 className="mt-5 text-[2.2rem] font-black leading-[1.02] tracking-[-0.035em] text-white sm:text-[3.3rem]">
             Laws You Need to Know Before Going to a Police Station
           </h2>
           <p className="mt-5 max-w-md text-[15px] leading-7 text-[#8f8f8f] sm:text-base">
             Know your rights. Be prepared. These key laws will help you understand your legal position and ensure you&rsquo;re not taken advantage of.
           </p>
         </div>
-        {/* Books + gavel hero */}
-        <div className="relative hidden h-full min-h-[230px] overflow-hidden rounded-2xl lg:block">
-          <div className="absolute inset-0 bg-[radial-gradient(120%_120%_at_70%_20%,#2a2a2a_0%,#131313_50%,#070707_100%)]" />
-          <div className="absolute right-6 top-6 space-y-2">
-            {["Criminal Procedure Code", "Indian Penal Code", "Constitution of India"].map((book, i) => (
-              <div
-                key={book}
-                className="flex h-10 items-center rounded-sm bg-gradient-to-r from-[#1b1b1b] to-[#2c2c2c] px-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-white/55 shadow-[0_8px_18px_rgba(0,0,0,0.5)]"
-                style={{ width: `${220 - i * 16}px` }}
-              >
-                {book}
-              </div>
-            ))}
-          </div>
-          {/* gavel */}
-          <div className="absolute bottom-6 right-10">
-            <div className="h-5 w-16 -rotate-[18deg] rounded bg-gradient-to-r from-[#3a3a3a] to-[#161616] shadow-[0_8px_20px_rgba(0,0,0,0.6)]" />
-            <div className="ml-2 mt-2 h-2 w-12 rounded-full bg-[#1b1b1b]" />
-          </div>
+        <div className="relative hidden aspect-[4/5] overflow-hidden rounded-2xl border border-white/10 lg:block">
+          <img
+            src={heroLaws}
+            alt="Stacked law books — Criminal Procedure Code, Indian Penal Code, Constitution of India — with scales of justice and a gavel"
+            className="h-full w-full object-cover object-center"
+          />
         </div>
       </div>
 
@@ -346,17 +300,17 @@ function LawsView() {
           <button
             key={title}
             type="button"
-            className="group flex w-full items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4 text-left transition hover:border-white/20 hover:bg-white/[0.05] sm:px-5"
+            className="group flex w-full items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4 text-left transition hover:border-white/20 hover:bg-white/[0.05] sm:gap-5 sm:px-6 sm:py-5"
           >
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/[0.04] text-white/75 sm:h-14 sm:w-14">
               <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-bold text-white sm:text-base">{title}</span>
+              <span className="block text-[15px] font-bold text-white sm:text-lg">{title}</span>
               <span className="mt-1 block text-[13px] leading-6 text-[#8f8f8f] sm:text-sm">{body}</span>
             </span>
-            <span className="hidden shrink-0 items-center gap-3 sm:flex">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-white/80 transition group-hover:bg-white/10">
+            <span className="hidden shrink-0 items-center gap-4 sm:flex">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 text-white/80 transition group-hover:bg-white/10">
                 <PlayIcon className="h-4 w-4 translate-x-[1px]" />
               </span>
               <span className="text-right leading-tight text-[#9a9a9a]">
@@ -379,8 +333,8 @@ function LawsView() {
       <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.02] p-5 sm:p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-4">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/[0.04] text-white/75">
-              <MegaphoneIcon className="h-6 w-6" />
+            <span className="shrink-0 pt-0.5 text-white/75">
+              <MegaphoneIcon className="h-9 w-9" />
             </span>
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#8c8c8c]">Stay Updated</p>
@@ -394,7 +348,7 @@ function LawsView() {
             href={INSTAGRAM_URL}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-white/25 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-white/25 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
           >
             <InstagramIcon className="h-5 w-5" />
             Follow on Instagram
@@ -425,60 +379,10 @@ const UPDATES = [
   { city: "Kolkata, West Bengal", state: "FIR Registered", status: "Completed", date: "14 Oct 2025" },
 ];
 
-// Approximate dot positions on the India map (percentages within the map box).
-const MAP_DOTS = [
-  { x: 36, y: 20, s: 1 }, { x: 30, y: 28, s: 0.7 }, { x: 44, y: 24, s: 0.8 },
-  { x: 25, y: 38, s: 0.9 }, { x: 38, y: 40, s: 1.1 }, { x: 52, y: 36, s: 0.7 },
-  { x: 62, y: 42, s: 0.8 }, { x: 70, y: 40, s: 0.7 }, { x: 46, y: 50, s: 0.9 },
-  { x: 33, y: 55, s: 0.8 }, { x: 58, y: 54, s: 1 }, { x: 42, y: 62, s: 0.9 },
-  { x: 50, y: 68, s: 0.8 }, { x: 36, y: 72, s: 1 }, { x: 44, y: 82, s: 0.9 },
-  { x: 40, y: 90, s: 0.7 },
-];
-
-function IndiaMap() {
-  return (
-    <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#050505] p-3">
-      <div className="absolute inset-0 opacity-[0.35] [background-image:linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:26px_26px]" />
-      <div className="absolute left-3 top-3 flex flex-col items-center text-white/50">
-        <CompassIcon className="h-7 w-7" />
-      </div>
-      <svg viewBox="0 0 400 480" className="relative h-full w-full" aria-hidden="true">
-        <path
-          d="M150 28 C135 40 128 54 120 62 C104 70 92 72 78 82 C70 96 66 118 58 142 C52 160 48 172 52 182 C60 186 72 182 78 190 C82 206 76 224 84 248 C96 276 112 302 128 332 C140 356 150 386 162 414 C168 432 174 448 178 452 C184 446 190 420 198 392 C208 360 220 330 236 300 C252 270 266 240 278 210 C288 186 296 168 300 150 C312 148 326 150 338 140 C352 128 362 120 356 110 C344 112 330 122 318 120 C300 116 286 96 268 86 C248 74 224 62 204 50 C186 40 166 30 150 28 Z"
-          fill="rgba(255,255,255,0.045)"
-          stroke="rgba(255,255,255,0.4)"
-          strokeWidth="1.4"
-          strokeLinejoin="round"
-        />
-        {/* a few internal state strokes for texture */}
-        <path
-          d="M120 110 C160 120 210 118 250 130 M110 170 C160 180 210 185 260 180 M130 240 C170 250 210 255 250 250 M150 320 C180 320 210 315 235 300"
-          fill="none"
-          stroke="rgba(255,255,255,0.14)"
-          strokeWidth="1"
-        />
-      </svg>
-      {MAP_DOTS.map((d, i) => (
-        <span
-          key={i}
-          className="nd-dot-glow absolute rounded-full bg-white shadow-[0_0_12px_4px_rgba(255,255,255,0.5)]"
-          style={{
-            left: `${d.x}%`,
-            top: `${d.y}%`,
-            width: `${6 * d.s}px`,
-            height: `${6 * d.s}px`,
-            animationDelay: `${(i % 7) * 0.3}s`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
 function StatMarker({ kind }) {
   if (kind === "completed") {
     return (
-      <span className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/[0.04]">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/[0.04]">
         <svg viewBox="0 0 24 24" className="h-5 w-5 text-white" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <path d="m5 12 4 4 10-10" />
         </svg>
@@ -487,7 +391,7 @@ function StatMarker({ kind }) {
   }
   if (kind === "progress") {
     return (
-      <span className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/[0.04]">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/[0.04]">
         <svg viewBox="0 0 24 24" className="h-6 w-6 -rotate-90" fill="none">
           <circle cx="12" cy="12" r="8" stroke="rgba(255,255,255,0.18)" strokeWidth="2.5" />
           <circle cx="12" cy="12" r="8" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="34 50" />
@@ -497,13 +401,13 @@ function StatMarker({ kind }) {
   }
   if (kind === "done") {
     return (
-      <span className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/[0.04]">
-        <span className="h-5 w-5 rounded-full bg-white/80" />
+      <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/[0.04]">
+        <span className="h-5 w-5 rounded-full bg-white/85" />
       </span>
     );
   }
   return (
-    <span className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/[0.04]">
+    <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/[0.04]">
       <span className="h-5 w-5 rounded-full border-2 border-white/40" />
     </span>
   );
@@ -517,38 +421,47 @@ function statusDotClass(status) {
 
 function TrackerView() {
   return (
-    <article className="nd-view overflow-hidden rounded-[26px] border border-white/10 bg-[#070707] p-5 shadow-[0_30px_90px_rgba(0,0,0,0.55)] sm:p-9">
+    <article className="nd-view overflow-hidden rounded-[28px] border border-white/10 bg-[#070707] p-5 shadow-[0_30px_90px_rgba(0,0,0,0.55)] sm:p-10">
       {/* Header */}
-      <div className="relative grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+      <div className="relative grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
         <div>
           <Kicker>National Progress</Kicker>
-          <h2 className="mt-5 text-[2.2rem] font-black leading-[1.02] tracking-[-0.03em] text-white sm:text-[3rem]">
+          <h2 className="mt-5 text-[2.3rem] font-black leading-[1.0] tracking-[-0.035em] text-white sm:text-[3.4rem]">
             FIR Process<br className="hidden sm:block" /> Across India
           </h2>
           <p className="mt-5 max-w-lg text-[15px] leading-7 text-[#8f8f8f] sm:text-base">
             We are tracking FIRs filed across the country. Here you can see where the process is active, which locations have already registered FIRs, and where it is still in progress.
           </p>
         </div>
-        <div className="relative hidden min-h-[180px] overflow-hidden rounded-2xl lg:block">
-          <div className="absolute inset-0 bg-[radial-gradient(120%_120%_at_70%_10%,#2a2a2a_0%,#121212_52%,#070707_100%)]" />
-          {/* dome suggestion */}
-          <div className="absolute right-10 top-7 h-16 w-28 rounded-t-full bg-[radial-gradient(circle_at_50%_80%,#3a3a3a,#141414)] opacity-80" />
-          <div className="absolute right-6 top-[5.5rem] h-16 w-36 bg-gradient-to-t from-[#1b1b1b] to-[#2a2a2a] opacity-70" />
-          <p className="absolute bottom-6 right-6 text-right text-[11px] font-semibold uppercase leading-5 tracking-[0.22em] text-white/45">
+        <div className="relative hidden aspect-[16/10] overflow-hidden rounded-2xl border border-white/10 lg:block">
+          <SupremeCourtHero className="h-full w-full" />
+          <p className="absolute bottom-4 right-4 text-right text-[11px] font-semibold uppercase leading-5 tracking-[0.22em] text-white/60">
             More FIRs. Stronger Voices.<br />Across India.
           </p>
         </div>
       </div>
 
       {/* Map + stats */}
-      <div className="mt-8 grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
-        <IndiaMap />
+      <div className="mt-8 grid gap-5 lg:grid-cols-[1.08fr_0.92fr]">
+        <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#050505] p-4">
+          <div className="absolute inset-0 opacity-[0.3] [background-image:linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:28px_28px]" />
+          {/* Compass */}
+          <div className="absolute left-4 top-4 z-10 flex flex-col items-center text-white/55">
+            <svg viewBox="0 0 40 52" className="h-11 w-9" aria-hidden="true">
+              <path d="M20 4 26 24 20 19 14 24 20 4Z" fill="rgba(255,255,255,0.9)" />
+              <path d="M20 40 14 24 20 29 26 24 20 40Z" fill="rgba(255,255,255,0.28)" />
+            </svg>
+            <span className="text-[11px] font-bold tracking-[0.2em]">N</span>
+          </div>
+          <IndiaMap className="relative mx-auto h-[400px] w-full sm:h-[460px]" />
+        </div>
+
         <div className="flex flex-col gap-3">
           {STATS.map((s) => (
             <div key={s.label} className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4">
               <StatMarker kind={s.kind} />
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#8c8c8c]">{s.label}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8c8c8c]">{s.label}</p>
                 <p className="mt-1 text-2xl font-black text-white sm:text-3xl">
                   {s.value} <span className="text-sm font-medium text-[#8f8f8f]">{s.note}</span>
                 </p>
@@ -567,7 +480,7 @@ function TrackerView() {
       <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.02] p-5 sm:p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-white">
-            <PinIcon className="h-5 w-5" />
+            <PinFilledIcon className="h-5 w-5" />
             <span className="text-[13px] font-semibold uppercase tracking-[0.24em]">Latest Updates</span>
           </div>
           <button type="button" className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-[13px] font-medium text-white transition hover:bg-white/10">
@@ -582,7 +495,7 @@ function TrackerView() {
                 <p className="text-[12px] text-[#8f8f8f]">{u.state}</p>
               </div>
               <div className="flex shrink-0 items-center gap-4">
-                <span className="hidden items-center gap-2 rounded-full border border-white/12 bg-white/[0.03] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#cfcfcf] sm:inline-flex">
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.03] px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#cfcfcf] sm:px-3 sm:text-[11px] sm:tracking-[0.14em]">
                   <span className={`h-2.5 w-2.5 rounded-full ${statusDotClass(u.status)}`} />
                   {u.status}
                 </span>
@@ -597,8 +510,8 @@ function TrackerView() {
       <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.02] p-5 sm:p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-4">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/[0.04] text-white/75">
-              <PinIcon className="h-5 w-5" />
+            <span className="shrink-0 text-white/70">
+              <PinFilledIcon className="h-9 w-9" />
             </span>
             <div>
               <p className="text-[13px] font-semibold uppercase tracking-[0.18em] text-white">See the Full List &amp; Real-Time Progress</p>
@@ -609,7 +522,7 @@ function TrackerView() {
           </div>
           <button
             type="button"
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-white/25 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-white/25 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
           >
             <ExternalIcon className="h-5 w-5" />
             View Full Tracker
