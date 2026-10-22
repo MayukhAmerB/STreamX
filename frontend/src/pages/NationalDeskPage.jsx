@@ -315,9 +315,8 @@ function FileFirView({ data, audio }) {
       </div>
 
       {/* Body */}
-      <div className="px-5 pb-8 pt-2 sm:px-10 sm:pb-11">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.34em] text-[#8c8c8c]">{data.section_label}</p>
-        <h2 className="mt-3 text-[2.6rem] font-black leading-[0.98] tracking-[-0.035em] text-white sm:text-[3.8rem]">
+      <div className="px-5 pb-8 pt-6 sm:px-10 sm:pb-11 sm:pt-8">
+        <h2 className="text-[2.6rem] font-black leading-[0.98] tracking-[-0.035em] text-white sm:text-[3.8rem]">
           {data.title}
         </h2>
         <p className="mt-5 max-w-xl text-[15px] leading-7 text-[#9a9a9a] sm:text-lg sm:leading-8">{data.subtitle}</p>
