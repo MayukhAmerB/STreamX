@@ -7,6 +7,7 @@ from .models import (
     FirFilingGuide,
     LawsSection,
     LawTopic,
+    LawTopicVideo,
     TrackerOverview,
     TrackerUpdate,
 )
@@ -22,16 +23,59 @@ def _media_url(file_field, request):
     return get_media_public_url(url, request=request)
 
 
+class LawTopicVideoSerializer(serializers.ModelSerializer):
+    video_url = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LawTopicVideo
+        fields = ("id", "title", "description", "duration", "video_url", "thumbnail_url")
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_video_url(self, obj):
+        uploaded = _media_url(obj.video_file, self.context.get("request"))
+        return uploaded or obj.video_url
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_thumbnail_url(self, obj):
+        return _media_url(obj.thumbnail, self.context.get("request"))
+
+
 class LawTopicSerializer(serializers.ModelSerializer):
     audio_url = serializers.SerializerMethodField()
+    pdf_url = serializers.SerializerMethodField()
+    videos = serializers.SerializerMethodField()
 
     class Meta:
         model = LawTopic
-        fields = ("id", "icon_key", "title", "body", "audio_duration", "audio_url")
+        fields = (
+            "id",
+            "action_type",
+            "icon_key",
+            "title",
+            "body",
+            "audio_duration",
+            "audio_url",
+            "audio_note",
+            "pdf_url",
+            "view_all_url",
+            "videos",
+        )
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_audio_url(self, obj):
         return _media_url(obj.audio_file, self.context.get("request"))
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_pdf_url(self, obj):
+        return _media_url(obj.pdf_file, self.context.get("request"))
+
+    @extend_schema_field(LawTopicVideoSerializer(many=True))
+    def get_videos(self, obj):
+        videos = getattr(obj, "public_videos", None)
+        if videos is None:
+            videos = obj.videos.filter(is_active=True)
+        return LawTopicVideoSerializer(videos, many=True, context=self.context).data
 
 
 class TrackerUpdateSerializer(serializers.ModelSerializer):

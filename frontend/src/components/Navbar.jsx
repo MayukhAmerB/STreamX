@@ -63,11 +63,6 @@ export default function Navbar() {
           >
             Courses
           </NavLink>
-          {isAuthenticated ? (
-            <NavLink to="/guides" className={navClass}>
-              Guides
-            </NavLink>
-          ) : null}
           <NavLink to="/about" className={navClass}>
             About Us
           </NavLink>
@@ -239,11 +234,6 @@ export default function Navbar() {
             >
               Courses
             </NavLink>
-            {isAuthenticated ? (
-              <NavLink to="/guides" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-                Guides
-              </NavLink>
-            ) : null}
             <NavLink to="/about" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
               About Us
             </NavLink>

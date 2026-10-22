@@ -1,4 +1,5 @@
 from config.response import api_response
+from django.db.models import Prefetch
 from drf_spectacular.utils import extend_schema
 from rest_framework import permissions
 from rest_framework.throttling import AnonRateThrottle
@@ -8,6 +9,7 @@ from .models import (
     FirFilingGuide,
     LawsSection,
     LawTopic,
+    LawTopicVideo,
     NationalDeskSettings,
     TrackerOverview,
     TrackerUpdate,
@@ -40,7 +42,10 @@ class NationalDeskView(APIView):
         fir = FirFilingGuide.load()
 
         laws = LawsSection.load()
-        laws.public_topics = LawTopic.objects.filter(is_active=True)
+        active_videos = LawTopicVideo.objects.filter(is_active=True)
+        laws.public_topics = LawTopic.objects.filter(is_active=True).prefetch_related(
+            Prefetch("videos", queryset=active_videos, to_attr="public_videos")
+        )
 
         tracker = TrackerOverview.load()
         tracker.public_updates = TrackerUpdate.objects.filter(is_active=True)

@@ -7,6 +7,7 @@ from apps.national_desk.models import (
     FirFilingGuide,
     LawsSection,
     LawTopic,
+    LawTopicVideo,
     NationalDeskSettings,
     TrackerOverview,
     TrackerUpdate,
@@ -14,6 +15,7 @@ from apps.national_desk.models import (
 
 INSTAGRAM_URL = "https://www.instagram.com/adlfrontofficial?igsh=MTgwN3Z2ZXZ4aGswYg=="
 
+# (icon_key, title, body, audio_duration, sort_order)
 LAW_TOPICS = (
     (
         "book",
@@ -52,6 +54,33 @@ LAW_TOPICS = (
     ),
 )
 
+PDF_ROW = {
+    "title": "Complaint Letter Format",
+    "icon_key": "pdf",
+    "action_type": "pdf",
+    "body": "Download the ready-to-use complaint letter format to file your FIR.",
+    "audio_duration": "02:40",
+    "sort_order": 60,
+}
+
+VIDEO_ROW = {
+    "title": "Video Proof Examples",
+    "icon_key": "video",
+    "action_type": "video",
+    "body": "Watch sample video formats and how to present evidence properly.",
+    "audio_duration": "2:18",
+    "audio_note": "Tap to listen to a quick guide on how to record and present evidence correctly.",
+    "sort_order": 70,
+}
+
+# (title, description, duration, sort_order)
+VIDEO_EXAMPLES = (
+    ("Recording an Incident", "How to properly record a video at the scene and what details to include.", "2:14", 10),
+    ("Showing Location Proof", "How to capture location, surroundings and time in your video.", "1:48", 20),
+    ("Capturing Evidence (Do's & Don'ts)", "What to record, what to avoid, and common mistakes to prevent.", "3:22", 30),
+    ("How to Present Video to Police", "Step-by-step guide on how to submit your video evidence properly.", "2:37", 40),
+)
+
 TRACKER_UPDATES = (
     ("Lucknow", "Uttar Pradesh", "completed", "FIR Registered", datetime.date(2025, 10, 18), 10),
     ("Bhopal", "Madhya Pradesh", "in_progress", "Under Process", datetime.date(2025, 10, 17), 20),
@@ -66,7 +95,7 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
-        created = {"topics": 0, "updates": 0}
+        created = {"topics": 0, "videos": 0, "updates": 0}
 
         # Single-row configuration tables carry today's content in their field
         # defaults; create them if they do not exist yet, without clobbering edits.
@@ -80,12 +109,35 @@ class Command(BaseCommand):
                 title=title,
                 defaults={
                     "icon_key": icon_key,
+                    "action_type": "audio",
                     "body": body,
                     "audio_duration": duration,
                     "sort_order": sort_order,
                 },
             )
             created["topics"] += int(was_created)
+
+        _, was_created = LawTopic.objects.get_or_create(
+            title=PDF_ROW["title"], defaults={k: v for k, v in PDF_ROW.items() if k != "title"}
+        )
+        created["topics"] += int(was_created)
+
+        video_topic, was_created = LawTopic.objects.get_or_create(
+            title=VIDEO_ROW["title"], defaults={k: v for k, v in VIDEO_ROW.items() if k != "title"}
+        )
+        created["topics"] += int(was_created)
+
+        for title, description, duration, sort_order in VIDEO_EXAMPLES:
+            _, v_created = LawTopicVideo.objects.get_or_create(
+                topic=video_topic,
+                title=title,
+                defaults={
+                    "description": description,
+                    "duration": duration,
+                    "sort_order": sort_order,
+                },
+            )
+            created["videos"] += int(v_created)
 
         for city, region, status, note, event_date, sort_order in TRACKER_UPDATES:
             _, was_created = TrackerUpdate.objects.get_or_create(
@@ -103,7 +155,7 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 "National Desk seeded: "
-                f"{created['topics']} new law topic(s), {created['updates']} new tracker update(s). "
-                "Settings/guide/laws/tracker rows ensured."
+                f"{created['topics']} new law topic(s), {created['videos']} new video(s), "
+                f"{created['updates']} new tracker update(s). Settings/guide/laws/tracker rows ensured."
             )
         )

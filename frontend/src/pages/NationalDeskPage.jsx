@@ -153,13 +153,96 @@ function ExternalIcon({ className = "h-5 w-5" }) {
   );
 }
 
+function PdfIcon({ className = "h-5 w-5" }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" />
+      <path d="M14 3v5h5" />
+      <text x="12" y="17" textAnchor="middle" fontSize="5.5" fontWeight="700" fill="currentColor" stroke="none">PDF</text>
+    </svg>
+  );
+}
+
+function VideoIcon({ className = "h-5 w-5" }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="6" width="13" height="12" rx="2" />
+      <path d="m16 10 5-3v10l-5-3" />
+      <path d="M8.5 10.5v3l2.5-1.5-2.5-1.5Z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function DownloadIcon({ className = "h-4 w-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3v12m0 0 4-4m-4 4-4-4" />
+      <path d="M5 19h14" />
+    </svg>
+  );
+}
+
+function ArrowLeftIcon({ className = "h-5 w-5" }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M19 12H5M11 18l-6-6 6-6" />
+    </svg>
+  );
+}
+
 const LAW_ICONS = {
   book: BookIcon,
   person: PersonIcon,
   clipboard: ClipboardCheckIcon,
   scale: ScaleIcon,
   shield: ShieldIcon,
+  pdf: PdfIcon,
+  video: VideoIcon,
 };
+
+// Thin, seekable progress bar used by the compact listen-guide player.
+function LinearSeek({ progress = 0, onSeek, className = "" }) {
+  const ref = useRef(null);
+  const [dragging, setDragging] = useState(false);
+  const seekFromClientX = (clientX) => {
+    const el = ref.current;
+    if (!el || !onSeek) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    onSeek(Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)));
+  };
+  return (
+    <div
+      ref={ref}
+      role="slider"
+      tabIndex={onSeek ? 0 : -1}
+      aria-label="Seek audio"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(progress * 100)}
+      className={`relative flex touch-none select-none items-center ${onSeek ? "cursor-pointer" : ""} ${className}`}
+      onPointerDown={(e) => {
+        if (!onSeek) return;
+        setDragging(true);
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+        seekFromClientX(e.clientX);
+      }}
+      onPointerMove={(e) => { if (dragging) seekFromClientX(e.clientX); }}
+      onPointerUp={(e) => {
+        setDragging(false);
+        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+      }}
+    >
+      <span className="h-1 w-full rounded-full bg-white/20">
+        <span className="block h-full rounded-full bg-white" style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%` }} />
+      </span>
+      <span
+        className="pointer-events-none absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow"
+        style={{ left: `${Math.min(100, Math.max(0, progress * 100))}%` }}
+      />
+    </div>
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /* Defaults (used until the admin-managed API responds)                */
@@ -189,11 +272,24 @@ const DEFAULTS = {
     cta_body:
       "Follow us on Instagram for more legal awareness content, real-time updates and important announcements.",
     topics: [
-      { icon_key: "book", title: "Your Right to File a Complaint", body: "Under Section 154 of the CrPC, you have the right to file an FIR. The police must register it without delay.", audio_duration: "04:32", audio_url: "" },
-      { icon_key: "person", title: "What to Do If FIR Is Not Registered", body: "If the police refuse to register your complaint, you can approach higher authorities or a magistrate.", audio_duration: "03:18", audio_url: "" },
-      { icon_key: "clipboard", title: "Your Rights During Police Interrogation", body: "You have the right to remain silent, to legal counsel, and to not be forced into self-incrimination.", audio_duration: "05:26", audio_url: "" },
-      { icon_key: "scale", title: "Important Legal Provisions to Know", body: "Key sections: IPC (e.g., 499, 500), CrPC (e.g., 41, 41A, 161), and your fundamental rights under the Constitution.", audio_duration: "06:14", audio_url: "" },
-      { icon_key: "shield", title: "What to Do After Filing the FIR", body: "Next steps; follow-up, investigation process, and how to track your case status.", audio_duration: "04:50", audio_url: "" },
+      { action_type: "audio", icon_key: "book", title: "Your Right to File a Complaint", body: "Under Section 154 of the CrPC, you have the right to file an FIR. The police must register it without delay.", audio_duration: "04:32", audio_url: "", pdf_url: "", videos: [] },
+      { action_type: "audio", icon_key: "person", title: "What to Do If FIR Is Not Registered", body: "If the police refuse to register your complaint, you can approach higher authorities or a magistrate.", audio_duration: "03:18", audio_url: "", pdf_url: "", videos: [] },
+      { action_type: "audio", icon_key: "clipboard", title: "Your Rights During Police Interrogation", body: "You have the right to remain silent, to legal counsel, and to not be forced into self-incrimination.", audio_duration: "05:26", audio_url: "", pdf_url: "", videos: [] },
+      { action_type: "audio", icon_key: "scale", title: "Important Legal Provisions to Know", body: "Key sections: IPC (e.g., 499, 500), CrPC (e.g., 41, 41A, 161), and your fundamental rights under the Constitution.", audio_duration: "06:14", audio_url: "", pdf_url: "", videos: [] },
+      { action_type: "audio", icon_key: "shield", title: "What to Do After Filing the FIR", body: "Next steps; follow-up, investigation process, and how to track your case status.", audio_duration: "04:50", audio_url: "", pdf_url: "", videos: [] },
+      { action_type: "pdf", icon_key: "pdf", title: "Complaint Letter Format", body: "Download the ready-to-use complaint letter format to file your FIR.", audio_duration: "02:40", audio_url: "", pdf_url: "", videos: [] },
+      {
+        action_type: "video", icon_key: "video", title: "Video Proof Examples",
+        body: "Watch sample video formats and how to present evidence properly.",
+        audio_duration: "2:18", audio_url: "", pdf_url: "", view_all_url: "",
+        audio_note: "Tap to listen to a quick guide on how to record and present evidence correctly.",
+        videos: [
+          { title: "Recording an Incident", description: "How to properly record a video at the scene and what details to include.", duration: "2:14", video_url: "", thumbnail_url: "" },
+          { title: "Showing Location Proof", description: "How to capture location, surroundings and time in your video.", duration: "1:48", video_url: "", thumbnail_url: "" },
+          { title: "Capturing Evidence (Do's & Don'ts)", description: "What to record, what to avoid, and common mistakes to prevent.", duration: "3:22", video_url: "", thumbnail_url: "" },
+          { title: "How to Present Video to Police", description: "Step-by-step guide on how to submit your video evidence properly.", duration: "2:37", video_url: "", thumbnail_url: "" },
+        ],
+      },
     ],
   },
   tracker: {
@@ -472,97 +568,306 @@ function FileFirView({ data, audio }) {
 /* View 2 — Laws You Need to Know                                      */
 /* ------------------------------------------------------------------ */
 
-function LawsView({ data, instagram, audio }) {
+function RowLead({ topic }) {
+  const Icon = LAW_ICONS[topic.icon_key] || BookIcon;
   return (
-    <article className="nd-view overflow-hidden rounded-[28px] border border-white/10 bg-[#070707] p-5 shadow-[0_30px_90px_rgba(0,0,0,0.55)] sm:p-10">
-      {/* Header — full-bleed hero with the copy overlaid on the image */}
-      <div className="relative flex min-h-[420px] overflow-hidden rounded-[22px] border border-white/10 sm:min-h-[520px]">
-        <img
-          src={data.hero_image_url || heroLaws}
-          alt="Stacked law books — Criminal Procedure Code, Indian Penal Code, Constitution of India — with scales of justice and a gavel"
-          className="absolute inset-0 h-full w-full object-cover object-center"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#060606] via-[#060606]/80 to-[#060606]/15" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#060606]/90 via-transparent to-[#060606]/40" />
-        <div className="relative z-10 flex w-full max-w-xl flex-col justify-center px-6 py-10 sm:px-10 sm:py-14">
-          <Kicker className="self-start">{data.section_label}</Kicker>
-          <h2 className="mt-5 text-[2.1rem] font-black leading-[1.03] tracking-[-0.035em] text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.6)] sm:text-[3.1rem]">
-            {data.title}
-          </h2>
-          <p className="mt-5 max-w-md text-[15px] leading-7 text-[#d6d6d6] drop-shadow-[0_1px_10px_rgba(0,0,0,0.6)] sm:text-base">
-            {data.subtitle}
-          </p>
-        </div>
-      </div>
+    <>
+      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/[0.04] text-white/75 sm:h-14 sm:w-14">
+        <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-bold text-white sm:text-lg">{topic.title}</span>
+        <span className="mt-1 block text-[13px] leading-6 text-[#8f8f8f] sm:text-sm">{topic.body}</span>
+      </span>
+    </>
+  );
+}
 
-      {/* Rows */}
-      <div className="mt-8 space-y-3">
-        {data.topics.map((topic, index) => {
-          const Icon = LAW_ICONS[topic.icon_key] || BookIcon;
-          const hasAudio = Boolean(topic.audio_url);
-          const isPlaying = hasAudio && audio.url === topic.audio_url && audio.playing;
-          return (
-            <button
-              key={topic.id ?? `${topic.title}-${index}`}
-              type="button"
-              onClick={() => audio.toggle(topic.audio_url)}
-              className="group flex w-full items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4 text-left transition hover:border-white/20 hover:bg-white/[0.05] sm:gap-5 sm:px-6 sm:py-5"
-            >
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/[0.04] text-white/75 sm:h-14 sm:w-14">
-                <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-bold text-white sm:text-lg">{topic.title}</span>
-                <span className="mt-1 block text-[13px] leading-6 text-[#8f8f8f] sm:text-sm">{topic.body}</span>
-              </span>
-              <span className="hidden shrink-0 items-center gap-4 sm:flex">
-                <span className={`flex h-11 w-11 items-center justify-center rounded-full border border-white/20 text-white/80 transition group-hover:bg-white/10 ${hasAudio ? "" : "opacity-50"}`}>
-                  {isPlaying ? <PauseIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4 translate-x-[1px]" />}
-                </span>
-                <span className="text-right leading-tight text-[#9a9a9a]">
-                  <span className="block text-[13px]">Audio</span>
-                  <span className="block text-[13px]">{topic.audio_duration || "--:--"}</span>
-                </span>
-                <ChevronRight className="h-4 w-4 text-[#6e6e6e]" />
-              </span>
-              <span className="flex shrink-0 items-center gap-2 sm:hidden">
-                <span className={`flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white/80 ${hasAudio ? "" : "opacity-50"}`}>
-                  {isPlaying ? <PauseIcon className="h-3.5 w-3.5" /> : <PlayIcon className="h-3.5 w-3.5 translate-x-[1px]" />}
-                </span>
-                <ChevronRight className="h-4 w-4 text-[#6e6e6e]" />
-              </span>
-            </button>
-          );
-        })}
-      </div>
+const ROW_PILL =
+  "inline-flex items-center justify-center gap-2 rounded-full border border-white/20 px-4 py-2.5 text-[13px] font-medium text-white transition hover:bg-white/10";
 
-      {/* Instagram CTA */}
-      {instagram.enabled ? (
-        <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.02] p-5 sm:p-6">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-4">
-              <span className="shrink-0 pt-0.5 text-white/75">
-                <MegaphoneIcon className="h-9 w-9" />
-              </span>
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#8c8c8c]">{data.cta_kicker}</p>
-                <p className="mt-1 text-[15px] font-bold text-white">{data.cta_title}</p>
-                <p className="mt-1 max-w-md text-[13px] leading-6 text-[#8f8f8f]">{data.cta_body}</p>
-              </div>
-            </div>
-            <a
-              href={instagram.url || DEFAULT_INSTAGRAM_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-white/25 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
-            >
-              <InstagramIcon className="h-5 w-5" />
-              Follow on Instagram
-              <ChevronRight className="h-4 w-4" />
-            </a>
+function LawRow({ topic, audio, onOpenVideos }) {
+  const actionType = topic.action_type || "audio";
+  const hasAudio = Boolean(topic.audio_url);
+  const isPlaying = hasAudio && audio.url === topic.audio_url && audio.playing;
+
+  // Simple audio row: the whole card toggles playback.
+  if (actionType === "audio") {
+    return (
+      <button
+        type="button"
+        onClick={() => audio.toggle(topic.audio_url)}
+        className="group flex w-full items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4 text-left transition hover:border-white/20 hover:bg-white/[0.05] sm:gap-5 sm:px-6 sm:py-5"
+      >
+        <RowLead topic={topic} />
+        <span className="hidden shrink-0 items-center gap-4 sm:flex">
+          <span className={`flex h-11 w-11 items-center justify-center rounded-full border border-white/20 text-white/80 transition group-hover:bg-white/10 ${hasAudio ? "" : "opacity-50"}`}>
+            {isPlaying ? <PauseIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4 translate-x-[1px]" />}
+          </span>
+          <span className="text-right leading-tight text-[#9a9a9a]">
+            <span className="block text-[13px]">Audio</span>
+            <span className="block text-[13px]">{topic.audio_duration || "--:--"}</span>
+          </span>
+          <ChevronRight className="h-4 w-4 text-[#6e6e6e]" />
+        </span>
+        <span className="flex shrink-0 items-center gap-2 sm:hidden">
+          <span className={`flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white/80 ${hasAudio ? "" : "opacity-50"}`}>
+            {isPlaying ? <PauseIcon className="h-3.5 w-3.5" /> : <PlayIcon className="h-3.5 w-3.5 translate-x-[1px]" />}
+          </span>
+          <ChevronRight className="h-4 w-4 text-[#6e6e6e]" />
+        </span>
+      </button>
+    );
+  }
+
+  // PDF / video rows: two action buttons on the right.
+  const isPdf = actionType === "pdf";
+  const hasPdf = Boolean(topic.pdf_url);
+  return (
+    <div className="flex w-full items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-4 sm:gap-5 sm:px-6 sm:py-5">
+      <RowLead topic={topic} />
+      <div className="flex shrink-0 flex-col gap-2">
+        {isPdf ? (
+          <a
+            href={hasPdf ? topic.pdf_url : undefined}
+            target="_blank"
+            rel="noreferrer"
+            download
+            aria-disabled={!hasPdf}
+            className={`${ROW_PILL} w-[150px] ${hasPdf ? "" : "pointer-events-none opacity-50"}`}
+          >
+            <DownloadIcon className="h-4 w-4" />
+            Download PDF
+          </a>
+        ) : (
+          <button type="button" onClick={onOpenVideos} className={`${ROW_PILL} w-[150px]`}>
+            <PlayIcon className="h-3.5 w-3.5 translate-x-[0.5px]" />
+            Get Videos
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => audio.toggle(topic.audio_url)}
+          disabled={!hasAudio}
+          className={`${ROW_PILL} w-[150px] ${hasAudio ? "" : "opacity-50"}`}
+        >
+          <HeadphonesIcon className="h-4 w-4" />
+          {isPlaying ? "Pause" : "Listen Guide"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function VideoRow({ video, index }) {
+  const href = video.video_url || undefined;
+  const Wrapper = href ? "a" : "div";
+  const linkProps = href ? { href, target: "_blank", rel: "noreferrer" } : {};
+  return (
+    <Wrapper
+      {...linkProps}
+      className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-3 transition hover:border-white/20 hover:bg-white/[0.05] sm:gap-4 sm:px-4"
+    >
+      <span className="relative h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-[#111] sm:h-16 sm:w-24">
+        {video.thumbnail_url ? (
+          <img src={video.thumbnail_url} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center text-white/35">
+            <VideoIcon className="h-6 w-6" />
+          </span>
+        )}
+        {video.duration ? (
+          <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
+            {video.duration}
+          </span>
+        ) : null}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[14px] font-bold text-white sm:text-[15px]">{index + 1}. {video.title}</span>
+        <span className="mt-1 block text-[12px] leading-5 text-[#8f8f8f] sm:text-[13px]">{video.description}</span>
+      </span>
+      <span className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-white/80 transition group-hover:bg-white/10">
+          <PlayIcon className="h-4 w-4 translate-x-[1px]" />
+        </span>
+        <ChevronRight className="h-4 w-4 text-[#6e6e6e]" />
+      </span>
+    </Wrapper>
+  );
+}
+
+function VideoDetailPanel({ topic, audio, onBack }) {
+  const hasAudio = Boolean(topic.audio_url);
+  const active = hasAudio && audio.url === topic.audio_url;
+  const isPlaying = active && audio.playing;
+  const cur = active ? audio.currentTime : 0;
+  const dur = active ? audio.duration : 0;
+  const progress = active && audio.duration > 0 ? audio.currentTime / audio.duration : 0;
+  const videos = topic.videos || [];
+
+  return (
+    <div className="nd-view">
+      <button
+        type="button"
+        onClick={onBack}
+        className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+      >
+        <ArrowLeftIcon className="h-4 w-4" />
+        Back
+      </button>
+
+      {/* Header + Listen Guide */}
+      <div className="grid gap-4 rounded-2xl border border-white/10 bg-white/[0.02] p-5 sm:p-6 lg:grid-cols-[1fr_0.82fr] lg:items-center">
+        <div className="flex items-start gap-4">
+          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/[0.04] text-white/80">
+            <VideoIcon className="h-7 w-7" />
+          </span>
+          <div>
+            <h3 className="text-xl font-black text-white sm:text-2xl">{topic.title}</h3>
+            <p className="mt-1 text-[13px] leading-6 text-[#8f8f8f] sm:text-sm">{topic.body}</p>
           </div>
         </div>
-      ) : null}
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="flex items-center gap-2 text-white">
+            <HeadphonesIcon className="h-5 w-5" />
+            <span className="text-sm font-semibold">Listen Guide</span>
+          </div>
+          {topic.audio_note ? (
+            <p className="mt-2 text-[12px] leading-5 text-[#8f8f8f]">{topic.audio_note}</p>
+          ) : null}
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => audio.toggle(topic.audio_url)}
+              disabled={!hasAudio}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/25 text-white transition hover:bg-white/10 ${hasAudio ? "" : "opacity-50"}`}
+              aria-label={isPlaying ? "Pause guide" : "Play guide"}
+            >
+              {isPlaying ? <PauseIcon className="h-3.5 w-3.5" /> : <PlayIcon className="h-4 w-4 translate-x-[1px]" />}
+            </button>
+            <LinearSeek
+              className="h-3 min-w-0 flex-1"
+              progress={progress}
+              onSeek={hasAudio ? (fraction) => audio.seekFraction(topic.audio_url, fraction) : undefined}
+            />
+            <span className="shrink-0 text-[11px] tabular-nums text-[#9a9a9a]">
+              {formatTime(cur)} / {dur ? formatTime(dur) : topic.audio_duration || "0:00"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Video examples */}
+      <div className="mt-6 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-white">
+          <VideoIcon className="h-5 w-5" />
+          <span className="text-[13px] font-semibold uppercase tracking-[0.2em]">Video Examples</span>
+        </div>
+        {topic.view_all_url ? (
+          <a href={topic.view_all_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-[13px] font-medium text-white transition hover:bg-white/10">
+            View All <ArrowRight className="h-4 w-4" />
+          </a>
+        ) : (
+          <span className="inline-flex items-center gap-2 text-[13px] font-medium text-white/70">
+            View All <ArrowRight className="h-4 w-4" />
+          </span>
+        )}
+      </div>
+      <div className="mt-4 space-y-3">
+        {videos.length === 0 ? (
+          <p className="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-6 text-center text-sm text-[#8f8f8f]">
+            No videos have been added yet.
+          </p>
+        ) : (
+          videos.map((video, index) => (
+            <VideoRow key={video.id ?? `${video.title}-${index}`} video={video} index={index} />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LawsView({ data, instagram, audio }) {
+  const [videoTopic, setVideoTopic] = useState(null);
+  const topics = data.topics || [];
+
+  const openVideos = (topic) => {
+    setVideoTopic(topic);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const closeVideos = () => {
+    setVideoTopic(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  return (
+    <article className="nd-view overflow-hidden rounded-[28px] border border-white/10 bg-[#070707] p-5 shadow-[0_30px_90px_rgba(0,0,0,0.55)] sm:p-10">
+      {videoTopic ? (
+        <VideoDetailPanel topic={videoTopic} audio={audio} onBack={closeVideos} />
+      ) : (
+        <>
+          {/* Header — full-bleed hero with the copy overlaid on the image */}
+          <div className="relative flex min-h-[420px] overflow-hidden rounded-[22px] border border-white/10 sm:min-h-[520px]">
+            <img
+              src={data.hero_image_url || heroLaws}
+              alt="Stacked law books — Criminal Procedure Code, Indian Penal Code, Constitution of India — with scales of justice and a gavel"
+              className="absolute inset-0 h-full w-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#060606] via-[#060606]/80 to-[#060606]/15" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#060606]/90 via-transparent to-[#060606]/40" />
+            <div className="relative z-10 flex w-full max-w-xl flex-col justify-center px-6 py-10 sm:px-10 sm:py-14">
+              <Kicker className="self-start">{data.section_label}</Kicker>
+              <h2 className="mt-5 text-[2.1rem] font-black leading-[1.03] tracking-[-0.035em] text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.6)] sm:text-[3.1rem]">
+                {data.title}
+              </h2>
+              <p className="mt-5 max-w-md text-[15px] leading-7 text-[#d6d6d6] drop-shadow-[0_1px_10px_rgba(0,0,0,0.6)] sm:text-base">
+                {data.subtitle}
+              </p>
+            </div>
+          </div>
+
+          {/* Rows */}
+          <div className="mt-8 space-y-3">
+            {topics.map((topic, index) => (
+              <LawRow
+                key={topic.id ?? `${topic.title}-${index}`}
+                topic={topic}
+                audio={audio}
+                onOpenVideos={() => openVideos(topic)}
+              />
+            ))}
+          </div>
+
+          {/* Instagram CTA */}
+          {instagram.enabled ? (
+            <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.02] p-5 sm:p-6">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-4">
+                  <span className="shrink-0 pt-0.5 text-white/75">
+                    <MegaphoneIcon className="h-9 w-9" />
+                  </span>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#8c8c8c]">{data.cta_kicker}</p>
+                    <p className="mt-1 text-[15px] font-bold text-white">{data.cta_title}</p>
+                    <p className="mt-1 max-w-md text-[13px] leading-6 text-[#8f8f8f]">{data.cta_body}</p>
+                  </div>
+                </div>
+                <a
+                  href={instagram.url || DEFAULT_INSTAGRAM_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-white/25 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                >
+                  <InstagramIcon className="h-5 w-5" />
+                  Follow on Instagram
+                  <ChevronRight className="h-4 w-4" />
+                </a>
+              </div>
+            </div>
+          ) : null}
+        </>
+      )}
     </article>
   );
 }

@@ -1,5 +1,10 @@
 from config.model_validators import validate_no_active_content, validate_safe_public_url
-from config.upload_validators import validate_audio_upload, validate_profile_image_upload
+from config.upload_validators import (
+    validate_audio_upload,
+    validate_profile_image_upload,
+    validate_resource_upload,
+    validate_video_upload,
+)
 from django.db import models
 
 
@@ -161,21 +166,40 @@ class LawsSection(SingletonModel):
 
 
 class LawTopic(models.Model):
-    """Page 2 — Laws to Know: a single audio-backed law row."""
+    """Page 2 — Laws to Know: a single row (audio, PDF download, or video collection)."""
 
     ICON_BOOK = "book"
     ICON_PERSON = "person"
     ICON_CLIPBOARD = "clipboard"
     ICON_SCALE = "scale"
     ICON_SHIELD = "shield"
+    ICON_PDF = "pdf"
+    ICON_VIDEO = "video"
     ICON_CHOICES = [
         (ICON_BOOK, "Book"),
         (ICON_PERSON, "Person"),
         (ICON_CLIPBOARD, "Clipboard / check"),
         (ICON_SCALE, "Scales of justice"),
         (ICON_SHIELD, "Shield"),
+        (ICON_PDF, "PDF document"),
+        (ICON_VIDEO, "Video camera"),
     ]
 
+    ACTION_AUDIO = "audio"
+    ACTION_PDF = "pdf"
+    ACTION_VIDEO = "video"
+    ACTION_CHOICES = [
+        (ACTION_AUDIO, "Audio only (play button)"),
+        (ACTION_PDF, "PDF download + listen guide"),
+        (ACTION_VIDEO, "Video collection + listen guide"),
+    ]
+
+    action_type = models.CharField(
+        max_length=10,
+        choices=ACTION_CHOICES,
+        default=ACTION_AUDIO,
+        help_text="Controls which buttons the row shows on the Laws page.",
+    )
     icon_key = models.CharField(max_length=20, choices=ICON_CHOICES, default=ICON_BOOK)
     title = models.CharField(max_length=160)
     body = models.TextField(max_length=600)
@@ -189,7 +213,25 @@ class LawTopic(models.Model):
         upload_to="national_desk/audio/",
         blank=True,
         null=True,
-        help_text="MP3, M4A, AAC, WAV, or OGG.",
+        help_text="Listen guide audio. MP3, M4A, AAC, WAV, or OGG.",
+    )
+    audio_note = models.CharField(
+        max_length=300,
+        blank=True,
+        default="",
+        help_text="Short line under the Listen Guide on the video detail panel.",
+    )
+    pdf_file = models.FileField(
+        upload_to="national_desk/pdf/",
+        blank=True,
+        null=True,
+        help_text="Downloadable document for 'PDF download' rows (PDF/DOC/DOCX).",
+    )
+    view_all_url = models.URLField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="Optional 'View All' link on the video detail panel.",
     )
     sort_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
@@ -198,8 +240,8 @@ class LawTopic(models.Model):
 
     class Meta:
         ordering = ("sort_order", "pk")
-        verbose_name = "Law topic (audio row)"
-        verbose_name_plural = "Law topics (audio rows)"
+        verbose_name = "Law topic (row)"
+        verbose_name_plural = "Law topics (rows)"
         indexes = [
             models.Index(fields=("is_active", "sort_order"), name="nd_law_active_sort_idx"),
         ]
@@ -209,7 +251,74 @@ class LawTopic(models.Model):
         validate_no_active_content(self.title, "title")
         validate_no_active_content(self.body, "body")
         validate_no_active_content(self.audio_duration, "audio_duration")
+        validate_no_active_content(self.audio_note, "audio_note")
         validate_audio_upload(self.audio_file, "audio_file")
+        validate_resource_upload(self.pdf_file, "pdf_file")
+        validate_safe_public_url(self.view_all_url, "view_all_url")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.title
+
+
+class LawTopicVideo(models.Model):
+    """A single video example shown inside a 'Video collection' law topic."""
+
+    topic = models.ForeignKey(
+        LawTopic,
+        on_delete=models.CASCADE,
+        related_name="videos",
+    )
+    title = models.CharField(max_length=160)
+    description = models.TextField(max_length=400, blank=True, default="")
+    duration = models.CharField(
+        max_length=12,
+        blank=True,
+        default="",
+        help_text="Display label only, e.g. 2:14.",
+    )
+    video_url = models.URLField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="Link to the video (YouTube, Drive, etc.). Used when no file is uploaded.",
+    )
+    video_file = models.FileField(
+        upload_to="national_desk/video/",
+        blank=True,
+        null=True,
+        help_text="Optional uploaded video (MP4, M4V, MOV, WEBM).",
+    )
+    thumbnail = models.ImageField(
+        upload_to="national_desk/video_thumbs/",
+        blank=True,
+        null=True,
+        help_text="Optional thumbnail image (JPG/PNG).",
+    )
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("sort_order", "pk")
+        verbose_name = "Law topic video"
+        verbose_name_plural = "Law topic videos"
+        indexes = [
+            models.Index(fields=("topic", "is_active", "sort_order"), name="nd_vid_topic_active_idx"),
+        ]
+
+    def clean(self):
+        super().clean()
+        validate_no_active_content(self.title, "title")
+        validate_no_active_content(self.description, "description")
+        validate_no_active_content(self.duration, "duration")
+        validate_safe_public_url(self.video_url, "video_url")
+        validate_video_upload(self.video_file, "video_file")
+        validate_profile_image_upload(self.thumbnail, "thumbnail")
 
     def save(self, *args, **kwargs):
         self.full_clean()

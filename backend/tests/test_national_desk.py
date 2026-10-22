@@ -4,6 +4,7 @@ from apps.national_desk.models import (
     FirFilingGuide,
     LawsSection,
     LawTopic,
+    LawTopicVideo,
     NationalDeskSettings,
     TrackerOverview,
     TrackerUpdate,
@@ -22,7 +23,8 @@ class NationalDeskContentTests(APITestCase):
 
     def test_seed_command_is_idempotent(self):
         call_command("seed_national_desk")
-        self.assertEqual(LawTopic.objects.count(), 5)
+        self.assertEqual(LawTopic.objects.count(), 7)
+        self.assertEqual(LawTopicVideo.objects.count(), 4)
         self.assertEqual(TrackerUpdate.objects.count(), 5)
 
     def test_seed_materialises_singletons_and_rows(self):
@@ -30,7 +32,8 @@ class NationalDeskContentTests(APITestCase):
         self.assertTrue(FirFilingGuide.objects.filter(pk=1).exists())
         self.assertTrue(LawsSection.objects.filter(pk=1).exists())
         self.assertTrue(TrackerOverview.objects.filter(pk=1).exists())
-        self.assertEqual(LawTopic.objects.count(), 5)
+        self.assertEqual(LawTopic.objects.count(), 7)
+        self.assertEqual(LawTopicVideo.objects.count(), 4)
         self.assertEqual(TrackerUpdate.objects.count(), 5)
 
     def test_public_endpoint_returns_full_payload(self):
@@ -48,9 +51,16 @@ class NationalDeskContentTests(APITestCase):
         self.assertEqual(data["file_fir"]["title"], "How to File an FIR")
         self.assertEqual(data["file_fir"]["audio_duration"], "12:48")
 
-        self.assertEqual(len(data["laws"]["topics"]), 5)
+        self.assertEqual(len(data["laws"]["topics"]), 7)
         self.assertEqual(data["laws"]["topics"][0]["title"], "Your Right to File a Complaint")
         self.assertEqual(data["laws"]["topics"][0]["icon_key"], "book")
+
+        pdf_row = next(t for t in data["laws"]["topics"] if t["action_type"] == "pdf")
+        self.assertEqual(pdf_row["title"], "Complaint Letter Format")
+        video_row = next(t for t in data["laws"]["topics"] if t["action_type"] == "video")
+        self.assertEqual(len(video_row["videos"]), 4)
+        self.assertEqual(video_row["videos"][0]["title"], "Recording an Incident")
+        self.assertEqual(video_row["videos"][0]["duration"], "2:14")
 
         self.assertEqual(
             data["tracker"]["stats"],
@@ -69,7 +79,7 @@ class NationalDeskContentTests(APITestCase):
         response = self.client.get("/api/national-desk/")
         data = response.data["data"]
 
-        self.assertEqual(len(data["laws"]["topics"]), 4)
+        self.assertEqual(len(data["laws"]["topics"]), 6)
         titles = [item["title"] for item in data["laws"]["topics"]]
         self.assertNotIn("What to Do After Filing the FIR", titles)
 
@@ -81,7 +91,7 @@ class NationalDeskContentTests(APITestCase):
         topics = response.data["data"]["laws"]["topics"]
         self.assertEqual(
             [item["icon_key"] for item in topics],
-            ["book", "person", "clipboard", "scale", "shield"],
+            ["book", "person", "clipboard", "scale", "shield", "pdf", "video"],
         )
 
     def test_settings_is_a_singleton(self):
@@ -118,12 +128,35 @@ class NationalDeskContentTests(APITestCase):
         update.save()
         self.assertTrue(TrackerUpdate.objects.filter(city="Pune").exists())
 
+    def test_inactive_videos_are_excluded(self):
+        video_topic = LawTopic.objects.get(action_type="video")
+        LawTopicVideo.objects.filter(topic=video_topic, title="Showing Location Proof").update(
+            is_active=False
+        )
+        response = self.client.get("/api/national-desk/")
+        topics = response.data["data"]["laws"]["topics"]
+        video_row = next(t for t in topics if t["action_type"] == "video")
+        titles = [v["title"] for v in video_row["videos"]]
+        self.assertEqual(len(titles), 3)
+        self.assertNotIn("Showing Location Proof", titles)
+
+    def test_video_prefers_uploaded_file_then_url(self):
+        from apps.national_desk.serializers import LawTopicVideoSerializer
+
+        video_topic = LawTopic.objects.get(action_type="video")
+        video = LawTopicVideo.objects.filter(topic=video_topic).first()
+        video.video_url = "https://example.com/watch?v=abc"
+        video.save()
+        data = LawTopicVideoSerializer(video).data
+        self.assertEqual(data["video_url"], "https://example.com/watch?v=abc")
+
     def test_models_are_registered_in_admin(self):
         for model in (
             NationalDeskSettings,
             FirFilingGuide,
             LawsSection,
             LawTopic,
+            LawTopicVideo,
             TrackerOverview,
             TrackerUpdate,
         ):
