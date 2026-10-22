@@ -11,12 +11,19 @@ from apps.national_desk.models import (
 from django.contrib import admin
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
 from rest_framework.test import APITestCase
 
 
 class NationalDeskContentTests(APITestCase):
     def setUp(self):
         cache.clear()
+        call_command("seed_national_desk")
+
+    def test_seed_command_is_idempotent(self):
+        call_command("seed_national_desk")
+        self.assertEqual(LawTopic.objects.count(), 5)
+        self.assertEqual(TrackerUpdate.objects.count(), 5)
 
     def test_seed_materialises_singletons_and_rows(self):
         self.assertTrue(NationalDeskSettings.objects.filter(pk=1).exists())
