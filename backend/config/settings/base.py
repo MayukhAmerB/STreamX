@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "apps.realtime",
     "apps.campaigns",
     "apps.social_accounts.apps.SocialAccountsConfig",
+    "apps.national_desk.apps.NationalDeskConfig",
     "apps.notifications.apps.NotificationsConfig",
 ]
 

@@ -29,6 +29,22 @@ DISALLOWED_EMBEDDED_EXTENSIONS = {
 
 ALLOWED_VIDEO_EXTENSIONS = {"mp4", "m4v", "mov", "webm"}
 ALLOWED_VIDEO_CONTENT_TYPES = {"video/mp4", "video/quicktime", "video/webm", "application/octet-stream"}
+ALLOWED_AUDIO_EXTENSIONS = {"mp3", "m4a", "aac", "wav", "ogg"}
+ALLOWED_AUDIO_CONTENT_TYPES = {
+    "audio/mpeg",
+    "audio/mp3",
+    "audio/mp4",
+    "audio/aac",
+    "audio/x-m4a",
+    "audio/m4a",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/wave",
+    "audio/vnd.wave",
+    "audio/ogg",
+    "application/ogg",
+    "application/octet-stream",
+}
 ALLOWED_RESOURCE_EXTENSIONS = {"txt", "pdf", "ppt", "pptx", "doc", "docx"}
 ALLOWED_RESOURCE_CONTENT_TYPES = {
     "text/plain",
@@ -46,6 +62,7 @@ MAX_PROFILE_IMAGE_HEIGHT = 4096
 MAX_PROFILE_IMAGE_PIXELS = 16_000_000
 DEFAULT_MAX_VIDEO_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024  # 5 GB
 DEFAULT_MAX_RESOURCE_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MB
+DEFAULT_MAX_AUDIO_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
 def _max_video_upload_bytes():
@@ -211,6 +228,68 @@ def validate_video_upload(file_obj, field_name="video_file", max_bytes=None):
     if content_type and content_type not in ALLOWED_VIDEO_CONTENT_TYPES:
         raise ValidationError({field_name: "Unsupported video content type."})
     _validate_video_binary(file_obj, field_name)
+
+
+def _looks_like_mp3(header):
+    if len(header) >= 3 and header[:3] == b"ID3":
+        return True
+    # MPEG audio frame sync: 11 set bits (0xFF followed by 0xE0..0xFF high bits).
+    return len(header) >= 2 and header[0] == 0xFF and (header[1] & 0xE0) == 0xE0
+
+
+def _looks_like_wav(header):
+    return len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WAVE"
+
+
+def _looks_like_ogg(header):
+    return len(header) >= 4 and header[:4] == b"OggS"
+
+
+def _looks_like_adts_aac(header):
+    return len(header) >= 2 and header[0] == 0xFF and (header[1] & 0xF6) == 0xF0
+
+
+def _validate_audio_binary(file_obj, field_name):
+    header = _read_head(file_obj, bytes_count=64)
+    if not header:
+        raise ValidationError({field_name: "Uploaded audio file is empty."})
+    ext = _extension(file_obj)
+    if ext == "wav":
+        if not _looks_like_wav(header):
+            raise ValidationError({field_name: "Uploaded file does not match WAV format."})
+        return
+    if ext == "ogg":
+        if not _looks_like_ogg(header):
+            raise ValidationError({field_name: "Uploaded file does not match OGG format."})
+        return
+    if ext in {"m4a", "aac"}:
+        # m4a/aac is usually an MP4 container (ftyp); bare AAC uses an ADTS sync word.
+        if not (_looks_like_mp4_family(header) or _looks_like_adts_aac(header)):
+            raise ValidationError({field_name: "Uploaded file does not match AAC/M4A format."})
+        return
+    if ext == "mp3" and not _looks_like_mp3(header):
+        raise ValidationError({field_name: "Uploaded file does not match MP3 format."})
+
+
+def validate_audio_upload(file_obj, field_name="audio_file", max_bytes=None):
+    if not file_obj:
+        return
+    _validate_filename(file_obj, field_name)
+    _validate_no_dangerous_double_extension(file_obj, field_name)
+    ext = _extension(file_obj)
+    if ext not in ALLOWED_AUDIO_EXTENSIONS:
+        raise ValidationError({field_name: "Only MP3, M4A, AAC, WAV, or OGG audio files are allowed."})
+    size = getattr(file_obj, "size", None)
+    max_audio_upload_bytes = int(max_bytes or DEFAULT_MAX_AUDIO_UPLOAD_BYTES)
+    if size and size > max_audio_upload_bytes:
+        limit_mb = max_audio_upload_bytes / float(1024 * 1024)
+        raise ValidationError(
+            {field_name: f"Audio file is too large. Max allowed size is {limit_mb:.0f} MB."}
+        )
+    content_type = _content_type(file_obj)
+    if content_type and content_type not in ALLOWED_AUDIO_CONTENT_TYPES:
+        raise ValidationError({field_name: "Unsupported audio content type."})
+    _validate_audio_binary(file_obj, field_name)
 
 
 def validate_resource_upload(file_obj, field_name="resource_file", max_bytes=None):
