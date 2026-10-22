@@ -245,54 +245,149 @@ function Kicker({ children, className = "" }) {
   );
 }
 
-function Waveform({ bars = 42, className = "" }) {
+function formatTime(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+// Waveform that doubles as a seek bar: click or drag anywhere to jump.
+function WaveformSeek({ progress = 0, onSeek, bars = 48, className = "" }) {
+  const ref = useRef(null);
+  const [dragging, setDragging] = useState(false);
   const heights = useMemo(
-    () => Array.from({ length: bars }, (_, i) => 20 + Math.round(Math.abs(Math.sin(i * 1.3) * 60) + (i % 5) * 6)),
+    () => Array.from({ length: bars }, (_, i) => 24 + Math.round(Math.abs(Math.sin(i * 1.3) * 54) + (i % 5) * 6)),
     [bars],
   );
+
+  const seekFromClientX = (clientX) => {
+    const el = ref.current;
+    if (!el || !onSeek) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    onSeek(Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)));
+  };
+
   return (
-    <div className={`flex items-center gap-[3px] ${className}`} aria-hidden="true">
-      {heights.map((h, i) => (
-        <span
-          key={i}
-          className="nd-wave-bar w-[2px] rounded-full bg-white/45"
-          style={{ height: `${Math.min(h, 72)}%`, animationDelay: `${(i % 9) * 0.09}s` }}
-        />
-      ))}
+    <div
+      ref={ref}
+      role="slider"
+      tabIndex={onSeek ? 0 : -1}
+      aria-label="Seek audio"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(progress * 100)}
+      className={`relative flex touch-none select-none items-center gap-[2px] ${onSeek ? "cursor-pointer" : ""} ${className}`}
+      onPointerDown={(e) => {
+        if (!onSeek) return;
+        setDragging(true);
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+        seekFromClientX(e.clientX);
+      }}
+      onPointerMove={(e) => { if (dragging) seekFromClientX(e.clientX); }}
+      onPointerUp={(e) => {
+        setDragging(false);
+        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+      }}
+      onKeyDown={(e) => {
+        if (!onSeek) return;
+        if (e.key === "ArrowRight") { e.preventDefault(); onSeek(Math.min(1, progress + 0.05)); }
+        if (e.key === "ArrowLeft") { e.preventDefault(); onSeek(Math.max(0, progress - 0.05)); }
+      }}
+    >
+      {heights.map((h, i) => {
+        const played = (i + 0.5) / bars <= progress;
+        return (
+          <span
+            key={i}
+            className={`flex-1 rounded-full transition-colors ${played ? "bg-white" : "bg-white/25"}`}
+            style={{ height: `${Math.min(h, 72)}%` }}
+          />
+        );
+      })}
     </div>
   );
 }
 
 function useAudioPlayer() {
   const audioRef = useRef(null);
-  const [playingUrl, setPlayingUrl] = useState("");
+  const [url, setUrl] = useState("");
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const getAudio = () => {
+    if (!audioRef.current) {
+      const audio = new Audio();
+      audio.preload = "metadata";
+      audio.addEventListener("timeupdate", () => setCurrentTime(audio.currentTime || 0));
+      const syncDuration = () => setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
+      audio.addEventListener("loadedmetadata", syncDuration);
+      audio.addEventListener("durationchange", syncDuration);
+      audio.addEventListener("play", () => setPlaying(true));
+      audio.addEventListener("pause", () => setPlaying(false));
+      audio.addEventListener("ended", () => { setPlaying(false); setCurrentTime(0); });
+      audio.addEventListener("error", () => setPlaying(false));
+      audioRef.current = audio;
+    }
+    return audioRef.current;
+  };
 
   useEffect(
     () => () => {
       if (audioRef.current) {
         audioRef.current.pause();
+        audioRef.current.src = "";
         audioRef.current = null;
       }
     },
     [],
   );
 
-  const toggle = (url) => {
-    if (!url) return;
-    if (audioRef.current && playingUrl === url) {
-      audioRef.current.pause();
-      setPlayingUrl("");
-      return;
+  // Point the shared element at a url (swapping source resets position).
+  const load = (nextUrl) => {
+    const audio = getAudio();
+    if (url !== nextUrl) {
+      audio.pause();
+      audio.src = nextUrl;
+      setUrl(nextUrl);
+      setCurrentTime(0);
+      setDuration(0);
     }
-    if (audioRef.current) audioRef.current.pause();
-    const audio = new Audio(url);
-    audioRef.current = audio;
-    audio.onended = () => setPlayingUrl("");
-    audio.onerror = () => setPlayingUrl("");
-    audio.play().then(() => setPlayingUrl(url)).catch(() => setPlayingUrl(""));
+    return audio;
   };
 
-  return { playingUrl, toggle };
+  const toggle = (nextUrl) => {
+    if (!nextUrl) return;
+    const audio = load(nextUrl);
+    if (audio.paused) audio.play().catch(() => {});
+    else audio.pause();
+  };
+
+  const seekFraction = (nextUrl, fraction) => {
+    if (!nextUrl) return;
+    const audio = load(nextUrl);
+    const clamped = Math.min(1, Math.max(0, fraction));
+    const applySeek = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        audio.currentTime = clamped * audio.duration;
+        setCurrentTime(audio.currentTime);
+      }
+    };
+    if (Number.isFinite(audio.duration) && audio.duration > 0) {
+      applySeek();
+    } else {
+      const onMeta = () => {
+        applySeek();
+        audio.removeEventListener("loadedmetadata", onMeta);
+      };
+      audio.addEventListener("loadedmetadata", onMeta);
+    }
+    if (audio.paused) audio.play().catch(() => {});
+  };
+
+  return { url, playing, currentTime, duration, toggle, seekFraction };
 }
 
 /* ------------------------------------------------------------------ */
@@ -301,7 +396,11 @@ function useAudioPlayer() {
 
 function FileFirView({ data, audio }) {
   const hasAudio = Boolean(data.audio_url);
-  const isPlaying = hasAudio && audio.playingUrl === data.audio_url;
+  const active = hasAudio && audio.url === data.audio_url;
+  const isPlaying = active && audio.playing;
+  const cur = active ? audio.currentTime : 0;
+  const dur = active ? audio.duration : 0;
+  const progress = active && audio.duration > 0 ? audio.currentTime / audio.duration : 0;
   return (
     <article className="nd-view overflow-hidden rounded-[28px] border border-white/10 bg-[#070707] shadow-[0_30px_90px_rgba(0,0,0,0.55)]">
       {/* Hero */}
@@ -330,9 +429,9 @@ function FileFirView({ data, audio }) {
           <h3 className="mt-3 text-xl font-bold text-white sm:text-2xl">{data.audio_title}</h3>
           <div className="mt-2 flex items-center gap-2 text-sm text-[#9a9a9a]">
             <ClockIcon className="h-4 w-4" />
-            <span>{data.audio_duration}</span>
+            <span>{dur ? formatTime(dur) : data.audio_duration}</span>
           </div>
-          <div className="mt-6 flex items-center gap-4">
+          <div className="mt-6 flex items-center gap-3 sm:gap-4">
             <button
               type="button"
               onClick={() => audio.toggle(data.audio_url)}
@@ -342,7 +441,17 @@ function FileFirView({ data, audio }) {
             >
               {isPlaying ? <PauseIcon className="h-5 w-5" /> : <PlayIcon className="h-6 w-6 translate-x-[1px]" />}
             </button>
-            <Waveform className="h-10 min-w-0 flex-1 overflow-hidden" bars={54} />
+            <div className="min-w-0 flex-1">
+              <WaveformSeek
+                className="h-10"
+                progress={progress}
+                onSeek={hasAudio ? (fraction) => audio.seekFraction(data.audio_url, fraction) : undefined}
+              />
+              <div className="mt-1.5 flex items-center justify-between text-[11px] tabular-nums text-[#9a9a9a]">
+                <span>{formatTime(cur)}</span>
+                <span>{dur ? formatTime(dur) : data.audio_duration}</span>
+              </div>
+            </div>
             <button
               type="button"
               onClick={() => audio.toggle(data.audio_url)}
@@ -391,7 +500,7 @@ function LawsView({ data, instagram, audio }) {
         {data.topics.map((topic, index) => {
           const Icon = LAW_ICONS[topic.icon_key] || BookIcon;
           const hasAudio = Boolean(topic.audio_url);
-          const isPlaying = hasAudio && audio.playingUrl === topic.audio_url;
+          const isPlaying = hasAudio && audio.url === topic.audio_url && audio.playing;
           return (
             <button
               key={topic.id ?? `${topic.title}-${index}`}
