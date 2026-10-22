@@ -342,7 +342,7 @@ function FileFirView({ data, audio }) {
             >
               {isPlaying ? <PauseIcon className="h-5 w-5" /> : <PlayIcon className="h-6 w-6 translate-x-[1px]" />}
             </button>
-            <Waveform className="h-10 flex-1" bars={54} />
+            <Waveform className="h-10 min-w-0 flex-1 overflow-hidden" bars={54} />
             <button
               type="button"
               onClick={() => audio.toggle(data.audio_url)}
@@ -366,21 +366,23 @@ function FileFirView({ data, audio }) {
 function LawsView({ data, instagram, audio }) {
   return (
     <article className="nd-view overflow-hidden rounded-[28px] border border-white/10 bg-[#070707] p-5 shadow-[0_30px_90px_rgba(0,0,0,0.55)] sm:p-10">
-      {/* Header */}
-      <div className="relative grid gap-6 lg:grid-cols-[1fr_0.82fr] lg:items-start">
-        <div>
-          <Kicker>{data.section_label}</Kicker>
-          <h2 className="mt-5 text-[2.2rem] font-black leading-[1.02] tracking-[-0.035em] text-white sm:text-[3.3rem]">
+      {/* Header — full-bleed hero with the copy overlaid on the image */}
+      <div className="relative flex min-h-[420px] overflow-hidden rounded-[22px] border border-white/10 sm:min-h-[520px]">
+        <img
+          src={data.hero_image_url || heroLaws}
+          alt="Stacked law books — Criminal Procedure Code, Indian Penal Code, Constitution of India — with scales of justice and a gavel"
+          className="absolute inset-0 h-full w-full object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#060606] via-[#060606]/80 to-[#060606]/15" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#060606]/90 via-transparent to-[#060606]/40" />
+        <div className="relative z-10 flex w-full max-w-xl flex-col justify-center px-6 py-10 sm:px-10 sm:py-14">
+          <Kicker className="self-start">{data.section_label}</Kicker>
+          <h2 className="mt-5 text-[2.1rem] font-black leading-[1.03] tracking-[-0.035em] text-white drop-shadow-[0_2px_18px_rgba(0,0,0,0.6)] sm:text-[3.1rem]">
             {data.title}
           </h2>
-          <p className="mt-5 max-w-md text-[15px] leading-7 text-[#8f8f8f] sm:text-base">{data.subtitle}</p>
-        </div>
-        <div className="relative hidden aspect-[4/5] overflow-hidden rounded-2xl border border-white/10 lg:block">
-          <img
-            src={data.hero_image_url || heroLaws}
-            alt="Stacked law books — Criminal Procedure Code, Indian Penal Code, Constitution of India — with scales of justice and a gavel"
-            className="h-full w-full object-cover object-center"
-          />
+          <p className="mt-5 max-w-md text-[15px] leading-7 text-[#d6d6d6] drop-shadow-[0_1px_10px_rgba(0,0,0,0.6)] sm:text-base">
+            {data.subtitle}
+          </p>
         </div>
       </div>
 
@@ -699,7 +701,7 @@ export default function NationalDeskPage() {
       </div>
 
       {/* Tab switcher */}
-      <div className="mb-6 flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-white/[0.02] p-1.5">
+      <div className="mb-6 grid grid-cols-3 gap-1.5 rounded-2xl border border-white/10 bg-white/[0.02] p-1.5 sm:gap-2">
         {PAGES.map((p, i) => {
           const isActive = p.key === active;
           return (
@@ -708,13 +710,13 @@ export default function NationalDeskPage() {
               type="button"
               onClick={() => goTo(p.key)}
               aria-current={isActive ? "page" : undefined}
-              className={`flex-1 whitespace-nowrap rounded-xl px-3 py-2.5 text-[13px] font-semibold transition sm:text-sm ${
+              className={`rounded-xl px-2 py-2.5 text-center text-[11px] font-semibold leading-tight transition sm:px-3 sm:text-sm ${
                 isActive
                   ? "bg-white text-black shadow-[0_6px_18px_rgba(255,255,255,0.12)]"
                   : "text-[#b9b9b9] hover:bg-white/[0.06] hover:text-white"
               }`}
             >
-              <span className="mr-1.5 text-[11px] opacity-60">0{i + 1}</span>
+              <span className="mr-1.5 text-[10px] opacity-60 sm:text-[11px]">0{i + 1}</span>
               {p.label}
             </button>
           );
