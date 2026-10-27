@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 
 import { getJoinSettings, listJoinLocations, submitJoinApplication } from "../api/join";
 import joinArchImage from "../assets/join-arch.jpg";
-import joinBackgroundImage from "../assets/join-background.jpg";
 import TurnstileWidget from "../components/TurnstileWidget";
 import { useAuth } from "../hooks/useAuth";
 import { useTurnstileChallenge } from "../hooks/useTurnstileChallenge";
@@ -716,8 +715,7 @@ export default function JoinAlSyedPage() {
   };
 
   return (
-    <section className="join-page" style={{ "--join-bg-image": `url(${joinBackgroundImage})` }}>
-      <div className="join-backdrop" aria-hidden="true" />
+    <section className="join-page">
       <div className="join-container">
         {step === "role" ? (
           <RoleStep

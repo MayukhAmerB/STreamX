@@ -17,6 +17,7 @@
   overflow: hidden;
   min-height: calc(100dvh - 4.5rem);
   padding: 0 0 clamp(300px, 92vw, 580px);
+  background: #000;
   color: var(--join-text);
 }
 
@@ -783,28 +784,7 @@
   color: #b3b3b3;
 }
 
-/* backdrop + ornament */
-
-.join-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.62) 100%),
-    var(--join-bg-image) center top / cover no-repeat,
-    #181712;
-}
-
-/* Wider than the artwork: show the whole scroll frame instead of cropping it. */
-@media (min-aspect-ratio: 2/3) {
-  .join-backdrop {
-    background:
-      linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.62) 100%),
-      var(--join-bg-image) center / contain no-repeat,
-      #181712;
-  }
-}
+/* ornament */
 
 .join-arch {
   position: absolute;
