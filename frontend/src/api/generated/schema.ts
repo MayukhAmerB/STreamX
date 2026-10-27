@@ -693,6 +693,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/join/applications/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["join_applications_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/join/locations/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["join_locations_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/lecture-questions/": {
         parameters: {
             query?: never;
@@ -877,6 +909,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["my_courses_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/national-desk/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["national_desk_content"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1420,6 +1468,13 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * @description * `audio` - Audio only (play button)
+         *     * `pdf` - PDF download + listen guide
+         *     * `video` - Video collection + listen guide
+         * @enum {string}
+         */
+        ActionTypeEnum: "audio" | "pdf" | "video";
+        /**
          * @description * `connecting` - connecting
          *     * `connected` - connected
          *     * `reconnecting` - reconnecting
@@ -1431,15 +1486,120 @@ export interface components {
          * @enum {string}
          */
         EventEnum: "connecting" | "connected" | "reconnecting" | "reconnected" | "disconnected" | "connection_failed" | "quality_changed" | "relay_fallback";
+        FirFilingGuide: {
+            badge_label?: string;
+            section_label?: string;
+            title?: string;
+            subtitle?: string;
+            readonly hero_image_url: string;
+            audio_kicker?: string;
+            audio_title?: string;
+            /** @description Display label only, e.g. 12:48. */
+            audio_duration?: string;
+            readonly audio_url: string;
+            is_active?: boolean;
+        };
+        JoinApplicationCreateRequest: {
+            role: components["schemas"]["RoleEnum"];
+            full_name: string;
+            age?: number | null;
+            phone_number: string;
+            address?: string;
+            state: components["schemas"]["StateEnum"];
+            district: string;
+            terms_accepted: boolean;
+        };
+        JoinApplicationCreateResponse: {
+            success: boolean;
+            message: string;
+            data: components["schemas"]["JoinApplicationCreated"] | null;
+            errors: unknown;
+        };
+        JoinApplicationCreated: {
+            application_id: number;
+            status: string;
+        };
+        JoinLocation: {
+            state: string;
+            districts: string[];
+        };
+        JoinLocationDirectoryResponse: {
+            success: boolean;
+            message: string;
+            data: components["schemas"]["JoinLocation"][];
+            errors: unknown;
+        };
+        LawTopic: {
+            readonly id: number;
+            /**
+             * @description Controls which buttons the row shows on the Laws page.
+             *
+             *     * `audio` - Audio only (play button)
+             *     * `pdf` - PDF download + listen guide
+             *     * `video` - Video collection + listen guide
+             */
+            action_type?: components["schemas"]["ActionTypeEnum"];
+            icon_key?: components["schemas"]["LawTopicIconKeyEnum"];
+            title: string;
+            body: string;
+            /** @description Display label only, e.g. 04:32. */
+            audio_duration?: string;
+            readonly audio_url: string;
+            /** @description Short line under the Listen Guide on the video detail panel. */
+            audio_note?: string;
+            readonly pdf_url: string;
+            /** @description Optional 'View All' link on the video detail panel. */
+            view_all_url?: string;
+            readonly videos: components["schemas"]["LawTopicVideo"][];
+        };
         /**
-         * @description * `youtube` - YouTube
-         *     * `instagram` - Instagram
-         *     * `x` - X
-         *     * `facebook` - Facebook
-         *     * `link` - Generic link
+         * @description * `book` - Book
+         *     * `person` - Person
+         *     * `clipboard` - Clipboard / check
+         *     * `scale` - Scales of justice
+         *     * `shield` - Shield
+         *     * `pdf` - PDF document
+         *     * `video` - Video camera
          * @enum {string}
          */
-        IconKeyEnum: "youtube" | "instagram" | "x" | "facebook" | "link";
+        LawTopicIconKeyEnum: "book" | "person" | "clipboard" | "scale" | "shield" | "pdf" | "video";
+        LawTopicVideo: {
+            readonly id: number;
+            title: string;
+            description?: string;
+            /** @description Display label only, e.g. 2:14. */
+            duration?: string;
+            readonly video_url: string;
+            readonly thumbnail_url: string;
+        };
+        LawsSection: {
+            section_label?: string;
+            title?: string;
+            subtitle?: string;
+            readonly hero_image_url: string;
+            cta_kicker?: string;
+            cta_title?: string;
+            cta_body?: string;
+            readonly topics: components["schemas"]["LawTopic"][];
+            is_active?: boolean;
+        };
+        NationalDeskData: {
+            is_published: boolean;
+            instagram: components["schemas"]["NationalDeskInstagram"];
+            file_fir: components["schemas"]["FirFilingGuide"];
+            laws: components["schemas"]["LawsSection"];
+            tracker: components["schemas"]["TrackerOverview"];
+        };
+        NationalDeskInstagram: {
+            enabled: boolean;
+            url: string;
+        };
+        NationalDeskResponse: {
+            success: boolean;
+            message: string;
+            data: components["schemas"]["NationalDeskData"] | null;
+            errors: unknown;
+        };
         /**
          * @description * `slow_2g` - slow_2g
          *     * `2g` - 2g
@@ -1521,6 +1681,12 @@ export interface components {
             /** @default 0 */
             elapsed_ms: number;
         };
+        /**
+         * @description * `citizen` - Citizen / Volunteer
+         *     * `lawyer` - Lawyer
+         * @enum {string}
+         */
+        RoleEnum: "citizen" | "lawyer";
         SocialAccount: {
             readonly id: number;
             account_name: string;
@@ -1536,15 +1702,100 @@ export interface components {
             name: string;
             slug?: string;
             description?: string;
-            icon_key?: components["schemas"]["IconKeyEnum"];
+            icon_key?: components["schemas"]["SocialAccountCategoryIconKeyEnum"];
             readonly account_count: number;
             readonly accounts: components["schemas"]["SocialAccount"][];
         };
+        /**
+         * @description * `youtube` - YouTube
+         *     * `instagram` - Instagram
+         *     * `x` - X
+         *     * `facebook` - Facebook
+         *     * `link` - Generic link
+         * @enum {string}
+         */
+        SocialAccountCategoryIconKeyEnum: "youtube" | "instagram" | "x" | "facebook" | "link";
         SocialAccountDirectoryResponse: {
             success: boolean;
             message: string;
             data: components["schemas"]["SocialAccountCategory"][];
             errors: unknown;
+        };
+        /**
+         * @description * `Andaman and Nicobar Islands` - Andaman and Nicobar Islands
+         *     * `Andhra Pradesh` - Andhra Pradesh
+         *     * `Arunachal Pradesh` - Arunachal Pradesh
+         *     * `Assam` - Assam
+         *     * `Bihar` - Bihar
+         *     * `Chandigarh` - Chandigarh
+         *     * `Chhattisgarh` - Chhattisgarh
+         *     * `Dadra and Nagar Haveli and Daman and Diu` - Dadra and Nagar Haveli and Daman and Diu
+         *     * `Delhi` - Delhi
+         *     * `Goa` - Goa
+         *     * `Gujarat` - Gujarat
+         *     * `Haryana` - Haryana
+         *     * `Himachal Pradesh` - Himachal Pradesh
+         *     * `Jammu and Kashmir` - Jammu and Kashmir
+         *     * `Jharkhand` - Jharkhand
+         *     * `Karnataka` - Karnataka
+         *     * `Kerala` - Kerala
+         *     * `Ladakh` - Ladakh
+         *     * `Lakshadweep` - Lakshadweep
+         *     * `Madhya Pradesh` - Madhya Pradesh
+         *     * `Maharashtra` - Maharashtra
+         *     * `Manipur` - Manipur
+         *     * `Meghalaya` - Meghalaya
+         *     * `Mizoram` - Mizoram
+         *     * `Nagaland` - Nagaland
+         *     * `Odisha` - Odisha
+         *     * `Puducherry` - Puducherry
+         *     * `Punjab` - Punjab
+         *     * `Rajasthan` - Rajasthan
+         *     * `Sikkim` - Sikkim
+         *     * `Tamil Nadu` - Tamil Nadu
+         *     * `Telangana` - Telangana
+         *     * `Tripura` - Tripura
+         *     * `Uttar Pradesh` - Uttar Pradesh
+         *     * `Uttarakhand` - Uttarakhand
+         *     * `West Bengal` - West Bengal
+         * @enum {string}
+         */
+        StateEnum: "Andaman and Nicobar Islands" | "Andhra Pradesh" | "Arunachal Pradesh" | "Assam" | "Bihar" | "Chandigarh" | "Chhattisgarh" | "Dadra and Nagar Haveli and Daman and Diu" | "Delhi" | "Goa" | "Gujarat" | "Haryana" | "Himachal Pradesh" | "Jammu and Kashmir" | "Jharkhand" | "Karnataka" | "Kerala" | "Ladakh" | "Lakshadweep" | "Madhya Pradesh" | "Maharashtra" | "Manipur" | "Meghalaya" | "Mizoram" | "Nagaland" | "Odisha" | "Puducherry" | "Punjab" | "Rajasthan" | "Sikkim" | "Tamil Nadu" | "Telangana" | "Tripura" | "Uttar Pradesh" | "Uttarakhand" | "West Bengal";
+        /**
+         * @description * `completed` - Completed
+         *     * `in_progress` - In Progress
+         *     * `planned` - Planned
+         * @enum {string}
+         */
+        StatusEnum: "completed" | "in_progress" | "planned";
+        TrackerOverview: {
+            section_label?: string;
+            title?: string;
+            subtitle?: string;
+            tagline?: string;
+            readonly hero_image_url: string;
+            readonly stats: {
+                [key: string]: unknown;
+            };
+            updates_cta_kicker?: string;
+            updates_cta_body?: string;
+            /** @description Destination for the 'View Full Tracker' button. */
+            full_tracker_url?: string;
+            readonly updates: components["schemas"]["TrackerUpdate"][];
+            is_active?: boolean;
+        };
+        TrackerUpdate: {
+            readonly id: number;
+            city: string;
+            /** @description State or union territory, e.g. Uttar Pradesh. */
+            region: string;
+            status?: components["schemas"]["StatusEnum"];
+            readonly status_display: string;
+            /** @description Sub-line under the location, e.g. 'FIR Registered' or 'Under Process'. */
+            status_note?: string;
+            readonly date: string;
+            /** Format: date */
+            readonly date_iso: string;
         };
         /**
          * @description * `auto` - auto
@@ -2943,6 +3194,58 @@ export interface operations {
             };
         };
     };
+    join_applications_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JoinApplicationCreateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["JoinApplicationCreateRequest"];
+                "multipart/form-data": components["schemas"]["JoinApplicationCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinApplicationCreateResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinApplicationCreateResponse"];
+                };
+            };
+        };
+    };
+    join_locations_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinLocationDirectoryResponse"];
+                };
+            };
+        };
+    };
     lecture_questions_retrieve: {
         parameters: {
             query?: never;
@@ -3439,6 +3742,25 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    national_desk_content: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NationalDeskResponse"];
                 };
             };
         };

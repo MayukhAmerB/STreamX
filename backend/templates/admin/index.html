@@ -75,6 +75,20 @@
           </a>
         </div>
       </article>
+      <article class="enterprise-admin-acceptance-card">
+        <h3>Join Al Syed (Joining Forms)</h3>
+        <p class="enterprise-admin-muted">
+          Review citizen, volunteer and lawyer joining forms submitted from the website.
+        </p>
+        <div class="enterprise-admin-model-actions">
+          <a class="enterprise-admin-action-link" href="{% url 'admin:join_requests_joinapplication_changelist' %}?status__exact=new">
+            New Submissions
+          </a>
+          <a class="enterprise-admin-action-link" href="{% url 'admin:join_requests_joinapplication_changelist' %}">
+            All Submissions
+          </a>
+        </div>
+      </article>
     </div>
   </section>
 

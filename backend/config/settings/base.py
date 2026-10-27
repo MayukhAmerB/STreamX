@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "apps.campaigns",
     "apps.social_accounts.apps.SocialAccountsConfig",
     "apps.national_desk.apps.NationalDeskConfig",
+    "apps.join_requests.apps.JoinRequestsConfig",
     "apps.notifications.apps.NotificationsConfig",
 ]
 
@@ -225,6 +226,7 @@ REST_FRAMEWORK = {
         "contact": "5/hour",
         "public_enrollment_lead": "20/hour",
         "campaign_volunteer": "30/hour",
+        "join_application": "30/hour",
         "password_reset_request": "5/hour",
         "password_reset_confirm": "20/hour",
         "payment_create": "120/minute",

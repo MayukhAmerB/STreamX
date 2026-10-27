@@ -23,6 +23,7 @@ const GuidesPage = lazy(() => import("../pages/GuidesPage"));
 const HallOfFamePage = lazy(() => import("../pages/HallOfFamePage"));
 const IdCardPage = lazy(() => import("../pages/IdCardPage"));
 const InstructorDashboardPage = lazy(() => import("../pages/InstructorDashboardPage"));
+const JoinAlSyedPage = lazy(() => import("../pages/JoinAlSyedPage"));
 const JoinLivePage = lazy(() => import("../pages/JoinLivePage"));
 const LandingPage = lazy(() => import("../pages/LandingPage"));
 const PentestingRegistrationPage = lazy(() => import("../pages/PentestingRegistrationPage"));
@@ -47,6 +48,7 @@ export default function AppRoutes() {
           <Route path="/about" element={<AboutPage />} />
           {siteBrand.id !== "owlcognito" ? <Route path="/as-accounts" element={<AccountsDirectoryPage />} /> : null}
           {siteBrand.id !== "owlcognito" ? <Route path="/national-desk" element={<NationalDeskPage />} /> : null}
+          {siteBrand.id !== "owlcognito" ? <Route path="/join-alsyed" element={<JoinAlSyedPage />} /> : null}
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/faqs" element={<FaqPage />} />
           {siteBrand.id !== "owlcognito" ? <Route path="/hall-of-fame" element={<HallOfFamePage />} /> : null}

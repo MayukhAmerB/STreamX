@@ -77,6 +77,11 @@ export default function Navbar() {
             </NavLink>
           ) : null}
           {!isOwlCognito ? (
+            <NavLink to="/join-alsyed" className={navClass}>
+              Join Al Syed
+            </NavLink>
+          ) : null}
+          {!isOwlCognito ? (
             <NavLink to="/hall-of-fame" className={navClass}>
               Hall of Fame
             </NavLink>
@@ -245,6 +250,11 @@ export default function Navbar() {
             {!isOwlCognito ? (
               <NavLink to="/national-desk" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
                 National Desk
+              </NavLink>
+            ) : null}
+            {!isOwlCognito ? (
+              <NavLink to="/join-alsyed" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
+                Join Al Syed
               </NavLink>
             ) : null}
             {!isOwlCognito ? (

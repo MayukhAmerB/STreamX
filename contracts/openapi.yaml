@@ -1212,6 +1212,52 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /join/applications/:
+    post:
+      operationId: join_applications_create
+      tags:
+      - Join Al Syed
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JoinApplicationCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/JoinApplicationCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/JoinApplicationCreateRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JoinApplicationCreateResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JoinApplicationCreateResponse'
+          description: ''
+  /join/locations/:
+    get:
+      operationId: join_locations_list
+      tags:
+      - Join Al Syed
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JoinLocationDirectoryResponse'
+          description: ''
   /lecture-questions/:
     get:
       operationId: lecture_questions_retrieve
@@ -1696,6 +1742,22 @@ paths:
               schema:
                 type: object
                 additionalProperties: {}
+          description: ''
+  /national-desk/:
+    get:
+      operationId: national_desk_content
+      tags:
+      - National Desk
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NationalDeskResponse'
           description: ''
   /notifications/:
     get:
@@ -2759,6 +2821,16 @@ paths:
           description: No response body
 components:
   schemas:
+    ActionTypeEnum:
+      enum:
+      - audio
+      - pdf
+      - video
+      type: string
+      description: |-
+        * `audio` - Audio only (play button)
+        * `pdf` - PDF download + listen guide
+        * `video` - Video collection + listen guide
     EventEnum:
       enum:
       - connecting
@@ -2779,20 +2851,320 @@ components:
         * `connection_failed` - connection_failed
         * `quality_changed` - quality_changed
         * `relay_fallback` - relay_fallback
-    IconKeyEnum:
+    FirFilingGuide:
+      type: object
+      properties:
+        badge_label:
+          type: string
+          maxLength: 60
+        section_label:
+          type: string
+          maxLength: 60
+        title:
+          type: string
+          maxLength: 160
+        subtitle:
+          type: string
+          maxLength: 600
+        hero_image_url:
+          type: string
+          readOnly: true
+        audio_kicker:
+          type: string
+          maxLength: 60
+        audio_title:
+          type: string
+          maxLength: 200
+        audio_duration:
+          type: string
+          description: Display label only, e.g. 12:48.
+          maxLength: 12
+        audio_url:
+          type: string
+          readOnly: true
+        is_active:
+          type: boolean
+      required:
+      - audio_url
+      - hero_image_url
+    JoinApplicationCreateRequest:
+      type: object
+      properties:
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        age:
+          type: integer
+          maximum: 100
+          minimum: 18
+          nullable: true
+        phone_number:
+          type: string
+          minLength: 1
+          maxLength: 24
+        address:
+          type: string
+          maxLength: 300
+        state:
+          $ref: '#/components/schemas/StateEnum'
+        district:
+          type: string
+          minLength: 1
+          maxLength: 80
+        terms_accepted:
+          type: boolean
+          writeOnly: true
+      required:
+      - district
+      - full_name
+      - phone_number
+      - role
+      - state
+      - terms_accepted
+    JoinApplicationCreateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          allOf:
+          - $ref: '#/components/schemas/JoinApplicationCreated'
+          nullable: true
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    JoinApplicationCreated:
+      type: object
+      properties:
+        application_id:
+          type: integer
+        status:
+          type: string
+      required:
+      - application_id
+      - status
+    JoinLocation:
+      type: object
+      properties:
+        state:
+          type: string
+        districts:
+          type: array
+          items:
+            type: string
+      required:
+      - districts
+      - state
+    JoinLocationDirectoryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/JoinLocation'
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    LawTopic:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        action_type:
+          allOf:
+          - $ref: '#/components/schemas/ActionTypeEnum'
+          description: |-
+            Controls which buttons the row shows on the Laws page.
+
+            * `audio` - Audio only (play button)
+            * `pdf` - PDF download + listen guide
+            * `video` - Video collection + listen guide
+        icon_key:
+          $ref: '#/components/schemas/LawTopicIconKeyEnum'
+        title:
+          type: string
+          maxLength: 160
+        body:
+          type: string
+          maxLength: 600
+        audio_duration:
+          type: string
+          description: Display label only, e.g. 04:32.
+          maxLength: 12
+        audio_url:
+          type: string
+          readOnly: true
+        audio_note:
+          type: string
+          description: Short line under the Listen Guide on the video detail panel.
+          maxLength: 300
+        pdf_url:
+          type: string
+          readOnly: true
+        view_all_url:
+          description: Optional 'View All' link on the video detail panel.
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 500
+          - type: string
+            maxLength: 0
+        videos:
+          type: array
+          items:
+            $ref: '#/components/schemas/LawTopicVideo'
+          readOnly: true
+      required:
+      - audio_url
+      - body
+      - id
+      - pdf_url
+      - title
+      - videos
+    LawTopicIconKeyEnum:
       enum:
-      - youtube
-      - instagram
-      - x
-      - facebook
-      - link
+      - book
+      - person
+      - clipboard
+      - scale
+      - shield
+      - pdf
+      - video
       type: string
       description: |-
-        * `youtube` - YouTube
-        * `instagram` - Instagram
-        * `x` - X
-        * `facebook` - Facebook
-        * `link` - Generic link
+        * `book` - Book
+        * `person` - Person
+        * `clipboard` - Clipboard / check
+        * `scale` - Scales of justice
+        * `shield` - Shield
+        * `pdf` - PDF document
+        * `video` - Video camera
+    LawTopicVideo:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 400
+        duration:
+          type: string
+          description: Display label only, e.g. 2:14.
+          maxLength: 12
+        video_url:
+          type: string
+          readOnly: true
+        thumbnail_url:
+          type: string
+          readOnly: true
+      required:
+      - id
+      - thumbnail_url
+      - title
+      - video_url
+    LawsSection:
+      type: object
+      properties:
+        section_label:
+          type: string
+          maxLength: 60
+        title:
+          type: string
+          maxLength: 200
+        subtitle:
+          type: string
+          maxLength: 600
+        hero_image_url:
+          type: string
+          readOnly: true
+        cta_kicker:
+          type: string
+          maxLength: 60
+        cta_title:
+          type: string
+          maxLength: 160
+        cta_body:
+          type: string
+          maxLength: 400
+        topics:
+          type: array
+          items:
+            $ref: '#/components/schemas/LawTopic'
+          readOnly: true
+        is_active:
+          type: boolean
+      required:
+      - hero_image_url
+      - topics
+    NationalDeskData:
+      type: object
+      properties:
+        is_published:
+          type: boolean
+        instagram:
+          $ref: '#/components/schemas/NationalDeskInstagram'
+        file_fir:
+          $ref: '#/components/schemas/FirFilingGuide'
+        laws:
+          $ref: '#/components/schemas/LawsSection'
+        tracker:
+          $ref: '#/components/schemas/TrackerOverview'
+      required:
+      - file_fir
+      - instagram
+      - is_published
+      - laws
+      - tracker
+    NationalDeskInstagram:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        url:
+          type: string
+      required:
+      - enabled
+      - url
+    NationalDeskResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          allOf:
+          - $ref: '#/components/schemas/NationalDeskData'
+          nullable: true
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
     NetworkEnum:
       enum:
       - slow_2g
@@ -2944,6 +3316,14 @@ components:
           default: 0
       required:
       - event
+    RoleEnum:
+      enum:
+      - citizen
+      - lawyer
+      type: string
+      description: |-
+        * `citizen` - Citizen / Volunteer
+        * `lawyer` - Lawyer
     SocialAccount:
       type: object
       properties:
@@ -2993,7 +3373,7 @@ components:
           type: string
           maxLength: 600
         icon_key:
-          $ref: '#/components/schemas/IconKeyEnum'
+          $ref: '#/components/schemas/SocialAccountCategoryIconKeyEnum'
         account_count:
           type: integer
           readOnly: true
@@ -3007,6 +3387,20 @@ components:
       - accounts
       - id
       - name
+    SocialAccountCategoryIconKeyEnum:
+      enum:
+      - youtube
+      - instagram
+      - x
+      - facebook
+      - link
+      type: string
+      description: |-
+        * `youtube` - YouTube
+        * `instagram` - Instagram
+        * `x` - X
+        * `facebook` - Facebook
+        * `link` - Generic link
     SocialAccountDirectoryResponse:
       type: object
       properties:
@@ -3025,6 +3419,176 @@ components:
       - errors
       - message
       - success
+    StateEnum:
+      enum:
+      - Andaman and Nicobar Islands
+      - Andhra Pradesh
+      - Arunachal Pradesh
+      - Assam
+      - Bihar
+      - Chandigarh
+      - Chhattisgarh
+      - Dadra and Nagar Haveli and Daman and Diu
+      - Delhi
+      - Goa
+      - Gujarat
+      - Haryana
+      - Himachal Pradesh
+      - Jammu and Kashmir
+      - Jharkhand
+      - Karnataka
+      - Kerala
+      - Ladakh
+      - Lakshadweep
+      - Madhya Pradesh
+      - Maharashtra
+      - Manipur
+      - Meghalaya
+      - Mizoram
+      - Nagaland
+      - Odisha
+      - Puducherry
+      - Punjab
+      - Rajasthan
+      - Sikkim
+      - Tamil Nadu
+      - Telangana
+      - Tripura
+      - Uttar Pradesh
+      - Uttarakhand
+      - West Bengal
+      type: string
+      description: |-
+        * `Andaman and Nicobar Islands` - Andaman and Nicobar Islands
+        * `Andhra Pradesh` - Andhra Pradesh
+        * `Arunachal Pradesh` - Arunachal Pradesh
+        * `Assam` - Assam
+        * `Bihar` - Bihar
+        * `Chandigarh` - Chandigarh
+        * `Chhattisgarh` - Chhattisgarh
+        * `Dadra and Nagar Haveli and Daman and Diu` - Dadra and Nagar Haveli and Daman and Diu
+        * `Delhi` - Delhi
+        * `Goa` - Goa
+        * `Gujarat` - Gujarat
+        * `Haryana` - Haryana
+        * `Himachal Pradesh` - Himachal Pradesh
+        * `Jammu and Kashmir` - Jammu and Kashmir
+        * `Jharkhand` - Jharkhand
+        * `Karnataka` - Karnataka
+        * `Kerala` - Kerala
+        * `Ladakh` - Ladakh
+        * `Lakshadweep` - Lakshadweep
+        * `Madhya Pradesh` - Madhya Pradesh
+        * `Maharashtra` - Maharashtra
+        * `Manipur` - Manipur
+        * `Meghalaya` - Meghalaya
+        * `Mizoram` - Mizoram
+        * `Nagaland` - Nagaland
+        * `Odisha` - Odisha
+        * `Puducherry` - Puducherry
+        * `Punjab` - Punjab
+        * `Rajasthan` - Rajasthan
+        * `Sikkim` - Sikkim
+        * `Tamil Nadu` - Tamil Nadu
+        * `Telangana` - Telangana
+        * `Tripura` - Tripura
+        * `Uttar Pradesh` - Uttar Pradesh
+        * `Uttarakhand` - Uttarakhand
+        * `West Bengal` - West Bengal
+    StatusEnum:
+      enum:
+      - completed
+      - in_progress
+      - planned
+      type: string
+      description: |-
+        * `completed` - Completed
+        * `in_progress` - In Progress
+        * `planned` - Planned
+    TrackerOverview:
+      type: object
+      properties:
+        section_label:
+          type: string
+          maxLength: 60
+        title:
+          type: string
+          maxLength: 120
+        subtitle:
+          type: string
+          maxLength: 600
+        tagline:
+          type: string
+          maxLength: 120
+        hero_image_url:
+          type: string
+          readOnly: true
+        stats:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        updates_cta_kicker:
+          type: string
+          maxLength: 120
+        updates_cta_body:
+          type: string
+          maxLength: 400
+        full_tracker_url:
+          description: Destination for the 'View Full Tracker' button.
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 500
+          - type: string
+            maxLength: 0
+        updates:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrackerUpdate'
+          readOnly: true
+        is_active:
+          type: boolean
+      required:
+      - hero_image_url
+      - stats
+      - updates
+    TrackerUpdate:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        city:
+          type: string
+          maxLength: 120
+        region:
+          type: string
+          description: State or union territory, e.g. Uttar Pradesh.
+          maxLength: 120
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        status_display:
+          type: string
+          readOnly: true
+        status_note:
+          type: string
+          description: Sub-line under the location, e.g. 'FIR Registered' or 'Under
+            Process'.
+          maxLength: 120
+        date:
+          type: string
+          readOnly: true
+        date_iso:
+          type: string
+          format: date
+          readOnly: true
+      required:
+      - city
+      - date
+      - date_iso
+      - id
+      - region
+      - status_display
     TransportEnum:
       enum:
       - auto
