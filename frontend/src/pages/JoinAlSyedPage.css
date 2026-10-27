@@ -17,7 +17,7 @@
   /* clip, not hidden: hidden would make this a scroll container and break the sticky side panel */
   overflow: clip;
   min-height: calc(100dvh - 4.5rem);
-  padding: 0 0 clamp(300px, 92vw, 580px);
+  padding: 0 0 clamp(240px, 70vw, 420px);
   background: #000;
   color: var(--join-text);
 }
@@ -827,23 +827,35 @@
   display: flex;
   justify-content: center;
   pointer-events: none;
+  background: radial-gradient(ellipse at 50% 100%, rgba(255, 255, 255, 0.05), transparent 65%);
 }
 
-.join-arch img {
-  display: block;
+.join-arch svg {
   width: min(100%, 620px);
   height: auto;
-  aspect-ratio: 351 / 313;
-  object-fit: cover;
-  opacity: 0.9;
-  -webkit-mask-image:
-    linear-gradient(to right, transparent 0, #000 14%, #000 86%, transparent 100%),
-    linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
-  -webkit-mask-composite: source-in;
-  mask-image:
-    linear-gradient(to right, transparent 0, #000 14%, #000 86%, transparent 100%),
-    linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
-  mask-composite: intersect;
+  aspect-ratio: 400 / 330;
+  color: rgba(255, 255, 255, 0.16);
+}
+
+.join-arch-field {
+  opacity: 0.55;
+}
+
+.join-arch-inner {
+  opacity: 1;
+}
+
+.join-arch-line {
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+}
+
+.join-arch-line--outer {
+  stroke: rgba(255, 255, 255, 0.32);
+}
+
+.join-arch-line--inner {
+  stroke: rgba(255, 255, 255, 0.18);
 }
 
 /* terms dialog */
