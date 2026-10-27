@@ -1,9 +1,11 @@
-from config.model_validators import validate_no_active_content
+from config.model_validators import validate_no_active_content, validate_safe_public_url
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 
 from .india_locations import STATE_CHOICES, is_valid_district
+
+DEFAULT_INSTAGRAM_URL = "https://www.instagram.com/adlfrontofficial?igsh=MTgwN3Z2ZXZ4aGswYg=="
 
 INDIA_MOBILE_VALIDATOR = RegexValidator(
     regex=r"^\+91[6-9]\d{9}$",
@@ -71,3 +73,39 @@ class JoinApplication(models.Model):
 
     def __str__(self):
         return f"{self.full_name} ({self.get_role_display()})"
+
+
+class JoinFormSettings(models.Model):
+    """Single-row, admin-managed settings for the public Join Al Syed form (pinned to pk=1)."""
+
+    instagram_url = models.URLField(
+        "Instagram link",
+        max_length=500,
+        default=DEFAULT_INSTAGRAM_URL,
+        help_text="Where the 'Get the Updates' button on the Form Submitted screen sends people.",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Joining form settings"
+        verbose_name_plural = "Joining form settings"
+
+    def clean(self):
+        super().clean()
+        validate_safe_public_url(self.instagram_url, "instagram_url")
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        self.full_clean(validate_unique=False)
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        return (0, {})
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return "Joining form settings"

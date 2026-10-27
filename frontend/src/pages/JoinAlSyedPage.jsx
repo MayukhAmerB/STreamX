@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 
-import { listJoinLocations, submitJoinApplication } from "../api/join";
-import { listSocialAccounts } from "../api/socialAccounts";
+import { getJoinSettings, listJoinLocations, submitJoinApplication } from "../api/join";
+import joinArchImage from "../assets/join-arch.jpg";
+import joinBackgroundImage from "../assets/join-background.jpg";
 import TurnstileWidget from "../components/TurnstileWidget";
 import { useAuth } from "../hooks/useAuth";
 import { useTurnstileChallenge } from "../hooks/useTurnstileChallenge";
@@ -120,11 +121,9 @@ export function buildJoinPayload(form) {
   };
 }
 
-export function pickInstagramUrl(categories) {
-  if (!Array.isArray(categories)) return DEFAULT_INSTAGRAM_URL;
-  const instagram = categories.find((category) => category?.slug === "instagram");
-  const account = instagram?.accounts?.find((item) => item?.url);
-  return account?.url || DEFAULT_INSTAGRAM_URL;
+export function pickInstagramUrl(settings) {
+  const url = typeof settings?.instagram_url === "string" ? settings.instagram_url.trim() : "";
+  return /^https?:\/\//i.test(url) ? url : DEFAULT_INSTAGRAM_URL;
 }
 
 /* ---------- icons ---------- */
@@ -224,42 +223,10 @@ function Icon({ name }) {
 
 /* ---------- decorative arch ---------- */
 
-const ARCH_PATH =
-  "M40 330 V188 C40 150 78 128 118 112 C150 99 172 82 184 60 C190 48 194 36 200 22 C206 36 210 48 216 60 C228 82 250 99 282 112 C322 128 360 150 360 188 V330";
-
 export function JoinArchOrnament() {
-  const patternId = useId().replace(/:/g, "");
   return (
     <div className="join-arch" aria-hidden="true">
-      <svg viewBox="0 0 400 330" preserveAspectRatio="xMidYMax meet">
-        <defs>
-          <pattern id={`${patternId}-damask`} width="44" height="44" patternUnits="userSpaceOnUse">
-            <g fill="none" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round">
-              <path d="M22 4c6 5 6 11 0 15-6-4-6-10 0-15Z" />
-              <path d="M22 19v6M22 25c-5 0-9 3-10 8M22 25c5 0 9 3 10 8" />
-              <path d="M12 33c-3-1-5-4-4-7 3 0 5 3 4 7ZM32 33c3-1 5-4 4-7-3 0-5 3-4 7Z" />
-              <path d="M0 22c4-3 8-3 10 0-2 3-6 3-10 0ZM44 22c-4-3-8-3-10 0 2 3 6 3 10 0Z" />
-              <path d="M4 4c3 1 4 4 3 6M40 4c-3 1-4 4-3 6M4 40c3-1 4-4 3-6M40 40c-3-1-4-4-3-6" />
-              <circle cx="22" cy="38" r="1.6" />
-            </g>
-          </pattern>
-          <linearGradient id={`${patternId}-fade`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#fff" stopOpacity="0" />
-            <stop offset="0.45" stopColor="#fff" stopOpacity="0.55" />
-            <stop offset="1" stopColor="#fff" stopOpacity="1" />
-          </linearGradient>
-          <mask id={`${patternId}-mask`}>
-            <rect width="400" height="330" fill={`url(#${patternId}-fade)`} />
-          </mask>
-        </defs>
-        <g mask={`url(#${patternId}-mask)`}>
-          <rect width="400" height="330" fill={`url(#${patternId}-damask)`} className="join-arch-field" />
-          <path d={ARCH_PATH} fill="#050505" className="join-arch-inner-bg" />
-          <path d={ARCH_PATH} fill={`url(#${patternId}-damask)`} className="join-arch-inner" />
-          <path d={ARCH_PATH} fill="none" className="join-arch-line join-arch-line--outer" />
-          <path d={ARCH_PATH} fill="none" className="join-arch-line join-arch-line--inner" transform="translate(200 330) scale(0.9) translate(-200 -330)" />
-        </g>
-      </svg>
+      <img src={joinArchImage} alt="" loading="lazy" decoding="async" />
     </div>
   );
 }
@@ -705,9 +672,9 @@ export default function JoinAlSyedPage() {
       .catch((err) => {
         if (active) setLocationsError(apiMessage(err, "Could not load states and districts. Refresh and try again."));
       });
-    listSocialAccounts()
+    getJoinSettings()
       .then((response) => {
-        if (active) setInstagramUrl(pickInstagramUrl(apiData(response, [])));
+        if (active) setInstagramUrl(pickInstagramUrl(apiData(response, null)));
       })
       .catch(() => {});
     return () => {
@@ -749,7 +716,8 @@ export default function JoinAlSyedPage() {
   };
 
   return (
-    <section className="join-page">
+    <section className="join-page" style={{ "--join-bg-image": `url(${joinBackgroundImage})` }}>
+      <div className="join-backdrop" aria-hidden="true" />
       <div className="join-container">
         {step === "role" ? (
           <RoleStep

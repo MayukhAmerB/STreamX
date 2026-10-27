@@ -1,10 +1,11 @@
 import csv
 
 from django.contrib import admin, messages
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
+from django.urls import reverse
 from django.utils import timezone
 
-from .models import JoinApplication
+from .models import JoinApplication, JoinFormSettings
 
 CSV_FIELDS = (
     ("id", "ID"),
@@ -111,3 +112,25 @@ class JoinApplicationAdmin(admin.ModelAdmin):
                 row.append(_csv_cell(attr, value() if callable(value) else value))
             writer.writerow(row)
         return response
+
+
+@admin.register(JoinFormSettings)
+class JoinFormSettingsAdmin(admin.ModelAdmin):
+    readonly_fields = ("updated_at",)
+    fieldsets = (
+        ("Get the Updates button", {"fields": ("instagram_url",)}),
+        ("Meta", {"fields": ("updated_at",)}),
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        # One settings row: skip the list and open its edit form directly.
+        settings_row = JoinFormSettings.load()
+        return HttpResponseRedirect(
+            reverse("admin:join_requests_joinformsettings_change", args=(settings_row.pk,))
+        )

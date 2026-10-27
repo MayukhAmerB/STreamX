@@ -88,17 +88,13 @@ describe("JoinAlSyedPage", () => {
     expect(buildJoinPayload({ ...completeForm, age: "" }).age).toBeNull();
   });
 
-  it("normalises location payloads and picks the Instagram link from AS Accounts", () => {
+  it("normalises location payloads and picks the admin-managed Instagram link", () => {
     expect(normalizeLocations([{ state: "Goa", districts: ["North Goa", 4] }, null, { state: 3 }])).toEqual([
       { state: "Goa", districts: ["North Goa"] },
     ]);
-    expect(
-      pickInstagramUrl([
-        { slug: "youtube", accounts: [{ url: "https://youtube.com/x" }] },
-        { slug: "instagram", accounts: [{ url: "https://instagram.com/alsyed" }] },
-      ]),
-    ).toBe("https://instagram.com/alsyed");
-    expect(pickInstagramUrl([])).toContain("instagram.com");
+    expect(pickInstagramUrl({ instagram_url: "https://instagram.com/alsyed" })).toBe("https://instagram.com/alsyed");
+    expect(pickInstagramUrl({ instagram_url: "javascript:alert(1)" })).toContain("instagram.com/adlfront");
+    expect(pickInstagramUrl(null)).toContain("instagram.com");
   });
 
   it("renders the submitted screen with the updates link", () => {

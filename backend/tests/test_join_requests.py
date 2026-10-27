@@ -1,8 +1,9 @@
 from apps.join_requests.india_locations import INDIA_STATE_DISTRICTS
-from apps.join_requests.models import JoinApplication
+from apps.join_requests.models import DEFAULT_INSTAGRAM_URL, JoinApplication, JoinFormSettings
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from rest_framework.test import APITestCase
 
 APPLICATIONS_URL = "/api/join/applications/"
@@ -159,3 +160,41 @@ class JoinApplicationAdminTests(APITestCase):
         self.assertIn("Contact number", body)
         self.assertIn("+919876543210", body)
         self.assertIn("'=HYPERLINK(1)", body)
+
+
+class JoinFormSettingsTests(APITestCase):
+    def setUp(self):
+        cache.clear()
+        self.admin_user = get_user_model().objects.create_superuser(
+            email="join-settings@test.com",
+            password="StrongJoinSettingsPassword123!",
+        )
+
+    def test_settings_default_to_the_official_instagram_link(self):
+        response = self.client.get("/api/join/settings/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"], {"instagram_url": DEFAULT_INSTAGRAM_URL})
+
+    def test_admin_can_change_the_instagram_link(self):
+        self.client.force_login(self.admin_user)
+        JoinFormSettings.load()
+
+        response = self.client.post(
+            "/admin/join_requests/joinformsettings/1/change/",
+            {"instagram_url": "https://www.instagram.com/alsyedinitiative/"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        changelist = self.client.get("/admin/join_requests/joinformsettings/")
+        self.assertRedirects(changelist, "/admin/join_requests/joinformsettings/1/change/")
+        self.client.logout()
+        public = self.client.get("/api/join/settings/")
+        self.assertEqual(public.data["data"]["instagram_url"], "https://www.instagram.com/alsyedinitiative/")
+        self.assertIn(JoinFormSettings, admin.site._registry)
+
+    def test_rejects_internal_urls(self):
+        settings_row = JoinFormSettings.load()
+        settings_row.instagram_url = "http://127.0.0.1/admin"
+        with self.assertRaises(ValidationError):
+            settings_row.save()

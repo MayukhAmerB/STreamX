@@ -725,6 +725,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/join/settings/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["join_settings_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/lecture-questions/": {
         parameters: {
             query?: never;
@@ -1518,6 +1534,16 @@ export interface components {
         JoinApplicationCreated: {
             application_id: number;
             status: string;
+        };
+        JoinFormSettings: {
+            /** Format: uri */
+            instagram_url: string;
+        };
+        JoinFormSettingsResponse: {
+            success: boolean;
+            message: string;
+            data: components["schemas"]["JoinFormSettings"];
+            errors: unknown;
         };
         JoinLocation: {
             state: string;
@@ -3242,6 +3268,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JoinLocationDirectoryResponse"];
+                };
+            };
+        };
+    };
+    join_settings_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinFormSettingsResponse"];
                 };
             };
         };

@@ -8,10 +8,11 @@ from rest_framework.throttling import AnonRateThrottle, ScopedRateThrottle
 from rest_framework.views import APIView
 
 from .india_locations import location_directory
-from .models import JoinApplication
+from .models import JoinApplication, JoinFormSettings
 from .serializers import (
     JoinApplicationCreateResponseSerializer,
     JoinApplicationCreateSerializer,
+    JoinFormSettingsResponseSerializer,
     JoinLocationDirectoryResponseSerializer,
 )
 
@@ -34,6 +35,26 @@ class JoinLocationDirectoryView(APIView):
     def get(self, request):
         response = api_response(message="State and district directory fetched.", data=location_directory())
         response["Cache-Control"] = "public, max-age=3600, stale-while-revalidate=86400"
+        return response
+
+
+class JoinFormSettingsView(APIView):
+    authentication_classes = []
+    permission_classes = (permissions.AllowAny,)
+    throttle_classes = (JoinLocationDirectoryThrottle,)
+
+    @extend_schema(
+        operation_id="join_settings_retrieve",
+        tags=("Join Al Syed",),
+        responses={200: JoinFormSettingsResponseSerializer},
+    )
+    def get(self, request):
+        settings_row = JoinFormSettings.load()
+        response = api_response(
+            message="Joining form settings fetched.",
+            data={"instagram_url": settings_row.instagram_url},
+        )
+        response["Cache-Control"] = "public, max-age=60, stale-while-revalidate=120"
         return response
 
 

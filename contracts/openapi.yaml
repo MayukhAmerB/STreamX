@@ -1258,6 +1258,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/JoinLocationDirectoryResponse'
           description: ''
+  /join/settings/:
+    get:
+      operationId: join_settings_retrieve
+      tags:
+      - Join Al Syed
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JoinFormSettingsResponse'
+          description: ''
   /lecture-questions/:
     get:
       operationId: lecture_questions_retrieve
@@ -2952,6 +2966,30 @@ components:
       required:
       - application_id
       - status
+    JoinFormSettings:
+      type: object
+      properties:
+        instagram_url:
+          type: string
+          format: uri
+      required:
+      - instagram_url
+    JoinFormSettingsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/JoinFormSettings'
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
     JoinLocation:
       type: object
       properties:

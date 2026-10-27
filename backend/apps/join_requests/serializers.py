@@ -99,6 +99,17 @@ class JoinApplicationCreateResponseSerializer(serializers.Serializer):
     errors = serializers.JSONField(allow_null=True)
 
 
+class JoinFormSettingsSerializer(serializers.Serializer):
+    instagram_url = serializers.URLField()
+
+
+class JoinFormSettingsResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    data = JoinFormSettingsSerializer()
+    errors = serializers.JSONField(allow_null=True)
+
+
 class JoinLocationSerializer(serializers.Serializer):
     state = serializers.CharField()
     districts = serializers.ListField(child=serializers.CharField())

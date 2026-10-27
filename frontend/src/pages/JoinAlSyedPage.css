@@ -16,8 +16,7 @@
   isolation: isolate;
   overflow: hidden;
   min-height: calc(100dvh - 4.5rem);
-  padding: 0 0 clamp(240px, 70vw, 420px);
-  background: #000;
+  padding: 0 0 clamp(300px, 92vw, 580px);
   color: var(--join-text);
 }
 
@@ -784,7 +783,28 @@
   color: #b3b3b3;
 }
 
-/* ornament */
+/* backdrop + ornament */
+
+.join-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.62) 100%),
+    var(--join-bg-image) center top / cover no-repeat,
+    #181712;
+}
+
+/* Wider than the artwork: show the whole scroll frame instead of cropping it. */
+@media (min-aspect-ratio: 2/3) {
+  .join-backdrop {
+    background:
+      linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.62) 100%),
+      var(--join-bg-image) center / contain no-repeat,
+      #181712;
+  }
+}
 
 .join-arch {
   position: absolute;
@@ -793,35 +813,23 @@
   display: flex;
   justify-content: center;
   pointer-events: none;
-  background: radial-gradient(ellipse at 50% 100%, rgba(255, 255, 255, 0.05), transparent 65%);
 }
 
-.join-arch svg {
+.join-arch img {
+  display: block;
   width: min(100%, 620px);
   height: auto;
-  aspect-ratio: 400 / 330;
-  color: rgba(255, 255, 255, 0.16);
-}
-
-.join-arch-field {
-  opacity: 0.55;
-}
-
-.join-arch-inner {
-  opacity: 1;
-}
-
-.join-arch-line {
-  stroke-width: 2.2;
-  stroke-linejoin: round;
-}
-
-.join-arch-line--outer {
-  stroke: rgba(255, 255, 255, 0.32);
-}
-
-.join-arch-line--inner {
-  stroke: rgba(255, 255, 255, 0.18);
+  aspect-ratio: 351 / 313;
+  object-fit: cover;
+  opacity: 0.9;
+  -webkit-mask-image:
+    linear-gradient(to right, transparent 0, #000 14%, #000 86%, transparent 100%),
+    linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to right, transparent 0, #000 14%, #000 86%, transparent 100%),
+    linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
+  mask-composite: intersect;
 }
 
 /* terms dialog */
