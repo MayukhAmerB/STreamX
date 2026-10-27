@@ -14,7 +14,8 @@
 .join-page {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
+  /* clip, not hidden: hidden would make this a scroll container and break the sticky side panel */
+  overflow: clip;
   min-height: calc(100dvh - 4.5rem);
   padding: 0 0 clamp(300px, 92vw, 580px);
   background: #000;
@@ -782,6 +783,39 @@
   font-size: 15px;
   line-height: 1.5;
   color: #b3b3b3;
+}
+
+/* left side panel (wide screens only, fills the space beside the form column) */
+
+.join-side {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .join-side {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 0;
+    display: block;
+    width: calc((100% - 600px) / 2);
+    pointer-events: none;
+  }
+
+  .join-side img {
+    position: sticky;
+    top: 0;
+    display: block;
+    width: 100%;
+    /* the site zooms <html>, which shrinks viewport units; undo it so the panel spans the full screen */
+    height: calc(100dvh / var(--site-zoom, 1));
+    object-fit: cover;
+    object-position: center;
+    opacity: 0.85;
+    -webkit-mask-image: linear-gradient(to right, #000 55%, transparent 100%);
+    mask-image: linear-gradient(to right, #000 55%, transparent 100%);
+  }
 }
 
 /* ornament */
