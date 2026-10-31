@@ -10,7 +10,7 @@ import {
   requestCourse,
   requestLiveClass,
 } from '../api/academy';
-import { readableError } from '../api/client';
+import { ApiError, readableError } from '../api/client';
 import { clearSession, readSession, writeSession } from '../storage/session';
 import type { AcademyUser, Course, LiveClass, MobileSession } from '../types';
 
@@ -72,9 +72,13 @@ export function AcademyProvider({ children }: PropsWithChildren) {
           const freshUser = await currentUser();
           verified = { ...stored, user: freshUser };
           await writeSession(verified);
-        } catch {
-          verified = null;
-          await clearSession();
+        } catch (error) {
+          // Offline, deploys and throttling must not sign the user out; only
+          // the server rejecting the session does.
+          if (error instanceof ApiError && error.status === 401) {
+            verified = null;
+            await clearSession();
+          }
         }
       }
       if (!active) return;
@@ -99,7 +103,9 @@ export function AcademyProvider({ children }: PropsWithChildren) {
 
   async function logout() {
     try {
-      if (session?.tokens.refresh) await logoutRequest(session.tokens.refresh);
+      // React state can hold an already-rotated token; storage has the latest.
+      const stored = (await readSession()) || session;
+      if (stored?.tokens.refresh) await logoutRequest(stored.tokens.refresh);
     } finally {
       await clearSession();
       setSession(null);

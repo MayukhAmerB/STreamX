@@ -54,7 +54,55 @@ async function ensureCsrfToken(forceRefresh = false) {
   return csrfBootstrapPromise;
 }
 
+const REFRESH_RETRY_DELAYS_MS = [1000, 3000];
+let refreshInFlight = null;
+let lastRefreshCompletedAt = 0;
+
+function isTransientFailure(error) {
+  const status = error?.response?.status;
+  return !status || status === 408 || status === 429 || status >= 500;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function requestTokenRefresh() {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await apiClient.post("/auth/refresh/");
+    } catch (error) {
+      if (!isTransientFailure(error) || attempt >= REFRESH_RETRY_DELAYS_MS.length) {
+        throw error;
+      }
+      const delayMs = REFRESH_RETRY_DELAYS_MS[attempt];
+      await wait(delayMs + Math.round(Math.random() * delayMs * 0.5));
+    }
+  }
+}
+
+// Concurrent 401s share one refresh, and a request that was already in flight
+// when a refresh finished just retries with the new cookies.
+function refreshSession(requestSentAt = 0) {
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+  if (requestSentAt && requestSentAt < lastRefreshCompletedAt) {
+    return Promise.resolve();
+  }
+  refreshInFlight = requestTokenRefresh()
+    .then((response) => {
+      lastRefreshCompletedAt = Date.now();
+      return response;
+    })
+    .finally(() => {
+      refreshInFlight = null;
+    });
+  return refreshInFlight;
+}
+
 apiClient.interceptors.request.use(async (config) => {
+  config._sentAt = Date.now();
   const method = String(config?.method || "get").toLowerCase();
   if (!unsafeMethods.has(method)) {
     return config;
@@ -105,15 +153,18 @@ apiClient.interceptors.response.use(
     ) {
       error.config._retry = true;
       try {
-        await apiClient.post("/auth/refresh/");
+        await refreshSession(error.config._sentAt);
         return apiClient(error.config);
       } catch (refreshError) {
-        notifySessionExpired({
-          detail:
-            refreshError?.response?.data?.errors?.detail ||
-            refreshError?.response?.data?.detail ||
-            "Your session is no longer active.",
-        });
+        // Only the server rejecting the session ends it; outages and throttling
+        // must not log users out of a live class.
+        if (!isTransientFailure(refreshError)) {
+          const errors = refreshError?.response?.data?.errors || {};
+          notifySessionExpired({
+            code: errors.code || "",
+            detail: errors.detail || refreshError?.response?.data?.detail || "Your session is no longer active.",
+          });
+        }
         return Promise.reject(error);
       }
     }

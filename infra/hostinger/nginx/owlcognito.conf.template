@@ -75,7 +75,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
         expires 1d;
-        add_header Cache-Control "public, max-age=86400" always;
+        add_header Cache-Control "public, max-age=86400";
     }
 
     location /health/live {

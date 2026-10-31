@@ -22,11 +22,13 @@ export function AuthProvider({ children }) {
   const [webPushPublicKey, setWebPushPublicKey] = useState("");
   const [turnstileEnabled, setTurnstileEnabled] = useState(Boolean(buildTimeTurnstileSiteKey));
   const [turnstileSiteKey, setTurnstileSiteKey] = useState(buildTimeTurnstileSiteKey);
+  const [sessionEndedMessage, setSessionEndedMessage] = useState("");
   const hasBootstrappedRef = useRef(false);
 
   function setAuthenticatedUser(data) {
     if (data) {
       markKnownRegisteredVisitor();
+      setSessionEndedMessage("");
     }
     setUser(data);
   }
@@ -79,7 +81,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    const handleSessionExpired = () => {
+    const handleSessionExpired = (event) => {
+      if (event?.detail?.code === "session_replaced") {
+        setSessionEndedMessage(event.detail.detail || "This account was signed in on another device.");
+      }
       setUser(null);
       setLoading(false);
     };
@@ -123,6 +128,7 @@ export function AuthProvider({ children }) {
       webPushPublicKey,
       turnstileEnabled,
       turnstileSiteKey,
+      sessionEndedMessage,
       login,
       logout,
       acceptTerms,
@@ -137,6 +143,7 @@ export function AuthProvider({ children }) {
       webPushPublicKey,
       turnstileEnabled,
       turnstileSiteKey,
+      sessionEndedMessage,
     ]
   );
 

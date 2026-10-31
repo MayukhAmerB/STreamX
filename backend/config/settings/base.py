@@ -221,7 +221,11 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "50/minute",
         "user": "200/minute",
-        "login": "10/minute",
+        # Per-IP ceiling across all accounts; per-account abuse is covered by
+        # login_burst (IP + email) and the failed-login lockout.
+        "login": env("AUTH_LOGIN_IP_RATE", "120/minute"),
+        "refresh": env("AUTH_REFRESH_TOKEN_RATE", "30/minute"),
+        "refresh_ip": env("AUTH_REFRESH_IP_RATE", "600/minute"),
         "login_burst": "10/minute",
         "contact": "5/hour",
         "public_enrollment_lead": "20/hour",
@@ -399,6 +403,7 @@ SECURITY_MAX_INSPECTION_BODY_BYTES = env_int("SECURITY_MAX_INSPECTION_BODY_BYTES
 AUTH_LOGIN_MAX_FAILURES = env_int("AUTH_LOGIN_MAX_FAILURES", 10)
 AUTH_LOGIN_LOCKOUT_SECONDS = env_int("AUTH_LOGIN_LOCKOUT_SECONDS", 3600)
 AUTH_CONCURRENT_SESSION_EMAILS = env_list("AUTH_CONCURRENT_SESSION_EMAILS", [])
+AUTH_REFRESH_REUSE_GRACE_SECONDS = env_int("AUTH_REFRESH_REUSE_GRACE_SECONDS", 60)
 ACCOUNT_SELF_SERVICE_CREDENTIALS_ENABLED = env_bool("ACCOUNT_SELF_SERVICE_CREDENTIALS_ENABLED", False)
 COURSE_LIST_CACHE_TTL_SECONDS = env_int("COURSE_LIST_CACHE_TTL_SECONDS", 60)
 COURSE_DETAIL_CACHE_TTL_SECONDS = env_int("COURSE_DETAIL_CACHE_TTL_SECONDS", 60)

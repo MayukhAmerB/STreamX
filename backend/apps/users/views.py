@@ -17,13 +17,12 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.exceptions import TokenError
 
 from config.audit import log_security_event
 from config.client_ip import resolve_client_ip
 from config.cookies import REFRESH_COOKIE, clear_auth_cookies, set_auth_cookies
 from config.response import api_response
-from config.throttling import LoginRateThrottle
+from config.throttling import LoginRateThrottle, RefreshIpCeilingThrottle, RefreshTokenRateThrottle
 from config.turnstile import enforce_turnstile, turnstile_public_config
 
 from .async_jobs import async_jobs_enabled, enqueue_email_job
@@ -40,12 +39,19 @@ from .serializers import (
     UserSerializer,
 )
 from .models import TermsAcceptance
+from .refresh_rotation import (
+    REJECT_INVALID,
+    REJECT_REVOKED,
+    REJECT_SESSION_REPLACED,
+    RefreshRejected,
+    revoke_refresh_token,
+    rotate_refresh_token,
+)
 from .security import clear_failed_login, get_lockout_state, register_failed_login
 from .session_policy import (
     SESSION_VERSION_CLAIM,
     get_active_session_version,
     should_enforce_single_session,
-    token_matches_active_session,
 )
 from .terms import TERMS_BODY, TERMS_LAST_UPDATED, TERMS_TITLE, TERMS_VERSION
 
@@ -97,18 +103,6 @@ def _issue_tokens_for_user(user, *, rotate_session=False):
     return str(refresh.access_token), str(refresh)
 
 
-def _blacklist_refresh_token_string(refresh_token):
-    token_value = str(refresh_token or "").strip()
-    if not token_value:
-        return
-    try:
-        token = RefreshToken(token_value)
-        token.blacklist()
-    except Exception:
-        # Blacklist app may be unavailable or token already invalid/blacklisted.
-        return
-
-
 def _revoke_all_refresh_tokens_for_user(user):
     if not user:
         return
@@ -145,15 +139,22 @@ def _attach_csrf_token(response, request):
     return response
 
 
-def _refresh_token_error_response(request, *, message, detail):
+def _refresh_token_error_response(request, *, message, detail, code=REJECT_INVALID, clear_cookies=True):
     response = api_response(
         success=False,
         message=message,
-        errors={"detail": detail},
+        errors={"detail": detail, "code": code},
         status_code=status.HTTP_401_UNAUTHORIZED,
     )
-    clear_auth_cookies(response)
+    if clear_cookies:
+        clear_auth_cookies(response)
     return _attach_csrf_token(response, request)
+
+
+_REFRESH_REJECTION_MESSAGES = {
+    REJECT_SESSION_REPLACED: "Session expired.",
+    REJECT_REVOKED: "Session expired.",
+}
 
 
 def _auth_success_response(user, message, request=None, *, rotate_session=True):
@@ -315,6 +316,7 @@ class MobileLoginView(APIView):
 class MobileRefreshTokenView(APIView):
     permission_classes = [permissions.AllowAny]
     parser_classes = [JSONParser]
+    throttle_classes = [RefreshTokenRateThrottle, RefreshIpCeilingThrottle]
 
     def post(self, request):
         refresh_token = str(request.data.get("refresh", "")).strip()
@@ -322,46 +324,28 @@ class MobileRefreshTokenView(APIView):
             return api_response(
                 success=False,
                 message="Refresh token missing.",
-                errors={"detail": "Refresh token missing."},
+                errors={"detail": "Refresh token missing.", "code": REJECT_INVALID},
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
 
         try:
-            refresh = RefreshToken(refresh_token)
-            user = User.objects.get(id=refresh["user_id"])
-        except (TokenError, User.DoesNotExist, KeyError) as exc:
+            rotated = rotate_refresh_token(refresh_token, request=request)
+        except RefreshRejected as exc:
             return api_response(
                 success=False,
-                message="Invalid refresh token.",
-                errors={"detail": str(exc)},
+                message=_REFRESH_REJECTION_MESSAGES.get(exc.code, "Invalid refresh token."),
+                errors={"detail": exc.detail, "code": exc.code},
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
-
-        if not token_matches_active_session(refresh, user):
-            _blacklist_refresh_token_string(refresh_token)
-            return api_response(
-                success=False,
-                message="Session expired.",
-                errors={"detail": "This account is active on another device. Please log in again."},
-                status_code=status.HTTP_401_UNAUTHORIZED,
-            )
-
-        issued_refresh = refresh
-        if bool(getattr(settings, "SIMPLE_JWT", {}).get("ROTATE_REFRESH_TOKENS", False)):
-            if bool(getattr(settings, "SIMPLE_JWT", {}).get("BLACKLIST_AFTER_ROTATION", False)):
-                _blacklist_refresh_token_string(refresh_token)
-            issued_refresh = RefreshToken.for_user(user)
-            if should_enforce_single_session(user):
-                issued_refresh[SESSION_VERSION_CLAIM] = get_active_session_version(user)
 
         return api_response(
             success=True,
             message="Token refreshed.",
             data={
-                "user": _serialize_user(user, request=request),
+                "user": _serialize_user(rotated.user, request=request),
                 "tokens": {
-                    "access": str(issued_refresh.access_token),
-                    "refresh": str(issued_refresh),
+                    "access": rotated.access,
+                    "refresh": rotated.refresh,
                 },
             },
         )
@@ -372,7 +356,7 @@ class MobileLogoutView(APIView):
     parser_classes = [JSONParser]
 
     def post(self, request):
-        _blacklist_refresh_token_string(request.data.get("refresh"))
+        revoke_refresh_token(request.data.get("refresh"))
         return api_response(success=True, message="Logged out successfully.", data=None)
 
 
@@ -380,7 +364,7 @@ class LogoutView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        _blacklist_refresh_token_string(request.COOKIES.get(REFRESH_COOKIE))
+        revoke_refresh_token(request.COOKIES.get(REFRESH_COOKIE))
         response = api_response(success=True, message="Logged out successfully.", data=None)
         clear_auth_cookies(response)
         return response
@@ -388,6 +372,7 @@ class LogoutView(APIView):
 
 class RefreshTokenView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [RefreshTokenRateThrottle, RefreshIpCeilingThrottle]
 
     def post(self, request):
         refresh_token = request.COOKIES.get(REFRESH_COOKIE)
@@ -398,30 +383,17 @@ class RefreshTokenView(APIView):
                 detail="Refresh token missing.",
             )
         try:
-            refresh = RefreshToken(refresh_token)
-            user = User.objects.get(id=refresh["user_id"])
-        except (TokenError, User.DoesNotExist, KeyError) as exc:
+            rotated = rotate_refresh_token(refresh_token, request=request)
+        except RefreshRejected as exc:
             return _refresh_token_error_response(
                 request,
-                message="Invalid refresh token.",
-                detail=str(exc),
+                message=_REFRESH_REJECTION_MESSAGES.get(exc.code, "Invalid refresh token."),
+                detail=exc.detail,
+                code=exc.code,
+                clear_cookies=exc.clear_cookies,
             )
-        if not token_matches_active_session(refresh, user):
-            _blacklist_refresh_token_string(refresh_token)
-            return _refresh_token_error_response(
-                request,
-                message="Session expired.",
-                detail="This account is active on another device. Please log in again.",
-            )
-        issued_refresh = refresh
-        if bool(getattr(settings, "SIMPLE_JWT", {}).get("ROTATE_REFRESH_TOKENS", False)):
-            if bool(getattr(settings, "SIMPLE_JWT", {}).get("BLACKLIST_AFTER_ROTATION", False)):
-                _blacklist_refresh_token_string(refresh_token)
-            issued_refresh = RefreshToken.for_user(user)
-            if should_enforce_single_session(user):
-                issued_refresh[SESSION_VERSION_CLAIM] = get_active_session_version(user)
         response = api_response(success=True, message="Token refreshed.", data=None)
-        set_auth_cookies(response, str(issued_refresh.access_token), str(issued_refresh))
+        set_auth_cookies(response, rotated.access, rotated.refresh)
         return _attach_csrf_token(response, request)
 
 

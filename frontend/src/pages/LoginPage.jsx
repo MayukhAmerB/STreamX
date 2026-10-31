@@ -23,6 +23,7 @@ export default function LoginPage() {
     login,
     turnstileEnabled,
     turnstileSiteKey,
+    sessionEndedMessage,
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -31,7 +32,7 @@ export default function LoginPage() {
   const [form, setForm] = useState({ email: "", password: "", otp_code: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
+  const [info, setInfo] = useState(sessionEndedMessage || "");
   const [emailWhitespaceWarning, setEmailWhitespaceWarning] = useState("");
   const [needs2FA, setNeeds2FA] = useState(false);
 

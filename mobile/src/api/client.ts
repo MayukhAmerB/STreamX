@@ -27,21 +27,41 @@ async function parseEnvelope<T>(response: Response): Promise<ApiEnvelope<T>> {
   return payload;
 }
 
-async function refreshMobileSession(session: MobileSession): Promise<MobileSession | null> {
+let refreshInFlight: Promise<MobileSession | null> | null = null;
+
+async function requestMobileRefresh(session: MobileSession): Promise<MobileSession | null> {
+  // Network failures propagate as-is so callers keep the stored session.
   const response = await fetch(`${API_BASE_URL}/auth/mobile/refresh/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ refresh: session.tokens.refresh }),
   });
 
-  if (!response.ok) {
-    await clearSession();
+  if (response.status === 401) {
+    // Only the server rejecting the token ends the session. A newer session
+    // stored meanwhile (another refresh or login) is never wiped.
+    const stored = await readSession();
+    if (stored?.tokens.refresh === session.tokens.refresh) await clearSession();
     return null;
+  }
+  if (!response.ok) {
+    // Outages and throttling must not look like a rejected session (401).
+    throw new ApiError('The server could not refresh your session. Please try again.', response.status);
   }
 
   const payload = await parseEnvelope<MobileSession>(response);
   await writeSession(payload.data);
   return payload.data;
+}
+
+// Concurrent 401s share one refresh instead of racing to rotate the same token.
+function refreshMobileSession(session: MobileSession): Promise<MobileSession | null> {
+  if (!refreshInFlight) {
+    refreshInFlight = requestMobileRefresh(session).finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<ApiEnvelope<T>> {
@@ -61,7 +81,11 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   let response = await perform(session);
   if (response.status === 401 && authenticated && retryAuth && session) {
-    session = await refreshMobileSession(session);
+    // A refresh that finished while this request was in flight already stored
+    // newer tokens; retry with those instead of replaying the rotated token.
+    const stored = await readSession();
+    session =
+      stored && stored.tokens.refresh !== session.tokens.refresh ? stored : await refreshMobileSession(session);
     if (session) response = await perform(session);
   }
 
