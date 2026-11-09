@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     "apps.national_desk.apps.NationalDeskConfig",
     "apps.join_requests.apps.JoinRequestsConfig",
     "apps.notifications.apps.NotificationsConfig",
+    "apps.insights.apps.InsightsConfig",
 ]
 
 MIDDLEWARE = [
@@ -540,6 +541,10 @@ OWNCAST_ADMIN_PASSWORD = env("OWNCAST_ADMIN_PASSWORD", "")
 # Shared secret for the host ops agent that applies server resource profiles.
 # Empty disables the internal endpoints.
 OPS_AGENT_TOKEN = env("OPS_AGENT_TOKEN", "").strip()
+# Prometheus HTTP API queried server-side by the admin dashboard. It is never
+# exposed to the browser. An empty URL disables the infrastructure sections.
+PROMETHEUS_URL = env("PROMETHEUS_URL", "http://prometheus:9090").strip().rstrip("/")
+PROMETHEUS_TIMEOUT_SECONDS = max(1, env_int("PROMETHEUS_TIMEOUT_SECONDS", 4))
 OWNCAST_ROTATE_STREAM_KEY_ON_STOP = env_bool("OWNCAST_ROTATE_STREAM_KEY_ON_STOP", False)
 OWNCAST_CHAT_BRIDGE_ENABLED = env_bool("OWNCAST_CHAT_BRIDGE_ENABLED", False)
 OWNCAST_CHAT_BRIDGE_TTL_SECONDS = env_int("OWNCAST_CHAT_BRIDGE_TTL_SECONDS", 10800)

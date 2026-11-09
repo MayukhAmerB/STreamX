@@ -1,0 +1,61 @@
+{% load i18n enterprise_admin %}
+{% url 'admin:index' as overview_url %}
+{% url 'insights-dashboard' as dashboard_url %}
+<nav class="sticky enterprise-sidenav" id="nav-sidebar" aria-label="{% translate 'Main navigation' %}">
+  <div class="enterprise-sidenav-search">
+    <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-search"></use></svg>
+    <input type="search" id="nav-filter" placeholder="{% translate 'Find a section' %}" aria-label="{% translate 'Filter navigation' %}" autocomplete="off">
+  </div>
+
+  <ul class="enterprise-sidenav-list">
+    <li>
+      <a class="enterprise-sidenav-link{% if request.path == overview_url %} is-current{% endif %}" href="{{ overview_url }}"{% if request.path == overview_url %} aria-current="page"{% endif %} title="{% translate 'Overview' %}">
+        <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-home"></use></svg>
+        <span class="enterprise-sidenav-label">{% translate 'Overview' %}</span>
+      </a>
+    </li>
+    {% if dashboard_url and request.user.is_superuser %}
+    <li>
+      <a class="enterprise-sidenav-link{% if request.path == dashboard_url %} is-current{% endif %}" href="{{ dashboard_url }}"{% if request.path == dashboard_url %} aria-current="page"{% endif %} title="{% translate 'Dashboard' %}">
+        <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-dashboard"></use></svg>
+        <span class="enterprise-sidenav-label">{% translate 'Dashboard' %}</span>
+      </a>
+    </li>
+    {% endif %}
+  </ul>
+
+  {% enterprise_nav_groups available_apps request.path as nav_groups %}
+  {% for group in nav_groups %}
+    <p class="enterprise-sidenav-heading">{{ group.title }}</p>
+    <ul class="enterprise-sidenav-list">
+      {% for app in group.apps %}
+        <li class="enterprise-sidenav-app" data-nav-app>
+          <details{% if app.is_current %} open{% endif %}>
+            <summary class="enterprise-sidenav-link{% if app.is_current %} is-active-app{% endif %}" title="{{ app.name }}">
+              <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-{{ app.icon }}"></use></svg>
+              <span class="enterprise-sidenav-label">{{ app.name }}</span>
+              <svg class="enterprise-icon enterprise-sidenav-chevron" aria-hidden="true"><use href="#icon-chevron-down"></use></svg>
+            </summary>
+            <ul class="enterprise-sidenav-models">
+              {% for model in app.models %}
+                <li data-nav-item>
+                  {% if model.admin_url %}
+                    <a class="enterprise-sidenav-sublink{% if model.is_current %} is-current{% endif %}" href="{{ model.admin_url }}"{% if model.is_current %} aria-current="page"{% endif %}>{{ model.name }}</a>
+                  {% else %}
+                    <span class="enterprise-sidenav-sublink">{{ model.name }}</span>
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          </details>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endfor %}
+
+  <button type="button" class="enterprise-sidenav-collapse" id="enterprise-nav-collapse" aria-label="{% translate 'Collapse navigation' %}" aria-pressed="false">
+    <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-arrow-right"></use></svg>
+    <span class="enterprise-sidenav-label">{% translate 'Collapse' %}</span>
+  </button>
+</nav>
+<div class="enterprise-sidenav-backdrop" id="enterprise-nav-backdrop" hidden></div>

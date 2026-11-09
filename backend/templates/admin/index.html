@@ -1,104 +1,114 @@
 {% extends "admin/base_site.html" %}
-{% load i18n log realtime_admin %}
+{% load i18n log realtime_admin enterprise_admin %}
+
+{% block pretitle %}{% endblock %}
+
+{% block content_title %}
+  {% url 'insights-dashboard' as dashboard_url %}
+  <div class="enterprise-page-header">
+    <div>
+      <h1>Overview</h1>
+      <p class="enterprise-page-description">What needs you today, and every part of the admin in one place.</p>
+    </div>
+    {% if dashboard_url and request.user.is_superuser %}
+      <a class="button default enterprise-button-icon" href="{{ dashboard_url }}">
+        Open dashboard
+        <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-dashboard"></use></svg>
+      </a>
+    {% endif %}
+  </div>
+{% endblock %}
 
 {% block content %}
-  {% server_resource_profile_bar %}
-  <section class="enterprise-admin-acceptance enterprise-admin-acceptance--full">
-    <h2>Acceptance queue</h2>
-    <div class="enterprise-admin-acceptance-grid">
-      <article class="enterprise-admin-acceptance-card">
-        <h3>Course buy requests</h3>
-        <p class="enterprise-admin-muted">
-          Review and approve pending course buy requests.
-        </p>
-        <div class="enterprise-admin-model-actions">
-          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_enrollment_changelist' %}?payment_status__exact=pending">
-            Pending Course Requests
-          </a>
-          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_enrollment_changelist' %}">
-            All Course Requests
-          </a>
+  {% enterprise_queue_counts as queue %}
+  <section class="enterprise-section" aria-labelledby="queue-title">
+    <header class="enterprise-section-header">
+      <h2 class="enterprise-section-title" id="queue-title"><svg class="enterprise-icon" aria-hidden="true"><use href="#icon-warning"></use></svg>Needs attention</h2>
+      <p class="enterprise-admin-muted">Requests waiting for a decision.</p>
+    </header>
+    <div class="enterprise-queue-grid">
+      <article class="enterprise-queue-card">
+        <div class="enterprise-queue-head">
+          <svg class="enterprise-icon enterprise-icon-lg" aria-hidden="true"><use href="#icon-education"></use></svg>
+          <h3>Course buy requests</h3>
+        </div>
+        <p class="enterprise-queue-count">{% if queue.courses is not None %}{{ queue.courses }}{% else %}&mdash;{% endif %}<span>pending</span></p>
+        <div class="enterprise-queue-actions">
+          <a class="button default" href="{% url 'admin:courses_enrollment_changelist' %}?payment_status__exact=pending">Review pending</a>
+          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_enrollment_changelist' %}">All requests</a>
         </div>
       </article>
-      <article class="enterprise-admin-acceptance-card">
-        <h3>Live class enrollments</h3>
-        <p class="enterprise-admin-muted">
-          Review and approve pending live-class enrollment requests.
-        </p>
-        <div class="enterprise-admin-model-actions">
-          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_liveclassenrollment_changelist' %}?status__exact=pending">
-            Pending Live Class Requests
-          </a>
-          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_liveclassenrollment_changelist' %}">
-            All Live Class Requests
-          </a>
+      <article class="enterprise-queue-card">
+        <div class="enterprise-queue-head">
+          <svg class="enterprise-icon enterprise-icon-lg" aria-hidden="true"><use href="#icon-video"></use></svg>
+          <h3>Live class enrollments</h3>
+        </div>
+        <p class="enterprise-queue-count">{% if queue.live_classes is not None %}{{ queue.live_classes }}{% else %}&mdash;{% endif %}<span>pending</span></p>
+        <div class="enterprise-queue-actions">
+          <a class="button default" href="{% url 'admin:courses_liveclassenrollment_changelist' %}?status__exact=pending">Review pending</a>
+          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_liveclassenrollment_changelist' %}">All requests</a>
         </div>
       </article>
-      <article class="enterprise-admin-acceptance-card">
-        <h3>Join Al Syed forms</h3>
-        <p class="enterprise-admin-muted">
-          Review citizen, volunteer and lawyer joining forms submitted from the website.
-        </p>
-        <div class="enterprise-admin-model-actions">
-          <a class="enterprise-admin-action-link" href="{% url 'admin:join_requests_joinapplication_changelist' %}?status__exact=new">
-            New Submissions
-          </a>
-          <a class="enterprise-admin-action-link" href="{% url 'admin:join_requests_joinapplication_changelist' %}">
-            All Submissions
-          </a>
-          <a class="enterprise-admin-action-link" href="{% url 'admin:join_requests_joinformsettings_changelist' %}">
-            Instagram Link Settings
-          </a>
+      <article class="enterprise-queue-card">
+        <div class="enterprise-queue-head">
+          <svg class="enterprise-icon enterprise-icon-lg" aria-hidden="true"><use href="#icon-user-follow"></use></svg>
+          <h3>Join Al Syed forms</h3>
+        </div>
+        <p class="enterprise-queue-count">{% if queue.join_forms is not None %}{{ queue.join_forms }}{% else %}&mdash;{% endif %}<span>new</span></p>
+        <div class="enterprise-queue-actions">
+          <a class="button default" href="{% url 'admin:join_requests_joinapplication_changelist' %}?status__exact=new">Review new</a>
+          <a class="enterprise-admin-action-link" href="{% url 'admin:join_requests_joinapplication_changelist' %}">All forms</a>
+          <a class="enterprise-admin-action-link" href="{% url 'admin:join_requests_joinformsettings_changelist' %}">Form settings</a>
         </div>
       </article>
     </div>
   </section>
 
-  <div class="enterprise-admin-shell">
-    <h2 class="enterprise-section-title">All sections</h2>
-    <section class="enterprise-admin-main">
-      {% if app_list %}
-        {% for app in app_list %}
-          <article id="app-{{ app.app_label }}" class="enterprise-admin-appcard">
-            <header class="enterprise-admin-appcard-header">
-              <h3>{{ app.name }}</h3>
-            </header>
-            <div class="enterprise-admin-model-list">
-              {% for model in app.models %}
-                <div class="enterprise-admin-model-row">
-                  <div class="enterprise-admin-model-name">
-                    {% if model.admin_url %}
-                      <a href="{{ model.admin_url }}">{{ model.name }}</a>
-                    {% else %}
-                      {{ model.name }}
-                    {% endif %}
-                  </div>
-                  <div class="enterprise-admin-model-actions">
-                    {% if model.add_url %}
-                      <a href="{{ model.add_url }}" class="enterprise-admin-action-link">Add</a>
-                    {% endif %}
-                    {% if model.admin_url %}
-                      <a href="{{ model.admin_url }}" class="enterprise-admin-action-link">Manage</a>
-                    {% endif %}
-                  </div>
-                </div>
-              {% endfor %}
-            </div>
+  {% server_resource_profile_bar %}
+
+  <section class="enterprise-section" aria-labelledby="sections-title">
+    <header class="enterprise-section-header">
+      <h2 class="enterprise-section-title" id="sections-title"><svg class="enterprise-icon" aria-hidden="true"><use href="#icon-catalog"></use></svg>All sections</h2>
+      <p class="enterprise-admin-muted">Every area of the admin, grouped by what it manages.</p>
+    </header>
+    {% if app_list %}
+      {% enterprise_nav_groups app_list as areas %}
+      <div class="enterprise-area-grid">
+        {% for area in areas %}
+          <article class="enterprise-area" aria-labelledby="area-{{ forloop.counter }}">
+            <h3 class="enterprise-area-title" id="area-{{ forloop.counter }}">{{ area.title }}</h3>
+            {% for app in area.apps %}
+              <div class="enterprise-area-app">
+                <p class="enterprise-area-app-name">
+                  <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-{{ app.icon }}"></use></svg>
+                  {{ app.name }}
+                </p>
+                <ul class="enterprise-area-models">
+                  {% for model in app.models %}
+                    <li>
+                      {% if model.admin_url %}<a href="{{ model.admin_url }}">{{ model.name }}</a>{% else %}<span>{{ model.name }}</span>{% endif %}
+                      {% if model.add_url %}
+                        <a class="enterprise-icon-button" href="{{ model.add_url }}" title="Add {{ model.name }}" aria-label="Add {{ model.name }}">
+                          <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-add"></use></svg>
+                        </a>
+                      {% endif %}
+                    </li>
+                  {% endfor %}
+                </ul>
+              </div>
+            {% endfor %}
           </article>
         {% endfor %}
-      {% else %}
-        <article class="enterprise-admin-appcard">
-          <h3>No Management Permissions</h3>
-          <p class="enterprise-admin-muted">
-            You do not have permission to view or edit admin models.
-          </p>
-        </article>
-      {% endif %}
-    </section>
-  </div>
+      </div>
+    {% else %}
+      <p class="enterprise-admin-muted">You do not have permission to view or edit admin models.</p>
+    {% endif %}
+  </section>
 
-  <section class="enterprise-admin-activity enterprise-admin-activity--full">
-    <h2>Recent activity</h2>
+  <section class="enterprise-section enterprise-admin-activity" aria-labelledby="activity-title">
+    <header class="enterprise-section-header">
+      <h2 class="enterprise-section-title" id="activity-title"><svg class="enterprise-icon" aria-hidden="true"><use href="#icon-time"></use></svg>Recent activity</h2>
+    </header>
     {% get_admin_log 30 as admin_log for_user user %}
     <div class="enterprise-admin-tablist" role="tablist" aria-label="Activity tabs">
       <button

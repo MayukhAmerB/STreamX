@@ -1,11 +1,10 @@
 {% if visible %}
-  <section class="enterprise-profile-bar" aria-label="Server resource profile">
-    <div class="enterprise-profile-bar-heading">
-      <h2>Server profile</h2>
-      <p class="enterprise-admin-muted">
-        Applies live; no restarts and no interruption to classes in progress.
-      </p>
-    </div>
+  <section class="enterprise-section" aria-labelledby="profile-title">
+    <header class="enterprise-section-header">
+      <h2 class="enterprise-section-title" id="profile-title"><svg class="enterprise-icon" aria-hidden="true"><use href="#icon-meter"></use></svg>Server profile</h2>
+      <p class="enterprise-admin-muted">Applies live, with no restarts and no interruption to classes in progress.</p>
+    </header>
+    <div class="enterprise-profile-bar">
     <form method="post" action="{% url 'admin:realtime_serverresourceprofile_switch' %}" class="enterprise-profile-bar-options">
       {% csrf_token %}
       {% for choice in choices %}
@@ -29,5 +28,6 @@
       {% endif %}
       &middot; <a href="{% url 'admin:realtime_serverresourceprofile_changelist' %}">Details</a>
     </p>
+    </div>
   </section>
 {% endif %}

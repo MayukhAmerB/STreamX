@@ -17,7 +17,7 @@ from config.audit import log_security_event
 
 from .models import AsyncJob, TermsAcceptance, User, UserTermsStatus
 
-admin.site.enable_nav_sidebar = False
+admin.site.enable_nav_sidebar = True
 
 for model in (Group, Token):
     try:

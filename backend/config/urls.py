@@ -6,13 +6,16 @@ from django.urls import include, path
 from config.health import liveness_view, metrics_view, readiness_view
 from config.schema import AdminOpenAPISchemaView
 from apps.campaigns.views import CampaignAdminPageView, CampaignPublicPageView
+from apps.insights.views import dashboard_data_view, dashboard_page_view
 from apps.realtime.ops_views import ResourceProfileDesiredView, ResourceProfileReportView
 
-admin.site.enable_nav_sidebar = False
+admin.site.enable_nav_sidebar = True
 
 urlpatterns = [
     path("admin/admin", CampaignAdminPageView.as_view(), name="campaign-admin-page"),
     path("campaigns/", CampaignPublicPageView.as_view(), name="campaign-public-page"),
+    path("admin/dashboard/", dashboard_page_view, name="insights-dashboard"),
+    path("admin/dashboard/data/", dashboard_data_view, name="insights-dashboard-data"),
     path("admin/", admin.site.urls),
     path("health/live", liveness_view, name="health-live"),
     path("health/ready", readiness_view, name="health-ready"),

@@ -1,22 +1,72 @@
-﻿{% extends "admin/base_site.html" %}
-{% load static %}
+{% extends "admin/base_site.html" %}
+{% load static i18n %}
 
-{% block title %}{{ title }} | Al syed Initiative Control{% endblock %}
+{% block title %}{% if title %}{{ title }} | {% endif %}Al syed Initiative Enterprise Control{% endblock %}
 
 {% block extrahead %}
   {{ block.super }}
   {# Loaded in extrahead so it comes after page CSS (changelists.css, forms.css) and wins. #}
   <link rel="preload" href="{% static 'admin/fonts/ibm-plex-sans-latin-400-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{% static 'admin/css/enterprise.css' %}">
+  <script>try { if (localStorage.getItem("enterprise.navRail") === "1") document.documentElement.classList.add("enterprise-nav-rail"); } catch (e) {}</script>
+  <script src="{% static 'admin/js/enterprise-shell.js' %}" defer></script>
 {% endblock %}
 
 {% block branding %}
+  {% include "admin/includes/carbon_icons.html" %}
+  {% if not is_popup and is_nav_sidebar_enabled and has_permission %}
+    <button type="button" class="enterprise-menu-button" id="enterprise-nav-open" aria-label="{% translate 'Open navigation' %}" aria-controls="nav-sidebar" aria-expanded="false">
+      <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-menu"></use></svg>
+    </button>
+  {% endif %}
   <h1 id="site-name">
     <a href="{% url 'admin:index' %}"><span class="enterprise-brand-prefix">Al syed Initiative</span> Enterprise Control</a>
   </h1>
 {% endblock %}
 
-{% block nav-global %}
-  <div class="enterprise-admin-note">Operations, security, and platform governance</div>
+{% block welcome-msg %}
+  <span class="enterprise-header-user" title="{% translate 'Signed in as' %} {% firstof user.get_short_name user.get_username %}">
+    <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-user-avatar"></use></svg>
+    <span class="enterprise-header-label">{% firstof user.get_short_name user.get_username %}</span>
+  </span>
 {% endblock %}
 
+{% block userlinks %}
+  {% if site_url %}
+    <a class="enterprise-header-action" href="{{ site_url }}" title="{% translate 'View site' %}">
+      <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-launch"></use></svg>
+      <span class="enterprise-header-label">{% translate 'View site' %}</span>
+    </a>
+  {% endif %}
+  {% if user.has_usable_password %}
+    <a class="enterprise-header-action" href="{% url 'admin:password_change' %}" title="{% translate 'Change password' %}">
+      <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-password"></use></svg>
+      <span class="enterprise-header-label">{% translate 'Change password' %}</span>
+    </a>
+  {% endif %}
+  <form id="logout-form" method="post" action="{% url 'admin:logout' %}">
+    {% csrf_token %}
+    <button type="submit" class="enterprise-header-action" title="{% translate 'Log out' %}">
+      <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-logout"></use></svg>
+      <span class="enterprise-header-label">{% translate 'Log out' %}</span>
+    </button>
+  </form>
+  {% include "admin/color_theme_toggle.html" %}
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
+
+{# Breadcrumbs live at the top of the content column (Carbon), not above the sidebar. #}
+{% block nav-breadcrumbs %}{% endblock %}
+{% block pretitle %}
+  {% if not is_popup and has_permission %}
+    <nav class="enterprise-breadcrumbs" aria-label="{% translate 'Breadcrumbs' %}">
+      {% block breadcrumbs %}
+        <div class="breadcrumbs">
+          <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+          {% if title %} &rsaquo; {{ title }}{% endif %}
+        </div>
+      {% endblock %}
+    </nav>
+  {% endif %}
+{% endblock %}

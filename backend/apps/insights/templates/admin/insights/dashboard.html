@@ -1,0 +1,65 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block title %}Dashboard | {{ site_title|default:_("Django site admin") }}{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'admin/insights/dashboard.css' %}">
+  <script src="{% static 'admin/insights/carbon-viz.js' %}" defer></script>
+  <script src="{% static 'admin/insights/dashboard.js' %}" defer></script>
+{% endblock %}
+
+{% block bodyclass %}{{ block.super }} insights-dashboard-page{% endblock %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+    &rsaquo; Dashboard
+  </div>
+{% endblock %}
+
+{# The page renders its own header below, so suppress the admin's default title/subtitle. #}
+{% block content_title %}{% endblock %}
+{% block content_subtitle %}{% endblock %}
+
+{% block content %}
+<div class="insights-page">
+  <header class="insights-page__header">
+    <h1 class="insights-page__title">Dashboard</h1>
+    <p class="insights-page__lede">Revenue, learning, outreach and platform health for the selected period.</p>
+  </header>
+
+  <div class="insights-filters" aria-label="Dashboard filters" role="region">
+    <div class="insights-switcher" role="group" aria-label="Time range" id="insights-range-switcher">
+      {% for value, label in ranges %}
+        <button type="button" class="insights-switcher__btn" data-range="{{ value }}"
+                aria-pressed="{% if value == default_range %}true{% else %}false{% endif %}">{{ label }}</button>
+      {% endfor %}
+    </div>
+    <div class="insights-filters__status">
+      <span class="insights-updated" id="insights-updated" aria-live="polite">
+        <svg class="enterprise-icon" aria-hidden="true" width="16" height="16"><use href="#icon-time"></use></svg>
+        <span class="insights-updated__text">Loading&hellip;</span>
+      </span>
+      <button type="button" class="insights-icon-btn" id="insights-refresh" aria-label="Refresh data" title="Refresh data">
+        <svg class="enterprise-icon" aria-hidden="true" width="16" height="16"><use href="#icon-renew"></use></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="insights-root" id="insights-dashboard"
+       data-endpoint="{{ data_url }}"
+       data-default-range="{{ default_range }}"
+       aria-busy="true">
+    <noscript>
+      <div class="insights-notification insights-notification--warning" role="status">
+        <div class="insights-notification__text">
+          <strong>JavaScript is required.</strong>
+          The dashboard loads its figures in the browser. Enable JavaScript to see it.
+        </div>
+      </div>
+    </noscript>
+  </div>
+</div>
+{% endblock %}
