@@ -3,7 +3,59 @@
 
 {% block content %}
   {% server_resource_profile_bar %}
+  <section class="enterprise-admin-acceptance enterprise-admin-acceptance--full">
+    <h2>Acceptance queue</h2>
+    <div class="enterprise-admin-acceptance-grid">
+      <article class="enterprise-admin-acceptance-card">
+        <h3>Course buy requests</h3>
+        <p class="enterprise-admin-muted">
+          Review and approve pending course buy requests.
+        </p>
+        <div class="enterprise-admin-model-actions">
+          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_enrollment_changelist' %}?payment_status__exact=pending">
+            Pending Course Requests
+          </a>
+          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_enrollment_changelist' %}">
+            All Course Requests
+          </a>
+        </div>
+      </article>
+      <article class="enterprise-admin-acceptance-card">
+        <h3>Live class enrollments</h3>
+        <p class="enterprise-admin-muted">
+          Review and approve pending live-class enrollment requests.
+        </p>
+        <div class="enterprise-admin-model-actions">
+          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_liveclassenrollment_changelist' %}?status__exact=pending">
+            Pending Live Class Requests
+          </a>
+          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_liveclassenrollment_changelist' %}">
+            All Live Class Requests
+          </a>
+        </div>
+      </article>
+      <article class="enterprise-admin-acceptance-card">
+        <h3>Join Al Syed forms</h3>
+        <p class="enterprise-admin-muted">
+          Review citizen, volunteer and lawyer joining forms submitted from the website.
+        </p>
+        <div class="enterprise-admin-model-actions">
+          <a class="enterprise-admin-action-link" href="{% url 'admin:join_requests_joinapplication_changelist' %}?status__exact=new">
+            New Submissions
+          </a>
+          <a class="enterprise-admin-action-link" href="{% url 'admin:join_requests_joinapplication_changelist' %}">
+            All Submissions
+          </a>
+          <a class="enterprise-admin-action-link" href="{% url 'admin:join_requests_joinformsettings_changelist' %}">
+            Instagram Link Settings
+          </a>
+        </div>
+      </article>
+    </div>
+  </section>
+
   <div class="enterprise-admin-shell">
+    <h2 class="enterprise-section-title">All sections</h2>
     <section class="enterprise-admin-main">
       {% if app_list %}
         {% for app in app_list %}
@@ -45,59 +97,8 @@
     </section>
   </div>
 
-  <section class="enterprise-admin-acceptance enterprise-admin-acceptance--full">
-    <h2>Acceptance Queue</h2>
-    <div class="enterprise-admin-acceptance-grid">
-      <article class="enterprise-admin-acceptance-card">
-        <h3>Course Acceptance (Buy Requests)</h3>
-        <p class="enterprise-admin-muted">
-          Review and approve pending course buy requests.
-        </p>
-        <div class="enterprise-admin-model-actions">
-          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_enrollment_changelist' %}?payment_status__exact=pending">
-            Pending Course Requests
-          </a>
-          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_enrollment_changelist' %}">
-            All Course Requests
-          </a>
-        </div>
-      </article>
-      <article class="enterprise-admin-acceptance-card">
-        <h3>Live Class Acceptance (Enroll Requests)</h3>
-        <p class="enterprise-admin-muted">
-          Review and approve pending live-class enrollment requests.
-        </p>
-        <div class="enterprise-admin-model-actions">
-          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_liveclassenrollment_changelist' %}?status__exact=pending">
-            Pending Live Class Requests
-          </a>
-          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_liveclassenrollment_changelist' %}">
-            All Live Class Requests
-          </a>
-        </div>
-      </article>
-      <article class="enterprise-admin-acceptance-card">
-        <h3>Join Al Syed (Joining Forms)</h3>
-        <p class="enterprise-admin-muted">
-          Review citizen, volunteer and lawyer joining forms submitted from the website.
-        </p>
-        <div class="enterprise-admin-model-actions">
-          <a class="enterprise-admin-action-link" href="{% url 'admin:join_requests_joinapplication_changelist' %}?status__exact=new">
-            New Submissions
-          </a>
-          <a class="enterprise-admin-action-link" href="{% url 'admin:join_requests_joinapplication_changelist' %}">
-            All Submissions
-          </a>
-          <a class="enterprise-admin-action-link" href="{% url 'admin:join_requests_joinformsettings_changelist' %}">
-            Instagram Link Settings
-          </a>
-        </div>
-      </article>
-    </div>
-  </section>
-
   <section class="enterprise-admin-activity enterprise-admin-activity--full">
-    <h2>Recent Activities</h2>
+    <h2>Recent activity</h2>
     {% get_admin_log 30 as admin_log for_user user %}
     <div class="enterprise-admin-tablist" role="tablist" aria-label="Activity tabs">
       <button

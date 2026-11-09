@@ -3,14 +3,16 @@
 
 {% block title %}{{ title }} | Al syed Initiative Control{% endblock %}
 
-{% block extrastyle %}
+{% block extrahead %}
   {{ block.super }}
+  {# Loaded in extrahead so it comes after page CSS (changelists.css, forms.css) and wins. #}
+  <link rel="preload" href="{% static 'admin/fonts/ibm-plex-sans-latin-400-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{% static 'admin/css/enterprise.css' %}">
 {% endblock %}
 
 {% block branding %}
   <h1 id="site-name">
-    <a href="{% url 'admin:index' %}">Al syed Initiative Enterprise Control</a>
+    <a href="{% url 'admin:index' %}"><span class="enterprise-brand-prefix">Al syed Initiative</span> Enterprise Control</a>
   </h1>
 {% endblock %}
 
