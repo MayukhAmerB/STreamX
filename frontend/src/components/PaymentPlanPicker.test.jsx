@@ -34,6 +34,29 @@ describe("admin-controlled payment plans", () => {
     });
   });
 
+  it("offers Batch IV's EMI, lifetime and all-future-batches plans in order", () => {
+    const plans = availablePaymentPlans({
+      installment_payment_enabled: true,
+      monthly_price: "1500",
+      installments_required: 3,
+      installment_access_days: 30,
+      full_payment_enabled: true,
+      price: "3500",
+      batch_pass_payment_enabled: true,
+      batch_pass_price: "4500",
+    });
+    expect(plans.map(({ id, number, amount, total }) => ({ id, number, amount, total }))).toEqual([
+      { id: "monthly", number: 1, amount: 1500, total: 4500 },
+      { id: "full", number: 2, amount: 3500, total: 3500 },
+      { id: "batch_pass", number: 3, amount: 4500, total: 4500 },
+    ]);
+    const html = renderToStaticMarkup(
+      <PaymentPlanPicker course={{ ...configuredCourse, bundle_payment_enabled: false, batch_pass_payment_enabled: true, batch_pass_price: "4500" }} value="batch_pass" />,
+    );
+    expect(html).toContain("All Future Batches");
+    expect(html).toContain("Lifetime access + every future batch");
+  });
+
   it("hides disabled or unpriced plans including unset OSINT pricing", () => {
     expect(availablePaymentPlans({ full_payment_enabled: true, price: "0", installment_payment_enabled: false, monthly_price: "1500" })).toEqual([]);
   });

@@ -233,6 +233,23 @@ class Course(models.Model):
     bundle_price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     bundle_installments = models.PositiveSmallIntegerField(default=2)
     bundle_access_days = models.PositiveSmallIntegerField(default=90)
+    batch_pass_payment_enabled = models.BooleanField(
+        default=False,
+        help_text="Offer the all-future-batches pass on this course.",
+    )
+    batch_pass_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="One payment: lifetime access to this course and every course included in the pass.",
+    )
+    included_in_batch_pass = models.BooleanField(
+        default=False,
+        help_text=(
+            "Unlock this course for life for every all-future-batches pass holder. "
+            "Tick it on each new batch; holders get access as soon as it is published."
+        ),
+    )
     is_flagship = models.BooleanField(default=False, help_text="Show this course as the category's primary program.")
     duration = models.CharField(max_length=120, blank=True, default="")
     schedule = models.CharField(max_length=160, blank=True, default="")
@@ -325,7 +342,7 @@ class Course(models.Model):
             validate_no_active_content(item, "card_highlights")
         if any(
             value is not None and value < 0
-            for value in (self.price, self.monthly_price, self.bundle_price)
+            for value in (self.price, self.monthly_price, self.bundle_price, self.batch_pass_price)
         ):
             raise ValidationError("Course prices cannot be negative.")
         if any(

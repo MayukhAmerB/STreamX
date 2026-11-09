@@ -1,7 +1,8 @@
 {% extends "admin/base_site.html" %}
-{% load i18n log %}
+{% load i18n log realtime_admin %}
 
 {% block content %}
+  {% server_resource_profile_bar %}
   <div class="enterprise-admin-shell">
     <section class="enterprise-admin-main">
       {% if app_list %}

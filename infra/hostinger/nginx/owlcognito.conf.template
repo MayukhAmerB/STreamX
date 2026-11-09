@@ -74,8 +74,7 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
-        expires 1d;
-        add_header Cache-Control "public, max-age=86400";
+        proxy_next_upstream error timeout http_404 http_502 http_503 http_504;
     }
 
     location /health/live {

@@ -1,0 +1,19 @@
+[Unit]
+Description=StreamX server resource profile agent (applies the admin-selected CPU profile)
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/alsyed/StreamX
+EnvironmentFile=/etc/streamx/resource-profile-agent.env
+ExecStart=/usr/bin/python3 /opt/alsyed/StreamX/infra/hostinger/ops-agent/resource_profile_agent.py
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

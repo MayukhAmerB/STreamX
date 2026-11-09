@@ -5,29 +5,6 @@ wait_for_database() {
   python manage.py shell -c "from django.db import connection; connection.ensure_connection(); cursor = connection.cursor(); cursor.execute('SELECT 1'); row = cursor.fetchone(); raise SystemExit(0 if row and row[0] == 1 else 1)"
 }
 
-validate_staticfiles_manifest() {
-  python manage.py shell <<'PY'
-from django.contrib.staticfiles.storage import staticfiles_storage
-
-required = [
-    "admin/css/base.css",
-    "admin/css/login.css",
-]
-errors = []
-
-for name in required:
-    try:
-        staticfiles_storage.url(name)
-    except Exception as exc:  # pragma: no cover - startup guard
-        errors.append(f"{name}: {exc}")
-
-if errors:
-    print("[entrypoint] Staticfiles manifest validation failed:", flush=True)
-    for item in errors:
-        print(f"- {item}", flush=True)
-    raise SystemExit(1)
-PY
-}
 
 STARTUP_DB_MAX_ATTEMPTS="${STARTUP_DB_MAX_ATTEMPTS:-20}"
 STARTUP_DB_RETRY_SECONDS="${STARTUP_DB_RETRY_SECONDS:-3}"
@@ -51,10 +28,16 @@ if [ "${RUN_MIGRATIONS:-1}" = "1" ]; then
 else
   echo "[entrypoint] RUN_MIGRATIONS=0, skipping migrate step."
 fi
-if [ "${RUN_COLLECTSTATIC:-1}" = "1" ]; then
+# Static files are built into the image. RUN_COLLECTSTATIC=1 only exists for
+# images built without them (local development).
+if [ "${RUN_COLLECTSTATIC:-0}" = "1" ]; then
   python manage.py collectstatic --noinput --clear
-  validate_staticfiles_manifest
-else
-  echo "[entrypoint] RUN_COLLECTSTATIC=0, skipping collectstatic step."
+fi
+if [ "${APP_ENV:-}" = "production" ] || [ "${DJANGO_SETTINGS_MODULE:-}" = "config.settings.prod" ]; then
+  if [ "${VALIDATE_STATICFILES:-1}" = "1" ]; then
+    # Proves the admin assets are servable, not just listed in the manifest:
+    # a manifest without files renders an unstyled admin while /static/ 404s.
+    python manage.py verify_staticfiles
+  fi
 fi
 exec "$@"

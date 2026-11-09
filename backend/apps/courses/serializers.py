@@ -312,12 +312,13 @@ class CourseEnrollmentStatusMixin:
         full_available = bool(obj.full_payment_enabled and obj.price > 0)
         monthly_available = bool(obj.installment_payment_enabled and obj.monthly_price > 0)
         bundle_available = bool(obj.bundle_payment_enabled and obj.bundle_price > 0)
+        batch_pass_available = bool(obj.batch_pass_payment_enabled and obj.batch_pass_price > 0)
         return bool(
             getattr(settings, "DIRECT_COURSE_PAYMENTS_ENABLED", False)
             and obj.is_published
             and obj.launch_status == Course.STATUS_LIVE
             and not obj.registration_closed
-            and (full_available or monthly_available or bundle_available)
+            and (full_available or monthly_available or bundle_available or batch_pass_available)
         )
 
     def get_purchase_unavailable_reason(self, obj):
@@ -331,7 +332,7 @@ class CourseEnrollmentStatusMixin:
             return "course_not_live"
         if obj.registration_closed:
             return "registration_closed"
-        if not ((obj.full_payment_enabled and obj.price > 0) or (obj.installment_payment_enabled and obj.monthly_price > 0) or (obj.bundle_payment_enabled and obj.bundle_price > 0)):
+        if not ((obj.full_payment_enabled and obj.price > 0) or (obj.installment_payment_enabled and obj.monthly_price > 0) or (obj.bundle_payment_enabled and obj.bundle_price > 0) or (obj.batch_pass_payment_enabled and obj.batch_pass_price > 0)):
             return "price_not_configured"
         return "checkout_unavailable"
 
@@ -427,6 +428,7 @@ class CourseListSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeriali
             "batch", "duration", "schedule", "class_length", "total_classes", "total_hours", "batch_size",
             "start_date", "hero_countdown_end_at", "hero_countdown_label", "total_hours_label", "batch_size_label",
             "bundle_payment_enabled", "bundle_price", "bundle_installments", "bundle_access_days",
+            "batch_pass_payment_enabled", "batch_pass_price", "included_in_batch_pass",
             "is_flagship",
             "course_card_features",
             "thumbnail",
@@ -510,6 +512,7 @@ class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeria
             "batch", "duration", "schedule", "class_length", "total_classes", "total_hours", "batch_size",
             "start_date", "hero_countdown_end_at", "hero_countdown_label", "total_hours_label", "batch_size_label",
             "bundle_payment_enabled", "bundle_price", "bundle_installments", "bundle_access_days",
+            "batch_pass_payment_enabled", "batch_pass_price", "included_in_batch_pass",
             "about_the_course",
             "course_overview",
             "what_you_will_learn",

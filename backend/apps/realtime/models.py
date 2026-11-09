@@ -1011,3 +1011,77 @@ class RealtimeConfiguration(models.Model):
 
     def __str__(self):
         return "Realtime Configuration"
+
+
+
+class ServerResourceProfile(models.Model):
+    """Desired server CPU profile, applied live by the host ops agent.
+
+    The web tier never touches Docker. Admins pick a profile here; a
+    single-purpose agent on the host applies the matching
+    infra/hostinger/resource-profiles/<profile>.env with `docker update --cpus`,
+    which changes CPU quotas without restarting containers or live streams.
+    """
+
+    PROFILE_CONTENT = "content"
+    PROFILE_BROADCAST = "broadcast"
+    PROFILE_MEETING = "meeting"
+    PROFILE_CHOICES = [
+        (PROFILE_CONTENT, "Content"),
+        (PROFILE_BROADCAST, "Broadcast"),
+        (PROFILE_MEETING, "Meeting"),
+    ]
+    PROFILE_DESCRIPTIONS = {
+        PROFILE_CONTENT: "Everyday courses and recordings. Owncast 1.5 cores.",
+        PROFILE_BROADCAST: "OBS live class. Owncast 3 cores, transcoding reduced.",
+        PROFILE_MEETING: "Interactive meetings. LiveKit 3 cores, Owncast reduced.",
+    }
+    AGENT_OFFLINE_AFTER_SECONDS = 90
+
+    profile = models.CharField(max_length=16, choices=PROFILE_CHOICES, default=PROFILE_CONTENT)
+    applied_profile = models.CharField(max_length=16, blank=True, default="")
+    applied_at = models.DateTimeField(null=True, blank=True)
+    agent_last_seen_at = models.DateTimeField(null=True, blank=True)
+    agent_last_error = models.TextField(blank=True, default="")
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Server resource profile"
+        verbose_name_plural = "Server resource profile"
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    def agent_online(self, at=None):
+        if not self.agent_last_seen_at:
+            return False
+        age = ((at or timezone.now()) - self.agent_last_seen_at).total_seconds()
+        return age <= self.AGENT_OFFLINE_AFTER_SECONDS
+
+    def in_sync(self):
+        return self.applied_profile == self.profile
+
+    def status_label(self):
+        if not self.agent_online():
+            return "Agent offline: the change will apply when the host agent reconnects."
+        if self.agent_last_error:
+            return f"Agent error: {self.agent_last_error}"
+        if not self.in_sync():
+            return "Applying..."
+        return "Applied"
+
+    def __str__(self):
+        return "Server resource profile"

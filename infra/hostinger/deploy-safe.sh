@@ -66,5 +66,10 @@ wait_for_backend_health
 log "Running Django production checks."
 compose exec -T backend python manage.py check --deploy
 
+if [[ "${SKIP_POST_DEPLOY_SMOKE:-0}" != "1" ]]; then
+  log "Running post-deploy smoke checks."
+  "$SCRIPT_DIR/post-deploy-smoke.sh"
+fi
+
 log "Deployment complete."
 compose ps

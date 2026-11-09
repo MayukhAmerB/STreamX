@@ -6,6 +6,7 @@ from django.urls import include, path
 from config.health import liveness_view, metrics_view, readiness_view
 from config.schema import AdminOpenAPISchemaView
 from apps.campaigns.views import CampaignAdminPageView, CampaignPublicPageView
+from apps.realtime.ops_views import ResourceProfileDesiredView, ResourceProfileReportView
 
 admin.site.enable_nav_sidebar = False
 
@@ -22,6 +23,16 @@ urlpatterns = [
     path("api/schema/", AdminOpenAPISchemaView.as_view(), name="openapi-schema"),
     path("api/auth/", include("apps.users.urls")),
     path("api/notifications/", include("apps.notifications.urls")),
+    path(
+        "api/internal/ops/resource-profile/",
+        ResourceProfileDesiredView.as_view(),
+        name="ops-resource-profile-desired",
+    ),
+    path(
+        "api/internal/ops/resource-profile/report/",
+        ResourceProfileReportView.as_view(),
+        name="ops-resource-profile-report",
+    ),
     path("api/realtime/", include("apps.realtime.urls")),
     path("api/campaigns/", include("apps.campaigns.urls")),
     path("api/as-accounts/", include("apps.social_accounts.urls")),

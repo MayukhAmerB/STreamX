@@ -3,6 +3,7 @@ from decimal import Decimal
 FULL_PLAN = "full"
 MONTHLY_PLAN = "monthly"
 BUNDLE_PLAN = "bundle"
+BATCH_PASS_PLAN = "batch_pass"
 
 
 def get_plan_amount(course, plan):
@@ -12,6 +13,8 @@ def get_plan_amount(course, plan):
         amount = course.bundle_price
     elif plan == FULL_PLAN:
         amount = course.price
+    elif plan == BATCH_PASS_PLAN:
+        amount = course.batch_pass_price
     else:
         raise ValueError("Unsupported payment plan.")
     return Decimal(str(amount))

@@ -1,7 +1,8 @@
 from django import forms
 from django.contrib import admin, messages
-from django.http import HttpResponseRedirect
-from django.urls import reverse
+from django.core.exceptions import PermissionDenied
+from django.http import HttpResponseNotAllowed, HttpResponseRedirect
+from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 from datetime import timedelta
@@ -9,7 +10,13 @@ from urllib.parse import urlparse
 
 from config.url_utils import get_media_public_url
 
-from .models import OwncastChatIdentity, RealtimeConfiguration, RealtimeSession, RealtimeSessionRecording
+from .models import (
+    OwncastChatIdentity,
+    RealtimeConfiguration,
+    RealtimeSession,
+    RealtimeSessionRecording,
+    ServerResourceProfile,
+)
 from .services import (
     OwncastAdminError,
     OwncastConfigError,
@@ -728,3 +735,64 @@ class RealtimeSessionRecordingAdmin(admin.ModelAdmin):
             download_url,
             filename,
         )
+
+
+@admin.register(ServerResourceProfile)
+class ServerResourceProfileAdmin(admin.ModelAdmin):
+    fields = ("profile", "status", "applied_profile", "applied_at", "agent_last_seen_at", "agent_last_error", "updated_by", "updated_at")
+    readonly_fields = ("status", "applied_profile", "applied_at", "agent_last_seen_at", "agent_last_error", "updated_by", "updated_at")
+    radio_fields = {"profile": admin.HORIZONTAL}
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_urls(self):
+        custom = [
+            path(
+                "switch/",
+                self.admin_site.admin_view(self.switch_view),
+                name="realtime_serverresourceprofile_switch",
+            ),
+        ]
+        return custom + super().get_urls()
+
+    def changelist_view(self, request, extra_context=None):
+        singleton = ServerResourceProfile.get_solo()
+        return HttpResponseRedirect(reverse("admin:realtime_serverresourceprofile_change", args=[singleton.pk]))
+
+    @admin.display(description="Status")
+    def status(self, obj):
+        return obj.status_label()
+
+    def save_model(self, request, obj, form, change):
+        obj.updated_by = request.user
+        super().save_model(request, obj, form, change)
+
+    def switch_view(self, request):
+        if request.method != "POST":
+            return HttpResponseNotAllowed(["POST"])
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+        requested = str(request.POST.get("profile") or "").strip()
+        if requested not in dict(ServerResourceProfile.PROFILE_CHOICES):
+            messages.error(request, "Unknown server profile.")
+            return HttpResponseRedirect(reverse("admin:index"))
+        profile = ServerResourceProfile.get_solo()
+        if profile.profile != requested:
+            previous = profile.profile
+            profile.profile = requested
+            profile.updated_by = request.user
+            profile.save(update_fields=["profile", "updated_by", "updated_at"])
+            self.log_change(request, profile, f"Server profile {previous} -> {requested}")
+            label = dict(ServerResourceProfile.PROFILE_CHOICES)[requested]
+            if profile.agent_online():
+                messages.success(request, f"Switching to the {label} profile. It applies within about 15 seconds.")
+            else:
+                messages.warning(
+                    request,
+                    f"{label} profile saved, but the host agent is offline. It will apply when the agent reconnects.",
+                )
+        return HttpResponseRedirect(reverse("admin:index"))

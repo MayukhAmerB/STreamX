@@ -20,6 +20,7 @@ from rest_framework.views import APIView
 
 from apps.courses.models import Course, Enrollment
 
+from .batch_pass import user_has_active_batch_pass
 from .gateway_audit import set_gateway_audit as _set_gateway_audit
 from .idempotency import (
     IdempotencyConflict,
@@ -68,7 +69,10 @@ def _payment_support_whatsapp_url(payment):
 
 def _payment_success_data(payment):
     course = payment.course
-    if payment.plan == Payment.PLAN_BUNDLE:
+    if payment.plan == Payment.PLAN_BATCH_PASS:
+        access_duration = "Lifetime access, including every future batch"
+        plan_label = "Plan 3 - All Future Batches Pass"
+    elif payment.plan == Payment.PLAN_BUNDLE:
         access_duration = f"{(payment.terms_snapshot or {}).get('access_days', getattr(course, 'bundle_access_days', 90))} days"
         plan_label = "3-Month Bundle"
     elif payment.plan == Payment.PLAN_MONTHLY:
@@ -774,21 +778,27 @@ class CreateOrderView(APIView):
             Payment.PLAN_FULL: course.full_payment_enabled,
             Payment.PLAN_MONTHLY: course.installment_payment_enabled,
             Payment.PLAN_BUNDLE: course.bundle_payment_enabled,
+            Payment.PLAN_BATCH_PASS: course.batch_pass_payment_enabled,
         }[plan]
         existing_enrollment = (
             Enrollment.objects.filter(user=request.user, course=course).first()
             if request.user.is_authenticated
             else None
         )
-        already_enrolled = bool(
-            existing_enrollment
-            and existing_enrollment.has_active_access()
-            and (
-                plan == Payment.PLAN_FULL
-                or existing_enrollment.access_type
-                in (Enrollment.ACCESS_LEGACY, Enrollment.ACCESS_LIFETIME)
+        if plan == Payment.PLAN_BATCH_PASS:
+            # Lifetime course access alone does not include future batches, so
+            # those students may still upgrade; only an existing pass blocks.
+            already_enrolled = user_has_active_batch_pass(request.user)
+        else:
+            already_enrolled = bool(
+                existing_enrollment
+                and existing_enrollment.has_active_access()
+                and (
+                    plan == Payment.PLAN_FULL
+                    or existing_enrollment.access_type
+                    in (Enrollment.ACCESS_LEGACY, Enrollment.ACCESS_LIFETIME)
+                )
             )
-        )
         amount = get_plan_amount(course, plan)
         checkout_currently_allowed = bool(
             course_available
@@ -878,6 +888,13 @@ class CreateOrderView(APIView):
             )
         if plan == Payment.PLAN_BUNDLE and not plan_enabled:
             return api_response(success=False, message="Bundle payment is not enabled for this course.", status_code=400)
+        if plan == Payment.PLAN_BATCH_PASS and not plan_enabled:
+            return api_response(
+                success=False,
+                message="Payment plan unavailable.",
+                errors={"detail": "The all future batches pass is not offered for this course."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
         if already_enrolled:
             log_security_event("payment.create_order_already_enrolled", request=request, course_id=course.id)
             return api_response(

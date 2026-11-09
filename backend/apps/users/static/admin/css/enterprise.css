@@ -571,3 +571,87 @@ body.app-courses.model-publicenrollmentlead.change-list #changelist table#result
   color: #0f3c8a !important;
   text-decoration: underline;
 }
+
+/* Server resource profile switch on the admin home */
+.enterprise-profile-bar {
+  margin: 0 0 16px;
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 12px;
+  background: var(--admin-surface);
+  padding: 12px 14px;
+}
+
+.enterprise-profile-bar-heading h2 {
+  margin: 0;
+  color: var(--admin-text);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.enterprise-profile-bar-heading .enterprise-admin-muted {
+  margin: 4px 0 10px;
+}
+
+.enterprise-profile-bar-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.enterprise-profile-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  background: #101710;
+  color: var(--admin-text-soft);
+  padding: 10px 12px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.enterprise-profile-option:hover,
+.enterprise-profile-option:focus-visible {
+  border-color: var(--admin-accent);
+  color: var(--admin-text);
+}
+
+.enterprise-profile-option.is-selected {
+  border-color: var(--admin-accent-strong);
+  background: var(--admin-surface-soft);
+  color: var(--admin-text);
+}
+
+.enterprise-profile-option-label {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.enterprise-profile-option-description {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.enterprise-profile-bar-status {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--admin-text-soft);
+}
+
+.enterprise-profile-bar-status.is-ok::before,
+.enterprise-profile-bar-status.is-pending::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #5fb36b;
+}
+
+.enterprise-profile-bar-status.is-pending::before {
+  background: #d9a441;
+}

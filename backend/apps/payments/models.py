@@ -19,7 +19,13 @@ class Payment(models.Model):
     PLAN_FULL = "full"
     PLAN_MONTHLY = "monthly"
     PLAN_BUNDLE = "bundle"
-    PLAN_CHOICES = [(PLAN_FULL, "Full / lifetime"), (PLAN_MONTHLY, "Monthly installment"), (PLAN_BUNDLE, "3-month bundle")]
+    PLAN_BATCH_PASS = "batch_pass"
+    PLAN_CHOICES = [
+        (PLAN_FULL, "Full / lifetime"),
+        (PLAN_MONTHLY, "Monthly installment"),
+        (PLAN_BUNDLE, "3-month bundle"),
+        (PLAN_BATCH_PASS, "All future batches pass"),
+    ]
     terms_snapshot = models.JSONField(default=dict, blank=True)
     PROVISION_PENDING = "pending_payment"
     PROVISION_AWAITING_ADMIN = "awaiting_admin_credentials"
@@ -241,3 +247,27 @@ class PaymentCheckoutLock(models.Model):
 
     def __str__(self):
         return f"{self.course_id}:{self.identity_hash[:12]}"
+
+
+class BatchPass(models.Model):
+    """Lifetime entitlement to every course marked included_in_batch_pass.
+
+    Created when an all-future-batches payment is provisioned; access itself is
+    materialized as lifetime Enrollments so every existing access check keeps
+    working unchanged.
+    """
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="batch_passes")
+    payment = models.OneToOneField(Payment, on_delete=models.PROTECT, related_name="batch_pass")
+    source_course = models.ForeignKey(Course, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    is_active = models.BooleanField(default=True, help_text="Untick to stop granting future batches (e.g. after a refund).")
+    granted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-granted_at"]
+        indexes = [models.Index(fields=["is_active", "user"])]
+        verbose_name = "All future batches pass"
+        verbose_name_plural = "All future batches passes"
+
+    def __str__(self):
+        return f"{self.user} - all future batches pass"

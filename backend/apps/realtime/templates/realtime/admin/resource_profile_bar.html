@@ -1,0 +1,33 @@
+{% if visible %}
+  <section class="enterprise-profile-bar" aria-label="Server resource profile">
+    <div class="enterprise-profile-bar-heading">
+      <h2>Server profile</h2>
+      <p class="enterprise-admin-muted">
+        Applies live; no restarts and no interruption to classes in progress.
+      </p>
+    </div>
+    <form method="post" action="{% url 'admin:realtime_serverresourceprofile_switch' %}" class="enterprise-profile-bar-options">
+      {% csrf_token %}
+      {% for choice in choices %}
+        <button
+          type="submit"
+          name="profile"
+          value="{{ choice.value }}"
+          class="enterprise-profile-option{% if choice.selected %} is-selected{% endif %}"
+          aria-pressed="{% if choice.selected %}true{% else %}false{% endif %}"
+          title="{{ choice.description }}"
+        >
+          <span class="enterprise-profile-option-label">{{ choice.label }}</span>
+          <span class="enterprise-profile-option-description">{{ choice.description }}</span>
+        </button>
+      {% endfor %}
+    </form>
+    <p class="enterprise-profile-bar-status{% if agent_online and in_sync and not profile.agent_last_error %} is-ok{% else %} is-pending{% endif %}" role="status">
+      {{ profile.status_label }}
+      {% if profile.applied_profile %}
+        &middot; Running: {{ applied_label }}
+      {% endif %}
+      &middot; <a href="{% url 'admin:realtime_serverresourceprofile_changelist' %}">Details</a>
+    </p>
+  </section>
+{% endif %}

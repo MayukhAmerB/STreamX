@@ -220,6 +220,7 @@ function phoneDigits(value) {
 
 function stepSummary(step, profile, plan, course) {
   if (step.id === "plan") {
+    if (plan === "batch_pass") return `All future batches - ${formatINR(course?.batch_pass_price)}`;
     return plan === "bundle" ? `Bundle - ${formatINR(course?.bundle_price)}` : plan === "monthly"
       ? `Monthly - ${formatINR(course?.monthly_price)}`
       : `One-time - ${formatINR(course?.price)}`;
@@ -472,7 +473,7 @@ export default function CoursePaymentPage() {
       }
       const checkoutPlan = orderData?.plan || plan;
       const selectedPlan = availablePaymentPlans(course).find((item) => item.id === checkoutPlan);
-      const recognizedCheckoutPlan = ["full", "monthly", "bundle"].includes(checkoutPlan);
+      const recognizedCheckoutPlan = ["full", "monthly", "bundle", "batch_pass"].includes(checkoutPlan);
       const validServerAmount = Number.isSafeInteger(Number(orderData?.amount))
         && Number(orderData.amount) > 0
         && orderData?.currency === "INR";
@@ -495,9 +496,11 @@ export default function CoursePaymentPage() {
         order_id: orderData.razorpay_order_id,
         name: siteBrand.name,
         description:
-          checkoutPlan === "bundle" ? "Three-month course bundle" : checkoutPlan === "monthly"
-            ? "Monthly course installment"
-            : "One-time course payment",
+          checkoutPlan === "batch_pass"
+            ? "Lifetime access + all future batches"
+            : checkoutPlan === "bundle" ? "Three-month course bundle" : checkoutPlan === "monthly"
+              ? "Monthly course installment"
+              : "One-time course payment",
         theme: { color: "#111111" },
         prefill: {
           name: orderData?.checkout_profile?.name || checkoutProfile.buyer_name,
@@ -593,16 +596,20 @@ export default function CoursePaymentPage() {
       paymentResult.plan_label ||
       (plan === "monthly"
         ? "Plan 1 - Monthly Payment"
-        : plan === "bundle"
-          ? "Plan 3 - Three-Month Bundle"
-          : "Plan 2 - One-Time Payment");
+        : plan === "batch_pass"
+          ? "Plan 3 - All Future Batches Pass"
+          : plan === "bundle"
+            ? "Plan 3 - Three-Month Bundle"
+            : "Plan 2 - One-Time Payment");
     const accessDuration =
       paymentResult.access_duration ||
       (plan === "monthly"
         ? `${course.installment_access_days || 30} days`
-        : plan === "bundle"
-          ? `${course.bundle_access_days || 90} days`
-          : "Lifetime course access");
+        : plan === "batch_pass"
+          ? "Lifetime access, including every future batch"
+          : plan === "bundle"
+            ? `${course.bundle_access_days || 90} days`
+            : "Lifetime course access");
 
     return (
       <PageShell

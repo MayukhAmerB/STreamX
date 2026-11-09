@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import useOwncastChatLaunch from "../../hooks/useOwncastChatLaunch";
 import useOwncastStreamLaunch from "../../hooks/useOwncastStreamLaunch";
 import SecureHlsBroadcastPlayer from "./SecureHlsBroadcastPlayer";
@@ -83,7 +83,6 @@ export default function BroadcastViewerTheater({
   const [mobileChatOpen, setMobileChatOpen] = useState(true);
   const [streamFrameVersion, setStreamFrameVersion] = useState(0);
   const [chatFrameVersion, setChatFrameVersion] = useState(0);
-  const previousStreamStatusRef = useRef(streamStatus);
   const normalizedStreamStatus = String(streamStatus || "").trim().toLowerCase();
   const normalizedSessionStatus = String(sessionStatus || "").trim().toLowerCase();
   const isSessionEnded = normalizedSessionStatus === "ended";
@@ -142,6 +141,9 @@ export default function BroadcastViewerTheater({
         ? "The live video is temporarily offline. Keep chat open while the host reconnects OBS."
         : "");
 
+  // Only a manual Retry/Refresh relaunches the stream. When the stream comes
+  // back live the player reloads in place (with jitter) on its own, so a
+  // whole audience does not request new launches at the same moment.
   const refreshStreamFrame = () => {
     setStreamFrameVersion((previous) => previous + 1);
     if (typeof onRefreshStream === "function") {
@@ -155,14 +157,6 @@ export default function BroadcastViewerTheater({
       onRefreshChat();
     }
   };
-
-  useEffect(() => {
-    const previousStatus = String(previousStreamStatusRef.current || "").trim().toLowerCase();
-    if (previousStatus && previousStatus !== "live" && normalizedStreamStatus === "live") {
-      setStreamFrameVersion((previous) => previous + 1);
-    }
-    previousStreamStatusRef.current = normalizedStreamStatus;
-  }, [normalizedStreamStatus]);
 
   useEffect(() => {
     if (isStreamUnavailable) {
@@ -209,6 +203,7 @@ export default function BroadcastViewerTheater({
                 hlsUrl={secureStream.hlsUrl}
                 fallbackEmbedUrl={resolvedStreamUrl}
                 refreshKey={streamFrameVersion}
+                streamStatus={normalizedStreamStatus}
                 title={streamTitle}
               />
             ) : (

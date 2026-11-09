@@ -8,6 +8,7 @@ from django.utils import timezone
 from apps.courses.models import Enrollment
 from apps.realtime.domain import invalidate_course_join_access_cache
 
+from .batch_pass import activate_batch_pass
 from .models import Payment, StudentAccountSequence
 from .pricing import get_plan_terms
 
@@ -87,6 +88,8 @@ def provision_paid_payment(payment):
     )
     # Provider retries must not extend access or downgrade previously granted lifetime access.
     if payment.invoice_number and payment.provisioning_status in (Payment.PROVISION_AWAITING_ADMIN, Payment.PROVISION_CREDENTIALS_ISSUED):
+        if payment.plan == Payment.PLAN_BATCH_PASS:
+            activate_batch_pass(payment)
         return enrollment
     had_permanent_access = enrollment.payment_status == Enrollment.STATUS_PAID and enrollment.access_type in (Enrollment.ACCESS_LEGACY, Enrollment.ACCESS_LIFETIME) and not created
     enrollment.payment_status = Enrollment.STATUS_PAID
@@ -161,4 +164,6 @@ def provision_paid_payment(payment):
         ]
     )
     invalidate_course_join_access_cache(user_id=user.id, course_id=course.id)
+    if payment.plan == Payment.PLAN_BATCH_PASS:
+        activate_batch_pass(payment)
     return enrollment

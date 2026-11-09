@@ -33,7 +33,7 @@ function normalizeRecovery(value) {
   }
   // The stable request key is enough for server-side reconciliation. Never
   // persist Razorpay payment IDs or signatures in browser storage.
-  const plan = ["full", "monthly", "bundle"].includes(value.plan)
+  const plan = ["full", "monthly", "bundle", "batch_pass"].includes(value.plan)
     ? value.plan
     : undefined;
   const applicationReference = (

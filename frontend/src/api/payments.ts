@@ -3,7 +3,7 @@ import { typedApiRequest } from "./typedClient";
 export interface CreatePaymentOrderPayload {
   course_id: number;
   application_reference?: string;
-  plan: "full" | "monthly" | "bundle";
+  plan: "full" | "monthly" | "bundle" | "batch_pass";
   buyer_name: string;
   buyer_email: string;
   whatsapp_number: string;

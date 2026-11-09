@@ -582,6 +582,17 @@ class CourseAdmin(admin.ModelAdmin):
         ),
         ("Batch and extended facts", {"fields": ("start_date", "total_hours_label", "batch_size_label")}),
         ("Three-month bundle pricing", {"fields": ("bundle_payment_enabled", "bundle_price", "bundle_installments", "bundle_access_days")}),
+        (
+            "All future batches pass",
+            {
+                "description": (
+                    "Offer: one payment for lifetime access to this course and every course marked "
+                    "'Included in batch pass'. Inclusion: tick it on each new batch so existing pass "
+                    "holders are unlocked automatically when it is published."
+                ),
+                "fields": ("batch_pass_payment_enabled", "batch_pass_price", "included_in_batch_pass"),
+            },
+        ),
         ("Course facts", {"fields": ("is_flagship", "batch", "duration", "schedule", "class_length", "total_classes", "total_hours", "batch_size", "confirmed_statistics")}),
         (
             "Frontend Container Map (Read First)",
@@ -734,7 +745,8 @@ class CourseAdmin(admin.ModelAdmin):
         full_ready = bool(obj.full_payment_enabled and obj.price > 0)
         monthly_ready = bool(obj.installment_payment_enabled and obj.monthly_price > 0)
         bundle_ready = bool(obj.bundle_payment_enabled and obj.bundle_price > 0)
-        if not (full_ready or monthly_ready or bundle_ready):
+        batch_pass_ready = bool(obj.batch_pass_payment_enabled and obj.batch_pass_price > 0)
+        if not (full_ready or monthly_ready or bundle_ready or batch_pass_ready):
             blockers.append("enable a payment plan and set a positive price")
 
         if blockers:

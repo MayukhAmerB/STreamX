@@ -7,7 +7,7 @@ services:
       - ./backend/.env.hostinger.production
     environment:
       RUN_MIGRATIONS: "0"
-      RUN_COLLECTSTATIC: "1"
+      RUN_COLLECTSTATIC: "0"
       OWNCAST_CHAT_BRIDGE_ENABLED: "${OWNCAST_CHAT_BRIDGE_ENABLED:-1}"
     depends_on:
       postgres:
@@ -40,7 +40,7 @@ services:
       - ./backend/.env.hostinger.production
     environment:
       RUN_MIGRATIONS: "0"
-      RUN_COLLECTSTATIC: "1"
+      RUN_COLLECTSTATIC: "0"
       OWNCAST_CHAT_BRIDGE_ENABLED: "${OWNCAST_CHAT_BRIDGE_ENABLED:-1}"
     depends_on:
       postgres:
@@ -73,7 +73,7 @@ services:
       - ./backend/.env.hostinger.production
     environment:
       RUN_MIGRATIONS: "0"
-      RUN_COLLECTSTATIC: "1"
+      RUN_COLLECTSTATIC: "0"
       OWNCAST_CHAT_BRIDGE_ENABLED: "${OWNCAST_CHAT_BRIDGE_ENABLED:-1}"
     depends_on:
       postgres:

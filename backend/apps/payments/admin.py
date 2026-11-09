@@ -9,6 +9,7 @@ from config.audit import log_security_event
 
 from .credentials import issue_credentials_for_paid_user
 from .models import Payment, PaymentWebhookEvent, SuccessfulPaymentUser
+from .models import BatchPass
 
 
 @admin.register(Payment)
@@ -429,6 +430,21 @@ class PaymentWebhookEventAdmin(admin.ModelAdmin):
         "received_at",
         "processed_at",
     )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(BatchPass)
+class BatchPassAdmin(admin.ModelAdmin):
+    list_display = ("user", "source_course", "is_active", "granted_at", "payment")
+    list_filter = ("is_active",)
+    search_fields = ("user__email", "user__full_name", "payment__invoice_number")
+    readonly_fields = ("user", "payment", "source_course", "granted_at")
+    fields = ("user", "payment", "source_course", "is_active", "granted_at")
 
     def has_add_permission(self, request):
         return False

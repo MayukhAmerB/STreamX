@@ -55,11 +55,22 @@ export function availablePaymentPlans(course = {}) {
         ? `${bundleAccessDays}-day access window`
         : "Bundle course access",
     },
+    {
+      id: "batch_pass",
+      number: 3,
+      label: "All Future Batches",
+      enabled: course.batch_pass_payment_enabled,
+      amount: positiveNumber(course.batch_pass_price),
+      count: 1,
+      interval: "one payment",
+      paymentSummary: "Paid once",
+      accessLabel: "Lifetime access + every future batch",
+    },
   ];
 
   return plans
     .filter((plan) => plan.enabled && plan.amount > 0)
-    .map((plan) => ({ ...plan, total: plan.amount * plan.count }));
+    .map((plan, index) => ({ ...plan, number: index + 1, total: plan.amount * plan.count }));
 }
 
 function FeatureIcon({ type }) {
