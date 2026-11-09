@@ -110,21 +110,22 @@ def completed(stdout="", returncode=0):
 
 
 class FakeDocker:
-    """Two owncast containers on 1.5 cores, one backend already on 2.0."""
+    """One owncast container on 1.5 cores, one backend already on 2.0."""
 
     def __init__(self):
         self.nano = {"own1": 1_500_000_000, "back1": 2_000_000_000}
-        self.services = {"owncast": ["own1"], "backend": ["back1"]}
+        self.service_of = {"own1": "owncast", "back1": "backend"}
         self.updates = []
+        self.calls = 0
 
     def __call__(self, cmd, **kwargs):
+        self.calls += 1
         args = cmd[1:]
         if args[0] == "ps":
-            prefix = "label=com.docker.compose.service="
-            service = next(a[len(prefix):] for a in args if a.startswith(prefix))
-            return completed("\n".join(self.services.get(service, [])))
+            return completed("\n".join(self.nano))
         if args[0] == "inspect":
-            return completed(str(self.nano[args[-1]]))
+            ids = args[3:]
+            return completed("\n".join(f"{self.service_of[i]} {i} {self.nano[i]}" for i in ids))
         if args[0] == "update":
             cpus, container = args[2], args[3]
             self.updates.append((container, cpus))
@@ -163,6 +164,31 @@ class ResourceProfileAgentTests(TestCase):
         self.assertEqual(updated, 1)
         self.assertEqual(docker.updates, [("own1", "3.0")])
         self.assertEqual(self.agent.reconcile({"OWNCAST_CPUS": "3.0"}, "streamx", runner=docker), 0)
+
+    def test_reconcile_reads_all_containers_in_two_docker_calls(self):
+        docker = FakeDocker()
+
+        self.agent.reconcile({"OWNCAST_CPUS": "1.5", "BACKEND_CPUS": "2.0"}, "streamx", runner=docker)
+
+        self.assertEqual(docker.calls, 2)
+
+    def test_backend_connection_reset_does_not_crash_the_agent(self):
+        client = self.agent.BackendClient("http://127.0.0.1:9/", "token", "api.example.com")
+
+        def reset(*args, **kwargs):
+            raise ConnectionResetError(104, "Connection reset by peer")
+
+        original = self.agent.urllib.request.urlopen
+        self.agent.urllib.request.urlopen = reset
+        try:
+            with self.assertRaises(self.agent.AgentError):
+                client.desired_profile()
+            applied, error = self.agent.run_cycle(client, self.dir, "streamx", self.env_file, runner=FakeDocker())
+        finally:
+            self.agent.urllib.request.urlopen = original
+
+        self.assertEqual(applied, "")
+        self.assertIn("Connection reset", error)
 
     def test_persist_env_updates_values_and_keeps_other_settings(self):
         self.assertTrue(self.agent.persist_env(self.env_file, {"OWNCAST_CPUS": "3.0", "BACKEND_CPUS": "2.0"}))

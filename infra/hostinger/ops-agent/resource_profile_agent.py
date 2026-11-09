@@ -13,6 +13,7 @@ Standard library only.
 """
 
 import argparse
+import http.client
 import json
 import os
 import re
@@ -79,17 +80,27 @@ def docker(*args, runner=subprocess.run):
     return result.stdout.strip()
 
 
-def service_containers(project, service, runner=subprocess.run):
+def project_containers(project, runner=subprocess.run):
+    """Return (service, container_id, nano_cpus) for every running project container.
+
+    Two docker calls per cycle regardless of how many services exist.
+    """
+    ids = docker("ps", "-q", "--filter", f"label=com.docker.compose.project={project}", runner=runner).split()
+    if not ids:
+        return []
     output = docker(
-        "ps",
-        "-q",
-        "--filter",
-        f"label=com.docker.compose.project={project}",
-        "--filter",
-        f"label=com.docker.compose.service={service}",
+        "inspect",
+        "--format",
+        '{{index .Config.Labels "com.docker.compose.service"}} {{.Id}} {{.HostConfig.NanoCpus}}',
+        *ids,
         runner=runner,
     )
-    return [line for line in output.splitlines() if line.strip()]
+    rows = []
+    for line in output.splitlines():
+        parts = line.split()
+        if len(parts) == 3 and parts[2].isdigit():
+            rows.append((parts[0], parts[1], int(parts[2])))
+    return rows
 
 
 def nano_cpus(value):
@@ -98,16 +109,15 @@ def nano_cpus(value):
 
 def reconcile(values, project, runner=subprocess.run):
     """Bring every running container's CPU quota to the profile; return the number updated."""
+    targets = {service: cpus for key, cpus in values.items() for service in KEY_SERVICES[key]}
     updated = 0
-    for key, cpus in values.items():
-        for service in KEY_SERVICES[key]:
-            for container in service_containers(project, service, runner=runner):
-                current = docker("inspect", "--format", "{{.HostConfig.NanoCpus}}", container, runner=runner)
-                if current.isdigit() and int(current) == nano_cpus(cpus):
-                    continue
-                docker("update", "--cpus", cpus, container, runner=runner)
-                log(f"{service}: cpus -> {cpus}")
-                updated += 1
+    for service, container, current in project_containers(project, runner=runner):
+        cpus = targets.get(service)
+        if cpus is None or current == nano_cpus(cpus):
+            continue
+        docker("update", "--cpus", cpus, container, runner=runner)
+        log(f"{service}: cpus -> {cpus}")
+        updated += 1
     return updated
 
 
@@ -154,7 +164,8 @@ class BackendClient:
         try:
             with urllib.request.urlopen(request, timeout=10) as response:
                 return json.loads(response.read().decode() or "{}")
-        except (urllib.error.URLError, ValueError) as exc:
+        except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError) as exc:
+            # Includes resets while a backend restarts; the next cycle retries.
             raise AgentError(f"backend request failed: {exc}") from exc
 
     def desired_profile(self):
@@ -212,7 +223,11 @@ def main(argv=None):
     interval = max(5, int(os.environ.get("STREAMX_AGENT_INTERVAL_SECONDS", "15")))
 
     while True:
-        _applied, error = run_cycle(client, profile_dir, project, env_file)
+        try:
+            _applied, error = run_cycle(client, profile_dir, project, env_file)
+        except Exception as exc:  # never let one bad cycle stop the agent
+            log(f"cycle failed: {exc!r}")
+            error = str(exc)
         if args.once:
             return 1 if error else 0
         time.sleep(interval)
