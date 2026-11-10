@@ -1,7 +1,8 @@
 import { Information, PlayFilledAlt, Video } from "@carbon/icons-react";
-import { Button, ProgressBar, Tag, Tile } from "@carbon/react";
+import { Button, Tile } from "@carbon/react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import ProgressMeter from "../app-shell/ui/ProgressMeter";
 import { resolveCourseArtwork, resolveCourseArtworkFallback } from "../../utils/courseArtwork";
 import { formatCourseCategory, getCourseActionLabel, getCourseProgress } from "../../utils/courseProgress";
 
@@ -32,27 +33,12 @@ export default function CourseProgressTile({ course }) {
             onError={() => setArtwork(fallbackArtwork && artwork !== fallbackArtwork ? fallbackArtwork : "")}
           />
         ) : null}
+        <span className="cds-course-tile__shade" aria-hidden="true" />
+        <span className="cds-course-tile__category">{formatCourseCategory(course?.category)}</span>
       </div>
       <div className="cds-course-tile__body">
-        <div className="cds-course-tile__tags">
-          <Tag type="blue" size="sm">
-            {formatCourseCategory(course?.category)}
-          </Tag>
-          {progress.status === "completed" ? (
-            <Tag type="green" size="sm">
-              Completed
-            </Tag>
-          ) : null}
-        </div>
         <h2 className="cds-course-tile__title">{title}</h2>
-        <ProgressBar
-          className="cds-course-tile__progress"
-          label={`${progress.percent}% complete`}
-          helperText={progress.summary}
-          value={progress.percent}
-          size="small"
-          status={progress.status === "completed" ? "finished" : "active"}
-        />
+        <ProgressMeter progress={progress} name={title} className="cds-course-tile__progress" />
         <div className="cds-course-tile__actions">
           <Button
             as={Link}

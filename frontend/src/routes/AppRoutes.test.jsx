@@ -40,6 +40,7 @@ vi.mock("../pages/AboutPage", () => ({ default: () => "About" }));
 vi.mock("../pages/CourseListPage", () => ({ default: () => "CourseList" }));
 vi.mock("../pages/JoinLivePage", () => ({ default: () => "JoinLive" }));
 vi.mock("../pages/MyCoursesPage", () => ({ default: () => "MyCourses" }));
+vi.mock("../pages/UsersCornerPage", () => ({ default: () => "Console" }));
 vi.mock("../pages/GuidesPage", () => ({ default: () => "Guides" }));
 vi.mock("../pages/OsintToolsPage", () => ({ default: () => "OsintTools" }));
 vi.mock("../pages/IdCardPage", () => ({ default: () => "IdCard" }));
@@ -81,7 +82,7 @@ function authFor(kind, overrides = {}) {
 
 function LocationProbe() {
   const location = useLocation();
-  return ` @${location.pathname}`;
+  return ` @${location.pathname}${location.search}${location.hash}`;
 }
 
 async function renderAt(path, auth) {
@@ -123,7 +124,7 @@ describe("AppRoutes", () => {
   });
 
   it("keeps deep links with query strings on staff routes", async () => {
-    expect(await renderAt("/broadcasting?session=12", authFor("admin"))).toBe("shell:Broadcasting @/broadcasting");
+    expect(await renderAt("/broadcasting?session=12", authFor("admin"))).toBe("shell:Broadcasting @/broadcasting?session=12");
   });
 
   it.each([
@@ -175,5 +176,21 @@ describe("AppRoutes", () => {
     ["/courses", "CourseList"],
   ])("keeps public page %s in the website layout", async (path, page) => {
     expect(await renderAt(path, authFor("guest"))).toBe(`website:${page} @${path}`);
+  });
+
+  it("serves the Console hub at /console inside the shell", async () => {
+    expect(await renderAt("/console", authFor("student"))).toBe("shell:Console @/console");
+  });
+
+  it.each([
+    ["/users-corner", "/console"],
+    ["/users-corner/", "/console"],
+    ["/users-corner?tab=live#next", "/console?tab=live#next"],
+  ])("permanently redirects the old Console address %s to %s", async (path, target) => {
+    expect(await renderAt(path, authFor("student"))).toBe(`shell:Console @${target}`);
+  });
+
+  it("sends signed-out visitors from the old Console address to login for /console", async () => {
+    expect(await renderAt("/users-corner", authFor("guest"))).toBe("website:Login(from=/console) @/login");
   });
 });

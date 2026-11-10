@@ -83,19 +83,29 @@ def create_notification(
             ],
             ignore_conflicts=True,
         )
+        deliver_async = _push_is_configured() and _async_jobs_enabled()
+        if deliver_async:
+            # Transactional outbox (apps.core.outbox): the push is recorded in
+            # the same transaction as the notification, so it is never lost
+            # after commit and never sent for a rolled-back notification.
+            # Delivered by process_async_jobs via outbox_handlers.py.
+            from apps.core.outbox import publish
 
-    if _push_is_configured():
-        try:
-            from apps.users.async_jobs import async_jobs_enabled, enqueue_web_push_job
-        except Exception:
-            async_jobs_enabled = lambda: False
-            enqueue_web_push_job = None
+            from .outbox_handlers import WEB_PUSH_EVENT
 
-        if async_jobs_enabled() and enqueue_web_push_job is not None:
-            enqueue_web_push_job(notification_id=notification.id, user_ids=user_ids)
-        else:
-            send_push_for_notification(notification, user_ids)
+            publish(WEB_PUSH_EVENT, {"notification_id": notification.id, "user_ids": user_ids})
+
+    if _push_is_configured() and not deliver_async:
+        send_push_for_notification(notification, user_ids)
     return notification
+
+
+def _async_jobs_enabled():
+    try:
+        from apps.users.async_jobs import async_jobs_enabled
+    except Exception:
+        return False
+    return async_jobs_enabled()
 
 
 def course_enrolled_user_ids(course):

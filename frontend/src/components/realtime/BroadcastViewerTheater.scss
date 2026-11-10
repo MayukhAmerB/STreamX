@@ -1,12 +1,12 @@
 // Live broadcast theater (video + status + chat).
 //
 // Self-contained: the student live pages render it as a Carbon page in
-// User's Corner, the instructor Broadcasting page renders it inside the
+// Console, the instructor Broadcasting page renders it inside the
 // legacy frame. Colours read the shell's Carbon tokens (mapped to the User's
 // Corner palette) with the same palette values as fallbacks, and the legacy
 // frame pins them. No Carbon component CSS is required.
 
-// User's Corner values, used outside Carbon pages and inside legacy frames.
+// Console values, used outside Carbon pages and inside legacy frames.
 @mixin dark-palette {
   --bvt-text-primary: #f6f1e7;
   --bvt-text-secondary: #b8b3a8;

@@ -421,6 +421,7 @@ class CaptureLoopTests(RecordingFixtureMixin, TestCase):
         self.recorder = StreamRecorder(
             popen=popen, monotonic=lambda: self.clock[0], owncast_status=lambda **_: self.online
         )
+        self.addCleanup(self.recorder.shutdown)
         self.recording = services.ensure_server_recording(self.session)
 
     def test_one_copy_capture_per_connection_and_new_part_after_reconnect(self):
@@ -429,7 +430,11 @@ class CaptureLoopTests(RecordingFixtureMixin, TestCase):
         self.assertEqual(len(self.processes), 1)
         cmd = self.processes[0].cmd
         self.assertEqual(cmd[cmd.index("-c") + 1], "copy")
-        self.assertIn("http://owncast:8080/hls/stream.m3u8", cmd)
+        # ffmpeg reads Owncast through the recorder's local playlist filter.
+        source = cmd[cmd.index("-i") + 1]
+        self.assertTrue(source.startswith("http://127.0.0.1:"), source)
+        self.assertTrue(source.endswith("/hls/stream.m3u8"), source)
+        self.assertEqual(cmd[cmd.index("-live_start_index") + 1], "0")
         self.assertTrue(cmd[-1].endswith("part-0001.ts"))
 
         self.processes[0].returncode = 1  # OBS dropped; ffmpeg exits

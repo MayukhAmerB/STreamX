@@ -1,13 +1,23 @@
+import copy
 import re
 
 from config.request_security import contains_active_content, contains_suspicious_sqli, is_safe_public_http_url
 from config.upload_validators import validate_profile_image_upload, validate_video_upload
 from config.url_utils import build_public_url
-from django.conf import settings
 from django.urls import reverse
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from apps.payments.pricing import FULL_PLAN, MONTHLY_PLAN, get_plan_amount
+from apps.payments.plans import (
+    FULL_PLAN,
+    MONTHLY_PLAN,
+    PLAN_IDS,
+    course_purchase_block,
+    get_plan_amount,
+    payment_card_errors,
+    payment_cards_per_row,
+    resolve_course_plans,
+)
 
 from .access import user_has_course_access
 from .models import (
@@ -301,6 +311,80 @@ class SectionNestedSerializer(serializers.ModelSerializer):
         fields = ("id", "title", "description", "order", "created_at", "lectures")
 
 
+class PaymentPlanCardSerializer(serializers.Serializer):
+    """One payment card on the course payment page (apps.payments.plans)."""
+
+    plan = serializers.ChoiceField(choices=PLAN_IDS)
+    title = serializers.CharField()
+    subtitle = serializers.CharField()
+    amount = serializers.CharField(help_text="Rupees charged per payment, two decimals, e.g. \"1500.00\".")
+    currency = serializers.CharField()
+    price_label = serializers.CharField()
+    total_label = serializers.CharField(allow_null=True)
+    installments = serializers.IntegerField(allow_null=True)
+    access_label = serializers.CharField()
+    features = serializers.ListField(child=serializers.CharField())
+    badge = serializers.CharField(allow_null=True)
+    highlighted = serializers.BooleanField()
+    cta_label = serializers.CharField()
+    order = serializers.IntegerField()
+    available = serializers.BooleanField()
+    unavailable_reason = serializers.CharField(allow_null=True)
+
+
+class CourseDetailContractSerializer(serializers.Serializer):
+    """OpenAPI contract for GET /api/courses/{id}/ (documentation only).
+
+    Lists the fields clients of the payment page rely on; the response carries
+    further course fields (CourseDetailSerializer) for backward compatibility.
+    """
+
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    slug = serializers.CharField()
+    description = serializers.CharField()
+    category = serializers.ChoiceField(choices=Course.CATEGORY_CHOICES)
+    level = serializers.ChoiceField(choices=Course.LEVEL_CHOICES)
+    launch_status = serializers.ChoiceField(choices=Course.LAUNCH_STATUS_CHOICES)
+    registration_closed = serializers.BooleanField()
+    is_published = serializers.BooleanField()
+    price = serializers.CharField(help_text="One-time plan price in rupees, two decimals.")
+    monthly_price = serializers.CharField(help_text="Monthly installment amount in rupees, two decimals.")
+    full_payment_enabled = serializers.BooleanField()
+    installment_payment_enabled = serializers.BooleanField()
+    installments_required = serializers.IntegerField()
+    installment_access_days = serializers.IntegerField()
+    bundle_payment_enabled = serializers.BooleanField()
+    bundle_price = serializers.CharField()
+    bundle_installments = serializers.IntegerField()
+    bundle_access_days = serializers.IntegerField()
+    batch_pass_payment_enabled = serializers.BooleanField()
+    batch_pass_price = serializers.CharField()
+    included_in_batch_pass = serializers.BooleanField()
+    is_enrolled = serializers.BooleanField()
+    enrollment_status = serializers.CharField()
+    purchase_available = serializers.BooleanField()
+    purchase_unavailable_reason = serializers.CharField(
+        help_text='"" when purchasable, else checkout_disabled, course_unpublished, course_not_live, '
+        "registration_closed or price_not_configured."
+    )
+    payment_plans = PaymentPlanCardSerializer(
+        many=True,
+        help_text="The course's enabled payment cards, ordered for display (order = position, 1-based).",
+    )
+    payment_cards_per_row = serializers.ChoiceField(
+        choices=(2, 3, 4),
+        help_text="Plan picker columns: the number of cards, at least 2 and at most 4.",
+    )
+
+
+class CourseDetailResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    data = CourseDetailContractSerializer()
+    errors = serializers.JSONField(allow_null=True, required=False)
+
+
 class CourseEnrollmentStatusMixin:
     def get_price(self, obj):
         return format(get_plan_amount(obj, FULL_PLAN), ".2f")
@@ -309,32 +393,10 @@ class CourseEnrollmentStatusMixin:
         return format(get_plan_amount(obj, MONTHLY_PLAN), ".2f")
 
     def get_purchase_available(self, obj):
-        full_available = bool(obj.full_payment_enabled and obj.price > 0)
-        monthly_available = bool(obj.installment_payment_enabled and obj.monthly_price > 0)
-        bundle_available = bool(obj.bundle_payment_enabled and obj.bundle_price > 0)
-        batch_pass_available = bool(obj.batch_pass_payment_enabled and obj.batch_pass_price > 0)
-        return bool(
-            getattr(settings, "DIRECT_COURSE_PAYMENTS_ENABLED", False)
-            and obj.is_published
-            and obj.launch_status == Course.STATUS_LIVE
-            and not obj.registration_closed
-            and (full_available or monthly_available or bundle_available or batch_pass_available)
-        )
+        return course_purchase_block(obj) == ""
 
     def get_purchase_unavailable_reason(self, obj):
-        if self.get_purchase_available(obj):
-            return ""
-        if not getattr(settings, "DIRECT_COURSE_PAYMENTS_ENABLED", False):
-            return "checkout_disabled"
-        if not obj.is_published:
-            return "course_unpublished"
-        if obj.launch_status != Course.STATUS_LIVE:
-            return "course_not_live"
-        if obj.registration_closed:
-            return "registration_closed"
-        if not ((obj.full_payment_enabled and obj.price > 0) or (obj.installment_payment_enabled and obj.monthly_price > 0) or (obj.bundle_payment_enabled and obj.bundle_price > 0) or (obj.batch_pass_payment_enabled and obj.batch_pass_price > 0)):
-            return "price_not_configured"
-        return "checkout_unavailable"
+        return course_purchase_block(obj)
 
     def _normalize_enrollment_status(self, enrollment):
         if not enrollment:
@@ -500,6 +562,8 @@ class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeria
     live_classes = serializers.SerializerMethodField()
     price = serializers.SerializerMethodField()
     monthly_price = serializers.SerializerMethodField()
+    payment_plans = serializers.SerializerMethodField()
+    payment_cards_per_row = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -513,6 +577,8 @@ class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeria
             "start_date", "hero_countdown_end_at", "hero_countdown_label", "total_hours_label", "batch_size_label",
             "bundle_payment_enabled", "bundle_price", "bundle_installments", "bundle_access_days",
             "batch_pass_payment_enabled", "batch_pass_price", "included_in_batch_pass",
+            "payment_plans",
+            "payment_cards_per_row",
             "about_the_course",
             "course_overview",
             "what_you_will_learn",
@@ -559,6 +625,26 @@ class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeria
     def get_thumbnail(self, obj):
         request = self.context.get("request")
         return obj.get_thumbnail_url(request=request)
+
+    def _payment_plans(self, obj):
+        cache = self.context.setdefault("course_payment_plans_cache", {})
+        if obj.pk not in cache:
+            request = self.context.get("request")
+            user = getattr(request, "user", None)
+            enrollment_kwargs = {}
+            if user is not None and user.is_authenticated and user.id != obj.instructor_id:
+                # Reuse the enrollment row the status fields already loaded.
+                enrollment_kwargs["enrollment"] = self._get_cached_enrollment(obj)
+            cache[obj.pk] = resolve_course_plans(obj, user, **enrollment_kwargs)
+        return cache[obj.pk]
+
+    @extend_schema_field(PaymentPlanCardSerializer(many=True))
+    def get_payment_plans(self, obj):
+        return self._payment_plans(obj)
+
+    @extend_schema_field(serializers.ChoiceField(choices=(2, 3, 4)))
+    def get_payment_cards_per_row(self, obj):
+        return payment_cards_per_row(len(self._payment_plans(obj)))
 
     def get_live_classes(self, obj):
         request = self.context.get("request")
@@ -661,6 +747,20 @@ class CourseWriteSerializer(serializers.ModelSerializer):
             detail = getattr(exc, "message_dict", None) or getattr(exc, "message", None) or exc
             raise serializers.ValidationError(detail) from exc
         return value
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        # A price edit must leave the course's payment cards valid (an enabled
+        # card needs a positive price; 2 to 4 cards or none), exactly as the
+        # admin enforces.
+        candidate = copy.copy(self.instance) if self.instance is not None else Course()
+        for field, value in attrs.items():
+            if field != "thumbnail_file":
+                setattr(candidate, field, value)
+        errors = payment_card_errors(candidate)
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
 
     class Meta:
         model = Course

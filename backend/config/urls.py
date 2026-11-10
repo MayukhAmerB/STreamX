@@ -41,6 +41,7 @@ urlpatterns = [
     path("api/as-accounts/", include("apps.social_accounts.urls")),
     path("api/national-desk/", include("apps.national_desk.urls")),
     path("api/join/", include("apps.join_requests.urls")),
+    path("api/reports/", include("apps.reports.urls")),
     path("api/", include("apps.courses.urls")),
     path("api/payment/", include("apps.payments.urls")),
 ]

@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "rest_framework.authtoken",
     "rest_framework_simplejwt.token_blacklist",
+    "apps.core.apps.CoreConfig",
     "apps.users",
     "apps.courses",
     "apps.payments",
@@ -61,6 +62,7 @@ INSTALLED_APPS = [
     "apps.join_requests.apps.JoinRequestsConfig",
     "apps.notifications.apps.NotificationsConfig",
     "apps.insights.apps.InsightsConfig",
+    "apps.reports.apps.ReportsConfig",
 ]
 
 MIDDLEWARE = [
@@ -208,6 +210,9 @@ AUTH_USER_MODEL = "users.User"
 
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "config.openapi.StreamXAutoSchema",
+    # One error contract: every raised error leaves as the success/message/
+    # data/errors envelope with a stable errors.code (see apps/core/README.md).
+    "EXCEPTION_HANDLER": "apps.core.exception_handler.api_exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "config.authentication.CookieJWTAuthentication",
     ],
@@ -246,6 +251,12 @@ REST_FRAMEWORK = {
         "realtime_session_create": "30/hour",
         "realtime_session_join": "240/hour",
         "realtime_connection_telemetry": "600/hour",
+        # Weekly reports: one file per upload request, so the upload budget
+        # covers several files per task plus retries.
+        "report_upload": env("REPORT_UPLOAD_RATE", "120/hour"),
+        "report_submit": env("REPORT_SUBMIT_RATE", "60/hour"),
+        "report_grade": env("REPORT_GRADE_RATE", "1200/hour"),
+        "report_export": env("REPORT_EXPORT_RATE", "60/hour"),
     },
 }
 
@@ -264,6 +275,17 @@ SPECTACULAR_SETTINGS = {
         "StateEnum": "apps.join_requests.india_locations.STATE_CHOICES",
         "ClassRecordingStateEnum": "apps.realtime.recording.models.ClassRecording.STATE_CHOICES",
         "ClassRecordingSourceEnum": "apps.realtime.recording.models.ClassRecording.SOURCE_CHOICES",
+        "ReportTaskStatusEnum": "apps.reports.models.ReportTask.STATUS_CHOICES",
+        "ReportLatePolicyEnum": "apps.reports.models.ReportTask.LATE_POLICY_CHOICES",
+        "ReportMarksVisibilityEnum": "apps.reports.models.ReportTask.MARKS_VISIBILITY_CHOICES",
+        "ReportSubmissionStatusEnum": "apps.reports.models.ReportSubmission.STATUS_CHOICES",
+        "ReportGradeActionEnum": "apps.reports.models.GRADE_ACTION_CHOICES",
+        "ReportGradebookCellStatusEnum": "apps.reports.serializers.CELL_STATUS_CHOICES",
+        "ReportWindowEnum": "apps.reports.serializers.WINDOW_CHOICES",
+        "ReportFilePreviewEnum": "apps.reports.serializers.PREVIEW_CHOICES",
+        "ReportFileTypeEnum": "apps.reports.serializers.FILE_TYPE_CHOICES",
+        # Pinned so the reports enums above cannot rename this existing component.
+        "StatusEnum": "apps.national_desk.models.TrackerUpdate.STATUS_CHOICES",
     },
 }
 
@@ -416,6 +438,9 @@ STREAM_RECORDER_FINALIZE_SPACE_FACTOR = float(env("STREAM_RECORDER_FINALIZE_SPAC
 STREAM_RECORDER_FAILED_RETENTION_DAYS = env_int("STREAM_RECORDER_FAILED_RETENTION_DAYS", 7)
 STREAM_RECORDER_SWEEP_INTERVAL_SECONDS = env_int("STREAM_RECORDER_SWEEP_INTERVAL_SECONDS", 3600)
 STREAM_RECORDER_FINALIZE_QUEUE_SIZE = env_int("STREAM_RECORDER_FINALIZE_QUEUE_SIZE", 32)
+# Capture through the recorder's local playlist filter, which keeps Owncast's
+# offline clip out of recordings (see apps/realtime/recording/hls_proxy.py).
+STREAM_RECORDER_HLS_FILTER = env_bool("STREAM_RECORDER_HLS_FILTER", True)
 # When on, creating a broadcast session requires target_module_id (enable once the UI sends it).
 REALTIME_BROADCAST_REQUIRE_TARGET_MODULE = env_bool("REALTIME_BROADCAST_REQUIRE_TARGET_MODULE", False)
 COURSE_HLS_SEGMENT_DURATION_SECONDS = max(2, env_int("COURSE_HLS_SEGMENT_DURATION_SECONDS", 4))
@@ -527,6 +552,67 @@ ASYNC_WEBHOOK_RETRY_MAX_ATTEMPTS = env_int("ASYNC_WEBHOOK_RETRY_MAX_ATTEMPTS", 6
 ASYNC_PAYMENT_PROVISION_MAX_ATTEMPTS = env_int(
     "ASYNC_PAYMENT_PROVISION_MAX_ATTEMPTS", 8
 )
+# --- apps.core reliability building blocks (see apps/core/README.md) ---
+# Idempotency-Key storage for unsafe API calls.
+IDEMPOTENCY_KEY_TTL_SECONDS = env_int("IDEMPOTENCY_KEY_TTL_SECONDS", 86400)
+IDEMPOTENCY_LEASE_SECONDS = env_int("IDEMPOTENCY_LEASE_SECONDS", 60)
+# Transactional outbox, drained by process_async_jobs.
+OUTBOX_DEFAULT_MAX_ATTEMPTS = env_int("OUTBOX_DEFAULT_MAX_ATTEMPTS", 8)
+OUTBOX_LOCK_TIMEOUT_SECONDS = env_int("OUTBOX_LOCK_TIMEOUT_SECONDS", 300)
+OUTBOX_BACKOFF_BASE_SECONDS = env_int("OUTBOX_BACKOFF_BASE_SECONDS", 15)
+OUTBOX_MAX_BACKOFF_SECONDS = env_int("OUTBOX_MAX_BACKOFF_SECONDS", 3600)
+OUTBOX_RETENTION_DAYS = env_int("OUTBOX_RETENTION_DAYS", 14)
+# Outbound HTTP (apps.core.http) and per-upstream circuit breakers.
+OUTBOUND_HTTP_DEFAULT_TIMEOUT_SECONDS = max(1, env_int("OUTBOUND_HTTP_DEFAULT_TIMEOUT_SECONDS", 5))
+CIRCUIT_BREAKER_DEFAULTS = {
+    "failure_threshold": max(1, env_int("CIRCUIT_BREAKER_FAILURE_THRESHOLD", 5)),
+    "failure_window_seconds": max(5, env_int("CIRCUIT_BREAKER_FAILURE_WINDOW_SECONDS", 60)),
+    "open_seconds": max(1, env_int("CIRCUIT_BREAKER_OPEN_SECONDS", 30)),
+    "probe_timeout_seconds": max(1, env_int("CIRCUIT_BREAKER_PROBE_TIMEOUT_SECONDS", 15)),
+}
+# Named upstreams are listed (state shown on /health/ready) even before first use.
+CIRCUIT_BREAKERS = {
+    "owncast": {"open_seconds": 15},
+    "livekit": {},
+    "razorpay": {"failure_threshold": 3, "open_seconds": 60},
+    "prometheus": {},
+}
+# Readiness probe memo and MEDIA_ROOT disk thresholds.
+HEALTH_READINESS_CACHE_SECONDS = env_int("HEALTH_READINESS_CACHE_SECONDS", 3)
+HEALTH_MEDIA_MIN_FREE_BYTES = env_int("HEALTH_MEDIA_MIN_FREE_BYTES", 512 * 1024 * 1024)
+HEALTH_MEDIA_WARN_FREE_BYTES = env_int("HEALTH_MEDIA_WARN_FREE_BYTES", 5 * 1024 * 1024 * 1024)
+# --- Weekly report submissions (apps.reports) ---
+# Private storage for submitted report files. It must NOT be inside MEDIA_ROOT:
+# the nginx media container serves everything under MEDIA_ROOT publicly. In
+# Docker it is its own volume (streamx_backend_private_media -> /app/private_media)
+# that only the backend containers mount; files leave only through the
+# authenticated download view.
+REPORTS_PRIVATE_ROOT = env("REPORTS_PRIVATE_ROOT", str(BASE_DIR / "private_media")).strip() or str(
+    BASE_DIR / "private_media"
+)
+# Hard ceilings an instructor cannot exceed when configuring a task.
+REPORTS_MAX_FILE_SIZE_MB_CAP = max(1, env_int("REPORTS_MAX_FILE_SIZE_MB_CAP", 200))
+REPORTS_MAX_FILES_CAP = max(1, env_int("REPORTS_MAX_FILES_CAP", 20))
+# Uploads are refused (507) while the private volume has less free space than
+# this plus twice the incoming file.
+REPORTS_MIN_FREE_BYTES = max(0, env_int("REPORTS_MIN_FREE_BYTES", 1024 * 1024 * 1024))
+# Obsidian vault .zip limits (inspected in memory, never extracted).
+REPORTS_ZIP_MAX_ENTRIES = max(1, env_int("REPORTS_ZIP_MAX_ENTRIES", 2000))
+REPORTS_ZIP_MAX_UNCOMPRESSED_BYTES = max(1, env_int("REPORTS_ZIP_MAX_UNCOMPRESSED_BYTES", 500 * 1024 * 1024))
+REPORTS_ZIP_MAX_RATIO = max(1, env_int("REPORTS_ZIP_MAX_RATIO", 100))
+# Staged (uploaded but never submitted) files are deleted after this many hours.
+REPORTS_STAGED_UPLOAD_TTL_HOURS = max(1, env_int("REPORTS_STAGED_UPLOAD_TTL_HOURS", 48))
+# Optional antivirus hook: dotted path to a callable(path, *, filename) that
+# raises apps.reports.antivirus.InfectedFile (or returns a ScanResult). Empty =
+# off. "apps.reports.antivirus.clamd_scan" talks to clamd (REPORTS_CLAMD_*).
+REPORTS_ANTIVIRUS_SCANNER = env("REPORTS_ANTIVIRUS_SCANNER", "").strip()
+REPORTS_ANTIVIRUS_FAIL_CLOSED = env_bool("REPORTS_ANTIVIRUS_FAIL_CLOSED", True)
+REPORTS_CLAMD_HOST = env("REPORTS_CLAMD_HOST", "clamav").strip()
+REPORTS_CLAMD_PORT = env_int("REPORTS_CLAMD_PORT", 3310)
+REPORTS_CLAMD_TIMEOUT_SECONDS = max(1, env_int("REPORTS_CLAMD_TIMEOUT_SECONDS", 30))
+# Late-submission digest for the course instructor: one notification per task
+# per window instead of one per late upload.
+REPORTS_LATE_DIGEST_WINDOW_MINUTES = max(5, env_int("REPORTS_LATE_DIGEST_WINDOW_MINUTES", 60))
 WEB_PUSH_ENABLED = env_bool("WEB_PUSH_ENABLED", False)
 WEB_PUSH_VAPID_PUBLIC_KEY = env("WEB_PUSH_VAPID_PUBLIC_KEY", "").strip()
 WEB_PUSH_VAPID_PRIVATE_KEY = env("WEB_PUSH_VAPID_PRIVATE_KEY", "").strip()

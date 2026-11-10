@@ -819,8 +819,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: {}
+                $ref: '#/components/schemas/CourseDetailResponse'
           description: ''
     put:
       operationId: courses_update_by_id
@@ -3305,6 +3304,714 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /reports/attachments/{attachment_id}/download/:
+    get:
+      operationId: reports_attachments_download
+      description: 'Base for private file downloads: never cached, never sniffed.'
+      parameters:
+      - in: path
+        name: attachment_id
+        schema:
+          type: integer
+        required: true
+      - in: query
+        name: inline
+        schema:
+          type: boolean
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+  /reports/feedback-files/{submission_id}/download/:
+    get:
+      operationId: reports_feedback_file_download
+      description: 'Base for private file downloads: never cached, never sniffed.'
+      parameters:
+      - in: query
+        name: inline
+        schema:
+          type: boolean
+      - in: path
+        name: submission_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+  /reports/files/{file_id}/download/:
+    get:
+      operationId: reports_files_download
+      description: 'Base for private file downloads: never cached, never sniffed.'
+      parameters:
+      - in: path
+        name: file_id
+        schema:
+          type: integer
+        required: true
+      - in: query
+        name: inline
+        schema:
+          type: boolean
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+  /reports/manage/attachments/{attachment_id}/:
+    delete:
+      operationId: reports_manage_attachments_destroy
+      parameters:
+      - in: path
+        name: attachment_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          description: No response body
+  /reports/manage/courses/:
+    get:
+      operationId: reports_manage_courses_list
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GradableCourseList'
+          description: ''
+  /reports/manage/export.csv:
+    get:
+      operationId: reports_manage_export_csv
+      parameters:
+      - in: query
+        name: course
+        schema:
+          type: integer
+      - in: query
+        name: task
+        schema:
+          type: integer
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            text/csv:
+              schema:
+                type: string
+          description: ''
+  /reports/manage/gradebook/:
+    get:
+      operationId: reports_manage_gradebook_retrieve
+      parameters:
+      - in: query
+        name: course
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Gradebook'
+          description: ''
+  /reports/manage/submissions/:
+    get:
+      operationId: reports_manage_submissions_list
+      parameters:
+      - in: query
+        name: course
+        schema:
+          type: integer
+      - in: query
+        name: late
+        schema:
+          type: boolean
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Student name or email
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: awaiting, submitted, under_review, graded, returned_for_revision,
+          resubmitted
+      - in: query
+        name: task
+        schema:
+          type: integer
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionQueue'
+          description: ''
+  /reports/manage/submissions/{submission_id}/:
+    get:
+      operationId: reports_manage_submissions_retrieve
+      parameters:
+      - in: query
+        name: course
+        schema:
+          type: integer
+      - in: query
+        name: late
+        schema:
+          type: boolean
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Student name or email
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: awaiting, submitted, under_review, graded, returned_for_revision,
+          resubmitted
+      - in: path
+        name: submission_id
+        schema:
+          type: integer
+        required: true
+      - in: query
+        name: task
+        schema:
+          type: integer
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionDetail'
+          description: ''
+  /reports/manage/submissions/{submission_id}/grade/:
+    post:
+      operationId: reports_manage_submissions_grade_create
+      parameters:
+      - in: query
+        name: course
+        schema:
+          type: integer
+      - in: query
+        name: late
+        schema:
+          type: boolean
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Student name or email
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: awaiting, submitted, under_review, graded, returned_for_revision,
+          resubmitted
+      - in: path
+        name: submission_id
+        schema:
+          type: integer
+        required: true
+      - in: query
+        name: task
+        schema:
+          type: integer
+      tags:
+      - reports
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GradeRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GradeRequestRequest'
+        required: true
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionDetail'
+          description: ''
+  /reports/manage/tasks/:
+    get:
+      operationId: reports_manage_tasks_list
+      parameters:
+      - in: query
+        name: course
+        schema:
+          type: integer
+      - in: query
+        name: status
+        schema:
+          type: string
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManageTaskList'
+          description: ''
+    post:
+      operationId: reports_manage_tasks_create
+      tags:
+      - reports
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManageTaskRequest'
+        required: true
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManageTask'
+          description: ''
+  /reports/manage/tasks/{task_id}/:
+    get:
+      operationId: reports_manage_tasks_retrieve
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManageTask'
+          description: ''
+    patch:
+      operationId: reports_manage_tasks_partial_update
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedManageTaskRequest'
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManageTask'
+          description: ''
+    delete:
+      operationId: reports_manage_tasks_destroy
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          description: No response body
+  /reports/manage/tasks/{task_id}/attachments/:
+    post:
+      operationId: reports_manage_tasks_attachments_create
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadRequestRequest'
+        required: true
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttachmentUploadResponse'
+          description: ''
+  /reports/manage/tasks/{task_id}/close/:
+    post:
+      operationId: reports_manage_tasks_close_create_by_id
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManageTask'
+          description: ''
+  /reports/manage/tasks/{task_id}/download.zip:
+    get:
+      operationId: reports_manage_tasks_download_zip
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+          description: ''
+  /reports/manage/tasks/{task_id}/duplicate/:
+    post:
+      operationId: reports_manage_tasks_duplicate_create_by_id
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManageTask'
+          description: ''
+  /reports/manage/tasks/{task_id}/publish/:
+    post:
+      operationId: reports_manage_tasks_publish_create_by_id
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManageTask'
+          description: ''
+  /reports/manage/tasks/{task_id}/release-marks/:
+    post:
+      operationId: reports_manage_tasks_release_marks_create_by_id
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManageTask'
+          description: ''
+  /reports/manage/tasks/{task_id}/reopen/:
+    post:
+      operationId: reports_manage_tasks_reopen_create_by_id
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManageTask'
+          description: ''
+  /reports/marks/:
+    get:
+      operationId: reports_marks_retrieve
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyMarks'
+          description: ''
+  /reports/tasks/:
+    get:
+      operationId: reports_tasks_list
+      parameters:
+      - in: query
+        name: course
+        schema:
+          type: integer
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentTaskList'
+          description: ''
+  /reports/tasks/{task_id}/:
+    get:
+      operationId: reports_tasks_retrieve
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentTaskDetail'
+          description: ''
+  /reports/tasks/{task_id}/submit/:
+    post:
+      operationId: reports_tasks_submit_create
+      description: |-
+        DRF APIView/ViewSet mixin. Put it FIRST in the bases.
+
+        Runs after authentication/permissions/throttling (inside ``initial``) so
+        the owner is the authenticated user and rejected requests never claim keys.
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitReportRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SubmitReportRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SubmitReportRequestRequest'
+        required: true
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitReportResponse'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitReportResponse'
+          description: ''
+  /reports/tasks/{task_id}/uploads/:
+    post:
+      operationId: reports_tasks_uploads_create
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadRequestRequest'
+        required: true
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoredFile'
+          description: ''
+  /reports/tasks/{task_id}/uploads/{file_id}/:
+    delete:
+      operationId: reports_tasks_uploads_destroy
+      parameters:
+      - in: path
+        name: file_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          description: No response body
   /sections/:
     post:
       operationId: sections_create
@@ -3399,6 +4106,51 @@ components:
         * `audio` - Audio only (play button)
         * `pdf` - PDF download + listen guide
         * `video` - Video collection + listen guide
+    AttachmentUploadResponse:
+      type: object
+      properties:
+        attachment:
+          $ref: '#/components/schemas/StoredFile'
+      required:
+      - attachment
+    AuditEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        action:
+          type: string
+        action_label:
+          type: string
+        actor:
+          type: string
+        from_status:
+          type: string
+        to_status:
+          type: string
+        old_final_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          nullable: true
+        new_final_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - action
+      - action_label
+      - actor
+      - created_at
+      - from_status
+      - id
+      - new_final_marks
+      - old_final_marks
+      - to_status
     BroadcastEgressStatus:
       type: object
       properties:
@@ -3416,6 +4168,14 @@ components:
       - error
       - running
       - status
+    CategoryEnum:
+      enum:
+      - osint
+      - web_pentesting
+      type: string
+      description: |-
+        * `osint` - OSINT
+        * `web_pentesting` - Web Application Pentesting
     ClassRecording:
       type: object
       properties:
@@ -3569,11 +4329,13 @@ components:
       - server
       - obs_upload
       - livekit_egress
+      - imported
       type: string
       description: |-
         * `server` - Server recording (OBS stream)
         * `obs_upload` - OBS file upload (replacement)
         * `livekit_egress` - LiveKit egress (Host Studio)
+        * `imported` - Imported (found on the server)
     ClassRecordingStateEnum:
       enum:
       - recording
@@ -3581,6 +4343,7 @@ components:
       - processing
       - published
       - failed
+      - imported
       type: string
       description: |-
         * `recording` - Recording
@@ -3588,6 +4351,7 @@ components:
         * `processing` - Processing
         * `published` - Published
         * `failed` - Failed
+        * `imported` - Imported (unassigned)
     CommentAuthor:
       type: object
       properties:
@@ -3601,6 +4365,129 @@ components:
       - display_name
       - id
       - is_instructor
+    CourseDetailContract:
+      type: object
+      description: |-
+        OpenAPI contract for GET /api/courses/{id}/ (documentation only).
+
+        Lists the fields clients of the payment page rely on; the response carries
+        further course fields (CourseDetailSerializer) for backward compatibility.
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        level:
+          $ref: '#/components/schemas/LevelEnum'
+        launch_status:
+          $ref: '#/components/schemas/LaunchStatusEnum'
+        registration_closed:
+          type: boolean
+        is_published:
+          type: boolean
+        price:
+          type: string
+          description: One-time plan price in rupees, two decimals.
+        monthly_price:
+          type: string
+          description: Monthly installment amount in rupees, two decimals.
+        full_payment_enabled:
+          type: boolean
+        installment_payment_enabled:
+          type: boolean
+        installments_required:
+          type: integer
+        installment_access_days:
+          type: integer
+        bundle_payment_enabled:
+          type: boolean
+        bundle_price:
+          type: string
+        bundle_installments:
+          type: integer
+        bundle_access_days:
+          type: integer
+        batch_pass_payment_enabled:
+          type: boolean
+        batch_pass_price:
+          type: string
+        included_in_batch_pass:
+          type: boolean
+        is_enrolled:
+          type: boolean
+        enrollment_status:
+          type: string
+        purchase_available:
+          type: boolean
+        purchase_unavailable_reason:
+          type: string
+          description: '"" when purchasable, else checkout_disabled, course_unpublished,
+            course_not_live, registration_closed or price_not_configured.'
+        payment_plans:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentPlanCard'
+          description: The course's enabled payment cards, ordered for display (order
+            = position, 1-based).
+        payment_cards_per_row:
+          allOf:
+          - $ref: '#/components/schemas/PaymentCardsPerRowEnum'
+          description: |-
+            Plan picker columns: the number of cards, at least 2 and at most 4.
+
+            * `2` - 2
+            * `3` - 3
+            * `4` - 4
+      required:
+      - batch_pass_payment_enabled
+      - batch_pass_price
+      - bundle_access_days
+      - bundle_installments
+      - bundle_payment_enabled
+      - bundle_price
+      - category
+      - description
+      - enrollment_status
+      - full_payment_enabled
+      - id
+      - included_in_batch_pass
+      - installment_access_days
+      - installment_payment_enabled
+      - installments_required
+      - is_enrolled
+      - is_published
+      - launch_status
+      - level
+      - monthly_price
+      - payment_cards_per_row
+      - payment_plans
+      - price
+      - purchase_available
+      - purchase_unavailable_reason
+      - registration_closed
+      - slug
+      - title
+    CourseDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/CourseDetailContract'
+        errors:
+          nullable: true
+      required:
+      - data
+      - message
+      - success
     CourseRef:
       type: object
       properties:
@@ -3611,6 +4498,99 @@ components:
       required:
       - id
       - title
+    Criterion:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+      required:
+      - description
+      - id
+      - max_marks
+      - name
+    CriterionInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+          default: ''
+          maxLength: 2000
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+      required:
+      - max_marks
+      - name
+    CriterionInputRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          default: ''
+          maxLength: 2000
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+      required:
+      - max_marks
+      - name
+    CriterionMark:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          nullable: true
+      required:
+      - id
+      - marks
+      - max_marks
+      - name
+    CriterionRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+      required:
+      - description
+      - id
+      - max_marks
+      - name
     EventEnum:
       enum:
       - connecting
@@ -3631,6 +4611,25 @@ components:
         * `connection_failed` - connection_failed
         * `quality_changed` - quality_changed
         * `relay_fallback` - relay_fallback
+    FeedbackFile:
+      type: object
+      properties:
+        name:
+          type: string
+        extension:
+          type: string
+        size:
+          type: integer
+        preview:
+          $ref: '#/components/schemas/ReportFilePreviewEnum'
+        download_url:
+          type: string
+      required:
+      - download_url
+      - extension
+      - name
+      - preview
+      - size
     FirFilingGuide:
       type: object
       properties:
@@ -3667,6 +4666,278 @@ components:
       required:
       - audio_url
       - hero_image_url
+    GradableCourse:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/SectionOption'
+        next_week_number:
+          type: integer
+      required:
+      - id
+      - next_week_number
+      - sections
+      - title
+    GradableCourseList:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/GradableCourse'
+      required:
+      - results
+    GradeRequestRequest:
+      type: object
+      properties:
+        action:
+          $ref: '#/components/schemas/ReportGradeActionEnum'
+        expected_revision:
+          type: integer
+          minimum: 0
+        marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,4})?$
+          nullable: true
+        criteria_marks: {}
+        feedback:
+          type: string
+          default: ''
+          maxLength: 10000
+        annotated_file:
+          type: string
+          format: binary
+          nullable: true
+        remove_annotated_file:
+          type: boolean
+          default: false
+      required:
+      - action
+      - expected_revision
+    Gradebook:
+      type: object
+      properties:
+        course:
+          $ref: '#/components/schemas/Ref'
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/GradebookTask'
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/GradebookRow'
+      required:
+      - course
+      - rows
+      - tasks
+    GradebookCell:
+      type: object
+      properties:
+        task_id:
+          type: integer
+        status:
+          $ref: '#/components/schemas/ReportGradebookCellStatusEnum'
+        submission_id:
+          type: integer
+          nullable: true
+        final_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          nullable: true
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        is_late:
+          type: boolean
+        minutes_late:
+          type: integer
+        is_missing:
+          type: boolean
+      required:
+      - final_marks
+      - is_late
+      - is_missing
+      - max_marks
+      - minutes_late
+      - status
+      - submission_id
+      - task_id
+    GradebookRow:
+      type: object
+      properties:
+        student:
+          $ref: '#/components/schemas/Person'
+        cells:
+          type: array
+          items:
+            $ref: '#/components/schemas/GradebookCell'
+        totals:
+          $ref: '#/components/schemas/GradebookTotals'
+      required:
+      - cells
+      - student
+      - totals
+    GradebookTask:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        week_number:
+          type: integer
+          nullable: true
+        due_at:
+          type: string
+          format: date-time
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        status:
+          $ref: '#/components/schemas/ReportTaskStatusEnum'
+      required:
+      - due_at
+      - id
+      - max_marks
+      - status
+      - title
+      - week_number
+    GradebookTotals:
+      type: object
+      properties:
+        total_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        percentage:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          nullable: true
+        graded_count:
+          type: integer
+        missing_count:
+          type: integer
+        late_count:
+          type: integer
+        submitted_count:
+          type: integer
+      required:
+      - graded_count
+      - late_count
+      - max_marks
+      - missing_count
+      - percentage
+      - submitted_count
+      - total_marks
+    GraderGrade:
+      type: object
+      properties:
+        raw_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          nullable: true
+        late_penalty:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        final_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          nullable: true
+        criteria:
+          type: array
+          items:
+            $ref: '#/components/schemas/CriterionMark'
+        feedback:
+          type: string
+        revision_feedback:
+          type: string
+        annotated_file:
+          allOf:
+          - $ref: '#/components/schemas/FeedbackFile'
+          nullable: true
+        graded_by:
+          type: string
+        graded_at:
+          type: string
+          format: date-time
+          nullable: true
+        graded_version:
+          type: integer
+          nullable: true
+      required:
+      - annotated_file
+      - criteria
+      - feedback
+      - final_marks
+      - graded_at
+      - graded_by
+      - graded_version
+      - late_penalty
+      - raw_marks
+      - revision_feedback
+    GradingTask:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        course:
+          $ref: '#/components/schemas/Ref'
+        week_number:
+          type: integer
+          nullable: true
+        due_at:
+          type: string
+          format: date-time
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        late_penalty_percent_per_day:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        marks_visibility:
+          $ref: '#/components/schemas/ReportMarksVisibilityEnum'
+        marks_released_at:
+          type: string
+          format: date-time
+          nullable: true
+        criteria:
+          type: array
+          items:
+            $ref: '#/components/schemas/Criterion'
+      required:
+      - course
+      - criteria
+      - due_at
+      - id
+      - late_penalty_percent_per_day
+      - marks_released_at
+      - marks_visibility
+      - max_marks
+      - title
+      - week_number
     JoinApplicationCreateRequest:
       type: object
       properties:
@@ -3786,6 +5057,14 @@ components:
       - errors
       - message
       - success
+    LaunchStatusEnum:
+      enum:
+      - live
+      - coming_soon
+      type: string
+      description: |-
+        * `live` - Live
+        * `coming_soon` - Coming Soon
     LawTopic:
       type: object
       properties:
@@ -4089,6 +5368,241 @@ components:
       - is_published
       - stream_status
       - title
+    LevelEnum:
+      enum:
+      - beginner
+      - intermediate
+      - advanced
+      type: string
+      description: |-
+        * `beginner` - Beginner
+        * `intermediate` - Intermediate
+        * `advanced` - Advanced
+    ManageTask:
+      type: object
+      description: Create/update input and the grader's view of a task.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        course:
+          type: integer
+        course_title:
+          type: string
+          readOnly: true
+        section:
+          type: integer
+          nullable: true
+        section_title:
+          type: string
+          readOnly: true
+          nullable: true
+        week_number:
+          type: integer
+          maximum: 520
+          minimum: 1
+          nullable: true
+        title:
+          type: string
+          maxLength: 200
+        brief:
+          type: string
+          default: ''
+          maxLength: 20000
+        opens_at:
+          type: string
+          format: date-time
+          nullable: true
+        due_at:
+          type: string
+          format: date-time
+        late_policy:
+          allOf:
+          - $ref: '#/components/schemas/ReportLatePolicyEnum'
+          default: no_late
+        late_until:
+          type: string
+          format: date-time
+          nullable: true
+        late_penalty_percent_per_day:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          default: '0.00'
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          default: '10.00'
+        allowed_file_types:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportFileTypeEnum'
+        max_files:
+          type: integer
+          minimum: 1
+          default: 5
+        max_file_size_mb:
+          type: integer
+          minimum: 1
+          default: 50
+        max_total_size_mb:
+          type: integer
+          minimum: 1
+          default: 200
+        marks_visibility:
+          allOf:
+          - $ref: '#/components/schemas/ReportMarksVisibilityEnum'
+          default: on_grade
+        criteria:
+          type: array
+          items:
+            $ref: '#/components/schemas/CriterionInput'
+        status:
+          allOf:
+          - $ref: '#/components/schemas/ReportTaskStatusEnum'
+          readOnly: true
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        closed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        marks_released_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        has_grades:
+          type: boolean
+          readOnly: true
+        counts:
+          allOf:
+          - $ref: '#/components/schemas/TaskCounts'
+          readOnly: true
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoredFile'
+          readOnly: true
+        criteria_detail:
+          type: array
+          items:
+            $ref: '#/components/schemas/Criterion'
+          readOnly: true
+      required:
+      - attachments
+      - closed_at
+      - counts
+      - course
+      - course_title
+      - created_at
+      - criteria_detail
+      - due_at
+      - has_grades
+      - id
+      - marks_released_at
+      - published_at
+      - section_title
+      - status
+      - title
+      - updated_at
+    ManageTaskList:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManageTask'
+      required:
+      - results
+    ManageTaskRequest:
+      type: object
+      description: Create/update input and the grader's view of a task.
+      properties:
+        course:
+          type: integer
+        section:
+          type: integer
+          nullable: true
+        week_number:
+          type: integer
+          maximum: 520
+          minimum: 1
+          nullable: true
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        brief:
+          type: string
+          default: ''
+          maxLength: 20000
+        opens_at:
+          type: string
+          format: date-time
+          nullable: true
+        due_at:
+          type: string
+          format: date-time
+        late_policy:
+          allOf:
+          - $ref: '#/components/schemas/ReportLatePolicyEnum'
+          default: no_late
+        late_until:
+          type: string
+          format: date-time
+          nullable: true
+        late_penalty_percent_per_day:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          default: '0.00'
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          default: '10.00'
+        allowed_file_types:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportFileTypeEnum'
+        max_files:
+          type: integer
+          minimum: 1
+          default: 5
+        max_file_size_mb:
+          type: integer
+          minimum: 1
+          default: 50
+        max_total_size_mb:
+          type: integer
+          minimum: 1
+          default: 200
+        marks_visibility:
+          allOf:
+          - $ref: '#/components/schemas/ReportMarksVisibilityEnum'
+          default: on_grade
+        criteria:
+          type: array
+          items:
+            $ref: '#/components/schemas/CriterionInputRequest'
+      required:
+      - course
+      - due_at
+      - title
     ModuleOption:
       type: object
       properties:
@@ -4151,6 +5665,35 @@ components:
       - course_id
       - id
       - title
+    MyMarks:
+      type: object
+      properties:
+        courses:
+          type: array
+          items:
+            $ref: '#/components/schemas/MyMarksCourse'
+      required:
+      - courses
+    MyMarksCourse:
+      type: object
+      properties:
+        course:
+          $ref: '#/components/schemas/Ref'
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/GradebookTask'
+        cells:
+          type: array
+          items:
+            $ref: '#/components/schemas/GradebookCell'
+        totals:
+          $ref: '#/components/schemas/GradebookTotals'
+      required:
+      - cells
+      - course
+      - tasks
+      - totals
     NationalDeskData:
       type: object
       properties:
@@ -4256,12 +5799,179 @@ components:
           type: string
           minLength: 1
           maxLength: 2000
+    PatchedManageTaskRequest:
+      type: object
+      description: Create/update input and the grader's view of a task.
+      properties:
+        course:
+          type: integer
+        section:
+          type: integer
+          nullable: true
+        week_number:
+          type: integer
+          maximum: 520
+          minimum: 1
+          nullable: true
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        brief:
+          type: string
+          default: ''
+          maxLength: 20000
+        opens_at:
+          type: string
+          format: date-time
+          nullable: true
+        due_at:
+          type: string
+          format: date-time
+        late_policy:
+          allOf:
+          - $ref: '#/components/schemas/ReportLatePolicyEnum'
+          default: no_late
+        late_until:
+          type: string
+          format: date-time
+          nullable: true
+        late_penalty_percent_per_day:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          default: '0.00'
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          default: '10.00'
+        allowed_file_types:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportFileTypeEnum'
+        max_files:
+          type: integer
+          minimum: 1
+          default: 5
+        max_file_size_mb:
+          type: integer
+          minimum: 1
+          default: 50
+        max_total_size_mb:
+          type: integer
+          minimum: 1
+          default: 200
+        marks_visibility:
+          allOf:
+          - $ref: '#/components/schemas/ReportMarksVisibilityEnum'
+          default: on_grade
+        criteria:
+          type: array
+          items:
+            $ref: '#/components/schemas/CriterionInputRequest'
     PatchedSessionModuleUpdateRequest:
       type: object
       properties:
         target_module_id:
           type: integer
           nullable: true
+    PaymentCardsPerRowEnum:
+      enum:
+      - 2
+      - 3
+      - 4
+      type: integer
+      description: |-
+        * `2` - 2
+        * `3` - 3
+        * `4` - 4
+    PaymentPlanCard:
+      type: object
+      description: One payment card on the course payment page (apps.payments.plans).
+      properties:
+        plan:
+          $ref: '#/components/schemas/PlanEnum'
+        title:
+          type: string
+        subtitle:
+          type: string
+        amount:
+          type: string
+          description: Rupees charged per payment, two decimals, e.g. "1500.00".
+        currency:
+          type: string
+        price_label:
+          type: string
+        total_label:
+          type: string
+          nullable: true
+        installments:
+          type: integer
+          nullable: true
+        access_label:
+          type: string
+        features:
+          type: array
+          items:
+            type: string
+        badge:
+          type: string
+          nullable: true
+        highlighted:
+          type: boolean
+        cta_label:
+          type: string
+        order:
+          type: integer
+        available:
+          type: boolean
+        unavailable_reason:
+          type: string
+          nullable: true
+      required:
+      - access_label
+      - amount
+      - available
+      - badge
+      - cta_label
+      - currency
+      - features
+      - highlighted
+      - installments
+      - order
+      - plan
+      - price_label
+      - subtitle
+      - title
+      - total_label
+      - unavailable_reason
+    Person:
+      type: object
+      properties:
+        id:
+          type: integer
+        full_name:
+          type: string
+        email:
+          type: string
+          format: email
+      required:
+      - email
+      - full_name
+      - id
+    PlanEnum:
+      enum:
+      - monthly
+      - full
+      - bundle
+      - batch_pass
+      type: string
+      description: |-
+        * `monthly` - monthly
+        * `full` - full
+        * `bundle` - bundle
+        * `batch_pass` - batch_pass
     PlatformEnum:
       enum:
       - mobile
@@ -4395,6 +6105,146 @@ components:
           default: 0
       required:
       - event
+    Ref:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+      required:
+      - id
+      - title
+    ReportFilePreviewEnum:
+      enum:
+      - pdf
+      - image
+      - markdown
+      - canvas
+      - none
+      type: string
+      description: |-
+        * `pdf` - PDF
+        * `image` - Image
+        * `markdown` - Markdown
+        * `canvas` - Canvas
+        * `none` - None
+    ReportFileTypeEnum:
+      enum:
+      - pdf
+      - pptx
+      - ppt
+      - docx
+      - doc
+      - odt
+      - odp
+      - md
+      - canvas
+      - png
+      - jpg
+      - jpeg
+      - webp
+      - svg
+      - zip
+      type: string
+      description: |-
+        * `pdf` - .pdf
+        * `pptx` - .pptx
+        * `ppt` - .ppt
+        * `docx` - .docx
+        * `doc` - .doc
+        * `odt` - .odt
+        * `odp` - .odp
+        * `md` - .md
+        * `canvas` - .canvas
+        * `png` - .png
+        * `jpg` - .jpg
+        * `jpeg` - .jpeg
+        * `webp` - .webp
+        * `svg` - .svg
+        * `zip` - .zip
+    ReportGradeActionEnum:
+      enum:
+      - draft
+      - grade
+      - return
+      type: string
+      description: |-
+        * `draft` - Save draft (under review)
+        * `grade` - Save marks (graded)
+        * `return` - Return for revision
+    ReportGradebookCellStatusEnum:
+      enum:
+      - not_submitted
+      - submitted
+      - under_review
+      - graded
+      - returned_for_revision
+      - resubmitted
+      - missing
+      type: string
+      description: |-
+        * `not_submitted` - Not submitted
+        * `submitted` - Submitted
+        * `under_review` - Under review
+        * `graded` - Graded
+        * `returned_for_revision` - Returned for revision
+        * `resubmitted` - Resubmitted
+        * `missing` - Missing
+    ReportLatePolicyEnum:
+      enum:
+      - no_late
+      - allow_late
+      type: string
+      description: |-
+        * `no_late` - No late submissions
+        * `allow_late` - Allow late submissions until a cut-off
+    ReportMarksVisibilityEnum:
+      enum:
+      - on_grade
+      - on_release
+      type: string
+      description: |-
+        * `on_grade` - Show each student's marks as soon as they are graded
+        * `on_release` - Release all marks together
+    ReportSubmissionStatusEnum:
+      enum:
+      - not_submitted
+      - submitted
+      - under_review
+      - graded
+      - returned_for_revision
+      - resubmitted
+      type: string
+      description: |-
+        * `not_submitted` - Not submitted
+        * `submitted` - Submitted
+        * `under_review` - Under review
+        * `graded` - Graded
+        * `returned_for_revision` - Returned for revision
+        * `resubmitted` - Resubmitted
+    ReportTaskStatusEnum:
+      enum:
+      - draft
+      - published
+      - closed
+      type: string
+      description: |-
+        * `draft` - Draft
+        * `published` - Published
+        * `closed` - Closed
+    ReportWindowEnum:
+      enum:
+      - not_open
+      - open
+      - late
+      - closed
+      type: string
+      description: |-
+        * `not_open` - Not open
+        * `open` - Open
+        * `late` - Late window
+        * `closed` - Closed
     RoleEnum:
       enum:
       - citizen
@@ -4403,6 +6253,19 @@ components:
       description: |-
         * `citizen` - Citizen / Volunteer
         * `lawyer` - Lawyer
+    SectionOption:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        order:
+          type: integer
+      required:
+      - id
+      - order
+      - title
     SocialAccount:
       type: object
       properties:
@@ -4584,6 +6447,68 @@ components:
         * `completed` - Completed
         * `in_progress` - In Progress
         * `planned` - Planned
+    StoredFile:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        extension:
+          type: string
+        content_type:
+          type: string
+        size:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        preview:
+          $ref: '#/components/schemas/ReportFilePreviewEnum'
+        download_url:
+          type: string
+      required:
+      - content_type
+      - created_at
+      - download_url
+      - extension
+      - id
+      - name
+      - preview
+      - size
+    StoredFileRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+        extension:
+          type: string
+          minLength: 1
+        content_type:
+          type: string
+          minLength: 1
+        size:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        preview:
+          $ref: '#/components/schemas/ReportFilePreviewEnum'
+        download_url:
+          type: string
+          minLength: 1
+      required:
+      - content_type
+      - created_at
+      - download_url
+      - extension
+      - id
+      - name
+      - preview
+      - size
     StreamHeartbeatData:
       type: object
       properties:
@@ -4630,6 +6555,544 @@ components:
       - errors
       - message
       - success
+    StudentGrade:
+      type: object
+      properties:
+        raw_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          nullable: true
+        late_penalty:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        final_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          nullable: true
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        criteria:
+          type: array
+          items:
+            $ref: '#/components/schemas/CriterionMark'
+        feedback:
+          type: string
+        graded_at:
+          type: string
+          format: date-time
+          nullable: true
+        annotated_file:
+          allOf:
+          - $ref: '#/components/schemas/FeedbackFile'
+          nullable: true
+      required:
+      - annotated_file
+      - criteria
+      - feedback
+      - final_marks
+      - graded_at
+      - late_penalty
+      - max_marks
+      - raw_marks
+    StudentSubmission:
+      type: object
+      properties:
+        id:
+          type: integer
+        status:
+          $ref: '#/components/schemas/ReportSubmissionStatusEnum'
+        revision:
+          type: integer
+        version_count:
+          type: integer
+        first_submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_late:
+          type: boolean
+        minutes_late:
+          type: integer
+        current_version:
+          allOf:
+          - $ref: '#/components/schemas/Version'
+          nullable: true
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Version'
+      required:
+      - current_version
+      - first_submitted_at
+      - id
+      - is_late
+      - minutes_late
+      - revision
+      - status
+      - submitted_at
+      - version_count
+      - versions
+    StudentTaskDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        course:
+          $ref: '#/components/schemas/Ref'
+        section:
+          allOf:
+          - $ref: '#/components/schemas/Ref'
+          nullable: true
+        week_number:
+          type: integer
+          nullable: true
+        title:
+          type: string
+        opens_at:
+          type: string
+          format: date-time
+          nullable: true
+        due_at:
+          type: string
+          format: date-time
+        late_policy:
+          $ref: '#/components/schemas/ReportLatePolicyEnum'
+        late_until:
+          type: string
+          format: date-time
+          nullable: true
+        accepting_until:
+          type: string
+          format: date-time
+        window:
+          $ref: '#/components/schemas/ReportWindowEnum'
+        task_status:
+          $ref: '#/components/schemas/ReportTaskStatusEnum'
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        marks_visibility:
+          $ref: '#/components/schemas/ReportMarksVisibilityEnum'
+        status:
+          $ref: '#/components/schemas/ReportSubmissionStatusEnum'
+        is_late:
+          type: boolean
+        minutes_late:
+          type: integer
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        version_count:
+          type: integer
+        marks_visible:
+          type: boolean
+        final_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          nullable: true
+        can_submit:
+          type: boolean
+        brief:
+          type: string
+        late_penalty_percent_per_day:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        allowed_extensions:
+          type: array
+          items:
+            type: string
+        max_files:
+          type: integer
+        max_file_size_mb:
+          type: integer
+        max_total_size_mb:
+          type: integer
+        criteria:
+          type: array
+          items:
+            $ref: '#/components/schemas/Criterion'
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoredFile'
+        lock_reason:
+          type: string
+        submission:
+          allOf:
+          - $ref: '#/components/schemas/StudentSubmission'
+          nullable: true
+        staged_files:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoredFile'
+        grade:
+          allOf:
+          - $ref: '#/components/schemas/StudentGrade'
+          nullable: true
+        revision_feedback:
+          type: string
+        marks_hidden_until_release:
+          type: boolean
+      required:
+      - accepting_until
+      - allowed_extensions
+      - attachments
+      - brief
+      - can_submit
+      - course
+      - criteria
+      - due_at
+      - final_marks
+      - grade
+      - id
+      - is_late
+      - late_penalty_percent_per_day
+      - late_policy
+      - late_until
+      - lock_reason
+      - marks_hidden_until_release
+      - marks_visibility
+      - marks_visible
+      - max_file_size_mb
+      - max_files
+      - max_marks
+      - max_total_size_mb
+      - minutes_late
+      - opens_at
+      - revision_feedback
+      - section
+      - staged_files
+      - status
+      - submission
+      - submitted_at
+      - task_status
+      - title
+      - version_count
+      - week_number
+      - window
+    StudentTaskList:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudentTaskSummary'
+        next_due:
+          allOf:
+          - $ref: '#/components/schemas/StudentTaskSummary'
+          nullable: true
+        server_time:
+          type: string
+          format: date-time
+      required:
+      - next_due
+      - results
+      - server_time
+    StudentTaskSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        course:
+          $ref: '#/components/schemas/Ref'
+        section:
+          allOf:
+          - $ref: '#/components/schemas/Ref'
+          nullable: true
+        week_number:
+          type: integer
+          nullable: true
+        title:
+          type: string
+        opens_at:
+          type: string
+          format: date-time
+          nullable: true
+        due_at:
+          type: string
+          format: date-time
+        late_policy:
+          $ref: '#/components/schemas/ReportLatePolicyEnum'
+        late_until:
+          type: string
+          format: date-time
+          nullable: true
+        accepting_until:
+          type: string
+          format: date-time
+        window:
+          $ref: '#/components/schemas/ReportWindowEnum'
+        task_status:
+          $ref: '#/components/schemas/ReportTaskStatusEnum'
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        marks_visibility:
+          $ref: '#/components/schemas/ReportMarksVisibilityEnum'
+        status:
+          $ref: '#/components/schemas/ReportSubmissionStatusEnum'
+        is_late:
+          type: boolean
+        minutes_late:
+          type: integer
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        version_count:
+          type: integer
+        marks_visible:
+          type: boolean
+        final_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          nullable: true
+        can_submit:
+          type: boolean
+      required:
+      - accepting_until
+      - can_submit
+      - course
+      - due_at
+      - final_marks
+      - id
+      - is_late
+      - late_policy
+      - late_until
+      - marks_visibility
+      - marks_visible
+      - max_marks
+      - minutes_late
+      - opens_at
+      - section
+      - status
+      - submitted_at
+      - task_status
+      - title
+      - version_count
+      - week_number
+      - window
+    SubmissionDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        task:
+          $ref: '#/components/schemas/GradingTask'
+        student:
+          $ref: '#/components/schemas/Person'
+        status:
+          $ref: '#/components/schemas/ReportSubmissionStatusEnum'
+        revision:
+          type: integer
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        first_submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_late:
+          type: boolean
+        minutes_late:
+          type: integer
+        current_version:
+          allOf:
+          - $ref: '#/components/schemas/Version'
+          nullable: true
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Version'
+        grade:
+          allOf:
+          - $ref: '#/components/schemas/GraderGrade'
+          nullable: true
+        audit:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEntry'
+        neighbours:
+          $ref: '#/components/schemas/SubmissionNeighbours'
+      required:
+      - audit
+      - current_version
+      - first_submitted_at
+      - grade
+      - id
+      - is_late
+      - minutes_late
+      - neighbours
+      - revision
+      - status
+      - student
+      - submitted_at
+      - task
+      - versions
+    SubmissionNeighbours:
+      type: object
+      properties:
+        previous_id:
+          type: integer
+          nullable: true
+        next_id:
+          type: integer
+          nullable: true
+        next_ungraded_id:
+          type: integer
+          nullable: true
+        position:
+          type: integer
+          nullable: true
+        total:
+          type: integer
+      required:
+      - next_id
+      - next_ungraded_id
+      - position
+      - previous_id
+      - total
+    SubmissionQueue:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmissionQueueItem'
+        counts:
+          $ref: '#/components/schemas/TaskCounts'
+      required:
+      - counts
+      - results
+    SubmissionQueueItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        task:
+          $ref: '#/components/schemas/GradebookTask'
+        student:
+          $ref: '#/components/schemas/Person'
+        status:
+          $ref: '#/components/schemas/ReportSubmissionStatusEnum'
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_late:
+          type: boolean
+        minutes_late:
+          type: integer
+        version_count:
+          type: integer
+        final_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          nullable: true
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        revision:
+          type: integer
+      required:
+      - final_marks
+      - id
+      - is_late
+      - max_marks
+      - minutes_late
+      - revision
+      - status
+      - student
+      - submitted_at
+      - task
+      - version_count
+    SubmitReportRequestRequest:
+      type: object
+      properties:
+        file_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          maxItems: 50
+        note:
+          type: string
+          default: ''
+          maxLength: 2000
+      required:
+      - file_ids
+    SubmitReportResponse:
+      type: object
+      properties:
+        created:
+          type: boolean
+        task:
+          $ref: '#/components/schemas/StudentTaskDetail'
+      required:
+      - created
+      - task
+    TaskCounts:
+      type: object
+      properties:
+        students:
+          type: integer
+        submitted:
+          type: integer
+        awaiting:
+          type: integer
+        graded:
+          type: integer
+        returned:
+          type: integer
+        late:
+          type: integer
+      required:
+      - awaiting
+      - graded
+      - late
+      - returned
+      - students
+      - submitted
+    TaskCountsRequest:
+      type: object
+      properties:
+        students:
+          type: integer
+        submitted:
+          type: integer
+        awaiting:
+          type: integer
+        graded:
+          type: integer
+        returned:
+          type: integer
+        late:
+          type: integer
+      required:
+      - awaiting
+      - graded
+      - late
+      - returned
+      - students
+      - submitted
     TrackerOverview:
       type: object
       properties:
@@ -4724,6 +7187,45 @@ components:
         * `auto` - auto
         * `relay` - relay
         * `unknown` - unknown
+    UploadRequestRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+      required:
+      - file
+    Version:
+      type: object
+      properties:
+        id:
+          type: integer
+        number:
+          type: integer
+        note:
+          type: string
+        submitted_at:
+          type: string
+          format: date-time
+        is_late:
+          type: boolean
+        minutes_late:
+          type: integer
+        is_revision:
+          type: boolean
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoredFile'
+      required:
+      - files
+      - id
+      - is_late
+      - is_revision
+      - minutes_late
+      - note
+      - number
+      - submitted_at
   securitySchemes:
     bearerJWT:
       type: http

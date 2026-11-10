@@ -101,3 +101,8 @@ def ffmpeg_binary():
 
 def ffprobe_binary():
     return str(getattr(settings, "FFPROBE_BINARY", "ffprobe") or "ffprobe")
+
+
+def hls_filter_enabled():
+    """Capture through the local playlist filter (hls_proxy.py). Default on."""
+    return bool(getattr(settings, "STREAM_RECORDER_HLS_FILTER", True))

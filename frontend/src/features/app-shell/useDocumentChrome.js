@@ -14,8 +14,8 @@ function setMetaContent(name, content) {
 
 /**
  * While the app shell is mounted: match the browser/OS chrome colour to the
- * black User's Corner, let the layout extend under notches (safe-area
- * insets) and name the tab "<page> · User's Corner". All are restored when
+ * black Console, let the layout extend under notches (safe-area
+ * insets) and name the tab "<page> · Console". All are restored when
  * the user leaves the shell, so public pages keep the exact values from
  * index.html / main.jsx.
  */

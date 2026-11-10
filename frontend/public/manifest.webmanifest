@@ -1,9 +1,9 @@
 {
-  "name": "Al syed Initiative · User's Corner",
+  "name": "Al syed Initiative · Console",
   "short_name": "Al syed",
   "description": "Courses, live classes and learning tools.",
   "id": "/my-courses",
-  "start_url": "/users-corner",
+  "start_url": "/console",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",

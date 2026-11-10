@@ -83,6 +83,32 @@ if _PROMETHEUS_AVAILABLE:
         "Asynchronous background job executions.",
         labelnames=("job", "result"),
     )
+    UPSTREAM_REQUEST_TOTAL = Counter(
+        "streamx_upstream_requests_total",
+        "Outbound HTTP calls made through apps.core.http by upstream/outcome.",
+        labelnames=("upstream", "method", "outcome"),
+    )
+    UPSTREAM_REQUEST_LATENCY_SECONDS = Histogram(
+        "streamx_upstream_request_latency_seconds",
+        "Outbound HTTP attempt latency in seconds.",
+        labelnames=("upstream",),
+        buckets=(0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0),
+    )
+    CIRCUIT_BREAKER_TRANSITION_TOTAL = Counter(
+        "streamx_circuit_breaker_transitions_total",
+        "Circuit breaker state transitions per upstream.",
+        labelnames=("upstream", "from_state", "to_state"),
+    )
+    OUTBOX_EVENT_TOTAL = Counter(
+        "streamx_outbox_events_total",
+        "Transactional outbox deliveries by event type and result.",
+        labelnames=("event", "result"),
+    )
+    IDEMPOTENCY_TOTAL = Counter(
+        "streamx_idempotency_requests_total",
+        "Idempotency-Key handling outcomes per scope.",
+        labelnames=("scope", "outcome"),
+    )
 else:
     HTTP_REQUEST_TOTAL = None
     HTTP_REQUEST_LATENCY_SECONDS = None
@@ -90,6 +116,11 @@ else:
     REALTIME_CONNECTION_EVENT_TOTAL = None
     REALTIME_RECORDING_OP_TOTAL = None
     ASYNC_JOB_TOTAL = None
+    UPSTREAM_REQUEST_TOTAL = None
+    UPSTREAM_REQUEST_LATENCY_SECONDS = None
+    CIRCUIT_BREAKER_TRANSITION_TOTAL = None
+    OUTBOX_EVENT_TOTAL = None
+    IDEMPOTENCY_TOTAL = None
 
 
 def observe_http_request(request, *, status_code, elapsed_ms):
@@ -142,6 +173,47 @@ def record_async_job_execution(*, job, result):
     ASYNC_JOB_TOTAL.labels(
         job=_sanitize_label(job, fallback="unknown"),
         result=_sanitize_label(result, fallback="unknown"),
+    ).inc()
+
+
+def record_upstream_request(*, upstream, method, outcome, elapsed_seconds=None):
+    if not _metrics_enabled():
+        return
+    upstream_label = _sanitize_label(upstream, fallback="unknown")
+    UPSTREAM_REQUEST_TOTAL.labels(
+        upstream=upstream_label,
+        method=_sanitize_label(method, fallback="get"),
+        outcome=_sanitize_label(outcome, fallback="unknown"),
+    ).inc()
+    if elapsed_seconds is not None:
+        UPSTREAM_REQUEST_LATENCY_SECONDS.labels(upstream=upstream_label).observe(max(0.0, float(elapsed_seconds)))
+
+
+def record_circuit_breaker_transition(*, upstream, from_state, to_state):
+    if not _metrics_enabled():
+        return
+    CIRCUIT_BREAKER_TRANSITION_TOTAL.labels(
+        upstream=_sanitize_label(upstream, fallback="unknown"),
+        from_state=_sanitize_label(from_state, fallback="unknown"),
+        to_state=_sanitize_label(to_state, fallback="unknown"),
+    ).inc()
+
+
+def record_outbox_event(*, event, result):
+    if not _metrics_enabled():
+        return
+    OUTBOX_EVENT_TOTAL.labels(
+        event=_sanitize_label(event, fallback="unknown"),
+        result=_sanitize_label(result, fallback="unknown"),
+    ).inc()
+
+
+def record_idempotency_outcome(*, scope, outcome):
+    if not _metrics_enabled():
+        return
+    IDEMPOTENCY_TOTAL.labels(
+        scope=_sanitize_label(scope, fallback="unknown"),
+        outcome=_sanitize_label(outcome, fallback="unknown"),
     ).inc()
 
 

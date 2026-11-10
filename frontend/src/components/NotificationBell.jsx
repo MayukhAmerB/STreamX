@@ -42,7 +42,10 @@ function formatNotificationTime(value) {
   }
 }
 
-export default function NotificationBell() {
+const DEFAULT_BUTTON_CLASS =
+  "relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/25 bg-white/10 text-white transition hover:bg-white/15";
+
+export default function NotificationBell({ buttonClassName = DEFAULT_BUTTON_CLASS }) {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -144,14 +147,14 @@ export default function NotificationBell() {
     <div className="relative" ref={rootRef}>
       <button
         type="button"
-        className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/25 bg-white/10 text-white transition hover:bg-white/15"
+        className={buttonClassName}
         onClick={() => {
           setOpen((previous) => !previous);
           if (!open) {
             loadNotifications();
           }
         }}
-        aria-label="Open notifications"
+        aria-label={unreadCount > 0 ? `Open notifications, ${unreadCount} unread` : "Open notifications"}
         aria-expanded={open}
       >
         <BellIcon className="h-5 w-5" />

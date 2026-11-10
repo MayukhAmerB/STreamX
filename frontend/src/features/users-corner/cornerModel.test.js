@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   CORNER_COURSE_PREVIEW_LIMIT,
+  formatCountdown,
+  formatHubDate,
+  getAverageProgress,
+  getCountdown,
+  getCountdownSegments,
   getCornerGreeting,
   getCoursePreview,
   getFirstName,
@@ -27,7 +32,7 @@ const halfway = course(2, { started_lecture_count: 5, completed_lecture_count: 5
 const justStarted = course(3, { started_lecture_count: 1, completed_lecture_count: 1, progress_percent: 10 });
 const done = course(4, { started_lecture_count: 10, completed_lecture_count: 10, progress_percent: 100 });
 
-describe("User's Corner greeting", () => {
+describe("Console greeting", () => {
   it("greets by first name, falling back to the e-mail name", () => {
     expect(getFirstName({ full_name: "  Asha   Rao " })).toBe("Asha");
     expect(getFirstName({ full_name: "", email: "imran.syed@example.com" })).toBe("Imran");
@@ -99,5 +104,51 @@ describe("live card", () => {
     expect(getLiveJoinPath({ id: 12 })).toBe("/join-live?session=12");
     expect(getLiveJoinPath({ id: "x" })).toBe("/join-live");
     expect(getLiveJoinPath(null)).toBe("/join-live");
+  });
+});
+
+describe("Console greeting band", () => {
+  const now = new Date("2026-11-10T09:15:00Z");
+
+  it("formats today's date for the eyebrow", () => {
+    expect(formatHubDate(now, { timeZone: "Asia/Kolkata" })).toBe("Tuesday 10 November");
+    expect(formatHubDate("not a date")).toBe("");
+  });
+
+  it("counts down to the next class, rounding up to the minute", () => {
+    const in2d4h = new Date(now.getTime() + (2 * 24 + 4) * 3600_000);
+    const countdown = getCountdown(in2d4h, now);
+    expect(countdown).toMatchObject({ days: 2, hours: 4, minutes: 0, soon: false });
+    expect(formatCountdown(countdown)).toBe("Starts in 2 days, 4 hours");
+    expect(getCountdownSegments(countdown)).toEqual([{ value: 2, unit: "d" }, { value: 4, unit: "h" }]);
+
+    const in3h20 = getCountdown(new Date(now.getTime() + 3 * 3600_000 + 20 * 60_000), now);
+    expect(formatCountdown(in3h20)).toBe("Starts in 3 hours, 20 minutes");
+    expect(getCountdownSegments(in3h20)).toEqual([{ value: 3, unit: "h" }, { value: 20, unit: "m" }]);
+
+    const in1day = getCountdown(new Date(now.getTime() + 24 * 3600_000), now);
+    expect(formatCountdown(in1day)).toBe("Starts in 1 day");
+
+    const in30s = getCountdown(new Date(now.getTime() + 30_000), now);
+    expect(in30s).toMatchObject({ minutes: 1, soon: true });
+    expect(formatCountdown(in30s)).toBe("Starting now");
+    expect(getCountdownSegments(in30s)).toEqual([]);
+
+    const in5m = getCountdown(new Date(now.getTime() + 4 * 60_000 + 1), now);
+    expect(formatCountdown(in5m)).toBe("Starts in 5 minutes");
+    expect(getCountdownSegments(in5m)).toEqual([{ value: 5, unit: "m" }]);
+  });
+
+  it("treats a started or missing class safely", () => {
+    expect(getCountdown(new Date(now.getTime() - 1000), now)).toMatchObject({ soon: true, totalMs: 0 });
+    expect(getCountdown(null, now)).toBeNull();
+    expect(getCountdown("garbage", now)).toBeNull();
+    expect(formatCountdown(null)).toBe("");
+  });
+
+  it("averages course progress", () => {
+    expect(getAverageProgress([notStarted, halfway, done])).toBe(50);
+    expect(getAverageProgress([])).toBe(0);
+    expect(getAverageProgress(null)).toBe(0);
   });
 });

@@ -9,6 +9,7 @@ import uuid
 from django.conf import settings
 from django.db import connections
 
+from apps.core.concurrency import request_scope
 from config.metrics import observe_http_request
 
 
@@ -196,7 +197,9 @@ class RequestContextMiddleware:
         request.request_id = request_id
 
         try:
-            response = self.get_response(request)
+            # Per-request memo scope for apps.core.concurrency.per_request_memo.
+            with request_scope():
+                response = self.get_response(request)
         finally:
             _request_start_ns_ctx.reset(token_start)
             _request_id_ctx.reset(token_id)

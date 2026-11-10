@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { siteBrand } from "../../config/siteBrand";
 import NavActionList from "./NavActionList";
-import { USERS_CORNER_PATH, USERS_CORNER_TITLE } from "./navConfig";
+import { CONSOLE_PATH, CONSOLE_TITLE } from "./navConfig";
 import ShellBrand from "./ShellBrand";
 import SignOutButton from "./SignOutButton";
 import UserAvatar from "./UserAvatar";
@@ -20,8 +20,8 @@ import { useDismiss } from "./useDismiss";
 const ACCOUNT_PANEL_ID = "cds-app-account-panel";
 
 /**
- * Carbon UI Shell header for User's Corner: the website's brand block (links
- * to the User's Corner home), the section title, "Back to website", and an
+ * Carbon UI Shell header for the Console: the website's brand block (links
+ * to the Console home), the section title, "Back to website", and an
  * avatar button that opens the account panel (profile links, sign out).
  */
 export default function ShellHeader({ user, accountItems, onSignOut }) {
@@ -41,18 +41,18 @@ export default function ShellHeader({ user, accountItems, onSignOut }) {
   const displayName = user?.full_name || "Your account";
 
   return (
-    <Header aria-label={`${siteBrand.name} ${USERS_CORNER_TITLE}`}>
+    <Header aria-label={`${siteBrand.name} ${CONSOLE_TITLE}`}>
       <SkipToContent href="#main-content">Skip to main content</SkipToContent>
       <HeaderName
         as={Link}
-        to={USERS_CORNER_PATH}
+        to={CONSOLE_PATH}
         prefix=""
         className="uc-header__brand"
-        aria-label={`${siteBrand.name}, ${USERS_CORNER_TITLE} home`}
+        aria-label={`${siteBrand.name}, ${CONSOLE_TITLE} home`}
       >
         <ShellBrand />
       </HeaderName>
-      <span className="uc-header__section">{USERS_CORNER_TITLE}</span>
+      <span className="uc-header__section">{CONSOLE_TITLE}</span>
       <HeaderGlobalBar>
         <Link to="/" className="uc-header__back">
           <ArrowLeft size={20} aria-hidden="true" />

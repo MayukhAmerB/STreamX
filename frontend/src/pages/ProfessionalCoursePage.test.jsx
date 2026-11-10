@@ -14,6 +14,18 @@ describe("getCourseDetailPriceLabel", () => {
     expect(getCourseDetailPriceLabel({ price: 3500 })).toContain("3,500");
   });
 
+  it("prefers the admin's highlighted plan card when the backend sends payment_plans", () => {
+    expect(getCourseDetailPriceLabel({
+      price: 9999,
+      payment_plans: [
+        { plan: "monthly", amount: "1500.00", price_label: "₹1,500 / month", available: true },
+        { plan: "batch_pass", amount: "4500.00", price_label: "₹4,500", highlighted: true, available: true },
+      ],
+    })).toBe("₹4,500");
+    // Nothing purchasable in the cards: fall back to the legacy fee.
+    expect(getCourseDetailPriceLabel({ price: 3500, payment_plans: [] })).toContain("3,500");
+  });
+
   it("does not present a zero price as purchasable", () => {
     expect(getCourseDetailPriceLabel({ price: 0 })).toBe("To be announced");
   });

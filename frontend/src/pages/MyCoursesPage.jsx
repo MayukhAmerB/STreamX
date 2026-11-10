@@ -1,12 +1,13 @@
 import "./MyCoursesPage.scss";
 
 import { Catalog, Education, ToolKit } from "@carbon/icons-react";
-import { Button, Search, Tile } from "@carbon/react";
+import { Button, Search } from "@carbon/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getMyCourses } from "../api/courses";
 import CourseProgressTile from "../features/my-courses/CourseProgressTile";
-import { EmptyState, PageHeader, PageNotification, PageSkeleton } from "../features/app-shell/ui";
+import { EmptyState, PageHeader, PageNotification, PageSkeleton, StatChips } from "../features/app-shell/ui";
+import { getAverageProgress } from "../features/users-corner/cornerModel";
 import { apiData, apiMessage } from "../utils/api";
 import { isOsintCourse } from "../utils/courseAccess";
 
@@ -42,6 +43,7 @@ const BrowseButton = ({ kind = "primary" }) => (
 export function MyCoursesView({ courses = [], loading = false, error = "", onRetry }) {
   const [query, setQuery] = useState("");
   const stats = useMemo(() => getStudentLibraryStats(courses), [courses]);
+  const averageProgress = useMemo(() => getAverageProgress(courses), [courses]);
   const hasOsintAccess = useMemo(() => courses.some(isOsintCourse), [courses]);
   const visibleCourses = useMemo(() => filterCourses(courses, query), [courses, query]);
 
@@ -75,29 +77,28 @@ export function MyCoursesView({ courses = [], loading = false, error = "", onRet
 
       {!loading && !error && courses.length > 0 ? (
         <>
-          <dl className="cds-library-stats" aria-label="Your progress">
-            <Tile className="cds-library-stats__item">
-              <dt>Courses</dt>
-              <dd>{stats.total}</dd>
-            </Tile>
-            <Tile className="cds-library-stats__item">
-              <dt>In progress</dt>
-              <dd>{stats.inProgress}</dd>
-            </Tile>
-            <Tile className="cds-library-stats__item">
-              <dt>Completed</dt>
-              <dd>{stats.completed}</dd>
-            </Tile>
-          </dl>
+          <StatChips
+            className="cds-library-stats"
+            items={[
+              { id: "courses", label: stats.total === 1 ? "Course" : "Courses", value: stats.total },
+              { id: "progress", label: "In progress", value: stats.inProgress },
+              { id: "completed", label: "Completed", value: stats.completed },
+              { id: "average", label: "Avg. progress", value: averageProgress, suffix: "%", accent: true },
+            ]}
+          />
 
           {hasOsintAccess ? (
-            <Tile className="cds-library-callout">
-              <ToolKit size={32} aria-hidden="true" />
-              <p className="cds-library-callout__text">Your OSINT tools library is included.</p>
+            <div className="cds-library-callout">
+              <span className="cds-library-callout__icon" aria-hidden="true">
+                <ToolKit size={20} />
+              </span>
+              <p className="cds-library-callout__text">
+                <strong>OSINT tools included.</strong> Your investigation toolkit comes with your OSINT course.
+              </p>
               <Button as={Link} to="/osint-tools" kind="tertiary" size="md" renderIcon={ToolKit}>
                 Open tools
               </Button>
-            </Tile>
+            </div>
           ) : null}
 
           {courses.length >= SEARCH_THRESHOLD ? (

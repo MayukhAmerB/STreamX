@@ -288,6 +288,8 @@ $stage-text-secondary: var(--uc-text-2);
 
 .cds-app .cp-lesson-header__title {
   @include type-style('heading-03');
+  // Console heading language (hub, My courses, Live classes): Inter 800, tight.
+  @include corner-heading(-0.03em);
 
   color: $text-primary;
   overflow-wrap: anywhere;
@@ -298,6 +300,7 @@ $stage-text-secondary: var(--uc-text-2);
 
   @include breakpoint(lg) {
     @include type-style('heading-04');
+    @include corner-heading(-0.035em);
   }
 }
 

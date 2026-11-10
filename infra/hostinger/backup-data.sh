@@ -104,6 +104,8 @@ compose exec -T postgres sh -lc 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -
 
 log "Archiving persistent volumes."
 backup_volume "streamx_backend_media" "backend_media.tar.gz"
+# Weekly report submissions (private; never served by nginx).
+backup_volume "streamx_backend_private_media" "backend_private_media.tar.gz"
 backup_volume "streamx_recordings_data" "recordings_data.tar.gz"
 backup_volume "streamx_owncast_data" "owncast_data.tar.gz"
 if [ "$INCLUDE_REDIS_BACKUP" = "1" ]; then
@@ -113,6 +115,7 @@ fi
 log "Verifying backup archives."
 verify_gzip_archive "${BACKUP_DIR}/postgres.sql.gz"
 verify_gzip_archive "${BACKUP_DIR}/backend_media.tar.gz"
+verify_gzip_archive "${BACKUP_DIR}/backend_private_media.tar.gz"
 verify_gzip_archive "${BACKUP_DIR}/recordings_data.tar.gz"
 verify_gzip_archive "${BACKUP_DIR}/owncast_data.tar.gz"
 if [ "$INCLUDE_REDIS_BACKUP" = "1" ] && [ -f "${BACKUP_DIR}/redis_data.tar.gz" ]; then
@@ -131,6 +134,7 @@ compose_file=${COMPOSE_FILE}
 env_file=${ENV_FILE}
 database_backup=postgres.sql.gz
 media_backup=backend_media.tar.gz
+private_media_backup=backend_private_media.tar.gz
 recordings_backup=recordings_data.tar.gz
 owncast_backup=owncast_data.tar.gz
 redis_backup=$( [ "$INCLUDE_REDIS_BACKUP" = "1" ] && echo "redis_data.tar.gz" || echo "disabled" )

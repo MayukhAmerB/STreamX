@@ -243,6 +243,16 @@ class Course(models.Model):
         default=Decimal("0.00"),
         help_text="One payment: lifetime access to this course and every course included in the pass.",
     )
+    payment_cards = models.JSONField(
+        blank=True,
+        default=dict,
+        help_text=(
+            "Payment card wording per plan: {plan: {title, subtitle, features, badge, "
+            "highlighted, order, cta_label}}. Only settings that differ from the automatic "
+            "defaults are stored; prices and switches stay in their own fields. "
+            "Edited from the Course admin's Payment cards section."
+        ),
+    )
     included_in_batch_pass = models.BooleanField(
         default=False,
         help_text=(
@@ -355,6 +365,7 @@ class Course(models.Model):
             )
         ):
             raise ValidationError("Installment counts and access days must be greater than zero.")
+        self._clean_payment_cards()
 
         self.what_you_will_learn = _sanitize_string_list(self.what_you_will_learn)
         self.expected_outcomes = _sanitize_string_list(self.expected_outcomes)
@@ -367,6 +378,17 @@ class Course(models.Model):
 
         validate_safe_public_url(self.thumbnail, "thumbnail")
         validate_profile_image_upload(self.thumbnail_file, "thumbnail_file")
+
+    def _clean_payment_cards(self):
+        # Imported lazily: apps.payments imports this module.
+        from apps.payments.plans import payment_card_errors, sanitize_payment_cards
+
+        errors = payment_card_errors(self)
+        if errors:
+            # Non-field errors: every form that saves a course (admin change
+            # form, changelist list_editable) can display them.
+            raise ValidationError(errors)
+        self.payment_cards = sanitize_payment_cards(self.payment_cards)
 
     def get_thumbnail_url(self, request=None):
         if self._has_accessible_thumbnail_file():

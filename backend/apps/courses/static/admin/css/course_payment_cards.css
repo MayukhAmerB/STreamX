@@ -1,0 +1,74 @@
+/* Course admin, Payment cards: live count and saved-card preview. */
+
+.payment-cards-live {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--as-accent-line, rgba(243, 226, 179, 0.45));
+  border-radius: 12px;
+  background: var(--as-accent-wash, rgba(243, 226, 179, 0.08));
+  color: var(--as-text-primary, #f6f1e7);
+}
+
+.payment-cards-live [data-role="count"] {
+  color: var(--as-accent, #f3e2b3);
+  font-size: 1.05em;
+}
+
+.payment-cards-live [data-role="detail"] {
+  color: var(--as-text-secondary, #b8b3a8);
+}
+
+/* Invalid: the detail text says why; the rule carries the colour. */
+.payment-cards-live.is-invalid {
+  border-color: rgba(250, 77, 86, 0.5);
+  border-left: 3px solid var(--as-error, #fa4d56);
+  background: var(--as-surface-2, #111111);
+}
+
+.payment-cards-live.is-invalid [data-role="detail"] {
+  color: var(--as-text-primary, #f6f1e7);
+}
+
+.payment-cards-preview__note {
+  margin: 0 0 8px;
+  color: var(--as-text-secondary, #b8b3a8);
+}
+
+.payment-cards-preview {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.payment-cards-preview table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.payment-cards-preview th,
+.payment-cards-preview td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--as-border, rgba(255, 255, 255, 0.12));
+  text-align: left;
+  vertical-align: top;
+}
+
+.payment-cards-preview td span {
+  color: var(--as-text-secondary, #b8b3a8);
+}
+
+.payment-cards-preview tr.is-highlighted td {
+  background: var(--as-accent-wash, rgba(243, 226, 179, 0.08));
+}
+
+.payment-cards-preview tr.is-highlighted td:first-child {
+  box-shadow: inset 3px 0 0 var(--as-accent, #f3e2b3);
+}
+
+.payment-cards-preview tr.is-highlighted td:first-child::after {
+  content: " \2605";
+  color: var(--as-accent, #f3e2b3);
+}

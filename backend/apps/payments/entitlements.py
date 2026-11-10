@@ -27,10 +27,7 @@ from apps.courses.models import Enrollment
 from apps.realtime.domain import invalidate_course_join_access_cache
 
 from .models import BatchPass, Payment
-from .pricing import get_plan_terms
-
-PERMANENT_PLANS = (Payment.PLAN_FULL, Payment.PLAN_BATCH_PASS)
-INSTALLMENT_PLANS = (Payment.PLAN_MONTHLY, Payment.PLAN_BUNDLE)
+from .plans import INSTALLMENT_PLANS, PERMANENT_PLANS, get_plan_terms
 
 RESULT_UNCHANGED = "unchanged"
 RESULT_REVOKED = "revoked"

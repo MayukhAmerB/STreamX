@@ -18,9 +18,8 @@ from rest_framework import permissions, status
 from rest_framework.parsers import JSONParser
 from rest_framework.views import APIView
 
-from apps.courses.models import Course, Enrollment
+from apps.courses.models import Course
 
-from .batch_pass import user_has_active_batch_pass
 from .gateway_audit import safe_gateway_entity
 from .gateway_audit import set_gateway_audit as _set_gateway_audit
 from .idempotency import (
@@ -32,7 +31,18 @@ from .idempotency import (
 )
 from .models import Payment, PaymentWebhookEvent
 from .order_service import create_payment_order
-from .pricing import get_plan_amount, get_plan_amount_paise
+from .plans import (
+    BATCH_PASS_PLAN,
+    BUNDLE_PLAN,
+    MONTHLY_PLAN,
+    card_config,
+    course_open_for_enrollment,
+    get_plan_amount,
+    get_plan_amount_paise,
+    get_plan_spec,
+    is_plan_enabled,
+    user_owned_plan_message,
+)
 from .provisioning import provision_paid_payment
 from .refunds import record_pending_refund, record_refund
 from .serializers import CreateOrderSerializer, VerifyPaymentSerializer
@@ -81,22 +91,28 @@ def _verified_message(payment, default):
     return default
 
 
+def _snapshot_access_days(payment, course, field, fallback):
+    """Access days the buyer bought: the order's snapshot, else today's catalog."""
+    snapshot = payment.terms_snapshot or {}
+    try:
+        days = int(snapshot.get("access_days") or getattr(course, field, fallback) or fallback)
+    except (TypeError, ValueError):
+        days = fallback
+    return max(days, 1)
+
+
 def _payment_success_data(payment):
     course = payment.course
     duplicate_purchase = payment.provisioning_status == Payment.PROVISION_DUPLICATE
-    if payment.plan == Payment.PLAN_BATCH_PASS:
+    plan_label = get_plan_spec(payment.plan).receipt_label
+    if payment.plan == BATCH_PASS_PLAN:
         access_duration = "Lifetime access, including every future batch"
-        plan_label = "Plan 3 - All Future Batches Pass"
-    elif payment.plan == Payment.PLAN_BUNDLE:
-        access_duration = f"{(payment.terms_snapshot or {}).get('access_days', getattr(course, 'bundle_access_days', 90))} days"
-        plan_label = "3-Month Bundle"
-    elif payment.plan == Payment.PLAN_MONTHLY:
-        access_days = max(int(getattr(course, "installment_access_days", 30) or 30), 1)
-        access_duration = f"{access_days} days"
-        plan_label = "Plan 1 - Monthly Payment"
+    elif payment.plan == BUNDLE_PLAN:
+        access_duration = f"{_snapshot_access_days(payment, course, 'bundle_access_days', 90)} days"
+    elif payment.plan == MONTHLY_PLAN:
+        access_duration = f"{_snapshot_access_days(payment, course, 'installment_access_days', 30)} days"
     else:
         access_duration = "Lifetime course access"
-        plan_label = "Plan 2 - One-Time Payment"
     return {
         "course_id": payment.course_id or payment.course_id_snapshot,
         "course_title": payment.course_title_snapshot
@@ -940,46 +956,16 @@ class CreateOrderView(APIView):
                 )
             )
 
-        course_available = bool(
-            course.is_published
-            and course.launch_status == Course.STATUS_LIVE
-            and not course.registration_closed
-        )
+        course_available = course_open_for_enrollment(course)
         instructor_self_purchase = bool(
             request.user.is_authenticated and request.user.id == course.instructor_id
         )
-        plan_enabled = {
-            Payment.PLAN_FULL: course.full_payment_enabled,
-            Payment.PLAN_MONTHLY: course.installment_payment_enabled,
-            Payment.PLAN_BUNDLE: course.bundle_payment_enabled,
-            Payment.PLAN_BATCH_PASS: course.batch_pass_payment_enabled,
-        }[plan]
-        existing_enrollment = (
-            Enrollment.objects.filter(user=request.user, course=course).first()
-            if request.user.is_authenticated
-            else None
-        )
-        if not request.user.is_authenticated:
-            # Guests are identified only by a typed email, so answering
-            # "already enrolled" here would tell anyone what any email has
-            # bought. The duplicate check runs after capture instead
-            # (provisioning.py): a guest one-time purchase the email already
-            # owns grants nothing and is flagged for an admin refund.
-            already_enrolled = False
-        elif plan == Payment.PLAN_BATCH_PASS:
-            # Lifetime course access alone does not include future batches, so
-            # those students may still upgrade; only an existing pass blocks.
-            already_enrolled = user_has_active_batch_pass(request.user)
-        else:
-            already_enrolled = bool(
-                existing_enrollment
-                and existing_enrollment.has_active_access()
-                and (
-                    plan == Payment.PLAN_FULL
-                    or existing_enrollment.access_type
-                    in (Enrollment.ACCESS_LEGACY, Enrollment.ACCESS_LIFETIME)
-                )
-            )
+        # Switched on with a positive price: the same rule that decides which
+        # payment cards the course page shows (apps.payments.plans).
+        plan_enabled = is_plan_enabled(course, plan)
+        # Guests never get an answer (it would disclose what any email has
+        # bought); their duplicates are caught after capture in provisioning.
+        already_enrolled = user_owned_plan_message(course, plan, request.user) is not None
         amount = get_plan_amount(course, plan)
         checkout_currently_allowed = bool(
             course_available
@@ -1053,27 +1039,20 @@ class CreateOrderView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        if plan == Payment.PLAN_FULL and not plan_enabled:
-            return api_response(
-                success=False,
-                message="Payment plan unavailable.",
-                errors={"detail": "Full payment is not enabled for this course."},
-                status_code=status.HTTP_400_BAD_REQUEST,
+        if not plan_enabled:
+            log_security_event(
+                "payment.create_order_plan_disabled",
+                request=request,
+                course_id=course.id,
+                plan=plan,
             )
-        if plan == Payment.PLAN_MONTHLY and not plan_enabled:
             return api_response(
                 success=False,
                 message="Payment plan unavailable.",
-                errors={"detail": "Monthly payment is not enabled for this course."},
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-        if plan == Payment.PLAN_BUNDLE and not plan_enabled:
-            return api_response(success=False, message="Bundle payment is not enabled for this course.", status_code=400)
-        if plan == Payment.PLAN_BATCH_PASS and not plan_enabled:
-            return api_response(
-                success=False,
-                message="Payment plan unavailable.",
-                errors={"detail": "The all future batches pass is not offered for this course."},
+                errors={
+                    "plan": [f"The '{card_config(course, plan)['title']}' plan ({plan}) is not offered for this course."],
+                    "detail": "This payment plan is not offered for this course. Choose one of the plans shown on the course page.",
+                },
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
         if already_enrolled:

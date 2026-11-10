@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import apiClient from "../api/client";
-import PaymentPlanPicker, { availablePaymentPlans } from "../components/PaymentPlanPicker";
+import PaymentPlanPicker, {
+  availablePaymentPlans,
+  configuredPlanSummary,
+  defaultPaymentPlanId,
+} from "../components/PaymentPlanPicker";
 import "../components/PaymentPlanPicker.css";
+import {
+  configuredPaymentPlanCards,
+  hasConfiguredPaymentPlans,
+  paymentCardColumns,
+} from "../components/payments/paymentPlans";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 import { getCourse } from "../api/courses";
@@ -220,6 +229,8 @@ function phoneDigits(value) {
 
 function stepSummary(step, profile, plan, course) {
   if (step.id === "plan") {
+    const configured = configuredPlanSummary(course, plan);
+    if (configured) return `${configured.title} - ${configured.priceLabel}`;
     if (plan === "batch_pass") return `All future batches - ${formatINR(course?.batch_pass_price)}`;
     return plan === "bundle" ? `Bundle - ${formatINR(course?.bundle_price)}` : plan === "monthly"
       ? `Monthly - ${formatINR(course?.monthly_price)}`
@@ -318,9 +329,8 @@ export default function CoursePaymentPage() {
           if (!active) return;
         }
         setApplicationReady(true);
-        const available = availablePaymentPlans(loadedCourse);
         if (!initialCheckoutRecovery?.plan) {
-          setPlan(available.find((item) => item.id === "full")?.id || available[0]?.id || "full");
+          setPlan(defaultPaymentPlanId(loadedCourse));
         }
       } catch (err) {
         if (active) setError(apiMessage(err, "Failed to load payment details."));
@@ -595,8 +605,10 @@ export default function CoursePaymentPage() {
     const isDuplicatePurchase = Boolean(paymentResult.duplicate_purchase);
     const transactionId =
       paymentResult.transaction_id || paymentResult.invoice_number || "Recorded";
+    const configuredPlan = configuredPlanSummary(course, plan);
     const selectedPlan =
       paymentResult.plan_label ||
+      configuredPlan?.title ||
       (plan === "monthly"
         ? "Plan 1 - Monthly Payment"
         : plan === "batch_pass"
@@ -607,6 +619,7 @@ export default function CoursePaymentPage() {
     const accessDuration = isDuplicatePurchase
       ? "Already active - no change"
       : paymentResult.access_duration ||
+      configuredPlan?.accessLabel ||
       (plan === "monthly"
         ? `${course.installment_access_days || 30} days`
         : plan === "batch_pass"
@@ -741,12 +754,16 @@ export default function CoursePaymentPage() {
 
   const isFinalStep = currentStep === checkoutSteps.length - 1;
   const isPlanStep = activeStep.id === "plan";
+  // Four admin-configured cards per row need the full content width.
+  const widePlanGrid = isPlanStep
+    && hasConfiguredPaymentPlans(course)
+    && paymentCardColumns(course, configuredPaymentPlanCards(course).length) >= 4;
 
   return (
     <PageShell
       title={isPlanStep ? "" : "Course checkout"}
       subtitle={isPlanStep ? "" : "Confirm your details, then continue to the secure Razorpay checkout"}
-      containerClassName={isPlanStep ? "max-w-[1180px] py-4 sm:py-8" : ""}
+      containerClassName={isPlanStep ? `${widePlanGrid ? "max-w-[1400px]" : "max-w-[1180px]"} py-4 sm:py-8` : ""}
     >
       <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#080808] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">
@@ -828,7 +845,9 @@ export default function CoursePaymentPage() {
 
           <form
             className={`flex min-w-0 flex-col justify-between ${
-              isPlanStep ? "mx-auto w-full max-w-6xl p-3 sm:p-8 lg:px-14 lg:py-12" : "p-5 sm:p-8 lg:p-12"
+              isPlanStep
+                ? `mx-auto w-full p-3 sm:p-8 lg:py-12 ${widePlanGrid ? "max-w-none lg:px-10" : "max-w-6xl lg:px-14"}`
+                : "p-5 sm:p-8 lg:p-12"
             }`}
             onSubmit={isFinalStep ? handlePayNow : moveForward}
           >
@@ -928,7 +947,7 @@ export default function CoursePaymentPage() {
               ) : null}
 
               {activeStep.id === "plan" ? (
-                <div className="mx-auto w-full max-w-5xl">
+                <div className={`mx-auto w-full [--ppc-bleed:0.75rem] sm:[--ppc-bleed:2rem] ${widePlanGrid ? "max-w-none" : "max-w-5xl"}`}>
                   <header className="pt-3 text-center sm:pt-0">
                     <div className="mx-auto flex max-w-3xl items-center gap-4 sm:gap-7">
                       <span className="h-px flex-1 bg-[linear-gradient(90deg,transparent,rgba(147,166,194,0.45))]" aria-hidden="true" />

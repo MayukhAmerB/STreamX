@@ -1,4 +1,4 @@
-// User's Corner palette: black, white and grey with a "golden glowing white"
+// Console palette: black, white and grey with a "golden glowing white"
 // (champagne) accent, matching the public landing page.
 //
 // The palette is declared ONCE, as CSS custom properties on `.cds-app`
@@ -141,4 +141,12 @@ $corner-shadow: var(--uc-shadow);
 @mixin corner-focus-ring($offset: 2px) {
   outline: 2px solid var(--uc-accent);
   outline-offset: $offset;
+}
+
+/// Loading placeholder surface with a slow shimmer (keyframes are emitted
+/// once by _building-blocks.scss; reduced motion stops it in _shell.scss).
+@mixin corner-skeleton {
+  background: linear-gradient(90deg, var(--uc-surface-2) 0%, var(--uc-raised) 50%, var(--uc-surface-2) 100%);
+  background-size: 200% 100%;
+  animation: uc-skeleton-shimmer 1.6s ease-in-out infinite;
 }

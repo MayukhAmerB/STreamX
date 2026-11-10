@@ -4,6 +4,9 @@ One tick:
 1. capture  - keep one ffmpeg (stream copy) per RECORDING server recording
                while Owncast reports the feed online; every OBS (re)connect
                becomes a new MPEG-TS part. Disk/size/duration guards apply.
+               ffmpeg reads Owncast through the local playlist filter
+               (hls_proxy.py), which keeps Owncast's offline clip out of the
+               recording and lets a restarted part continue seamlessly.
 2. finalize - for FINALIZING rows: stop ffmpeg, concat parts (or take the
                LiveKit egress file, or remux a staged OBS MKV/FLV/TS upload)
                into a faststart MP4 inside the module's media folder, create or
@@ -21,6 +24,7 @@ ingest, so a crash here cannot interrupt the live class.
 """
 
 import logging
+import os
 import queue
 import re
 import shutil
@@ -39,9 +43,10 @@ from django.utils import timezone
 from apps.courses.models import Lecture
 
 from .. import services as realtime_services
-from . import config, ffmpeg, publisher, state
+from . import config, ffmpeg, hls_proxy, publisher, state
 from .models import ClassRecording
 from .publisher import free_disk_bytes  # noqa: F401 - re-exported for callers/tests
+from . import services as recording_services
 from .services import is_pending_obs_remux
 
 logger = logging.getLogger("ops.realtime")
@@ -60,6 +65,7 @@ class Capture:
     started_monotonic: float
     log_handle: object = field(default=None)
     connect_marker: str = ""
+    proxy_token: str = ""
 
 
 def list_parts(work_dir):
@@ -152,8 +158,15 @@ class StreamRecorder:
         owncast_status=None,
         background_finalize=False,
         should_finalize=None,
+        hls_filter=None,
+        recording_ids=None,
     ):
+        """``recording_ids`` limits every query of this recorder to those rows
+        (the ``verify_recording_pipeline`` check drives a recorder that must
+        never see, capture or finalize a real class)."""
         self._popen = popen
+        self.hls_filter = hls_filter
+        self._recording_ids = None if recording_ids is None else frozenset(recording_ids)
         self._monotonic = monotonic
         self._owncast_status = owncast_status or realtime_services.get_owncast_public_status
         self.captures = {}
@@ -176,8 +189,10 @@ class StreamRecorder:
         self.capture_active()
         self.finalize_pending()
         self.publish_processing()
+        self.process_file_deletions()
         self._stop_orphan_captures()
-        self.sweep_if_due()
+        if self._recording_ids is None:
+            self.sweep_if_due()
 
     def shutdown(self):
         for recording_id in list(self.captures):
@@ -186,6 +201,13 @@ class StreamRecorder:
             # A finalize cut short stays FINALIZING and is redone (idempotently)
             # by the next recorder.
             self.finalizer.stop(timeout=5.0)
+        if self.hls_filter is not None:
+            self.hls_filter.stop()
+
+    def _scoped(self, queryset):
+        if self._recording_ids is None:
+            return queryset
+        return queryset.filter(pk__in=self._recording_ids)
 
     # --------------------------------------------------------------- capture
     def capture_active(self):
@@ -196,7 +218,9 @@ class StreamRecorder:
                 status_cache["value"] = self._owncast_status(force_refresh=True) or {}
             return status_cache["value"]
 
-        recordings = R.objects.filter(source=R.SOURCE_SERVER, state=R.STATE_RECORDING).select_related("session")
+        recordings = self._scoped(
+            R.objects.filter(source=R.SOURCE_SERVER, state=R.STATE_RECORDING).select_related("session")
+        )
         for recording in recordings:
             capture = self.captures.get(recording.pk)
             if capture is not None and capture.process.poll() is not None:
@@ -211,6 +235,7 @@ class StreamRecorder:
             stop_reason = self._finalize_reason(recording)
             if stop_reason:
                 self._stop_capture(recording.pk, reason=stop_reason)
+                self._forget_filter_state(recording.pk)
                 state.transition(
                     recording, R.STATE_FINALIZING, reason=stop_reason, stop_requested_at=timezone.now()
                 )
@@ -254,31 +279,65 @@ class StreamRecorder:
             return "low_disk_space"
         return ""
 
+    def _capture_input(self, recording, connect_marker=""):
+        """(url, proxy token) for ffmpeg's ``-i``; a token means "via the filter".
+
+        Through the playlist filter when enabled (the default); straight from
+        Owncast if it is disabled or cannot start (logged; a recording with a
+        possible offline clip beats no recording).
+        """
+        source = config.source_url()
+        if not config.hls_filter_enabled():
+            return source, ""
+        try:
+            if self.hls_filter is None:
+                self.hls_filter = hls_proxy.HlsFilterProxy()
+            token, url = self.hls_filter.register(source, key=recording.pk, epoch=connect_marker)
+        except (OSError, ValueError) as exc:
+            logger.error(
+                "CLASS_RECORDING_HLS_FILTER_UNAVAILABLE recording_id=%s error=%s (capturing Owncast directly)",
+                recording.pk,
+                exc,
+            )
+            return source, ""
+        return url, token
+
+    def _forget_filter_state(self, recording_id):
+        if self.hls_filter is not None:
+            self.hls_filter.forget(recording_id)
+
     def _start_capture(self, recording, connect_marker=""):
         work_dir = Path(recording.work_dir or (config.work_root() / f"class-recording-{recording.pk}"))
         work_dir.mkdir(parents=True, exist_ok=True)
         part_number = len(list(work_dir.glob(PART_GLOB))) + 1
         part_path = work_dir / f"part-{part_number:04d}.ts"
+        source, token = self._capture_input(recording, connect_marker)
         log_handle = open(work_dir / f"part-{part_number:04d}.log", "ab")  # noqa: SIM115 - closed in _close_capture
         try:
             process = self._popen(
-                ffmpeg.build_capture_command(config.source_url(), part_path),
+                ffmpeg.build_capture_command(source, part_path, via_filter=bool(token)),
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=log_handle,
             )
         except OSError as exc:
             log_handle.close()
+            if token and self.hls_filter is not None:
+                self.hls_filter.release(token)
             self._next_start[recording.pk] = self._monotonic() + config.restart_backoff_seconds()
             logger.error("CLASS_RECORDING_CAPTURE_START_FAILED recording_id=%s error=%s", recording.pk, exc)
             return None
-        self.captures[recording.pk] = Capture(process, part_path, self._monotonic(), log_handle, connect_marker)
+        self.captures[recording.pk] = Capture(
+            process, part_path, self._monotonic(), log_handle, connect_marker, proxy_token=token
+        )
         self._next_start[recording.pk] = self._monotonic() + config.restart_backoff_seconds()
         logger.info("CLASS_RECORDING_PART_STARTED recording_id=%s part=%s", recording.pk, part_path.name)
         return part_path
 
     def _close_capture(self, recording_id, capture, *, reason):
         self.captures.pop(recording_id, None)
+        if capture.proxy_token and self.hls_filter is not None:
+            self.hls_filter.release(capture.proxy_token)
         if capture.log_handle is not None:
             try:
                 capture.log_handle.close()
@@ -315,6 +374,7 @@ class StreamRecorder:
         for recording_id in list(self.captures):
             if recording_id not in still_recording:
                 self._stop_capture(recording_id, reason="no_longer_recording")
+                self._forget_filter_state(recording_id)
 
     def _heartbeat(self, recording, note=None):
         now = self._monotonic()
@@ -339,8 +399,9 @@ class StreamRecorder:
         Captures belong to this (main) thread, so they are stopped here before
         the finalize itself runs anywhere else.
         """
-        for recording_id in R.objects.filter(state=R.STATE_FINALIZING).values_list("pk", flat=True):
+        for recording_id in self._scoped(R.objects.filter(state=R.STATE_FINALIZING)).values_list("pk", flat=True):
             self._stop_capture(recording_id, reason="finalizing")
+            self._forget_filter_state(recording_id)
             if self.finalizer is None:
                 self.finalize_recording(recording_id)
             else:
@@ -359,6 +420,8 @@ class StreamRecorder:
                 self._finalize_server(recording)
             elif recording.source == R.SOURCE_LIVEKIT_EGRESS:
                 self._finalize_egress(recording)
+            elif recording.source == R.SOURCE_IMPORTED:
+                publisher.finalize_import(recording)
             elif is_pending_obs_remux(recording):
                 publisher.finalize_obs_upload(recording)
             else:
@@ -415,12 +478,12 @@ class StreamRecorder:
 
     # --------------------------------------------------------------- publish
     def publish_processing(self):
-        for recording in R.objects.filter(state=R.STATE_PROCESSING).exclude(lecture__isnull=True):
+        for recording in self._scoped(R.objects.filter(state=R.STATE_PROCESSING).exclude(lecture__isnull=True)):
             publisher.publish_if_ready(recording)
         # Self-heal: the transcoder retries failed lectures on its own. An OBS
         # upload still waiting for its remux points at the lecture it will
         # replace, whose *old* video may be ready: it is not healed.
-        healed = (
+        healed = self._scoped(
             R.objects.filter(
                 state=R.STATE_FAILED,
                 lecture__isnull=False,
@@ -431,6 +494,23 @@ class StreamRecorder:
         for recording in healed:
             if state.transition(recording, R.STATE_PROCESSING, reason="transcode_recovered"):
                 publisher.publish_if_ready(recording)
+
+    # ------------------------------------------------------- admin deletes
+    def process_file_deletions(self):
+        """Delete files an admin asked to delete that the web tier cannot write."""
+        pending = self._scoped(R.objects.filter(delete_requested_at__isnull=False)).select_related("lecture")
+        for recording in pending:
+            kinds = [kind for kind in recording.delete_requested_kinds.split(",") if kind]
+            try:
+                recording_services.delete_recording_files(
+                    recording, kinds=kinds, confirm_published=True, allow_defer=False
+                )
+            except Exception as exc:  # recorded in the log; the request is not retried forever
+                logger.error("CLASS_RECORDING_DELETE_FAILED recording_id=%s error=%s", recording.pk, exc)
+            # Only this request is cleared; one queued meanwhile is handled next tick.
+            R.objects.filter(pk=recording.pk, delete_requested_at=recording.delete_requested_at).update(
+                delete_requested_kinds="", delete_requested_at=None
+            )
 
     # ----------------------------------------------------------------- sweep
     def sweep_if_due(self):
@@ -496,7 +576,15 @@ class StreamRecorder:
                     candidates[int(match.group(1))] = child
             if candidates:
                 states = dict(R.objects.filter(pk__in=list(candidates)).values_list("pk", "state"))
+                imported_dirs = {
+                    _norm(path)
+                    for path in R.objects.filter(source=R.SOURCE_IMPORTED)
+                    .exclude(work_dir="")
+                    .values_list("work_dir", flat=True)
+                }
                 for recording_id, directory in candidates.items():
+                    if _norm(directory) in imported_dirs:
+                        continue  # an imported recording owns these parts now
                     owner_state = states.get(recording_id)
                     if owner_state is not None and owner_state not in (R.STATE_PROCESSING, R.STATE_PUBLISHED):
                         continue  # live, finalizing, or failed within retention
@@ -510,7 +598,7 @@ class StreamRecorder:
         if staging_root.is_dir():
             referenced = {
                 Path(name).name
-                for name in R.objects.filter(source=R.SOURCE_OBS_UPLOAD)
+                for name in R.objects.filter(source__in=(R.SOURCE_OBS_UPLOAD, R.SOURCE_IMPORTED))
                 .exclude(source_path="")
                 .values_list("source_path", flat=True)
             }
@@ -521,6 +609,10 @@ class StreamRecorder:
                 swept["orphan_uploads"] += 1
                 logger.info("CLASS_RECORDING_STAGED_UPLOAD_SWEPT file=%s", item.name)
         return swept
+
+
+def _norm(path):
+    return os.path.normcase(os.path.abspath(str(path)))
 
 
 def _mtime(path):

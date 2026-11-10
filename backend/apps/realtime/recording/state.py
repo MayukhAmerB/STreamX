@@ -18,6 +18,8 @@ logger = logging.getLogger("ops.realtime")
 
 R = ClassRecording
 TRANSITIONS = {
+    # Found on disk by the import scan; an admin picks the module to publish it.
+    R.STATE_IMPORTED: {R.STATE_FINALIZING},
     R.STATE_RECORDING: {R.STATE_FINALIZING, R.STATE_FAILED},
     R.STATE_FINALIZING: {R.STATE_PROCESSING, R.STATE_FAILED},
     R.STATE_PROCESSING: {R.STATE_PUBLISHED, R.STATE_FAILED},

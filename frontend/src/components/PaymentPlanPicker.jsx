@@ -1,4 +1,10 @@
 import { formatINR } from "../utils/currency";
+import PaymentPlanCards from "./payments/PaymentPlanCards";
+import {
+  configuredPaymentPlanCards,
+  hasConfiguredPaymentPlans,
+  paymentCardColumns,
+} from "./payments/paymentPlans";
 
 const FALLBACK_FEATURES = [
   "Complete configured course curriculum",
@@ -12,7 +18,47 @@ function positiveNumber(value, fallback = 0) {
   return Number.isFinite(number) && number > 0 ? number : fallback;
 }
 
+/**
+ * Plans the buyer can check out with, as { id, label, amount, ... }.
+ * With the admin-configured `payment_plans` (newer backend) these are the
+ * available cards; otherwise they are derived from the legacy price fields.
+ * `amount` is what one checkout charges (compared with the server order).
+ */
 export function availablePaymentPlans(course = {}) {
+  if (hasConfiguredPaymentPlans(course)) {
+    return configuredPaymentPlanCards(course)
+      .filter((plan) => plan.available)
+      .map((plan, index) => ({
+        ...plan,
+        number: index + 1,
+        label: plan.title,
+        enabled: true,
+      }));
+  }
+  return legacyPaymentPlans(course);
+}
+
+/** The plan preselected on load: highlighted, else one-time, else the first. */
+export function defaultPaymentPlanId(course = {}) {
+  const available = availablePaymentPlans(course);
+  if (hasConfiguredPaymentPlans(course)) {
+    return (
+      available.find((plan) => plan.highlighted)?.id
+      || available.find((plan) => plan.id === "full")?.id
+      || available[0]?.id
+      || "full"
+    );
+  }
+  return available.find((item) => item.id === "full")?.id || available[0]?.id || "full";
+}
+
+/** Display copy for a selected plan id from the admin cards, or null (legacy backend). */
+export function configuredPlanSummary(course, planId) {
+  if (!hasConfiguredPaymentPlans(course)) return null;
+  return configuredPaymentPlanCards(course).find((plan) => plan.id === planId) || null;
+}
+
+function legacyPaymentPlans(course = {}) {
   const monthlyCount = positiveNumber(course.installments_required, 1);
   const bundleCount = positiveNumber(course.bundle_installments, 1);
   const bundleAccessDays = positiveNumber(course.bundle_access_days);
@@ -113,7 +159,7 @@ function ArrowIcon() {
   );
 }
 
-function planFeatures(course) {
+function planFeatures(course, { includeFallback = true } = {}) {
   const configured = Array.isArray(course.course_card_features)
     ? course.course_card_features
         .filter((feature) => feature && String(feature.title || "").trim())
@@ -124,6 +170,7 @@ function planFeatures(course) {
         }))
     : [];
 
+  if (!includeFallback) return configured;
   return configured.length
     ? configured
     : FALLBACK_FEATURES.map((title, index) => ({
@@ -132,7 +179,28 @@ function planFeatures(course) {
       }));
 }
 
-export default function PaymentPlanPicker({
+export default function PaymentPlanPicker(props) {
+  const { course } = props;
+  if (hasConfiguredPaymentPlans(course)) {
+    const cards = configuredPaymentPlanCards(course);
+    return (
+      <PaymentPlanCards
+        plans={cards}
+        columns={paymentCardColumns(course, cards.length)}
+        courseFeatures={planFeatures(course, { includeFallback: false }).map((feature) => feature.title)}
+        value={props.value}
+        onChange={props.onChange}
+        onContinue={props.onContinue}
+        disabled={props.disabled}
+        busyPlan={props.busyPlan}
+      />
+    );
+  }
+  return <LegacyPaymentPlanPicker {...props} />;
+}
+
+/** Today's cards, unchanged: used while the backend does not send `payment_plans`. */
+function LegacyPaymentPlanPicker({
   course,
   value,
   onChange,
@@ -140,7 +208,7 @@ export default function PaymentPlanPicker({
   disabled = false,
   busyPlan = "",
 }) {
-  const plans = availablePaymentPlans(course);
+  const plans = legacyPaymentPlans(course);
   const features = planFeatures(course);
 
   const choosePlan = (planId) => {

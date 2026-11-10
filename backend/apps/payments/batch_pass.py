@@ -106,10 +106,3 @@ def deactivate_batch_pass(batch_pass):
         [resync_enrollment_access(batch_pass.user_id, course) for course in _pass_scoped_courses(batch_pass)]
     )
 
-
-def user_has_active_batch_pass(user):
-    return bool(
-        user
-        and getattr(user, "is_authenticated", False)
-        and BatchPass.objects.filter(user=user, is_active=True).exists()
-    )

@@ -6,9 +6,9 @@ from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 from datetime import timedelta
-from urllib.parse import urlparse
+from pathlib import Path
 
-from config.url_utils import get_media_public_url
+from django.conf import settings
 
 from .models import (
     OwncastChatIdentity,
@@ -27,6 +27,7 @@ from .services import (
     owncast_set_chat_user_moderator,
     release_expired_owncast_chat_timeouts,
     resolve_obs_stream_server_url,
+    resolve_recording_local_path,
     sync_owncast_chat_identities_from_recent_messages,
 )
 
@@ -649,27 +650,84 @@ class RealtimeConfigurationAdmin(admin.ModelAdmin):
         )
 
 
+class RecordingCourseFilter(admin.SimpleListFilter):
+    title = "course"
+    parameter_name = "course"
+
+    def lookups(self, request, model_admin):
+        from apps.courses.models import Course
+
+        courses = Course.objects.filter(realtime_sessions__recordings__isnull=False).distinct().order_by("title")
+        return [(str(course.pk), course.title) for course in courses]
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        return queryset.filter(session__linked_course_id=value) if value and value.isdigit() else queryset
+
+
+def egress_local_path(recording, *, search=False):
+    """Local file of a LiveKit/browser recording (None if unknown).
+
+    ``search`` also tries the slower resolver (it may walk the recordings
+    volume); list columns use the direct mapping only.
+    """
+    name = str(getattr(getattr(recording, "video_file", None), "name", "") or "")
+    if name:
+        return Path(settings.MEDIA_ROOT) / name
+    output = str(recording.output_file_path or "").strip()
+    if not output:
+        return None
+    if search:
+        return resolve_recording_local_path(output)
+    normalized = output.replace("\\", "/")
+    prefix = str(getattr(settings, "LIVEKIT_RECORDING_FILEPATH_PREFIX", "/recordings") or "/recordings").rstrip("/")
+    root = Path(str(getattr(settings, "LIVEKIT_RECORDING_LOCAL_OUTPUT_ROOT", "/recordings") or "/recordings"))
+    if prefix and normalized.startswith(prefix + "/"):
+        return root / normalized[len(prefix) + 1 :]
+    candidate = Path(normalized)
+    return candidate if candidate.is_absolute() else root / normalized.lstrip("/")
+
+
+RECORDING_STATUS_CHIPS = {
+    RealtimeSessionRecording.STATUS_STARTING: ("active", "time"),
+    RealtimeSessionRecording.STATUS_RECORDING: ("active", "video"),
+    RealtimeSessionRecording.STATUS_STOPPING: ("active", "time"),
+    RealtimeSessionRecording.STATUS_COMPLETED: ("success", "checkmark"),
+    RealtimeSessionRecording.STATUS_FAILED: ("error", "error"),
+}
+
+
 @admin.register(RealtimeSessionRecording)
 class RealtimeSessionRecordingAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "session",
+        "course_display",
+        "module_display",
         "recording_type",
-        "status",
-        "started_by",
-        "livekit_egress_id",
+        "source_display",
+        "status_display",
+        "size_display",
+        "duration_display",
+        "lecture_display",
         "recording_player",
         "admin_actions",
         "started_at",
-        "ended_at",
-        "created_at",
     )
-    list_filter = ("recording_type", "status", "created_at", "started_at", "ended_at")
+    list_filter = (RecordingCourseFilter, "recording_type", "status", "created_at", "started_at", "ended_at")
     list_display_links = ("id", "session")
+    list_select_related = (
+        "session",
+        "session__linked_course",
+        "class_recording",
+        "class_recording__module",
+        "class_recording__lecture",
+    )
     search_fields = (
         "session__title",
         "session__room_name",
         "session__livekit_room_name",
+        "session__linked_course__title",
         "livekit_egress_id",
         "started_by__email",
         "video_file",
@@ -677,15 +735,20 @@ class RealtimeSessionRecordingAdmin(admin.ModelAdmin):
         "output_download_url",
     )
     readonly_fields = (
+        "player_panel",
         "session",
+        "course_display",
+        "module_display",
         "recording_type",
-        "status",
+        "source_display",
+        "status_display",
         "started_by",
         "livekit_egress_id",
         "output_file_path",
         "output_download_url",
         "video_file",
-        "recording_player",
+        "size_display",
+        "lecture_display",
         "error",
         "livekit_payload",
         "started_at",
@@ -695,6 +758,10 @@ class RealtimeSessionRecordingAdmin(admin.ModelAdmin):
     )
     autocomplete_fields = ("session", "started_by")
     actions = ("delete_selected_recordings",)
+
+    class Media:
+        js = ("admin/js/recordings_changelist_row_click.js",)
+        css = {"all": ("admin/css/class_recordings.css",)}
 
     def has_add_permission(self, request):
         return False
@@ -715,6 +782,82 @@ class RealtimeSessionRecordingAdmin(admin.ModelAdmin):
     def delete_selected_recordings(self, request, queryset):
         self.delete_queryset(request, queryset)
 
+    @staticmethod
+    def _class_recording(obj):
+        try:
+            return obj.class_recording
+        except Exception:  # RelatedObjectDoesNotExist: no class recording was built from it
+            return None
+
+    @admin.display(description="Course")
+    def course_display(self, obj):
+        course = getattr(obj.session, "linked_course", None)
+        return course.title if course is not None else "-"
+
+    @admin.display(description="Module")
+    def module_display(self, obj):
+        class_recording = self._class_recording(obj)
+        module = getattr(class_recording, "module", None) if class_recording else None
+        return module.title if module is not None else "-"
+
+    @admin.display(description="Source")
+    def source_display(self, obj):
+        payload = obj.livekit_payload if isinstance(obj.livekit_payload, dict) else {}
+        if obj.video_file or str(payload.get("source") or "").lower() == "browser_fallback":
+            return "Host Studio (browser recording)"
+        return "Host Studio (LiveKit egress)"
+
+    @admin.display(description="Status", ordering="status")
+    def status_display(self, obj):
+        modifier, icon = RECORDING_STATUS_CHIPS.get(obj.status, ("neutral", "information"))
+        return format_html(
+            '<span class="enterprise-status enterprise-status--{}">'
+            '<svg class="enterprise-icon" aria-hidden="true"><use href="#icon-{}"></use></svg>{}</span>',
+            modifier,
+            icon,
+            obj.get_status_display(),
+        )
+
+    @admin.display(description="Size")
+    def size_display(self, obj):
+        path = egress_local_path(obj)
+        try:
+            size = path.stat().st_size if path is not None and path.is_file() else 0
+        except OSError:
+            size = 0
+        if not size:
+            return "-"
+        for unit in ("B", "KB", "MB", "GB", "TB"):
+            if size < 1024 or unit == "TB":
+                return f"{size:.0f} {unit}" if unit in {"B", "KB"} else f"{size:.1f} {unit}"
+            size /= 1024
+        return "-"
+
+    @admin.display(description="Duration")
+    def duration_display(self, obj):
+        class_recording = self._class_recording(obj)
+        seconds = getattr(class_recording, "duration_seconds", None) if class_recording else None
+        if not seconds:
+            return "-"
+        minutes, secs = divmod(int(seconds), 60)
+        hours, minutes = divmod(minutes, 60)
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+
+    @admin.display(description="Lecture")
+    def lecture_display(self, obj):
+        from .recording.admin import lecture_chip
+
+        class_recording = self._class_recording(obj)
+        if class_recording is None:
+            return "Not published to a module"
+        link = format_html(
+            '<a href="{}">class recording #{}</a>',
+            reverse("admin:realtime_classrecording_change", args=[class_recording.pk]),
+            class_recording.pk,
+        )
+        lecture = class_recording.lecture if class_recording.lecture_id else None
+        return format_html("{}<br>{}", lecture_chip(lecture), link) if lecture else link
+
     @admin.display(description="Actions")
     def admin_actions(self, obj):
         if not getattr(obj, "pk", None):
@@ -722,39 +865,63 @@ class RealtimeSessionRecordingAdmin(admin.ModelAdmin):
         delete_url = reverse("admin:realtime_realtimesessionrecording_delete", args=[obj.pk])
         return format_html('<a href="{}">Delete</a>', delete_url)
 
-    class Media:
-        js = ("admin/js/recordings_changelist_row_click.js",)
+    def _media_url(self, obj):
+        return reverse("admin:realtime_realtimesessionrecording_media", args=[obj.pk])
 
     @admin.display(description="Recording File")
     def recording_player(self, obj):
-        download_url = ""
-        if obj.output_download_url:
-            download_url = obj.output_download_url
-        elif getattr(obj, "video_file", None):
-            download_url = get_media_public_url(obj.video_file.url)
-        elif obj.output_file_path and obj.pk:
-            download_url = reverse(
-                "realtime-session-recording-download",
-                kwargs={"recording_id": obj.pk},
-            )
-        if not download_url:
+        path = egress_local_path(obj)
+        if path is None:
+            if obj.output_download_url:
+                return format_html('<a href="{}" target="_blank" rel="noopener">External file</a>',
+                                   obj.output_download_url)
             return "-"
+        return format_html('<a href="{}?download=1" download>{}</a>', self._media_url(obj), path.name)
 
-        filename = ""
-        if getattr(obj, "video_file", None) and getattr(obj.video_file, "name", ""):
-            filename = str(obj.video_file.name).replace("\\", "/").split("/")[-1]
-        if not filename and obj.output_file_path:
-            filename = str(obj.output_file_path).replace("\\", "/").split("/")[-1]
-        if not filename and obj.output_download_url:
-            parsed_path = urlparse(obj.output_download_url).path
-            filename = parsed_path.rstrip("/").split("/")[-1]
-        if not filename:
-            filename = f"recording-{obj.pk or 'file'}.webm"
-
+    @admin.display(description="Video")
+    def player_panel(self, obj):
+        if not getattr(obj, "pk", None):
+            return "-"
+        path = egress_local_path(obj, search=True)
+        if path is None or not path.is_file():
+            if obj.output_download_url:
+                return format_html('<a href="{}" target="_blank" rel="noopener">External file</a>',
+                                   obj.output_download_url)
+            return "No video file on the server for this recording."
+        url = self._media_url(obj)
+        player = ""
+        if path.suffix.lower() in {".mp4", ".m4v", ".mov", ".webm"}:
+            player = format_html(
+                '<video class="class-recording-player" controls preload="metadata" src="{}"></video>', url
+            )
         return format_html(
-            '<a href="{}" target="_blank" rel="noopener" download>{}</a>',
-            download_url,
-            filename,
+            '<div class="class-recording-panel">{}<p><a class="button" href="{}?download=1" download>Download {}</a>'
+            "</p></div>",
+            player,
+            url,
+            path.name,
+        )
+
+    def get_urls(self):
+        custom = [
+            path(
+                "<int:recording_id>/media/",
+                self.admin_site.admin_view(self.media_view),
+                name="realtime_realtimesessionrecording_media",
+            ),
+        ]
+        return custom + super().get_urls()
+
+    def media_view(self, request, recording_id):
+        from django.shortcuts import get_object_or_404
+
+        from .recording.media import staff_file_response
+
+        recording = get_object_or_404(RealtimeSessionRecording, pk=recording_id)
+        if not self.has_view_permission(request, recording):
+            raise PermissionDenied
+        return staff_file_response(
+            request, egress_local_path(recording, search=True), download=request.GET.get("download") == "1"
         )
 
 

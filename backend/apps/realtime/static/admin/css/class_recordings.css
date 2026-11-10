@@ -1,0 +1,73 @@
+/* Class recordings admin: player, action buttons and state chips. */
+.class-recording-muted {
+  color: var(--as-text-muted);
+  font-size: 0.85em;
+}
+
+.enterprise-status--active {
+  color: var(--as-accent);
+}
+
+.enterprise-status--neutral {
+  color: var(--as-text-secondary);
+}
+
+.class-recording-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 100%;
+}
+
+.class-recording-player {
+  display: block;
+  width: 100%;
+  max-width: 880px;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border: 1px solid var(--as-border);
+  border-radius: var(--as-radius-tile);
+}
+
+.class-recording-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.class-recording-files {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.class-recording-files code {
+  word-break: break-all;
+}
+
+.class-recording-form ul {
+  padding-left: 0;
+  list-style: none;
+}
+
+.class-recording-form label {
+  overflow-wrap: anywhere;
+}
+
+.class-recording-warning {
+  padding: 10px 14px;
+  margin: 0 0 16px;
+  color: var(--as-warning);
+  border: 1px solid var(--as-warning);
+  border-radius: var(--as-radius-control);
+}
+
+.class-recording-form .submit-row input[type="submit"].default.class-recording-danger {
+  background: var(--as-error);
+  border-color: var(--as-error);
+  color: #fff;
+}
+
+.class-recording-form .submit-row input[type="submit"].default.class-recording-danger:hover {
+  background: var(--as-error-hover);
+  border-color: var(--as-error-hover);
+}

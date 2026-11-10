@@ -1,11 +1,11 @@
 import OwlCognitoMark from "../../components/OwlCognitoMark";
 import { siteBrand } from "../../config/siteBrand";
-import { USERS_CORNER_TITLE } from "./navConfig";
+import { CONSOLE_TITLE } from "./navConfig";
 
 /**
  * The website navbar's brand block (same logo asset / OwlCognito mark, name
  * and uppercase platform label), restyled for the black shell header. On
- * phones the platform label gives way to "User's Corner".
+ * phones the platform label gives way to "Console".
  */
 export default function ShellBrand() {
   const isOwlCognito = siteBrand.id === "owlcognito";
@@ -21,7 +21,7 @@ export default function ShellBrand() {
       <span className="uc-brand__text">
         <span className="uc-brand__name">{siteBrand.name}</span>
         <span className="uc-brand__platform">{siteBrand.platformLabel}</span>
-        <span className="uc-brand__corner">{USERS_CORNER_TITLE}</span>
+        <span className="uc-brand__corner">{CONSOLE_TITLE}</span>
       </span>
     </span>
   );

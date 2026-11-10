@@ -1,11 +1,11 @@
-import { siteBrand } from "../../../config/siteBrand";
+import { CONSOLE_TITLE } from "../navConfig";
 
 /**
- * Page header pattern: "— AL SYED INITIATIVE" eyebrow (the landing page's
- * section eyebrow), title, one-line description, primary action(s).
+ * Page header pattern: "— CONSOLE" eyebrow (the landing page's section
+ * eyebrow, same as the hub), title, one-line description, primary action(s).
  * `actions` is usually a single Carbon <Button> (icon + short label).
  */
-export default function PageHeader({ title, description, actions, eyebrow = siteBrand.name }) {
+export default function PageHeader({ title, description, actions, eyebrow = CONSOLE_TITLE }) {
   return (
     <header className="cds-page-header">
       <div className="cds-page-header__text">

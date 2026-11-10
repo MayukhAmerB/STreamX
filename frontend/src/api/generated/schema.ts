@@ -1619,6 +1619,415 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/attachments/{attachment_id}/download/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Base for private file downloads: never cached, never sniffed. */
+        get: operations["reports_attachments_download"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/feedback-files/{submission_id}/download/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Base for private file downloads: never cached, never sniffed. */
+        get: operations["reports_feedback_file_download"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/files/{file_id}/download/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Base for private file downloads: never cached, never sniffed. */
+        get: operations["reports_files_download"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/manage/attachments/{attachment_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["reports_manage_attachments_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/manage/courses/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reports_manage_courses_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/manage/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reports_manage_export_csv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/manage/gradebook/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reports_manage_gradebook_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/manage/submissions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reports_manage_submissions_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/manage/submissions/{submission_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reports_manage_submissions_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/manage/submissions/{submission_id}/grade/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reports_manage_submissions_grade_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/manage/tasks/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reports_manage_tasks_list"];
+        put?: never;
+        post: operations["reports_manage_tasks_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/manage/tasks/{task_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reports_manage_tasks_retrieve"];
+        put?: never;
+        post?: never;
+        delete: operations["reports_manage_tasks_destroy"];
+        options?: never;
+        head?: never;
+        patch: operations["reports_manage_tasks_partial_update"];
+        trace?: never;
+    };
+    "/reports/manage/tasks/{task_id}/attachments/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reports_manage_tasks_attachments_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/manage/tasks/{task_id}/close/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reports_manage_tasks_close_create_by_id"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/manage/tasks/{task_id}/download.zip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reports_manage_tasks_download_zip"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/manage/tasks/{task_id}/duplicate/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reports_manage_tasks_duplicate_create_by_id"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/manage/tasks/{task_id}/publish/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reports_manage_tasks_publish_create_by_id"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/manage/tasks/{task_id}/release-marks/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reports_manage_tasks_release_marks_create_by_id"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/manage/tasks/{task_id}/reopen/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reports_manage_tasks_reopen_create_by_id"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/marks/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reports_marks_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/tasks/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reports_tasks_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/tasks/{task_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reports_tasks_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/tasks/{task_id}/submit/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description DRF APIView/ViewSet mixin. Put it FIRST in the bases.
+         *
+         *     Runs after authentication/permissions/throttling (inside ``initial``) so
+         *     the owner is the authenticated user and rejected requests never claim keys.
+         */
+        post: operations["reports_tasks_submit_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/tasks/{task_id}/uploads/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reports_tasks_uploads_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/tasks/{task_id}/uploads/{file_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["reports_tasks_uploads_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sections/": {
         parameters: {
             query?: never;
@@ -1662,6 +2071,23 @@ export interface components {
          * @enum {string}
          */
         ActionTypeEnum: "audio" | "pdf" | "video";
+        AttachmentUploadResponse: {
+            attachment: components["schemas"]["StoredFile"];
+        };
+        AuditEntry: {
+            id: number;
+            action: string;
+            action_label: string;
+            actor: string;
+            from_status: string;
+            to_status: string;
+            /** Format: decimal */
+            old_final_marks: string | null;
+            /** Format: decimal */
+            new_final_marks: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
         BroadcastEgressStatus: {
             /** @description True while LiveKit reports the egress starting/active; null when it could not be verified. */
             running: boolean | null;
@@ -1669,6 +2095,12 @@ export interface components {
             status: string;
             error: string;
         };
+        /**
+         * @description * `osint` - OSINT
+         *     * `web_pentesting` - Web Application Pentesting
+         * @enum {string}
+         */
+        CategoryEnum: "osint" | "web_pentesting";
         ClassRecording: {
             readonly id: number;
             readonly session_id: number | null;
@@ -1717,26 +2149,117 @@ export interface components {
          * @description * `server` - Server recording (OBS stream)
          *     * `obs_upload` - OBS file upload (replacement)
          *     * `livekit_egress` - LiveKit egress (Host Studio)
+         *     * `imported` - Imported (found on the server)
          * @enum {string}
          */
-        ClassRecordingSourceEnum: "server" | "obs_upload" | "livekit_egress";
+        ClassRecordingSourceEnum: "server" | "obs_upload" | "livekit_egress" | "imported";
         /**
          * @description * `recording` - Recording
          *     * `finalizing` - Finalizing
          *     * `processing` - Processing
          *     * `published` - Published
          *     * `failed` - Failed
+         *     * `imported` - Imported (unassigned)
          * @enum {string}
          */
-        ClassRecordingStateEnum: "recording" | "finalizing" | "processing" | "published" | "failed";
+        ClassRecordingStateEnum: "recording" | "finalizing" | "processing" | "published" | "failed" | "imported";
         CommentAuthor: {
             id: number;
             display_name: string;
             is_instructor: boolean;
         };
+        /**
+         * @description OpenAPI contract for GET /api/courses/{id}/ (documentation only).
+         *
+         *     Lists the fields clients of the payment page rely on; the response carries
+         *     further course fields (CourseDetailSerializer) for backward compatibility.
+         */
+        CourseDetailContract: {
+            id: number;
+            title: string;
+            slug: string;
+            description: string;
+            category: components["schemas"]["CategoryEnum"];
+            level: components["schemas"]["LevelEnum"];
+            launch_status: components["schemas"]["LaunchStatusEnum"];
+            registration_closed: boolean;
+            is_published: boolean;
+            /** @description One-time plan price in rupees, two decimals. */
+            price: string;
+            /** @description Monthly installment amount in rupees, two decimals. */
+            monthly_price: string;
+            full_payment_enabled: boolean;
+            installment_payment_enabled: boolean;
+            installments_required: number;
+            installment_access_days: number;
+            bundle_payment_enabled: boolean;
+            bundle_price: string;
+            bundle_installments: number;
+            bundle_access_days: number;
+            batch_pass_payment_enabled: boolean;
+            batch_pass_price: string;
+            included_in_batch_pass: boolean;
+            is_enrolled: boolean;
+            enrollment_status: string;
+            purchase_available: boolean;
+            /** @description "" when purchasable, else checkout_disabled, course_unpublished, course_not_live, registration_closed or price_not_configured. */
+            purchase_unavailable_reason: string;
+            /** @description The course's enabled payment cards, ordered for display (order = position, 1-based). */
+            payment_plans: components["schemas"]["PaymentPlanCard"][];
+            /**
+             * @description Plan picker columns: the number of cards, at least 2 and at most 4.
+             *
+             *     * `2` - 2
+             *     * `3` - 3
+             *     * `4` - 4
+             */
+            payment_cards_per_row: components["schemas"]["PaymentCardsPerRowEnum"];
+        };
+        CourseDetailResponse: {
+            success: boolean;
+            message: string;
+            data: components["schemas"]["CourseDetailContract"];
+            errors?: unknown;
+        };
         CourseRef: {
             id: number;
             title: string;
+        };
+        Criterion: {
+            id: number;
+            name: string;
+            description: string;
+            /** Format: decimal */
+            max_marks: string;
+        };
+        CriterionInput: {
+            name: string;
+            /** @default  */
+            description: string;
+            /** Format: decimal */
+            max_marks: string;
+        };
+        CriterionInputRequest: {
+            name: string;
+            /** @default  */
+            description: string;
+            /** Format: decimal */
+            max_marks: string;
+        };
+        CriterionMark: {
+            id: number;
+            name: string;
+            /** Format: decimal */
+            max_marks: string;
+            /** Format: decimal */
+            marks: string | null;
+        };
+        CriterionRequest: {
+            id: number;
+            name: string;
+            description: string;
+            /** Format: decimal */
+            max_marks: string;
         };
         /**
          * @description * `connecting` - connecting
@@ -1750,6 +2273,13 @@ export interface components {
          * @enum {string}
          */
         EventEnum: "connecting" | "connected" | "reconnecting" | "reconnected" | "disconnected" | "connection_failed" | "quality_changed" | "relay_fallback";
+        FeedbackFile: {
+            name: string;
+            extension: string;
+            size: number;
+            preview: components["schemas"]["ReportFilePreviewEnum"];
+            download_url: string;
+        };
         FirFilingGuide: {
             badge_label?: string;
             section_label?: string;
@@ -1762,6 +2292,104 @@ export interface components {
             audio_duration?: string;
             readonly audio_url: string;
             is_active?: boolean;
+        };
+        GradableCourse: {
+            id: number;
+            title: string;
+            sections: components["schemas"]["SectionOption"][];
+            next_week_number: number;
+        };
+        GradableCourseList: {
+            results: components["schemas"]["GradableCourse"][];
+        };
+        GradeRequestRequest: {
+            action: components["schemas"]["ReportGradeActionEnum"];
+            expected_revision: number;
+            /** Format: decimal */
+            marks?: string | null;
+            criteria_marks?: unknown;
+            /** @default  */
+            feedback: string;
+            /** Format: binary */
+            annotated_file?: string | null;
+            /** @default false */
+            remove_annotated_file: boolean;
+        };
+        Gradebook: {
+            course: components["schemas"]["Ref"];
+            tasks: components["schemas"]["GradebookTask"][];
+            rows: components["schemas"]["GradebookRow"][];
+        };
+        GradebookCell: {
+            task_id: number;
+            status: components["schemas"]["ReportGradebookCellStatusEnum"];
+            submission_id: number | null;
+            /** Format: decimal */
+            final_marks: string | null;
+            /** Format: decimal */
+            max_marks: string;
+            is_late: boolean;
+            minutes_late: number;
+            is_missing: boolean;
+        };
+        GradebookRow: {
+            student: components["schemas"]["Person"];
+            cells: components["schemas"]["GradebookCell"][];
+            totals: components["schemas"]["GradebookTotals"];
+        };
+        GradebookTask: {
+            id: number;
+            title: string;
+            week_number: number | null;
+            /** Format: date-time */
+            due_at: string;
+            /** Format: decimal */
+            max_marks: string;
+            status: components["schemas"]["ReportTaskStatusEnum"];
+        };
+        GradebookTotals: {
+            /** Format: decimal */
+            total_marks: string;
+            /** Format: decimal */
+            max_marks: string;
+            /** Format: decimal */
+            percentage: string | null;
+            graded_count: number;
+            missing_count: number;
+            late_count: number;
+            submitted_count: number;
+        };
+        GraderGrade: {
+            /** Format: decimal */
+            raw_marks: string | null;
+            /** Format: decimal */
+            late_penalty: string;
+            /** Format: decimal */
+            final_marks: string | null;
+            criteria: components["schemas"]["CriterionMark"][];
+            feedback: string;
+            revision_feedback: string;
+            annotated_file: components["schemas"]["FeedbackFile"] | null;
+            graded_by: string;
+            /** Format: date-time */
+            graded_at: string | null;
+            graded_version: number | null;
+        };
+        GradingTask: {
+            id: number;
+            title: string;
+            course: components["schemas"]["Ref"];
+            week_number: number | null;
+            /** Format: date-time */
+            due_at: string;
+            /** Format: decimal */
+            max_marks: string;
+            /** Format: decimal */
+            late_penalty_percent_per_day: string;
+            marks_visibility: components["schemas"]["ReportMarksVisibilityEnum"];
+            /** Format: date-time */
+            marks_released_at: string | null;
+            criteria: components["schemas"]["Criterion"][];
         };
         JoinApplicationCreateRequest: {
             role: components["schemas"]["RoleEnum"];
@@ -1803,6 +2431,12 @@ export interface components {
             data: components["schemas"]["JoinLocation"][];
             errors: unknown;
         };
+        /**
+         * @description * `live` - Live
+         *     * `coming_soon` - Coming Soon
+         * @enum {string}
+         */
+        LaunchStatusEnum: "live" | "coming_soon";
         LawTopic: {
             readonly id: number;
             /**
@@ -1914,6 +2548,108 @@ export interface components {
             stream_status: string;
             is_published: boolean;
         };
+        /**
+         * @description * `beginner` - Beginner
+         *     * `intermediate` - Intermediate
+         *     * `advanced` - Advanced
+         * @enum {string}
+         */
+        LevelEnum: "beginner" | "intermediate" | "advanced";
+        /** @description Create/update input and the grader's view of a task. */
+        ManageTask: {
+            readonly id: number;
+            course: number;
+            readonly course_title: string;
+            section?: number | null;
+            readonly section_title: string | null;
+            week_number?: number | null;
+            title: string;
+            /** @default  */
+            brief: string;
+            /** Format: date-time */
+            opens_at?: string | null;
+            /** Format: date-time */
+            due_at: string;
+            /** @default no_late */
+            late_policy: components["schemas"]["ReportLatePolicyEnum"];
+            /** Format: date-time */
+            late_until?: string | null;
+            /**
+             * Format: decimal
+             * @default 0.00
+             */
+            late_penalty_percent_per_day: string;
+            /**
+             * Format: decimal
+             * @default 10.00
+             */
+            max_marks: string;
+            allowed_file_types?: components["schemas"]["ReportFileTypeEnum"][];
+            /** @default 5 */
+            max_files: number;
+            /** @default 50 */
+            max_file_size_mb: number;
+            /** @default 200 */
+            max_total_size_mb: number;
+            /** @default on_grade */
+            marks_visibility: components["schemas"]["ReportMarksVisibilityEnum"];
+            criteria?: components["schemas"]["CriterionInput"][];
+            readonly status: components["schemas"]["ReportTaskStatusEnum"];
+            /** Format: date-time */
+            readonly published_at: string | null;
+            /** Format: date-time */
+            readonly closed_at: string | null;
+            /** Format: date-time */
+            readonly marks_released_at: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+            readonly has_grades: boolean;
+            readonly counts: components["schemas"]["TaskCounts"];
+            readonly attachments: components["schemas"]["StoredFile"][];
+            readonly criteria_detail: components["schemas"]["Criterion"][];
+        };
+        ManageTaskList: {
+            results: components["schemas"]["ManageTask"][];
+        };
+        /** @description Create/update input and the grader's view of a task. */
+        ManageTaskRequest: {
+            course: number;
+            section?: number | null;
+            week_number?: number | null;
+            title: string;
+            /** @default  */
+            brief: string;
+            /** Format: date-time */
+            opens_at?: string | null;
+            /** Format: date-time */
+            due_at: string;
+            /** @default no_late */
+            late_policy: components["schemas"]["ReportLatePolicyEnum"];
+            /** Format: date-time */
+            late_until?: string | null;
+            /**
+             * Format: decimal
+             * @default 0.00
+             */
+            late_penalty_percent_per_day: string;
+            /**
+             * Format: decimal
+             * @default 10.00
+             */
+            max_marks: string;
+            allowed_file_types?: components["schemas"]["ReportFileTypeEnum"][];
+            /** @default 5 */
+            max_files: number;
+            /** @default 50 */
+            max_file_size_mb: number;
+            /** @default 200 */
+            max_total_size_mb: number;
+            /** @default on_grade */
+            marks_visibility: components["schemas"]["ReportMarksVisibilityEnum"];
+            criteria?: components["schemas"]["CriterionInputRequest"][];
+        };
         ModuleOption: {
             id: number;
             title: string;
@@ -1935,6 +2671,15 @@ export interface components {
             id: number;
             title: string;
             course_id: number;
+        };
+        MyMarks: {
+            courses: components["schemas"]["MyMarksCourse"][];
+        };
+        MyMarksCourse: {
+            course: components["schemas"]["Ref"];
+            tasks: components["schemas"]["GradebookTask"][];
+            cells: components["schemas"]["GradebookCell"][];
+            totals: components["schemas"]["GradebookTotals"];
         };
         NationalDeskData: {
             is_published: boolean;
@@ -1982,9 +2727,87 @@ export interface components {
         PatchedLectureCommentWriteRequest: {
             body?: string;
         };
+        /** @description Create/update input and the grader's view of a task. */
+        PatchedManageTaskRequest: {
+            course?: number;
+            section?: number | null;
+            week_number?: number | null;
+            title?: string;
+            /** @default  */
+            brief: string;
+            /** Format: date-time */
+            opens_at?: string | null;
+            /** Format: date-time */
+            due_at?: string;
+            /** @default no_late */
+            late_policy: components["schemas"]["ReportLatePolicyEnum"];
+            /** Format: date-time */
+            late_until?: string | null;
+            /**
+             * Format: decimal
+             * @default 0.00
+             */
+            late_penalty_percent_per_day: string;
+            /**
+             * Format: decimal
+             * @default 10.00
+             */
+            max_marks: string;
+            allowed_file_types?: components["schemas"]["ReportFileTypeEnum"][];
+            /** @default 5 */
+            max_files: number;
+            /** @default 50 */
+            max_file_size_mb: number;
+            /** @default 200 */
+            max_total_size_mb: number;
+            /** @default on_grade */
+            marks_visibility: components["schemas"]["ReportMarksVisibilityEnum"];
+            criteria?: components["schemas"]["CriterionInputRequest"][];
+        };
         PatchedSessionModuleUpdateRequest: {
             target_module_id?: number | null;
         };
+        /**
+         * @description * `2` - 2
+         *     * `3` - 3
+         *     * `4` - 4
+         * @enum {integer}
+         */
+        PaymentCardsPerRowEnum: 2 | 3 | 4;
+        /** @description One payment card on the course payment page (apps.payments.plans). */
+        PaymentPlanCard: {
+            plan: components["schemas"]["PlanEnum"];
+            title: string;
+            subtitle: string;
+            /** @description Rupees charged per payment, two decimals, e.g. "1500.00". */
+            amount: string;
+            currency: string;
+            price_label: string;
+            total_label: string | null;
+            installments: number | null;
+            access_label: string;
+            features: string[];
+            badge: string | null;
+            highlighted: boolean;
+            cta_label: string;
+            order: number;
+            available: boolean;
+            unavailable_reason: string | null;
+        };
+        Person: {
+            id: number;
+            full_name: string;
+            /** Format: email */
+            email: string;
+        };
+        /**
+         * @description * `monthly` - monthly
+         *     * `full` - full
+         *     * `bundle` - bundle
+         *     * `batch_pass` - batch_pass
+         * @enum {string}
+         */
+        PlanEnum: "monthly" | "full" | "bundle" | "batch_pass";
         /**
          * @description * `mobile` - mobile
          *     * `desktop` - desktop
@@ -2055,12 +2878,104 @@ export interface components {
             /** @default 0 */
             elapsed_ms: number;
         };
+        Ref: {
+            id: number;
+            title: string;
+        };
+        /**
+         * @description * `pdf` - PDF
+         *     * `image` - Image
+         *     * `markdown` - Markdown
+         *     * `canvas` - Canvas
+         *     * `none` - None
+         * @enum {string}
+         */
+        ReportFilePreviewEnum: "pdf" | "image" | "markdown" | "canvas" | "none";
+        /**
+         * @description * `pdf` - .pdf
+         *     * `pptx` - .pptx
+         *     * `ppt` - .ppt
+         *     * `docx` - .docx
+         *     * `doc` - .doc
+         *     * `odt` - .odt
+         *     * `odp` - .odp
+         *     * `md` - .md
+         *     * `canvas` - .canvas
+         *     * `png` - .png
+         *     * `jpg` - .jpg
+         *     * `jpeg` - .jpeg
+         *     * `webp` - .webp
+         *     * `svg` - .svg
+         *     * `zip` - .zip
+         * @enum {string}
+         */
+        ReportFileTypeEnum: "pdf" | "pptx" | "ppt" | "docx" | "doc" | "odt" | "odp" | "md" | "canvas" | "png" | "jpg" | "jpeg" | "webp" | "svg" | "zip";
+        /**
+         * @description * `draft` - Save draft (under review)
+         *     * `grade` - Save marks (graded)
+         *     * `return` - Return for revision
+         * @enum {string}
+         */
+        ReportGradeActionEnum: "draft" | "grade" | "return";
+        /**
+         * @description * `not_submitted` - Not submitted
+         *     * `submitted` - Submitted
+         *     * `under_review` - Under review
+         *     * `graded` - Graded
+         *     * `returned_for_revision` - Returned for revision
+         *     * `resubmitted` - Resubmitted
+         *     * `missing` - Missing
+         * @enum {string}
+         */
+        ReportGradebookCellStatusEnum: "not_submitted" | "submitted" | "under_review" | "graded" | "returned_for_revision" | "resubmitted" | "missing";
+        /**
+         * @description * `no_late` - No late submissions
+         *     * `allow_late` - Allow late submissions until a cut-off
+         * @enum {string}
+         */
+        ReportLatePolicyEnum: "no_late" | "allow_late";
+        /**
+         * @description * `on_grade` - Show each student's marks as soon as they are graded
+         *     * `on_release` - Release all marks together
+         * @enum {string}
+         */
+        ReportMarksVisibilityEnum: "on_grade" | "on_release";
+        /**
+         * @description * `not_submitted` - Not submitted
+         *     * `submitted` - Submitted
+         *     * `under_review` - Under review
+         *     * `graded` - Graded
+         *     * `returned_for_revision` - Returned for revision
+         *     * `resubmitted` - Resubmitted
+         * @enum {string}
+         */
+        ReportSubmissionStatusEnum: "not_submitted" | "submitted" | "under_review" | "graded" | "returned_for_revision" | "resubmitted";
+        /**
+         * @description * `draft` - Draft
+         *     * `published` - Published
+         *     * `closed` - Closed
+         * @enum {string}
+         */
+        ReportTaskStatusEnum: "draft" | "published" | "closed";
+        /**
+         * @description * `not_open` - Not open
+         *     * `open` - Open
+         *     * `late` - Late window
+         *     * `closed` - Closed
+         * @enum {string}
+         */
+        ReportWindowEnum: "not_open" | "open" | "late" | "closed";
         /**
          * @description * `citizen` - Citizen / Volunteer
          *     * `lawyer` - Lawyer
          * @enum {string}
          */
         RoleEnum: "citizen" | "lawyer";
+        SectionOption: {
+            id: number;
+            title: string;
+            order: number;
+        };
         SocialAccount: {
             readonly id: number;
             account_name: string;
@@ -2142,6 +3057,28 @@ export interface components {
          * @enum {string}
          */
         StatusEnum: "completed" | "in_progress" | "planned";
+        StoredFile: {
+            id: number;
+            name: string;
+            extension: string;
+            content_type: string;
+            size: number;
+            /** Format: date-time */
+            created_at: string;
+            preview: components["schemas"]["ReportFilePreviewEnum"];
+            download_url: string;
+        };
+        StoredFileRequest: {
+            id: number;
+            name: string;
+            extension: string;
+            content_type: string;
+            size: number;
+            /** Format: date-time */
+            created_at: string;
+            preview: components["schemas"]["ReportFilePreviewEnum"];
+            download_url: string;
+        };
         StreamHeartbeatData: {
             /** @description The session, in the same shape as GET /api/realtime/sessions/{id}/ returns it. */
             session: {
@@ -2164,6 +3101,188 @@ export interface components {
             message: string;
             data: components["schemas"]["StreamHeartbeatData"] | null;
             errors: unknown;
+        };
+        StudentGrade: {
+            /** Format: decimal */
+            raw_marks: string | null;
+            /** Format: decimal */
+            late_penalty: string;
+            /** Format: decimal */
+            final_marks: string | null;
+            /** Format: decimal */
+            max_marks: string;
+            criteria: components["schemas"]["CriterionMark"][];
+            feedback: string;
+            /** Format: date-time */
+            graded_at: string | null;
+            annotated_file: components["schemas"]["FeedbackFile"] | null;
+        };
+        StudentSubmission: {
+            id: number;
+            status: components["schemas"]["ReportSubmissionStatusEnum"];
+            revision: number;
+            version_count: number;
+            /** Format: date-time */
+            first_submitted_at: string | null;
+            /** Format: date-time */
+            submitted_at: string | null;
+            is_late: boolean;
+            minutes_late: number;
+            current_version: components["schemas"]["Version"] | null;
+            versions: components["schemas"]["Version"][];
+        };
+        StudentTaskDetail: {
+            id: number;
+            course: components["schemas"]["Ref"];
+            section: components["schemas"]["Ref"] | null;
+            week_number: number | null;
+            title: string;
+            /** Format: date-time */
+            opens_at: string | null;
+            /** Format: date-time */
+            due_at: string;
+            late_policy: components["schemas"]["ReportLatePolicyEnum"];
+            /** Format: date-time */
+            late_until: string | null;
+            /** Format: date-time */
+            accepting_until: string;
+            window: components["schemas"]["ReportWindowEnum"];
+            task_status: components["schemas"]["ReportTaskStatusEnum"];
+            /** Format: decimal */
+            max_marks: string;
+            marks_visibility: components["schemas"]["ReportMarksVisibilityEnum"];
+            status: components["schemas"]["ReportSubmissionStatusEnum"];
+            is_late: boolean;
+            minutes_late: number;
+            /** Format: date-time */
+            submitted_at: string | null;
+            version_count: number;
+            marks_visible: boolean;
+            /** Format: decimal */
+            final_marks: string | null;
+            can_submit: boolean;
+            brief: string;
+            /** Format: decimal */
+            late_penalty_percent_per_day: string;
+            allowed_extensions: string[];
+            max_files: number;
+            max_file_size_mb: number;
+            max_total_size_mb: number;
+            criteria: components["schemas"]["Criterion"][];
+            attachments: components["schemas"]["StoredFile"][];
+            lock_reason: string;
+            submission: components["schemas"]["StudentSubmission"] | null;
+            staged_files: components["schemas"]["StoredFile"][];
+            grade: components["schemas"]["StudentGrade"] | null;
+            revision_feedback: string;
+            marks_hidden_until_release: boolean;
+        };
+        StudentTaskList: {
+            results: components["schemas"]["StudentTaskSummary"][];
+            next_due: components["schemas"]["StudentTaskSummary"] | null;
+            /** Format: date-time */
+            server_time: string;
+        };
+        StudentTaskSummary: {
+            id: number;
+            course: components["schemas"]["Ref"];
+            section: components["schemas"]["Ref"] | null;
+            week_number: number | null;
+            title: string;
+            /** Format: date-time */
+            opens_at: string | null;
+            /** Format: date-time */
+            due_at: string;
+            late_policy: components["schemas"]["ReportLatePolicyEnum"];
+            /** Format: date-time */
+            late_until: string | null;
+            /** Format: date-time */
+            accepting_until: string;
+            window: components["schemas"]["ReportWindowEnum"];
+            task_status: components["schemas"]["ReportTaskStatusEnum"];
+            /** Format: decimal */
+            max_marks: string;
+            marks_visibility: components["schemas"]["ReportMarksVisibilityEnum"];
+            status: components["schemas"]["ReportSubmissionStatusEnum"];
+            is_late: boolean;
+            minutes_late: number;
+            /** Format: date-time */
+            submitted_at: string | null;
+            version_count: number;
+            marks_visible: boolean;
+            /** Format: decimal */
+            final_marks: string | null;
+            can_submit: boolean;
+        };
+        SubmissionDetail: {
+            id: number;
+            task: components["schemas"]["GradingTask"];
+            student: components["schemas"]["Person"];
+            status: components["schemas"]["ReportSubmissionStatusEnum"];
+            revision: number;
+            /** Format: date-time */
+            submitted_at: string | null;
+            /** Format: date-time */
+            first_submitted_at: string | null;
+            is_late: boolean;
+            minutes_late: number;
+            current_version: components["schemas"]["Version"] | null;
+            versions: components["schemas"]["Version"][];
+            grade: components["schemas"]["GraderGrade"] | null;
+            audit: components["schemas"]["AuditEntry"][];
+            neighbours: components["schemas"]["SubmissionNeighbours"];
+        };
+        SubmissionNeighbours: {
+            previous_id: number | null;
+            next_id: number | null;
+            next_ungraded_id: number | null;
+            position: number | null;
+            total: number;
+        };
+        SubmissionQueue: {
+            results: components["schemas"]["SubmissionQueueItem"][];
+            counts: components["schemas"]["TaskCounts"];
+        };
+        SubmissionQueueItem: {
+            id: number;
+            task: components["schemas"]["GradebookTask"];
+            student: components["schemas"]["Person"];
+            status: components["schemas"]["ReportSubmissionStatusEnum"];
+            /** Format: date-time */
+            submitted_at: string | null;
+            is_late: boolean;
+            minutes_late: number;
+            version_count: number;
+            /** Format: decimal */
+            final_marks: string | null;
+            /** Format: decimal */
+            max_marks: string;
+            revision: number;
+        };
+        SubmitReportRequestRequest: {
+            file_ids: number[];
+            /** @default  */
+            note: string;
+        };
+        SubmitReportResponse: {
+            created: boolean;
+            task: components["schemas"]["StudentTaskDetail"];
+        };
+        TaskCounts: {
+            students: number;
+            submitted: number;
+            awaiting: number;
+            graded: number;
+            returned: number;
+            late: number;
+        };
+        TaskCountsRequest: {
+            students: number;
+            submitted: number;
+            awaiting: number;
+            graded: number;
+            returned: number;
+            late: number;
         };
         TrackerOverview: {
             section_label?: string;
@@ -2201,6 +3320,21 @@ export interface components {
          * @enum {string}
          */
         TransportEnum: "auto" | "relay" | "unknown";
+        UploadRequestRequest: {
+            /** Format: binary */
+            file: string;
+        };
+        Version: {
+            id: number;
+            number: number;
+            note: string;
+            /** Format: date-time */
+            submitted_at: string;
+            is_late: boolean;
+            minutes_late: number;
+            is_revision: boolean;
+            files: components["schemas"]["StoredFile"][];
+        };
     };
     responses: never;
     parameters: never;
@@ -3187,9 +4321,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["CourseDetailResponse"];
                 };
             };
         };
@@ -5746,6 +6878,653 @@ export interface operations {
                         [key: string]: unknown;
                     };
                 };
+            };
+        };
+    };
+    reports_attachments_download: {
+        parameters: {
+            query?: {
+                inline?: boolean;
+            };
+            header?: never;
+            path: {
+                attachment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+        };
+    };
+    reports_feedback_file_download: {
+        parameters: {
+            query?: {
+                inline?: boolean;
+            };
+            header?: never;
+            path: {
+                submission_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+        };
+    };
+    reports_files_download: {
+        parameters: {
+            query?: {
+                inline?: boolean;
+            };
+            header?: never;
+            path: {
+                file_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+        };
+    };
+    reports_manage_attachments_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reports_manage_courses_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GradableCourseList"];
+                };
+            };
+        };
+    };
+    reports_manage_export_csv: {
+        parameters: {
+            query?: {
+                course?: number;
+                task?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+        };
+    };
+    reports_manage_gradebook_retrieve: {
+        parameters: {
+            query: {
+                course: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Gradebook"];
+                };
+            };
+        };
+    };
+    reports_manage_submissions_list: {
+        parameters: {
+            query?: {
+                course?: number;
+                late?: boolean;
+                /** @description Student name or email */
+                q?: string;
+                /** @description awaiting, submitted, under_review, graded, returned_for_revision, resubmitted */
+                status?: string;
+                task?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionQueue"];
+                };
+            };
+        };
+    };
+    reports_manage_submissions_retrieve: {
+        parameters: {
+            query?: {
+                course?: number;
+                late?: boolean;
+                /** @description Student name or email */
+                q?: string;
+                /** @description awaiting, submitted, under_review, graded, returned_for_revision, resubmitted */
+                status?: string;
+                task?: number;
+            };
+            header?: never;
+            path: {
+                submission_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionDetail"];
+                };
+            };
+        };
+    };
+    reports_manage_submissions_grade_create: {
+        parameters: {
+            query?: {
+                course?: number;
+                late?: boolean;
+                /** @description Student name or email */
+                q?: string;
+                /** @description awaiting, submitted, under_review, graded, returned_for_revision, resubmitted */
+                status?: string;
+                task?: number;
+            };
+            header?: never;
+            path: {
+                submission_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GradeRequestRequest"];
+                "multipart/form-data": components["schemas"]["GradeRequestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionDetail"];
+                };
+            };
+        };
+    };
+    reports_manage_tasks_list: {
+        parameters: {
+            query?: {
+                course?: number;
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManageTaskList"];
+                };
+            };
+        };
+    };
+    reports_manage_tasks_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManageTaskRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManageTask"];
+                };
+            };
+        };
+    };
+    reports_manage_tasks_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManageTask"];
+                };
+            };
+        };
+    };
+    reports_manage_tasks_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reports_manage_tasks_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedManageTaskRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManageTask"];
+                };
+            };
+        };
+    };
+    reports_manage_tasks_attachments_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["UploadRequestRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentUploadResponse"];
+                };
+            };
+        };
+    };
+    reports_manage_tasks_close_create_by_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManageTask"];
+                };
+            };
+        };
+    };
+    reports_manage_tasks_download_zip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+        };
+    };
+    reports_manage_tasks_duplicate_create_by_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManageTask"];
+                };
+            };
+        };
+    };
+    reports_manage_tasks_publish_create_by_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManageTask"];
+                };
+            };
+        };
+    };
+    reports_manage_tasks_release_marks_create_by_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManageTask"];
+                };
+            };
+        };
+    };
+    reports_manage_tasks_reopen_create_by_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManageTask"];
+                };
+            };
+        };
+    };
+    reports_marks_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyMarks"];
+                };
+            };
+        };
+    };
+    reports_tasks_list: {
+        parameters: {
+            query?: {
+                course?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentTaskList"];
+                };
+            };
+        };
+    };
+    reports_tasks_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentTaskDetail"];
+                };
+            };
+        };
+    };
+    reports_tasks_submit_create: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitReportRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["SubmitReportRequestRequest"];
+                "multipart/form-data": components["schemas"]["SubmitReportRequestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmitReportResponse"];
+                };
+            };
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmitReportResponse"];
+                };
+            };
+        };
+    };
+    reports_tasks_uploads_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["UploadRequestRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoredFile"];
+                };
+            };
+        };
+    };
+    reports_tasks_uploads_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file_id: number;
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

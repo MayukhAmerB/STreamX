@@ -19,6 +19,7 @@ services:
         condition: service_healthy
     volumes:
       - backend_media:/app/media
+      - backend_private_media:/app/private_media
       - recordings_data:/recordings:ro
     healthcheck:
       test:
@@ -59,6 +60,7 @@ services:
         condition: service_healthy
     volumes:
       - backend_media:/app/media
+      - backend_private_media:/app/private_media
       - recordings_data:/recordings:ro
     healthcheck:
       test:
@@ -110,6 +112,7 @@ services:
         condition: service_healthy
     volumes:
       - backend_media:/app/media
+      - backend_private_media:/app/private_media
       - recordings_data:/recordings
     healthcheck:
       test:

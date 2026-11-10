@@ -1,4 +1,4 @@
-// Layout of the User's Corner shell: header, side nav, content area, phone
+// Layout of the Console shell: header, side nav, content area, phone
 // bottom navigation and the "More" sheet. Carbon tokens + the User's
 // Corner palette (`--uc-*`, styles/_corner-palette.scss) only.
 @use './tokens' as *;
@@ -6,6 +6,7 @@
 $header-height-mobile: 3.5rem; // 56px
 $header-height-desktop: 4rem; // 64px, room for the two-line brand block
 $side-nav-width: 16rem;
+$side-nav-rail-width: 4.5rem; // collapsed icon rail
 $bottom-nav-height: 4rem; // 64px tab bar (+ safe-area inset)
 $safe-top: env(safe-area-inset-top, 0px);
 $safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -135,7 +136,7 @@ $safe-right: env(safe-area-inset-right, 0px);
   }
 }
 
-// Phones: "User's Corner" sits under the brand name instead.
+// Phones: "Console" sits under the brand name instead.
 .cds-app .uc-brand__corner {
   @include corner-micro-label(0.5625rem);
 
@@ -463,11 +464,80 @@ $safe-right: env(safe-area-inset-right, 0px);
   inset-block-start: var(--cds-app-header-height);
 }
 
+.cds-app .cds--header ~ .cds-app-sidenav.cds--side-nav--expanded {
+  transition: inline-size 180ms ease;
+}
+
 .cds-app .cds-app-sidenav .cds--side-nav__items {
   padding-block: $spacing-05 $spacing-07;
 }
 
-// "— USER'S CORNER": the landing page's eyebrow (hairline + micro-label).
+// "Collapse menu" toggle pinned under the items.
+.cds-app .cds-app-sidenav__footer {
+  flex: none;
+  padding: $spacing-03 $spacing-05 $spacing-05;
+  border-block-start: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cds-app .cds-app-sidenav__toggle {
+  display: flex;
+  align-items: center;
+  padding: 0 $spacing-04;
+  border: 0;
+  border-radius: var(--uc-radius-control);
+  background: none;
+  block-size: 2.75rem;
+  color: var(--uc-text-muted);
+  cursor: pointer;
+  font-family: var(--uc-font);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  gap: $spacing-04;
+  inline-size: 100%;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+
+  svg {
+    flex: none;
+    fill: currentColor;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--uc-accent);
+    outline-offset: -2px;
+  }
+
+  @media (any-hover: hover) {
+    &:hover {
+      background-color: rgba(246, 241, 231, 0.05);
+      color: var(--uc-text);
+    }
+  }
+}
+
+.cds-app .cds-app-sidenav__toggle-label {
+  white-space: nowrap;
+}
+
+// External destinations (Labs): a small "leaves the Console" icon.
+.cds-app .cds-app-sidenav .cds--side-nav__link-text {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-03;
+}
+
+.cds-app .cds-app-sidenav__external {
+  flex: none;
+  fill: var(--uc-text-muted);
+}
+
+.cds-app .cds-app-action-list__external {
+  margin-inline-start: auto;
+  fill: var(--uc-text-muted) !important;
+}
+
+// "— CONSOLE": the landing page's eyebrow (hairline + micro-label).
 .cds-app .cds-app-sidenav__title {
   @include corner-micro-label(0.625rem);
 
@@ -493,9 +563,101 @@ $safe-right: env(safe-area-inset-right, 0px);
 .cds-app .cds-app-sidenav__heading {
   @include corner-micro-label(0.625rem);
 
-  padding: $spacing-07 $spacing-06 $spacing-03;
+  padding: $spacing-06 $spacing-06 $spacing-03;
   color: var(--uc-text-muted);
   list-style: none;
+}
+
+.cds-app .cds-app-sidenav__title + .cds-app-sidenav__heading {
+  padding-block-start: $spacing-05;
+}
+
+// ---------------------------------------------------------------------------
+// Collapsed icon rail (desktop, remembered per viewer).
+// ---------------------------------------------------------------------------
+.cds-app[data-shell-layout='desktop'][data-sidenav='rail'] .cds-app__main {
+  margin-inline-start: $side-nav-rail-width;
+}
+
+.cds-app[data-shell-layout='desktop'] .cds-app__main {
+  transition: margin-inline-start 180ms ease;
+}
+
+.cds-app .cds--header ~ .cds-app-sidenav.cds-app-sidenav--rail.cds--side-nav--expanded {
+  inline-size: $side-nav-rail-width;
+}
+
+@mixin rail-visually-hidden {
+  position: absolute;
+  overflow: hidden;
+  block-size: 1px;
+  clip: rect(0 0 0 0);
+  inline-size: 1px;
+  white-space: nowrap;
+}
+
+.cds-app .cds-app-sidenav--rail {
+  // Headings collapse into short hairlines; their text stays for screen readers.
+  .cds-app-sidenav__title,
+  .cds-app-sidenav__heading {
+    position: relative;
+    display: block;
+    padding: $spacing-05 0 $spacing-03;
+    block-size: auto;
+    color: transparent;
+    text-shadow: none;
+
+    &::before {
+      display: block;
+      margin-inline: auto;
+      background-color: var(--uc-border-strong);
+      block-size: 1px;
+      content: '';
+      inline-size: 1.5rem;
+      opacity: 1;
+    }
+  }
+
+  .cds-app-sidenav__title {
+    padding-block-start: $spacing-03;
+    font-size: 0;
+
+    &::before {
+      background-color: var(--uc-accent);
+      box-shadow: 0 0 8px rgba(243, 226, 179, 0.6);
+    }
+  }
+
+  .cds-app-sidenav__heading-text {
+    @include rail-visually-hidden;
+  }
+
+  .cds--side-nav__link {
+    justify-content: center;
+    margin-inline: $spacing-03;
+    padding-inline: 0;
+
+    .cds--side-nav__icon:not(.cds--side-nav__submenu-chevron) {
+      margin-inline-end: 0;
+    }
+
+    > .cds--side-nav__link-text {
+      @include rail-visually-hidden;
+    }
+  }
+
+  .cds-app-sidenav__footer {
+    padding-inline: $spacing-03;
+  }
+
+  .cds-app-sidenav__toggle {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .cds-app-sidenav__toggle-label {
+    @include rail-visually-hidden;
+  }
 }
 
 .cds-app .cds-app-sidenav .cds--side-nav__item {
@@ -618,7 +780,7 @@ $safe-right: env(safe-area-inset-right, 0px);
 }
 
 // Pages not yet migrated (staff tools) keep their website styles, on the
-// same black as the rest of User's Corner. OwlCognito's legacy pages are
+// same black as the rest of Console. OwlCognito's legacy pages are
 // built for its light violet look, so they keep it.
 .cds-app .cds-legacy-frame {
   min-block-size: calc(100dvh - var(--cds-app-header-height));

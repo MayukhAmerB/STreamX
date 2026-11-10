@@ -1,5 +1,7 @@
 """Turn a finished class recording into a lecture of the tagged module."""
 
+import logging
+import os
 import shutil
 from pathlib import Path
 
@@ -18,6 +20,7 @@ from .models import ClassRecording
 
 
 GIB = 1024 * 1024 * 1024
+logger = logging.getLogger("ops.realtime")
 
 
 class RecordingPublishError(Exception):
@@ -60,14 +63,14 @@ def next_lecture_order(module):
     return int(current or 0) + 1
 
 
-def create_lecture(recording, module, *, storage_name):
+def create_lecture(recording, module, *, storage_name, title=None):
     """Create (once) the unpublished lecture for ``recording``. Idempotent."""
     with transaction.atomic():
         locked = ClassRecording.objects.select_for_update().get(pk=recording.pk)
         if locked.lecture_id:
             recording.lecture_id = locked.lecture_id
             return locked.lecture
-        title = lecture_title_for(recording.session, recording.started_at)
+        title = title or lecture_title_for(recording.session, recording.started_at)
         earlier_takes = (
             ClassRecording.objects.filter(session_id=recording.session_id, lecture__isnull=False)
             .exclude(pk=recording.pk)
@@ -284,3 +287,134 @@ def finalize_obs_upload(recording):
         )
         _delete_storage_file_on_commit(staged_name)
     return lecture
+
+
+# --------------------------------------------------------------------------
+# Imported recordings (found on the server by the import scan)
+# --------------------------------------------------------------------------
+
+NO_IMPORT_MODULE_ERROR = 'No module chosen for this imported recording: use "Publish to module" in the admin.'
+# Remuxed to a faststart MP4 on import; everything else is placed as it is.
+IMPORT_REMUX_SUFFIXES = frozenset({".mkv", ".flv", ".ts"})
+
+
+def imported_lecture_title(recording):
+    when = recording.started_at or recording.created_at
+    if recording.session_id:
+        return lecture_title_for(recording.session, when)
+    when = timezone.localtime(when or timezone.now())
+    return f"Class recording - {when:%d %b %Y}"[:255]
+
+
+def place_file(source, destination):
+    """Put ``source`` at ``destination`` without touching the original.
+
+    A hard link when both are on the same filesystem mount (no extra space;
+    deleting either name later keeps the other), otherwise a copy written to
+    ``<name>.partial`` and renamed into place. Docker volumes are separate
+    mounts, so /recordings -> /app/media is always a copy, while files already
+    under MEDIA_ROOT are linked. Returns "linked" or "copied".
+    """
+    source, destination = Path(source), Path(destination)
+    if source.resolve() == destination.resolve():
+        raise RecordingPublishError("The imported file is already at its lecture path.")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.unlink(missing_ok=True)  # deterministic name: a retry replaces its own leftover
+    try:
+        os.link(source, destination)
+        return "linked"
+    except OSError:
+        pass
+    partial = destination.with_name(destination.name + ".partial")
+    try:
+        shutil.copyfile(source, partial)
+        os.replace(partial, destination)
+    except BaseException:
+        partial.unlink(missing_ok=True)
+        raise
+    return "copied"
+
+
+def _imported_parts(work_dir):
+    directory = Path(work_dir)
+    if not directory.is_dir() or directory.is_symlink():
+        return []
+    return sorted(
+        path
+        for path in directory.glob("part-*.ts")
+        if path.is_file() and not path.is_symlink() and path.stat().st_size > 0
+    )
+
+
+def finalize_import(recording):
+    """Imported file (or orphaned capture parts) -> lecture of the chosen module.
+
+    FINALIZING -> PROCESSING; the transcoder and publish_if_ready do the rest.
+    The original is never moved or deleted: a single file is hard-linked or
+    copied into the module's media folder (MKV/FLV/TS are remuxed to a
+    faststart MP4 instead, falling back to a copy if that fails), parts are
+    concatenated like a server recording. Safe to run again after a crash.
+    """
+    from .importer import is_within_import_roots  # importer imports this module
+
+    if recording.lecture_id:
+        state.transition(recording, ClassRecording.STATE_PROCESSING, reason="lecture_already_created")
+        return recording.lecture
+    module = recording.module
+    if module is None:
+        raise RecordingPublishError(NO_IMPORT_MODULE_ERROR)
+    if recording.work_dir:
+        if not is_within_import_roots(recording.work_dir):
+            raise RecordingPublishError("The imported folder is outside the recording folders and is not used.")
+        parts = _imported_parts(recording.work_dir)
+        if not parts:
+            raise RecordingPublishError("The captured parts of this imported recording are no longer on the server.")
+        ensure_media_disk_space(sum(part.stat().st_size for part in parts), action="import the recording")
+        storage_name = storage_name_for(recording, module)
+        output_path = Path(settings.MEDIA_ROOT) / storage_name
+        # The list goes next to the output: the original folder is left untouched.
+        list_path = output_path.with_name(output_path.name + ".concat.txt")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            ffmpeg.concat_to_mp4(parts, output_path, list_path=list_path)
+        except ffmpeg.FFmpegError as exc:
+            raise RecordingPublishError(str(exc)) from exc
+        finally:
+            list_path.unlink(missing_ok=True)
+        method = "concatenated"
+    else:
+        source = Path(recording.source_path or "")
+        if not recording.source_path or not source.is_absolute() or not is_within_import_roots(source):
+            raise RecordingPublishError("The imported file is outside the recording folders and is not used.")
+        if source.is_symlink() or not source.is_file():
+            raise RecordingPublishError(f"The imported file is no longer on the server: {source}")
+        ensure_media_disk_space(source.stat().st_size, action="import the recording")
+        suffix = source.suffix.lower() or ".mp4"
+        storage_name = storage_name_for(recording, module, ".mp4" if suffix in IMPORT_REMUX_SUFFIXES else suffix)
+        output_path = Path(settings.MEDIA_ROOT) / storage_name
+        if suffix in IMPORT_REMUX_SUFFIXES:
+            try:
+                ffmpeg.remux_to_mp4(source, output_path)
+                method = "remuxed"
+            except ffmpeg.FFmpegError as exc:
+                # The transcoder decodes far more than MP4 can carry: keep the original container.
+                logger.warning(
+                    "CLASS_RECORDING_IMPORT_REMUX_FAILED recording_id=%s error=%s (using the original file)",
+                    recording.pk,
+                    exc,
+                )
+                storage_name = storage_name_for(recording, module, suffix)
+                output_path = Path(settings.MEDIA_ROOT) / storage_name
+                method = place_file(source, output_path)
+        else:
+            method = place_file(source, output_path)
+    create_lecture(recording, module, storage_name=storage_name, title=imported_lecture_title(recording))
+    state.transition(
+        recording,
+        ClassRecording.STATE_PROCESSING,
+        reason=f"import_{method}",
+        file_size_bytes=output_path.stat().st_size,
+        duration_seconds=ffmpeg.probe_duration_seconds(output_path) or recording.duration_seconds,
+        finalized_at=timezone.now(),
+    )
+    return recording.lecture

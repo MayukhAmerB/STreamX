@@ -49,6 +49,7 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - backend_media:/app/media
+      - backend_private_media:/app/private_media
       - recordings_data:/recordings:ro
     healthcheck:
       test:
@@ -269,6 +270,10 @@ volumes:
     name: streamx_owncast_data
   backend_media:
     name: streamx_backend_media
+  # Weekly report files (apps.reports): private, never mounted into the media
+  # (nginx) container; served only by the authenticated Django download view.
+  backend_private_media:
+    name: streamx_backend_private_media
   recordings_data:
     name: streamx_recordings_data
   cases_content:

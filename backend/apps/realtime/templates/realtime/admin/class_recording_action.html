@@ -1,0 +1,50 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'admin/css/class_recordings.css' %}">
+{% endblock %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a>
+    &rsaquo; <a href="{% url 'admin:realtime_classrecording_changelist' %}">Class recordings</a>
+    {% if recording %}&rsaquo; <a href="{{ cancel_url }}">#{{ recording.pk }} {{ recording_title }}</a>{% endif %}
+    &rsaquo; {{ title }}
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div id="content-main" class="class-recording-form">
+    {% if recording %}
+      <p class="class-recording-muted">
+        Class recording #{{ recording.pk }} &middot; {{ recording_title }}
+        {% if course %}&middot; {{ course.title }}{% endif %}
+        {% if module %}&middot; module "{{ module.title }}"{% endif %}
+        &middot; {{ recording.get_state_display }}
+      </p>
+    {% endif %}
+    {% if warning %}<p class="class-recording-warning">{{ warning }}</p>{% endif %}
+    <div>{{ intro }}</div>
+    <form method="post">
+      {% csrf_token %}
+      {% if form %}
+        {{ form.non_field_errors }}
+        <fieldset class="module aligned">
+          {% for field in form %}
+            <div class="form-row">
+              {{ field.errors }}
+              {{ field.label_tag }} {{ field }}
+              {% if field.help_text %}<div class="help">{{ field.help_text }}</div>{% endif %}
+            </div>
+          {% endfor %}
+        </fieldset>
+      {% endif %}
+      <div class="submit-row">
+        <input type="submit" class="default{% if danger %} class-recording-danger{% endif %}" value="{{ submit_label }}">
+        <a href="{{ cancel_url }}" class="closelink">Cancel</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

@@ -120,6 +120,8 @@ gzip -dc "${BACKUP_DIR}/postgres.sql.gz" \
 
 log "Restoring persistent volumes."
 restore_volume "streamx_backend_media" "backend_media.tar.gz"
+# Older backups have no private-media archive; restore_volume skips it.
+restore_volume "streamx_backend_private_media" "backend_private_media.tar.gz"
 restore_volume "streamx_recordings_data" "recordings_data.tar.gz"
 restore_volume "streamx_owncast_data" "owncast_data.tar.gz"
 if [ "$INCLUDE_REDIS_RESTORE" = "1" ]; then

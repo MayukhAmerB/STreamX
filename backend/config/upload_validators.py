@@ -1,4 +1,9 @@
+import json
 import os
+import re
+import warnings
+import zipfile
+from xml.etree import ElementTree
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -377,3 +382,464 @@ def validate_resource_upload(file_obj, field_name="resource_file", max_bytes=Non
     content_type = _content_type(file_obj)
     if content_type and content_type not in ALLOWED_RESOURCE_CONTENT_TYPES:
         raise ValidationError({field_name: "Unsupported resource content type."})
+
+
+# ---------------------------------------------------------------------------
+# Weekly report submissions (apps.reports)
+#
+# Students send PDF, PowerPoint/Word (and their OpenDocument equivalents) and
+# Obsidian exports: notes (.md), canvases (.canvas, JSON Canvas), exported
+# graphs (PNG/JPEG/WEBP/SVG) or a .zip of a vault folder. Every file is checked
+# by content, never by name or browser-sent MIME type: the bytes must match
+# the extension, Office macro formats are refused (also when renamed), and a
+# .zip is inspected in memory (never extracted) for bombs, traversal paths,
+# symlinks, encryption and file types outside the allow-list.
+# ---------------------------------------------------------------------------
+REPORT_ALLOWED_EXTENSIONS = (
+    "pdf",
+    "pptx",
+    "ppt",
+    "docx",
+    "doc",
+    "odt",
+    "odp",
+    "md",
+    "canvas",
+    "png",
+    "jpg",
+    "jpeg",
+    "webp",
+    "svg",
+    "zip",
+)
+REPORT_MACRO_EXTENSIONS = frozenset(
+    {"pptm", "potm", "ppsm", "ppam", "sldm", "docm", "dotm", "xlsm", "xltm", "xlam"}
+)
+REPORT_CONTENT_TYPES = {
+    "pdf": "application/pdf",
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "ppt": "application/vnd.ms-powerpoint",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "doc": "application/msword",
+    "odt": "application/vnd.oasis.opendocument.text",
+    "odp": "application/vnd.oasis.opendocument.presentation",
+    "md": "text/markdown; charset=utf-8",
+    "canvas": "application/json",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "webp": "image/webp",
+    "svg": "image/svg+xml",
+    "zip": "application/zip",
+}
+# Files inside an Obsidian vault .zip: notes, canvases, attachments and the
+# vault's JSON/CSS settings. Plugins (main.js) and anything executable are not.
+REPORT_ZIP_INNER_EXTENSIONS = frozenset(
+    {
+        "md",
+        "markdown",
+        "txt",
+        "canvas",
+        "base",
+        "json",
+        "css",
+        "csv",
+        "pdf",
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "webp",
+        "bmp",
+        "svg",
+    }
+)
+# OS metadata that zip tools add on their own; ignored, never rejected.
+REPORT_ZIP_IGNORED_NAMES = frozenset({".ds_store", "thumbs.db", "desktop.ini"})
+REPORT_TEXT_MAX_BYTES = 5 * 1024 * 1024
+REPORT_CANVAS_MAX_BYTES = 5 * 1024 * 1024
+REPORT_CANVAS_MAX_ITEMS = 5000
+REPORT_OFFICE_MAX_ENTRIES = 20000
+REPORT_OFFICE_MAX_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024
+DEFAULT_REPORT_ZIP_MAX_ENTRIES = 2000
+DEFAULT_REPORT_ZIP_MAX_UNCOMPRESSED_BYTES = 500 * 1024 * 1024
+DEFAULT_REPORT_ZIP_MAX_RATIO = 100
+OLE2_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+ZIP_LOCAL_HEADER_MAGIC = b"PK\x03\x04"
+_OLE_SCAN_CHUNK_BYTES = 1024 * 1024
+_OLE_VBA_MARKER = "_VBA_PROJECT".encode("utf-16-le")
+_OLE_WORD_MARKER = "WordDocument".encode("utf-16-le")
+_OLE_POWERPOINT_MARKER = "PowerPoint Document".encode("utf-16-le")
+_SVG_FORBIDDEN_PATTERNS = (
+    re.compile(r"<\s*script\b", re.IGNORECASE),
+    re.compile(r"<!\s*(?:doctype|entity)\b", re.IGNORECASE),
+    re.compile(r"\bon[a-z]+\s*=", re.IGNORECASE),
+    re.compile(r"javascript\s*:", re.IGNORECASE),
+)
+_DRIVE_PATH = re.compile(r"^[A-Za-z]:")
+
+
+def report_extension(name):
+    return os.path.splitext(str(name or ""))[1].lstrip(".").lower()
+
+
+def report_content_type(extension):
+    return REPORT_CONTENT_TYPES.get(str(extension or "").lower(), "application/octet-stream")
+
+
+def _report_reject(field_name, message):
+    raise ValidationError({field_name: message})
+
+
+def _display_name(file_obj):
+    raw = str(getattr(file_obj, "name", "") or "").replace("\\", "/").split("/")[-1]
+    return raw[:80] or "This file"
+
+
+def _format_megabytes(byte_count):
+    megabytes = byte_count / float(1024 * 1024)
+    if megabytes >= 10 or float(megabytes).is_integer():
+        return f"{megabytes:.0f} MB"
+    return f"{megabytes:.1f} MB"
+
+
+def _looks_like_executable(header):
+    return (
+        header.startswith(b"MZ")
+        or header.startswith(b"\x7fELF")
+        or header.startswith(b"#!")
+        or header[:4] in {b"\xca\xfe\xba\xbe", b"\xfe\xed\xfa\xce", b"\xfe\xed\xfa\xcf", b"\xcf\xfa\xed\xfe"}
+    )
+
+
+def _read_all_limited(file_obj, limit, field_name, label):
+    cursor = _safe_tell(file_obj)
+    try:
+        _safe_seek(file_obj, 0)
+        data = file_obj.read(limit + 1) or b""
+    finally:
+        if cursor is not None:
+            _safe_seek(file_obj, cursor)
+    if isinstance(data, str):
+        data = data.encode("utf-8")
+    if len(data) > limit:
+        _report_reject(field_name, f"{label} files must be {_format_megabytes(limit)} or smaller.")
+    return bytes(data)
+
+
+def _decode_utf8_text(data, field_name, label):
+    if b"\x00" in data:
+        _report_reject(field_name, f"This {label} file contains binary data. Upload a plain-text {label} file.")
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        _report_reject(field_name, f"This {label} file is not UTF-8 text. Save it as UTF-8 and upload again.")
+
+
+def _open_zip(file_obj, field_name, ext):
+    _safe_seek(file_obj, 0)
+    try:
+        return zipfile.ZipFile(file_obj)
+    except (zipfile.BadZipFile, zipfile.LargeZipFile, OSError, ValueError, EOFError):
+        _report_reject(field_name, f"This .{ext} file is damaged or is not a real .{ext} file.")
+
+
+def _zip_totals_within(infos, max_entries, max_uncompressed):
+    return len(infos) <= max_entries and sum(max(0, int(info.file_size)) for info in infos) <= max_uncompressed
+
+
+def _check_office_container(file_obj, ext, field_name):
+    """.docx / .pptx: an Office Open XML zip with the right main part and no VBA."""
+    kind = "Word document" if ext == "docx" else "PowerPoint presentation"
+    archive = _open_zip(file_obj, field_name, ext)
+    try:
+        infos = archive.infolist()
+        if not _zip_totals_within(infos, REPORT_OFFICE_MAX_ENTRIES, REPORT_OFFICE_MAX_UNCOMPRESSED_BYTES):
+            _report_reject(field_name, f"This .{ext} file is unusually large inside. Save it again and retry.")
+        names = {info.filename.replace("\\", "/").lower() for info in infos}
+        if "[content_types].xml" not in names:
+            _report_reject(field_name, f"This file is not a real .{ext} {kind}.")
+        main_part = "word/document.xml" if ext == "docx" else "ppt/presentation.xml"
+        if main_part not in names:
+            _report_reject(field_name, f"This file is not a {kind}. Check the file type and try again.")
+        try:
+            content_types = archive.read("[Content_Types].xml")[: 2 * 1024 * 1024].lower()
+        except (KeyError, zipfile.BadZipFile, OSError, RuntimeError, NotImplementedError, ValueError):
+            content_types = None
+        if content_types is None:
+            _report_reject(field_name, f"This .{ext} file is damaged.")
+        if any(name.endswith("vbaproject.bin") for name in names) or b"macroenabled" in content_types:
+            _report_reject(
+                field_name,
+                f"This file contains macros, which are not accepted. Save it as a normal .{ext} (without macros) and upload again.",
+            )
+    finally:
+        archive.close()
+
+
+def _check_opendocument(file_obj, ext, field_name):
+    expected = {
+        "odt": b"application/vnd.oasis.opendocument.text",
+        "odp": b"application/vnd.oasis.opendocument.presentation",
+    }[ext]
+    archive = _open_zip(file_obj, field_name, ext)
+    try:
+        infos = archive.infolist()
+        if not infos or infos[0].filename != "mimetype":
+            _report_reject(field_name, f"This file is not a real OpenDocument (.{ext}) file.")
+        if not _zip_totals_within(infos, REPORT_OFFICE_MAX_ENTRIES, REPORT_OFFICE_MAX_UNCOMPRESSED_BYTES):
+            _report_reject(field_name, f"This .{ext} file is unusually large inside. Save it again and retry.")
+        try:
+            mimetype = archive.read("mimetype")[:200].strip()
+        except (KeyError, zipfile.BadZipFile, OSError, RuntimeError, NotImplementedError, ValueError):
+            mimetype = b""
+        if mimetype != expected:
+            _report_reject(field_name, f"This file is not a real OpenDocument (.{ext}) file.")
+        if any(info.filename.startswith(("Basic/", "Scripts/")) for info in infos):
+            _report_reject(field_name, "This file contains macros, which are not accepted. Remove them and upload again.")
+    finally:
+        archive.close()
+
+
+def _check_ole_document(file_obj, header, ext, field_name):
+    """Legacy .doc / .ppt (OLE2 compound file): the right stream and no VBA project."""
+    kind = "Word document" if ext == "doc" else "PowerPoint presentation"
+    if not header.startswith(OLE2_MAGIC):
+        _report_reject(field_name, f"This file is not a real .{ext} {kind}.")
+    marker = _OLE_WORD_MARKER if ext == "doc" else _OLE_POWERPOINT_MARKER
+    found_marker = False
+    found_macros = False
+    tail = b""
+    cursor = _safe_tell(file_obj)
+    try:
+        _safe_seek(file_obj, 0)
+        while True:
+            chunk = file_obj.read(_OLE_SCAN_CHUNK_BYTES)
+            if not chunk:
+                break
+            window = tail + chunk
+            if _OLE_VBA_MARKER in window:
+                found_macros = True
+                break
+            found_marker = found_marker or marker in window
+            tail = window[-64:]
+    finally:
+        if cursor is not None:
+            _safe_seek(file_obj, cursor)
+    if found_macros:
+        _report_reject(
+            field_name,
+            f"This file contains macros, which are not accepted. Save it as .{ext}x without macros and upload again.",
+        )
+    if not found_marker:
+        _report_reject(field_name, f"This file is not a {kind}. Check the file type and try again.")
+
+
+def _check_report_image(file_obj, header, ext, field_name):
+    signatures = {
+        "png": header.startswith(b"\x89PNG\r\n\x1a\n"),
+        "jpg": header.startswith(b"\xff\xd8\xff"),
+        "jpeg": header.startswith(b"\xff\xd8\xff"),
+        "webp": len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WEBP",
+    }
+    if not signatures[ext]:
+        _report_reject(field_name, f"This file is not a real .{ext} image.")
+    expected_format = {"png": "PNG", "jpg": "JPEG", "jpeg": "JPEG", "webp": "WEBP"}[ext]
+    problem = None
+    cursor = _safe_tell(file_obj)
+    try:
+        _safe_seek(file_obj, 0)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(file_obj) as image:
+                if str(image.format or "").upper() != expected_format:
+                    problem = f"This file is not a real .{ext} image."
+                else:
+                    image.verify()
+    except (Image.DecompressionBombError, Image.DecompressionBombWarning):
+        problem = "This image is too large (too many pixels). Export it at a smaller size."
+    except (UnidentifiedImageError, OSError, ValueError, SyntaxError, EOFError):
+        problem = f"This .{ext} image is damaged."
+    finally:
+        if cursor is not None:
+            _safe_seek(file_obj, cursor)
+    if problem:
+        _report_reject(field_name, problem)
+
+
+def _check_report_svg(file_obj, field_name):
+    text = _decode_utf8_text(_read_all_limited(file_obj, REPORT_TEXT_MAX_BYTES, field_name, "SVG"), field_name, "SVG")
+    if any(pattern.search(text) for pattern in _SVG_FORBIDDEN_PATTERNS):
+        _report_reject(
+            field_name,
+            "This SVG contains scripts or embedded definitions, which are not accepted. Export it again as a plain image.",
+        )
+    try:
+        root = ElementTree.fromstring(text.strip())
+    except ElementTree.ParseError:
+        root = None
+    if root is None or str(root.tag).rsplit("}", 1)[-1].lower() != "svg":
+        _report_reject(field_name, "This file is damaged or is not an SVG image.")
+
+
+def validate_obsidian_canvas_text(text, field_name="file"):
+    """JSON Canvas (https://jsoncanvas.org): ``{"nodes": [...], "edges": [...]}``."""
+    try:
+        payload = json.loads(text) if str(text or "").strip() else {}
+    except (ValueError, RecursionError):
+        payload = None
+    if payload is None:
+        _report_reject(field_name, "This .canvas file is not valid JSON. Export it from Obsidian again.")
+    if not isinstance(payload, dict):
+        _report_reject(field_name, "This .canvas file is not an Obsidian canvas.")
+    nodes = payload.get("nodes", [])
+    edges = payload.get("edges", [])
+    if not isinstance(nodes, list) or not isinstance(edges, list):
+        _report_reject(field_name, "This .canvas file is not an Obsidian canvas.")
+    if len(nodes) + len(edges) > REPORT_CANVAS_MAX_ITEMS:
+        _report_reject(field_name, f"This canvas has more than {REPORT_CANVAS_MAX_ITEMS} cards and connections.")
+    for node in nodes:
+        if not isinstance(node, dict) or not isinstance(node.get("id"), str):
+            _report_reject(field_name, "This .canvas file has a card without an id. Export it from Obsidian again.")
+    for edge in edges:
+        if not isinstance(edge, dict) or not isinstance(edge.get("fromNode"), str) or not isinstance(edge.get("toNode"), str):
+            _report_reject(field_name, "This .canvas file has a broken connection. Export it from Obsidian again.")
+    return payload
+
+
+def _zip_limit(limits, key, default):
+    try:
+        return max(1, int((limits or {}).get(key) or default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _check_obsidian_zip(file_obj, field_name, limits=None):
+    max_entries = _zip_limit(limits, "max_entries", DEFAULT_REPORT_ZIP_MAX_ENTRIES)
+    max_uncompressed = _zip_limit(limits, "max_uncompressed_bytes", DEFAULT_REPORT_ZIP_MAX_UNCOMPRESSED_BYTES)
+    max_ratio = _zip_limit(limits, "max_ratio", DEFAULT_REPORT_ZIP_MAX_RATIO)
+    archive = _open_zip(file_obj, field_name, "zip")
+    try:
+        infos = archive.infolist()
+        if len(infos) > max_entries:
+            _report_reject(field_name, f"This .zip has more than {max_entries} entries. Zip only the vault folder you need.")
+        total_uncompressed = 0
+        total_compressed = 0
+        file_count = 0
+        for info in infos:
+            name = info.filename.replace("\\", "/")
+            if not name or len(name) > 1024 or any(ord(char) < 32 for char in name):
+                _report_reject(field_name, "This .zip contains a file with an invalid name.")
+            if name.startswith("/") or _DRIVE_PATH.match(name):
+                _report_reject(field_name, "This .zip contains absolute paths, which are not allowed.")
+            if ".." in name.split("/"):
+                _report_reject(field_name, "This .zip contains '..' paths, which are not allowed.")
+            if info.flag_bits & 0x1:
+                _report_reject(field_name, "This .zip is password-protected. Upload it without a password.")
+            if (info.external_attr >> 16) & 0o170000 == 0o120000:
+                _report_reject(field_name, "This .zip contains symbolic links, which are not allowed.")
+            if name.endswith("/"):
+                continue
+            file_size = max(0, int(info.file_size))
+            compress_size = max(0, int(info.compress_size))
+            total_uncompressed += file_size
+            total_compressed += compress_size
+            if total_uncompressed > max_uncompressed:
+                _report_reject(
+                    field_name,
+                    f"This .zip unpacks to more than {_format_megabytes(max_uncompressed)}. Zip a smaller part of the vault.",
+                )
+            if file_size > 1024 * 1024 and file_size > max_ratio * max(1, compress_size):
+                _report_reject(field_name, "This .zip is compressed suspiciously well (a possible zip bomb) and was rejected.")
+            parts = [part for part in name.split("/") if part]
+            base_name = parts[-1] if parts else ""
+            if (parts and parts[0] == "__MACOSX") or base_name.lower() in REPORT_ZIP_IGNORED_NAMES or base_name.startswith("._"):
+                continue
+            file_count += 1
+            if report_extension(base_name) not in REPORT_ZIP_INNER_EXTENSIONS:
+                shown = name if len(name) <= 80 else f"...{name[-77:]}"
+                hint = " Leave out the .obsidian/plugins folder." if "/plugins/" in f"/{name}" else ""
+                _report_reject(
+                    field_name,
+                    f"This .zip contains a file type that is not allowed ({shown}). "
+                    f"Vault zips may contain notes, canvases, images and PDFs only.{hint}",
+                )
+        if file_count == 0:
+            _report_reject(field_name, "This .zip has no notes or files in it.")
+        if total_uncompressed > 1024 * 1024 and total_uncompressed > max_ratio * max(1, total_compressed):
+            _report_reject(field_name, "This .zip is compressed suspiciously well (a possible zip bomb) and was rejected.")
+    finally:
+        archive.close()
+
+
+def validate_report_upload(file_obj, *, max_bytes, field_name="file", allowed_extensions=None, zip_limits=None):
+    """Validate one weekly-report file by its content.
+
+    Returns ``{"extension": ..., "content_type": ...}`` (the type to serve it
+    with, derived from the verified extension, never from the browser).
+    Raises ``ValidationError({field_name: message})`` with a sentence the
+    student can act on.
+    """
+    if not file_obj:
+        _report_reject(field_name, "Choose a file to upload.")
+    _validate_filename(file_obj, field_name)
+    _validate_no_dangerous_double_extension(file_obj, field_name)
+    ext = _extension(file_obj)
+    if ext in REPORT_MACRO_EXTENSIONS:
+        _report_reject(
+            field_name,
+            "Macro-enabled Office files (.pptm, .docm) are not accepted. Save it as .pptx or .docx and upload again.",
+        )
+    wanted = set(allowed_extensions or REPORT_ALLOWED_EXTENSIONS)
+    allowed = [value for value in REPORT_ALLOWED_EXTENSIONS if value in wanted]
+    if ext not in allowed:
+        listed = ", ".join(f".{value}" for value in allowed)
+        shown = f".{ext} files are" if ext else "Files without an extension are"
+        _report_reject(field_name, f"{shown} not accepted for this report. Allowed: {listed}.")
+    size = getattr(file_obj, "size", None)
+    if not size:
+        _report_reject(field_name, f"{_display_name(file_obj)} is empty.")
+    max_bytes = max(1, int(max_bytes))
+    if size > max_bytes:
+        _report_reject(field_name, f"{_display_name(file_obj)} is larger than the {_format_megabytes(max_bytes)} limit.")
+    header = _read_head(file_obj, bytes_count=2048)
+    if not header:
+        _report_reject(field_name, f"{_display_name(file_obj)} is empty.")
+    if _looks_like_executable(header):
+        _report_reject(field_name, "Programs and scripts are not accepted.")
+
+    if ext == "pdf":
+        if b"%PDF-" not in header[:1024]:
+            _report_reject(field_name, "This file is not a real PDF. Export or save it as PDF and try again.")
+    elif ext in {"docx", "pptx"}:
+        if header.startswith(OLE2_MAGIC):
+            _report_reject(
+                field_name,
+                f"This .{ext} looks password-protected or saved in an older format. "
+                f"Remove the password or save it as .{ext} again.",
+            )
+        if not header.startswith(ZIP_LOCAL_HEADER_MAGIC):
+            _report_reject(field_name, f"This file is not a real .{ext} file.")
+        _check_office_container(file_obj, ext, field_name)
+    elif ext in {"odt", "odp"}:
+        if not header.startswith(ZIP_LOCAL_HEADER_MAGIC):
+            _report_reject(field_name, f"This file is not a real .{ext} file.")
+        _check_opendocument(file_obj, ext, field_name)
+    elif ext in {"doc", "ppt"}:
+        _check_ole_document(file_obj, header, ext, field_name)
+    elif ext == "md":
+        data = _read_all_limited(file_obj, REPORT_TEXT_MAX_BYTES, field_name, "Markdown")
+        _decode_utf8_text(data, field_name, "Markdown")
+    elif ext == "canvas":
+        data = _read_all_limited(file_obj, REPORT_CANVAS_MAX_BYTES, field_name, "Canvas")
+        validate_obsidian_canvas_text(_decode_utf8_text(data, field_name, "canvas"), field_name)
+    elif ext in {"png", "jpg", "jpeg", "webp"}:
+        _check_report_image(file_obj, header, ext, field_name)
+    elif ext == "svg":
+        _check_report_svg(file_obj, field_name)
+    elif ext == "zip":
+        if not header.startswith(ZIP_LOCAL_HEADER_MAGIC):
+            _report_reject(field_name, "This file is not a real .zip file.")
+        _check_obsidian_zip(file_obj, field_name, zip_limits)
+    _safe_seek(file_obj, 0)
+    return {"extension": ext, "content_type": report_content_type(ext)}

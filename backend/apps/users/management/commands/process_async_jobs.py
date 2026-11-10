@@ -3,11 +3,12 @@ import time
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
+from apps.core.worker import run_worker_tick
 from apps.users.async_jobs import run_pending_jobs
 
 
 class Command(BaseCommand):
-    help = "Process queued asynchronous jobs (email/webhook retries)."
+    help = "Process queued asynchronous jobs (email/webhook retries) and deliver transactional-outbox events."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -42,6 +43,13 @@ class Command(BaseCommand):
                 f"retried={stats['retried']} "
                 f"dead={stats['dead']}"
             )
+            try:
+                outbox_stats = run_worker_tick(batch_size=batch_size)
+            except Exception as exc:  # noqa: BLE001 - outbox trouble must not stop AsyncJob delivery
+                self.stderr.write(f"outbox drain failed: {exc!r}")
+            else:
+                if outbox_stats.get("claimed") or outbox_stats.get("reclaimed") or run_once:
+                    self.stdout.write("outbox " + " ".join(f"{key}={value}" for key, value in outbox_stats.items()))
             if run_once:
                 return
             time.sleep(poll_seconds)

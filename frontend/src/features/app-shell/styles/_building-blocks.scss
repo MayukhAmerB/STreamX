@@ -21,23 +21,30 @@
   min-inline-size: 0;
 }
 
-// "— USER'S CORNER": the landing page's section eyebrow.
+// "— CONSOLE": the landing page's section eyebrow (same as the hub's).
 .cds-app .cds-page-header__eyebrow {
   @include corner-micro-label(0.625rem);
 
   display: flex;
   align-items: center;
-  margin-block-end: $spacing-04;
-  color: var(--uc-text-muted);
-  gap: $spacing-04;
+  margin-block-end: $spacing-05;
+  color: var(--uc-accent);
+  gap: $spacing-05;
+  letter-spacing: 0.22em;
+  text-shadow: var(--uc-text-glow);
 
   &::before {
     display: block;
     flex: none;
-    background-color: rgba(255, 255, 255, 0.7);
+    background-color: var(--uc-accent);
     block-size: 1px;
     content: '';
-    inline-size: 2.5rem;
+    inline-size: 2rem;
+    opacity: 0.7;
+  }
+
+  @include breakpoint(md) {
+    font-size: 0.6875rem;
   }
 }
 
@@ -154,4 +161,190 @@
   .cds-page-notification {
     margin-block-end: $spacing-04;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Micro-stat chips (hub greeting band + My courses).
+// ---------------------------------------------------------------------------
+.cds-app .cds-stat-chips {
+  display: grid;
+  max-inline-size: 40rem;
+  margin: 0;
+  gap: $spacing-03;
+  grid-template-columns: repeat(auto-fit, minmax(7.25rem, 1fr));
+}
+
+.cds-app .cds-stat-chip {
+  display: flex;
+  min-inline-size: 0;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  padding: $spacing-03 $spacing-05;
+  border: 1px solid var(--uc-border);
+  border-radius: var(--uc-radius-md);
+  background: rgba(255, 255, 255, 0.025);
+  gap: 2px;
+}
+
+.cds-app .cds-stat-chip__label {
+  @include corner-micro-label(0.5625rem);
+
+  color: var(--uc-text-2);
+  letter-spacing: 0.18em;
+}
+
+.cds-app .cds-stat-chip__value {
+  @include corner-heading(-0.04em);
+
+  margin: 0;
+  color: var(--uc-text);
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.cds-app .cds-stat-chip__suffix {
+  margin-inline-start: 1px;
+  color: var(--uc-text-2);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.cds-app .cds-stat-chip--accent {
+  border-color: var(--uc-accent-line);
+  background: var(--uc-accent-soft);
+
+  .cds-stat-chip__value {
+    color: var(--uc-accent);
+    text-shadow: var(--uc-text-glow);
+  }
+
+  .cds-stat-chip__suffix {
+    color: var(--uc-accent);
+  }
+}
+
+.cds-app .cds-stat-chip--skeleton {
+  flex-direction: column;
+  gap: $spacing-03;
+  min-block-size: 3.875rem;
+}
+
+// ---------------------------------------------------------------------------
+// Progress meter: "30% complete · 6 of 20 lessons done" + slim bar.
+// ---------------------------------------------------------------------------
+.cds-app .cds-meter {
+  display: flex;
+  min-inline-size: 0;
+  flex-direction: column;
+  gap: $spacing-03;
+}
+
+.cds-app .cds-meter__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-02 $spacing-03;
+}
+
+.cds-app .cds-meter__value {
+  display: inline-flex;
+  align-items: center;
+  color: var(--uc-text);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  gap: $spacing-02;
+}
+
+.cds-app .cds-meter__icon {
+  fill: var(--uc-success);
+}
+
+.cds-app .cds-meter__summary {
+  color: var(--uc-text-2);
+  font-size: 0.75rem;
+}
+
+.cds-app .cds-meter__track {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--uc-radius-pill);
+  background-color: rgba(255, 255, 255, 0.1);
+  block-size: 4px;
+}
+
+.cds-app .cds-meter__fill {
+  display: block;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--uc-accent-active), var(--uc-accent));
+  block-size: 100%;
+  box-shadow: 0 0 10px rgba(243, 226, 179, 0.5);
+  max-inline-size: 100%;
+  transition: inline-size 400ms ease;
+}
+
+.cds-app .cds-meter--done .cds-meter__fill {
+  background: var(--uc-success);
+  box-shadow: 0 0 10px rgba(66, 190, 101, 0.45);
+}
+
+// ---------------------------------------------------------------------------
+// Skeleton bars shaped like the final content.
+// ---------------------------------------------------------------------------
+@keyframes uc-skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.cds-app .cds-skeleton-bar {
+  display: block;
+  border-radius: 6px;
+  block-size: 0.75rem;
+  inline-size: 60%;
+
+  @include corner-skeleton;
+}
+
+.cds-app .cds-skeleton-bar--label {
+  block-size: 0.5rem;
+  inline-size: 3.5rem;
+}
+
+.cds-app .cds-skeleton-bar--value {
+  block-size: 1.5rem;
+  inline-size: 2.5rem;
+}
+
+.cds-app .cds-skeleton-bar--tag {
+  border-radius: var(--uc-radius-pill);
+  block-size: 1.25rem;
+  inline-size: 4.5rem;
+}
+
+.cds-app .cds-skeleton-bar--title {
+  block-size: 1.5rem;
+  inline-size: 75%;
+}
+
+.cds-app .cds-skeleton-bar--line {
+  inline-size: 50%;
+}
+
+.cds-app .cds-skeleton-bar--track {
+  border-radius: var(--uc-radius-pill);
+  block-size: 4px;
+  inline-size: 100%;
+}
+
+.cds-app .cds-skeleton-bar--button {
+  border-radius: var(--uc-radius-control);
+  block-size: 2.75rem;
+  inline-size: 9rem;
 }

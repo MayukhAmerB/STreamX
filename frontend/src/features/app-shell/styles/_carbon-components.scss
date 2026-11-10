@@ -9,14 +9,19 @@
 @use '@carbon/styles/scss/layout';
 @use '@carbon/styles/scss/components/ui-shell';
 @use '@carbon/styles/scss/components/button';
+// Weekly reports: editor checkboxes / radios, confirmation modal, selects.
+@use '@carbon/styles/scss/components/checkbox';
 @use '@carbon/styles/scss/components/content-switcher';
 @use '@carbon/styles/scss/components/form';
 @use '@carbon/styles/scss/components/inline-loading';
 @use '@carbon/styles/scss/components/link';
+@use '@carbon/styles/scss/components/modal';
 @use '@carbon/styles/scss/components/notification';
 @use '@carbon/styles/scss/components/popover';
 @use '@carbon/styles/scss/components/progress-bar';
+@use '@carbon/styles/scss/components/radio-button';
 @use '@carbon/styles/scss/components/search';
+@use '@carbon/styles/scss/components/select';
 @use '@carbon/styles/scss/components/skeleton-styles';
 @use '@carbon/styles/scss/components/stack';
 @use '@carbon/styles/scss/components/tabs';

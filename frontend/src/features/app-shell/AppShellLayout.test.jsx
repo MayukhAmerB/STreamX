@@ -33,7 +33,7 @@ function renderShell({ path = "/my-courses", auth = {} } = {}) {
 describe("AppShellLayout", () => {
   it("renders the Carbon header, side nav and page inside the scoped shell root", () => {
     const html = renderShell();
-    // Dark only: one User's Corner theme, no Carbon White/G100 switch.
+    // Dark only: one Console theme, no Carbon White/G100 switch.
     expect(html).toMatch(/^<div class="cds-app" data-shell-layout="desktop">/);
     expect(html).toContain('class="cds--header"');
     expect(html).toContain("Skip to main content");
@@ -45,16 +45,18 @@ describe("AppShellLayout", () => {
     expect(html).toContain('<div class="cds-page"><p>Page body</p></div>');
   });
 
-  it("brands the shell as User's Corner with the website brand block and a way back", () => {
+  it("brands the shell as the Console with the website brand block and a way back", () => {
     const html = renderShell();
-    expect(html).toContain('aria-label="Al syed Initiative User&#x27;s Corner"');
-    // Brand block (logo + name + platform label) links to the User's Corner home.
-    expect(html).toMatch(/<a[^>]*class="cds--header__name uc-header__brand"[^>]*href="\/users-corner"/);
+    expect(html).toContain('aria-label="Al syed Initiative Console"');
+    // Brand block (logo + name + platform label) links to the Console home.
+    expect(html).toMatch(/<a[^>]*class="cds--header__name uc-header__brand"[^>]*href="\/console"/);
     expect(html).toContain('src="/logo.jpeg"');
     expect(html).toContain('<span class="uc-brand__name">Al syed Initiative</span>');
     expect(html).toContain('<span class="uc-brand__platform">Cybersecurity Platform</span>');
-    expect(html).toContain('<span class="uc-header__section">User&#x27;s Corner</span>');
-    expect(html).toContain('<li class="cds-app-sidenav__title">User&#x27;s Corner</li>');
+    expect(html).toContain('<span class="uc-header__section">Console</span>');
+    expect(html).toContain('<li class="cds-app-sidenav__title">Console</li>');
+    expect(html).toContain('<span class="uc-brand__corner">Console</span>');
+    expect(html).not.toMatch(/User(&#x27;|')s Corner/);
     expect(html).toMatch(/<a class="uc-header__back" href="\/">.*Back to website<\/span><\/a>/);
     // The Light / Dark / Auto switcher is gone.
     expect(html).not.toContain("Appearance");
@@ -62,11 +64,40 @@ describe("AppShellLayout", () => {
   });
 
   it("makes Overview the first destination and highlights it on the hub", () => {
-    const html = renderShell({ path: "/users-corner" });
+    const html = renderShell({ path: "/console" });
     expect(html.match(/aria-current="page"/g)).toHaveLength(1);
-    expect(html).toMatch(/<a aria-current="page"[^>]*href="\/users-corner"/);
+    expect(html).toMatch(/<a aria-current="page"[^>]*href="\/console"/);
     const firstNavLink = html.slice(html.indexOf("cds-app-sidenav__title")).match(/href="([^"]+)"/);
-    expect(firstNavLink[1]).toBe("/users-corner");
+    expect(firstNavLink[1]).toBe("/console");
+  });
+
+  it("groups the side nav under micro-label headings", () => {
+    const html = renderShell();
+    const headings = [...html.matchAll(/<span class="cds-app-sidenav__heading-text">([^<]+)<\/span>/g)].map((m) => m[1]);
+    expect(headings).toEqual(["Learn", "Account"]);
+  });
+
+  it("links Labs as an external site in a new tab, never as the current page", () => {
+    for (const path of ["/console", "/osint-tools", "/labs"]) {
+      const html = renderShell({ path });
+      const labs = html.match(/<a[^>]*href="https:\/\/labs\.alsyedinitiative\.com"[^>]*>.*?<\/a>/)?.[0] || "";
+      expect(labs).toContain('target="_blank"');
+      expect(labs).toContain('rel="noopener noreferrer"');
+      expect(labs).toContain("Labs");
+      expect(labs).toContain("(opens in a new tab)");
+      expect(labs).not.toContain("aria-current");
+      expect(labs).not.toContain("side-nav__link--current");
+    }
+    // Sits right after OSINT tools in the Learn group.
+    const html = renderShell();
+    expect(html.indexOf("labs.alsyedinitiative.com")).toBeGreaterThan(html.indexOf('href="/osint-tools"'));
+    expect(html.indexOf("labs.alsyedinitiative.com")).toBeLessThan(html.indexOf('href="/profile"'));
+  });
+
+  it("offers a collapse toggle for the desktop side nav", () => {
+    const html = renderShell();
+    expect(html).toMatch(/<button type="button" class="cds-app-sidenav__toggle" aria-controls="cds-app-side-nav" aria-expanded="true"/);
+    expect(html).toContain("Collapse menu");
   });
 
   it("marks only the active destination with aria-current", () => {

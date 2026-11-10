@@ -1,19 +1,35 @@
 import ast
+import copy
 import json
 
 from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count
 from django.urls import reverse
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django.utils.translation import ngettext
 
 from apps.payments.batch_pass import (
     active_pass_holder_count,
     grant_course_to_pass_holders,
     revoke_course_from_pass_holders,
+)
+from apps.payments.plans import (
+    CARD_KEYS,
+    CARD_TEXT_LIMITS,
+    CATALOG,
+    MAX_CARD_FEATURES,
+    MAX_CARDS,
+    card_config,
+    clean_card_value,
+    default_card,
+    enabled_plan_ids,
+    payment_cards_per_row,
+    resolve_course_plans,
+    validation_messages,
 )
 from config.audit import log_security_event
 
@@ -180,6 +196,145 @@ def _parse_public_curriculum(value):
         raise forms.ValidationError(messages or str(exc)) from exc
 
 
+# ---------------------------------------------------------------------------
+# Payment cards: one admin section per plan (apps.payments.plans is the rulebook)
+# ---------------------------------------------------------------------------
+
+PAYMENT_CARD_SHORT_NAMES = {
+    "monthly": "Monthly",
+    "full": "One-time",
+    "bundle": "Bundle",
+    "batch_pass": "Pass",
+}
+# Course fields that hold each plan's switch, price, installments and access days.
+PAYMENT_CARD_MONEY_LABELS = {
+    "installment_payment_enabled": ("Show the monthly (EMI) card", ""),
+    "monthly_price": ("Amount per installment (₹)", "Charged on each monthly payment."),
+    "installments_required": ("Number of installments", "Paying all of them unlocks lifetime access."),
+    "installment_access_days": ("Access days per installment", "Each paid installment unlocks this many days."),
+    "full_payment_enabled": ("Show the one-time card", ""),
+    "price": ("Price (₹)", "One payment, lifetime access to this course."),
+    "bundle_payment_enabled": ("Show the bundle card", ""),
+    "bundle_price": ("Amount per bundle payment (₹)", "Charged on each bundle payment."),
+    "bundle_installments": ("Number of bundle payments", "Paying all of them unlocks lifetime access."),
+    "bundle_access_days": ("Access days per bundle payment", "Each paid bundle payment unlocks this many days."),
+    "batch_pass_payment_enabled": ("Show the all-future-batches card", ""),
+    "batch_pass_price": (
+        "Price (₹)",
+        "One payment: lifetime access to this course and every course included in the pass.",
+    ),
+}
+
+
+def payment_card_field_name(plan, key):
+    return f"card_{plan}_{key}"
+
+
+def _payment_card_form_fields():
+    fields = {}
+    for spec in CATALOG:
+        short = PAYMENT_CARD_SHORT_NAMES[spec.plan]
+        name = lambda key, plan=spec.plan: payment_card_field_name(plan, key)  # noqa: E731
+        fields[name("title")] = forms.CharField(
+            required=False,
+            max_length=CARD_TEXT_LIMITS["title"],
+            label=f"{short} card title",
+            help_text="Leave blank for the automatic title.",
+        )
+        fields[name("subtitle")] = forms.CharField(
+            required=False,
+            max_length=CARD_TEXT_LIMITS["subtitle"],
+            label=f"{short} card subtitle",
+            help_text="Short line under the title. Leave blank for the automatic text.",
+        )
+        fields[name("features")] = forms.CharField(
+            required=False,
+            label=f"{short} card features",
+            help_text=(
+                f"One bullet per line, at most {MAX_CARD_FEATURES}. Leave blank to use the first four "
+                "Catalog Card Features of this course."
+            ),
+            widget=forms.Textarea(attrs={"rows": 4}),
+        )
+        fields[name("badge")] = forms.CharField(
+            required=False,
+            max_length=CARD_TEXT_LIMITS["badge"],
+            label=f"{short} card badge",
+            help_text='Optional ribbon such as "Most popular" or "Best value". Blank shows no badge.',
+        )
+        fields[name("highlighted")] = forms.BooleanField(
+            required=False,
+            label=f"Highlight the {short.lower()} card",
+            help_text="Visually emphasize this card. Only one shown card can be highlighted.",
+        )
+        fields[name("order")] = forms.TypedChoiceField(
+            required=False,
+            coerce=int,
+            empty_value=None,
+            choices=[("", "Automatic")] + [(position, str(position)) for position in range(1, MAX_CARDS + 1)],
+            label=f"{short} card position",
+            help_text="1 is the first card. Each shown card needs its own position.",
+        )
+        fields[name("cta_label")] = forms.CharField(
+            required=False,
+            max_length=CARD_TEXT_LIMITS["cta_label"],
+            label=f"{short} card button label",
+            help_text='Leave blank for "Enroll Now".',
+        )
+    return fields
+
+
+def _payment_card_fieldsets():
+    money_fields = {
+        "monthly": (
+            "installment_payment_enabled",
+            ("monthly_price", "installments_required", "installment_access_days"),
+        ),
+        "full": ("full_payment_enabled", "price"),
+        "bundle": (
+            "bundle_payment_enabled",
+            ("bundle_price", "bundle_installments", "bundle_access_days"),
+        ),
+        "batch_pass": ("batch_pass_payment_enabled", "batch_pass_price"),
+    }
+    fieldsets = []
+    for spec in CATALOG:
+        name = lambda key, plan=spec.plan: payment_card_field_name(plan, key)  # noqa: E731
+        fieldsets.append(
+            (
+                f"Payment card: {spec.admin_label}",
+                {
+                    "classes": ("payment-card-fieldset",),
+                    "fields": (
+                        *money_fields[spec.plan],
+                        (name("title"), name("subtitle")),
+                        (name("badge"), name("order"), name("highlighted")),
+                        name("features"),
+                        name("cta_label"),
+                    ),
+                },
+            )
+        )
+    return tuple(fieldsets)
+
+
+def _card_form_value(key, value):
+    """Admin input to an override value; None means "use the automatic default"."""
+    if key in ("title", "subtitle", "cta_label"):
+        text = " ".join(str(value or "").split())
+        return text or None
+    if key == "features":
+        lines = [" ".join(line.split()) for line in str(value or "").splitlines()]
+        lines = [line for line in lines if line]
+        return lines or None
+    if key == "badge":
+        # Blank is a real choice here: no badge.
+        return " ".join(str(value or "").split())
+    if key == "highlighted":
+        return bool(value)
+    return value  # order: int or None
+
+
 class CourseAdminForm(forms.ModelForm):
     card_highlights = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 5}), help_text="One course-card bullet per line.")
 
@@ -279,6 +434,15 @@ class CourseAdminForm(forms.ModelForm):
             self.fields["course_card_features"].initial = _format_course_card_features(
                 default_course_card_features()
             )
+            for field_name in ("what_you_will_learn", "expected_outcomes", "public_curriculum"):
+                self.fields[field_name].initial = ""
+        # The model's list values sit in self.initial (model_to_dict) and win
+        # over field.initial, which rendered Python reprs that the line parsers
+        # then rejected on save. Show the one-per-line text instead.
+        for field_name in ("what_you_will_learn", "expected_outcomes", "course_card_features", "public_curriculum"):
+            if field_name in self.fields and self.fields[field_name].initial is not None:
+                self.initial[field_name] = self.fields[field_name].initial
+        self._init_payment_card_fields(instance if instance is not None else Course())
 
         textarea_rows = {
             "description": 3,
@@ -356,6 +520,78 @@ class CourseAdminForm(forms.ModelForm):
             }
         )
 
+    def _init_payment_card_fields(self, course):
+        for field_name, (label, help_text) in PAYMENT_CARD_MONEY_LABELS.items():
+            field = self.fields.get(field_name)
+            if field is None:
+                continue
+            field.label = label
+            if help_text:
+                field.help_text = help_text
+        if course.pk is None and not course.course_card_features:
+            course.course_card_features = default_course_card_features()
+        for spec in CATALOG:
+            config = card_config(course, spec.plan)
+            for key in CARD_KEYS:
+                field = self.fields.get(payment_card_field_name(spec.plan, key))
+                if field is None:
+                    continue
+                value = config[key]
+                field.initial = "\n".join(value) if key == "features" else value
+
+    def _course_facts(self, cleaned_data):
+        """The course as submitted, for computing the automatic card defaults."""
+        facts = copy.copy(self.instance)
+        for field_name in (
+            "installments_required",
+            "installment_access_days",
+            "bundle_installments",
+            "bundle_access_days",
+            "course_card_features",
+        ):
+            if field_name in self.fields and field_name not in self.errors:
+                setattr(facts, field_name, cleaned_data.get(field_name))
+        return facts
+
+    def _clean_payment_cards(self, cleaned_data):
+        """Store only the card settings that differ from the automatic defaults.
+
+        Unchanged settings keep following the course (e.g. features follow the
+        Catalog Card Features). The model's clean() then validates the whole
+        configuration: 2 to 4 shown cards or none, one highlight, unique positions.
+        """
+        stored = self.instance.payment_cards if isinstance(self.instance.payment_cards, dict) else {}
+        cards = {plan: dict(overrides) for plan, overrides in stored.items() if isinstance(overrides, dict)}
+        facts = self._course_facts(cleaned_data)
+        valid = True
+        for spec in CATALOG:
+            names = {key: payment_card_field_name(spec.plan, key) for key in CARD_KEYS}
+            if not all(name in self.fields for name in names.values()):
+                continue  # this form does not edit that card; keep what is stored
+            defaults = default_card(facts, spec.plan)
+            overrides = {}
+            for key, name in names.items():
+                if name in self.errors:
+                    valid = False
+                    continue
+                value = _card_form_value(key, cleaned_data.get(name))
+                if value is None:
+                    continue
+                try:
+                    value = clean_card_value(spec.plan, key, value)
+                except ValidationError as exc:
+                    self.add_error(name, validation_messages(exc))
+                    valid = False
+                    continue
+                if value != defaults[key]:
+                    overrides[key] = value
+            if overrides:
+                cards[spec.plan] = overrides
+            else:
+                cards.pop(spec.plan, None)
+        if valid:
+            self.instance.payment_cards = cards
+
     def clean_what_you_will_learn(self):
         return _parse_admin_list_field(self.cleaned_data.get("what_you_will_learn"))
 
@@ -370,6 +606,7 @@ class CourseAdminForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        self._clean_payment_cards(cleaned_data)
         if "included_in_batch_pass" not in self.fields:
             return cleaned_data
         changes_pass = bool(cleaned_data.get("included_in_batch_pass")) != self._was_in_batch_pass
@@ -379,6 +616,13 @@ class CourseAdminForm(forms.ModelForm):
                 f"Tick '{self.fields['confirm_batch_pass_change'].label}' to confirm this batch pass change.",
             )
         return cleaned_data
+
+
+# Declared after the class so each plan's card fields are generated from the
+# catalog; ModelAdmin's form factory then treats them like declared fields.
+for _name, _field in _payment_card_form_fields().items():
+    CourseAdminForm.base_fields[_name] = _field
+    CourseAdminForm.declared_fields[_name] = _field
 
 
 class LectureInlineForm(forms.ModelForm):
@@ -518,6 +762,18 @@ class LiveClassInline(admin.TabularInline):
     verbose_name_plural = "Live Classes Included With This Course"
 
 
+def _payment_cards_count_label(count):
+    return ngettext("%(count)d card will show", "%(count)d cards will show", count) % {"count": count}
+
+
+def _payment_cards_count_detail(count):
+    if count == 0:
+        return "Online purchase is off for this course."
+    if count == 1:
+        return f"Show 2 to {MAX_CARDS} cards, or none to turn off online purchase."
+    return f"Laid out {payment_cards_per_row(count)} per row."
+
+
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
     @admin.display(description="Confirmed students / published reviews")
@@ -566,6 +822,7 @@ class CourseAdmin(admin.ModelAdmin):
     )
     readonly_fields = (
         "confirmed_statistics",
+        "payment_cards_overview",
         "slug",
         "frontend_container_guide",
         "enrollment_container_source",
@@ -618,18 +875,29 @@ class CourseAdmin(admin.ModelAdmin):
             },
         ),
         ("Batch and extended facts", {"fields": ("start_date", "total_hours_label", "batch_size_label")}),
-        ("Three-month bundle pricing", {"fields": ("bundle_payment_enabled", "bundle_price", "bundle_installments", "bundle_access_days")}),
         (
-            "All future batches pass",
+            "Payment cards",
             {
                 "description": (
-                    "Offer: one payment for lifetime access to this course and every course marked "
-                    "'Included in batch pass'. Inclusion: tick it on each new batch so existing pass "
-                    "holders are unlocked automatically when it is published."
+                    "The plans a student chooses from on the payment page. Each card below is one "
+                    "plan: switch it on, set its price, and word the card. Show 2 to 4 cards, or none "
+                    "to turn off online purchase. Prices are charged exactly as set here; a price "
+                    "change only affects checkouts started after you save."
+                ),
+                "classes": ("payment-cards-overview",),
+                "fields": ("payment_cards_overview", "purchase_readiness"),
+            },
+        ),
+        *_payment_card_fieldsets(),
+        (
+            "All future batches pass: course inclusion",
+            {
+                "description": (
+                    "Tick 'Included in batch pass' on each new batch so existing pass holders are "
+                    "unlocked automatically when it is published. Selling the pass is the "
+                    "'All future batches pass' payment card above."
                 ),
                 "fields": (
-                    "batch_pass_payment_enabled",
-                    "batch_pass_price",
                     "included_in_batch_pass",
                     "confirm_batch_pass_change",
                 ),
@@ -660,16 +928,8 @@ class CourseAdmin(admin.ModelAdmin):
         (
             "Container 2: Hero Left Cards",
             {
-                "fields": (
-                    "price",
-                    "full_payment_enabled",
-                    "installment_payment_enabled",
-                    "monthly_price",
-                    "installments_required",
-                    "installment_access_days",
-                    "purchase_readiness",
-                    "about_the_course",
-                )
+                "description": "The price shown here is the One-time payment card's price (Payment cards above).",
+                "fields": ("about_the_course",),
             },
         ),
         (
@@ -784,12 +1044,8 @@ class CourseAdmin(admin.ModelAdmin):
             blockers.append("course not live")
         if obj.registration_closed:
             blockers.append("registration closed")
-        full_ready = bool(obj.full_payment_enabled and obj.price > 0)
-        monthly_ready = bool(obj.installment_payment_enabled and obj.monthly_price > 0)
-        bundle_ready = bool(obj.bundle_payment_enabled and obj.bundle_price > 0)
-        batch_pass_ready = bool(obj.batch_pass_payment_enabled and obj.batch_pass_price > 0)
-        if not (full_ready or monthly_ready or bundle_ready or batch_pass_ready):
-            blockers.append("enable a payment plan and set a positive price")
+        if not enabled_plan_ids(obj):
+            blockers.append("no payment cards are switched on")
 
         if blockers:
             return format_html(
@@ -803,6 +1059,73 @@ class CourseAdmin(admin.ModelAdmin):
             '<span class="enterprise-status enterprise-status--success">'
             '<svg class="enterprise-icon" aria-hidden="true"><use href="#icon-checkmark"></use></svg>'
             'Ready for secure purchase</span>'
+        )
+
+    @admin.display(description="Payment cards")
+    def payment_cards_overview(self, obj):
+        """Live card count (updated as you edit) and a preview of the saved cards."""
+        live_inputs = json.dumps(
+            [
+                {
+                    "plan": spec.plan,
+                    "label": spec.admin_label,
+                    "enabled": f"id_{spec.enabled_field}",
+                    "price": f"id_{spec.price_field}",
+                }
+                for spec in CATALOG
+            ]
+        )
+        # Re-read the row: after a rejected save, obj holds the submitted values.
+        saved = Course.objects.filter(pk=obj.pk).first() if obj is not None and obj.pk else None
+        saved_cards = resolve_course_plans(saved) if saved is not None else []
+        count = len(saved_cards)
+        live_count = format_html(
+            '<div class="payment-cards-live" data-payment-cards="{}" aria-live="polite">'
+            '<strong data-role="count">{}</strong> <span data-role="detail">{}</span></div>',
+            live_inputs,
+            _payment_cards_count_label(count),
+            _payment_cards_count_detail(count),
+        )
+        if not saved_cards:
+            preview = format_html(
+                '<p class="payment-cards-preview__note">{}</p>',
+                "Save the course to preview its payment cards."
+                if obj is None or not obj.pk
+                else "No payment cards are shown: online purchase is off and the page says pricing will be announced.",
+            )
+            return format_html("{}{}", live_count, preview)
+        shown = {card["plan"] for card in saved_cards}
+        hidden = [spec.admin_label for spec in CATALOG if spec.plan not in shown]
+        rows = format_html_join(
+            "",
+            "<tr{}><td>{}</td><td><strong>{}</strong><br><span>{}</span></td><td>{}<br><span>{}</span></td>"
+            "<td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+            (
+                (
+                    format_html(' class="{}"', "is-highlighted") if card["highlighted"] else "",
+                    card["order"],
+                    card["title"],
+                    card["subtitle"],
+                    card["price_label"],
+                    card["total_label"] or "",
+                    card["access_label"],
+                    card["badge"] or "-",
+                    "; ".join(card["features"]),
+                    card["cta_label"],
+                )
+                for card in saved_cards
+            ),
+        )
+        return format_html(
+            '{}<p class="payment-cards-preview__note">Saved cards as students see them, {} per row{}. '
+            "The highlighted card is marked.</p>"
+            '<div class="payment-cards-preview"><table><thead><tr><th>#</th><th>Card</th><th>Price</th>'
+            "<th>Access</th><th>Badge</th><th>Features</th><th>Button</th></tr></thead>"
+            "<tbody>{}</tbody></table></div>",
+            live_count,
+            payment_cards_per_row(count),
+            format_html("; hidden: {}", ", ".join(hidden)) if hidden else "",
+            rows,
         )
 
     @admin.display(ordering="_section_count", description="Modules")
@@ -879,7 +1202,7 @@ class CourseAdmin(admin.ModelAdmin):
             """
             <div style="line-height:1.5;">
               <div><strong>1. Hero Header:</strong> category, level, launch status, title, short description</div>
-              <div><strong>2. Hero Left Cards:</strong> price + About This Course</div>
+              <div><strong>2. Hero Left Cards:</strong> one-time price (Payment cards) + About This Course</div>
               <div><strong>3. Optional course image:</strong> use only with an informational image and enable its display toggle</div>
               <div><strong>4. What You Will Cover:</strong> one line = one chip</div>
               <div><strong>5. Expected Outcomes:</strong> one line = one outcome card</div>
@@ -896,10 +1219,15 @@ class CourseAdmin(admin.ModelAdmin):
         launch_label = dict(Course.LAUNCH_STATUS_CHOICES).get(launch_value, launch_value)
         price_value = getattr(obj, "price", None)
         return format_html(
-            "This panel uses launch status <strong>{}</strong> and price <strong>{}</strong> from Container 1/2.",
+            "This panel uses launch status <strong>{}</strong> (Container 1) and the one-time price "
+            "<strong>{}</strong> (Payment cards).",
             launch_label,
             price_value if price_value is not None else "-",
         )
+
+    class Media:
+        css = {"all": ("admin/css/course_payment_cards.css",)}
+        js = ("admin/js/course_payment_cards.js",)
 
     @transaction.atomic
     def save_model(self, request, obj, form, change):

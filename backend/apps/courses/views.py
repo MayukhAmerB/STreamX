@@ -6,6 +6,7 @@ from django.core.cache import cache
 from django.db.models import Count, Prefetch, Q
 from django.http import FileResponse, HttpResponse, HttpResponseNotFound
 from django.shortcuts import redirect
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 
@@ -50,6 +51,7 @@ from .permissions import (
 from .review_queries import annotate_shared_review_metrics
 from .serializers import (
     CourseEnrollSerializer,
+    CourseDetailResponseSerializer,
     CourseDetailSerializer,
     CourseListSerializer,
     CourseWriteSerializer,
@@ -393,6 +395,7 @@ class CourseDetailView(APIView):
             return course
         raise permissions.PermissionDenied("Course is not published.")
 
+    @extend_schema(responses={200: CourseDetailResponseSerializer})
     def get(self, request, pk):
         cache_key = None
         if not request.user.is_authenticated:

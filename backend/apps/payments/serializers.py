@@ -4,6 +4,8 @@ from rest_framework import serializers
 
 from config.request_security import contains_active_content, contains_suspicious_sqli
 
+from .plans import BATCH_PASS_PLAN, BUNDLE_PLAN, FULL_PLAN, MONTHLY_PLAN
+
 
 NAME_PUNCTUATION = {" ", "'", "\u2019", "-", "."}
 LOCATION_PUNCTUATION = NAME_PUNCTUATION | {",", "(", ")", "&", "/"}
@@ -126,7 +128,12 @@ class CheckoutProfileSerializer(serializers.Serializer):
 class CreateOrderSerializer(CheckoutProfileSerializer):
     application_reference = serializers.UUIDField(required=False)
     course_id = serializers.IntegerField(min_value=1)
-    plan = serializers.ChoiceField(choices=("full", "monthly", "bundle", "batch_pass"), default="full")
+    # Every plan in the catalog (apps.payments.plans); whether the course
+    # offers it is decided by the view, which answers 400 for a disabled plan.
+    plan = serializers.ChoiceField(
+        choices=(FULL_PLAN, MONTHLY_PLAN, BUNDLE_PLAN, BATCH_PASS_PLAN),
+        default=FULL_PLAN,
+    )
 
 
 class VerifyPaymentSerializer(serializers.Serializer):

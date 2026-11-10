@@ -1,373 +1,519 @@
-import { useEffect, useRef, useState } from "react";
+import "./Navbar.css";
+
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../hooks/useAuth";
 import { siteBrand } from "../config/siteBrand";
+import { useAuth } from "../hooks/useAuth";
 import { resolveDjangoAdminUrl } from "../utils/backendUrl";
-import Button from "./Button";
 import BrandLogo from "./BrandLogo";
 import NotificationBell from "./NotificationBell";
+import {
+  getAccountMenuGroups,
+  getInitials,
+  getShortName,
+  getSiteNavGroups,
+  getSiteNavLinks,
+  isSiteLinkActive,
+  SITE_CONSOLE_PATH,
+} from "./siteNavModel";
 
-const navClass = ({ isActive }) =>
-  `text-sm ${
-    isActive
-      ? "text-white underline decoration-white/50 underline-offset-8"
-      : "text-white/80 hover:text-white"
-  } transition font-medium`;
+const SCROLLED_AFTER_PX = 8;
+const DESKTOP_QUERY = "(min-width: 1024px)";
 
+function ChevronIcon({ className = "" }) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m4 6 4 4 4-4" />
+    </svg>
+  );
+}
+
+function ArrowIcon({ className = "" }) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 8h10M9 4l4 4-4 4" />
+    </svg>
+  );
+}
+
+function ExternalIcon({ className = "" }) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6.5 3.5H3.5v9h9v-3M9 3h4v4M13 3 7.5 8.5" />
+    </svg>
+  );
+}
+
+function ConsoleIcon({ className = "" }) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2.5" width="12" height="11" rx="2" />
+      <path d="M5 6.5 7 8l-2 1.5M8.5 10H11" />
+    </svg>
+  );
+}
+
+/** Moves focus between the links of an open menu with the arrow keys. */
+function handleMenuArrows(event, container) {
+  if (!container || !["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+  const items = [...container.querySelectorAll("a[href], button:not([disabled])")];
+  if (items.length === 0) return;
+  event.preventDefault();
+  const index = items.indexOf(document.activeElement);
+  let next = 0;
+  if (event.key === "End") next = items.length - 1;
+  else if (event.key === "ArrowDown") next = index < 0 ? 0 : (index + 1) % items.length;
+  else if (event.key === "ArrowUp") next = index <= 0 ? items.length - 1 : index - 1;
+  items[next].focus();
+}
+
+/**
+ * A disclosure dropdown that stays in the header's DOM (no portal):
+ * Escape or a click outside closes it, focus returns to the trigger.
+ */
+function useDisclosure() {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef(null);
+  const panelRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointerDown = (event) => {
+      if (triggerRef.current?.contains(event.target) || panelRef.current?.contains(event.target)) return;
+      setOpen(false);
+    };
+    const onKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown, { passive: true });
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  const onTriggerKeyDown = (event) => {
+    if (event.key !== "ArrowDown") return;
+    event.preventDefault();
+    setOpen(true);
+    window.requestAnimationFrame(() => panelRef.current?.querySelector("a[href], button")?.focus());
+  };
+
+  return { open, setOpen, triggerRef, panelRef, onTriggerKeyDown };
+}
+
+function MenuLink({ link, className, onNavigate }) {
+  if (link.external) {
+    return (
+      <a href={link.href} target="_blank" rel="noopener noreferrer" className={className} onClick={onNavigate}>
+        <span>{link.label}</span>
+        <ExternalIcon className="snav__external" />
+        <span className="sr-only"> (opens in a new tab)</span>
+      </a>
+    );
+  }
+  return (
+    <NavLink to={link.to} className={className} onClick={onNavigate}>
+      <span>{link.label}</span>
+    </NavLink>
+  );
+}
+
+function MoreMenu({ links, pathname }) {
+  const menuId = useId();
+  const { open, setOpen, triggerRef, panelRef, onTriggerKeyDown } = useDisclosure();
+  const active = links.some((link) => isSiteLinkActive(link, pathname));
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname, setOpen]);
+
+  return (
+    <li className="snav__more">
+      <button
+        ref={triggerRef}
+        type="button"
+        className={`snav__link snav__more-trigger${active ? " is-active" : ""}`}
+        aria-expanded={open}
+        aria-controls={menuId}
+        onClick={() => setOpen((value) => !value)}
+        onKeyDown={onTriggerKeyDown}
+      >
+        More
+        <ChevronIcon className={`snav__chevron${open ? " is-open" : ""}`} />
+      </button>
+      <div
+        ref={panelRef}
+        id={menuId}
+        className="snav__menu snav__menu--more"
+        hidden={!open}
+        onKeyDown={(event) => handleMenuArrows(event, panelRef.current)}
+      >
+        <ul className="snav__menu-list">
+          {links.map((link) => (
+            <li key={link.id}>
+              <MenuLink link={link} className="snav__menu-item" onNavigate={() => setOpen(false)} />
+            </li>
+          ))}
+        </ul>
+      </div>
+    </li>
+  );
+}
+
+function AccountMenu({ user, groups, onSignOut, pathname }) {
+  const menuId = useId();
+  const { open, setOpen, triggerRef, panelRef, onTriggerKeyDown } = useDisclosure();
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname, setOpen]);
+
+  return (
+    <div className="snav__account">
+      <button
+        ref={triggerRef}
+        type="button"
+        className="snav__avatar-btn"
+        aria-expanded={open}
+        aria-controls={menuId}
+        aria-label={`Account menu for ${user?.full_name || user?.email || "your account"}`}
+        onClick={() => setOpen((value) => !value)}
+        onKeyDown={onTriggerKeyDown}
+      >
+        <span className="snav__avatar" aria-hidden="true">
+          {getInitials(user)}
+        </span>
+        <span className="snav__avatar-name" aria-hidden="true">
+          {getShortName(user)}
+        </span>
+        <ChevronIcon className={`snav__chevron${open ? " is-open" : ""}`} />
+      </button>
+      <div
+        ref={panelRef}
+        id={menuId}
+        className="snav__menu snav__menu--account"
+        hidden={!open}
+        onKeyDown={(event) => handleMenuArrows(event, panelRef.current)}
+      >
+        <div className="snav__menu-user">
+          <span className="snav__avatar snav__avatar--lg" aria-hidden="true">
+            {getInitials(user)}
+          </span>
+          <span className="snav__menu-user-text">
+            <span className="snav__menu-user-name">{user?.full_name || user?.email}</span>
+            {user?.full_name && user?.email ? <span className="snav__menu-user-email">{user.email}</span> : null}
+          </span>
+        </div>
+        {groups.map((group) => (
+          <div key={group.id} className="snav__menu-group">
+            <p className="snav__menu-label">{group.label}</p>
+            <ul className="snav__menu-list">
+              {group.links.map((link) => (
+                <li key={link.id}>
+                  <MenuLink link={link} className="snav__menu-item" onNavigate={() => setOpen(false)} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        <div className="snav__menu-group">
+          <button type="button" className="snav__menu-item snav__menu-item--danger" onClick={onSignOut}>
+            Sign out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function trapTab(event, container) {
+  if (event.key !== "Tab" || !container) return;
+  const focusable = [...container.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])')];
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+/** Phone / tablet: a full-screen sheet with grouped links and the main action at the bottom. */
+function MobileSheet({ id, isAuthenticated, user, siteGroups, accountGroups, onSignOut, onClose, returnFocusRef }) {
+  const panelRef = useRef(null);
+  const titleId = useId();
+
+  useEffect(() => {
+    panelRef.current?.focus();
+    const { body } = document;
+    const previousOverflow = body.style.overflow;
+    body.style.overflow = "hidden";
+    const onKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      onClose();
+      returnFocusRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose, returnFocusRef]);
+
+  const close = () => {
+    onClose();
+    returnFocusRef.current?.focus();
+  };
+
+  return (
+    <div
+      ref={panelRef}
+      id={id}
+      className="snav-sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      tabIndex={-1}
+      onKeyDown={(event) => trapTab(event, panelRef.current)}
+    >
+      <div className="snav-sheet__top">
+        <BrandLogo className="snav__brand" />
+        <h2 id={titleId} className="sr-only">
+          Site menu
+        </h2>
+        <button type="button" className="snav__icon-btn" aria-label="Close navigation menu" onClick={close}>
+          <svg aria-hidden="true" viewBox="0 0 16 16" className="snav__icon" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+            <path d="M4 4l8 8M12 4l-8 8" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="snav-sheet__body">
+        {isAuthenticated ? (
+          <div className="snav-sheet__user">
+            <span className="snav__avatar snav__avatar--lg" aria-hidden="true">
+              {getInitials(user)}
+            </span>
+            <span className="snav__menu-user-text">
+              <span className="snav__menu-user-name">{user?.full_name || user?.email}</span>
+              {user?.full_name && user?.email ? <span className="snav__menu-user-email">{user.email}</span> : null}
+            </span>
+          </div>
+        ) : null}
+
+        <nav aria-label="Site">
+          {siteGroups.map((group) => (
+            <div key={group.id} className="snav-sheet__group">
+              <p className="snav-sheet__label">{group.label}</p>
+              <ul className="snav-sheet__list">
+                {group.links.map((link) => (
+                  <li key={link.id}>
+                    <NavLink to={link.to} className="snav-sheet__link" onClick={onClose}>
+                      <span>{link.label}</span>
+                      <ArrowIcon className="snav-sheet__arrow" />
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </nav>
+
+        {isAuthenticated
+          ? accountGroups.map((group) => (
+              <div key={group.id} className="snav-sheet__group">
+                <p className="snav-sheet__label">{group.label}</p>
+                <ul className="snav-sheet__list">
+                  {group.links.map((link) => (
+                    <li key={link.id}>
+                      {link.external ? (
+                        <a href={link.href} target="_blank" rel="noopener noreferrer" className="snav-sheet__link" onClick={onClose}>
+                          <span>{link.label}</span>
+                          <ExternalIcon className="snav-sheet__arrow" />
+                          <span className="sr-only"> (opens in a new tab)</span>
+                        </a>
+                      ) : (
+                        <NavLink to={link.to} className="snav-sheet__link" onClick={onClose}>
+                          <span>{link.label}</span>
+                          <ArrowIcon className="snav-sheet__arrow" />
+                        </NavLink>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          : null}
+
+        {isAuthenticated ? (
+          <div className="snav-sheet__group">
+            <button type="button" className="snav-sheet__link snav-sheet__link--danger" onClick={onSignOut}>
+              Sign out
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="snav-sheet__footer">
+        {isAuthenticated ? (
+          <Link to={SITE_CONSOLE_PATH} className="snav__cta snav__cta--block" onClick={onClose}>
+            <ConsoleIcon className="snav__icon" />
+            Open Console
+          </Link>
+        ) : (
+          <>
+            <Link to="/courses" className="snav__cta snav__cta--block" onClick={onClose}>
+              Browse courses
+            </Link>
+            <Link to="/login" className="snav__ghost snav__ghost--block" onClick={onClose}>
+              Sign in
+            </Link>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Website navbar: brand on the left, a centred pill with the key links and
+ * "More", and on the right the bell, avatar menu and the champagne Console
+ * button (guests: Sign in + Browse courses). Phones and tablets get a
+ * full-screen sheet. The bar keeps one height in every state (no layout
+ * shift); scrolling only adds the blur and the hairline.
+ */
 export default function Navbar() {
   const { user, isAuthenticated, isInstructor, isAdmin, logout } = useAuth();
-  const isOwlCognito = siteBrand.id === "owlcognito";
-  const canAccessControls = Boolean(isAdmin || isInstructor);
   const navigate = useNavigate();
   const location = useLocation();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const { pathname } = location;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const menuRef = useRef(null);
-  const djangoAdminUrl = resolveDjangoAdminUrl();
+  const [scrolled, setScrolled] = useState(false);
+  const menuButtonRef = useRef(null);
+  const sheetId = useId();
+
+  const { primary, more } = getSiteNavLinks(siteBrand.id);
+  const siteGroups = getSiteNavGroups(siteBrand.id);
+  const accountGroups = isAuthenticated
+    ? getAccountMenuGroups({ isInstructor, isAdmin, djangoAdminUrl: isAdmin ? resolveDjangoAdminUrl() : "" })
+    : [];
 
   useEffect(() => {
-    setMenuOpen(false);
     setMobileMenuOpen(false);
-  }, [location.pathname]);
+  }, [pathname]);
 
   useEffect(() => {
-    const handlePointerDown = (event) => {
-      if (!menuRef.current || menuRef.current.contains(event.target)) {
-        return;
-      }
-      setMenuOpen(false);
-      setMobileMenuOpen(false);
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-    };
+    const update = () => setScrolled(window.scrollY > SCROLLED_AFTER_PX);
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    return () => window.removeEventListener("scroll", update);
   }, []);
 
+  // The sheet is for small screens only: close it when the window grows.
+  useEffect(() => {
+    if (!mobileMenuOpen || typeof window.matchMedia !== "function") return undefined;
+    const query = window.matchMedia(DESKTOP_QUERY);
+    const onChange = () => {
+      if (query.matches) setMobileMenuOpen(false);
+    };
+    query.addEventListener?.("change", onChange);
+    return () => query.removeEventListener?.("change", onChange);
+  }, [mobileMenuOpen]);
+
+  const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
+
   const onLogout = async () => {
-    setMenuOpen(false);
     setMobileMenuOpen(false);
     await logout();
     navigate("/login");
   };
 
   return (
-    <header className="sticky top-0 z-20 border-b border-white/10 bg-black/95 px-2 pt-[env(safe-area-inset-top)] backdrop-blur-xl sm:px-3" ref={menuRef}>
-      <div className="relative mx-auto flex max-w-7xl items-center justify-between gap-2 px-1 py-2.5 text-neutral-950 sm:gap-4 sm:px-2 sm:py-4">
-        <BrandLogo className="min-w-0 flex-1 lg:flex-none" />
-        <nav className="hidden items-center gap-5 lg:flex">
-          {isAuthenticated ? (
-            <NavLink to="/users-corner" className={navClass}>
-              User&apos;s Corner
-            </NavLink>
-          ) : null}
-          <NavLink
-            to="/courses"
-            className={navClass}
-          >
-            Courses
-          </NavLink>
-          <NavLink to="/about" className={navClass}>
-            About Us
-          </NavLink>
-          {!isOwlCognito ? (
-            <NavLink to="/as-accounts" className={navClass}>
-              AS-Accounts
-            </NavLink>
-          ) : null}
-          {!isOwlCognito ? (
-            <NavLink to="/national-desk" className={navClass}>
-              National Desk
-            </NavLink>
-          ) : null}
-          {!isOwlCognito ? (
-            <NavLink to="/join-alsyed" className={navClass}>
-              Join Al Syed
-            </NavLink>
-          ) : null}
-          {!isOwlCognito ? (
-            <NavLink to="/hall-of-fame" className={navClass}>
-              Hall of Fame
-            </NavLink>
-          ) : null}
-          <NavLink to="/contact" className={navClass}>
-            Contact
-          </NavLink>
-          <NavLink to="/faqs" className={navClass}>
-            FAQs
-          </NavLink>
+    <header
+      className={`snav sticky top-0${mobileMenuOpen ? " z-50" : " z-20"}`}
+      data-scrolled={scrolled ? "true" : "false"}
+    >
+      <div className="snav__backdrop" aria-hidden="true" />
+      <div className="snav__bar">
+        <BrandLogo className="snav__brand" />
+
+        <nav className="snav__primary" aria-label="Main">
+          <ul className="snav__pill">
+            {primary.map((link) => (
+              <li key={link.id}>
+                <NavLink
+                  to={link.to}
+                  className={({ isActive }) => `snav__link${isActive ? " is-active" : ""}`}
+                >
+                  {link.shortLabel || link.label}
+                </NavLink>
+              </li>
+            ))}
+            {more.length > 0 ? <MoreMenu links={more} pathname={pathname} /> : null}
+          </ul>
         </nav>
-        <div className="flex shrink-0 items-center gap-2">
-          {isAuthenticated ? <NotificationBell /> : null}
+
+        <div className="snav__actions">
           {isAuthenticated ? (
-            <div className="relative hidden sm:block">
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
-                onClick={() => setMenuOpen((prev) => !prev)}
+            <>
+              <NotificationBell buttonClassName="snav__icon-btn" />
+              <Link
+                to={SITE_CONSOLE_PATH}
+                className={`snav__cta snav__cta--bar${isSiteLinkActive({ to: SITE_CONSOLE_PATH }, pathname) ? " is-active" : ""}`}
               >
-                <span className="max-w-[210px] truncate">{user?.full_name || user?.email}</span>
-                <span className={`text-xs transition ${menuOpen ? "rotate-180" : ""}`}>v</span>
-              </button>
-              {menuOpen ? (
-                <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-black panel-gradient shadow-[0_16px_35px_rgba(0,0,0,0.36)]">
-                  <Link
-                    to="/users-corner"
-                    className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
-                  >
-                    User&apos;s Corner
-                  </Link>
-                  <Link
-                    to="/courses?view=owned"
-                    className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
-                  >
-                      Your Courses
-                  </Link>
-                  <Link
-                    to="/guides"
-                    className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
-                  >
-                    Guides
-                  </Link>
-                  <Link
-                    to="/profile"
-                    className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
-                  >
-                    Profile
-                  </Link>
-                  <Link
-                    to="/id-card"
-                    className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
-                  >
-                    ID Card
-                  </Link>
-                  {isInstructor ? (
-                    <Link
-                      to="/instructor/dashboard"
-                      className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
-                    >
-                      Instructor
-                    </Link>
-                  ) : null}
-                  {canAccessControls ? (
-                    <Link
-                      to="/control-center"
-                      className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
-                    >
-                      Admin Control Center
-                    </Link>
-                  ) : null}
-                  {canAccessControls ? (
-                    <Link
-                      to="/meeting"
-                      className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
-                    >
-                      Meeting Control
-                    </Link>
-                  ) : null}
-                  {canAccessControls ? (
-                    <Link
-                      to="/broadcasting"
-                      className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
-                    >
-                      Broadcast Control
-                    </Link>
-                  ) : null}
-                  {isAdmin ? (
-                    <Link
-                      to="/lecture-questions"
-                      className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
-                    >
-                      Lecture Questions
-                    </Link>
-                  ) : null}
-                  {isAdmin ? (
-                    <a
-                      href={djangoAdminUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
-                    >
-                      Django Admin
-                    </a>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="block w-full border-t border-black px-4 py-2.5 text-left text-sm text-red-300 transition hover:bg-[#202020]"
-                    onClick={onLogout}
-                  >
-                    Logout
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <div className="hidden items-center gap-2 sm:flex">
-              <Link to="/login">
-                <Button variant="indigoSoft" className="border-white/25 bg-white/10 text-white hover:bg-white/15">
-                  Login
-                </Button>
+                <ConsoleIcon className="snav__icon" />
+                Console
               </Link>
-            </div>
+              <AccountMenu user={user} groups={accountGroups} onSignOut={onLogout} pathname={pathname} />
+            </>
+          ) : (
+            <>
+              <Link to="/login" className="snav__ghost snav__ghost--bar">
+                Sign in
+              </Link>
+              <Link to="/courses" className="snav__cta snav__cta--bar snav__cta--guest">
+                Browse courses
+              </Link>
+            </>
           )}
           <button
+            ref={menuButtonRef}
             type="button"
-            className="inline-flex h-11 w-11 touch-manipulation items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15 lg:hidden"
-            onClick={() => {
-              setMenuOpen(false);
-              setMobileMenuOpen((prev) => !prev);
-            }}
+            className="snav__icon-btn snav__menu-btn"
+            onClick={() => setMobileMenuOpen((value) => !value)}
             aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
             aria-expanded={mobileMenuOpen}
+            aria-controls={mobileMenuOpen ? sheetId : undefined}
+            aria-haspopup="dialog"
           >
-            <span className="relative inline-flex h-4 w-4 flex-col items-center justify-center">
-              <span
-                className={`absolute h-[1.5px] w-4 rounded-full bg-current transition ${
-                  mobileMenuOpen ? "translate-y-0 rotate-45" : "-translate-y-[5px]"
-                }`}
-              />
-              <span
-                className={`absolute h-[1.5px] w-4 rounded-full bg-current transition ${
-                  mobileMenuOpen ? "opacity-0" : "opacity-100"
-                }`}
-              />
-              <span
-                className={`absolute h-[1.5px] w-4 rounded-full bg-current transition ${
-                  mobileMenuOpen ? "translate-y-0 -rotate-45" : "translate-y-[5px]"
-                }`}
-              />
-            </span>
+            <svg aria-hidden="true" viewBox="0 0 16 16" className="snav__icon" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <path d="M2.5 5h11M2.5 11h11" />
+            </svg>
           </button>
         </div>
       </div>
-      {mobileMenuOpen ? (
-        <div className="mx-auto mt-1 max-h-[calc(100dvh-4.75rem-env(safe-area-inset-top))] max-w-7xl overflow-y-auto overscroll-contain rounded-2xl border border-black panel-gradient p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-[0_18px_34px_rgba(0,0,0,0.34)] backdrop-blur lg:hidden">
-          <nav className="grid gap-1">
-            {isAuthenticated ? (
-              <NavLink
-                to="/users-corner"
-                className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]"
-              >
-                User&apos;s Corner
-              </NavLink>
-            ) : null}
-            <NavLink
-              to="/courses"
-              className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]"
-            >
-              Courses
-            </NavLink>
-            <NavLink to="/about" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-              About Us
-            </NavLink>
-            {!isOwlCognito ? (
-              <NavLink to="/as-accounts" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-                AS-Accounts
-              </NavLink>
-            ) : null}
-            {!isOwlCognito ? (
-              <NavLink to="/national-desk" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-                National Desk
-              </NavLink>
-            ) : null}
-            {!isOwlCognito ? (
-              <NavLink to="/join-alsyed" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-                Join Al Syed
-              </NavLink>
-            ) : null}
-            {!isOwlCognito ? (
-              <NavLink to="/hall-of-fame" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-                Hall of Fame
-              </NavLink>
-            ) : null}
-            <NavLink to="/contact" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-              Contact
-            </NavLink>
-            <NavLink to="/faqs" className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-              FAQs
-            </NavLink>
-          </nav>
 
-          <div className="mt-3 border-t border-black pt-3">
-            {isAuthenticated ? (
-              <div className="space-y-2">
-                <div className="rounded-xl border border-black panel-gradient px-3 py-2 text-xs text-[#DBDBDB]">
-                  <div className="truncate font-semibold text-white">{user?.full_name || user?.email}</div>
-                  <div className="mt-0.5 truncate text-[#A4A4A4]">{user?.email}</div>
-                </div>
-                <div className="grid gap-1">
-                    <Link to="/courses?view=owned" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-                      Your Courses
-                  </Link>
-                  <Link to="/guides" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-                    Guides
-                  </Link>
-                  <Link to="/profile" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-                    Profile
-                  </Link>
-                  <Link to="/id-card" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-                    ID Card
-                  </Link>
-                  {isInstructor ? (
-                    <Link to="/instructor/dashboard" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-                      Instructor
-                    </Link>
-                  ) : null}
-                  {canAccessControls ? (
-                    <Link to="/control-center" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-                      Admin Control Center
-                    </Link>
-                  ) : null}
-                  {canAccessControls ? (
-                    <Link to="/meeting" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-                      Meeting Control
-                    </Link>
-                  ) : null}
-                  {canAccessControls ? (
-                    <Link to="/broadcasting" className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]">
-                      Broadcast Control
-                    </Link>
-                  ) : null}
-                  {isAdmin ? (
-                    <Link
-                      to="/lecture-questions"
-                      className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]"
-                    >
-                      Lecture Questions
-                    </Link>
-                  ) : null}
-                  {isAdmin ? (
-                    <a
-                      href={djangoAdminUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded-lg px-3 py-2 text-sm text-[#DFDFDF] transition hover:bg-[#1E1E1E]"
-                    >
-                      Django Admin
-                    </a>
-                  ) : null}
-                </div>
-                <Button
-                  type="button"
-                  variant="danger"
-                  className="mt-2 w-full"
-                  onClick={onLogout}
-                >
-                  Logout
-                </Button>
-              </div>
-            ) : (
-              <div className="grid gap-2">
-                <Link to="/login" className="block">
-                  <Button className="w-full">Login</Button>
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
+      {mobileMenuOpen ? (
+        <MobileSheet
+          id={sheetId}
+          isAuthenticated={isAuthenticated}
+          user={user}
+          siteGroups={siteGroups}
+          accountGroups={accountGroups}
+          onSignOut={onLogout}
+          onClose={closeMobileMenu}
+          returnFocusRef={menuButtonRef}
+        />
       ) : null}
     </header>
   );
 }
-

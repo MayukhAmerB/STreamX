@@ -5,7 +5,7 @@ from typing import Any
 from .gateway_audit import set_gateway_audit
 from .idempotency import serialized_checkout
 from .models import Payment
-from .pricing import get_plan_terms
+from .plans import get_plan_terms
 from .services import RazorpayServiceError, validate_created_razorpay_order
 
 

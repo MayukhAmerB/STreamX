@@ -8,6 +8,7 @@ import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
 import { getPurchaseUnavailableMessage, isOsintCourse } from "../utils/courseAccess";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
+import { configuredCourseFeeLabel } from "../components/payments/paymentPlans";
 import { formatINR } from "../utils/currency";
 import { normalizeTextList } from "../utils/textList";
 
@@ -350,7 +351,7 @@ export default function CourseDetailPage() {
               <div className="min-w-0 rounded-xl border border-black panel-gradient p-2.5 backdrop-blur-sm sm:rounded-2xl sm:p-3">
                 <div className="text-[10px] uppercase tracking-[0.16em] text-[#949494]">Access</div>
                 <div className="mt-1 break-words text-sm font-semibold leading-tight text-white sm:text-lg">
-                  {launchStatus.isComingSoon ? "Coming Soon" : formatINR(course.price)}
+                  {launchStatus.isComingSoon ? "Coming Soon" : configuredCourseFeeLabel(course) || formatINR(course.price)}
                 </div>
                 <div className="mt-1 hidden text-xs text-[#BBBBBB] sm:block">
                   {launchStatus.isComingSoon ? "Waitlist release" : "Admin-approved access"}
@@ -608,7 +609,7 @@ export default function CourseDetailPage() {
             </div>
 
             <div className="mt-4 font-reference text-3xl font-semibold tracking-tight text-white">
-              {launchStatus.isComingSoon ? "Coming Soon" : formatINR(course.price)}
+              {launchStatus.isComingSoon ? "Coming Soon" : configuredCourseFeeLabel(course) || formatINR(course.price)}
             </div>
             <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
               {sections.length} modules / {lectureCount} lessons / {formatLevel(course.level)} level

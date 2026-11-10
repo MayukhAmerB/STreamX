@@ -12,7 +12,7 @@ from config.audit import log_security_event
 from .batch_pass import activate_batch_pass
 from .entitlements import is_duplicate_guest_purchase
 from .models import Payment, StudentAccountSequence
-from .pricing import get_plan_terms
+from .plans import INSTALLMENT_PLANS, get_plan_terms
 from .refunds import apply_pending_refund
 
 
@@ -127,7 +127,7 @@ def provision_paid_payment(payment):
     enrollment.payment_status = Enrollment.STATUS_PAID
     terms = payment.terms_snapshot or get_plan_terms(course, payment.plan)
 
-    if payment.plan in (Payment.PLAN_MONTHLY, Payment.PLAN_BUNDLE):
+    if payment.plan in INSTALLMENT_PLANS:
         paid_installments = (
             Payment.objects.filter(
                 user=user,

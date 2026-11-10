@@ -6,6 +6,7 @@ import { getCourse } from "../api/courses";
 import CourseReviews from "../components/CourseReviews";
 import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
+import { configuredCourseFeeLabel } from "../components/payments/paymentPlans";
 import { formatINR } from "../utils/currency";
 import { normalizeTextList } from "../utils/textList";
 import "../components/CourseExperience.css";
@@ -32,6 +33,8 @@ const CATEGORY_META = {
 };
 
 export function getCourseDetailPriceLabel(course) {
+  const configured = configuredCourseFeeLabel(course);
+  if (configured) return configured;
   const amount = Number(course?.price || 0);
   return Number.isFinite(amount) && amount > 0 ? formatINR(amount) : "To be announced";
 }

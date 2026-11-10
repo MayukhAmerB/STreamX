@@ -5,11 +5,14 @@ import {
   Collaborate,
   Dashboard,
   Education,
+  Flag,
   Home,
   Identification,
   Microphone,
   PlayOutline,
   QuestionAnswering,
+  Report,
+  TaskApproved,
   ToolKit,
   UserAvatar,
   Video,
@@ -31,6 +34,9 @@ export const NAV_ICONS = {
   meeting: Collaborate,
   broadcast: Microphone,
   questions: QuestionAnswering,
+  labs: Flag,
+  reports: Report,
+  grading: TaskApproved,
 };
 
 export function getNavIcon(key) {

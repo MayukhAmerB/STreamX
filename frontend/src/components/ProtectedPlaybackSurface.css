@@ -1,10 +1,10 @@
 /*
  * Shared video controls (ProtectedPlaybackSurface).
  *
- * Self-contained on purpose: the player renders inside User's Corner (the
+ * Self-contained on purpose: the player renders inside Console (the
  * Carbon shell), including legacy staff pages, so it uses its own `pps-`
  * classes and never depends on Carbon component CSS. Like every video player
- * it is always dark: a black glass control bar with the User's Corner
+ * it is always dark: a black glass control bar with the Console
  * champagne accent on the scrubber and active states (`--uc-*` from the
  * shell, with the same values as fallbacks).
  */
@@ -191,7 +191,7 @@
   background-color: rgba(0, 0, 0, 0.42);
 }
 
-/* The big play / pause button: champagne with the User's Corner glow. */
+/* The big play / pause button: champagne with the Console glow. */
 .pps-btn--primary {
   border-color: transparent;
   background-color: var(--pps-accent);
