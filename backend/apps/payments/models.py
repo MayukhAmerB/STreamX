@@ -11,10 +11,12 @@ class Payment(models.Model):
     STATUS_CREATED = "created"
     STATUS_PAID = "paid"
     STATUS_FAILED = "failed"
+    STATUS_REFUNDED = "refunded"
     STATUS_CHOICES = [
         (STATUS_CREATED, "Created"),
         (STATUS_PAID, "Paid"),
         (STATUS_FAILED, "Failed"),
+        (STATUS_REFUNDED, "Refunded"),
     ]
     PLAN_FULL = "full"
     PLAN_MONTHLY = "monthly"
@@ -31,11 +33,15 @@ class Payment(models.Model):
     PROVISION_AWAITING_ADMIN = "awaiting_admin_credentials"
     PROVISION_CREDENTIALS_ISSUED = "credentials_issued"
     PROVISION_FAILED = "failed"
+    # A captured guest one-time purchase the buyer email already owned: nothing
+    # was granted; refund it (admin filter "Provisioning status").
+    PROVISION_DUPLICATE = "duplicate_refund_due"
     PROVISION_CHOICES = [
         (PROVISION_PENDING, "Pending payment"),
         (PROVISION_AWAITING_ADMIN, "Awaiting admin credentials"),
         (PROVISION_CREDENTIALS_ISSUED, "Credentials issued"),
         (PROVISION_FAILED, "Provisioning failed"),
+        (PROVISION_DUPLICATE, "Duplicate purchase - refund due"),
     ]
 
     application = models.ForeignKey("courses.PentestingApplication", on_delete=models.PROTECT,
@@ -87,6 +93,13 @@ class Payment(models.Model):
     failure_reason = models.TextField(blank=True, default="")
     last_webhook_event = models.CharField(max_length=120, blank=True, default="")
     paid_at = models.DateTimeField(blank=True, null=True)
+    amount_refunded = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Cumulative amount refunded through Razorpay or marked refunded by an admin.",
+    )
+    refunded_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -260,7 +273,10 @@ class BatchPass(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="batch_passes")
     payment = models.OneToOneField(Payment, on_delete=models.PROTECT, related_name="batch_pass")
     source_course = models.ForeignKey(Course, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
-    is_active = models.BooleanField(default=True, help_text="Untick to stop granting future batches (e.g. after a refund).")
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Untick to end the pass: future batches stop and courses only the pass unlocked are revoked.",
+    )
     granted_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

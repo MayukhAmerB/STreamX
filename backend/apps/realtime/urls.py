@@ -1,5 +1,13 @@
 from django.urls import path
 
+from .recording.views import (
+    ClassRecordingObsUploadView,
+    ClassRecordingRetryView,
+    ModuleOptionsView,
+    SessionClassRecordingListView,
+    SessionObsUploadView,
+)
+
 from .views import (
     RealtimeOwncastChatBridgeView,
     RealtimeOwncastStreamAccessView,
@@ -19,6 +27,7 @@ from .views import (
     RealtimeSessionRecordingStopView,
     RealtimeSessionPresenterPermissionView,
     RealtimeSessionSpeakerPermissionView,
+    RealtimeSessionStreamHeartbeatView,
     RealtimeSessionStreamStartView,
     RealtimeSessionStreamStopView,
     RealtimeSessionStreamRotateKeyView,
@@ -75,6 +84,11 @@ urlpatterns = [
     path("sessions/<int:pk>/stream/start/", RealtimeSessionStreamStartView.as_view(), name="realtime-session-stream-start"),
     path("sessions/<int:pk>/stream/stop/", RealtimeSessionStreamStopView.as_view(), name="realtime-session-stream-stop"),
     path(
+        "sessions/<int:pk>/stream/heartbeat/",
+        RealtimeSessionStreamHeartbeatView.as_view(),
+        name="realtime-session-stream-heartbeat",
+    ),
+    path(
         "sessions/<int:pk>/stream/rotate-key/",
         RealtimeSessionStreamRotateKeyView.as_view(),
         name="realtime-session-stream-rotate-key",
@@ -110,6 +124,27 @@ urlpatterns = [
         name="realtime-session-recording-browser-upload",
     ),
     path("sessions/<int:pk>/end/", RealtimeSessionEndView.as_view(), name="realtime-session-end"),
+    path("module-options/", ModuleOptionsView.as_view(), name="realtime-module-options"),
+    path(
+        "sessions/<int:pk>/class-recordings/",
+        SessionClassRecordingListView.as_view(),
+        name="realtime-session-class-recordings",
+    ),
+    path(
+        "sessions/<int:pk>/class-recordings/obs-upload/",
+        SessionObsUploadView.as_view(),
+        name="realtime-session-class-recording-obs-upload",
+    ),
+    path(
+        "class-recordings/<int:recording_id>/obs-upload/",
+        ClassRecordingObsUploadView.as_view(),
+        name="realtime-class-recording-obs-upload",
+    ),
+    path(
+        "class-recordings/<int:recording_id>/retry/",
+        ClassRecordingRetryView.as_view(),
+        name="realtime-class-recording-retry",
+    ),
     path(
         "sessions/<int:pk>/presenters/<str:permission_action>/",
         RealtimeSessionPresenterPermissionView.as_view(),

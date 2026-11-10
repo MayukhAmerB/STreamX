@@ -18,6 +18,11 @@ Rotation history forms a hash chain (token -> successor -> ...). An
 already-used token is redeemed only within the grace window and only while its
 successor is unrevoked; logout walks the chain and revokes every descendant, so
 logging out with a stale token still ends the live session.
+
+Every token in a chain carries the same session slot (see session_policy), so
+a rotated chain stays one device. A pre-slot (legacy) token is always rotated
+rather than re-issued, so its jti is blacklisted the moment it claims its slot
+and an evicted legacy device can never claim that slot again.
 """
 
 from dataclasses import dataclass
@@ -37,10 +42,17 @@ from rest_framework_simplejwt.utils import datetime_from_epoch, get_md5_hash_pas
 from config.audit import log_security_event
 
 from .session_policy import (
+    SESSION_SLOT_CLAIM,
     SESSION_VERSION_CLAIM,
+    claim_session_slot,
+    enforces_session_limit,
     get_active_session_version,
-    should_enforce_single_session,
-    token_matches_active_session,
+    legacy_session_slot,
+    release_session_slot,
+    session_slot_exists,
+    token_matches_session_version,
+    token_session_slot,
+    touch_session_slot,
 )
 
 _SUCCESSOR_SALT = "apps.users.refresh_rotation.successor"
@@ -98,15 +110,17 @@ def _is_blacklisted(outstanding):
     return BlacklistedToken.objects.filter(token=outstanding).exists()
 
 
-def _issue_refresh_token(user, jti):
+def _issue_refresh_token(user, jti, slot_id=None):
     token = RefreshToken()
     token[api_settings.JTI_CLAIM] = jti
     user_id = getattr(user, api_settings.USER_ID_FIELD)
     token[api_settings.USER_ID_CLAIM] = user_id if isinstance(user_id, int) else str(user_id)
     if api_settings.CHECK_REVOKE_TOKEN:
         token[api_settings.REVOKE_TOKEN_CLAIM] = get_md5_hash_password(user.password)
-    if should_enforce_single_session(user):
+    if enforces_session_limit(user):
         token[SESSION_VERSION_CLAIM] = get_active_session_version(user)
+        if slot_id:
+            token[SESSION_SLOT_CLAIM] = slot_id
     OutstandingToken.objects.get_or_create(
         jti=jti,
         defaults={
@@ -137,24 +151,60 @@ def _session(user, refresh):
     return RotatedSession(user=user, access=str(refresh.access_token), refresh=str(refresh))
 
 
+def _session_replaced():
+    return RefreshRejected(
+        REJECT_SESSION_REPLACED,
+        "This account is active on another device. Please log in again.",
+        clear_cookies=True,
+    )
+
+
+class _SessionSlotEvicted(Exception):
+    """The token's session slot was taken by a newer sign-in."""
+
+
 def _rotate_locked(presented, user, request):
     jti = presented[api_settings.JTI_CLAIM]
+    slot_id = None
+    legacy = False
+    if enforces_session_limit(user):
+        slot_id = token_session_slot(presented)
+        if slot_id is None:
+            legacy = True
+            slot_id = legacy_session_slot(jti)
+
     outstanding = OutstandingToken.objects.filter(jti=jti).first()
     if outstanding is None or not _is_blacklisted(outstanding):
+        if legacy:
+            if not api_settings.ROTATE_REFRESH_TOKENS:
+                return _session(user, presented)
+            # Move the pre-slot session into a slot, and always rotate so the
+            # legacy jti is spent and cannot claim the slot again once evicted.
+            claim_session_slot(user, slot_id, request=request)
+            presented.blacklist()
+            return _session(user, _issue_refresh_token(user, successor_jti(jti), slot_id))
+        if slot_id:
+            if not session_slot_exists(user, slot_id):
+                raise _SessionSlotEvicted()
+            touch_session_slot(user, slot_id)
         if not api_settings.ROTATE_REFRESH_TOKENS:
             return _session(user, presented)
         if _minted_within_grace(outstanding):
-            return _session(user, _issue_refresh_token(user, jti))
+            return _session(user, _issue_refresh_token(user, jti, slot_id))
         if api_settings.BLACKLIST_AFTER_ROTATION:
             presented.blacklist()
-        return _session(user, _issue_refresh_token(user, successor_jti(jti)))
+        return _session(user, _issue_refresh_token(user, successor_jti(jti), slot_id))
 
+    # Revocation is checked before the slot: logging out frees the slot too,
+    # and a tab replaying a logged-out token must not read as an eviction.
     successor = _live_successor(outstanding, user)
     if successor is None:
         log_security_event("auth.refresh_reuse_rejected", request=request, target_user_id=user.pk)
         raise RefreshRejected(REJECT_REVOKED, "Token is blacklisted", clear_cookies=False)
+    if slot_id and not session_slot_exists(user, slot_id):
+        raise _SessionSlotEvicted()
     log_security_event("auth.refresh_reuse_redeemed", request=request, target_user_id=user.pk)
-    return _session(user, _issue_refresh_token(user, successor.jti))
+    return _session(user, _issue_refresh_token(user, successor.jti, slot_id))
 
 
 def rotate_refresh_token(raw_token, request=None):
@@ -168,18 +218,19 @@ def rotate_refresh_token(raw_token, request=None):
         raise RefreshRejected(REJECT_INVALID, str(exc), clear_cookies=True) from exc
 
     with transaction.atomic():
-        # Lock the user row first, matching login's single-session rotation:
-        # both then insert blacklist rows, and opposite lock orders deadlock.
+        # Lock the user row first, matching sign-in and sign-out: all of them
+        # then write blacklist and session-slot rows, and opposite lock orders
+        # deadlock.
         user = User.objects.select_for_update().get(pk=user_pk)
-        if token_matches_active_session(presented, user):
-            return _rotate_locked(presented, user, request)
+        if token_matches_session_version(presented, user):
+            try:
+                return _rotate_locked(presented, user, request)
+            except _SessionSlotEvicted:
+                # Raised before _rotate_locked writes anything.
+                pass
         presented.blacklist()
 
-    raise RefreshRejected(
-        REJECT_SESSION_REPLACED,
-        "This account is active on another device. Please log in again.",
-        clear_cookies=True,
-    )
+    raise _session_replaced()
 
 
 def revoke_refresh_token(raw_token):
@@ -187,6 +238,7 @@ def revoke_refresh_token(raw_token):
 
     Clients can log out with a token that was already rotated (a stale tab or
     app state); revoking only that token would leave its live successor valid.
+    Every token in a chain shares one session slot, which is freed as well.
     """
     value = str(raw_token or "").strip()
     if not value:
@@ -195,11 +247,21 @@ def revoke_refresh_token(raw_token):
         presented = _PresentedRefreshToken(value)
     except TokenError:
         return
-    presented.blacklist()
+    User = get_user_model()
     jti = presented[api_settings.JTI_CLAIM]
-    for _ in range(_MAX_REVOKE_HOPS):
-        jti = successor_jti(jti)
-        node = OutstandingToken.objects.filter(jti=jti).first()
-        if node is None:
-            return
-        BlacklistedToken.objects.get_or_create(token=node)
+    slot_id = token_session_slot(presented) or legacy_session_slot(jti)
+    with transaction.atomic():
+        # Same lock order as rotation and sign-in: the user row first.
+        try:
+            user = User.objects.select_for_update().filter(pk=presented.get(api_settings.USER_ID_CLAIM)).first()
+        except (TypeError, ValueError):
+            user = None
+        presented.blacklist()
+        for _ in range(_MAX_REVOKE_HOPS):
+            jti = successor_jti(jti)
+            node = OutstandingToken.objects.filter(jti=jti).first()
+            if node is None:
+                break
+            BlacklistedToken.objects.get_or_create(token=node)
+        if user is not None:
+            release_session_slot(user, slot_id)

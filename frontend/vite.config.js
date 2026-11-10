@@ -3,6 +3,17 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  css: {
+    preprocessorOptions: {
+      scss: {
+        // Carbon's Sass (functional app shell only) is compiled with the
+        // modern Sass API; its own deprecation notices are not actionable here.
+        api: "modern-compiler",
+        quietDeps: true,
+        silenceDeprecations: ["if-function"],
+      },
+    },
+  },
   build: {
     sourcemap: false,
   },

@@ -1,5 +1,6 @@
 import { createContext, useEffect, useMemo, useRef, useState } from "react";
-import { AUTH_SESSION_EXPIRED_EVENT } from "../api/client";
+import { useLocation, useNavigate } from "react-router-dom";
+import { AUTH_SESSION_EXPIRED_EVENT, resetSessionEviction } from "../api/client";
 import {
   fetchAuthConfig,
   fetchCsrfToken,
@@ -10,10 +11,47 @@ import {
 } from "../api/auth";
 import { apiData, apiMessage } from "../utils/api";
 import { markKnownRegisteredVisitor } from "../utils/knownRegisteredVisitor";
+import {
+  SESSION_EVICTED_LOGIN_MESSAGE,
+  isSessionEviction,
+  loginReturnState,
+} from "../utils/sessionEviction";
+import SessionEvictedDialog from "../components/SessionEvictedDialog";
 
 export const AuthContext = createContext(null);
 
 const buildTimeTurnstileSiteKey = String(import.meta.env.VITE_TURNSTILE_SITE_KEY || "").trim();
+
+// Mounted only while the dialog is open, beside (never around) the routed page.
+function SessionEvictionPrompt({ onUseThisDevice, onSignOut }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [signingOut, setSigningOut] = useState(false);
+
+  const continueOnThisDevice = () => {
+    navigate("/login", { state: loginReturnState(location) });
+    onUseThisDevice();
+  };
+
+  const signOut = async () => {
+    setSigningOut(true);
+    try {
+      await onSignOut();
+    } catch {
+      // logout() has already cleared the local session.
+    }
+    navigate("/login");
+  };
+
+  return (
+    <SessionEvictedDialog
+      open
+      signingOut={signingOut}
+      onUseThisDevice={continueOnThisDevice}
+      onSignOut={signOut}
+    />
+  );
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -23,12 +61,14 @@ export function AuthProvider({ children }) {
   const [turnstileEnabled, setTurnstileEnabled] = useState(Boolean(buildTimeTurnstileSiteKey));
   const [turnstileSiteKey, setTurnstileSiteKey] = useState(buildTimeTurnstileSiteKey);
   const [sessionEndedMessage, setSessionEndedMessage] = useState("");
+  const [sessionEvicted, setSessionEvicted] = useState(false);
   const hasBootstrappedRef = useRef(false);
 
   function setAuthenticatedUser(data) {
     if (data) {
       markKnownRegisteredVisitor();
       setSessionEndedMessage("");
+      setSessionEvicted(false);
     }
     setUser(data);
   }
@@ -82,8 +122,11 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const handleSessionExpired = (event) => {
-      if (event?.detail?.code === "session_replaced") {
-        setSessionEndedMessage(event.detail.detail || "This account was signed in on another device.");
+      if (isSessionEviction(event?.detail)) {
+        // Keep the user and the page mounted (a class may be playing); the
+        // dialog lets the student decide when to leave it.
+        setSessionEvicted(true);
+        return;
       }
       setUser(null);
       setLoading(false);
@@ -106,8 +149,16 @@ export function AuthProvider({ children }) {
     try {
       await logoutUser();
     } finally {
+      resetSessionEviction();
+      setSessionEvicted(false);
       setUser(null);
     }
+  };
+
+  const signInOnThisDevice = () => {
+    setSessionEndedMessage(SESSION_EVICTED_LOGIN_MESSAGE);
+    setSessionEvicted(false);
+    setUser(null);
   };
 
   const acceptTerms = async ({ accepted = true, terms_version } = {}) => {
@@ -147,5 +198,14 @@ export function AuthProvider({ children }) {
     ]
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  // The dialog's state stays out of the context value so the routed page does
+  // not even re-render when it opens.
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+      {sessionEvicted ? (
+        <SessionEvictionPrompt onUseThisDevice={signInOnThisDevice} onSignOut={logout} />
+      ) : null}
+    </AuthContext.Provider>
+  );
 }

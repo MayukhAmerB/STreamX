@@ -1,0 +1,122 @@
+// ID card page chrome (Carbon). The credential itself keeps its own branded
+// look from the page's inline styles (.asi-id-card-*). Token-only imports.
+@use '../features/app-shell/styles/tokens' as *;
+
+// The credential, centred (about the width it had before the shell).
+.cds-app .cds-id-card {
+  max-inline-size: 72rem;
+  margin-inline: auto;
+  margin-block-end: $spacing-07;
+}
+
+.cds-app .cds-id-card .asi-id-card-shell:focus-visible {
+  @include focus-outline('outline');
+}
+
+// Only shown when printing (the card itself is hidden from print).
+.cds-app .id-card-print-warning {
+  @include type-style('body-02');
+
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-07;
+  border: 1px solid $border-subtle;
+  min-block-size: 40vh;
+  text-align: center;
+}
+
+// Supporting panels under the card.
+.cds-app .cds-id-card-panels {
+  display: grid;
+  gap: $spacing-05;
+  grid-template-columns: minmax(0, 1fr);
+
+  @include breakpoint(md) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @include breakpoint(xlg) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.cds-app .cds-id-card-panel {
+  min-inline-size: 0;
+}
+
+.cds-app .cds-id-card-panel__title {
+  @include type-style('heading-compact-02');
+
+  margin-block-end: $spacing-05;
+  color: $text-primary;
+}
+
+.cds-app .cds-id-card-facts {
+  display: grid;
+  margin: 0;
+  gap: $spacing-05;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  dt {
+    @include type-style('label-01');
+
+    color: $text-secondary;
+  }
+
+  dd {
+    @include type-style('body-compact-02');
+
+    margin: $spacing-02 0 0;
+    color: $text-primary;
+    overflow-wrap: anywhere;
+  }
+}
+
+.cds-app .cds-id-card-facts--stacked {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.cds-app .cds-id-card-facts .cds-id-card-facts__mono {
+  @include type-style('code-02');
+}
+
+.cds-app .cds-id-card-facts .cds-id-card-facts__note {
+  @include type-style('body-compact-01');
+
+  color: $text-secondary;
+}
+
+.cds-app .cds-id-card-protection {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  gap: $spacing-04;
+  list-style: none;
+
+  li {
+    @include type-style('body-01');
+
+    position: relative;
+    padding-inline-start: $spacing-05;
+    color: $text-secondary;
+
+    &::before {
+      position: absolute;
+      border-radius: 50%;
+      background-color: $icon-secondary;
+      block-size: 0.375rem;
+      content: '';
+      inline-size: 0.375rem;
+      inset-block-start: 0.5rem;
+      inset-inline-start: 0;
+    }
+  }
+}
+
+@media print {
+  .cds-app .id-card-print-warning {
+    display: flex;
+  }
+}

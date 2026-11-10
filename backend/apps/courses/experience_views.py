@@ -1,15 +1,15 @@
 from config.request_security import contains_active_content
 from config.response import api_response
+from config.throttling import ClientIpAnonRateThrottle, ClientIpUserRateThrottle
 from django.db import IntegrityError, transaction
-from django.db.models import Avg, Count
+from django.db.models import Avg, Count, Prefetch
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, serializers
 from rest_framework.exceptions import PermissionDenied, ValidationError
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework.views import APIView
 
-from .models import Course, CourseReview, Enrollment, PentestingApplication
+from .models import Course, CourseReview, Enrollment, Lecture, PentestingApplication
 from .review_queries import (
     active_review_course_for_user,
     confirmed_reviews_for_course,
@@ -35,12 +35,12 @@ def course_statistics(course):
     }
 
 
-class ExperienceReadThrottle(AnonRateThrottle):
+class ExperienceReadThrottle(ClientIpAnonRateThrottle):
     scope = "course_experience_read"
     rate = "120/min"
 
 
-class ExperienceWriteThrottle(UserRateThrottle):
+class ExperienceWriteThrottle(ClientIpUserRateThrottle):
     scope = "course_experience_write"
     rate = "10/min"
 
@@ -95,9 +95,18 @@ class CourseExperienceView(APIView):
                     "title": section.title,
                     "description": section.description,
                     "topics": section.topics,
-                    "lessons": list(section.lectures.values("title", "description")),
+                    "lessons": [
+                        {"title": lecture.title, "description": lecture.description}
+                        for lecture in section.published_lectures
+                    ],
                 }
-                for section in course.sections.prefetch_related("lectures").all()
+                for section in course.sections.prefetch_related(
+                    Prefetch(
+                        "lectures",
+                        queryset=Lecture.objects.published(),
+                        to_attr="published_lectures",
+                    )
+                ).all()
             ]
 
         data = {

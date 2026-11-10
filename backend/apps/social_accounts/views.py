@@ -2,14 +2,14 @@ from config.response import api_response
 from django.db.models import Prefetch
 from drf_spectacular.utils import extend_schema
 from rest_framework import permissions
-from rest_framework.throttling import AnonRateThrottle
+from config.throttling import ClientIpAnonRateThrottle
 from rest_framework.views import APIView
 
 from .models import SocialAccount, SocialAccountCategory
 from .serializers import SocialAccountCategorySerializer, SocialAccountDirectoryResponseSerializer
 
 
-class SocialAccountDirectoryThrottle(AnonRateThrottle):
+class SocialAccountDirectoryThrottle(ClientIpAnonRateThrottle):
     scope = "social_account_directory"
     rate = "120/min"
 

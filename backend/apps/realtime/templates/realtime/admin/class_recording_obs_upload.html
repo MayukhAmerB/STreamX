@@ -1,0 +1,44 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'admin/css/courses_upload_progress.css' %}">
+  <script src="{% static 'admin/js/courses_upload_progress.js' %}"></script>
+{% endblock %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a>
+    &rsaquo; <a href="{% url 'admin:realtime_classrecording_changelist' %}">Class recordings</a>
+    &rsaquo; {{ title }}
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div id="content-main">
+    <p>
+      Class recording #{{ recording.pk }} &middot; {{ recording.session.title }}
+      {% if recording.lecture %}
+        &middot; lecture #{{ recording.lecture.pk }} "{{ recording.lecture.title }}" in module "{{ recording.lecture.section.title }}"
+      {% elif recording.session.target_module %}
+        &middot; a new lecture will be created in module "{{ recording.session.target_module.title }}"
+      {% endif %}
+    </p>
+    {# id="section_form" + .submit-row lets the shared upload progress script drive this form. #}
+    <form id="section_form" method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <fieldset class="module aligned">
+        <div class="form-row">
+          {{ form.video_file.errors }}
+          {{ form.video_file.label_tag }} {{ form.video_file }}
+          <div class="help">{{ form.video_file.help_text }}</div>
+        </div>
+      </fieldset>
+      <div class="submit-row">
+        <input type="submit" class="default" value="Upload and replace">
+      </div>
+    </form>
+  </div>
+{% endblock %}

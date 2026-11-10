@@ -566,6 +566,11 @@ class GuideVideo(models.Model):
         return self.title
 
 
+class LectureQuerySet(models.QuerySet):
+    def published(self):
+        return self.filter(is_published=True)
+
+
 class Lecture(models.Model):
     STREAM_PENDING = "pending"
     STREAM_UPLOADED = "uploaded"
@@ -593,8 +598,17 @@ class Lecture(models.Model):
     stream_error = models.TextField(blank=True, default="")
     order = models.PositiveIntegerField(default=1)
     is_preview = models.BooleanField(default=False)
+    is_published = models.BooleanField(
+        default=True,
+        help_text=(
+            "Unpublished lectures are hidden from students. Class recordings are created "
+            "unpublished and published automatically once their HLS stream is ready."
+        ),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = LectureQuerySet.as_manager()
 
     class Meta:
         ordering = ["order", "id"]
@@ -1207,3 +1221,4 @@ class EnrollmentRequestNotification(models.Model):
 
 
 from .experience_models import CourseReview, PentestingApplication  # noqa: E402,F401
+from .engagement.models import LectureComment, LectureLike, LectureView  # noqa: E402,F401

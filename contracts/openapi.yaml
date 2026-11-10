@@ -1272,6 +1272,91 @@ paths:
               schema:
                 $ref: '#/components/schemas/JoinFormSettingsResponse'
           description: ''
+  /lecture-comments/{comment_id}/:
+    patch:
+      operationId: lecture_comment_update
+      description: Edit your own comment.
+      parameters:
+      - in: path
+        name: comment_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Lecture engagement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedLectureCommentWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedLectureCommentWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedLectureCommentWriteRequest'
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureCommentResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureCommentResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureCommentResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureCommentResponse'
+          description: ''
+    delete:
+      operationId: lecture_comment_delete
+      description: Delete your own comment (staff and the course instructor may delete
+        any).
+      parameters:
+      - in: path
+        name: comment_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Lecture engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureCommentDeleteResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureCommentDeleteResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureCommentDeleteResponse'
+          description: ''
   /lecture-questions/:
     get:
       operationId: lecture_questions_retrieve
@@ -1397,6 +1482,197 @@ paths:
       responses:
         '204':
           description: No response body
+  /lectures/{id}/comments/:
+    get:
+      operationId: lecture_comments_list
+      description: Visible comments, newest first. Always paginated.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: 1-50
+      tags:
+      - Lecture engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureCommentPageResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureCommentPageResponse'
+          description: ''
+    post:
+      operationId: lecture_comments_create
+      description: Post a plain-text comment (HTML is stripped).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Lecture engagement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LectureCommentWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LectureCommentWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LectureCommentWriteRequest'
+        required: true
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureCommentResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureCommentResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureCommentResponse'
+          description: ''
+  /lectures/{id}/engagement/:
+    get:
+      operationId: lecture_engagement_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Lecture engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureEngagementSummaryResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureEngagementSummaryResponse'
+          description: ''
+  /lectures/{id}/like/:
+    post:
+      operationId: lecture_like_toggle
+      description: Toggle the caller's like on the lecture.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Lecture engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureEngagementSummaryResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureEngagementSummaryResponse'
+          description: ''
+    put:
+      operationId: lecture_like_set
+      description: Idempotently like the lecture.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Lecture engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureEngagementSummaryResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureEngagementSummaryResponse'
+          description: ''
+    delete:
+      operationId: lecture_like_remove
+      description: Idempotently remove the caller's like.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Lecture engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureEngagementSummaryResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LectureEngagementSummaryResponse'
+          description: ''
   /lectures/{id}/notes/:
     get:
       operationId: lectures_notes_retrieve_by_id
@@ -1954,6 +2230,119 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /realtime/class-recordings/{recording_id}/obs-upload/:
+    post:
+      operationId: realtime_class_recording_obs_upload
+      description: Replace this recording's lecture video with the OBS file (lecture
+        identity is kept).
+      parameters:
+      - in: path
+        name: recording_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Class recordings
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ObsUploadRequest'
+        required: true
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassRecordingResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassRecordingResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassRecordingResponse'
+          description: ''
+  /realtime/class-recordings/{recording_id}/retry/:
+    post:
+      operationId: realtime_class_recording_retry
+      parameters:
+      - in: path
+        name: recording_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Class recordings
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassRecordingResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassRecordingResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassRecordingResponse'
+          description: ''
+  /realtime/module-options/:
+    get:
+      operationId: realtime_module_options
+      description: Modules of a course for the "target module" picker (admins and
+        the course instructor).
+      parameters:
+      - in: query
+        name: course_id
+        schema:
+          type: integer
+      - in: query
+        name: live_class_id
+        schema:
+          type: integer
+        description: Resolve the course from a live class.
+      tags:
+      - Class recordings
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModuleOptionsResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModuleOptionsResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModuleOptionsResponse'
+          description: ''
   /realtime/owncast/chat-bridge/:
     get:
       operationId: realtime_owncast_chat_bridge_retrieve
@@ -2134,6 +2523,54 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+    patch:
+      operationId: realtime_sessions_partial_update_by_id
+      description: Update the session's target module (the module that receives its
+        class recording).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - realtime
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSessionModuleUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSessionModuleUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSessionModuleUpdateRequest'
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /realtime/sessions/{id}/broadcast-chat/launch/:
     post:
       operationId: realtime_sessions_broadcast_chat_launch_create_by_id
@@ -2292,6 +2729,75 @@ paths:
               schema:
                 type: object
                 additionalProperties: {}
+          description: ''
+  /realtime/sessions/{id}/class-recordings/:
+    get:
+      operationId: realtime_session_class_recordings_list
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Class recordings
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassRecordingListResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassRecordingListResponse'
+          description: ''
+  /realtime/sessions/{id}/class-recordings/obs-upload/:
+    post:
+      operationId: realtime_session_class_recording_obs_upload
+      description: Upload the file OBS saved locally. Replaces the video of the session's
+        latest class-recording lecture (same lecture id, likes, comments, views),
+        or creates the lecture in the session's target module when no recording exists.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Class recordings
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ObsUploadRequest'
+        required: true
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassRecordingResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassRecordingResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassRecordingResponse'
           description: ''
   /realtime/sessions/{id}/connection-events/:
     post:
@@ -2643,6 +3149,54 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /realtime/sessions/{id}/stream/heartbeat/:
+    post:
+      operationId: realtime_session_stream_heartbeat
+      description: Host Studio heartbeat. For live browser (LiveKit) broadcasts, checks
+        the egress with LiveKit (at most every REALTIME_HOST_EGRESS_CHECK_INTERVAL_SECONDS)
+        and restarts a dead egress when the caller reports it is still publishing;
+        otherwise marks the stream failed.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - realtime
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StreamHeartbeatRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StreamHeartbeatRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StreamHeartbeatRequest'
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreamHeartbeatResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreamHeartbeatResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreamHeartbeatResponse'
+          description: ''
   /realtime/sessions/{id}/stream/rotate-key/:
     post:
       operationId: realtime_sessions_stream_rotate_key_create_by_id
@@ -2845,6 +3399,218 @@ components:
         * `audio` - Audio only (play button)
         * `pdf` - PDF download + listen guide
         * `video` - Video collection + listen guide
+    BroadcastEgressStatus:
+      type: object
+      properties:
+        running:
+          type: boolean
+          nullable: true
+          description: True while LiveKit reports the egress starting/active; null
+            when it could not be verified.
+        status:
+          type: string
+          description: LiveKit EgressStatus name, e.g. EGRESS_ACTIVE or EGRESS_FAILED.
+        error:
+          type: string
+      required:
+      - error
+      - running
+      - status
+    ClassRecording:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        session_id:
+          type: integer
+          readOnly: true
+          nullable: true
+        source:
+          allOf:
+          - $ref: '#/components/schemas/ClassRecordingSourceEnum'
+          readOnly: true
+        state:
+          allOf:
+          - $ref: '#/components/schemas/ClassRecordingStateEnum'
+          readOnly: true
+        module:
+          allOf:
+          - $ref: '#/components/schemas/ModuleRef'
+          nullable: true
+          readOnly: true
+        lecture:
+          allOf:
+          - $ref: '#/components/schemas/LectureRef'
+          nullable: true
+          readOnly: true
+        error:
+          type: string
+          readOnly: true
+        part_count:
+          type: integer
+          readOnly: true
+        captured_bytes:
+          type: integer
+          readOnly: true
+          description: Bytes captured into parts (server recordings).
+        file_size_bytes:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: Size of the published source file.
+        duration_seconds:
+          type: integer
+          readOnly: true
+          nullable: true
+        attempts:
+          type: integer
+          readOnly: true
+        recorder_heartbeat_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        started_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        stop_requested_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        finalized_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        can_retry:
+          type: boolean
+          readOnly: true
+        can_replace:
+          type: boolean
+          readOnly: true
+      required:
+      - attempts
+      - can_replace
+      - can_retry
+      - captured_bytes
+      - created_at
+      - duration_seconds
+      - error
+      - file_size_bytes
+      - finalized_at
+      - id
+      - lecture
+      - module
+      - part_count
+      - published_at
+      - recorder_heartbeat_at
+      - session_id
+      - source
+      - started_at
+      - state
+      - stop_requested_at
+      - updated_at
+    ClassRecordingListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClassRecording'
+          nullable: true
+        success:
+          type: boolean
+        message:
+          type: string
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    ClassRecordingResponse:
+      type: object
+      properties:
+        data:
+          allOf:
+          - $ref: '#/components/schemas/ClassRecording'
+          nullable: true
+        success:
+          type: boolean
+        message:
+          type: string
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    ClassRecordingSourceEnum:
+      enum:
+      - server
+      - obs_upload
+      - livekit_egress
+      type: string
+      description: |-
+        * `server` - Server recording (OBS stream)
+        * `obs_upload` - OBS file upload (replacement)
+        * `livekit_egress` - LiveKit egress (Host Studio)
+    ClassRecordingStateEnum:
+      enum:
+      - recording
+      - finalizing
+      - processing
+      - published
+      - failed
+      type: string
+      description: |-
+        * `recording` - Recording
+        * `finalizing` - Finalizing
+        * `processing` - Processing
+        * `published` - Published
+        * `failed` - Failed
+    CommentAuthor:
+      type: object
+      properties:
+        id:
+          type: integer
+        display_name:
+          type: string
+        is_instructor:
+          type: boolean
+      required:
+      - display_name
+      - id
+      - is_instructor
+    CourseRef:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+      required:
+      - id
+      - title
     EventEnum:
       enum:
       - connecting
@@ -3156,6 +3922,235 @@ components:
       required:
       - hero_image_url
       - topics
+    LectureComment:
+      type: object
+      description: Student-facing comment. Never exposes emails or moderation metadata.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        lecture_id:
+          type: integer
+          readOnly: true
+        body:
+          type: string
+          readOnly: true
+        author:
+          allOf:
+          - $ref: '#/components/schemas/CommentAuthor'
+          readOnly: true
+        is_mine:
+          type: boolean
+          readOnly: true
+        is_edited:
+          type: boolean
+          readOnly: true
+        can_delete:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - author
+      - body
+      - can_delete
+      - created_at
+      - id
+      - is_edited
+      - is_mine
+      - lecture_id
+      - updated_at
+    LectureCommentDeleteResponse:
+      type: object
+      properties:
+        data:
+          nullable: true
+        success:
+          type: boolean
+        message:
+          type: string
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    LectureCommentPage:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LectureComment'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+      required:
+      - pagination
+      - results
+    LectureCommentPageResponse:
+      type: object
+      properties:
+        data:
+          allOf:
+          - $ref: '#/components/schemas/LectureCommentPage'
+          nullable: true
+        success:
+          type: boolean
+        message:
+          type: string
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    LectureCommentResponse:
+      type: object
+      properties:
+        data:
+          allOf:
+          - $ref: '#/components/schemas/LectureComment'
+          nullable: true
+        success:
+          type: boolean
+        message:
+          type: string
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    LectureCommentWriteRequest:
+      type: object
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 2000
+      required:
+      - body
+    LectureEngagementSummary:
+      type: object
+      properties:
+        lecture_id:
+          type: integer
+        like_count:
+          type: integer
+        liked:
+          type: boolean
+        comment_count:
+          type: integer
+      required:
+      - comment_count
+      - lecture_id
+      - like_count
+      - liked
+    LectureEngagementSummaryResponse:
+      type: object
+      properties:
+        data:
+          allOf:
+          - $ref: '#/components/schemas/LectureEngagementSummary'
+          nullable: true
+        success:
+          type: boolean
+        message:
+          type: string
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    LectureRef:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        stream_status:
+          type: string
+        is_published:
+          type: boolean
+      required:
+      - id
+      - is_published
+      - stream_status
+      - title
+    ModuleOption:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        order:
+          type: integer
+        lecture_count:
+          type: integer
+      required:
+      - description
+      - id
+      - lecture_count
+      - order
+      - title
+    ModuleOptions:
+      type: object
+      properties:
+        course:
+          $ref: '#/components/schemas/CourseRef'
+        modules:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModuleOption'
+      required:
+      - course
+      - modules
+    ModuleOptionsResponse:
+      type: object
+      properties:
+        data:
+          allOf:
+          - $ref: '#/components/schemas/ModuleOptions'
+          nullable: true
+        success:
+          type: boolean
+        message:
+          type: string
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    ModuleRef:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        course_id:
+          type: integer
+      required:
+      - course_id
+      - id
+      - title
     NationalDeskData:
       type: object
       properties:
@@ -3221,6 +4216,52 @@ components:
         * `wifi` - wifi
         * `ethernet` - ethernet
         * `unknown` - unknown
+    ObsUploadRequest:
+      type: object
+      properties:
+        video_file:
+          type: string
+          format: binary
+          description: 'The recording OBS saved: MP4/MOV/M4V/WEBM, or OBS''s MKV/FLV/TS,
+            which the server remuxes to MP4 (stream copy) before swapping it in. Max
+            MAX_VIDEO_UPLOAD_BYTES (5 GB).'
+      required:
+      - video_file
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+        pages:
+          type: integer
+        has_next:
+          type: boolean
+        has_previous:
+          type: boolean
+      required:
+      - has_next
+      - has_previous
+      - page
+      - page_size
+      - pages
+      - total
+    PatchedLectureCommentWriteRequest:
+      type: object
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 2000
+    PatchedSessionModuleUpdateRequest:
+      type: object
+      properties:
+        target_module_id:
+          type: integer
+          nullable: true
     PlatformEnum:
       enum:
       - mobile
@@ -3543,6 +4584,52 @@ components:
         * `completed` - Completed
         * `in_progress` - In Progress
         * `planned` - Planned
+    StreamHeartbeatData:
+      type: object
+      properties:
+        session:
+          type: object
+          additionalProperties: {}
+          description: The session, in the same shape as GET /api/realtime/sessions/{id}/
+            returns it.
+        egress:
+          allOf:
+          - $ref: '#/components/schemas/BroadcastEgressStatus'
+          nullable: true
+          description: Null for OBS sessions and for streams that are not live.
+        restarted:
+          type: boolean
+          description: True when this heartbeat replaced a dead egress.
+      required:
+      - egress
+      - restarted
+      - session
+    StreamHeartbeatRequest:
+      type: object
+      properties:
+        publishing:
+          type: boolean
+          default: false
+          description: True while the Host Studio has a connected room and a published
+            video track.
+    StreamHeartbeatResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          allOf:
+          - $ref: '#/components/schemas/StreamHeartbeatData'
+          nullable: true
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
     TrackerOverview:
       type: object
       properties:

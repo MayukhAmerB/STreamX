@@ -2,6 +2,8 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
+# Carbon pulls in @ibm/telemetry-js, which reports usage at install time.
+ENV IBM_TELEMETRY_DISABLED=true
 RUN npm ci --no-audit --no-fund
 
 COPY . .

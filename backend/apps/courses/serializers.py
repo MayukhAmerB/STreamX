@@ -477,7 +477,7 @@ class CourseListSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeriali
         value = getattr(obj, "lecture_count", None)
         if value is not None:
             return int(value)
-        return Lecture.objects.filter(section__course=obj).count()
+        return Lecture.objects.published().filter(section__course=obj).count()
 
     def get_average_rating(self, obj):
         value = getattr(obj, "average_rating", None)

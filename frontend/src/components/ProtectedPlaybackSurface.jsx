@@ -1,16 +1,43 @@
+import "./ProtectedPlaybackSurface.css";
+
+import {
+  Checkmark,
+  Forward_10,
+  Maximize,
+  Minimize,
+  PauseFilled,
+  PlayFilledAlt,
+  Rewind_10,
+  Settings,
+  VolumeMuteFilled,
+  VolumeUpFilled,
+} from "@carbon/icons-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import PlaybackWatermark from "./PlaybackWatermark";
+import { useMediaQuery } from "../features/app-shell/useBreakpoint";
 import {
   isNestedFullscreenTarget,
   normalizeProtectedPlaybackClassName,
 } from "../utils/protectedPlayback";
+import {
+  CONTROLS_AUTO_HIDE_MS,
+  DEFAULT_PLAYBACK_RATES,
+  formatPlaybackRate,
+  formatPlaybackTime,
+  formatSeekValueText,
+  getNextPlaybackRate,
+  getProgressPercent,
+  isLiveDuration,
+  isMostlyInViewport,
+  normalizePlaybackRates,
+  resolveControlsLayout,
+} from "../utils/playbackControls";
 
 const VIDEO_SKIP_SECONDS = 10;
 const DOUBLE_TAP_WINDOW_MS = 320;
 const SINGLE_CLICK_DELAY_MS = DOUBLE_TAP_WINDOW_MS + 40;
 const TAP_MOVEMENT_THRESHOLD_PX = 14;
 const VIDEO_REPLAY_THRESHOLD_SECONDS = 0.25;
-const FULLSCREEN_CONTROLS_HIDE_DELAY_MS = 2600;
 
 function getScreenOrientationController() {
   if (typeof screen === "undefined") return null;
@@ -115,28 +142,43 @@ function getFullscreenElement() {
   );
 }
 
-function formatPlaybackTime(totalSeconds) {
-  const normalized = Math.max(0, Math.floor(Number(totalSeconds) || 0));
-  const hours = Math.floor(normalized / 3600);
-  const minutes = Math.floor((normalized % 3600) / 60);
-  const seconds = normalized % 60;
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  }
-
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
-
 function shouldIgnoreGestureTarget(target) {
   return Boolean(
-    target instanceof Element &&
+    typeof Element !== "undefined" &&
+      target instanceof Element &&
       target.closest(
         "[data-playback-gesture-ignore='true'],button,input,select,textarea,a,[role='button']"
       )
   );
 }
 
+function isKeyboardFocus(target) {
+  try {
+    return typeof target?.matches === "function" ? target.matches(":focus-visible") : false;
+  } catch {
+    // Browsers without :focus-visible: treat focus as keyboard focus.
+    return true;
+  }
+}
+
+// Phones held sideways: the video takes the whole screen, like video apps.
+const LANDSCAPE_PHONE_QUERY = "(orientation: landscape) and (pointer: coarse) and (max-height: 540px)";
+
+function ControlButton({ label, icon: Icon, iconSize = 20, className = "", ...props }) {
+  return (
+    <button type="button" className={`pps-btn ${className}`.trim()} aria-label={label} {...props}>
+      <Icon size={iconSize} aria-hidden="true" />
+    </button>
+  );
+}
+
+/**
+ * Shared protected video surface: watermark, signed-stream friendly
+ * fullscreen (native or "app" fallback), and a YouTube-style control bar
+ * (icons, scrubber, time, speed, quality, fullscreen) that fades out while
+ * playing. Styles live in ProtectedPlaybackSurface.css under a `pps-`
+ * prefix so the player looks the same inside and outside the Carbon shell.
+ */
 export default function ProtectedPlaybackSurface({
   children,
   watermarkEnabled = true,
@@ -152,28 +194,48 @@ export default function ProtectedPlaybackSurface({
   activeQualityLabel = "",
   qualityControlMessage = "",
   showQualityControl = false,
-  playbackRates = [1, 1.5, 2],
+  playbackRates = DEFAULT_PLAYBACK_RATES,
+  live = false,
+  autoFullscreenOnLandscape = false,
 }) {
   const containerRef = useRef(null);
   const gestureSurfaceRef = useRef(null);
   const qualityMenuRef = useRef(null);
   const orientationLockedRef = useRef(false);
+  const autoFullscreenRef = useRef(false);
   const lastTapRef = useRef({ timestamp: 0, side: "" });
   const singleToggleTimerRef = useRef(null);
   const controlsHideTimerRef = useRef(null);
   const suppressClickUntilRef = useRef(0);
   const touchGestureRef = useRef({ x: 0, y: 0, moved: false });
+  const videoPausedRef = useRef(true);
+  const controlsVisibleRef = useRef(true);
+  // Keeps the bar on screen while it has keyboard focus or a menu is open.
+  const controlsPinnedRef = useRef(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isAppFullscreen, setIsAppFullscreen] = useState(false);
-  const [controlsVisible, setControlsVisible] = useState(true);
+  const [controlsVisible, setControlsVisibleState] = useState(true);
   const [videoDuration, setVideoDuration] = useState(0);
   const [videoCurrentTime, setVideoCurrentTime] = useState(0);
   const [videoPaused, setVideoPaused] = useState(true);
   const [videoMuted, setVideoMuted] = useState(false);
   const [videoPlaybackRate, setVideoPlaybackRate] = useState(1);
+  const [videoIsLive, setVideoIsLive] = useState(false);
+  const [hasVideoElement, setHasVideoElement] = useState(false);
   const [qualityMenuOpen, setQualityMenuOpen] = useState(false);
+  const [surfaceWidth, setSurfaceWidth] = useState(0);
+  const coarsePointer = useMediaQuery("(pointer: coarse)");
+
+  videoPausedRef.current = videoPaused;
+
+  const setControlsVisible = (visible) => {
+    controlsVisibleRef.current = visible;
+    setControlsVisibleState(visible);
+  };
 
   useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+
     const syncFullscreenState = () => {
       const fullscreenElement = getFullscreenElement();
       const container = containerRef.current;
@@ -218,6 +280,7 @@ export default function ProtectedPlaybackSurface({
     setVideoPaused(true);
     setVideoMuted(false);
     setVideoPlaybackRate(1);
+    setVideoIsLive(false);
   }, [videoSessionKey]);
 
   function clearSingleToggleTimer() {
@@ -253,16 +316,17 @@ export default function ProtectedPlaybackSurface({
     const syncVideoState = () => {
       if (!videoElement) return;
 
-      const nextDuration = Number.isFinite(videoElement.duration) ? videoElement.duration : 0;
+      const rawDuration = videoElement.duration;
+      const nextDuration = Number.isFinite(rawDuration) ? rawDuration : 0;
       const nextTime = Number.isFinite(videoElement.currentTime) ? videoElement.currentTime : 0;
       setVideoDuration(nextDuration);
       setVideoCurrentTime(Math.min(nextTime, nextDuration || nextTime));
-      setVideoPaused(videoElement.paused);
+      setVideoPaused(Boolean(videoElement.paused));
       setVideoMuted(Boolean(videoElement.muted || videoElement.volume === 0));
       setVideoPlaybackRate(Number(videoElement.playbackRate) || 1);
+      setVideoIsLive(isLiveDuration(rawDuration));
     };
 
-    syncVideoState();
     const events = [
       "loadedmetadata",
       "durationchange",
@@ -289,7 +353,8 @@ export default function ProtectedPlaybackSurface({
     };
 
     const bindVideoElement = () => {
-      const nextVideoElement = videoRef?.current;
+      const nextVideoElement = videoRef?.current || null;
+      setHasVideoElement(Boolean(nextVideoElement));
       if (!nextVideoElement || nextVideoElement === videoElement) return;
 
       unbindVideoElement();
@@ -323,51 +388,84 @@ export default function ProtectedPlaybackSurface({
     releaseOrientationLock();
   }, []);
 
+  // The player's own width picks the desktop bar or the touch layout.
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element || typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(([entry]) => {
+      setSurfaceWidth(Math.round(entry?.contentRect?.width ?? 0));
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
   const hasVideoControls = Boolean(videoRef);
+  // Controls only make sense once a <video> is mounted (signed live streams
+  // show a "preparing" message first).
+  const showVideoChrome = hasVideoControls && hasVideoElement;
   const isImmersiveFullscreen = isFullscreen || isAppFullscreen;
+  const isLive = Boolean(live) || videoIsLive;
   // App fullscreen is a reliable fallback for iframe players and mobile
   // browsers that expose but reject the native Fullscreen API.
   const canUseFullscreenControl = showFullscreenButton;
   const canSelectQuality =
     showQualityControl && Array.isArray(qualityOptions) && qualityOptions.length > 1 && typeof onQualityChange === "function";
   const shouldShowQualityBadge = showQualityControl && !canSelectQuality && Boolean(activeQualityLabel);
-  const availablePlaybackRates = (Array.isArray(playbackRates) ? playbackRates : [1, 1.5, 2])
-    .map((rate) => Number(rate))
-    .filter((rate, index, rates) => Number.isFinite(rate) && rate > 0 && rates.indexOf(rate) === index);
+  const availablePlaybackRates = normalizePlaybackRates(playbackRates);
+  const canChangePlaybackRate = !isLive && availablePlaybackRates.length > 1;
   const qualityButtonLabel =
     activeQualityLabel
     || qualityOptions.find((option) => option.value === selectedQuality)?.label
     || "HD";
+  const controlsLayout = resolveControlsLayout({ width: surfaceWidth, coarsePointer });
+  const isTouchLayout = controlsLayout === "touch";
 
-  const revealControls = ({ autoHide = true } = {}) => {
+  const scheduleControlsAutoHide = () => {
     clearControlsHideTimer();
-    setControlsVisible(true);
-
-    if (!isImmersiveFullscreen || !autoHide || videoPaused || typeof window === "undefined") {
-      return;
-    }
+    if (typeof window === "undefined") return;
 
     controlsHideTimerRef.current = window.setTimeout(() => {
       controlsHideTimerRef.current = null;
+      if (videoPausedRef.current || controlsPinnedRef.current) return;
       setControlsVisible(false);
-    }, FULLSCREEN_CONTROLS_HIDE_DELAY_MS);
+    }, CONTROLS_AUTO_HIDE_MS);
+  };
+
+  const revealControls = ({ autoHide = true } = {}) => {
+    clearControlsHideTimer();
+    if (!controlsVisibleRef.current) setControlsVisible(true);
+
+    if (!autoHide || !hasVideoControls || videoPausedRef.current) {
+      return;
+    }
+
+    scheduleControlsAutoHide();
+  };
+
+  const hideControlsNow = () => {
+    clearControlsHideTimer();
+    if (videoPausedRef.current || controlsPinnedRef.current) return;
+    setControlsVisible(false);
   };
 
   const scheduleControlsToggle = () => {
+    const toggle = () => {
+      if (controlsVisibleRef.current && !videoPausedRef.current) {
+        hideControlsNow();
+      } else {
+        revealControls();
+      }
+    };
+
     if (typeof window === "undefined") {
-      clearControlsHideTimer();
-      setControlsVisible((current) => !current);
+      toggle();
       return;
     }
 
     clearSingleToggleTimer();
     singleToggleTimerRef.current = window.setTimeout(() => {
       singleToggleTimerRef.current = null;
-      clearControlsHideTimer();
-      setControlsVisible((current) => {
-        const nextVisible = !current;
-        return nextVisible;
-      });
+      toggle();
     }, SINGLE_CLICK_DELAY_MS);
   };
 
@@ -407,6 +505,7 @@ export default function ProtectedPlaybackSurface({
 
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
+        autoFullscreenRef.current = false;
         setIsAppFullscreen(false);
       }
     };
@@ -417,29 +516,70 @@ export default function ProtectedPlaybackSurface({
     };
   }, [isAppFullscreen]);
 
+  // Phones: turning the phone sideways while the video plays fills the
+  // screen; turning it back returns to the page (only if it was automatic).
+  // Uses the CSS "app" fullscreen because the Fullscreen API needs a tap.
+  useEffect(() => {
+    if (!autoFullscreenOnLandscape || !hasVideoControls || typeof window === "undefined" || !window.matchMedia) {
+      return undefined;
+    }
+
+    const query = window.matchMedia(LANDSCAPE_PHONE_QUERY);
+    let frame = 0;
+    const applyOrientation = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        if (query.matches) {
+          if (getFullscreenElement() || videoPausedRef.current || !videoRef?.current) return;
+          const rect = containerRef.current?.getBoundingClientRect?.();
+          if (!isMostlyInViewport(rect, window.innerHeight)) return;
+          autoFullscreenRef.current = true;
+          setIsAppFullscreen(true);
+          return;
+        }
+        if (autoFullscreenRef.current) {
+          autoFullscreenRef.current = false;
+          setIsAppFullscreen(false);
+        }
+      });
+    };
+
+    query.addEventListener?.("change", applyOrientation);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      query.removeEventListener?.("change", applyOrientation);
+    };
+  }, [autoFullscreenOnLandscape, hasVideoControls, videoRef]);
+
   useEffect(() => {
     if (!isImmersiveFullscreen) {
+      releaseOrientationLock();
+    }
+
+    if (videoPaused) {
       clearControlsHideTimer();
       setControlsVisible(true);
-      releaseOrientationLock();
       return;
     }
 
-    revealControls({ autoHide: !videoPaused });
+    revealControls();
+    // Runs when playback starts/stops or fullscreen changes; the helpers it
+    // calls only read refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isImmersiveFullscreen, videoPaused, videoSessionKey]);
 
   const buttonLabel = useMemo(() => {
     if (isImmersiveFullscreen) {
-      return "Exit Fullscreen";
+      return "Exit fullscreen";
     }
     return fullscreenLabel;
   }, [fullscreenLabel, isImmersiveFullscreen]);
 
   const surfaceClassName = useMemo(() => {
     if (isAppFullscreen) {
-      return "fixed inset-0 z-[9999] flex h-[100dvh] w-[100dvw] flex-col overflow-hidden bg-black";
+      return "pps-surface fixed inset-0 z-[9999] flex h-[100dvh] w-[100dvw] flex-col overflow-hidden bg-black";
     }
-    return `relative isolate bg-black ${isImmersiveFullscreen ? "flex h-full w-full flex-col overflow-hidden" : ""}`.trim();
+    return `pps-surface relative isolate bg-black ${isImmersiveFullscreen ? "flex h-full w-full flex-col overflow-hidden" : ""}`.trim();
   }, [isAppFullscreen, isImmersiveFullscreen]);
 
   const stageClassName = useMemo(() => {
@@ -447,11 +587,11 @@ export default function ProtectedPlaybackSurface({
     return `relative overflow-hidden bg-black ${isImmersiveFullscreen ? "flex min-h-0 flex-1 items-center justify-center" : ""} ${normalizedClassName}`.trim();
   }, [className, isImmersiveFullscreen]);
 
-  const hasSeekableVideo = hasVideoControls && videoDuration > 0;
-  const progressPercent = hasSeekableVideo ? Math.min(100, (videoCurrentTime / videoDuration) * 100) : 0;
+  const hasSeekableVideo = hasVideoControls && videoDuration > 0 && !isLive;
+  const progressPercent = hasSeekableVideo ? getProgressPercent(videoCurrentTime, videoDuration) : 0;
   const playPauseLabel = videoPaused ? "Play" : "Pause";
   const muteLabel = videoMuted ? "Unmute" : "Mute";
-  const shouldShowControls = !isImmersiveFullscreen || controlsVisible || videoPaused;
+  const shouldShowControls = controlsVisible || videoPaused || qualityMenuOpen;
 
   useEffect(() => {
     if (!canSelectQuality) {
@@ -489,20 +629,10 @@ export default function ProtectedPlaybackSurface({
     };
   }, [qualityMenuOpen]);
 
-  const controlsDockClassName = isImmersiveFullscreen
-    ? `pointer-events-none absolute left-3 right-3 bottom-3 z-20 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] transition duration-200 ${
-        shouldShowControls ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
-      }`
-    : "relative z-20 mt-2";
-  const controlsPanelClassName = `${shouldShowControls ? "pointer-events-auto" : "pointer-events-none"} w-full max-w-full px-2.5 py-2.5 sm:px-3 ${
-    isImmersiveFullscreen
-      ? "rounded-[20px] border border-white/12 bg-black/75 shadow-[0_18px_40px_rgba(0,0,0,0.34)] backdrop-blur-xl sm:py-3"
-      : "border-t border-white/10 bg-black sm:py-2.5"
-  }`;
-
   const seekBySeconds = (deltaSeconds) => {
     const videoElement = videoRef?.current;
-    if (!videoElement) return;
+    // Live streams are never scrubbed (the recovery logic owns the live edge).
+    if (!videoElement || isLive) return;
 
     const resolvedDuration = Number.isFinite(videoElement.duration) ? videoElement.duration : videoDuration;
     const baseTime = Number(videoElement.currentTime) || 0;
@@ -543,10 +673,12 @@ export default function ProtectedPlaybackSurface({
 
   const handleSkipBackward = () => {
     seekBySeconds(-VIDEO_SKIP_SECONDS);
+    revealControls();
   };
 
   const handleSkipForward = () => {
     seekBySeconds(VIDEO_SKIP_SECONDS);
+    revealControls();
   };
 
   const handleTogglePlayback = async () => {
@@ -586,6 +718,10 @@ export default function ProtectedPlaybackSurface({
     setVideoPlaybackRate(rate);
   };
 
+  const handleCyclePlaybackRate = () => {
+    handlePlaybackRateChange(getNextPlaybackRate(availablePlaybackRates, videoPlaybackRate));
+  };
+
   const schedulePlaybackToggle = () => {
     if (typeof window === "undefined") {
       void handleTogglePlayback();
@@ -599,21 +735,18 @@ export default function ProtectedPlaybackSurface({
     }, SINGLE_CLICK_DELAY_MS);
   };
 
+  // Mouse: a click plays/pauses and a double click seeks, like desktop players.
   const handleSurfaceClickCapture = (event) => {
-    if (!hasVideoControls || shouldIgnoreGestureTarget(event.target)) return;
+    if (!showVideoChrome || shouldIgnoreGestureTarget(event.target)) return;
     if (Date.now() < suppressClickUntilRef.current) return;
     if (event.detail !== 1) return;
 
-    if (isImmersiveFullscreen) {
-      scheduleControlsToggle();
-      return;
-    }
-
+    revealControls();
     schedulePlaybackToggle();
   };
 
   const handleSurfaceDoubleClickCapture = (event) => {
-    if (!hasVideoControls) return;
+    if (!showVideoChrome) return;
 
     clearSingleToggleTimer();
     revealControls();
@@ -621,8 +754,10 @@ export default function ProtectedPlaybackSurface({
     event.preventDefault();
   };
 
+  // Touch: a tap shows/hides the controls and a double tap seeks 10s, like
+  // phone video apps.
   const handleSurfaceTouchEndCapture = (event) => {
-    if (!hasVideoControls) return;
+    if (!showVideoChrome) return;
 
     const touchPoint = event.changedTouches?.[0];
     if (!touchPoint) return;
@@ -640,7 +775,7 @@ export default function ProtectedPlaybackSurface({
     suppressClickUntilRef.current = Date.now() + TOUCH_CLICK_SUPPRESSION_MS;
     const now = Date.now();
     const previousTap = lastTapRef.current;
-    if (previousTap.side === side && now - previousTap.timestamp <= DOUBLE_TAP_WINDOW_MS) {
+    if (!isLive && previousTap.side === side && now - previousTap.timestamp <= DOUBLE_TAP_WINDOW_MS) {
       clearSingleToggleTimer();
       revealControls();
       handleDirectionalSeek(touchPoint.clientX, event.currentTarget);
@@ -652,17 +787,12 @@ export default function ProtectedPlaybackSurface({
 
     lastTapRef.current = { timestamp: now, side };
     resetTouchGesture();
-    if (isImmersiveFullscreen) {
-      event.preventDefault();
-      scheduleControlsToggle();
-      return;
-    }
     event.preventDefault();
-    schedulePlaybackToggle();
+    scheduleControlsToggle();
   };
 
   const handleSurfaceTouchStartCapture = (event) => {
-    if (!hasVideoControls) return;
+    if (!showVideoChrome) return;
 
     const touchPoint = event.touches?.[0];
     if (!touchPoint) {
@@ -678,7 +808,7 @@ export default function ProtectedPlaybackSurface({
   };
 
   const handleSurfaceTouchMoveCapture = (event) => {
-    if (!hasVideoControls) return;
+    if (!showVideoChrome) return;
 
     const touchPoint = event.touches?.[0];
     if (!touchPoint) return;
@@ -690,14 +820,46 @@ export default function ProtectedPlaybackSurface({
     }
   };
 
+  const handleSurfacePointerMove = (event) => {
+    if (!hasVideoControls || event.pointerType === "touch") return;
+    revealControls();
+  };
+
+  const handleSurfacePointerLeave = (event) => {
+    if (!hasVideoControls || event.pointerType === "touch") return;
+    hideControlsNow();
+  };
+
+  // Any interaction with the bar (tap, click, key) restarts the fade timer.
+  const handleControlsInteraction = () => {
+    revealControls();
+  };
+
+  // Keyboard users keep the bar while they tab through it; a mouse click or
+  // tap that focuses a button must not stop the bar from fading.
+  const handleControlsFocus = (event) => {
+    if (!isKeyboardFocus(event.target)) return;
+    controlsPinnedRef.current = true;
+    revealControls({ autoHide: false });
+  };
+
+  const handleControlsBlur = (event) => {
+    const nextTarget = event.relatedTarget;
+    if (nextTarget && typeof event.currentTarget?.contains === "function" && event.currentTarget.contains(nextTarget)) {
+      return;
+    }
+    controlsPinnedRef.current = false;
+    if (!videoPausedRef.current) scheduleControlsAutoHide();
+  };
+
   const handleToggleFullscreen = async () => {
     try {
       const containerElement = containerRef.current;
+      autoFullscreenRef.current = false;
 
       if (isAppFullscreen) {
         setIsAppFullscreen(false);
-        clearControlsHideTimer();
-        setControlsVisible(true);
+        revealControls();
         releaseOrientationLock();
         return;
       }
@@ -708,7 +870,7 @@ export default function ProtectedPlaybackSurface({
       }
       if (shouldUseAppFullscreen()) {
         setIsAppFullscreen(true);
-        setControlsVisible(true);
+        revealControls();
         orientationLockedRef.current = await lockLandscapeOrientation();
         return;
       }
@@ -723,12 +885,19 @@ export default function ProtectedPlaybackSurface({
         }
       }
       setIsAppFullscreen(true);
-      setControlsVisible(true);
+      revealControls();
       orientationLockedRef.current = await lockLandscapeOrientation();
     } catch {
       // Best-effort enhancement only. Playback must remain usable if fullscreen fails.
     }
   };
+
+  const playbackRateLabel = formatPlaybackRate(videoPlaybackRate);
+  const FullscreenIcon = isImmersiveFullscreen ? Minimize : Maximize;
+  const PlayPauseIcon = videoPaused ? PlayFilledAlt : PauseFilled;
+  // Touch layout: play/back/forward sit in the middle while controls show.
+  // Desktop layout: only the big play button, and only while paused.
+  const centerVisible = showVideoChrome && (isTouchLayout ? shouldShowControls : videoPaused);
 
   return (
     <div
@@ -736,21 +905,21 @@ export default function ProtectedPlaybackSurface({
       data-protected-playback-surface="true"
       data-fullscreen={isImmersiveFullscreen ? "true" : "false"}
       data-app-fullscreen={isAppFullscreen ? "true" : "false"}
+      data-controls-visible={shouldShowControls ? "true" : "false"}
+      data-controls-layout={controlsLayout}
+      data-live={isLive ? "true" : "false"}
       className={surfaceClassName}
       style={{ touchAction: hasVideoControls ? "manipulation" : undefined }}
-      onMouseMoveCapture={() => {
-        if (isImmersiveFullscreen) {
-          revealControls();
-        }
-      }}
+      onPointerMove={handleSurfacePointerMove}
+      onPointerLeave={handleSurfacePointerLeave}
     >
       <div data-protected-playback-content="true" className={stageClassName}>
         {children}
-        {hasVideoControls ? (
+        {showVideoChrome ? (
           <div
             ref={gestureSurfaceRef}
             data-playback-gesture-surface="true"
-            className="absolute inset-0 z-[5]"
+            className="pps-gesture"
             onClickCapture={handleSurfaceClickCapture}
             onDoubleClickCapture={handleSurfaceDoubleClickCapture}
             onTouchStartCapture={handleSurfaceTouchStartCapture}
@@ -760,70 +929,66 @@ export default function ProtectedPlaybackSurface({
             aria-hidden="true"
           />
         ) : null}
-        {hasVideoControls ? (
-          <div
-            className={`pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,10,0.22)_0%,rgba(5,6,10,0)_38%,rgba(5,6,10,0.14)_62%,rgba(5,6,10,0.48)_100%)] transition-opacity duration-200 ${
-              shouldShowControls ? "opacity-100" : "opacity-0"
-            }`}
-          />
-        ) : null}
+        {showVideoChrome ? <div className="pps-scrim" aria-hidden="true" /> : null}
         <PlaybackWatermark enabled={watermarkEnabled} className={watermarkClassName} />
-        {hasVideoControls && videoPaused ? (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-            <button
-              type="button"
-              data-playback-gesture-ignore="true"
+        {centerVisible ? (
+          <div className="pps-center" data-playback-gesture-ignore="true" onClickCapture={handleControlsInteraction}>
+            {isTouchLayout && !isLive ? (
+              <ControlButton
+                label={`Back ${VIDEO_SKIP_SECONDS} seconds`}
+                icon={Rewind_10}
+                iconSize={24}
+                className="pps-btn--round"
+                onClick={handleSkipBackward}
+                disabled={!hasSeekableVideo}
+              />
+            ) : null}
+            <ControlButton
+              label={videoPaused ? "Play video" : "Pause video"}
+              icon={PlayPauseIcon}
+              iconSize={32}
+              className="pps-btn--round pps-btn--primary"
               onClick={() => {
                 clearSingleToggleTimer();
                 void handleTogglePlayback();
               }}
-              className="pointer-events-auto inline-flex h-16 w-16 items-center justify-center rounded-full border border-white/20 bg-black/70 text-white shadow-[0_18px_55px_rgba(0,0,0,0.5)] backdrop-blur-md transition hover:scale-105 hover:bg-[#2A2A2A] sm:h-20 sm:w-20"
-              aria-label="Play video"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true" className="ml-1 h-7 w-7 fill-current sm:h-9 sm:w-9">
-                <path d="M8 5.2v13.6L19 12 8 5.2Z" />
-              </svg>
-            </button>
+            />
+            {isTouchLayout && !isLive ? (
+              <ControlButton
+                label={`Forward ${VIDEO_SKIP_SECONDS} seconds`}
+                icon={Forward_10}
+                iconSize={24}
+                className="pps-btn--round"
+                onClick={handleSkipForward}
+                disabled={!hasSeekableVideo}
+              />
+            ) : null}
           </div>
         ) : null}
         {!hasVideoControls && canUseFullscreenControl ? (
-          <div
-            data-playback-gesture-ignore="true"
-            className="pointer-events-none absolute right-3 top-3 z-30"
-          >
-            <button
-              type="button"
+          <div data-playback-gesture-ignore="true" className="pps-corner">
+            <ControlButton
+              label={buttonLabel}
+              icon={FullscreenIcon}
+              className="pps-btn--overlay"
+              data-playback-action="fullscreen"
               onClick={handleToggleFullscreen}
-              className="pointer-events-auto rounded-full border border-white/12 bg-black/55 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/92 shadow-[0_12px_30px_rgba(0,0,0,0.28)] backdrop-blur-sm transition hover:bg-black/70"
-            >
-              {buttonLabel}
-            </button>
+            />
           </div>
         ) : null}
-      </div>
-      {hasVideoControls ? (
-        <div
-          className={controlsDockClassName}
-          onPointerMove={() => revealControls()}
-          onFocusCapture={() => revealControls({ autoHide: false })}
-        >
+        {showVideoChrome ? (
           <div
+            className="pps-controls"
             data-playback-gesture-ignore="true"
-            className={controlsPanelClassName}
+            onClickCapture={handleControlsInteraction}
+            onFocus={handleControlsFocus}
+            onBlur={handleControlsBlur}
           >
-            <div className="mb-2 grid grid-cols-[auto,minmax(0,1fr),auto] items-center gap-2 sm:gap-3">
-              <span className="min-w-[2.75rem] shrink-0 text-right text-[10px] font-semibold tabular-nums text-white/70 sm:min-w-[3.5rem] sm:text-xs">
-                {formatPlaybackTime(videoCurrentTime)}
-              </span>
-              <div className="relative min-w-0 flex-1">
-                <div className="absolute left-0 right-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-white/12">
-                  <div
-                    className="h-full rounded-full bg-white"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
+            {!isLive ? (
+              <div className="pps-progress">
                 <input
                   type="range"
+                  className="pps-seek"
                   min="0"
                   max={hasSeekableVideo ? videoDuration : 0}
                   step="0.1"
@@ -831,97 +996,76 @@ export default function ProtectedPlaybackSurface({
                   onChange={handleSeekChange}
                   disabled={!hasSeekableVideo}
                   aria-label="Seek through video"
-                  className="playback-slider relative h-6 w-full cursor-pointer appearance-none bg-transparent disabled:cursor-not-allowed disabled:opacity-45"
+                  aria-valuetext={formatSeekValueText(videoCurrentTime, videoDuration)}
+                  style={{ "--pps-progress": `${progressPercent}%` }}
                 />
               </div>
-              <span className="min-w-[2.75rem] shrink-0 text-right text-[10px] font-semibold tabular-nums text-white/70 sm:min-w-[3.5rem] sm:text-xs">
-                {formatPlaybackTime(videoDuration)}
-              </span>
-            </div>
-            <div className="flex flex-col gap-2 text-[10px] font-semibold text-white/90 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:text-xs">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleSkipBackward}
-                  disabled={!hasSeekableVideo}
-                  className="shrink-0 rounded-full border border-white/12 bg-white/8 px-3 py-1.5 transition hover:bg-white/16 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  -10s
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleTogglePlayback()}
-                  className="shrink-0 rounded-full border border-white/12 bg-white px-4 py-1.5 text-[#14161d] transition hover:bg-white/90"
-                >
-                  {playPauseLabel}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSkipForward}
-                  disabled={!hasSeekableVideo}
-                  className="shrink-0 rounded-full border border-white/12 bg-white/8 px-3 py-1.5 transition hover:bg-white/16 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  +10s
-                </button>
+            ) : null}
+            <div className="pps-bar">
+              <div className="pps-bar__group">
+                {!isTouchLayout ? (
+                  <ControlButton label={playPauseLabel} icon={PlayPauseIcon} onClick={() => void handleTogglePlayback()} />
+                ) : null}
+                {!isTouchLayout && !isLive ? (
+                  <>
+                    <ControlButton
+                      label={`Back ${VIDEO_SKIP_SECONDS} seconds`}
+                      icon={Rewind_10}
+                      onClick={handleSkipBackward}
+                      disabled={!hasSeekableVideo}
+                    />
+                    <ControlButton
+                      label={`Forward ${VIDEO_SKIP_SECONDS} seconds`}
+                      icon={Forward_10}
+                      onClick={handleSkipForward}
+                      disabled={!hasSeekableVideo}
+                    />
+                  </>
+                ) : null}
+                <ControlButton
+                  label={muteLabel}
+                  icon={videoMuted ? VolumeMuteFilled : VolumeUpFilled}
+                  onClick={handleToggleMute}
+                />
+                {isLive ? (
+                  <span className="pps-live">
+                    <span className="pps-live__dot" aria-hidden="true" />
+                    Live
+                  </span>
+                ) : (
+                  <span className="pps-time">
+                    {formatPlaybackTime(videoCurrentTime)}
+                    <span className="pps-time__total"> / {formatPlaybackTime(videoDuration)}</span>
+                  </span>
+                )}
               </div>
-              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                <div
-                  data-playback-gesture-ignore="true"
-                  className="flex shrink-0 items-center rounded-full border border-white/12 bg-black/30 p-0.5"
-                  aria-label="Playback speed"
-                >
-                  {availablePlaybackRates.map((rate) => {
-                    const isActive = Math.abs(videoPlaybackRate - rate) < 0.01;
-                    return (
-                      <button
-                        key={rate}
-                        type="button"
-                        onClick={() => handlePlaybackRateChange(rate)}
-                        aria-pressed={isActive ? "true" : "false"}
-                        className={`rounded-full px-2.5 py-1 text-[10px] font-semibold transition sm:text-xs ${
-                          isActive
-                            ? "bg-white text-[#111111]"
-                            : "text-white/72 hover:bg-white/10 hover:text-white"
-                        }`}
-                      >
-                        {rate}x
-                      </button>
-                    );
-                  })}
-                </div>
-                {canSelectQuality ? (
-                  <div
-                    ref={qualityMenuRef}
-                    data-playback-gesture-ignore="true"
-                    className="relative shrink-0"
+              <div className="pps-bar__group pps-bar__group--end">
+                {canChangePlaybackRate ? (
+                  <button
+                    type="button"
+                    className="pps-btn pps-btn--text"
+                    onClick={handleCyclePlaybackRate}
+                    aria-label={`Playback speed ${playbackRateLabel}. Change speed`}
                   >
+                    {playbackRateLabel}
+                  </button>
+                ) : null}
+                {canSelectQuality ? (
+                  <div ref={qualityMenuRef} className="pps-menu-anchor">
                     <button
                       type="button"
+                      className="pps-btn pps-btn--quality"
                       onClick={() => setQualityMenuOpen((current) => !current)}
                       aria-haspopup="menu"
                       aria-expanded={qualityMenuOpen ? "true" : "false"}
-                      title={qualityControlMessage || "Choose playback quality"}
-                      className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/8 px-3 py-1.5 text-[10px] font-semibold text-white/90 transition hover:bg-white/16 sm:text-xs"
+                      aria-label={`Quality: ${qualityButtonLabel}`}
                     >
-                      <svg
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                        className="h-3.5 w-3.5 shrink-0 fill-none stroke-current"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <circle cx="12" cy="12" r="3.2" />
-                        <path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a1.7 1.7 0 0 1 0 2.4 1.7 1.7 0 0 1-2.4 0l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V19a1.7 1.7 0 0 1-1.7 1.7h-.2A1.7 1.7 0 0 1 12 19v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a1.7 1.7 0 0 1-2.4 0 1.7 1.7 0 0 1 0-2.4l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H7a1.7 1.7 0 0 1-1.7-1.7v-.2A1.7 1.7 0 0 1 7 10h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a1.7 1.7 0 0 1 0-2.4 1.7 1.7 0 0 1 2.4 0l.1.1a1 1 0 0 0 1.1.2 1 1 0 0 0 .6-.9V5A1.7 1.7 0 0 1 13.7 3.3h.2A1.7 1.7 0 0 1 15.6 5v.2a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a1.7 1.7 0 0 1 2.4 0 1.7 1.7 0 0 1 0 2.4l-.1.1a1 1 0 0 0-.2 1.1 1 1 0 0 0 .9.6h.2A1.7 1.7 0 0 1 22.3 11v.2A1.7 1.7 0 0 1 20.6 13h-.2a1 1 0 0 0-.9.6Z" />
-                      </svg>
-                      <span>{qualityButtonLabel}</span>
+                      <Settings size={20} aria-hidden="true" />
+                      <span className="pps-btn__text">{qualityButtonLabel}</span>
                     </button>
                     {qualityMenuOpen ? (
-                      <div
-                        role="menu"
-                        className="absolute bottom-full right-0 z-30 mb-2 min-w-[8.5rem] overflow-hidden rounded-2xl border border-white/12 bg-[linear-gradient(180deg,rgba(15,18,26,0.97),rgba(8,10,16,0.96))] p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.4)] backdrop-blur-xl"
-                      >
-                        <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">
+                      <div role="menu" aria-label="Quality" className="pps-menu">
+                        <div className="pps-menu__title" aria-hidden="true">
                           Quality
                         </div>
                         {qualityOptions.map((option) => {
@@ -932,55 +1076,42 @@ export default function ProtectedPlaybackSurface({
                               type="button"
                               role="menuitemradio"
                               aria-checked={isActive ? "true" : "false"}
+                              className="pps-menu__item"
                               onClick={() => {
                                 onQualityChange(option.value);
                                 setQualityMenuOpen(false);
                               }}
-                              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[11px] font-semibold transition sm:text-xs ${
-                                isActive
-                                  ? "bg-white text-[#14161d]"
-                                  : "text-white/88 hover:bg-white/10"
-                              }`}
                             >
+                              <span className="pps-menu__check" aria-hidden="true">
+                                {isActive ? <Checkmark size={16} /> : null}
+                              </span>
                               <span>{option.label}</span>
-                              {isActive ? <span className="text-[10px] uppercase tracking-[0.12em]">On</span> : null}
                             </button>
                           );
                         })}
+                        {qualityControlMessage ? <p className="pps-menu__note">{qualityControlMessage}</p> : null}
                       </div>
                     ) : null}
                   </div>
                 ) : shouldShowQualityBadge ? (
-                  <span
-                    data-playback-gesture-ignore="true"
-                    title={qualityControlMessage || `Playback quality: ${activeQualityLabel}`}
-                    className="shrink-0 rounded-full border border-white/12 bg-white/8 px-3 py-1.5 text-[10px] font-semibold text-white/90 sm:text-xs"
-                  >
+                  <span className="pps-badge">
+                    <span className="pps-visually-hidden">Playback quality: </span>
                     {activeQualityLabel}
                   </span>
                 ) : null}
                 {canUseFullscreenControl ? (
-                  <button
-                    type="button"
+                  <ControlButton
+                    label={buttonLabel}
+                    icon={FullscreenIcon}
+                    data-playback-action="fullscreen"
                     onClick={handleToggleFullscreen}
-                    className="shrink-0 rounded-full border border-white/12 bg-white/8 px-3 py-1.5 transition hover:bg-white/16"
-                  >
-                    <span className="sm:hidden">{isImmersiveFullscreen ? "Exit" : "Full"}</span>
-                    <span className="hidden sm:inline">{buttonLabel}</span>
-                  </button>
+                  />
                 ) : null}
-                <button
-                  type="button"
-                  onClick={handleToggleMute}
-                  className="shrink-0 rounded-full border border-white/12 bg-white/8 px-3 py-1.5 transition hover:bg-white/16"
-                >
-                  {muteLabel}
-                </button>
               </div>
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }

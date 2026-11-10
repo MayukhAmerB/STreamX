@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 
 from config.audit import log_security_event
 from config.response import api_response
+from config.throttling import ClientIpScopedRateThrottle
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
@@ -15,12 +16,12 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_protect
 from rest_framework import permissions, status
 from rest_framework.parsers import JSONParser
-from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.courses.models import Course, Enrollment
 
 from .batch_pass import user_has_active_batch_pass
+from .gateway_audit import safe_gateway_entity
 from .gateway_audit import set_gateway_audit as _set_gateway_audit
 from .idempotency import (
     IdempotencyConflict,
@@ -33,6 +34,7 @@ from .models import Payment, PaymentWebhookEvent
 from .order_service import create_payment_order
 from .pricing import get_plan_amount, get_plan_amount_paise
 from .provisioning import provision_paid_payment
+from .refunds import record_pending_refund, record_refund
 from .serializers import CreateOrderSerializer, VerifyPaymentSerializer
 from .services import (
     RazorpayServiceError,
@@ -67,8 +69,21 @@ def _payment_support_whatsapp_url(payment):
     return f"https://wa.me/{whatsapp_number}?{urlencode({'text': message})}"
 
 
+DUPLICATE_PURCHASE_MESSAGE = (
+    "Payment received, but this email already has this access. Nothing new was granted "
+    "and the payment will be refunded. Contact support if you need help signing in."
+)
+
+
+def _verified_message(payment, default):
+    if payment.provisioning_status == Payment.PROVISION_DUPLICATE:
+        return DUPLICATE_PURCHASE_MESSAGE
+    return default
+
+
 def _payment_success_data(payment):
     course = payment.course
+    duplicate_purchase = payment.provisioning_status == Payment.PROVISION_DUPLICATE
     if payment.plan == Payment.PLAN_BATCH_PASS:
         access_duration = "Lifetime access, including every future batch"
         plan_label = "Plan 3 - All Future Batches Pass"
@@ -86,7 +101,10 @@ def _payment_success_data(payment):
         "course_id": payment.course_id or payment.course_id_snapshot,
         "course_title": payment.course_title_snapshot
         or getattr(course, "title", ""),
-        "enrolled": True,
+        "enrolled": not duplicate_purchase,
+        # The buyer email already owned this one-time purchase: nothing new was
+        # granted and the payment is queued for a refund by the admin.
+        "duplicate_purchase": duplicate_purchase,
         "invoice_number": payment.invoice_number,
         "transaction_id": payment.razorpay_payment_id,
         "plan": payment.plan,
@@ -390,7 +408,7 @@ def _create_order_replay_response(
         replay_payment.refresh_from_db()
         return api_response(
             success=True,
-            message="Payment already verified.",
+            message=_verified_message(replay_payment, "Payment already verified."),
             data={
                 **_payment_success_data(replay_payment),
                 "payment_verified": True,
@@ -442,6 +460,128 @@ def _create_order_replay_response(
     )
 
 
+# Razorpay sends refund.processed once money has actually gone back to the
+# buyer; payment.refunded is accepted for payloads shaped like a payment event.
+# refund.created / refund.failed are informational and never change access.
+REFUND_WEBHOOK_EVENTS = {"refund.processed", "payment.refunded"}
+
+
+def _paise_value(value):
+    if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+        return value
+    return None
+
+
+def _webhook_refund_state(payment, payment_entity, refund_entity):
+    """Return (cumulative refunded paise, is_full) or None if unusable."""
+    expected_paise = int(Decimal(payment.amount) * 100)
+    candidates = [
+        value
+        for value in (
+            _paise_value(payment_entity.get("amount_refunded")),
+            _paise_value(refund_entity.get("amount")),
+        )
+        if value is not None
+    ]
+    is_full = (
+        str(payment_entity.get("refund_status") or "").strip().lower() == "full"
+        or str(payment_entity.get("status") or "").strip().lower() == "refunded"
+    )
+    if not candidates:
+        return (expected_paise, True) if is_full else None
+    refunded_paise = max(candidates)
+    return refunded_paise, is_full or refunded_paise >= expected_paise
+
+
+def _apply_refund_webhook(
+    *, payment, payment_entity, refund_entity, payment_id, event, request, source
+):
+    """Record a refund for a locked payment. Returns (payment, processed, error)."""
+    log_context = {
+        "request": request,
+        "payment_id": payment.id,
+        "course_id": payment.course_id,
+        "webhook_event": event or None,
+        "source": source,
+    }
+    refund_before_capture = bool(
+        payment.status == Payment.STATUS_CREATED
+        and payment_id
+        and payment.razorpay_payment_id in (None, "", payment_id)
+    )
+    if not refund_before_capture and (
+        not payment.razorpay_payment_id or payment_id != payment.razorpay_payment_id
+    ):
+        # Razorpay auto-refunds duplicate or late payments made against an
+        # already paid order; those refunds must not touch this purchase.
+        log_security_event("payment.webhook_refund_payment_mismatch", **log_context)
+        return payment, False, None
+    refund_state = _webhook_refund_state(payment, payment_entity, refund_entity)
+    if refund_state is None:
+        log_security_event("payment.webhook_incomplete_refund", **log_context)
+        return payment, False, {
+            "success": False,
+            "status_code": status.HTTP_400_BAD_REQUEST,
+            "message": "Webhook verification failed.",
+            "errors": {"detail": "Refund payload is incomplete."},
+        }
+    refunded_paise, is_full = refund_state
+    if refund_before_capture:
+        # The capture of this payment has not been recorded yet (webhooks are
+        # unordered). Keep the refund so that capture ends refunded, with no
+        # access granted, instead of dropping it.
+        _set_gateway_audit(payment, payment_entity, event=event)
+        payment.save(update_fields=["gateway_details", "gateway_status", "payment_method", "last_webhook_event", "updated_at"])
+        recorded = record_pending_refund(
+            payment,
+            razorpay_payment_id=payment_id,
+            amount_refunded=Decimal(refunded_paise) / 100,
+            full=is_full,
+        )
+        log_security_event(
+            "payment.webhook_refund_before_capture_recorded",
+            amount_refunded=str(Decimal(refunded_paise) / 100),
+            full=is_full,
+            **log_context,
+        )
+        return payment, recorded, None
+
+    _set_gateway_audit(payment, payment_entity, event=event)
+    safe_refund = safe_gateway_entity(refund_entity)
+    if safe_refund:
+        payment.gateway_details = {**(payment.gateway_details or {}), "refund": safe_refund}
+    payment.save(
+        update_fields=[
+            "gateway_details",
+            "gateway_status",
+            "payment_method",
+            "last_webhook_event",
+            "updated_at",
+        ]
+    )
+    outcome = record_refund(
+        payment,
+        amount_refunded=Decimal(refunded_paise) / 100,
+        full=is_full,
+    )
+    if outcome.newly_refunded:
+        log_security_event(
+            "payment.webhook_refund_access_revoked",
+            amount_refunded=str(outcome.payment.amount_refunded),
+            **outcome.access,
+            **log_context,
+        )
+    elif outcome.partial:
+        log_security_event(
+            "payment.webhook_partial_refund_recorded",
+            amount_refunded=str(outcome.payment.amount_refunded),
+            **log_context,
+        )
+    else:
+        log_security_event("payment.webhook_refund_already_recorded", **log_context)
+    return outcome.payment, outcome.recorded, None
+
+
 def process_payment_webhook_payload(
     *,
     payload,
@@ -454,13 +594,19 @@ def process_payment_webhook_payload(
     payload_data = payload.get("payload") or {}
     payment_entity = ((payload_data.get("payment") or {}).get("entity") or {})
     order_entity = ((payload_data.get("order") or {}).get("entity") or {})
+    refund_entity = ((payload_data.get("refund") or {}).get("entity") or {})
+    is_refund_event = event in REFUND_WEBHOOK_EVENTS
     order_id = str(payment_entity.get("order_id") or order_entity.get("id") or "").strip()
-    payment_id = str(payment_entity.get("id") or "").strip()
+    payment_id = str(
+        payment_entity.get("id")
+        or (refund_entity.get("payment_id") if is_refund_event else "")
+        or ""
+    ).strip()
     payment_status = str(payment_entity.get("status") or "").strip().lower()
     amount_paise = payment_entity.get("amount")
     currency = str(payment_entity.get("currency") or "").strip().upper()
 
-    if not order_id:
+    if not order_id and not (is_refund_event and payment_id):
         log_security_event(
             "payment.webhook_ignored_missing_order",
             request=request,
@@ -476,7 +622,11 @@ def process_payment_webhook_payload(
 
     payment = (
         Payment.objects.select_related("course", "user")
-        .filter(razorpay_order_id=order_id)
+        .filter(
+            Q(razorpay_order_id=order_id)
+            if order_id
+            else Q(razorpay_payment_id=payment_id)
+        )
         .order_by("-created_at")
         .first()
     )
@@ -549,7 +699,31 @@ def process_payment_webhook_payload(
             Payment.objects.select_for_update()
             .get(pk=payment.pk)
         )
-        if event == "payment.captured" or payment_status == "captured":
+        if is_refund_event:
+            payment, processed, refund_error = _apply_refund_webhook(
+                payment=payment,
+                payment_entity=payment_entity,
+                refund_entity=refund_entity,
+                payment_id=payment_id,
+                event=event,
+                request=request,
+                source=source,
+            )
+            if refund_error:
+                return refund_error
+        elif event.startswith("refund.") or payment.status == Payment.STATUS_REFUNDED:
+            # A refunded payment never becomes paid or failed again, whatever
+            # late capture or failure events arrive for it.
+            log_security_event(
+                "payment.webhook_ignored_event",
+                request=request,
+                payment_id=payment.id,
+                course_id=payment.course_id,
+                webhook_event=event or None,
+                payment_status=payment.status,
+                source=source,
+            )
+        elif event == "payment.captured" or payment_status == "captured":
             if not payment_id or amount_paise is None or not currency:
                 log_security_event(
                     "payment.webhook_incomplete_capture",
@@ -709,7 +883,7 @@ def process_payment_webhook_payload(
 class CreateOrderView(APIView):
     permission_classes = [permissions.AllowAny]
     parser_classes = [JSONParser]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIpScopedRateThrottle]
     throttle_scope = "payment_create"
 
     def post(self, request):
@@ -785,7 +959,14 @@ class CreateOrderView(APIView):
             if request.user.is_authenticated
             else None
         )
-        if plan == Payment.PLAN_BATCH_PASS:
+        if not request.user.is_authenticated:
+            # Guests are identified only by a typed email, so answering
+            # "already enrolled" here would tell anyone what any email has
+            # bought. The duplicate check runs after capture instead
+            # (provisioning.py): a guest one-time purchase the email already
+            # owns grants nothing and is flagged for an admin refund.
+            already_enrolled = False
+        elif plan == Payment.PLAN_BATCH_PASS:
             # Lifetime course access alone does not include future batches, so
             # those students may still upgrade; only an existing pass blocks.
             already_enrolled = user_has_active_batch_pass(request.user)
@@ -1086,7 +1267,7 @@ class CreateOrderView(APIView):
 class VerifyPaymentView(APIView):
     permission_classes = [permissions.AllowAny]
     parser_classes = [JSONParser]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIpScopedRateThrottle]
     throttle_scope = "payment_verify"
 
     def post(self, request):
@@ -1140,13 +1321,22 @@ class VerifyPaymentView(APIView):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
+        if payment.status == Payment.STATUS_REFUNDED:
+            log_security_event("payment.verify_refunded_payment", request=request, course_id=payment.course_id, payment_id=payment.id)
+            return api_response(
+                success=False,
+                message="Payment verification failed.",
+                errors={"detail": "This payment was refunded, so it no longer grants course access."},
+                status_code=status.HTTP_409_CONFLICT,
+            )
+
         if payment.status == Payment.STATUS_PAID and payment.razorpay_payment_id == data["razorpay_payment_id"]:
             _grant_paid_course_access(payment)
             payment.refresh_from_db()
             log_security_event("payment.verify_already_paid", request=request, course_id=payment.course_id, payment_id=payment.id)
             return api_response(
                 success=True,
-                message="Payment already verified.",
+                message=_verified_message(payment, "Payment already verified."),
                 data=_payment_success_data(payment),
             )
 
@@ -1218,7 +1408,7 @@ class VerifyPaymentView(APIView):
                 _grant_paid_course_access(payment)
                 return api_response(
                     success=True,
-                    message="Payment already verified.",
+                    message=_verified_message(payment, "Payment already verified."),
                     data=_payment_success_data(payment),
                 )
             payment.status = Payment.STATUS_PAID
@@ -1244,9 +1434,18 @@ class VerifyPaymentView(APIView):
         log_security_event("payment.verify_success", request=request, course_id=payment.course_id, payment_id=payment.id)
 
         payment.refresh_from_db()
+        if payment.status == Payment.STATUS_REFUNDED:
+            # Razorpay's refund of this payment was recorded before its capture.
+            log_security_event("payment.verify_refunded_payment", request=request, course_id=payment.course_id, payment_id=payment.id)
+            return api_response(
+                success=False,
+                message="Payment verification failed.",
+                errors={"detail": "This payment was refunded, so it no longer grants course access."},
+                status_code=status.HTTP_409_CONFLICT,
+            )
         return api_response(
             success=True,
-            message="Payment verified and enrollment created.",
+            message=_verified_message(payment, "Payment verified and enrollment created."),
             data=_payment_success_data(payment),
         )
 

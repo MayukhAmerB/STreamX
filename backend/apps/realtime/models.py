@@ -25,6 +25,7 @@ class RealtimeSessionQuerySet(models.QuerySet):
             "linked_course",
             "linked_live_class",
             "linked_live_class__linked_course",
+            "target_module",
         )
 
 
@@ -99,6 +100,19 @@ class RealtimeSession(models.Model):
         null=True,
         blank=True,
         related_name="realtime_sessions",
+    )
+    # SET_NULL (not PROTECT): admins must stay free to reorganise or delete
+    # modules without being blocked by historical sessions. Lectures already
+    # published live inside the module itself; a session whose module vanished
+    # simply fails to publish its next recording with a retryable error.
+    target_module = models.ForeignKey(
+        "courses.Section",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="realtime_sessions",
+        verbose_name="Target module",
+        help_text="Module of the linked course that receives this class recording as a lecture.",
     )
     room_name = models.CharField(max_length=255, unique=True, blank=True)
     livekit_room_name = models.CharField(max_length=255, blank=True, default="")
@@ -175,6 +189,7 @@ class RealtimeSession(models.Model):
             else:
                 detail = "Select a linked live class for broadcast sessions."
             raise ValidationError({"linked_live_class": detail})
+        self.validate_target_module()
         if self.session_type == self.TYPE_MEETING and self.stream_service != self.STREAM_SERVICE_ALSYED:
             raise ValidationError({"stream_service": "Meeting sessions support only Alsyed Stream mode."})
         obs_key = str(self.obs_stream_key or "").strip()
@@ -198,6 +213,24 @@ class RealtimeSession(models.Model):
         normalized_speakers = self.get_speaker_user_ids()
         if len(normalized_speakers) > 1000:
             raise ValidationError({"speaker_user_ids": "Too many speaker overrides for one session."})
+
+    def resolve_course_id(self):
+        if self.linked_course_id:
+            return self.linked_course_id
+        if self.linked_live_class_id:
+            return getattr(self.linked_live_class, "linked_course_id", None)
+        return None
+
+    def validate_target_module(self):
+        if not self.target_module_id:
+            return
+        course_id = self.resolve_course_id()
+        if not course_id:
+            raise ValidationError(
+                {"target_module": "Link the session to a course (via its live class) before choosing a module."}
+            )
+        if self.target_module.course_id != course_id:
+            raise ValidationError({"target_module": "The module must belong to the session's course."})
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -1033,7 +1066,7 @@ class ServerResourceProfile(models.Model):
     ]
     PROFILE_DESCRIPTIONS = {
         PROFILE_CONTENT: "Everyday courses and recordings. Owncast 1.5 cores.",
-        PROFILE_BROADCAST: "OBS live class. Owncast 3 cores, transcoding reduced.",
+        PROFILE_BROADCAST: "Live class (OBS or Host Studio). Owncast 3.5 cores with top CPU priority, background work reduced.",
         PROFILE_MEETING: "Interactive meetings. LiveKit 3 cores, Owncast reduced.",
     }
     AGENT_OFFLINE_AFTER_SECONDS = 90
@@ -1085,3 +1118,6 @@ class ServerResourceProfile(models.Model):
 
     def __str__(self):
         return "Server resource profile"
+
+
+from .recording.models import ClassRecording  # noqa: E402,F401

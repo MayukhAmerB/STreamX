@@ -1,0 +1,521 @@
+// Layout of the functional app shell: header, side nav, content area,
+// phone bottom navigation and the "More" sheet. Carbon tokens only.
+@use './tokens' as *;
+
+$header-height: 3rem;
+$side-nav-width: 16rem;
+$bottom-nav-height: 4rem; // 64px tab bar (+ safe-area inset)
+$safe-top: env(safe-area-inset-top, 0px);
+$safe-bottom: env(safe-area-inset-bottom, 0px);
+$safe-left: env(safe-area-inset-left, 0px);
+$safe-right: env(safe-area-inset-right, 0px);
+
+.cds-app {
+  --cds-app-header-height: calc(#{$header-height} + #{$safe-top});
+  --cds-app-bottom-nav-height: calc(#{$bottom-nav-height} + #{$safe-bottom});
+}
+
+// ---------------------------------------------------------------------------
+// Header
+// ---------------------------------------------------------------------------
+.cds-app .cds--header {
+  block-size: var(--cds-app-header-height);
+  padding-block-start: $safe-top;
+  padding-inline: $safe-left $safe-right;
+}
+
+.cds-app .cds--header__name {
+  overflow: hidden;
+  min-inline-size: 0;
+  flex: 0 1 auto;
+  white-space: nowrap;
+
+  > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.cds-app .cds-app-header__brand-mark {
+  display: inline-block;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  flex: none;
+  border-radius: 50%;
+  margin-inline-end: $spacing-03;
+  object-fit: cover;
+  vertical-align: middle;
+}
+
+// Avatar trigger: room for the 32px avatar inside the 48px action.
+.cds-app .cds--header__action .cds-app-avatar {
+  pointer-events: none;
+}
+
+// Avatar inside the header action button.
+.cds-app .cds-app-avatar {
+  display: inline-flex;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background-color: $layer-accent;
+  block-size: 2rem;
+  color: $text-primary;
+  flex: none;
+  font-weight: 600;
+  inline-size: 2rem;
+  font-size: 0.875rem;
+  line-height: 1;
+
+  img {
+    display: block;
+    block-size: 100%;
+    inline-size: 100%;
+    object-fit: cover;
+  }
+}
+
+.cds-app .cds-app-avatar--lg {
+  block-size: 3rem;
+  inline-size: 3rem;
+  font-size: 1.25rem;
+}
+
+.cds-app .cds-app-avatar--xl {
+  block-size: 5rem;
+  inline-size: 5rem;
+  font-size: 2rem;
+}
+
+// Account panel (opens from the avatar).
+.cds-app .cds-app-account-panel {
+  display: flex;
+  flex-direction: column;
+  inset-block-start: var(--cds-app-header-height);
+  block-size: auto;
+  max-block-size: calc(100dvh - var(--cds-app-header-height));
+  overflow-y: auto;
+
+  @include breakpoint-down(md) {
+    &.cds--header-panel--expanded {
+      inline-size: 100%;
+    }
+  }
+}
+
+.cds-app .cds-app-account-panel__user {
+  display: flex;
+  align-items: center;
+  padding: $spacing-06 $spacing-05;
+  border-block-end: 1px solid $border-subtle;
+  gap: $spacing-04;
+}
+
+.cds-app .cds-app-account-panel__name {
+  @include type-style('heading-compact-02');
+
+  overflow: hidden;
+  color: $text-primary;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cds-app .cds-app-account-panel__email {
+  @include type-style('label-01');
+
+  overflow: hidden;
+  color: $text-secondary;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cds-app .cds-app-account-panel__section {
+  padding: $spacing-05;
+  border-block-end: 1px solid $border-subtle;
+}
+
+.cds-app .cds-app-section-label {
+  @include type-style('label-01');
+
+  display: block;
+  margin-block-end: $spacing-03;
+  color: $text-secondary;
+}
+
+// ---------------------------------------------------------------------------
+// Shared action list (account panel + More sheet): icon + label rows.
+// ---------------------------------------------------------------------------
+.cds-app .cds-app-action-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cds-app .cds-app-action-list__item {
+  @include type-style('body-compact-01');
+
+  display: flex;
+  align-items: center;
+  padding: 0 $spacing-05;
+  border: 0;
+  background: none;
+  color: $text-primary;
+  cursor: pointer;
+  gap: $spacing-04;
+  inline-size: 100%;
+  min-block-size: 3rem;
+  text-align: start;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+
+  svg {
+    flex: none;
+    fill: $icon-secondary;
+  }
+
+  &:focus-visible {
+    @include focus-outline('outline');
+  }
+
+  &:active {
+    background-color: $background-active;
+  }
+
+  &[aria-current='page'] {
+    background-color: $background-selected;
+    box-shadow: inset 3px 0 0 $border-interactive;
+    font-weight: 600;
+
+    svg {
+      fill: $icon-primary;
+    }
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      background-color: $background-hover;
+    }
+  }
+}
+
+.cds-app .cds-app-action-list__item--danger {
+  color: $text-error;
+
+  svg {
+    fill: $support-error;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Desktop side nav
+// ---------------------------------------------------------------------------
+.cds-app .cds-app-sidenav {
+  border-inline-end: 1px solid $border-subtle;
+}
+
+.cds-app .cds-app-sidenav .cds--side-nav__items {
+  padding-block: $spacing-05;
+}
+
+.cds-app .cds-app-sidenav__heading {
+  @include type-style('label-01');
+
+  padding: $spacing-06 $spacing-05 $spacing-03;
+  color: $text-secondary;
+  list-style: none;
+}
+
+.cds-app .cds-app-sidenav .cds--side-nav__link {
+  min-block-size: 2.5rem;
+}
+
+// ---------------------------------------------------------------------------
+// Content area
+// ---------------------------------------------------------------------------
+.cds-app .cds-app__main {
+  display: block;
+  min-block-size: 100dvh;
+  padding-block-start: var(--cds-app-header-height);
+  overflow-x: clip;
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.cds-app[data-shell-layout='desktop'] .cds-app__main {
+  margin-inline-start: $side-nav-width;
+}
+
+.cds-app[data-shell-layout='mobile'] .cds-app__main {
+  padding-block-end: var(--cds-app-bottom-nav-height);
+  padding-inline: $safe-left $safe-right;
+}
+
+// Carbon-native pages: generous Carbon spacing, centred reading width.
+.cds-app .cds-page {
+  max-inline-size: 82rem;
+  margin-inline: auto;
+  padding: $spacing-07 $spacing-05 $spacing-09;
+
+  @include breakpoint(md) {
+    padding: $spacing-08 $spacing-07 $spacing-10;
+  }
+
+  @include breakpoint(lg) {
+    padding: $spacing-09 $spacing-09 $spacing-10;
+  }
+}
+
+// Edge-to-edge Carbon pages (course player) lay themselves out.
+.cds-app .cds-page.cds-page--flush {
+  max-inline-size: none;
+  padding: 0;
+}
+
+// Pages not yet migrated keep the website's dark (or OwlCognito light) look.
+.cds-app .cds-legacy-frame {
+  min-block-size: calc(100dvh - var(--cds-app-header-height));
+  background-color: #000000;
+  color: #ffffff;
+}
+
+html[data-site-brand='owlcognito'] .cds-app .cds-legacy-frame {
+  background-color: #fbfaff;
+  color: #241344;
+}
+
+.cds-app[data-shell-layout='mobile'] .cds-legacy-frame {
+  min-block-size: calc(100dvh - var(--cds-app-header-height) - var(--cds-app-bottom-nav-height));
+}
+
+// ---------------------------------------------------------------------------
+// Phone / tablet bottom navigation
+// ---------------------------------------------------------------------------
+.cds-app .cds-app-bottom-nav {
+  position: fixed;
+  z-index: 8000;
+  display: grid;
+  border-block-start: 1px solid $border-subtle;
+  background-color: $layer-01;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  inset-block-end: 0;
+  inset-inline: 0;
+  padding-block-end: $safe-bottom;
+  padding-inline: $safe-left $safe-right;
+}
+
+.cds-app .cds-app-bottom-nav__item {
+  @include type-style('label-01');
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-03 $spacing-02;
+  border: 0;
+  margin: 0;
+  background: none;
+  block-size: $bottom-nav-height;
+  color: $text-secondary;
+  cursor: pointer;
+  gap: $spacing-02;
+  min-inline-size: 2.75rem;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+
+  svg {
+    fill: currentColor;
+  }
+
+  &::before {
+    position: absolute;
+    block-size: 3px;
+    background-color: transparent;
+    content: '';
+    inset-block-start: -1px;
+    inset-inline: 22%;
+  }
+
+  &:focus-visible {
+    @include focus-outline('outline');
+  }
+
+  &:active {
+    background-color: $background-active;
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      background-color: $background-hover;
+      color: $text-primary;
+    }
+  }
+}
+
+.cds-app .cds-app-bottom-nav__item.is-active {
+  color: $text-primary;
+  font-weight: 600;
+
+  &::before {
+    background-color: $border-interactive;
+  }
+}
+
+.cds-app .cds-app-bottom-nav__label {
+  overflow: hidden;
+  max-inline-size: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Host Studio's "You are live. Return to Host Studio" badge is appended to
+// <body> with [data-host-live-badge] (services/realtime/hostStudioController.js) at bottom: 16px with an
+// inline z-index of 1000, which would sit under the phone tab bar. Lift it
+// above the tab bar while the mobile shell is mounted.
+body:has(.cds-app[data-shell-layout='mobile']) > [data-host-live-badge] {
+  bottom: calc(#{$bottom-nav-height} + #{$safe-bottom} + #{$spacing-05}) !important;
+}
+
+// ---------------------------------------------------------------------------
+// "More" bottom sheet
+// ---------------------------------------------------------------------------
+.cds-app .cds-app-sheet {
+  position: fixed;
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  inset: 0;
+}
+
+.cds-app .cds-app-sheet__scrim {
+  position: absolute;
+  border: 0;
+  background-color: $overlay;
+  inset: 0;
+  animation: cds-app-fade-in $duration-moderate-01 motion(entrance, productive);
+}
+
+.cds-app .cds-app-sheet__panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background-color: $layer-01;
+  max-block-size: min(85dvh, 40rem);
+  overscroll-behavior: contain;
+  padding-block-end: $safe-bottom;
+  padding-inline: $safe-left $safe-right;
+  animation: cds-app-sheet-in $duration-moderate-02 motion(entrance, expressive);
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.cds-app .cds-app-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline-start: $spacing-05;
+  border-block-end: 1px solid $border-subtle;
+  min-block-size: 3rem;
+}
+
+.cds-app .cds-app-sheet__title {
+  @include type-style('heading-compact-02');
+}
+
+.cds-app .cds-app-sheet__body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.cds-app .cds-app-sheet__group + .cds-app-sheet__group {
+  border-block-start: 1px solid $border-subtle;
+}
+
+.cds-app .cds-app-sheet__group-label {
+  @include type-style('label-01');
+
+  display: block;
+  padding: $spacing-05 $spacing-05 $spacing-02;
+  color: $text-secondary;
+}
+
+.cds-app .cds-app-sheet__section {
+  padding: $spacing-05;
+  border-block-start: 1px solid $border-subtle;
+}
+
+@keyframes cds-app-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes cds-app-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Toasts
+// ---------------------------------------------------------------------------
+.cds-app .cds-app-toasts {
+  position: fixed;
+  z-index: 9100;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-03;
+  inset-block-start: calc(var(--cds-app-header-height) + #{$spacing-05});
+  inset-inline-end: $spacing-05;
+  pointer-events: none;
+
+  > * {
+    pointer-events: auto;
+  }
+}
+
+.cds-app[data-shell-layout='mobile'] .cds-app-toasts {
+  inset-block: auto calc(var(--cds-app-bottom-nav-height) + #{$spacing-03});
+  inset-inline: $spacing-03;
+
+  .cds--toast-notification {
+    inline-size: 100%;
+    max-inline-size: none;
+    margin: 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Theme switch (content switcher) fills its container.
+// ---------------------------------------------------------------------------
+.cds-app .cds-app-theme-switch {
+  inline-size: 100%;
+}
+
+.cds-app .cds-app-theme-switch .cds--content-switcher-btn {
+  min-block-size: 2.75rem;
+}
+
+// ---------------------------------------------------------------------------
+// Motion: respect the OS setting everywhere in the shell.
+// ---------------------------------------------------------------------------
+@media (prefers-reduced-motion: reduce) {
+  .cds-app *,
+  .cds-app *::before,
+  .cds-app *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

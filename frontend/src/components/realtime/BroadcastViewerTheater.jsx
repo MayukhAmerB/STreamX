@@ -1,62 +1,97 @@
+import "./BroadcastViewerTheater.scss";
+
+import { ChevronDown, Launch, Renew, WarningAltFilled } from "@carbon/icons-react";
 import { useEffect, useState } from "react";
 import useOwncastChatLaunch from "../../hooks/useOwncastChatLaunch";
 import useOwncastStreamLaunch from "../../hooks/useOwncastStreamLaunch";
 import SecureHlsBroadcastPlayer from "./SecureHlsBroadcastPlayer";
 
-function EmptyPanel({ className, message }) {
+function EmptyPanel({ className = "", message }) {
   return (
-    <div className={`flex items-center justify-center px-6 text-center text-sm text-[#BBBBBB] ${className}`.trim()}>
-      {message}
+    <div className={`bvt__empty ${className}`.trim()}>
+      <p>{message}</p>
     </div>
   );
 }
 
-function ChatPanel({ title, url, message, onRefresh }) {
+/** "live" | "starting" | "offline" | "ended" for the status tag. */
+export function resolveTheaterState({ streamStatus = "", sessionStatus = "" } = {}) {
+  const stream = String(streamStatus || "").trim().toLowerCase();
+  const session = String(sessionStatus || "").trim().toLowerCase();
+  if (session === "ended") return "ended";
+  if (stream === "starting") return "starting";
+  if (stream && stream !== "live") return "offline";
+  return "live";
+}
+
+const STATE_LABELS = {
+  starting: "Reconnecting",
+  offline: "Offline",
+  ended: "Ended",
+};
+
+function ChatPanel({ title, url, message, onRefresh, chatEnabled, open, onToggle }) {
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex min-h-14 items-center justify-between gap-3 border-b border-white/10 bg-[#101010] px-4 py-3">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-white">{title}</div>
-          <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.13em] text-emerald-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            Read &amp; reply
-          </div>
+    <section className="bvt__chat" data-open={open ? "true" : "false"} aria-label={title}>
+      <div className="bvt__chat-header">
+        <div className="bvt__chat-heading">
+          <h3 className="bvt__chat-title">{title}</h3>
+          <p className="bvt__chat-status" data-enabled={chatEnabled ? "true" : "false"}>
+            <span className="bvt__dot" aria-hidden="true" />
+            {chatEnabled ? "Read & reply" : "Chat is off"}
+          </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="rounded-lg border border-white/10 bg-[#171717] px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[#D7D7D7] transition hover:bg-[#222222]"
-          >
-            Refresh
+        <div className="bvt__chat-actions">
+          <button type="button" className="bvt__icon-btn" onClick={onRefresh} aria-label="Refresh chat">
+            <Renew size={20} aria-hidden="true" />
           </button>
           {url ? (
             <a
               href={url}
               target="_blank"
               rel="noreferrer"
-              className="rounded-lg border border-white/10 bg-white px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-black transition hover:bg-[#E5E5E5]"
+              className="bvt__icon-btn"
+              aria-label="Open chat in a new tab"
             >
-              Open
+              <Launch size={20} aria-hidden="true" />
             </a>
           ) : null}
+          <button
+            type="button"
+            className="bvt__icon-btn bvt__chat-toggle"
+            onClick={onToggle}
+            disabled={!chatEnabled}
+            aria-expanded={open ? "true" : "false"}
+            aria-label={open ? "Hide chat" : "Show chat"}
+          >
+            <ChevronDown size={20} aria-hidden="true" />
+          </button>
         </div>
       </div>
-      {url ? (
-        <iframe
-          title={title}
-          src={url}
-          className="block h-[58vh] min-h-[340px] w-full flex-1 lg:h-0 lg:min-h-0 lg:max-h-none"
-          allow="clipboard-read; clipboard-write"
-          referrerPolicy="strict-origin-when-cross-origin"
-        />
-      ) : (
-        <EmptyPanel className="h-[340px] flex-1 lg:h-0 lg:min-h-0" message={message} />
-      )}
-    </div>
+      <div className="bvt__chat-body">
+        {url ? (
+          <iframe
+            title={title}
+            src={url}
+            className="bvt__chat-frame"
+            allow="clipboard-read; clipboard-write"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        ) : (
+          <EmptyPanel className="bvt__empty--chat" message={message} />
+        )}
+      </div>
+    </section>
   );
 }
 
+/**
+ * Student live-broadcast view: secure HLS player, title + live status, and
+ * the Owncast chat beside the video (desktop) or under it (phones).
+ * Styles are self-contained (`bvt-`/`bvt__` classes, Carbon tokens with dark
+ * fallbacks) because the instructor Broadcasting page still renders this
+ * outside the Carbon shell.
+ */
 export default function BroadcastViewerTheater({
   title = "",
   sessionId = null,
@@ -79,6 +114,7 @@ export default function BroadcastViewerTheater({
   personalizeChat = false,
   withContainer = true,
   className = "",
+  actions = null,
 }) {
   const [mobileChatOpen, setMobileChatOpen] = useState(true);
   const [streamFrameVersion, setStreamFrameVersion] = useState(0);
@@ -102,13 +138,6 @@ export default function BroadcastViewerTheater({
     enabled: Boolean(personalizeChat && canUseChat && chatUrl),
   });
   const resolvedChatUrl = secureChat.chatUrl;
-  const layoutClassName = showChat
-    ? showHeaderMeta
-      ? "mt-3 grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:items-stretch"
-      : "grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:items-stretch"
-    : showHeaderMeta
-      ? "mt-3"
-      : "";
   const isStreamStarting = Boolean(
     resolvedStreamUrl && normalizedSessionStatus !== "ended" && normalizedStreamStatus === "starting"
   );
@@ -140,6 +169,8 @@ export default function BroadcastViewerTheater({
       : isStreamUnavailable
         ? "The live video is temporarily offline. Keep chat open while the host reconnects OBS."
         : "");
+  const theaterState = resolveTheaterState({ streamStatus, sessionStatus });
+  const tagLabel = theaterState === "live" ? badgeLabel : STATE_LABELS[theaterState];
 
   // Only a manual Retry/Refresh relaunches the stream. When the stream comes
   // back live the player reloads in place (with jitter) on its own, so a
@@ -164,37 +195,15 @@ export default function BroadcastViewerTheater({
     }
   }, [isStreamUnavailable]);
 
+  const hasMeta = showHeaderMeta || Boolean(resolvedStatusMessage) || Boolean(actions);
+
   const content = (
-    <>
-      {showHeaderMeta ? (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-xs uppercase tracking-[0.14em] text-[#949494]">{headerLabel}</div>
-            <span className="text-sm text-[#DFDFDF]">{title}</span>
-          </div>
-          <span className="rounded-full border border-black bg-[#171717] px-3 py-1 text-xs uppercase tracking-[0.12em] text-[#CDCDCD]">
-            {badgeLabel}
-          </span>
-        </div>
-      ) : null}
-
-      {resolvedStatusMessage ? (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-black bg-[#141414] px-4 py-3 text-sm text-[#D7D7D7]">
-          <span>{resolvedStatusMessage}</span>
-          {streamUrl && canRenderLiveFrames ? (
-            <button
-              type="button"
-              onClick={refreshStreamFrame}
-              className="rounded-full border border-black bg-[#1B1B1B] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[#E2E2E2] transition hover:bg-[#232323]"
-            >
-              Retry Video
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-
-      <div className={layoutClassName}>
-        <div className="overflow-hidden rounded-2xl border border-black bg-black shadow-[0_14px_34px_rgba(0,0,0,0.24)]">
+    <div
+      className={`bvt${showChat ? " bvt--with-chat" : ""}${withContainer ? "" : ` ${className}`}`.trimEnd()}
+      data-state={theaterState}
+    >
+      <div className="bvt__video">
+        <div className="bvt__frame">
           {streamUrl && canRenderLiveFrames ? (
             resolvedStreamUrl ? (
               <SecureHlsBroadcastPlayer
@@ -204,53 +213,70 @@ export default function BroadcastViewerTheater({
                 fallbackEmbedUrl={resolvedStreamUrl}
                 refreshKey={streamFrameVersion}
                 streamStatus={normalizedStreamStatus}
+                sessionStatus={normalizedSessionStatus}
                 title={streamTitle}
               />
             ) : (
-              <EmptyPanel className="aspect-video w-full" message={resolvedStreamFallbackMessage} />
+              <EmptyPanel className="bvt__empty--video" message={resolvedStreamFallbackMessage} />
             )
           ) : (
-            <EmptyPanel
-              className="aspect-video w-full"
-              message={resolvedStreamFallbackMessage}
-            />
+            <EmptyPanel className="bvt__empty--video" message={resolvedStreamFallbackMessage} />
           )}
         </div>
-
-        {showChat ? (
-          <>
-            <button
-              type="button"
-              onClick={() => setMobileChatOpen((previous) => !previous)}
-              disabled={!chatEnabled}
-              className="sticky bottom-3 z-20 w-full rounded-xl border border-white/10 bg-[#151515]/96 px-4 py-3 text-sm font-semibold text-[#EAEAEA] shadow-[0_16px_34px_rgba(0,0,0,0.3)] backdrop-blur transition hover:bg-[#1C1C1C] disabled:cursor-not-allowed disabled:opacity-70 lg:hidden"
-            >
-              {!chatEnabled ? "Live Chat Disabled" : mobileChatOpen ? "Hide Live Chat" : "Show Live Chat & Reply"}
-            </button>
-            <div
-              className={`${mobileChatOpen ? "block" : "hidden"} overflow-hidden rounded-2xl border border-black panel-gradient lg:block lg:h-full lg:min-h-0`}
-            >
-              <ChatPanel
-                title={chatTitle}
-                url={canUseChat ? resolvedChatUrl : ""}
-                message={resolvedChatFallbackMessage}
-                onRefresh={refreshChatFrame}
-              />
-            </div>
-          </>
-        ) : null}
       </div>
-    </>
+
+      {hasMeta ? (
+        <div className="bvt__meta">
+          {showHeaderMeta || actions ? (
+            <div className="bvt__heading">
+              {showHeaderMeta ? (
+                <div className="bvt__titles">
+                  <span className={`bvt__tag bvt__tag--${theaterState}`}>
+                    <span className="bvt__dot" aria-hidden="true" />
+                    {tagLabel}
+                  </span>
+                  <h2 className="bvt__title">
+                    <span className="bvt__visually-hidden">{headerLabel}: </span>
+                    {title || streamTitle}
+                  </h2>
+                </div>
+              ) : null}
+              {actions ? <div className="bvt__actions">{actions}</div> : null}
+            </div>
+          ) : null}
+
+          {resolvedStatusMessage ? (
+            <div className="bvt__status" role="status">
+              <WarningAltFilled size={20} aria-hidden="true" className="bvt__status-icon" />
+              <p className="bvt__status-text">{resolvedStatusMessage}</p>
+              {streamUrl && canRenderLiveFrames ? (
+                <button type="button" className="bvt__btn" onClick={refreshStreamFrame}>
+                  <Renew size={16} aria-hidden="true" />
+                  Retry video
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {showChat ? (
+        <ChatPanel
+          title={chatTitle}
+          url={canUseChat ? resolvedChatUrl : ""}
+          message={resolvedChatFallbackMessage}
+          onRefresh={refreshChatFrame}
+          chatEnabled={chatEnabled}
+          open={mobileChatOpen}
+          onToggle={() => setMobileChatOpen((previous) => !previous)}
+        />
+      ) : null}
+    </div>
   );
 
   if (!withContainer) {
     return content;
   }
 
-  return (
-    <section className={`mb-6 rounded-[26px] border border-black panel-gradient p-4 sm:p-5 ${className}`.trim()}>
-      {content}
-    </section>
-  );
+  return <section className={`bvt-container ${className}`.trim()}>{content}</section>;
 }
-

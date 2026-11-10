@@ -17,6 +17,8 @@ from .models import (
     RealtimeSessionRecording,
     ServerResourceProfile,
 )
+from .recording import admin as class_recording_admin  # noqa: F401  (registers ClassRecordingAdmin)
+from apps.courses.models import Section
 from .services import (
     OwncastAdminError,
     OwncastConfigError,
@@ -227,12 +229,14 @@ class RealtimeSessionAdmin(admin.ModelAdmin):
         "status",
         "stream_status",
         "linked_live_class",
+        "target_module",
         "host",
         "meeting_capacity",
         "max_audience",
         "created_at",
     )
     list_filter = ("session_type", "status", "stream_status", "linked_live_class", "created_at")
+    list_select_related = ("linked_live_class", "target_module", "host")
     search_fields = (
         "title",
         "room_name",
@@ -267,6 +271,7 @@ class RealtimeSessionAdmin(admin.ModelAdmin):
                     "host",
                     "linked_live_class",
                     "linked_course",
+                    "target_module",
                 )
             },
         ),
@@ -313,6 +318,22 @@ class RealtimeSessionAdmin(admin.ModelAdmin):
             },
         ),
     )
+
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        form = super().get_form(request, obj, change=change, **kwargs)
+        field = form.base_fields.get("target_module")
+        if field is not None:
+            queryset = Section.objects.select_related("course").order_by("course__title", "order", "id")
+            course_id = obj.resolve_course_id() if obj is not None else None
+            if course_id:
+                queryset = queryset.filter(course_id=course_id)
+            field.queryset = queryset
+            field.help_text = (
+                "Module of this session's course that receives the class recording as a lecture. "
+                "On a new session every module is listed as 'Course - Module'; saving rejects a module "
+                "from another course."
+            )
+        return form
 
     @admin.display(description="OBS Server URL")
     def obs_stream_server_url_display(self, obj):

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
-import { Room, createLocalAudioTrack, createLocalScreenTracks, createLocalVideoTrack } from "livekit-client";
 import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 import BroadcastViewerTheater from "../components/realtime/BroadcastViewerTheater";
+import ClassRecordingStatus, { hasActiveClassRecording } from "../components/realtime/ClassRecordingStatus";
+import HostStudioStatusChip from "../components/realtime/HostStudioStatus";
 import { listLiveClasses } from "../api/courses";
 import {
   applyRealtimeOwncastChatModeration,
@@ -23,10 +24,17 @@ import {
   stopRealtimeStream,
   uploadRealtimeBrowserRecording,
 } from "../api/realtime";
+import {
+  getRealtimeModuleOptions,
+  listSessionClassRecordings,
+  retryClassRecording,
+  sendRealtimeStreamHeartbeat,
+} from "../api/realtimeLive";
 import { useAuth } from "../hooks/useAuth";
 import useAdaptiveRealtimeSessionPolling from "../hooks/useAdaptiveRealtimeSessionPolling";
 import useOwncastStreamLaunch from "../hooks/useOwncastStreamLaunch";
 import { ScreenityFallbackRecorder } from "../services/recording/ScreenityFallbackRecorder";
+import { HOST_LINK, HOST_SOURCE, getHostStudioController } from "../services/realtime/hostStudioController";
 import { resolveBroadcastEmbedUrls } from "../utils/broadcastUrls";
 import { apiData, apiMessage } from "../utils/api";
 import { copyTextToClipboard } from "../utils/clipboard";
@@ -38,6 +46,7 @@ const initialForm = {
   title: "",
   description: "",
   linked_live_class_id: "",
+  target_module_id: "",
   stream_service: "alsyed_stream",
   obs_stream_server_url: "",
   obs_stream_key: "",
@@ -61,6 +70,25 @@ function clampNumber(value, min, max, fallback) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(max, Math.max(min, Math.round(parsed)));
+}
+
+function normalizeBroadcastProfile(serverProfile = {}) {
+  return {
+    capture_width: clampNumber(serverProfile.capture_width, 320, 1920, defaultBroadcastProfile.capture_width),
+    capture_height: clampNumber(serverProfile.capture_height, 180, 1080, defaultBroadcastProfile.capture_height),
+    fps: clampNumber(serverProfile.fps, 10, 30, defaultBroadcastProfile.fps),
+    max_video_bitrate_kbps: clampNumber(
+      serverProfile.max_video_bitrate_kbps,
+      200,
+      4000,
+      defaultBroadcastProfile.max_video_bitrate_kbps
+    ),
+  };
+}
+
+function moduleOptionLabel(module) {
+  const count = Number(module?.lecture_count || 0);
+  return `${module?.title || "Untitled module"} (${count} lecture${count === 1 ? "" : "s"})`;
 }
 
 function inferObsServerUrl() {
@@ -224,15 +252,30 @@ export default function BroadcastingPage() {
   const [isActiveBroadcastAccessVisible, setIsActiveBroadcastAccessVisible] = useState(false);
 
   const [studioSession, setStudioSession] = useState(null);
-  const [studioProfile, setStudioProfile] = useState(defaultBroadcastProfile);
-  const [studioVideoSource, setStudioVideoSource] = useState(defaultBroadcastSource);
+  // Publishing lives in a module-level controller so it survives this page
+  // unmounting mid-class; the page only renders its state.
+  const studioController = useMemo(() => getHostStudioController(), []);
+  const [studioLink, setStudioLink] = useState(() => studioController.getSnapshot());
   const [studioState, setStudioState] = useState({
-    connecting: false,
-    connected: false,
     actionLoading: false,
     error: "",
     info: "",
   });
+  const [moduleOptionsState, setModuleOptionsState] = useState({
+    liveClassId: "",
+    loading: false,
+    error: "",
+    course: null,
+    modules: [],
+  });
+  const [classRecordingState, setClassRecordingState] = useState({
+    sessionId: null,
+    rows: [],
+    loading: false,
+    error: "",
+    retryingId: null,
+  });
+  const [classRecordingRefreshKey, setClassRecordingRefreshKey] = useState(0);
   const [studioRecordingState, setStudioRecordingState] = useState({
     loading: false,
     error: "",
@@ -242,12 +285,20 @@ export default function BroadcastingPage() {
     mode: "",
   });
 
-  const roomRef = useRef(null);
-  const localVideoTrackRef = useRef(null);
-  const localAudioTrackRef = useRef(null);
-  const connectedStudioSessionIdRef = useRef(null);
-  const previewVideoRef = useRef(null);
   const fallbackRecorderRef = useRef(null);
+  const attachStudioPreview = useCallback(
+    (element) => {
+      studioController.attachPreview(element);
+    },
+    [studioController]
+  );
+
+  const isStudioLinkedToSession = Boolean(studioSession?.id) && studioLink.sessionId === studioSession?.id;
+  const studioConnected =
+    isStudioLinkedToSession && [HOST_LINK.CONNECTED, HOST_LINK.RECONNECTING].includes(studioLink.link);
+  const studioConnecting = isStudioLinkedToSession && studioLink.link === HOST_LINK.CONNECTING;
+  const studioProfile = (isStudioLinkedToSession && studioLink.profile) || defaultBroadcastProfile;
+  const studioVideoSource = isStudioLinkedToSession ? studioLink.source : defaultBroadcastSource;
 
   const highlightedSessionId = searchParams.get("session");
 
@@ -377,18 +428,6 @@ export default function BroadcastingPage() {
     }
   };
 
-  const stopLocalMedia = () => {
-    if (localVideoTrackRef.current) {
-      localVideoTrackRef.current.detach();
-      localVideoTrackRef.current.stop();
-      localVideoTrackRef.current = null;
-    }
-    if (localAudioTrackRef.current) {
-      localAudioTrackRef.current.stop();
-      localAudioTrackRef.current = null;
-    }
-  };
-
   const stopFallbackRecorder = () => {
     const recorder = fallbackRecorderRef.current;
     if (recorder?.isRecording) {
@@ -399,32 +438,176 @@ export default function BroadcastingPage() {
     fallbackRecorderRef.current = null;
   };
 
-  const disconnectStudio = () => {
+  const disconnectStudio = async ({ confirmIfLive = false } = {}) => {
+    if (
+      confirmIfLive &&
+      studioController.getSnapshot().live &&
+      !window.confirm("You are live. Disconnecting stops your video and audio for every viewer. Disconnect anyway?")
+    ) {
+      return;
+    }
     stopFallbackRecorder();
-    stopLocalMedia();
-    if (roomRef.current) {
-      roomRef.current.disconnect();
-      roomRef.current = null;
-    }
-    if (previewVideoRef.current) {
-      previewVideoRef.current.srcObject = null;
-    }
-    connectedStudioSessionIdRef.current = null;
-    setStudioProfile(defaultBroadcastProfile);
-    setStudioVideoSource(defaultBroadcastSource);
-    setStudioState((prev) => ({ ...prev, connected: false }));
+    await studioController.disconnect();
   };
 
   useEffect(() => {
+    studioController.configure({
+      fetchToken: async (sessionId) => {
+        const tokenResponse = await getRealtimeHostToken(sessionId);
+        const tokenData = apiData(tokenResponse, {});
+        if (!tokenData.token || !tokenData.livekit_url) {
+          throw new Error("Browser publishing is not available for this session.");
+        }
+        return {
+          url: tokenData.livekit_url,
+          token: tokenData.token,
+          profile: normalizeBroadcastProfile(tokenData.broadcast_profile || {}),
+        };
+      },
+      sendHeartbeat: (sessionId, payload) => sendRealtimeStreamHeartbeat(sessionId, payload),
+      startStream: async (sessionId) => apiData(await startRealtimeStream(sessionId), null),
+    });
+    const unsubscribe = studioController.subscribe(setStudioLink);
+
+    // Back from another page while still live: reopen the studio for that session.
+    const snapshot = studioController.getSnapshot();
+    let cancelled = false;
+    if (snapshot.sessionId !== null) {
+      getRealtimeSession(snapshot.sessionId)
+        .then((response) => {
+          const session = apiData(response, null);
+          if (!cancelled && session) {
+            setStudioSession((current) => current || session);
+          }
+        })
+        .catch(() => {
+          // the studio panel stays closed; the badge still links back here
+        });
+    }
+
     return () => {
-      disconnectStudio();
+      cancelled = true;
+      unsubscribe();
+      stopFallbackRecorder();
+      // Leaving the page must not cut a live class: the controller keeps
+      // publishing (with a badge linking back) until Stop Live or Disconnect.
+      if (!studioController.getSnapshot().live) {
+        studioController.disconnect();
+      }
     };
-  }, []);
+  }, [studioController]);
+
+  useEffect(() => {
+    // Heartbeats carry the latest session row (stream status, egress errors).
+    const latest = studioLink.lastSession;
+    if (!latest?.id) return;
+    setSessions((prev) => prev.map((item) => (item.id === latest.id ? latest : item)));
+    setStudioSession((current) => (current?.id === latest.id ? latest : current));
+  }, [studioLink.lastSession]);
+
+  useEffect(() => {
+    const liveClassId = String(form.linked_live_class_id || "");
+    if (!liveClassId) {
+      setModuleOptionsState({ liveClassId: "", loading: false, error: "", course: null, modules: [] });
+      return undefined;
+    }
+    let cancelled = false;
+    setModuleOptionsState({ liveClassId, loading: true, error: "", course: null, modules: [] });
+    getRealtimeModuleOptions({ live_class_id: Number(liveClassId) })
+      .then((options) => {
+        if (cancelled) return;
+        setModuleOptionsState({
+          liveClassId,
+          loading: false,
+          error: "",
+          course: options?.course || null,
+          modules: Array.isArray(options?.modules) ? options.modules : [],
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setModuleOptionsState({
+          liveClassId,
+          loading: false,
+          error: apiMessage(err, "Unable to load the course modules."),
+          course: null,
+          modules: [],
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [form.linked_live_class_id]);
+
+  useEffect(() => {
+    const sessionId = studioSession?.id;
+    if (!sessionId) {
+      setClassRecordingState({ sessionId: null, rows: [], loading: false, error: "", retryingId: null });
+      return undefined;
+    }
+    let cancelled = false;
+    let timerId = null;
+    const poll = async () => {
+      try {
+        const rows = await listSessionClassRecordings(sessionId);
+        if (cancelled) return;
+        setClassRecordingState((prev) => ({ ...prev, sessionId, rows, loading: false, error: "" }));
+        // Follow a recording closely while it is being saved, lazily otherwise.
+        timerId = window.setTimeout(poll, hasActiveClassRecording(rows) ? 5000 : 30000);
+      } catch (err) {
+        if (cancelled) return;
+        setClassRecordingState((prev) => ({
+          ...prev,
+          sessionId,
+          loading: false,
+          error: apiMessage(err, "Unable to load class recordings."),
+        }));
+        timerId = window.setTimeout(poll, 30000);
+      }
+    };
+    setClassRecordingState((prev) =>
+      prev.sessionId === sessionId
+        ? { ...prev, loading: true }
+        : { sessionId, rows: [], loading: true, error: "", retryingId: null }
+    );
+    poll();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timerId);
+    };
+  }, [studioSession?.id, classRecordingRefreshKey]);
+
+  const handleRetryClassRecording = async (recording) => {
+    setClassRecordingState((prev) => ({ ...prev, retryingId: recording.id, error: "" }));
+    try {
+      await retryClassRecording(recording.id);
+      setClassRecordingState((prev) => ({ ...prev, retryingId: null }));
+      setClassRecordingRefreshKey((previous) => previous + 1);
+    } catch (err) {
+      setClassRecordingState((prev) => ({
+        ...prev,
+        retryingId: null,
+        error: apiMessage(err, "Unable to retry the class recording."),
+      }));
+    }
+  };
 
   const handleCreate = async (event) => {
     event.preventDefault();
     if (!form.linked_live_class_id) {
       setCreateState({ loading: false, error: "Select the linked live class for this broadcast.", success: "" });
+      return;
+    }
+    if (moduleOptionsState.loading) {
+      setCreateState({ loading: false, error: "Course modules are still loading. Try again in a moment.", success: "" });
+      return;
+    }
+    if (moduleOptionsState.modules.length > 0 && !form.target_module_id) {
+      setCreateState({
+        loading: false,
+        error: "Select the module that will receive this class recording.",
+        success: "",
+      });
       return;
     }
     setCreateState({ loading: true, error: "", success: "" });
@@ -434,6 +617,7 @@ export default function BroadcastingPage() {
         title: form.title,
         description: form.description,
         linked_live_class_id: Number(form.linked_live_class_id),
+        target_module_id: form.target_module_id ? Number(form.target_module_id) : null,
         session_type: "broadcasting",
         stream_service: form.stream_service,
         obs_stream_key: "",
@@ -486,7 +670,7 @@ export default function BroadcastingPage() {
 
   const handleOpenStudio = (session) => {
     const obsMode = isObsStreamMode(session);
-    if (obsMode) {
+    if (obsMode && !studioController.getSnapshot().live) {
       disconnectStudio();
     }
     setIsStudioObsKeyVisible(false);
@@ -494,7 +678,6 @@ export default function BroadcastingPage() {
     setStudioState((prev) => ({
       ...prev,
       error: "",
-      connected: obsMode ? false : prev.connected,
       info: obsMode
         ? "OBS mode selected. Configure OBS with server URL + stream key, then click Start Live."
         : "Host studio selected.",
@@ -764,8 +947,10 @@ export default function BroadcastingPage() {
     try {
       await endRealtimeSession(session.id);
       setSessions((prev) => prev.filter((row) => row.id !== session.id));
-      if (studioSession?.id === session.id) {
+      if (studioSession?.id === session.id || studioController.getSnapshot().sessionId === session.id) {
         disconnectStudio();
+      }
+      if (studioSession?.id === session.id) {
         setStudioSession(null);
       }
       if (activeBroadcast?.session?.id === session.id) {
@@ -817,179 +1002,61 @@ export default function BroadcastingPage() {
     if (isObsStreamMode(studioSession)) {
       setStudioState((prev) => ({
         ...prev,
-        connecting: false,
-        connected: false,
         actionLoading: false,
         error: "",
         info: "OBS mode is active. Publish from OBS using the server URL and stream key below.",
       }));
       return;
     }
-    const nextSource = source === "screen" ? "screen" : "camera";
-    const sourceLabel = nextSource === "screen" ? "screen share" : "camera";
-    setStudioState({
-      connecting: true,
-      connected: false,
-      actionLoading: false,
-      error: "",
-      info: `Connecting ${sourceLabel}...`,
-    });
+    const sessionId = studioSession.id;
+    const nextSource = source === "screen" ? HOST_SOURCE.SCREEN : HOST_SOURCE.CAMERA;
+    const sourceLabel = nextSource === HOST_SOURCE.SCREEN ? "Screen share" : "Camera";
+    const current = studioController.getSnapshot();
+    if (
+      current.live &&
+      current.sessionId !== sessionId &&
+      !window.confirm(
+        "You are live in another broadcast. Connecting here stops your video and audio in that broadcast. Continue?"
+      )
+    ) {
+      return;
+    }
+    setStudioState((prev) => ({ ...prev, error: "", info: "" }));
 
     try {
-      if (
-        roomRef.current &&
-        connectedStudioSessionIdRef.current &&
-        connectedStudioSessionIdRef.current !== studioSession.id
-      ) {
-        disconnectStudio();
+      await studioController.connect(sessionId, nextSource);
+      const profile = studioController.getSnapshot().profile || defaultBroadcastProfile;
+      const alreadyLive = String(studioSession.stream_status || "").trim().toLowerCase() === "live";
+      if (alreadyLive) {
+        // Rejoining a class that is still marked live (e.g. after a reload): the
+        // heartbeat verifies the egress and restarts it for this connection.
+        studioController.setLive(sessionId, true);
       }
-
-      const tokenResponse = await getRealtimeHostToken(studioSession.id);
-      const tokenData = apiData(tokenResponse, {});
-      const serverProfile = tokenData.broadcast_profile || {};
-      const profile = {
-        capture_width: clampNumber(
-          serverProfile.capture_width,
-          320,
-          1920,
-          defaultBroadcastProfile.capture_width
-        ),
-        capture_height: clampNumber(
-          serverProfile.capture_height,
-          180,
-          1080,
-          defaultBroadcastProfile.capture_height
-        ),
-        fps: clampNumber(serverProfile.fps, 10, 30, defaultBroadcastProfile.fps),
-        max_video_bitrate_kbps: clampNumber(
-          serverProfile.max_video_bitrate_kbps,
-          200,
-          4000,
-          defaultBroadcastProfile.max_video_bitrate_kbps
-        ),
-      };
-
-      let room = roomRef.current;
-      if (!room) {
-        room = new Room({
-          adaptiveStream: false,
-          dynacast: false,
-        });
-        await room.connect(tokenData.livekit_url, tokenData.token);
-        roomRef.current = room;
-        connectedStudioSessionIdRef.current = studioSession.id;
-      }
-
-      const previousVideoTrack = localVideoTrackRef.current;
-
-      let videoTrack = null;
-      if (nextSource === "screen") {
-        const createdTracks = await createLocalScreenTracks({
-          audio: false,
-          resolution: {
-            width: profile.capture_width,
-            height: profile.capture_height,
-            frameRate: profile.fps,
-          },
-        });
-        videoTrack = createdTracks.find((track) => track.kind === "video") || null;
-      } else {
-        videoTrack = await createLocalVideoTrack({
-          facingMode: "user",
-          resolution: {
-            width: profile.capture_width,
-            height: profile.capture_height,
-          },
-          frameRate: profile.fps,
-        });
-      }
-      if (!videoTrack) {
-        throw new Error("No video track available from selected source.");
-      }
-
-      if (!localAudioTrackRef.current) {
-        localAudioTrackRef.current = await createLocalAudioTrack();
-        await room.localParticipant.publishTrack(localAudioTrackRef.current);
-      }
-
-      if (videoTrack?.mediaStreamTrack && "contentHint" in videoTrack.mediaStreamTrack) {
-        videoTrack.mediaStreamTrack.contentHint = "detail";
-      }
-
-      if (previousVideoTrack) {
-        try {
-          await room.localParticipant.unpublishTrack(previousVideoTrack, true);
-        } catch {
-          // best effort cleanup before replacing video source
-        }
-        previousVideoTrack.detach();
-        previousVideoTrack.stop();
-      }
-
-      await room.localParticipant.publishTrack(videoTrack, {
-        simulcast: false,
-        videoEncoding: {
-          maxBitrate: profile.max_video_bitrate_kbps * 1000,
-          maxFramerate: profile.fps,
-        },
-        degradationPreference: "maintain-resolution",
-      });
-
-      if (previewVideoRef.current) {
-        videoTrack.attach(previewVideoRef.current);
-      }
-
-      localVideoTrackRef.current = videoTrack;
-      setStudioProfile(profile);
-      setStudioVideoSource(nextSource);
-
-      if (nextSource === "screen" && videoTrack?.mediaStreamTrack?.addEventListener) {
-        videoTrack.mediaStreamTrack.addEventListener(
-          "ended",
-          () => {
-            if (localVideoTrackRef.current === videoTrack) {
-              room.localParticipant.unpublishTrack(videoTrack, true).catch(() => {
-                // no-op
-              });
-              videoTrack.detach();
-              videoTrack.stop();
-              localVideoTrackRef.current = null;
-              if (previewVideoRef.current) {
-                previewVideoRef.current.srcObject = null;
-              }
-              setStudioVideoSource(defaultBroadcastSource);
-              setStudioState((prev) => ({
-                ...prev,
-                connected: false,
-                error: "",
-                info: "Screen share ended. Click Share Screen to present again, or switch to camera.",
-              }));
-            }
-          },
-          { once: true }
-        );
-      }
-
-      setStudioState({
-        connecting: false,
-        connected: true,
-        actionLoading: false,
+      setStudioState((prev) => ({
+        ...prev,
         error: "",
-        info: `${
-          nextSource === "screen" ? "Screen share" : "Camera"
-        } connected (${profile.capture_width}x${profile.capture_height} @ ${profile.fps}fps, ${profile.max_video_bitrate_kbps}kbps). Click Start Live to begin streaming. If admin changes profile, reconnect to apply.`,
-      });
+        info: alreadyLive
+          ? `${sourceLabel} connected. This class is live: delivery to viewers is being checked and resumed.`
+          : `${sourceLabel} connected (${profile.capture_width}x${profile.capture_height} @ ${profile.fps}fps, ${profile.max_video_bitrate_kbps}kbps). Click Start Live to begin streaming. You can switch between camera and screen while live.`,
+      }));
     } catch (err) {
-      if (!roomRef.current) {
-        disconnectStudio();
+      const snapshot = studioController.getSnapshot();
+      const stillPublishing = snapshot.sessionId === sessionId && snapshot.link === HOST_LINK.CONNECTED;
+      // The studio status already shows its own error while linked to this session.
+      const shownByStudio = snapshot.sessionId === sessionId && !stillPublishing && Boolean(snapshot.error);
+      let message = apiMessage(err, "Unable to access selected media source for browser publishing.");
+      if (nextSource === HOST_SOURCE.SCREEN && err?.name === "NotAllowedError") {
+        message = stillPublishing
+          ? "Screen sharing was cancelled. Your previous source is still being broadcast."
+          : "Screen sharing was cancelled or blocked by the browser.";
+      } else if (!stillPublishing && snapshot.error) {
+        message = snapshot.error;
       }
-      setStudioState({
-        connecting: false,
-        connected: Boolean(localVideoTrackRef.current && localAudioTrackRef.current && roomRef.current),
-        actionLoading: false,
-        error: apiMessage(err, "Unable to access selected media source for browser publishing."),
+      setStudioState((prev) => ({
+        ...prev,
+        error: shownByStudio ? "" : message,
         info: "",
-      });
+      }));
     }
   };
 
@@ -1004,27 +1071,41 @@ export default function BroadcastingPage() {
   const handleStartLive = async () => {
     if (!studioSession) return;
     const obsMode = isObsStreamMode(studioSession);
-    if (!obsMode && !studioState.connected) {
+    if (!obsMode && !studioConnected) {
       setStudioState((prev) => ({ ...prev, error: "Connect camera or screen share first before starting live." }));
       return;
     }
 
-    setStudioState((prev) => ({ ...prev, actionLoading: true, error: "", info: "Starting live stream..." }));
+    const wasLive = String(studioSession.stream_status || "").trim().toLowerCase() === "live";
+    setStudioState((prev) => ({
+      ...prev,
+      actionLoading: true,
+      error: "",
+      info: wasLive ? "Checking live delivery..." : "Starting live stream...",
+    }));
     try {
       const response = await startRealtimeStream(studioSession.id);
       const updated = apiData(response, null);
       if (updated) {
         syncSessionRow(updated);
       }
+      if (!obsMode) {
+        studioController.setLive(studioSession.id, true);
+      }
+      const serverMessage = String(response?.data?.message || "").trim();
       setStudioState((prev) => ({
         ...prev,
         actionLoading: false,
         error: "",
         info: obsMode
-          ? obsStartInfoMessage
-          : "You are live. Viewers can watch from the broadcast player.",
+          ? serverMessage.toLowerCase().includes("already live")
+            ? "OBS is already live. Nothing needed to change."
+            : obsStartInfoMessage
+          : wasLive
+            ? serverMessage || "Live delivery checked."
+            : "You are live. Viewers can watch from the broadcast player.",
       }));
-      if (!obsMode) {
+      if (!obsMode && !wasLive) {
         await handleJoin(studioSession.id);
       }
     } catch (err) {
@@ -1044,9 +1125,11 @@ export default function BroadcastingPage() {
     try {
       const response = await stopRealtimeStream(studioSession.id);
       const updated = apiData(response, null);
+      studioController.setLive(studioSession.id, false);
       if (updated) {
         syncSessionRow(updated);
       }
+      setClassRecordingRefreshKey((previous) => previous + 1);
       setStudioState((prev) => ({
         ...prev,
         actionLoading: false,
@@ -1511,7 +1594,9 @@ export default function BroadcastingPage() {
                     <select
                       className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999]"
                       value={form.linked_live_class_id}
-                      onChange={(e) => setForm((prev) => ({ ...prev, linked_live_class_id: e.target.value }))}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, linked_live_class_id: e.target.value, target_module_id: "" }))
+                      }
                       required
                     >
                       <option value="">Select live class...</option>
@@ -1521,6 +1606,45 @@ export default function BroadcastingPage() {
                         </option>
                       ))}
                     </select>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="broadcast-target-module"
+                      className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-[#949494]"
+                    >
+                      Save Recording To Module
+                    </label>
+                    <select
+                      id="broadcast-target-module"
+                      className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999] disabled:opacity-60"
+                      value={form.target_module_id}
+                      onChange={(e) => setForm((prev) => ({ ...prev, target_module_id: e.target.value }))}
+                      required={moduleOptionsState.modules.length > 0}
+                      disabled={!form.linked_live_class_id || moduleOptionsState.loading}
+                    >
+                      <option value="">
+                        {!form.linked_live_class_id
+                          ? "Select a live class first"
+                          : moduleOptionsState.loading
+                            ? "Loading modules..."
+                            : moduleOptionsState.modules.length
+                              ? "Select module..."
+                              : "No modules in this course"}
+                      </option>
+                      {moduleOptionsState.modules.map((module) => (
+                        <option key={module.id} value={module.id}>
+                          {moduleOptionLabel(module)}
+                        </option>
+                      ))}
+                    </select>
+                    {moduleOptionsState.course ? (
+                      <p className="mt-1 text-[11px] text-[#9A9A9A]">
+                        The class recording is published as a lecture in this module of {moduleOptionsState.course.title}.
+                      </p>
+                    ) : null}
+                    {moduleOptionsState.error ? (
+                      <p className="mt-1 text-[11px] text-amber-300">{moduleOptionsState.error}</p>
+                    ) : null}
                   </div>
                   <div>
                     <label className="mb-1 block text-[11px] uppercase tracking-[0.14em] text-[#949494]">
@@ -1624,9 +1748,18 @@ export default function BroadcastingPage() {
                 Service: {getStreamServiceLabel(studioSession)}
               </p>
             </div>
-            <span className="rounded-full border border-black bg-[#171717] px-3 py-1 text-xs uppercase tracking-[0.12em] text-[#CDCDCD]">
-              {studioSession.stream_status || "idle"}
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              {!isObsStudioMode ? (
+                <HostStudioStatusChip
+                  link={isStudioLinkedToSession ? studioLink.link : HOST_LINK.IDLE}
+                  live={isStudioLinkedToSession && studioLink.live}
+                  egress={isStudioLinkedToSession ? studioLink.egress : null}
+                />
+              ) : null}
+              <span className="rounded-full border border-black bg-[#171717] px-3 py-1 text-xs uppercase tracking-[0.12em] text-[#CDCDCD]">
+                {studioSession.stream_status || "idle"}
+              </span>
+            </div>
           </div>
 
           <div className="mb-4 rounded-xl border border-black panel-gradient px-4 py-3">
@@ -1812,7 +1945,7 @@ export default function BroadcastingPage() {
                 )
               ) : (
                 <video
-                  ref={previewVideoRef}
+                  ref={attachStudioPreview}
                   autoPlay
                   muted
                   playsInline
@@ -1824,30 +1957,36 @@ export default function BroadcastingPage() {
               {!isObsStudioMode ? (
                 <>
                   <div className="grid gap-2 sm:grid-cols-3">
-                    <Button onClick={handleConnectCamera} loading={studioState.connecting || studioState.actionLoading}>
-                      {studioState.connected && studioVideoSource === "camera" ? "Reconnect Camera" : "Connect Camera"}
+                    <Button onClick={handleConnectCamera} loading={studioConnecting || studioState.actionLoading}>
+                      {studioConnected && studioVideoSource === HOST_SOURCE.CAMERA
+                        ? "Restart Camera"
+                        : studioConnected
+                          ? "Switch to Camera"
+                          : "Connect Camera"}
                     </Button>
                     <Button
                       variant="secondary"
                       onClick={handleShareScreen}
-                      loading={studioState.connecting}
+                      loading={studioConnecting}
                       disabled={studioState.actionLoading}
                     >
-                      {studioState.connected && studioVideoSource === "screen" ? "Reshare Screen" : "Share Screen"}
+                      {studioConnected && studioVideoSource === HOST_SOURCE.SCREEN ? "Reshare Screen" : "Share Screen"}
                     </Button>
                     <Button
                       variant="secondary"
-                      onClick={disconnectStudio}
-                      disabled={!studioState.connected || studioState.actionLoading}
+                      onClick={() => disconnectStudio({ confirmIfLive: true })}
+                      disabled={
+                        !isStudioLinkedToSession || studioLink.link === HOST_LINK.IDLE || studioState.actionLoading
+                      }
                     >
                       Disconnect
                     </Button>
                     <Button
                       onClick={handleStartLive}
-                      disabled={studioSession.stream_status === "live" || studioState.actionLoading}
-                      loading={studioState.actionLoading && studioSession.stream_status !== "live"}
+                      disabled={studioState.actionLoading}
+                      loading={studioState.actionLoading}
                     >
-                      Start Live
+                      {studioSession.stream_status === "live" ? "Verify Delivery" : "Start Live"}
                     </Button>
                     <Button
                       variant="danger"
@@ -1911,12 +2050,26 @@ export default function BroadcastingPage() {
 
               {studioState.error ? <p className="mt-3 text-xs text-red-300">{studioState.error}</p> : null}
               {studioState.info ? <p className="mt-3 text-xs text-zinc-300">{studioState.info}</p> : null}
+              {!isObsStudioMode && isStudioLinkedToSession && studioLink.error ? (
+                <p role="alert" className="mt-2 text-xs text-red-300">
+                  {studioLink.error}
+                </p>
+              ) : null}
+              {!isObsStudioMode && isStudioLinkedToSession && studioLink.info ? (
+                <p className="mt-2 text-xs text-zinc-300">{studioLink.info}</p>
+              ) : null}
               {!isObsStudioMode ? (
                 <>
                   {studioRecordingState.error ? <p className="mt-2 text-xs text-red-300">{studioRecordingState.error}</p> : null}
                   {studioRecordingState.info ? <p className="mt-2 text-xs text-zinc-300">{studioRecordingState.info}</p> : null}
                   <p className="mt-2 text-[11px] text-[#A4A4A4]">
-                    Active source: {studioVideoSource === "screen" ? "Screen share" : "Camera"}.
+                    Active source:{" "}
+                    {studioVideoSource === HOST_SOURCE.SCREEN
+                      ? "Screen share"
+                      : studioVideoSource === HOST_SOURCE.PLACEHOLDER
+                        ? "None (viewers see a blank screen)"
+                        : "Camera"}
+                    .
                   </p>
                   <p className="mt-1 text-[11px] text-[#A4A4A4]">
                     Active profile: {studioProfile.capture_width}x{studioProfile.capture_height} at{" "}
@@ -1962,6 +2115,17 @@ export default function BroadcastingPage() {
                 </p>
               ) : null}
             </div>
+          </div>
+
+          <div className="mt-4">
+            <ClassRecordingStatus
+              recordings={classRecordingState.sessionId === studioSession.id ? classRecordingState.rows : []}
+              targetModule={studioSession.target_module}
+              loading={classRecordingState.loading}
+              error={classRecordingState.error}
+              retryingId={classRecordingState.retryingId}
+              onRetry={handleRetryClassRecording}
+            />
           </div>
 
           <div className="mt-4 rounded-2xl border border-black panel-gradient p-4">

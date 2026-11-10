@@ -190,6 +190,72 @@ def _validate_video_binary(file_obj, field_name):
         raise ValidationError({field_name: "Uploaded file does not match MP4/MOV container format."})
 
 
+# OBS's own recording containers. Accepted only for class-recording OBS uploads
+# (never for general lecture uploads): the stream recorder remuxes them to a
+# faststart MP4 (stream copy) before the lecture video is swapped.
+OBS_REMUX_EXTENSIONS = {"mkv", "flv", "ts"}
+ALLOWED_OBS_RECORDING_EXTENSIONS = ALLOWED_VIDEO_EXTENSIONS | OBS_REMUX_EXTENSIONS
+ALLOWED_OBS_RECORDING_CONTENT_TYPES = ALLOWED_VIDEO_CONTENT_TYPES | {
+    "video/x-matroska",
+    "video/matroska",
+    "video/x-flv",
+    "video/flv",
+    "video/mp2t",
+    "video/vnd.dlna.mpeg-tts",
+}
+MPEG_TS_PACKET_BYTES = 188
+
+
+def _looks_like_matroska(header):
+    return _looks_like_webm(header)  # Same EBML magic: WEBM is a Matroska profile.
+
+
+def _looks_like_flv(header):
+    return len(header) >= 4 and header[:3] == b"FLV" and header[3] == 0x01
+
+
+def _looks_like_mpeg_ts(header):
+    if len(header) < MPEG_TS_PACKET_BYTES + 1:
+        return len(header) >= 1 and header[0] == 0x47
+    return header[0] == 0x47 and header[MPEG_TS_PACKET_BYTES] == 0x47
+
+
+def needs_obs_remux(file_name):
+    return os.path.splitext(str(file_name or ""))[1].lstrip(".").lower() in OBS_REMUX_EXTENSIONS
+
+
+def validate_obs_recording_upload(file_obj, field_name="video_file", max_bytes=None):
+    """Class-recording OBS upload: the lecture formats plus OBS's MKV/FLV/TS."""
+    if not file_obj:
+        return
+    ext = _extension(file_obj)
+    if ext not in OBS_REMUX_EXTENSIONS:
+        try:
+            validate_video_upload(file_obj, field_name, max_bytes=max_bytes)
+        except ValidationError as exc:
+            if ext not in ALLOWED_VIDEO_EXTENSIONS:
+                raise ValidationError(
+                    {field_name: "Only MP4, M4V, MOV, WEBM, MKV, FLV or TS recordings are allowed."}
+                ) from exc
+            raise
+        return
+    _validate_filename(file_obj, field_name)
+    size = getattr(file_obj, "size", None)
+    max_video_upload_bytes = int(max_bytes or _max_video_upload_bytes())
+    if size and size > max_video_upload_bytes:
+        limit_gb = max_video_upload_bytes / float(1024 * 1024 * 1024)
+        raise ValidationError({field_name: f"Video file is too large. Max allowed size is {limit_gb:.0f} GB."})
+    content_type = _content_type(file_obj)
+    if content_type and content_type not in ALLOWED_OBS_RECORDING_CONTENT_TYPES:
+        raise ValidationError({field_name: "Unsupported video content type."})
+    header = _read_head(file_obj, bytes_count=MPEG_TS_PACKET_BYTES + 1)
+    if not header:
+        raise ValidationError({field_name: "Uploaded video file is empty."})
+    checks = {"mkv": _looks_like_matroska, "flv": _looks_like_flv, "ts": _looks_like_mpeg_ts}
+    if not checks[ext](header):
+        raise ValidationError({field_name: f"Uploaded file does not match {ext.upper()} format."})
+
+
 def validate_profile_image_upload(file_obj, field_name="profile_image"):
     if not file_obj:
         return

@@ -5,6 +5,8 @@ import ScrollToTop from "../components/ScrollToTop";
 import { siteBrand } from "../config/siteBrand";
 import AppLayout from "../layouts/AppLayout";
 
+// Carbon app shell for functional routes; lazy so Carbon never ships in the public website bundle.
+const AppShellLayout = lazy(() => import("../features/app-shell/AppShellLayout"));
 const AdminControlCenterPage = lazy(() => import("../pages/AdminControlCenterPage"));
 const AboutPage = lazy(() => import("../pages/AboutPage"));
 const AccountsDirectoryPage = lazy(() => import("../pages/AccountsDirectoryPage"));
@@ -58,28 +60,32 @@ export default function AppRoutes() {
           <Route path="/courses/:id/register" element={<PentestingRegistrationPage />} />
           <Route path="/courses/:id/payment" element={<CoursePaymentPage />} />
           <Route path="/terms" element={<TermsPage />} />
-          <Route element={<ProtectedRoute />}>
-            <Route path="/guides" element={<GuidesPage />} />
+        </Route>
+        {/* Functional (logged-in) app: lazy Carbon shell with side nav / bottom nav and no website navbar or footer. */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AppShellLayout />}>
             <Route path="/my-courses" element={<MyCoursesPage />} />
-            <Route path="/osint-tools" element={<OsintToolsPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/id-card" element={<IdCardPage />} />
             <Route path="/learn/:courseId" element={<CoursePlayerPage />} />
             <Route path="/courses/:id/live" element={<LiveClassesPage />} />
             <Route path="/join-live" element={<JoinLivePage />} />
-          </Route>
-          <Route element={<ProtectedRoute requireModerator />}>
-            <Route path="/control-center" element={<AdminControlCenterPage />} />
-            <Route path="/meeting" element={<MeetingPage />} />
-            <Route path="/broadcasting" element={<BroadcastingPage />} />
-          </Route>
-          <Route element={<ProtectedRoute requireAdmin />}>
-            <Route path="/lecture-questions" element={<LectureQuestionsPage />} />
-          </Route>
-          <Route element={<ProtectedRoute requireInstructor />}>
-            <Route path="/instructor/dashboard" element={<InstructorDashboardPage />} />
-            <Route path="/instructor/courses/new" element={<CreateCoursePage />} />
-            <Route path="/instructor/courses/:id/edit" element={<EditCoursePage />} />
+            <Route path="/guides" element={<GuidesPage />} />
+            <Route path="/osint-tools" element={<OsintToolsPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/id-card" element={<IdCardPage />} />
+            {/* Staff tools share the same shell instance; each group keeps its original role check. */}
+            <Route element={<ProtectedRoute requireModerator />}>
+              <Route path="/control-center" element={<AdminControlCenterPage />} />
+              <Route path="/meeting" element={<MeetingPage />} />
+              <Route path="/broadcasting" element={<BroadcastingPage />} />
+            </Route>
+            <Route element={<ProtectedRoute requireAdmin />}>
+              <Route path="/lecture-questions" element={<LectureQuestionsPage />} />
+            </Route>
+            <Route element={<ProtectedRoute requireInstructor />}>
+              <Route path="/instructor/dashboard" element={<InstructorDashboardPage />} />
+              <Route path="/instructor/courses/new" element={<CreateCoursePage />} />
+              <Route path="/instructor/courses/:id/edit" element={<EditCoursePage />} />
+            </Route>
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

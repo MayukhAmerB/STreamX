@@ -1,0 +1,126 @@
+// Shared building blocks for Carbon pages: page header, empty state,
+// skeletons, section headings, responsive tile grid.
+@use './tokens' as *;
+
+// Page header: title, one-line description, primary action.
+.cds-app .cds-page-header {
+  display: flex;
+  flex-direction: column;
+  margin-block-end: $spacing-07;
+  gap: $spacing-05;
+
+  @include breakpoint(md) {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-block-end: $spacing-08;
+  }
+}
+
+.cds-app .cds-page-header__text {
+  min-inline-size: 0;
+}
+
+.cds-app .cds-page-header__title {
+  @include type-style('heading-04');
+
+  color: $text-primary;
+
+  @include breakpoint(lg) {
+    @include type-style('heading-05');
+  }
+}
+
+.cds-app .cds-page-header__description {
+  @include type-style('body-01');
+
+  max-inline-size: 40rem;
+  margin-block-start: $spacing-03;
+  color: $text-secondary;
+}
+
+.cds-app .cds-page-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  flex: none;
+  gap: $spacing-03;
+
+  @include breakpoint-down(md) {
+    > .cds--btn {
+      flex: 1 1 auto;
+      max-inline-size: none;
+    }
+  }
+}
+
+// Section heading inside a page.
+.cds-app .cds-section-title {
+  @include type-style('heading-03');
+
+  margin-block-end: $spacing-05;
+  color: $text-primary;
+}
+
+// Responsive tile grid (1 / 2 / 3 columns).
+.cds-app .cds-tile-grid {
+  display: grid;
+  gap: $spacing-05;
+  grid-template-columns: minmax(0, 1fr);
+
+  @include breakpoint(md) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @include breakpoint(xlg) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+// Empty state: icon + one sentence + one action.
+.cds-app .cds-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: $spacing-10 $spacing-06;
+  gap: $spacing-05;
+  text-align: center;
+
+  svg {
+    fill: $icon-secondary;
+  }
+}
+
+.cds-app .cds-empty-state__text {
+  @include type-style('heading-02');
+
+  max-inline-size: 28rem;
+  color: $text-primary;
+}
+
+// Skeletons.
+.cds-app .cds-page-skeleton__header {
+  margin-block-end: $spacing-08;
+}
+
+.cds-app .cds-page-skeleton__tile {
+  padding: $spacing-05;
+  background-color: $layer-01;
+}
+
+.cds-app .cds-page-skeleton .cds--skeleton__placeholder {
+  inline-size: 100%;
+}
+
+// Inline notification spacing within pages.
+.cds-app .cds-page-notification {
+  margin-block-end: $spacing-06;
+  max-inline-size: none;
+}
+
+.cds-app .cds-page-notification-group {
+  margin-block-end: $spacing-06;
+
+  .cds-page-notification {
+    margin-block-end: $spacing-04;
+  }
+}

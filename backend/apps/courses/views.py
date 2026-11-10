@@ -7,13 +7,13 @@ from django.db.models import Count, Prefetch, Q
 from django.http import FileResponse, HttpResponse, HttpResponseNotFound
 from django.shortcuts import redirect
 from rest_framework import generics, permissions, status
-from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from config.audit import log_security_event
 from config.pagination import apply_optional_pagination
 from config.request_security import find_disallowed_query_params
 from config.response import api_response
+from config.throttling import ClientIpScopedRateThrottle
 from config.turnstile import enforce_turnstile
 
 from apps.payments.models import Payment
@@ -22,9 +22,11 @@ from .access import (
     active_enrollment_q,
     build_live_class_access_maps,
     enrollment_has_active_access,
+    lecture_access_context,
     user_has_course_access,
 )
 from .cache_utils import get_course_list_cache_version, get_live_class_list_cache_version
+from .engagement.views_tracking import record_lecture_view
 from .models import (
     Course,
     Enrollment,
@@ -131,7 +133,7 @@ def _course_prefetch_queryset():
             queryset=Section.objects.all().prefetch_related(
                 Prefetch(
                     "lectures",
-                    queryset=Lecture.objects.all().prefetch_related("resources"),
+                    queryset=Lecture.objects.published().prefetch_related("resources"),
                 )
             ),
         ),
@@ -147,26 +149,16 @@ def _course_prefetch_queryset():
 def _with_course_catalog_metrics(queryset):
     queryset = queryset.annotate(
         section_count=Count("sections", distinct=True),
-        lecture_count=Count("sections__lectures", distinct=True),
+        lecture_count=Count(
+            "sections__lectures",
+            filter=Q(sections__lectures__is_published=True),
+            distinct=True,
+        ),
     )
     return annotate_shared_review_metrics(queryset)
 
 
-def _get_lecture_access_context(lecture, user):
-    course = lecture.section.course
-    is_authenticated = bool(user and getattr(user, "is_authenticated", False))
-    is_instructor_owner = bool(
-        is_authenticated and user.role == "instructor" and getattr(user, "id", None) == course.instructor_id
-    )
-    is_enrolled = bool(is_authenticated and user_has_course_access(user, course.id))
-    can_access = bool(lecture.is_preview and is_authenticated) or is_instructor_owner or is_enrolled
-    return {
-        "course": course,
-        "is_authenticated": is_authenticated,
-        "is_instructor_owner": is_instructor_owner,
-        "is_enrolled": is_enrolled,
-        "can_access": can_access,
-    }
+_get_lecture_access_context = lecture_access_context
 
 
 def _build_lecture_progress_map(*, course, user):
@@ -528,7 +520,7 @@ class GuideListView(APIView):
 
 class GuideVideoView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIpScopedRateThrottle]
     throttle_scope = "lecture_playback"
 
     def get(self, request, pk):
@@ -750,7 +742,7 @@ class LectureDetailView(APIView):
 
 class LectureVideoView(APIView):
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIpScopedRateThrottle]
     throttle_scope = "lecture_playback"
 
     def get(self, request, pk):
@@ -758,9 +750,23 @@ class LectureVideoView(APIView):
             Lecture.objects.select_related("section__course", "section__course__instructor"),
             pk=pk,
         )
+        response = self._issue_playback(request, lecture)
+        if response.status_code == status.HTTP_200_OK:
+            # Playback is starting: count the (de-duplicated) view server-side.
+            record_lecture_view(lecture=lecture, request=request)
+        return response
+
+    def _issue_playback(self, request, lecture):
         access_context = _get_lecture_access_context(lecture, request.user)
         course = access_context["course"]
         expires_in = resolve_lecture_playback_expires_in(lecture)
+        if not access_context["is_visible"]:
+            return api_response(
+                success=False,
+                message="Lecture not found.",
+                errors={"detail": "Not found."},
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
         if not lecture.is_preview:
             if not access_context["is_authenticated"]:
                 log_security_event("course.lecture_playback_denied_unauthenticated", request=request, lecture_id=lecture.id)
@@ -938,7 +944,7 @@ class LectureProtectedMediaView(APIView):
 
 class LectureResourceDownloadView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIpScopedRateThrottle]
     throttle_scope = "lecture_playback"
 
     def get(self, request, lecture_pk, pk):
@@ -1253,15 +1259,26 @@ class MyCoursesView(APIView):
             .select_related("instructor")
             .annotate(
                 section_count=Count("sections", distinct=True),
-                lecture_count=Count("sections__lectures", distinct=True),
+                lecture_count=Count(
+                    "sections__lectures",
+                    filter=Q(sections__lectures__is_published=True),
+                    distinct=True,
+                ),
+                # Progress counts only published lectures, like lecture_count:
+                # progress kept on a lecture that was later unpublished must
+                # not push the course past 100%.
                 started_lecture_count=Count(
                     "sections__lectures__progress_entries",
-                    filter=Q(sections__lectures__progress_entries__user=request.user),
+                    filter=Q(
+                        sections__lectures__is_published=True,
+                        sections__lectures__progress_entries__user=request.user,
+                    ),
                     distinct=True,
                 ),
                 completed_lecture_count=Count(
                     "sections__lectures__progress_entries",
                     filter=Q(
+                        sections__lectures__is_published=True,
                         sections__lectures__progress_entries__user=request.user,
                         sections__lectures__progress_entries__completed=True,
                     ),
@@ -1307,7 +1324,7 @@ class InstructorCoursesView(APIView):
 
 class CourseEnrollView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIpScopedRateThrottle]
     throttle_scope = "course_enroll"
 
     def post(self, request):
@@ -1470,7 +1487,7 @@ class LiveClassListView(APIView):
 
 class LiveClassEnrollView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIpScopedRateThrottle]
     throttle_scope = "live_class_enroll"
 
     def post(self, request):
@@ -1544,7 +1561,7 @@ class LiveClassEnrollView(APIView):
 
 class PublicEnrollmentLeadCreateView(APIView):
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIpScopedRateThrottle]
     throttle_scope = "public_enrollment_lead"
 
     def post(self, request):

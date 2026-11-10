@@ -590,6 +590,9 @@ export default function CoursePaymentPage() {
   }
 
   if (paymentResult) {
+    // The backend flags a guest payment for something this email already owns:
+    // nothing new is granted and the payment is queued for a refund.
+    const isDuplicatePurchase = Boolean(paymentResult.duplicate_purchase);
     const transactionId =
       paymentResult.transaction_id || paymentResult.invoice_number || "Recorded";
     const selectedPlan =
@@ -601,8 +604,9 @@ export default function CoursePaymentPage() {
           : plan === "bundle"
             ? "Plan 3 - Three-Month Bundle"
             : "Plan 2 - One-Time Payment");
-    const accessDuration =
-      paymentResult.access_duration ||
+    const accessDuration = isDuplicatePurchase
+      ? "Already active - no change"
+      : paymentResult.access_duration ||
       (plan === "monthly"
         ? `${course.installment_access_days || 30} days`
         : plan === "batch_pass"
@@ -630,14 +634,16 @@ export default function CoursePaymentPage() {
                 <span className="h-px flex-1 bg-[linear-gradient(to_left,transparent,rgba(255,255,255,0.2))]" />
               </div>
               <p className="mt-7 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#BEBEBE] sm:text-sm">
-                Payment successful
+                {isDuplicatePurchase ? "Payment received" : "Payment successful"}
               </p>
               <h1 className="mt-3 font-reference text-4xl font-semibold tracking-[-0.035em] text-white sm:text-6xl">
-                Payment Successful!
+                {isDuplicatePurchase ? "You already have this access" : "Payment Successful!"}
               </h1>
               <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[#B8B8B8] sm:text-lg sm:leading-8">
-                Your payment has been received and verified securely. Thank you for
-                enrolling with us.
+                {isDuplicatePurchase
+                  ? paymentResult.message ||
+                    "This email already owns this plan, so nothing new was added. This payment will be refunded to your original payment method."
+                  : "Your payment has been received and verified securely. Thank you for enrolling with us."}
               </p>
             </div>
 

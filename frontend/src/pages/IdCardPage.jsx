@@ -1,10 +1,12 @@
+import "./IdCardPage.scss";
+
+import { Edit, Education } from "@carbon/icons-react";
+import { Button, InlineNotification, Tile } from "@carbon/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { getMyCourses, listLiveClasses } from "../api/courses";
 import defaultIdCardProfileImage from "../assets/id-card-default-profile.jpg";
-import BrandLogo from "../components/BrandLogo";
-import Button from "../components/Button";
-import PageShell from "../components/PageShell";
+import { PageHeader, PageNotification } from "../features/app-shell/ui";
 import { useAuth } from "../hooks/useAuth";
 import { apiData } from "../utils/api";
 import { siteBrand } from "../config/siteBrand";
@@ -109,6 +111,7 @@ export default function IdCardPage() {
   const [shieldActive, setShieldActive] = useState(false);
   const [timestamp, setTimestamp] = useState(() => new Date());
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const matrixCanvasRef = useRef(null);
   const matrixShellRef = useRef(null);
 
@@ -241,7 +244,7 @@ export default function IdCardPage() {
       }
 
       if (partialFailures > 0) {
-        setDataNotice("Some live/course enrichment could not be loaded right now. Identity details are still accurate.");
+        setDataNotice("Your identity details are still correct.");
       }
 
       setLoading(false);
@@ -250,7 +253,7 @@ export default function IdCardPage() {
     return () => {
       active = false;
     };
-  }, [user?.id]);
+  }, [user?.id, reloadKey]);
 
   useEffect(() => {
     setAvatarLoadFailed(false);
@@ -312,49 +315,7 @@ export default function IdCardPage() {
     memberVerificationLabel === "Verified" ? "identity confirmed" : "membership pending";
   const rankHeading = user?.id ? `#${user.id}` : "#0000";
 
-  const _profileReadiness = useMemo(() => {
-    const hasImage = hasProfileImage;
-    const hasPhone = hasProfilePhone;
-    const hasName = hasProfileName;
-    const completedSignals = [hasImage, hasPhone, hasName].filter(Boolean).length;
 
-    if (completedSignals === 3) {
-      return {
-        label: "Profile Ready",
-        sublabel: "Name, phone, and image are all on file.",
-        tone: "text-[#E5E5E5]",
-        accent: "bg-[#EFEFEF]",
-      };
-    }
-
-    return {
-      label: "Needs Update",
-      sublabel: "Complete your profile details for a stronger identity record.",
-        tone: "text-[#D7B88C]",
-        accent: "bg-[#D7B88C]",
-      };
-  }, [hasProfileImage, hasProfileName, hasProfilePhone]);
-
-  const _securitySummary = useMemo(() => {
-    if (user?.two_factor_enabled) {
-      return {
-        label: "2FA Enabled",
-        sublabel: "This account has an extra authentication step enabled.",
-        tone: "text-[#E5E5E5]",
-      };
-    }
-
-    return {
-      label: "2FA Off",
-      sublabel: "Two-factor authentication is not enabled on this account yet.",
-      tone: "text-[#D7B88C]",
-    };
-  }, [user?.two_factor_enabled]);
-
-  const _accessSummary = useMemo(
-    () => `${courses.length} course${courses.length === 1 ? "" : "s"} // ${approvedLiveClasses.length} live class${approvedLiveClasses.length === 1 ? "" : "es"}`,
-    [approvedLiveClasses.length, courses.length]
-  );
   const idCardLevelLabel = "Cyber Security Apprentice";
 
   const preventSurfaceCaptureShortcuts = (event) => {
@@ -367,21 +328,40 @@ export default function IdCardPage() {
   };
 
   return (
-    <PageShell
-      title="ID Card"
-      subtitle="Private credential view for the authenticated account only. There is no user-id route for this card, so every viewer only sees their own identity data."
-      badge="Personal Credential"
-      action={
-        <div className="flex flex-wrap items-center gap-3">
-          <Link to="/profile">
-            <Button variant="secondary">Edit Profile</Button>
-          </Link>
-          <Link to="/my-courses">
-            <Button>Open Courses</Button>
-          </Link>
-        </div>
-      }
-    >
+    <>
+      <PageHeader
+        title="ID card"
+        description="Your private member card. Only you can see it."
+        actions={
+          <>
+            <Button as={Link} to="/profile" kind="primary" renderIcon={Edit}>
+              Edit profile
+            </Button>
+            <Button as={Link} to="/my-courses" kind="tertiary" renderIcon={Education}>
+              My courses
+            </Button>
+          </>
+        }
+      />
+
+      <InlineNotification
+        className="cds-page-notification"
+        kind="warning"
+        lowContrast
+        hideCloseButton
+        title="Do not share this card."
+        subtitle={`Sharing it breaks the ${siteBrand.name} terms and conditions and can lead to account suspension, loss of access and legal action.`}
+      />
+
+      {dataNotice ? (
+        <PageNotification
+          kind="info"
+          title="Some course details could not be loaded."
+          subtitle={dataNotice}
+          actionLabel="Try again"
+          onAction={() => setReloadKey((value) => value + 1)}
+        />
+      ) : null}
       <style>{`
         @keyframes idCardSweep {
           0% { transform: translateY(-100%); opacity: 0; }
@@ -1188,27 +1168,11 @@ export default function IdCardPage() {
         }
       `}</style>
 
-      <div className="mb-6 rounded-[26px] border border-red-400/30 bg-[linear-gradient(135deg,rgba(120,0,0,0.32),rgba(35,0,0,0.9))] p-5 text-white shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-red-200">Legal Warning</div>
-        <p className="mt-3 max-w-4xl text-sm leading-7 text-red-50/92">
-          Sharing of this ID card is a violation of {siteBrand.name} terms and conditions and may result in account suspension, access revocation, and legal case escalation.
-        </p>
-        <p className="mt-2 max-w-4xl text-sm leading-7 text-red-100/80">
-          This page uses watermarking, right-click blocking, print blocking, and protected-view shielding as deterrents. Browsers cannot guarantee absolute screenshot or screen-recording prevention, so every visible view carries your account identity markers.
-        </p>
-      </div>
-
-      {dataNotice ? (
-        <div className="mb-6 rounded-2xl border border-black panel-gradient px-4 py-3 text-sm text-[#CFCFCF] shadow-[0_14px_32px_rgba(0,0,0,0.24)]">
-          {dataNotice}
-        </div>
-      ) : null}
-
-      <div className="id-card-print-warning hidden min-h-[40vh] items-center justify-center rounded-[28px] border border-red-400/20 bg-black p-8 text-center text-white">
+      <div className="id-card-print-warning" role="note">
         Printing and static export of this protected credential are disabled.
       </div>
 
-      <div className="mx-auto w-full max-w-[1420px] space-y-6">
+      <div className="cds-id-card">
         <section
           ref={matrixShellRef}
           className="id-card-protected-root asi-id-card-shell"
@@ -1426,86 +1390,63 @@ export default function IdCardPage() {
             <div className="asi-id-card-stripe" />
           </div>
         </section>
-
-        <div className="grid gap-6 xl:grid-cols-3">
-          <section className="rounded-[28px] border border-black panel-gradient p-5 shadow-[0_20px_55px_rgba(0,0,0,0.28)]">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9C9C9C]">
-                  Identity Source
-                </div>
-                <h3 className="mt-2 font-reference text-xl font-semibold text-white">Authenticated Account</h3>
-              </div>
-              <BrandLogo className="max-w-[220px]" />
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-black panel-gradient p-4">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#969696]">User ID</div>
-                <div className="mt-2 font-mono text-lg text-white">{user?.id || "n/a"}</div>
-              </div>
-              <div className="rounded-2xl border border-black panel-gradient p-4">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#969696]">Access Class</div>
-                <div className="mt-2 text-lg text-white">{roleLabel}</div>
-              </div>
-              <div className="rounded-2xl border border-black panel-gradient p-4">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#969696]">Session Status</div>
-                <div className="mt-2 text-lg text-white">Authenticated</div>
-              </div>
-              <div className="rounded-2xl border border-black panel-gradient p-4">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#969696]">Watermark Stamp</div>
-                <div className="mt-2 font-mono text-sm text-white">{formatTimestamp(timestamp)}</div>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-[28px] border border-black panel-gradient p-5 shadow-[0_20px_55px_rgba(0,0,0,0.28)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9C9C9C]">Access Footprint</div>
-            <h3 className="mt-2 font-reference text-xl font-semibold text-white">Your Current Access</h3>
-            <p className="mt-2 text-sm leading-7 text-[#BCBCBC]">
-              This summary is generated from your current authenticated user record, paid course enrollments, and approved live-class enrollments.
-            </p>
-
-            <div className="mt-4 space-y-3">
-              <div className="rounded-2xl border border-black panel-gradient p-4">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#969696]">Courses</div>
-                <div className="mt-2 text-white">
-                  {loading ? "Loading course library..." : `${courses.length} unlocked`}
-                </div>
-                <div className="mt-2 text-sm text-[#B8B8B8]">
-                  {primaryCourse?.title || "No approved or purchased course available yet."}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-black panel-gradient p-4">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-[#969696]">Live Classes</div>
-                <div className="mt-2 text-white">
-                  {loading ? "Loading live classes..." : `${approvedLiveClasses.length} approved`}
-                </div>
-                <div className="mt-2 text-sm text-[#B8B8B8]">
-                  {primaryLiveClass?.title || "No approved live class linked to this account yet."}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-[28px] border border-black panel-gradient p-5 shadow-[0_20px_55px_rgba(0,0,0,0.28)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9C9C9C]">Protection Notice</div>
-            <h3 className="mt-2 font-reference text-xl font-semibold text-white">Private Credential Handling</h3>
-            <ul className="mt-4 space-y-3 text-sm leading-7 text-[#C9C9C9]">
-              <li className="rounded-2xl border border-black panel-gradient px-4 py-3">
-                This page is self-only. It renders the authenticated viewer&apos;s details and does not expose another user&apos;s card route.
-              </li>
-              <li className="rounded-2xl border border-black panel-gradient px-4 py-3">
-                Watermarks include your account markers and live timestamp so leaked captures can be traced back to the viewing session.
-              </li>
-              <li className="rounded-2xl border border-black panel-gradient px-4 py-3">
-                Browser protections can deter casual copying, printing, and right-click saving, but they cannot guarantee absolute screenshot or screen-recording prevention.
-              </li>
-            </ul>
-          </section>
-        </div>
       </div>
-    </PageShell>
+
+      <div className="cds-id-card-panels">
+        <Tile className="cds-id-card-panel">
+          <h2 className="cds-id-card-panel__title">Account</h2>
+          <dl className="cds-id-card-facts">
+            <div>
+              <dt>User ID</dt>
+              <dd className="cds-id-card-facts__mono">{user?.id || "n/a"}</dd>
+            </div>
+            <div>
+              <dt>Access class</dt>
+              <dd>{roleLabel}</dd>
+            </div>
+            <div>
+              <dt>Session</dt>
+              <dd>Signed in</dd>
+            </div>
+            <div>
+              <dt>Watermark stamp</dt>
+              <dd className="cds-id-card-facts__mono">{formatTimestamp(timestamp)}</dd>
+            </div>
+          </dl>
+        </Tile>
+
+        <Tile className="cds-id-card-panel">
+          <h2 className="cds-id-card-panel__title">Your access</h2>
+          <dl className="cds-id-card-facts cds-id-card-facts--stacked">
+            <div>
+              <dt>Courses</dt>
+              <dd>{loading ? "Loading…" : `${courses.length} unlocked`}</dd>
+              <dd className="cds-id-card-facts__note">
+                {primaryCourse?.title || "No approved or purchased course yet."}
+              </dd>
+            </div>
+            <div>
+              <dt>Live classes</dt>
+              <dd>{loading ? "Loading…" : `${approvedLiveClasses.length} approved`}</dd>
+              <dd className="cds-id-card-facts__note">
+                {primaryLiveClass?.title || "No approved live class yet."}
+              </dd>
+            </div>
+          </dl>
+        </Tile>
+
+        <Tile className="cds-id-card-panel">
+          <h2 className="cds-id-card-panel__title">How your card is protected</h2>
+          <ul className="cds-id-card-protection">
+            <li>Only you can open this page. There is no link to anyone else&apos;s card.</li>
+            <li>Your account details and a live timestamp are stamped across the card, so a leaked copy can be traced.</li>
+            <li>
+              Right-click, saving and printing are blocked. Browsers cannot fully stop screenshots or screen
+              recording, so every view carries your identity markers.
+            </li>
+          </ul>
+        </Tile>
+      </div>
+    </>
   );
 }

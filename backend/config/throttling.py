@@ -1,19 +1,50 @@
 import hashlib
 
-from rest_framework.throttling import SimpleRateThrottle
+from rest_framework.throttling import (
+    AnonRateThrottle,
+    ScopedRateThrottle,
+    SimpleRateThrottle,
+    UserRateThrottle,
+)
 
 from config.client_ip import resolve_client_ip
 from config.cookies import REFRESH_COOKIE
 
 
-class LoginRateThrottle(SimpleRateThrottle):
+class ClientIpIdentMixin:
+    """Identify anonymous clients by the proxy-verified address.
+
+    DRF's default get_ident() returns the raw X-Forwarded-For string when
+    NUM_PROXIES is unset, so a client could rotate that header to get a fresh
+    bucket on every request. Every throttle in this project must use this
+    mixin (or one of the classes below) so throttling follows
+    resolve_client_ip(), which only trusts entries our own proxies appended.
+    """
+
+    def get_ident(self, request):
+        return resolve_client_ip(request)
+
+
+class ClientIpAnonRateThrottle(ClientIpIdentMixin, AnonRateThrottle):
+    pass
+
+
+class ClientIpUserRateThrottle(ClientIpIdentMixin, UserRateThrottle):
+    pass
+
+
+class ClientIpScopedRateThrottle(ClientIpIdentMixin, ScopedRateThrottle):
+    pass
+
+
+class LoginRateThrottle(ClientIpIdentMixin, SimpleRateThrottle):
     scope = "login_burst"
 
     def get_cache_key(self, request, view):
         if request.method != "POST":
             return None
         email = str(request.data.get("email", "")).strip().lower()
-        ident = resolve_client_ip(request)
+        ident = self.get_ident(request)
         if not email:
             email = "no-email"
         return self.cache_format % {"scope": self.scope, "ident": f"{ident}:{email}"}
@@ -27,7 +58,7 @@ def _presented_refresh_token(request):
     return str(raw_token or "").strip()
 
 
-class RefreshTokenRateThrottle(SimpleRateThrottle):
+class RefreshTokenRateThrottle(ClientIpIdentMixin, SimpleRateThrottle):
     """Budget refreshes per refresh token, not per IP.
 
     Classrooms and carrier-grade NAT put many students behind one address, so
@@ -49,7 +80,7 @@ class RefreshTokenRateThrottle(SimpleRateThrottle):
         return self.cache_format % {"scope": self.scope, "ident": ident}
 
 
-class RefreshIpCeilingThrottle(SimpleRateThrottle):
+class RefreshIpCeilingThrottle(ClientIpIdentMixin, SimpleRateThrottle):
     """Generous per-IP ceiling so forged tokens cannot mint unbounded buckets."""
 
     scope = "refresh_ip"
@@ -57,4 +88,4 @@ class RefreshIpCeilingThrottle(SimpleRateThrottle):
     def get_cache_key(self, request, view):
         if request.method != "POST" or not _presented_refresh_token(request):
             return None
-        return self.cache_format % {"scope": self.scope, "ident": resolve_client_ip(request)}
+        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}

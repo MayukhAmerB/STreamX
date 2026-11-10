@@ -741,6 +741,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/lecture-comments/{comment_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Delete your own comment (staff and the course instructor may delete any). */
+        delete: operations["lecture_comment_delete"];
+        options?: never;
+        head?: never;
+        /** @description Edit your own comment. */
+        patch: operations["lecture_comment_update"];
+        trace?: never;
+    };
     "/lecture-questions/": {
         parameters: {
             query?: never;
@@ -800,6 +818,59 @@ export interface paths {
         put: operations["lectures_update_by_id"];
         post?: never;
         delete: operations["lectures_destroy_by_id"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lectures/{id}/comments/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Visible comments, newest first. Always paginated. */
+        get: operations["lecture_comments_list"];
+        put?: never;
+        /** @description Post a plain-text comment (HTML is stripped). */
+        post: operations["lecture_comments_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lectures/{id}/engagement/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["lecture_engagement_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/lectures/{id}/like/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Idempotently like the lecture. */
+        put: operations["lecture_like_set"];
+        /** @description Toggle the caller's like on the lecture. */
+        post: operations["lecture_like_toggle"];
+        /** @description Idempotently remove the caller's like. */
+        delete: operations["lecture_like_remove"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1061,6 +1132,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/realtime/class-recordings/{recording_id}/obs-upload/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Replace this recording's lecture video with the OBS file (lecture identity is kept). */
+        post: operations["realtime_class_recording_obs_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/realtime/class-recordings/{recording_id}/retry/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["realtime_class_recording_retry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/realtime/module-options/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Modules of a course for the "target module" picker (admins and the course instructor). */
+        get: operations["realtime_module_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/realtime/owncast/chat-bridge/": {
         parameters: {
             query?: never;
@@ -1170,7 +1291,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** @description Update the session's target module (the module that receives its class recording). */
+        patch: operations["realtime_sessions_partial_update_by_id"];
         trace?: never;
     };
     "/realtime/sessions/{id}/broadcast-chat/launch/": {
@@ -1232,6 +1354,39 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["realtime_sessions_broadcast_stream_launch_create_by_id"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/realtime/sessions/{id}/class-recordings/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["realtime_session_class_recordings_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/realtime/sessions/{id}/class-recordings/obs-upload/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Upload the file OBS saved locally. Replaces the video of the session's latest class-recording lecture (same lecture id, likes, comments, views), or creates the lecture in the session's target module when no recording exists. */
+        post: operations["realtime_session_class_recording_obs_upload"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1399,6 +1554,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/realtime/sessions/{id}/stream/heartbeat/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Host Studio heartbeat. For live browser (LiveKit) broadcasts, checks the egress with LiveKit (at most every REALTIME_HOST_EGRESS_CHECK_INTERVAL_SECONDS) and restarts a dead egress when the caller reports it is still publishing; otherwise marks the stream failed. */
+        post: operations["realtime_session_stream_heartbeat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/realtime/sessions/{id}/stream/rotate-key/": {
         parameters: {
             query?: never;
@@ -1490,6 +1662,82 @@ export interface components {
          * @enum {string}
          */
         ActionTypeEnum: "audio" | "pdf" | "video";
+        BroadcastEgressStatus: {
+            /** @description True while LiveKit reports the egress starting/active; null when it could not be verified. */
+            running: boolean | null;
+            /** @description LiveKit EgressStatus name, e.g. EGRESS_ACTIVE or EGRESS_FAILED. */
+            status: string;
+            error: string;
+        };
+        ClassRecording: {
+            readonly id: number;
+            readonly session_id: number | null;
+            readonly source: components["schemas"]["ClassRecordingSourceEnum"];
+            readonly state: components["schemas"]["ClassRecordingStateEnum"];
+            readonly module: components["schemas"]["ModuleRef"] | null;
+            readonly lecture: components["schemas"]["LectureRef"] | null;
+            readonly error: string;
+            readonly part_count: number;
+            /** @description Bytes captured into parts (server recordings). */
+            readonly captured_bytes: number;
+            /** @description Size of the published source file. */
+            readonly file_size_bytes: number | null;
+            readonly duration_seconds: number | null;
+            readonly attempts: number;
+            /** Format: date-time */
+            readonly recorder_heartbeat_at: string | null;
+            /** Format: date-time */
+            readonly started_at: string | null;
+            /** Format: date-time */
+            readonly stop_requested_at: string | null;
+            /** Format: date-time */
+            readonly finalized_at: string | null;
+            /** Format: date-time */
+            readonly published_at: string | null;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+            readonly can_retry: boolean;
+            readonly can_replace: boolean;
+        };
+        ClassRecordingListResponse: {
+            data: components["schemas"]["ClassRecording"][] | null;
+            success: boolean;
+            message: string;
+            errors: unknown;
+        };
+        ClassRecordingResponse: {
+            data: components["schemas"]["ClassRecording"] | null;
+            success: boolean;
+            message: string;
+            errors: unknown;
+        };
+        /**
+         * @description * `server` - Server recording (OBS stream)
+         *     * `obs_upload` - OBS file upload (replacement)
+         *     * `livekit_egress` - LiveKit egress (Host Studio)
+         * @enum {string}
+         */
+        ClassRecordingSourceEnum: "server" | "obs_upload" | "livekit_egress";
+        /**
+         * @description * `recording` - Recording
+         *     * `finalizing` - Finalizing
+         *     * `processing` - Processing
+         *     * `published` - Published
+         *     * `failed` - Failed
+         * @enum {string}
+         */
+        ClassRecordingStateEnum: "recording" | "finalizing" | "processing" | "published" | "failed";
+        CommentAuthor: {
+            id: number;
+            display_name: string;
+            is_instructor: boolean;
+        };
+        CourseRef: {
+            id: number;
+            title: string;
+        };
         /**
          * @description * `connecting` - connecting
          *     * `connected` - connected
@@ -1609,6 +1857,85 @@ export interface components {
             readonly topics: components["schemas"]["LawTopic"][];
             is_active?: boolean;
         };
+        /** @description Student-facing comment. Never exposes emails or moderation metadata. */
+        LectureComment: {
+            readonly id: number;
+            readonly lecture_id: number;
+            readonly body: string;
+            readonly author: components["schemas"]["CommentAuthor"];
+            readonly is_mine: boolean;
+            readonly is_edited: boolean;
+            readonly can_delete: boolean;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** Format: date-time */
+            readonly updated_at: string;
+        };
+        LectureCommentDeleteResponse: {
+            data: unknown;
+            success: boolean;
+            message: string;
+            errors: unknown;
+        };
+        LectureCommentPage: {
+            results: components["schemas"]["LectureComment"][];
+            pagination: components["schemas"]["PaginationMeta"];
+        };
+        LectureCommentPageResponse: {
+            data: components["schemas"]["LectureCommentPage"] | null;
+            success: boolean;
+            message: string;
+            errors: unknown;
+        };
+        LectureCommentResponse: {
+            data: components["schemas"]["LectureComment"] | null;
+            success: boolean;
+            message: string;
+            errors: unknown;
+        };
+        LectureCommentWriteRequest: {
+            body: string;
+        };
+        LectureEngagementSummary: {
+            lecture_id: number;
+            like_count: number;
+            liked: boolean;
+            comment_count: number;
+        };
+        LectureEngagementSummaryResponse: {
+            data: components["schemas"]["LectureEngagementSummary"] | null;
+            success: boolean;
+            message: string;
+            errors: unknown;
+        };
+        LectureRef: {
+            id: number;
+            title: string;
+            stream_status: string;
+            is_published: boolean;
+        };
+        ModuleOption: {
+            id: number;
+            title: string;
+            description: string;
+            order: number;
+            lecture_count: number;
+        };
+        ModuleOptions: {
+            course: components["schemas"]["CourseRef"];
+            modules: components["schemas"]["ModuleOption"][];
+        };
+        ModuleOptionsResponse: {
+            data: components["schemas"]["ModuleOptions"] | null;
+            success: boolean;
+            message: string;
+            errors: unknown;
+        };
+        ModuleRef: {
+            id: number;
+            title: string;
+            course_id: number;
+        };
         NationalDeskData: {
             is_published: boolean;
             instagram: components["schemas"]["NationalDeskInstagram"];
@@ -1637,6 +1964,27 @@ export interface components {
          * @enum {string}
          */
         NetworkEnum: "slow_2g" | "2g" | "3g" | "4g" | "wifi" | "ethernet" | "unknown";
+        ObsUploadRequest: {
+            /**
+             * Format: binary
+             * @description The recording OBS saved: MP4/MOV/M4V/WEBM, or OBS's MKV/FLV/TS, which the server remuxes to MP4 (stream copy) before swapping it in. Max MAX_VIDEO_UPLOAD_BYTES (5 GB).
+             */
+            video_file: string;
+        };
+        PaginationMeta: {
+            page: number;
+            page_size: number;
+            total: number;
+            pages: number;
+            has_next: boolean;
+            has_previous: boolean;
+        };
+        PatchedLectureCommentWriteRequest: {
+            body?: string;
+        };
+        PatchedSessionModuleUpdateRequest: {
+            target_module_id?: number | null;
+        };
         /**
          * @description * `mobile` - mobile
          *     * `desktop` - desktop
@@ -1794,6 +2142,29 @@ export interface components {
          * @enum {string}
          */
         StatusEnum: "completed" | "in_progress" | "planned";
+        StreamHeartbeatData: {
+            /** @description The session, in the same shape as GET /api/realtime/sessions/{id}/ returns it. */
+            session: {
+                [key: string]: unknown;
+            };
+            /** @description Null for OBS sessions and for streams that are not live. */
+            egress: components["schemas"]["BroadcastEgressStatus"] | null;
+            /** @description True when this heartbeat replaced a dead egress. */
+            restarted: boolean;
+        };
+        StreamHeartbeatRequest: {
+            /**
+             * @description True while the Host Studio has a connected room and a published video track.
+             * @default false
+             */
+            publishing: boolean;
+        };
+        StreamHeartbeatResponse: {
+            success: boolean;
+            message: string;
+            data: components["schemas"]["StreamHeartbeatData"] | null;
+            errors: unknown;
+        };
         TrackerOverview: {
             section_label?: string;
             title?: string;
@@ -3291,6 +3662,94 @@ export interface operations {
             };
         };
     };
+    lecture_comment_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureCommentDeleteResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureCommentDeleteResponse"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureCommentDeleteResponse"];
+                };
+            };
+        };
+    };
+    lecture_comment_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                comment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedLectureCommentWriteRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedLectureCommentWriteRequest"];
+                "multipart/form-data": components["schemas"]["PatchedLectureCommentWriteRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureCommentResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureCommentResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureCommentResponse"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureCommentResponse"];
+                };
+            };
+        };
+    };
     lecture_questions_retrieve: {
         parameters: {
             query?: never;
@@ -3421,6 +3880,198 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    lecture_comments_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                /** @description 1-50 */
+                page_size?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureCommentPageResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureCommentPageResponse"];
+                };
+            };
+        };
+    };
+    lecture_comments_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LectureCommentWriteRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["LectureCommentWriteRequest"];
+                "multipart/form-data": components["schemas"]["LectureCommentWriteRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureCommentResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureCommentResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureCommentResponse"];
+                };
+            };
+        };
+    };
+    lecture_engagement_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureEngagementSummaryResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureEngagementSummaryResponse"];
+                };
+            };
+        };
+    };
+    lecture_like_set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureEngagementSummaryResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureEngagementSummaryResponse"];
+                };
+            };
+        };
+    };
+    lecture_like_toggle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureEngagementSummaryResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureEngagementSummaryResponse"];
+                };
+            };
+        };
+    };
+    lecture_like_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureEngagementSummaryResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LectureEngagementSummaryResponse"];
+                };
             };
         };
     };
@@ -4013,6 +4664,123 @@ export interface operations {
             };
         };
     };
+    realtime_class_recording_obs_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recording_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["ObsUploadRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassRecordingResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassRecordingResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassRecordingResponse"];
+                };
+            };
+        };
+    };
+    realtime_class_recording_retry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recording_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassRecordingResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassRecordingResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassRecordingResponse"];
+                };
+            };
+        };
+    };
+    realtime_module_options: {
+        parameters: {
+            query?: {
+                course_id?: number;
+                /** @description Resolve the course from a live class. */
+                live_class_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleOptionsResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleOptionsResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleOptionsResponse"];
+                };
+            };
+        };
+    };
     realtime_owncast_chat_bridge_retrieve: {
         parameters: {
             query?: never;
@@ -4229,6 +4997,55 @@ export interface operations {
             };
         };
     };
+    realtime_sessions_partial_update_by_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedSessionModuleUpdateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedSessionModuleUpdateRequest"];
+                "multipart/form-data": components["schemas"]["PatchedSessionModuleUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     realtime_sessions_broadcast_chat_launch_create_by_id: {
         parameters: {
             query?: never;
@@ -4379,6 +5196,76 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    realtime_session_class_recordings_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassRecordingListResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassRecordingListResponse"];
+                };
+            };
+        };
+    };
+    realtime_session_class_recording_obs_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["ObsUploadRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassRecordingResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassRecordingResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassRecordingResponse"];
                 };
             };
         };
@@ -4710,6 +5597,49 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    realtime_session_stream_heartbeat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["StreamHeartbeatRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["StreamHeartbeatRequest"];
+                "multipart/form-data": components["schemas"]["StreamHeartbeatRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StreamHeartbeatResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StreamHeartbeatResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StreamHeartbeatResponse"];
                 };
             };
         };

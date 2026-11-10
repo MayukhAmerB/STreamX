@@ -4,6 +4,7 @@ import logging
 import re
 import time
 import base64
+import secrets
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from urllib.request import Request, urlopen
@@ -378,15 +379,24 @@ def _get_owncast_status_base_candidates():
     return candidates
 
 
-def get_owncast_public_status(*, force_refresh=False):
-    cache_ttl = max(0, int(getattr(settings, "REALTIME_OWNCAST_STATUS_CACHE_TTL_SECONDS", 3) or 3))
-    cache_key = "realtime:owncast:public-status"
-    if not force_refresh and cache_ttl > 0:
-        cached_payload = cache.get(cache_key)
-        if isinstance(cached_payload, dict):
-            return cached_payload
+OWNCAST_STATUS_CACHE_KEY = "realtime:owncast:public-status"
+OWNCAST_STATUS_STALE_CACHE_KEY = "realtime:owncast:public-status:last-known"
+OWNCAST_STATUS_FAILURE_CACHE_KEY = "realtime:owncast:public-status:unreachable"
+OWNCAST_STATUS_LOCK_KEY = "realtime:owncast:public-status:lock"
 
+
+def _owncast_status_timeout_seconds():
+    try:
+        value = float(getattr(settings, "REALTIME_OWNCAST_STATUS_TIMEOUT_SECONDS", 3) or 3)
+    except (TypeError, ValueError):
+        value = 3.0
+    return min(10.0, max(0.5, value))
+
+
+def _fetch_owncast_public_status():
+    """One round of Owncast /api/status calls. Returns (payload or None, last_error)."""
     last_error = ""
+    timeout = _owncast_status_timeout_seconds()
     for base_url in _get_owncast_status_base_candidates():
         endpoint = f"{base_url}/api/status"
         request = Request(
@@ -395,23 +405,20 @@ def get_owncast_public_status(*, force_refresh=False):
             headers={"Accept": "application/json"},
         )
         try:
-            with urlopen(request, timeout=5) as response:
+            with urlopen(request, timeout=timeout) as response:
                 raw_payload = response.read().decode("utf-8") or "{}"
             parsed_payload = json.loads(raw_payload)
             if not isinstance(parsed_payload, dict):
                 raise OwncastAdminError("Owncast status API returned an invalid payload.")
 
-            normalized_payload = {
+            return {
                 "online": bool(parsed_payload.get("online")),
                 "viewerCount": parsed_payload.get("viewerCount"),
                 "streamTitle": str(parsed_payload.get("streamTitle") or "").strip(),
                 "lastConnectTime": str(parsed_payload.get("lastConnectTime") or "").strip(),
                 "lastDisconnectTime": str(parsed_payload.get("lastDisconnectTime") or "").strip(),
                 "serverTime": str(parsed_payload.get("serverTime") or "").strip(),
-            }
-            if cache_ttl > 0:
-                cache.set(cache_key, normalized_payload, timeout=cache_ttl)
-            return normalized_payload
+            }, ""
         except HTTPError as exc:
             body = ""
             try:
@@ -426,10 +433,69 @@ def get_owncast_public_status(*, force_refresh=False):
         except Exception as exc:
             last_error = str(exc)
             continue
+    return None, last_error
 
-    if last_error:
-        logger.debug("Owncast public status check failed: %s", last_error)
-    return {}
+
+def get_owncast_public_status(*, force_refresh=False):
+    """Owncast's public /api/status, cached and single-flight.
+
+    A whole class joins within seconds, so at most one worker talks to Owncast
+    at a time: the others reuse the fresh cached payload, or the last known
+    payload while a refresh is in flight, instead of each blocking a gunicorn
+    worker on its own HTTP call. ``force_refresh`` skips the fresh cache (host
+    actions) but still joins an in-flight refresh rather than starting another.
+    """
+    cache_ttl = max(0, int(getattr(settings, "REALTIME_OWNCAST_STATUS_CACHE_TTL_SECONDS", 3) or 3))
+    if not force_refresh and cache_ttl > 0:
+        cached_payload = cache.get(OWNCAST_STATUS_CACHE_KEY)
+        if isinstance(cached_payload, dict):
+            return cached_payload
+        if cache.get(OWNCAST_STATUS_FAILURE_CACHE_KEY):
+            # Owncast just failed to answer; don't make every request wait on it again.
+            return {}
+
+    candidates = _get_owncast_status_base_candidates()
+    if not candidates:
+        return {}
+
+    fetch_budget_seconds = _owncast_status_timeout_seconds() * len(candidates)
+    lock_token = secrets.token_hex(8)
+    lock_acquired = cache.add(OWNCAST_STATUS_LOCK_KEY, lock_token, timeout=int(fetch_budget_seconds) + 2)
+    if not lock_acquired:
+        if not force_refresh:
+            last_known = cache.get(OWNCAST_STATUS_STALE_CACHE_KEY)
+            if isinstance(last_known, dict):
+                return last_known
+        # No usable payload yet (or a host action needs the fresh one): wait for
+        # the in-flight refresh instead of starting a parallel one.
+        deadline = time.monotonic() + fetch_budget_seconds + 0.5
+        while time.monotonic() < deadline:
+            time.sleep(0.05)
+            if cache.get(OWNCAST_STATUS_LOCK_KEY) is None:
+                break
+        refreshed_payload = cache.get(OWNCAST_STATUS_CACHE_KEY)
+        if isinstance(refreshed_payload, dict):
+            return refreshed_payload
+        last_known = cache.get(OWNCAST_STATUS_STALE_CACHE_KEY)
+        return last_known if isinstance(last_known, dict) else {}
+
+    try:
+        payload, last_error = _fetch_owncast_public_status()
+        if payload is not None:
+            if cache_ttl > 0:
+                cache.set(OWNCAST_STATUS_CACHE_KEY, payload, timeout=cache_ttl)
+            # Served only while another worker's refresh is in flight.
+            cache.set(OWNCAST_STATUS_STALE_CACHE_KEY, payload, timeout=max(30, cache_ttl * 10))
+            cache.delete(OWNCAST_STATUS_FAILURE_CACHE_KEY)
+            return payload
+        if cache_ttl > 0:
+            cache.set(OWNCAST_STATUS_FAILURE_CACHE_KEY, True, timeout=cache_ttl)
+        if last_error:
+            logger.debug("Owncast public status check failed: %s", last_error)
+        return {}
+    finally:
+        if cache.get(OWNCAST_STATUS_LOCK_KEY) == lock_token:
+            cache.delete(OWNCAST_STATUS_LOCK_KEY)
 
 
 def refresh_obs_session_stream_health(session, *, force_refresh=False, persist=True):
@@ -1312,68 +1378,35 @@ def _list_room_participants(room_name):
     return participants if isinstance(participants, list) else []
 
 
-def _normalize_livekit_track_source(source):
-    return str(source or "").strip().lower().replace("-", "_").replace(" ", "_")
+def resolve_host_publisher_identity(*, room_name, session_id, preferred_identity=""):
+    """Identity of the Host Studio publisher currently in the room.
 
-
-def _select_participant_track_sid(participant, *, preferred_sources):
-    normalized_preferences = {_normalize_livekit_track_source(item) for item in preferred_sources or []}
-    for track in participant.get("tracks") or []:
-        source = _normalize_livekit_track_source(track.get("source"))
-        if source not in normalized_preferences:
-            continue
-        track_sid = str(track.get("sid") or track.get("trackSid") or "").strip()
-        if track_sid:
-            return track_sid
-    return ""
-
-
-def _build_screen_share_track_composite_payload(*, room_name, participant_identity, rtmp_target_url):
+    Publishers join as ``host-<user id>-session-<session id>``. The requesting
+    manager's own identity wins when it is publishing; otherwise any other
+    manager publishing this session is used (an admin pressing Start Live for
+    the instructor). Falls back to ``preferred_identity`` when the room cannot
+    be listed or nobody is publishing yet.
+    """
+    preferred_identity = str(preferred_identity or "").strip()
     try:
         participants = _list_room_participants(room_name)
-    except LiveKitRoomServiceError as exc:
-        logger.warning(
-            "LiveKit screen-share track lookup failed for room=%s identity=%s: %s",
-            room_name,
-            participant_identity,
-            exc,
-        )
-        return None
+    except Exception as exc:  # LiveKit unreachable/misconfigured: trust the caller.
+        logger.warning("LiveKit publisher lookup failed for room=%s: %s", room_name, exc)
+        return preferred_identity
 
-    participant = next(
-        (
-            item
-            for item in participants
-            if str(item.get("identity") or "").strip() == str(participant_identity or "").strip()
-        ),
-        None,
-    )
-    if not isinstance(participant, dict):
-        return None
-
-    screen_share_track_id = _select_participant_track_sid(
-        participant,
-        preferred_sources={"screen_share"},
-    )
-    if not screen_share_track_id:
-        return None
-
-    audio_track_id = _select_participant_track_sid(
-        participant,
-        preferred_sources={"microphone"},
-    ) or _select_participant_track_sid(
-        participant,
-        preferred_sources={"screen_share_audio"},
-    )
-
-    payload = {
-        "room_name": room_name,
-        "video_track_id": screen_share_track_id,
-        "stream_outputs": [{"urls": [rtmp_target_url]}],
-    }
-    if audio_track_id:
-        payload["audio_track_id"] = audio_track_id
-    return payload
+    suffix = f"-session-{session_id}"
+    publishers = []
+    for participant in participants:
+        if not isinstance(participant, dict):
+            continue
+        identity = str(participant.get("identity") or "").strip()
+        if identity.startswith("host-") and identity.endswith(suffix):
+            publishers.append(identity)
+    if preferred_identity and preferred_identity in publishers:
+        return preferred_identity
+    if publishers:
+        return publishers[0]
+    return preferred_identity
 
 
 def _build_livekit_publish_sources(*, allow_presenter, allow_microphone):
@@ -1784,7 +1817,7 @@ def _build_egress_admin_token():
     )
 
 
-def _twirp_post(path, payload):
+def _twirp_post(path, payload, *, timeout=None):
     base_urls = _get_livekit_server_base_urls()
     if not base_urls:
         raise LiveKitEgressError(
@@ -1807,7 +1840,7 @@ def _twirp_post(path, payload):
             },
         )
         try:
-            with urlopen(request, timeout=settings.LIVEKIT_EGRESS_TWIRP_TIMEOUT_SECONDS) as response:
+            with urlopen(request, timeout=timeout or settings.LIVEKIT_EGRESS_TWIRP_TIMEOUT_SECONDS) as response:
                 return json.loads(response.read().decode("utf-8") or "{}")
         except HTTPError as exc:
             body = ""
@@ -1830,33 +1863,28 @@ def _twirp_post(path, payload):
     raise LiveKitEgressError(last_error_message or "Egress request failed.")
 
 
-def start_room_broadcast_egress(*, room_name, rtmp_target_url, participant_identity=""):
-    # Prefer participant egress for browser-published host media because it avoids
-    # the headless-browser ICE path used by room-composite egress.
+def start_room_broadcast_egress(*, room_name, rtmp_target_url, participant_identity="", session_id=None):
+    """Start the RTMP egress that feeds Owncast from the Host Studio.
+
+    Participant egress follows the publisher rather than specific track SIDs,
+    so it keeps streaming when the host switches between camera and screen
+    (the Host Studio swaps the media on one published camera-source track) or
+    republishes after a reconnect. Room composite is only the fallback for a
+    session with no known publisher, because it needs a headless browser.
+    """
+    if session_id is not None:
+        participant_identity = resolve_host_publisher_identity(
+            room_name=room_name,
+            session_id=session_id,
+            preferred_identity=participant_identity,
+        )
     if participant_identity:
-        participant_payload = {
+        payload = {
             "room_name": room_name,
             "identity": participant_identity,
             "stream_outputs": [{"urls": [rtmp_target_url]}],
         }
-        screen_share_payload = _build_screen_share_track_composite_payload(
-            room_name=room_name,
-            participant_identity=participant_identity,
-            rtmp_target_url=rtmp_target_url,
-        )
-        if screen_share_payload:
-            try:
-                data = _twirp_post("livekit.Egress/StartTrackCompositeEgress", screen_share_payload)
-            except LiveKitEgressError as exc:
-                logger.warning(
-                    "LiveKit track composite egress failed for room=%s identity=%s; falling back to participant egress: %s",
-                    room_name,
-                    participant_identity,
-                    exc,
-                )
-                data = _twirp_post("livekit.Egress/StartParticipantEgress", participant_payload)
-        else:
-            data = _twirp_post("livekit.Egress/StartParticipantEgress", participant_payload)
+        data = _twirp_post("livekit.Egress/StartParticipantEgress", payload)
     else:
         payload = {
             "room_name": room_name,
@@ -1874,6 +1902,61 @@ def stop_room_broadcast_egress(*, egress_id):
     if not egress_id:
         return
     _twirp_post("livekit.Egress/StopEgress", {"egress_id": egress_id})
+
+
+# livekit.EgressStatus. proto3 JSON omits the zero value, so a missing status
+# means EGRESS_STARTING.
+LIVEKIT_EGRESS_STATUS_NAMES = {
+    0: "EGRESS_STARTING",
+    1: "EGRESS_ACTIVE",
+    2: "EGRESS_ENDING",
+    3: "EGRESS_COMPLETE",
+    4: "EGRESS_FAILED",
+    5: "EGRESS_ABORTED",
+    6: "EGRESS_LIMIT_REACHED",
+}
+LIVEKIT_EGRESS_RUNNING_STATUSES = frozenset({"EGRESS_STARTING", "EGRESS_ACTIVE"})
+LIVEKIT_EGRESS_STOPPED_STATUSES = frozenset(
+    {"EGRESS_ENDING", "EGRESS_COMPLETE", "EGRESS_FAILED", "EGRESS_ABORTED", "EGRESS_LIMIT_REACHED"}
+)
+
+
+def get_broadcast_egress_status(*, egress_id):
+    """Ask LiveKit whether one egress is still streaming.
+
+    Returns ``{"running": bool | None, "status": str, "error": str}``.
+    ``running`` is None only for a status this code does not know. Raises
+    LiveKitConfigError / LiveKitEgressError when LiveKit cannot be asked.
+    """
+    egress_id = str(egress_id or "").strip()
+    if not egress_id:
+        return {"running": False, "status": "EGRESS_MISSING", "error": ""}
+    timeout = max(1, int(getattr(settings, "LIVEKIT_EGRESS_STATUS_TIMEOUT_SECONDS", 5) or 5))
+    data = _twirp_post("livekit.Egress/ListEgress", {"egress_id": egress_id}, timeout=timeout)
+    items = data.get("items") if isinstance(data, dict) else None
+    match = None
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("egress_id") or item.get("egressId") or "").strip() == egress_id:
+            match = item
+            break
+    if match is None:
+        # LiveKit forgets finished egresses after a while; unknown means not streaming.
+        return {"running": False, "status": "EGRESS_NOT_FOUND", "error": ""}
+
+    raw_status = match.get("status", 0)
+    if isinstance(raw_status, int) or str(raw_status).strip().isdigit():
+        status_name = LIVEKIT_EGRESS_STATUS_NAMES.get(int(raw_status), f"EGRESS_STATUS_{raw_status}")
+    else:
+        status_name = str(raw_status).strip().upper()
+    if status_name in LIVEKIT_EGRESS_RUNNING_STATUSES:
+        running = True
+    elif status_name in LIVEKIT_EGRESS_STOPPED_STATUSES:
+        running = False
+    else:
+        running = None
+    return {"running": running, "status": status_name, "error": str(match.get("error") or "").strip()}
 
 
 def build_recording_filepath(*, room_name, session_type):

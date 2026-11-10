@@ -5,6 +5,8 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
+from apps.users.session_policy import release_all_session_slots
+
 from .models import Payment
 
 
@@ -40,6 +42,8 @@ def issue_credentials_for_paid_user(*, user_id):
     user.set_password(password)
     user.active_session_version += 1
     user.save(update_fields=["password", "active_session_version", "updated_at"])
+    # New credentials sign every device out; the user row is already locked.
+    release_all_session_slots(user)
 
     issued_at = timezone.now()
     Payment.objects.filter(user=user, status=Payment.STATUS_PAID).update(

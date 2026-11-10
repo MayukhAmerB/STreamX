@@ -1,10 +1,10 @@
 from config.audit import log_security_event
 from config.client_ip import resolve_client_ip
 from config.response import api_response
+from config.throttling import ClientIpAnonRateThrottle, ClientIpScopedRateThrottle
 from config.turnstile import enforce_turnstile
 from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, status
-from rest_framework.throttling import AnonRateThrottle, ScopedRateThrottle
 from rest_framework.views import APIView
 
 from .india_locations import location_directory
@@ -17,7 +17,7 @@ from .serializers import (
 )
 
 
-class JoinLocationDirectoryThrottle(AnonRateThrottle):
+class JoinLocationDirectoryThrottle(ClientIpAnonRateThrottle):
     scope = "join_location_directory"
     rate = "120/min"
 
@@ -61,7 +61,7 @@ class JoinFormSettingsView(APIView):
 class JoinApplicationCreateView(APIView):
     authentication_classes = []
     permission_classes = (permissions.AllowAny,)
-    throttle_classes = (ScopedRateThrottle,)
+    throttle_classes = (ClientIpScopedRateThrottle,)
     throttle_scope = "join_application"
 
     @extend_schema(

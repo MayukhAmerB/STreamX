@@ -14,7 +14,6 @@ import pyotp
 from rest_framework import permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -22,7 +21,12 @@ from config.audit import log_security_event
 from config.client_ip import resolve_client_ip
 from config.cookies import REFRESH_COOKIE, clear_auth_cookies, set_auth_cookies
 from config.response import api_response
-from config.throttling import LoginRateThrottle, RefreshIpCeilingThrottle, RefreshTokenRateThrottle
+from config.throttling import (
+    ClientIpScopedRateThrottle,
+    LoginRateThrottle,
+    RefreshIpCeilingThrottle,
+    RefreshTokenRateThrottle,
+)
 from config.turnstile import enforce_turnstile, turnstile_public_config
 
 from .async_jobs import async_jobs_enabled, enqueue_email_job
@@ -49,9 +53,12 @@ from .refresh_rotation import (
 )
 from .security import clear_failed_login, get_lockout_state, register_failed_login
 from .session_policy import (
+    SESSION_SLOT_CLAIM,
     SESSION_VERSION_CLAIM,
+    claim_session_slot,
+    enforces_session_limit,
     get_active_session_version,
-    should_enforce_single_session,
+    release_all_session_slots,
 )
 from .terms import TERMS_BODY, TERMS_LAST_UPDATED, TERMS_TITLE, TERMS_VERSION
 
@@ -80,26 +87,24 @@ def _self_service_credentials_enabled():
     return bool(getattr(settings, "ACCOUNT_SELF_SERVICE_CREDENTIALS_ENABLED", False))
 
 
-def _rotate_single_session_version(user):
-    if not should_enforce_single_session(user):
-        return get_active_session_version(user)
-
+def _start_session_slot(user, *, request=None, end_other_sessions=False):
+    """Give this sign-in its own session slot, evicting the LRU one past the cap."""
     with transaction.atomic():
+        # User row first: the lock order refresh rotation and sign-out use.
         locked_user = User.objects.select_for_update().get(pk=user.pk)
-        locked_user.active_session_version = get_active_session_version(locked_user) + 1
-        locked_user.save(update_fields=["active_session_version"])
-        _revoke_all_refresh_tokens_for_user(locked_user)
-        user.active_session_version = locked_user.active_session_version
+        if end_other_sessions:
+            release_all_session_slots(locked_user)
+        slot_id = claim_session_slot(locked_user, request=request)
+    user.active_session_version = locked_user.active_session_version
+    return slot_id
 
-    return get_active_session_version(user)
 
-
-def _issue_tokens_for_user(user, *, rotate_session=False):
-    if rotate_session:
-        _rotate_single_session_version(user)
+def _issue_tokens_for_user(user, *, request=None, end_other_sessions=False):
     refresh = RefreshToken.for_user(user)
-    if should_enforce_single_session(user):
+    if enforces_session_limit(user):
+        slot_id = _start_session_slot(user, request=request, end_other_sessions=end_other_sessions)
         refresh[SESSION_VERSION_CLAIM] = get_active_session_version(user)
+        refresh[SESSION_SLOT_CLAIM] = slot_id
     return str(refresh.access_token), str(refresh)
 
 
@@ -157,8 +162,8 @@ _REFRESH_REJECTION_MESSAGES = {
 }
 
 
-def _auth_success_response(user, message, request=None, *, rotate_session=True):
-    access, refresh = _issue_tokens_for_user(user, rotate_session=rotate_session)
+def _auth_success_response(user, message, request=None, *, end_other_sessions=False):
+    access, refresh = _issue_tokens_for_user(user, request=request, end_other_sessions=end_other_sessions)
     response = api_response(
         success=True,
         message=message,
@@ -169,8 +174,8 @@ def _auth_success_response(user, message, request=None, *, rotate_session=True):
     return _attach_csrf_token(response, request)
 
 
-def _mobile_auth_success_response(user, message, request=None, *, rotate_session=True):
-    access, refresh = _issue_tokens_for_user(user, rotate_session=rotate_session)
+def _mobile_auth_success_response(user, message, request=None):
+    access, refresh = _issue_tokens_for_user(user, request=request)
     return api_response(
         success=True,
         message=message,
@@ -185,7 +190,7 @@ def _mobile_auth_success_response(user, message, request=None, *, rotate_session
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
     parser_classes = [JSONParser]
-    throttle_classes = [LoginRateThrottle, ScopedRateThrottle]
+    throttle_classes = [LoginRateThrottle, ClientIpScopedRateThrottle]
     throttle_scope = "login"
 
     def post(self, request):
@@ -253,7 +258,7 @@ class MobileLoginView(APIView):
 
     permission_classes = [permissions.AllowAny]
     parser_classes = [JSONParser]
-    throttle_classes = [LoginRateThrottle, ScopedRateThrottle]
+    throttle_classes = [LoginRateThrottle, ClientIpScopedRateThrottle]
     throttle_scope = "login"
 
     def post(self, request):
@@ -528,7 +533,7 @@ class CsrfTokenView(APIView):
 class PasswordResetRequestView(APIView):
     permission_classes = [permissions.AllowAny]
     parser_classes = [JSONParser]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIpScopedRateThrottle]
     throttle_scope = "password_reset_request"
 
     def post(self, request):
@@ -612,7 +617,7 @@ class PasswordResetRequestView(APIView):
 class PasswordResetConfirmView(APIView):
     permission_classes = [permissions.AllowAny]
     parser_classes = [JSONParser]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIpScopedRateThrottle]
     throttle_scope = "password_reset_confirm"
 
     def post(self, request):
@@ -653,9 +658,17 @@ class PasswordResetConfirmView(APIView):
                 errors={"detail": "Invalid or expired reset link."},
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
-        user.set_password(data["new_password"])
-        user.save(update_fields=["password"])
-        _revoke_all_refresh_tokens_for_user(user)
+        with transaction.atomic():
+            # User row first: the lock order sign-in, refresh rotation and
+            # sign-out use. A reset signs every device out, like a password
+            # change: slots are released (slot tokens stop authenticating at
+            # once) and the session version moves on (pre-slot tokens too).
+            locked_user = User.objects.select_for_update().get(pk=user.pk)
+            locked_user.set_password(data["new_password"])
+            locked_user.active_session_version = get_active_session_version(locked_user) + 1
+            locked_user.save(update_fields=["password", "active_session_version"])
+            release_all_session_slots(locked_user)
+            _revoke_all_refresh_tokens_for_user(locked_user)
         log_security_event("auth.password_reset_confirm_success", request=request, target_user_id=user.id)
         return api_response(success=True, message="Password has been reset successfully.", data=None)
 
@@ -663,7 +676,7 @@ class PasswordResetConfirmView(APIView):
 class ContactMessageView(APIView):
     permission_classes = [permissions.AllowAny]
     parser_classes = [JSONParser]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIpScopedRateThrottle]
     throttle_scope = "contact"
 
     def post(self, request):
@@ -818,7 +831,12 @@ class ChangePasswordView(APIView):
         request.user.save(update_fields=["password"])
         _revoke_all_refresh_tokens_for_user(request.user)
         log_security_event("auth.password_change_success", request=request)
-        return _auth_success_response(request.user, "Password changed successfully.", request=request)
+        return _auth_success_response(
+            request.user,
+            "Password changed successfully.",
+            request=request,
+            end_other_sessions=True,
+        )
 
 
 class TwoFactorSetupView(APIView):

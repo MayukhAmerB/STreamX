@@ -47,7 +47,9 @@ class CookieJWTAuthentication(JWTAuthentication):
             user = self.get_user(validated_token)
         except InvalidToken:
             return None
-        if not token_matches_active_session(validated_token, user):
+        # A token whose session slot was evicted authenticates nobody; the
+        # client's refresh then gets the "session_replaced" rejection.
+        if not token_matches_active_session(validated_token, user, record_activity=True):
             return None
         if not using_header:
             self.enforce_csrf(request)

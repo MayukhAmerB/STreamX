@@ -7,10 +7,13 @@ from django.utils import timezone
 
 from apps.courses.models import Enrollment
 from apps.realtime.domain import invalidate_course_join_access_cache
+from config.audit import log_security_event
 
 from .batch_pass import activate_batch_pass
+from .entitlements import is_duplicate_guest_purchase
 from .models import Payment, StudentAccountSequence
 from .pricing import get_plan_terms
+from .refunds import apply_pending_refund
 
 
 def _allocate_student_login():
@@ -36,11 +39,13 @@ def _resolve_or_create_user(payment):
 
     User = get_user_model()
     buyer_email = User.objects.normalize_auth_email(payment.buyer_email)
+    # Refunded purchases still identify the buyer's account, so a repurchase
+    # after a refund reuses it instead of minting a second login.
     prior_paid_purchase = (
         Payment.objects.filter(
             buyer_email__iexact=buyer_email,
             course=payment.course,
-            status=Payment.STATUS_PAID,
+            status__in=(Payment.STATUS_PAID, Payment.STATUS_REFUNDED),
             user__isnull=False,
         )
         .exclude(pk=payment.pk)
@@ -72,6 +77,33 @@ def _resolve_or_create_user(payment):
 def provision_paid_payment(payment):
     payment = Payment.objects.select_for_update().get(pk=payment.pk)
     if payment.status != Payment.STATUS_PAID or not payment.course_id:
+        return None
+    if payment.provisioning_status == Payment.PROVISION_DUPLICATE:
+        return None
+    pending_refund = apply_pending_refund(payment)
+    if pending_refund is not None:
+        # The refund webhook for this very payment was handled before its
+        # capture: a full refund ends here, refunded, with no access granted.
+        payment = pending_refund.payment
+        if payment.status != Payment.STATUS_PAID:
+            log_security_event(
+                "payment.refund_before_capture_applied",
+                payment_id=payment.pk,
+                course_id=payment.course_id,
+                amount_refunded=str(payment.amount_refunded),
+            )
+            return None
+    if is_duplicate_guest_purchase(payment):
+        # Never grant (or mint a second login for) what this email already
+        # owns; the admin refunds the payment.
+        payment.provisioning_status = Payment.PROVISION_DUPLICATE
+        payment.save(update_fields=["provisioning_status", "updated_at"])
+        log_security_event(
+            "payment.duplicate_guest_purchase_refund_due",
+            payment_id=payment.pk,
+            course_id=payment.course_id,
+            plan=payment.plan,
+        )
         return None
 
     user = _resolve_or_create_user(payment)

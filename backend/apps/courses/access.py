@@ -119,3 +119,29 @@ def build_live_class_access_maps(*, live_classes, user):
             statuses[item.id] = legacy_status
             sources[item.id] = "legacy_live_class"
     return statuses, sources
+
+
+def lecture_access_context(lecture, user):
+    """Single source of truth for who may see/play a lecture."""
+    course = lecture.section.course
+    is_authenticated = bool(user and getattr(user, "is_authenticated", False))
+    is_instructor_owner = bool(
+        is_authenticated and user.role == "instructor" and getattr(user, "id", None) == course.instructor_id
+    )
+    is_enrolled = bool(is_authenticated and user_has_course_access(user, course.id))
+    is_staff = bool(is_authenticated and (user.is_staff or user.is_superuser))
+    # Unpublished lectures (class recordings still transcoding) stay invisible
+    # to students; the owning instructor and staff can still preview them.
+    is_visible = bool(lecture.is_published) or is_instructor_owner or is_staff
+    can_access = is_visible and (
+        bool(lecture.is_preview and is_authenticated) or is_instructor_owner or is_enrolled
+    )
+    return {
+        "course": course,
+        "is_authenticated": is_authenticated,
+        "is_instructor_owner": is_instructor_owner,
+        "is_staff": is_staff,
+        "is_enrolled": is_enrolled,
+        "is_visible": is_visible,
+        "can_access": can_access,
+    }

@@ -1,6 +1,7 @@
 import logging
 import mimetypes
 import time
+import uuid
 import json
 import hashlib
 from datetime import timedelta
@@ -11,7 +12,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core import signing
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.http import FileResponse, HttpResponse
 from django.http.response import HttpResponseRedirect
@@ -20,8 +21,8 @@ from django.utils.html import strip_tags
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.authentication import SessionAuthentication
-from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 
 from config.audit import log_security_event
@@ -35,6 +36,7 @@ from config.metrics import (
 from config.pagination import apply_optional_pagination
 from config.request_security import find_disallowed_query_params
 from config.response import api_response
+from config.throttling import ClientIpScopedRateThrottle
 
 from .domain import (
     build_permission_set,
@@ -44,6 +46,7 @@ from .domain import (
     session_payload_for_create,
 )
 from .models import OwncastChatIdentity, RealtimeConfiguration, RealtimeSession, RealtimeSessionRecording
+from .policies.transitions import InvalidRealtimeTransition, ensure_stream_transition
 from .serializers import (
     RealtimeOwncastChatModerationActionSerializer,
     RealtimeBroadcastPlaybackIssueSerializer,
@@ -54,8 +57,12 @@ from .serializers import (
     RealtimeSessionListSerializer,
     RealtimeSessionRecordingSerializer,
     RealtimePresenterPermissionSerializer,
+    StreamHeartbeatResponseSerializer,
+    StreamHeartbeatSerializer,
 )
 from .schedule import get_live_class_schedule_snapshot
+from .recording import services as class_recording_services
+from .recording.serializers import SessionModuleUpdateSerializer
 from .services import (
     apply_live_presenter_permission_update,
     apply_live_speaker_permission_update,
@@ -76,6 +83,7 @@ from .services import (
     fetch_owncast_disabled_chat_users,
     fetch_owncast_ip_bans,
     fetch_owncast_moderator_chat_users,
+    get_broadcast_egress_status,
     get_room_participant_count,
     is_livekit_configured,
     owncast_ban_ip_address,
@@ -585,9 +593,31 @@ def _rotate_obs_stream_key_if_enabled(*, session, force=False):
     return {"rotated": True, "error": ""}
 
 
+def _start_class_recording_non_blocking(*, session, request):
+    """Recording must never block or fail the live stream itself."""
+    try:
+        class_recording_services.ensure_server_recording(session, user=request.user, request=request)
+    except Exception:
+        realtime_ops_logger.exception("Class recording start failed. session_id=%s", session.id)
+
+
+def _finalize_class_recording_non_blocking(*, session, request, reason):
+    try:
+        class_recording_services.request_finalize(session, reason=reason, request=request)
+    except Exception:
+        realtime_ops_logger.exception("Class recording finalize request failed. session_id=%s", session.id)
+
+
+def _publish_egress_recording_non_blocking(*, recording, request):
+    try:
+        class_recording_services.enqueue_egress_publish(recording, request=request)
+    except Exception:
+        realtime_ops_logger.exception("Egress class recording publish failed. recording_id=%s", recording.id)
+
+
 class RealtimeSessionListCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIpScopedRateThrottle]
     throttle_scope = "realtime_session_create"
 
     def get_throttles(self):
@@ -769,10 +799,53 @@ class RealtimeSessionDetailView(APIView):
         data = RealtimeSessionListSerializer(session, context={"request": request}).data
         return api_response(success=True, message="Realtime session fetched.", data=data)
 
+    @extend_schema(
+        operation_id="realtime_sessions_partial_update_by_id",
+        request=SessionModuleUpdateSerializer,
+        responses={200: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT, 403: OpenApiTypes.OBJECT},
+        description="Update the session's target module (the module that receives its class recording).",
+    )
+    def patch(self, request, pk):
+        session = get_object_or_404(RealtimeSession.objects.with_related(), pk=pk)
+        if not _can_manage_session(request.user, session):
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "Only host, assigned instructor, or admin can update this session."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = SessionModuleUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return api_response(
+                success=False,
+                message="Realtime session update failed.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        session.target_module = serializer.validated_data["target_module"]
+        try:
+            session.validate_target_module()
+        except DjangoValidationError as exc:
+            return api_response(
+                success=False,
+                message="Realtime session update failed.",
+                errors={"target_module_id": exc.message_dict.get("target_module", exc.messages)},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        session.save(update_fields=["target_module", "updated_at"])
+        log_security_event(
+            "realtime.session_target_module_updated",
+            request=request,
+            session_id=session.id,
+            target_module_id=session.target_module_id,
+        )
+        data = RealtimeSessionListSerializer(session, context={"request": request}).data
+        return api_response(success=True, message="Realtime session updated.", data=data)
+
 
 class RealtimeSessionJoinView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIpScopedRateThrottle]
     throttle_scope = "realtime_session_join"
 
     def post(self, request, pk):
@@ -832,7 +905,9 @@ class RealtimeSessionJoinView(APIView):
                 errors={"detail": f"Your class schedule is {schedule_snapshot['label']}."},
                 status_code=status.HTTP_403_FORBIDDEN,
             )
-        refresh_obs_session_stream_health(session, force_refresh=True)
+        # Cached, single-flight Owncast status: a whole class joining at once
+        # must cost one Owncast call, not one blocked worker per student.
+        refresh_obs_session_stream_health(session)
         if (
             not is_session_manager
             and session.session_type == RealtimeSession.TYPE_BROADCASTING
@@ -1055,7 +1130,7 @@ class RealtimeSessionConnectionEventView(APIView):
     """Accept bounded client connection diagnostics for authorized attendees."""
 
     permission_classes = [permissions.IsAuthenticated]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIpScopedRateThrottle]
     throttle_scope = "realtime_connection_telemetry"
 
     @extend_schema(request=RealtimeConnectionEventSerializer, responses={204: None})
@@ -1998,6 +2073,7 @@ class RealtimeSessionEndView(APIView):
 
         if session.status != RealtimeSession.STATUS_ENDED:
             session.mark_ended()
+        _finalize_class_recording_non_blocking(session=session, request=request, reason="session_ended")
 
         if (
             session.stream_service == RealtimeSession.STREAM_SERVICE_OBS
@@ -2230,6 +2306,185 @@ class RealtimeSessionHostTokenView(APIView):
         )
 
 
+def _host_egress_lock_key(session_id):
+    return f"realtime:host-egress:{session_id}:lock"
+
+
+def _host_egress_check_cache_key(session_id):
+    return f"realtime:host-egress:{session_id}:last-check"
+
+
+def _host_egress_restart_count_cache_key(session_id):
+    return f"realtime:host-egress:{session_id}:auto-restarts"
+
+
+def _check_host_broadcast_egress(session):
+    """LiveKit's view of the session's broadcast egress (never raises)."""
+    if not str(session.livekit_egress_id or "").strip():
+        return {"running": False, "status": "EGRESS_MISSING", "error": ""}
+    try:
+        return get_broadcast_egress_status(egress_id=session.livekit_egress_id)
+    except (LiveKitConfigError, LiveKitEgressError) as exc:
+        return {"running": None, "status": "EGRESS_UNVERIFIED", "error": str(exc)[:500]}
+
+
+EGRESS_RESTART_STARTED = "started"
+EGRESS_RESTART_BUSY = "busy"
+EGRESS_RESTART_SUPERSEDED = "superseded"
+EGRESS_RESTART_FAILED = "failed"
+
+
+def _host_egress_state_matches(session_id, *, expected_stream_status, expected_egress_id):
+    """Re-read the session under a row lock: is it still in the state the caller judged?
+
+    The row lock is held only for this read (no network I/O inside it), so it
+    orders this check against a concurrent Stop/End/restart write.
+    """
+    with transaction.atomic():
+        row = (
+            RealtimeSession.objects.select_for_update()
+            .filter(pk=session_id)
+            .values("status", "stream_status", "livekit_egress_id")
+            .first()
+        )
+    if not row:
+        return False
+    return (
+        row["status"] != RealtimeSession.STATUS_ENDED
+        and row["stream_status"] == expected_stream_status
+        and (row["livekit_egress_id"] or "") == expected_egress_id
+    )
+
+
+def _host_egress_compare_and_set(session_id, *, expected_stream_status, expected_egress_id, exclude_ended, **values):
+    """Atomically update the session only if it is still in the expected stream state."""
+    queryset = RealtimeSession.objects.filter(
+        pk=session_id,
+        stream_status=expected_stream_status,
+        livekit_egress_id=expected_egress_id,
+    )
+    if exclude_ended:
+        queryset = queryset.exclude(status=RealtimeSession.STATUS_ENDED)
+    return queryset.update(updated_at=timezone.now(), **values) == 1
+
+
+def _mark_host_stream_failed_if_current(session, *, expected_egress_id, message):
+    """Mark a live Host Studio stream failed unless Stop/End/a restart moved it meanwhile."""
+    updated = _host_egress_compare_and_set(
+        session.id,
+        expected_stream_status=RealtimeSession.STREAM_LIVE,
+        expected_egress_id=expected_egress_id,
+        exclude_ended=False,
+        stream_status=RealtimeSession.STREAM_FAILED,
+        livekit_egress_error=str(message or "")[:1000],
+    )
+    session.refresh_from_db()
+    return updated
+
+
+def _stop_orphan_host_egress(*, session_id, egress_id, reason):
+    try:
+        stop_room_broadcast_egress(egress_id=egress_id)
+    except (LiveKitConfigError, LiveKitEgressError) as exc:
+        realtime_ops_logger.error(
+            "Could not stop superseded host broadcast egress. session_id=%s egress_id=%s reason=%s error=%s",
+            session_id,
+            egress_id,
+            reason,
+            exc,
+        )
+        return
+    realtime_ops_logger.warning(
+        "Stopped superseded host broadcast egress. session_id=%s egress_id=%s reason=%s",
+        session_id,
+        egress_id,
+        reason,
+    )
+
+
+def _restart_host_broadcast_egress(*, session, request, rtmp_target_url, expected_stream_status):
+    """Replace the session's broadcast egress with a new one (single-flight, compare-and-set).
+
+    ``session`` is the caller's (possibly stale) snapshot: its ``livekit_egress_id``
+    is the egress the caller judged dead and ``expected_stream_status`` the stream
+    state it saw. The replacement only goes ahead -- and is only recorded -- while
+    the database still shows exactly that state, so a Stop/End or another
+    restarter that won the race is never overridden:
+
+    * before touching LiveKit the session is re-read under a row lock (released
+      before any network call) and the restart is abandoned if it moved;
+    * the new egress is recorded with a conditional UPDATE on the same state; if
+      that matches nothing (stopped, ended or replaced while LiveKit was starting
+      it) the new egress is stopped again so nothing double-publishes to Owncast.
+
+    Returns ``(outcome, error)`` with outcome one of ``EGRESS_RESTART_*``.
+    """
+    expected_egress_id = session.livekit_egress_id or ""
+    lock_key = _host_egress_lock_key(session.id)
+    lock_timeout = int(getattr(settings, "LIVEKIT_EGRESS_TWIRP_TIMEOUT_SECONDS", 60) or 60) * 2 + 10
+    lock_token = uuid.uuid4().hex
+    if not cache.add(lock_key, lock_token, timeout=lock_timeout):
+        return EGRESS_RESTART_BUSY, ""
+    try:
+        if not _host_egress_state_matches(
+            session.id,
+            expected_stream_status=expected_stream_status,
+            expected_egress_id=expected_egress_id,
+        ):
+            realtime_ops_logger.info(
+                "Host broadcast egress restart abandoned; the stream changed meanwhile. session_id=%s egress_id=%s",
+                session.id,
+                expected_egress_id or "-",
+            )
+            return EGRESS_RESTART_SUPERSEDED, ""
+        if expected_egress_id.strip():
+            try:
+                stop_room_broadcast_egress(egress_id=expected_egress_id.strip())
+            except (LiveKitConfigError, LiveKitEgressError):
+                pass  # Already ended; LiveKit refuses to stop a finished egress.
+        try:
+            egress_id = start_room_broadcast_egress(
+                room_name=session.livekit_room_name or session.room_name,
+                rtmp_target_url=rtmp_target_url,
+                participant_identity=build_host_publisher_identity(request.user.id, session.id),
+                session_id=session.id,
+            )
+        except (LiveKitConfigError, LiveKitEgressError) as exc:
+            _host_egress_compare_and_set(
+                session.id,
+                expected_stream_status=expected_stream_status,
+                expected_egress_id=expected_egress_id,
+                exclude_ended=False,
+                stream_status=RealtimeSession.STREAM_FAILED,
+                livekit_egress_error=str(exc)[:1000],
+            )
+            return EGRESS_RESTART_FAILED, str(exc) or "LiveKit egress could not be started."
+        claimed = _host_egress_compare_and_set(
+            session.id,
+            expected_stream_status=expected_stream_status,
+            expected_egress_id=expected_egress_id,
+            exclude_ended=True,
+            stream_status=RealtimeSession.STREAM_LIVE,
+            livekit_egress_id=egress_id or "",
+            livekit_egress_error="",
+        )
+        if not claimed:
+            # Stopped, ended or restarted elsewhere while LiveKit started this one.
+            _stop_orphan_host_egress(session_id=session.id, egress_id=egress_id, reason="state_changed_during_start")
+            return EGRESS_RESTART_SUPERSEDED, ""
+        cache.delete(_host_egress_check_cache_key(session.id))
+        realtime_ops_logger.info(
+            "Host broadcast egress started. session_id=%s egress_id=%s replaced=%s",
+            session.id,
+            egress_id,
+            expected_egress_id or "-",
+        )
+        return EGRESS_RESTART_STARTED, ""
+    finally:
+        if cache.get(lock_key) == lock_token:
+            cache.delete(lock_key)
+
+
 class RealtimeSessionStreamStartView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -2241,6 +2496,13 @@ class RealtimeSessionStreamStartView(APIView):
                 message="Access denied.",
                 errors={"detail": "Only host, assigned instructor, or admin can start streaming."},
                 status_code=status.HTTP_403_FORBIDDEN,
+            )
+        if session.status == RealtimeSession.STATUS_ENDED:
+            return api_response(
+                success=False,
+                message="Session has ended.",
+                errors={"detail": "This session has ended. Create a new broadcast to go live again."},
+                status_code=status.HTTP_409_CONFLICT,
             )
 
         rtmp_target_url = session.resolve_stream_target_url()
@@ -2257,81 +2519,315 @@ class RealtimeSessionStreamStartView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        if (
-            session.stream_service != RealtimeSession.STREAM_SERVICE_OBS
-            and session.stream_status == RealtimeSession.STREAM_LIVE
-            and session.livekit_egress_id
-        ):
-            return api_response(
-                success=True,
-                message="Stream already live.",
-                data=RealtimeSessionListSerializer(session, context={"request": request}).data,
-            )
-
-        was_obs_marked_live = (
-            session.stream_service == RealtimeSession.STREAM_SERVICE_OBS
-            and session.stream_status == RealtimeSession.STREAM_LIVE
-        )
-        session.mark_stream_starting()
-        if session.stream_service == RealtimeSession.STREAM_SERVICE_OBS:
-            stream_key = str(session.default_obs_stream_key() or "").strip()
-            if not stream_key:
-                session.mark_stream_failed("Fixed OBS stream key is not configured.")
-                return api_response(
-                    success=False,
-                    message="Unable to prepare OBS stream key.",
-                    errors={"detail": "Fixed OBS stream key is not configured."},
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                )
-            session.obs_stream_key = stream_key
-            session.save(update_fields=["obs_stream_key", "updated_at"])
-            try:
-                sync_owncast_stream_key(stream_key)
-            except (OwncastConfigError, OwncastAdminError) as exc:
-                session.mark_stream_failed(str(exc))
-                return api_response(
-                    success=False,
-                    message="Unable to prepare OBS stream key.",
-                    errors={"detail": str(exc)},
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                )
-            refresh_obs_session_stream_health(session, force_refresh=True)
-            session.livekit_egress_error = ""
-            session.save(update_fields=["livekit_egress_error", "updated_at"])
-            _sync_owncast_chat_settings_non_blocking(session=session)
-            data = RealtimeSessionListSerializer(session, context={"request": request}).data
-            message = "OBS stream prepared. Start streaming from OBS now."
-            if was_obs_marked_live:
-                message = (
-                    "OBS stream re-prepared. If OBS showed a disconnect warning, "
-                    "resume publishing with the same server URL and key now."
-                )
-            return api_response(success=True, message=message, data=data)
-
         try:
-            participant_identity = (
-                build_host_publisher_identity(session.host_id, session.id)
-                if request.user.id == session.host_id
-                else ""
-            )
-            egress_id = start_room_broadcast_egress(
-                room_name=session.livekit_room_name or session.room_name,
-                rtmp_target_url=rtmp_target_url,
-                participant_identity=participant_identity,
-            )
-            session.mark_stream_live(egress_id)
-            _sync_owncast_chat_settings_non_blocking(session=session)
-        except (LiveKitConfigError, LiveKitEgressError) as exc:
-            session.mark_stream_failed(str(exc))
+            if session.stream_service == RealtimeSession.STREAM_SERVICE_OBS:
+                return self._prepare_obs_stream(request, session)
+            return self._start_host_studio_stream(request, session, rtmp_target_url)
+        except InvalidRealtimeTransition as exc:
+            # A concurrent start/stop moved the session underneath this request.
             return api_response(
                 success=False,
-                message="Unable to start live stream.",
+                message="Stream state changed. Refresh and try again.",
+                errors={"detail": " ".join(exc.messages)},
+                status_code=status.HTTP_409_CONFLICT,
+            )
+
+    def _prepare_obs_stream(self, request, session):
+        was_obs_marked_live = session.stream_status == RealtimeSession.STREAM_LIVE
+        if was_obs_marked_live:
+            health = refresh_obs_session_stream_health(session, force_refresh=True)
+            if session.stream_status == RealtimeSession.STREAM_LIVE and health.get("online") is True:
+                # Idempotent: OBS is publishing right now. Re-syncing the key or
+                # touching the recording would only put the live feed at risk.
+                return api_response(
+                    success=True,
+                    message="OBS is already live. Nothing to re-prepare.",
+                    data=RealtimeSessionListSerializer(session, context={"request": request}).data,
+                )
+
+        stream_key = str(session.default_obs_stream_key() or "").strip()
+        if not stream_key:
+            if session.stream_status != RealtimeSession.STREAM_LIVE:
+                session.mark_stream_failed("Fixed OBS stream key is not configured.")
+            return api_response(
+                success=False,
+                message="Unable to prepare OBS stream key.",
+                errors={"detail": "Fixed OBS stream key is not configured."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        # While Owncast's offline grace still reports the session live, students
+        # stay connected: re-preparing keeps it live instead of regressing it to
+        # "starting" (live -> starting is not a valid transition).
+        if session.stream_status != RealtimeSession.STREAM_LIVE:
+            session.mark_stream_starting()
+        session.obs_stream_key = stream_key
+        session.save(update_fields=["obs_stream_key", "updated_at"])
+        try:
+            sync_owncast_stream_key(stream_key)
+        except (OwncastConfigError, OwncastAdminError) as exc:
+            if session.stream_status == RealtimeSession.STREAM_LIVE:
+                session.livekit_egress_error = str(exc)[:1000]
+                session.save(update_fields=["livekit_egress_error", "updated_at"])
+            else:
+                session.mark_stream_failed(str(exc))
+            return api_response(
+                success=False,
+                message="Unable to prepare OBS stream key.",
                 errors={"detail": str(exc)},
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
+        refresh_obs_session_stream_health(session, force_refresh=True)
+        session.livekit_egress_error = ""
+        session.save(update_fields=["livekit_egress_error", "updated_at"])
+        _sync_owncast_chat_settings_non_blocking(session=session)
+        _start_class_recording_non_blocking(session=session, request=request)
+        data = RealtimeSessionListSerializer(session, context={"request": request}).data
+        message = "OBS stream prepared. Start streaming from OBS now."
+        if was_obs_marked_live:
+            message = (
+                "OBS stream re-prepared. If OBS showed a disconnect warning, "
+                "resume publishing with the same server URL and key now."
+            )
+        return api_response(success=True, message=message, data=data)
 
+    def _start_host_studio_stream(self, request, session, rtmp_target_url):
+        if session.stream_status == RealtimeSession.STREAM_LIVE:
+            egress = _check_host_broadcast_egress(session)
+            if egress["running"] is not False:
+                message = "Stream already live."
+                if egress["running"] is None:
+                    message = (
+                        "Stream is marked live, but LiveKit did not confirm the delivery status. "
+                        "Try again in a moment if viewers report a frozen stream."
+                    )
+                    realtime_ops_logger.warning(
+                        "Host broadcast egress status unverified. session_id=%s egress_id=%s status=%s error=%s",
+                        session.id,
+                        session.livekit_egress_id,
+                        egress["status"],
+                        egress["error"],
+                    )
+                return api_response(
+                    success=True,
+                    message=message,
+                    data=RealtimeSessionListSerializer(session, context={"request": request}).data,
+                )
+            realtime_ops_logger.warning(
+                "Host broadcast egress found dead on Start Live; restarting. "
+                "session_id=%s egress_id=%s status=%s error=%s",
+                session.id,
+                session.livekit_egress_id,
+                egress["status"],
+                egress["error"],
+            )
+            expected_stream_status = RealtimeSession.STREAM_LIVE
+        else:
+            ensure_stream_transition(session.stream_status, RealtimeSession.STREAM_STARTING)
+            # Conditional: a double-clicked Start that already went live (or a
+            # Stop/End in between) must not be dragged back to "starting".
+            if not _host_egress_compare_and_set(
+                session.id,
+                expected_stream_status=session.stream_status,
+                expected_egress_id=session.livekit_egress_id or "",
+                exclude_ended=True,
+                stream_status=RealtimeSession.STREAM_STARTING,
+                livekit_egress_error="",
+            ):
+                raise InvalidRealtimeTransition({"stream_status": "The stream state changed while starting."})
+            session.refresh_from_db()
+            expected_stream_status = RealtimeSession.STREAM_STARTING
+
+        outcome, error = _restart_host_broadcast_egress(
+            session=session,
+            request=request,
+            rtmp_target_url=rtmp_target_url,
+            expected_stream_status=expected_stream_status,
+        )
+        session.refresh_from_db()
+        if outcome == EGRESS_RESTART_FAILED:
+            return api_response(
+                success=False,
+                message="Unable to start live stream.",
+                errors={"detail": error},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        if outcome == EGRESS_RESTART_SUPERSEDED:
+            return api_response(
+                success=False,
+                message="Stream state changed. Refresh and try again.",
+                errors={"detail": "The stream was stopped, ended or restarted while this request was starting it."},
+                status_code=status.HTTP_409_CONFLICT,
+            )
+        if outcome != EGRESS_RESTART_STARTED:
+            return api_response(
+                success=False,
+                message="Live stream is already starting.",
+                errors={"detail": "Another request is starting this stream. Wait a few seconds and check again."},
+                status_code=status.HTTP_409_CONFLICT,
+            )
+        # A manual (re)start clears the automatic-restart budget.
+        cache.delete(_host_egress_restart_count_cache_key(session.id))
+        _sync_owncast_chat_settings_non_blocking(session=session)
         data = RealtimeSessionListSerializer(session, context={"request": request}).data
         return api_response(success=True, message="Live stream started.", data=data)
+
+
+class RealtimeSessionStreamHeartbeatView(APIView):
+    """Host Studio heartbeat: verifies the LiveKit egress and revives a dead one.
+
+    LiveKit egress can end on its own (publisher dropped, encoder error,
+    limit reached). With no egress webhook configured, the host's open studio
+    polls this, so a dead egress is noticed within seconds and restarted while
+    the host is still publishing.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        operation_id="realtime_session_stream_heartbeat",
+        request=StreamHeartbeatSerializer,
+        responses={
+            200: StreamHeartbeatResponseSerializer,
+            400: StreamHeartbeatResponseSerializer,
+            403: StreamHeartbeatResponseSerializer,
+        },
+        description=(
+            "Host Studio heartbeat. For live browser (LiveKit) broadcasts, checks the egress with LiveKit "
+            "(at most every REALTIME_HOST_EGRESS_CHECK_INTERVAL_SECONDS) and restarts a dead egress when "
+            "the caller reports it is still publishing; otherwise marks the stream failed."
+        ),
+    )
+    def post(self, request, pk):
+        session = get_object_or_404(RealtimeSession, pk=pk)
+        if not _can_manage_session(request.user, session):
+            return api_response(
+                success=False,
+                message="Access denied.",
+                errors={"detail": "Only host, assigned instructor, or admin can send stream heartbeats."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = StreamHeartbeatSerializer(data=request.data)
+        if not serializer.is_valid():
+            return api_response(
+                success=False,
+                message="Invalid heartbeat.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        publishing = bool(serializer.validated_data.get("publishing", False))
+
+        def respond(*, egress=None, restarted=False, message="Stream heartbeat recorded."):
+            return api_response(
+                success=True,
+                message=message,
+                data={
+                    "session": RealtimeSessionListSerializer(session, context={"request": request}).data,
+                    "egress": egress,
+                    "restarted": restarted,
+                },
+            )
+
+        if session.stream_service == RealtimeSession.STREAM_SERVICE_OBS:
+            refresh_obs_session_stream_health(session)
+            return respond()
+        if (
+            session.status == RealtimeSession.STATUS_ENDED
+            or session.stream_status != RealtimeSession.STREAM_LIVE
+        ):
+            return respond()
+
+        check_interval = max(0, int(getattr(settings, "REALTIME_HOST_EGRESS_CHECK_INTERVAL_SECONDS", 10) or 0))
+        check_cache_key = _host_egress_check_cache_key(session.id)
+        cached = cache.get(check_cache_key) if check_interval > 0 else None
+        if isinstance(cached, dict) and cached.get("egress_id") == session.livekit_egress_id:
+            return respond(egress=cached.get("egress"))
+
+        egress = _check_host_broadcast_egress(session)
+        if egress["running"] is not False:
+            if check_interval > 0:
+                cache.set(
+                    check_cache_key,
+                    {"egress_id": session.livekit_egress_id, "egress": egress},
+                    timeout=check_interval,
+                )
+            return respond(egress=egress)
+
+        dead_egress_id = session.livekit_egress_id or ""
+        dead_detail = egress["error"] or f"LiveKit egress status {egress['status']}"
+        realtime_ops_logger.warning(
+            "Host broadcast egress is not running. session_id=%s egress_id=%s status=%s error=%s publishing=%s",
+            session.id,
+            dead_egress_id,
+            egress["status"],
+            egress["error"],
+            publishing,
+        )
+        # The LiveKit check above can take seconds: the host may have pressed
+        # Stop, ended the class, or another tab may have restarted the egress
+        # meanwhile. Act only on the state that was judged.
+        if not _host_egress_state_matches(
+            session.id,
+            expected_stream_status=RealtimeSession.STREAM_LIVE,
+            expected_egress_id=dead_egress_id,
+        ):
+            session.refresh_from_db()
+            return respond(message="Stream state changed; nothing to restart.")
+        if not publishing:
+            _mark_host_stream_failed_if_current(
+                session,
+                expected_egress_id=dead_egress_id,
+                message=(
+                    f"Live delivery stopped ({dead_detail}). Reconnect your camera or screen and press Start Live."
+                ),
+            )
+            return respond(egress=egress, message="Live delivery stopped.")
+
+        restart_window_seconds = 600
+        max_restarts = max(0, int(getattr(settings, "REALTIME_HOST_EGRESS_MAX_AUTO_RESTARTS", 5) or 0))
+        restart_count_key = _host_egress_restart_count_cache_key(session.id)
+        cache.add(restart_count_key, 0, timeout=restart_window_seconds)
+        restart_count = int(cache.get(restart_count_key) or 0)
+        if restart_count >= max_restarts:
+            _mark_host_stream_failed_if_current(
+                session,
+                expected_egress_id=dead_egress_id,
+                message=(
+                    f"Live delivery stopped repeatedly ({dead_detail}). "
+                    "Check the host connection, then press Start Live."
+                ),
+            )
+            return respond(egress=egress, message="Live delivery stopped repeatedly; automatic restart paused.")
+        try:
+            cache.incr(restart_count_key)
+        except ValueError:
+            cache.set(restart_count_key, restart_count + 1, timeout=restart_window_seconds)
+
+        rtmp_target_url = session.resolve_stream_target_url()
+        if not rtmp_target_url:
+            _mark_host_stream_failed_if_current(
+                session,
+                expected_egress_id=dead_egress_id,
+                message="Streaming target unavailable. Set OWNCAST_RTMP_TARGET.",
+            )
+            return respond(egress=egress, message="Streaming target unavailable.")
+        outcome, _error = _restart_host_broadcast_egress(
+            session=session,
+            request=request,
+            rtmp_target_url=rtmp_target_url,
+            expected_stream_status=RealtimeSession.STREAM_LIVE,
+        )
+        session.refresh_from_db()
+        if outcome == EGRESS_RESTART_STARTED:
+            return respond(
+                egress={"running": True, "status": "EGRESS_STARTING", "error": ""},
+                restarted=True,
+                message="Live delivery restarted.",
+            )
+        if outcome == EGRESS_RESTART_FAILED:
+            return respond(egress=egress, message="Live delivery could not be restarted.")
+        if outcome == EGRESS_RESTART_SUPERSEDED:
+            return respond(message="Stream state changed; nothing to restart.")
+        return respond(egress=egress, message="Live delivery restart already in progress.")
 
 
 class RealtimeSessionStreamStopView(APIView):
@@ -2349,6 +2845,7 @@ class RealtimeSessionStreamStopView(APIView):
 
         if session.stream_service == RealtimeSession.STREAM_SERVICE_OBS:
             session.mark_stream_stopped()
+            _finalize_class_recording_non_blocking(session=session, request=request, reason="stream_stopped")
             rotation_result = _rotate_obs_stream_key_if_enabled(session=session)
             if rotation_result["error"]:
                 session.livekit_egress_error = str(rotation_result["error"])[:1000]
@@ -2363,11 +2860,28 @@ class RealtimeSessionStreamStopView(APIView):
             data = RealtimeSessionListSerializer(session, context={"request": request}).data
             return api_response(success=True, message="Live stream stopped.", data=data)
 
-        try:
-            stop_room_broadcast_egress(egress_id=session.livekit_egress_id)
+        # Record the stop first, under the row lock, and stop the egress the
+        # database holds at that moment. A heartbeat/Start Live restart that is
+        # in flight then fails its compare-and-set and stops its own new egress;
+        # one that already finished is the egress read (and stopped) here.
+        with transaction.atomic():
+            session = RealtimeSession.objects.select_for_update().get(pk=session.pk)
+            egress_id = session.livekit_egress_id or ""
             session.mark_stream_stopped()
+        cache.delete(_host_egress_check_cache_key(session.id))
+        try:
+            stop_room_broadcast_egress(egress_id=egress_id.strip())
         except (LiveKitConfigError, LiveKitEgressError) as exc:
-            session.mark_stream_failed(str(exc))
+            # Keep the egress id so a retried Stop can reach it again.
+            _host_egress_compare_and_set(
+                session.id,
+                expected_stream_status=RealtimeSession.STREAM_STOPPED,
+                expected_egress_id="",
+                exclude_ended=False,
+                stream_status=RealtimeSession.STREAM_FAILED,
+                livekit_egress_id=egress_id,
+                livekit_egress_error=str(exc)[:1000],
+            )
             return api_response(
                 success=False,
                 message="Unable to stop live stream cleanly.",
@@ -2648,6 +3162,7 @@ class RealtimeSessionRecordingStopView(APIView):
                 file_url=resolved_output.get("download_url", ""),
                 payload={"stop_response": stop_payload},
             )
+            _publish_egress_recording_non_blocking(recording=recording, request=request)
         except (LiveKitConfigError, LiveKitEgressError) as exc:
             recording.mark_failed(str(exc), payload={"stop_error": str(exc)})
             _record_recording_metric(action="stop", result="failure", reason="livekit_error")

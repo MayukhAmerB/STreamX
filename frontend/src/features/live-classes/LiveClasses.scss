@@ -1,0 +1,564 @@
+// Student live pages (/join-live, /courses/:id/live). Token-only imports:
+// emits no Carbon component CSS. Everything is scoped under `.cds-app`.
+// The pages are "flush" in the shell (navConfig CARBON_FLUSH_PATHS) so the
+// live video can run edge to edge on phones; .lc-page restores the usual
+// page padding everywhere else.
+@use '../app-shell/styles/tokens' as *;
+
+$tap-target: 2.75rem; // 44px
+
+@mixin line-clamp($lines) {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: $lines;
+}
+
+// ---------------------------------------------------------------------------
+// Page frame
+// ---------------------------------------------------------------------------
+.cds-app .lc-page {
+  --lc-gutter: #{$spacing-05};
+
+  max-inline-size: 82rem;
+  margin-inline: auto;
+  padding: $spacing-07 var(--lc-gutter) $spacing-09;
+
+  @include breakpoint(md) {
+    --lc-gutter: #{$spacing-07};
+
+    padding-block: $spacing-08 $spacing-10;
+  }
+
+  @include breakpoint(lg) {
+    --lc-gutter: #{$spacing-09};
+
+    padding-block: $spacing-09 $spacing-10;
+  }
+}
+
+// Watching: wider canvas for video + chat.
+.cds-app .lc-page--watching {
+  max-inline-size: 120rem;
+
+  @include breakpoint(md) {
+    padding-block-start: $spacing-06;
+  }
+}
+
+// Phones: the video sits right under the app header, edge to edge.
+@include breakpoint-down(md) {
+  .cds-app .lc-page--watching {
+    padding-block-start: 0;
+  }
+
+  .cds-app .lc-theater {
+    --bvt-gutter: var(--lc-gutter);
+
+    margin-inline: calc(-1 * var(--lc-gutter));
+  }
+}
+
+// Phones held sideways (video paused, so not fullscreen yet): same edge to
+// edge video, fitted between the header and the tab bar by the theater.
+@media (orientation: landscape) and (max-height: 540px) {
+  .cds-app .lc-page--watching {
+    padding-block-start: 0;
+  }
+
+  .cds-app .lc-theater {
+    --bvt-gutter: var(--lc-gutter);
+
+    margin-inline: calc(-1 * var(--lc-gutter));
+  }
+}
+
+.cds-app .lc-visually-hidden {
+  position: absolute;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  margin: -1px;
+  block-size: 1px;
+  clip: rect(0 0 0 0);
+  inline-size: 1px;
+  white-space: nowrap;
+}
+
+// Carbon buttons reach 44px on touch screens.
+@media (pointer: coarse) {
+  .cds-app .lc-page .cds--btn {
+    min-block-size: $tap-target;
+  }
+}
+
+.cds-app .lc-page .cds-page-notification,
+.cds-app .lc-page .cds-page-notification-group {
+  margin-block-end: $spacing-05;
+}
+
+// ---------------------------------------------------------------------------
+// Live dot + tags
+// ---------------------------------------------------------------------------
+.cds-app .lc-live-dot {
+  display: inline-block;
+  flex: none;
+  border-radius: 50%;
+  margin-inline-end: $spacing-02;
+  animation: lc-live-pulse 2s ease-in-out infinite;
+  background-color: currentColor;
+  block-size: 0.5rem;
+  inline-size: 0.5rem;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes lc-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.cds-app .lc-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-02;
+
+  .cds--tag {
+    margin: 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// "Live now" card: the one big Join button
+// ---------------------------------------------------------------------------
+.cds-app .lc-hero {
+  margin-block-end: $spacing-07;
+}
+
+.cds-app .lc-live-card {
+  display: flex;
+  flex-direction: column;
+  padding: $spacing-06 $spacing-05;
+  box-shadow: inset 0.25rem 0 0 $support-error;
+  gap: $spacing-06;
+
+  @include breakpoint(md) {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: $spacing-07 $spacing-07 $spacing-07 $spacing-08;
+  }
+}
+
+.cds-app .lc-live-card__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-inline-size: 0;
+  gap: $spacing-03;
+}
+
+.cds-app .lc-live-tag {
+  margin: 0;
+}
+
+.cds-app .lc-live-card__title {
+  @include type-style('heading-04');
+
+  color: $text-primary;
+  overflow-wrap: anywhere;
+
+  @include breakpoint(lg) {
+    @include type-style('heading-05');
+  }
+}
+
+.cds-app .lc-live-card__meta {
+  @include type-style('body-01');
+
+  color: $text-secondary;
+}
+
+.cds-app .lc-live-card__note {
+  @include type-style('helper-text-01');
+
+  color: $text-helper;
+}
+
+.cds-app .lc-live-card__join.cds--btn {
+  flex: none;
+  inline-size: 100%;
+  max-inline-size: none;
+
+  @include breakpoint(md) {
+    inline-size: auto;
+    min-inline-size: 14rem;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// "No live class right now" card
+// ---------------------------------------------------------------------------
+.cds-app .lc-next-card {
+  display: flex;
+  flex-direction: column;
+  padding: $spacing-06 $spacing-05;
+  gap: $spacing-06;
+
+  @include breakpoint(md) {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: $spacing-07;
+  }
+}
+
+.cds-app .lc-next-card__body {
+  min-inline-size: 0;
+}
+
+.cds-app .lc-next-card__title {
+  @include type-style('heading-03');
+
+  color: $text-primary;
+
+  @include breakpoint(lg) {
+    @include type-style('heading-04');
+  }
+}
+
+.cds-app .lc-next-card__facts {
+  display: grid;
+  margin: $spacing-05 0 0;
+  gap: $spacing-04 $spacing-07;
+  grid-template-columns: minmax(0, 1fr);
+
+  @include breakpoint(md) {
+    grid-template-columns: repeat(2, max-content);
+  }
+
+  dt {
+    @include type-style('label-01');
+
+    color: $text-secondary;
+  }
+
+  dd {
+    @include type-style('heading-02');
+
+    margin: $spacing-01 0 0;
+    color: $text-primary;
+  }
+}
+
+.cds-app .lc-next-card__hint {
+  @include type-style('helper-text-01');
+
+  margin-block-start: $spacing-05;
+  color: $text-helper;
+}
+
+.cds-app .lc-next-card__action.cds--btn {
+  flex: none;
+  inline-size: 100%;
+  max-inline-size: none;
+
+  @include breakpoint(md) {
+    inline-size: auto;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Live area on the course classroom page
+// ---------------------------------------------------------------------------
+.cds-app .lc-stage-anchor {
+  scroll-margin-block-start: var(--cds-app-header-height);
+}
+
+.cds-app .lc-stage__footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-block-start: $spacing-03;
+  gap: $spacing-03;
+}
+
+.cds-app .lc-stage .cds-page-notification {
+  margin-block: $spacing-05 0;
+}
+
+// The meeting room keeps the website's own dark styles.
+.cds-app .lc-meeting {
+  margin-block-end: $spacing-05;
+}
+
+.cds-app .lc-meeting .cds-legacy-frame {
+  min-block-size: 0;
+}
+
+// ---------------------------------------------------------------------------
+// Sections and session list
+// ---------------------------------------------------------------------------
+.cds-app .lc-section {
+  margin-block-start: $spacing-09;
+}
+
+.cds-app .lc-stage-anchor + .lc-section {
+  margin-block-start: $spacing-08;
+}
+
+.cds-app .lc-section__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-block-end: $spacing-05;
+  gap: $spacing-02 $spacing-05;
+}
+
+.cds-app .lc-section__title {
+  @include type-style('heading-03');
+
+  color: $text-primary;
+}
+
+.cds-app .lc-section__count {
+  @include type-style('body-compact-01');
+
+  color: $text-secondary;
+}
+
+.cds-app .lc-filters {
+  display: flex;
+  flex-direction: column;
+  margin-block-end: $spacing-05;
+  gap: $spacing-04;
+
+  @include breakpoint(md) {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.cds-app .lc-filters__switch {
+  flex: none;
+
+  @include breakpoint(md) {
+    inline-size: 26rem;
+  }
+}
+
+.cds-app .lc-filters__search {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.cds-app .lc-session-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  gap: $spacing-03;
+  list-style: none;
+}
+
+.cds-app .lc-session {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  padding: $spacing-05;
+  gap: $spacing-05;
+
+  @include breakpoint(md) {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.cds-app .lc-session--highlighted {
+  outline: 2px solid $border-interactive;
+  outline-offset: -2px;
+}
+
+.cds-app .lc-session__body {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  gap: $spacing-03;
+}
+
+.cds-app .lc-session__title {
+  @include type-style('heading-02');
+
+  color: $text-primary;
+  overflow-wrap: anywhere;
+}
+
+.cds-app .lc-session__description {
+  @include type-style('body-01');
+  @include line-clamp(2);
+
+  color: $text-secondary;
+}
+
+.cds-app .lc-session__host {
+  @include type-style('label-01');
+
+  color: $text-helper;
+}
+
+.cds-app .lc-session__action {
+  flex: none;
+
+  .cds--btn {
+    inline-size: 100%;
+    max-inline-size: none;
+
+    @include breakpoint(md) {
+      inline-size: auto;
+      min-inline-size: 9rem;
+    }
+  }
+}
+
+.cds-app .lc-session__when {
+  @include type-style('body-compact-01');
+
+  display: flex;
+  align-items: flex-start;
+  color: $text-secondary;
+  gap: $spacing-03;
+
+  svg {
+    flex: none;
+    margin-block-start: 0.125rem;
+    fill: $icon-secondary;
+  }
+
+  > span {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-01;
+  }
+}
+
+.cds-app .lc-session__when-label {
+  color: $text-primary;
+  font-weight: 600;
+}
+
+// ---------------------------------------------------------------------------
+// Live-class track tiles
+// ---------------------------------------------------------------------------
+.cds-app .lc-track {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  padding: $spacing-05;
+  gap: $spacing-03;
+}
+
+.cds-app .lc-track--skeleton {
+  background-color: $layer-01;
+  gap: $spacing-05;
+}
+
+.cds-app .lc-track__eyebrow {
+  @include type-style('label-01');
+
+  margin-block-start: $spacing-03;
+  color: $text-secondary;
+}
+
+.cds-app .lc-track__title {
+  @include type-style('heading-03');
+
+  color: $text-primary;
+  overflow-wrap: anywhere;
+}
+
+.cds-app .lc-track__description {
+  @include type-style('body-01');
+  @include line-clamp(3);
+
+  color: $text-secondary;
+}
+
+.cds-app .lc-track__facts {
+  display: grid;
+  margin: $spacing-03 0 0;
+  gap: $spacing-03;
+}
+
+.cds-app .lc-track__fact {
+  @include type-style('body-compact-01');
+
+  display: flex;
+  align-items: flex-start;
+  color: $text-primary;
+  gap: $spacing-03;
+
+  dt {
+    display: inline-flex;
+    flex: none;
+    padding-block-start: 0.125rem;
+
+    svg {
+      fill: $icon-secondary;
+    }
+  }
+
+  dd {
+    min-inline-size: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.cds-app .lc-track__link {
+  color: $link-primary;
+  text-decoration: none;
+
+  &:hover {
+    color: $link-primary-hover;
+    text-decoration: underline;
+  }
+
+  &:focus {
+    outline: 1px solid $focus;
+    outline-offset: 1px;
+  }
+}
+
+.cds-app .lc-track__action {
+  margin-block-start: auto;
+  padding-block-start: $spacing-05;
+}
+
+.cds-app .lc-track__primary.cds--btn {
+  inline-size: 100%;
+  max-inline-size: none;
+}
+
+.cds-app .lc-track__next {
+  @include type-style('body-compact-01');
+
+  display: flex;
+  align-items: flex-start;
+  color: $text-secondary;
+  gap: $spacing-03;
+
+  svg {
+    flex: none;
+    margin-block-start: 0.125rem;
+    fill: $icon-secondary;
+  }
+}

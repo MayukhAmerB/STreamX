@@ -1,10 +1,9 @@
 import re
 from typing import Tuple
-import ipaddress
 
 from django.conf import settings
 from django.http import HttpResponse
-from config.client_ip import resolve_client_ip
+from config.client_ip import is_internal_address, resolve_client_ip
 
 try:
     from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
@@ -47,11 +46,9 @@ def _metrics_enabled():
 
 
 def _is_private_or_loopback_ip(ip_text):
-    try:
-        ip_obj = ipaddress.ip_address(str(ip_text or "").strip())
-    except ValueError:
-        return False
-    return bool(ip_obj.is_private or ip_obj.is_loopback)
+    # Explicit internal ranges only: Python's is_private also covers 240.0.0.0/4,
+    # which Cloudflare Pseudo IPv4 assigns to internet visitors.
+    return is_internal_address(str(ip_text or "").strip())
 
 
 if _PROMETHEUS_AVAILABLE:

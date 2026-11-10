@@ -1,11 +1,34 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import Button from "../components/Button";
-import PageShell from "../components/PageShell";
-import ProtectedPlaybackSurface from "../components/ProtectedPlaybackSurface";
+import "./GuidesPage.scss";
+
+import { ArrowRight, Book, PlayFilledAlt } from "@carbon/icons-react";
+import { Button, InlineLoading, Tag } from "@carbon/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getGuideVideoUrl, listGuides } from "../api/guides";
+import ProtectedPlaybackSurface from "../components/ProtectedPlaybackSurface";
+import { EmptyState, PageHeader, PageNotification, PageSkeleton, useBreakpoint, useMediaQuery } from "../features/app-shell/ui";
 import { apiData, apiMessage } from "../utils/api";
 
+/** Picks the guide to show: the current one when it still exists, else the first. */
+export function resolveSelectedGuideId(guides = [], requestedId = null) {
+  if (requestedId != null && guides.some((guide) => String(guide.id) === String(requestedId))) {
+    return guides.find((guide) => String(guide.id) === String(requestedId)).id;
+  }
+  return guides[0]?.id ?? null;
+}
+
+function GuideStageMessage({ loadingVideo }) {
+  return (
+    <div className="cds-guides__stage-message">
+      {loadingVideo ? (
+        <InlineLoading description="Loading video…" />
+      ) : (
+        <p>Choose a guide to start watching.</p>
+      )}
+    </div>
+  );
+}
+
+/** Presentational view, also used by tests. */
 export function GuidesPageContent({
   guides,
   selectedGuide,
@@ -16,145 +39,138 @@ export function GuidesPageContent({
   videoError,
   onSelectGuide,
   onVideoError,
+  onRetry,
+  onRetryVideo,
   videoRef,
+  stageRef,
 }) {
   if (loading) {
-    return <p className="text-sm text-[#BBBBBB]">Loading guides...</p>;
+    return <PageSkeleton label="Loading guides" count={2} />;
   }
 
   if (!guides.length) {
-    return (
-      <div className="rounded-[28px] border border-black panel-gradient p-6 shadow-[0_20px_60px_rgba(0,0,0,0.22)]">
-        <h2 className="font-reference text-xl font-semibold text-white">No guides published yet</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-7 text-[#BBBBBB]">
-          Once guide videos are uploaded and published from the Guide Panel, they will appear here for every logged-in user.
-        </p>
-        {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
-      </div>
+    return error ? (
+      <PageNotification
+        kind="error"
+        title="Guides could not be loaded."
+        subtitle={error}
+        actionLabel={onRetry ? "Try again" : undefined}
+        onAction={onRetry}
+      />
+    ) : (
+      <EmptyState icon={Book} text="No guides yet. New how-to videos will appear here." />
     );
   }
 
+  const selectedIndex = Math.max(
+    0,
+    guides.findIndex((guide) => guide.id === selectedGuide?.id)
+  );
+  const nextGuide = selectedGuide ? guides[selectedIndex + 1] || null : null;
+
   return (
-    <div className="grid gap-5 xl:grid-cols-[1.18fr_0.82fr]">
-      <section className="overflow-hidden rounded-[28px] border border-black panel-gradient shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
-        <div className="border-b border-[#222222] bg-[radial-gradient(circle_at_top_right,rgba(192,192,192,0.15),transparent_36%)] p-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#949494]">
-                Guide Viewer
-              </div>
-              <h2 className="mt-2 text-2xl font-semibold text-white">
-                {selectedGuide?.title || "Select a guide"}
-              </h2>
-              <p className="mt-1 text-sm text-[#BBBBBB]">
-                Platform walkthroughs for onboarding, navigation, and daily use.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <span className="rounded-full border border-black bg-white/5 px-3 py-1 text-xs font-semibold text-[#E0E0E0]">
-                {guides.length} guide{guides.length === 1 ? "" : "s"}
-              </span>
-              {loadingVideo ? (
-                <span className="rounded-full border border-black bg-white/5 px-3 py-1 text-xs font-semibold text-[#E0E0E0]">
-                  Loading video...
-                </span>
-              ) : null}
-            </div>
-          </div>
+    <div className="cds-guides">
+      <section className="cds-guides__viewer" aria-label="Guide player">
+        <div className="cds-guides__stage" ref={stageRef}>
+          <ProtectedPlaybackSurface
+            className="aspect-video"
+            watermarkEnabled={Boolean(videoUrl)}
+            showFullscreenButton={Boolean(videoUrl)}
+            videoRef={videoUrl ? videoRef : null}
+            videoSessionKey={videoUrl || ""}
+          >
+            {videoUrl ? (
+              <video
+                key={videoUrl}
+                ref={videoRef}
+                src={videoUrl}
+                className="cds-guides__video"
+                aria-label={selectedGuide?.title ? `Video: ${selectedGuide.title}` : "Guide video"}
+                disablePictureInPicture
+                disableRemotePlayback
+                preload="metadata"
+                playsInline
+                onDoubleClick={(event) => event.preventDefault()}
+                onError={onVideoError}
+              />
+            ) : (
+              <GuideStageMessage loadingVideo={loadingVideo} />
+            )}
+          </ProtectedPlaybackSurface>
         </div>
 
-        <div className="p-5">
-          <div className="overflow-hidden rounded-[24px] border border-black bg-black">
-            <ProtectedPlaybackSurface
-              className="aspect-video"
-              watermarkEnabled={Boolean(videoUrl)}
-              showFullscreenButton={Boolean(videoUrl)}
-              videoRef={videoUrl ? videoRef : null}
-              videoSessionKey={videoUrl || ""}
+        <div className="cds-guides__details">
+          <p className="cds-guides__eyebrow">
+            Guide {selectedIndex + 1} of {guides.length}
+          </p>
+          <h2 className="cds-guides__title">{selectedGuide?.title || "Choose a guide"}</h2>
+          {selectedGuide?.description ? (
+            <p className="cds-guides__description">{selectedGuide.description}</p>
+          ) : null}
+          {videoError ? (
+            <PageNotification
+              kind="warning"
+              title="This video can't play right now."
+              subtitle={videoError}
+              actionLabel={onRetryVideo ? "Try again" : undefined}
+              onAction={onRetryVideo}
+            />
+          ) : null}
+          {error ? <PageNotification kind="error" title="Something went wrong." subtitle={error} /> : null}
+          {nextGuide ? (
+            <Button
+              kind="tertiary"
+              size="md"
+              renderIcon={ArrowRight}
+              className="cds-guides__next"
+              onClick={() => onSelectGuide(nextGuide)}
             >
-              {videoUrl ? (
-                <video
-                  key={videoUrl}
-                  ref={videoRef}
-                  src={videoUrl}
-                  disablePictureInPicture
-                  disableRemotePlayback
-                  preload="metadata"
-                  playsInline
-                  className="h-full w-full bg-black object-contain"
-                  onDoubleClick={(event) => event.preventDefault()}
-                  onError={onVideoError}
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-sm text-[#8F8F8F]">
-                  {loadingVideo ? "Preparing the selected guide..." : "Select a guide to start watching."}
-                </div>
-              )}
-            </ProtectedPlaybackSurface>
-          </div>
-
-          <div className="mt-5 rounded-2xl border border-black panel-gradient p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#949494]">
-              Guide Notes
-            </div>
-            <p className="mt-3 text-sm leading-7 text-[#D7D7D7]">
-              {selectedGuide?.description || "This guide will walk through the selected workflow step by step."}
-            </p>
-            {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
-            {videoError ? <p className="mt-3 text-sm text-amber-300">{videoError}</p> : null}
-          </div>
+              Next guide
+            </Button>
+          ) : null}
         </div>
       </section>
 
-      <aside className="overflow-hidden rounded-[28px] border border-black panel-gradient shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
-        <div className="border-b border-[#222222] bg-[radial-gradient(circle_at_top,rgba(192,192,192,0.12),transparent_48%)] p-5">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#949494]">
-            Guide Library
-          </div>
-          <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
-            Admin-uploaded help videos for learning how to use the platform.
-          </p>
+      <section className="cds-guides__library" aria-labelledby="cds-guides-library-title">
+        <div className="cds-guides__library-header">
+          <h2 id="cds-guides-library-title" className="cds-guides__library-title">
+            All guides
+          </h2>
+          <Tag type="gray" size="sm">
+            {guides.length}
+          </Tag>
         </div>
-
-        <div className="max-h-[72vh] space-y-3 overflow-auto p-4">
+        <ol className="cds-guides__list">
           {guides.map((guide, index) => {
-            const isActive = guide.id === selectedGuide?.id;
+            const active = guide.id === selectedGuide?.id;
             return (
-              <button
-                key={guide.id}
-                type="button"
-                onClick={() => onSelectGuide(guide)}
-                className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
-                  isActive
-                    ? "border-[#C0C0C0] bg-[#DFDFDF] text-[#1D1D1D]"
-                    : "border-black bg-[#0C0C0C] text-[#D9D9D9] hover:border-black hover:bg-[#141414]"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-70">
-                      Guide {index + 1}
-                    </div>
-                    <div className="mt-2 text-base font-semibold">{guide.title}</div>
-                    <p className={`mt-2 text-sm leading-6 ${isActive ? "text-[#3A3A3A]" : "text-[#949494]"}`}>
-                      {guide.description || "Video guide ready to watch from the platform library."}
-                    </p>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                      isActive
-                        ? "border border-[#A9A9A9] bg-white text-[#202020]"
-                        : "border border-black bg-[#171717] text-[#A1A1A1]"
-                    }`}
-                  >
-                    {isActive ? "Now Playing" : "Watch"}
+              <li key={guide.id}>
+                <button
+                  type="button"
+                  className={`cds-guide-item${active ? " is-active" : ""}`}
+                  aria-current={active ? "true" : undefined}
+                  onClick={() => onSelectGuide(guide)}
+                >
+                  <span className="cds-guide-item__index" aria-hidden="true">
+                    {active ? <PlayFilledAlt size={16} /> : index + 1}
                   </span>
-                </div>
-              </button>
+                  <span className="cds-guide-item__text">
+                    <span className="cds-guide-item__title">{guide.title}</span>
+                    {guide.description ? (
+                      <span className="cds-guide-item__description">{guide.description}</span>
+                    ) : null}
+                  </span>
+                  {active ? (
+                    <Tag type="blue" size="sm" className="cds-guide-item__tag">
+                      Now playing
+                    </Tag>
+                  ) : null}
+                </button>
+              </li>
             );
           })}
-        </div>
-      </aside>
+        </ol>
+      </section>
     </div>
   );
 }
@@ -167,22 +183,25 @@ export default function GuidesPage() {
   const [loadingVideo, setLoadingVideo] = useState(false);
   const [error, setError] = useState("");
   const [videoError, setVideoError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
+  const [videoAttempt, setVideoAttempt] = useState(0);
   const videoRef = useRef(null);
+  const stageRef = useRef(null);
+  const { isDesktop } = useBreakpoint();
+  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setError("");
     (async () => {
       try {
         const response = await listGuides();
         const items = apiData(response, []);
         if (!active) return;
-        setGuides(items);
-        setSelectedGuideId((current) => {
-          if (current && items.some((guide) => guide.id === current)) {
-            return current;
-          }
-          return items[0]?.id || null;
-        });
+        const nextGuides = Array.isArray(items) ? items : [];
+        setGuides(nextGuides);
+        setSelectedGuideId((current) => resolveSelectedGuideId(nextGuides, current));
       } catch (err) {
         if (!active) return;
         setGuides([]);
@@ -194,7 +213,7 @@ export default function GuidesPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   const selectedGuide = useMemo(
     () => guides.find((guide) => guide.id === selectedGuideId) || null,
@@ -205,7 +224,7 @@ export default function GuidesPage() {
     if (!selectedGuide?.id) {
       setVideoUrl("");
       setLoadingVideo(false);
-      return;
+      return undefined;
     }
 
     let active = true;
@@ -234,19 +253,23 @@ export default function GuidesPage() {
     return () => {
       active = false;
     };
-  }, [selectedGuide?.id]);
+  }, [selectedGuide?.id, videoAttempt]);
+
+  const handleSelectGuide = useCallback(
+    (guide) => {
+      if (!guide) return;
+      setSelectedGuideId(guide.id);
+      // On phones the list sits below the player: bring the player back into view.
+      if (!isDesktop) {
+        stageRef.current?.scrollIntoView?.({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+      }
+    },
+    [isDesktop, reduceMotion]
+  );
 
   return (
-    <PageShell
-      title="Guides"
-      subtitle="Watch admin-uploaded walkthrough videos for learning how to use the platform."
-      badge="Guide Library"
-      action={
-        <Link to="/courses?view=owned" className="inline-flex">
-          <Button variant="secondary">Your Courses</Button>
-        </Link>
-      }
-    >
+    <>
+      <PageHeader title="Guides" description="Short videos that show you how to use the platform." />
       <GuidesPageContent
         guides={guides}
         selectedGuide={selectedGuide}
@@ -255,10 +278,13 @@ export default function GuidesPage() {
         loadingVideo={loadingVideo}
         error={error}
         videoError={videoError}
-        onSelectGuide={(guide) => setSelectedGuideId(guide.id)}
+        onSelectGuide={handleSelectGuide}
         onVideoError={() => setVideoError("This guide video could not be played in your browser.")}
+        onRetry={() => setReloadKey((value) => value + 1)}
+        onRetryVideo={() => setVideoAttempt((value) => value + 1)}
         videoRef={videoRef}
+        stageRef={stageRef}
       />
-    </PageShell>
+    </>
   );
 }

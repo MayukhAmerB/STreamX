@@ -10,12 +10,12 @@ from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import permissions, status
-from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from config.audit import log_security_event
 from config.client_ip import resolve_client_ip
 from config.response import api_response
+from config.throttling import ClientIpScopedRateThrottle
 
 from .models import Campaign, CampaignSiteVisit, CampaignVolunteer
 from .serializers import (
@@ -167,7 +167,7 @@ class CampaignSiteVisitView(APIView):
 class CampaignVolunteerCreateView(APIView):
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIpScopedRateThrottle]
     throttle_scope = "campaign_volunteer"
 
     def post(self, request):
@@ -203,7 +203,7 @@ class CampaignVolunteerCreateView(APIView):
 class CampaignAdminLoginView(APIView):
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [ClientIpScopedRateThrottle]
     throttle_scope = "login"
 
     def post(self, request):

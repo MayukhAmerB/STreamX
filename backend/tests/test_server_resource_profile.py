@@ -238,3 +238,35 @@ class ResourceProfileAgentTests(TestCase):
         self.assertIn("docker update --cpus failed", error)
         self.assertEqual(client.reports[0][0], "")
         self.assertIn("OWNCAST_CPUS=1.5", self.env_file.read_text())
+
+
+class ShippedBroadcastProfileTests(TestCase):
+    """The broadcast profile must not throttle the web/DB tier on class day.
+
+    The caps are CFS ceilings (throttling even while the host is idle) and every
+    live HLS segment is authorized by the backend through nginx auth_request.
+    """
+
+    PROFILES_DIR = AGENT_PATH.parents[1] / "resource-profiles"
+    # The caps the web/DB tier had before the broadcast profile was retuned.
+    WEB_DB_FLOORS = {
+        "POSTGRES_CPUS": 2.0,
+        "REDIS_CPUS": 1.0,
+        "BACKEND_CPUS": 2.0,
+        "BACKEND_POOL_CPUS": 1.5,
+        "GATEWAY_CPUS": 0.75,
+        "PGBOUNCER_CPUS": 0.75,
+    }
+
+    def test_web_and_database_caps_are_not_lowered(self):
+        profile = {key: float(value) for key, value in load_agent().load_profile(self.PROFILES_DIR, "broadcast").items()}
+        for key, floor in self.WEB_DB_FLOORS.items():
+            with self.subTest(key=key):
+                self.assertGreaterEqual(profile[key], floor)
+
+    def test_live_path_caps(self):
+        profile = {key: float(value) for key, value in load_agent().load_profile(self.PROFILES_DIR, "broadcast").items()}
+        self.assertGreaterEqual(profile["OWNCAST_CPUS"], 3.5)
+        egress_yaml = (AGENT_PATH.parents[1] / "egress.yaml").read_text(encoding="utf-8")
+        participant_cost = float(egress_yaml.split("participant_cpu_cost:", 1)[1].split()[0])
+        self.assertGreaterEqual(profile["LIVEKIT_EGRESS_CPUS"], participant_cost)

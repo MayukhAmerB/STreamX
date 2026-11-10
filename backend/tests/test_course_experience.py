@@ -11,7 +11,9 @@ from apps.users.models import User
 from django.apps import apps
 from django.contrib import admin
 from django.core.cache import cache
+from django.db import connection
 from django.test import RequestFactory, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
@@ -64,6 +66,26 @@ class CourseExperienceTests(APITestCase):
         module = self.experience().data["data"]["modules"][0]
         self.assertEqual(module["topics"], ["Search operators", "Evidence capture"])
         self.assertNotIn("video", str(module))
+
+    def test_curriculum_query_count_does_not_grow_with_modules(self):
+        first = Section.objects.create(course=self.course, title="Module 1", order=1)
+        Lecture.objects.create(section=first, title="Visible", order=1, is_published=True)
+        Lecture.objects.create(section=first, title="Draft", order=2, is_published=False)
+        self.experience()  # warm caches unrelated to the curriculum
+        with CaptureQueriesContext(connection) as baseline:
+            self.experience()
+        for index in range(2, 6):
+            module = Section.objects.create(course=self.course, title=f"Module {index}", order=index)
+            Lecture.objects.create(section=module, title=f"Lesson {index}", order=1, is_published=True)
+            Lecture.objects.create(section=module, title=f"Draft {index}", order=2, is_published=False)
+
+        with self.assertNumQueries(len(baseline.captured_queries)):
+            response = self.experience()
+
+        modules = response.data["data"]["modules"]
+        self.assertEqual(len(modules), 5)
+        self.assertEqual(modules[0]["lessons"], [{"title": "Visible", "description": ""}])
+        self.assertEqual([lesson["title"] for lesson in modules[4]["lessons"]], ["Lesson 5"])
 
     def test_public_curriculum_enriches_details_without_replacing_lesson_modules(self):
         section = Section.objects.create(

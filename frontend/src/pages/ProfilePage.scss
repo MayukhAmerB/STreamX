@@ -1,0 +1,92 @@
+// Profile (Carbon). Token-only imports: emits no Carbon component CSS.
+@use '../features/app-shell/styles/tokens' as *;
+
+.cds-app .cds-profile-layout {
+  display: grid;
+  gap: $spacing-05;
+  grid-template-columns: minmax(0, 1fr);
+
+  @include breakpoint(lg) {
+    align-items: start;
+    gap: $spacing-06;
+    grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+
+    > .cds-page-notification {
+      grid-column: 1 / -1;
+    }
+  }
+}
+
+.cds-app .cds-profile-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: $spacing-06 $spacing-05;
+  gap: $spacing-05;
+
+  @include breakpoint(lg) {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.cds-app .cds-profile-identity__text {
+  flex: 1 1 10rem;
+  min-inline-size: 0;
+
+  @include breakpoint(lg) {
+    flex: 0 0 auto;
+    inline-size: 100%;
+  }
+}
+
+.cds-app .cds-profile-identity__name {
+  @include type-style('heading-03');
+
+  overflow-wrap: anywhere;
+}
+
+.cds-app .cds-profile-identity__email {
+  @include type-style('body-compact-01');
+
+  margin-block-start: $spacing-02;
+  color: $text-secondary;
+  overflow-wrap: anywhere;
+}
+
+.cds-app .cds-profile-identity__tags {
+  display: flex;
+  flex-wrap: wrap;
+  margin-block-start: $spacing-04;
+  gap: $spacing-02;
+
+  .cds--tag {
+    margin: 0;
+  }
+}
+
+.cds-app .cds-profile-identity__photo {
+  flex: 1 1 100%;
+  max-inline-size: none;
+}
+
+.cds-app .cds-profile-form-tile {
+  padding: $spacing-06 $spacing-05;
+
+  @include breakpoint(md) {
+    padding: $spacing-07 $spacing-06;
+  }
+}
+
+.cds-app .cds-profile-form__actions {
+  display: flex;
+  align-items: center;
+  min-block-size: 3rem;
+
+  .cds--btn {
+    @include breakpoint-down(md) {
+      flex: 1 1 auto;
+      max-inline-size: none;
+    }
+  }
+}

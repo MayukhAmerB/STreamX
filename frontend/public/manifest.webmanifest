@@ -1,0 +1,17 @@
+{
+  "name": "Al syed Initiative",
+  "short_name": "Al syed",
+  "description": "Courses, live classes and learning tools.",
+  "id": "/my-courses",
+  "start_url": "/my-courses",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#161616",
+  "theme_color": "#161616",
+  "icons": [
+    { "src": "/favicon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

@@ -26,6 +26,12 @@ from .views import (
     SectionDetailView,
 )
 
+from .engagement.views import (
+    LectureCommentDetailView,
+    LectureCommentListCreateView,
+    LectureEngagementView,
+    LectureLikeView,
+)
 from .experience_views import (CourseExperienceView, CourseReviewView, PentestingApplicationView, ApplicationCheckoutView)
 
 urlpatterns = [
@@ -53,6 +59,14 @@ urlpatterns = [
     path("lectures/<int:pk>/notes/", LectureNoteView.as_view(), name="lecture-notes"),
     path("lectures/<int:pk>/questions/", LectureQuestionListCreateView.as_view(), name="lecture-questions"),
     path("lecture-questions/", LectureQuestionAdminListView.as_view(), name="lecture-question-admin-list"),
+    path("lectures/<int:pk>/engagement/", LectureEngagementView.as_view(), name="lecture-engagement"),
+    path("lectures/<int:pk>/like/", LectureLikeView.as_view(), name="lecture-like"),
+    path("lectures/<int:pk>/comments/", LectureCommentListCreateView.as_view(), name="lecture-comments"),
+    path(
+        "lecture-comments/<int:comment_id>/",
+        LectureCommentDetailView.as_view(),
+        name="lecture-comment-detail",
+    ),
     path(
         "lectures/<int:lecture_pk>/resources/<int:pk>/download/",
         LectureResourceDownloadView.as_view(),

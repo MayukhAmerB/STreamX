@@ -1,0 +1,196 @@
+// OSINT tools (Carbon). Token-only imports: emits no Carbon component CSS.
+@use '../features/app-shell/styles/tokens' as *;
+
+.cds-app .cds-osint-filters {
+  margin-block-end: $spacing-06;
+}
+
+.cds-app .cds-osint-filters__label {
+  @include type-style('heading-compact-01');
+
+  margin-block: $spacing-06 $spacing-03;
+  color: $text-primary;
+}
+
+// Clue chips: one swipeable row on phones (app-style), wrapping from md up.
+.cds-app .cds-osint-chips {
+  position: relative;
+  display: flex;
+  overflow-x: auto;
+  padding: $spacing-02 $spacing-05;
+  margin-inline: calc(-1 * #{$spacing-05});
+  gap: $spacing-03;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: $spacing-05;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  .cds--tag {
+    flex: none;
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  @include breakpoint(md) {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    padding-inline: 0;
+    margin-inline: 0;
+  }
+}
+
+// Bigger touch targets for the chips on touch screens.
+@media (pointer: coarse) {
+  .cds-app .cds-osint-chips .cds--tag {
+    min-block-size: 2.5rem;
+    padding-inline: $spacing-05;
+  }
+}
+
+// Selected clue guidance.
+.cds-app .cds-osint-guide {
+  padding: $spacing-05;
+  margin-block-end: $spacing-06;
+  background-color: $layer-01;
+  border-inline-start: 3px solid $border-interactive;
+
+  @include breakpoint(md) {
+    padding: $spacing-06;
+  }
+}
+
+// Heading + count tag flow like text, so the tag follows the last word.
+.cds-app .cds-osint-guide__head,
+.cds-app .cds-osint-group__head {
+  .cds-osint-guide__title,
+  .cds-osint-group__title {
+    display: inline;
+  }
+
+  .cds--tag {
+    margin: 0 0 0 $spacing-03;
+    vertical-align: 0.25em;
+  }
+}
+
+.cds-app .cds-osint-guide__title {
+  @include type-style('heading-03');
+
+  color: $text-primary;
+}
+
+.cds-app .cds-osint-guide__focus {
+  @include type-style('body-01');
+
+  margin-block-start: $spacing-03;
+  color: $text-secondary;
+}
+
+.cds-app .cds-osint-guide__start {
+  @include type-style('body-02');
+
+  max-inline-size: 48rem;
+  margin-block-start: $spacing-05;
+  color: $text-primary;
+
+  strong {
+    font-weight: 600;
+  }
+}
+
+.cds-app .cds-osint-guide__use-case {
+  @include type-style('body-01');
+
+  max-inline-size: 48rem;
+  margin-block-start: $spacing-03;
+  color: $text-secondary;
+}
+
+.cds-app .cds-osint-guide__caution {
+  max-inline-size: none;
+  margin-block: $spacing-05 0;
+}
+
+// Result count + clear.
+.cds-app .cds-osint-results-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: $spacing-05;
+  gap: $spacing-03;
+  min-block-size: 2rem;
+}
+
+.cds-app .cds-osint-results {
+  @include type-style('label-02');
+
+  color: $text-secondary;
+}
+
+// Category groups (All tools).
+.cds-app .cds-osint-group + .cds-osint-group {
+  margin-block-start: $spacing-09;
+}
+
+.cds-app .cds-osint-group__title {
+  @include type-style('heading-03');
+
+  color: $text-primary;
+}
+
+.cds-app .cds-osint-group__focus {
+  @include type-style('body-01');
+
+  max-inline-size: 48rem;
+  margin-block: $spacing-02 $spacing-05;
+  color: $text-secondary;
+}
+
+// Tool card.
+.cds-app .cds-osint-tool {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  gap: $spacing-04;
+}
+
+.cds-app .cds-osint-tool__head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: $spacing-03;
+
+  .cds--tag {
+    margin: 0;
+  }
+}
+
+.cds-app .cds-osint-tool__name {
+  @include type-style('heading-compact-02');
+
+  color: $text-primary;
+  overflow-wrap: anywhere;
+}
+
+.cds-app .cds-osint-tool__use {
+  @include type-style('body-01');
+
+  flex: 1;
+  color: $text-secondary;
+}
+
+.cds-app .cds-osint-tool__actions {
+  display: flex;
+  align-items: center;
+  min-block-size: 2.5rem;
+}
+
+.cds-app .cds-osint-tool__reference {
+  @include type-style('helper-text-01');
+
+  color: $text-helper;
+}

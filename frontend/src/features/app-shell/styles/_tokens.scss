@@ -1,0 +1,9 @@
+// Token-only Carbon modules for page/feature stylesheets. These emit no CSS,
+// so any functional page can `@use '.../app-shell/styles/tokens' as *;`
+// without duplicating Carbon output.
+@forward '@carbon/styles/scss/spacing';
+@forward '@carbon/styles/scss/theme';
+@forward '@carbon/styles/scss/type';
+@forward '@carbon/styles/scss/breakpoint';
+@forward '@carbon/styles/scss/motion';
+@forward '@carbon/styles/scss/utilities/focus-outline';

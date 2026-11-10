@@ -1,11 +1,30 @@
+import "../features/live-classes/LiveClasses.scss";
+
+import { Search as SearchIcon } from "@carbon/icons-react";
+import { Button, ContentSwitcher, Search, Switch } from "@carbon/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import Button from "../components/Button";
-import PageShell from "../components/PageShell";
 import BroadcastViewerTheater from "../components/realtime/BroadcastViewerTheater";
-import LiveClassScheduleStatus from "../components/realtime/LiveClassScheduleStatus";
 import MeetingRoomExperience from "../components/realtime/MeetingRoomExperience";
 import { createRealtimeOwncastChatLaunch, joinRealtimeSession, listRealtimeSessions } from "../api/realtime";
+import { EmptyState, PageHeader, PageNotification, PageSkeleton, useToast } from "../features/app-shell/ui";
+import {
+  LeaveClassButton,
+  LiveMeetingFrame,
+  LiveNowCard,
+  NextClassCard,
+  SessionTile,
+} from "../features/live-classes/LiveCards";
+import {
+  SESSION_FILTERS,
+  SESSION_SEARCH_THRESHOLD,
+  countLiveSessions,
+  filterLiveSessions,
+  filterSessionsForCourse,
+  shouldShowSessionFilter,
+  sortLiveSessions,
+} from "../features/live-classes/liveSessions";
+import { formatScheduleSummary } from "../features/live-classes/schedule";
 import { useAuth } from "../hooks/useAuth";
 import useAdaptiveRealtimeSessionPolling from "../hooks/useAdaptiveRealtimeSessionPolling";
 import {
@@ -21,14 +40,6 @@ import {
   resolveLiveClassSchedule,
 } from "../utils/liveClassSchedule";
 
-const pageBackgroundImage =
-  "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
-
-const modeOptions = [
-  { key: "all", label: "All Sessions" },
-  { key: "meeting", label: "Meetings" },
-  { key: "broadcasting", label: "Broadcasts" },
-];
 const ACTIVE_BROADCAST_STORAGE_KEY = "streamx:join-live:active-broadcast";
 
 function sanitizeBroadcastSession(session) {
@@ -85,22 +96,9 @@ function persistBroadcastPayload(payload) {
   }
 }
 
-function statusBadgeClass(status) {
-  if (status === "live") {
-    return "border-zinc-400/30 bg-zinc-400/10 text-zinc-200";
-  }
-  if (status === "scheduled") {
-    return "border-amber-300/30 bg-amber-300/10 text-amber-200";
-  }
-  return "border-black bg-[#171717] text-[#CDCDCD]";
-}
-
-function sessionTypeLabel(sessionType) {
-  return sessionType === "broadcasting" ? "Broadcast" : "Meeting";
-}
-
 export default function JoinLivePage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { showToast } = useToast();
   const { id: courseIdParam } = useParams();
   const [searchParams] = useSearchParams();
   const authenticatedUserId = Number(user?.id || 0) || null;
@@ -157,58 +155,19 @@ export default function JoinLivePage() {
     return () => window.clearInterval(refreshId);
   }, []);
 
-  const orderedSessions = useMemo(() => {
-    return [...sessions].sort((a, b) => {
-      const statusWeight = { live: 1, scheduled: 2, ended: 3 };
-      const aWeight = statusWeight[a.status] || 4;
-      const bWeight = statusWeight[b.status] || 4;
-      if (aWeight !== bWeight) return aWeight - bWeight;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    });
-  }, [sessions]);
-
-  const courseSessions = useMemo(() => {
-    if (!courseId) {
-      return orderedSessions;
-    }
-    return orderedSessions.filter((session) => {
-      const linkedCourseId = Number(
-        session.linked_course?.id || session.linked_live_class?.linked_course_id || 0
-      );
-      return linkedCourseId === courseId;
-    });
-  }, [courseId, orderedSessions]);
-
-  const filteredSessions = useMemo(() => {
-    const trimmed = query.trim().toLowerCase();
-    return courseSessions.filter((session) => {
-      if (mode !== "all" && session.session_type !== mode) {
-        return false;
-      }
-      if (!trimmed) {
-        return true;
-      }
-      return (
-        (session.title || "").toLowerCase().includes(trimmed) ||
-        (session.description || "").toLowerCase().includes(trimmed) ||
-        (session.host?.full_name || "").toLowerCase().includes(trimmed)
-      );
-    });
-  }, [courseSessions, mode, query]);
-
-  const stats = useMemo(() => {
-    const liveCount = courseSessions.filter((session) => session.status === "live").length;
-    const meetingCount = courseSessions.filter((session) => session.session_type === "meeting").length;
-    const broadcastCount = courseSessions.filter(
-      (session) => session.session_type === "broadcasting"
-    ).length;
-    return {
-      total: courseSessions.length,
-      live: liveCount,
-      meeting: meetingCount,
-      broadcasting: broadcastCount,
-    };
-  }, [courseSessions]);
+  const orderedSessions = useMemo(() => sortLiveSessions(sessions), [sessions]);
+  const courseSessions = useMemo(
+    () => filterSessionsForCourse(orderedSessions, courseId),
+    [courseId, orderedSessions]
+  );
+  const stats = useMemo(() => countLiveSessions(courseSessions), [courseSessions]);
+  const showModeFilter = shouldShowSessionFilter(stats);
+  const showSearch = courseSessions.length >= SESSION_SEARCH_THRESHOLD || Boolean(query);
+  const effectiveMode = showModeFilter ? mode : "all";
+  const filteredSessions = useMemo(
+    () => filterLiveSessions(courseSessions, { mode: effectiveMode, query }),
+    [courseSessions, effectiveMode, query]
+  );
 
   const liveSchedule = useMemo(() => resolveLiveClassSchedule(courseSessions), [courseSessions]);
   const joinableLiveSession = useMemo(
@@ -231,7 +190,10 @@ export default function JoinLivePage() {
       setActiveSession(nextActiveSession);
       persistBroadcastPayload(nextActiveSession);
       persistMeetingSessionId(data?.mode === "meeting" ? data?.session?.id : null, authenticatedUserId);
-      setJoinState({ loadingId: null, error: "", info: "Joined live session." });
+      setJoinState({ loadingId: null, error: "", info: "" });
+      if (data?.mode === "meeting" || data?.mode === "broadcast") {
+        showToast({ kind: "success", title: "You joined the class", timeout: 3000 });
+      }
       await loadSessions();
     } catch (err) {
       setJoinState({ loadingId: null, error: apiMessage(err, "Unable to join live session."), info: "" });
@@ -514,198 +476,210 @@ export default function JoinLivePage() {
     shouldUsePersonalizedBroadcastChat,
   ]);
 
+  const isWatching = activeSession?.mode === "broadcast" || activeSession?.mode === "meeting";
+  const pageTitle = courseId ? "Course live classroom" : "Live classes";
+  const scheduleSummary = formatScheduleSummary(liveSchedule);
+  const loadFailed = Boolean(error) && sessions.length === 0;
+  const selectedModeIndex = Math.max(
+    0,
+    SESSION_FILTERS.findIndex((option) => option.key === effectiveMode)
+  );
+
+  const retryLoad = () => {
+    setLoading(true);
+    setError("");
+    loadSessions();
+  };
+
+  const leaveBroadcast = () => {
+    setActiveSession(null);
+    setJoinState({ loadingId: null, error: "", info: "" });
+  };
+
   return (
-    <PageShell
-      title={courseId ? "Course Live Classroom" : "Join Live"}
-      subtitle={
-        courseId
-          ? "Watch the schedule and join live sessions included with this course."
-          : "Access all active meetings and broadcasts from one premium live operations screen."
-      }
-      badge={courseId ? "COURSE LIVE" : "LIVE ACCESS"}
-      decryptTitle
-      containerClassName="xl:max-w-[86rem] 2xl:max-w-[92rem]"
-    >
-      <section className="relative mb-5 overflow-hidden rounded-[20px] border border-black bg-[#080808] shadow-[0_18px_50px_rgba(0,0,0,0.32)] sm:mb-6 sm:rounded-[30px] sm:shadow-[0_26px_70px_rgba(0,0,0,0.35)]">
-        <div className="absolute inset-0">
-          <img
-            src={pageBackgroundImage}
-            alt=""
-            aria-hidden="true"
-            className="h-full w-full object-cover opacity-[0.16]"
-          />
-          <div className="absolute inset-0 bg-gradient-to-br from-black/88 via-black/78 to-[#111111]/94" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_12%,rgba(192,192,192,0.12),transparent_36%)]" />
-        </div>
-
-        <div className="relative grid gap-4 p-4 sm:gap-5 sm:p-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <div>
-            <h2 className="font-reference text-2xl font-semibold leading-tight text-white sm:text-4xl">
-              Elegant unified entry for every live experience
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-[#BBBBBB]">
-              Join two-way meeting rooms, switch into stream mode when sessions scale, and keep users
-              in one polished workflow.
-            </p>
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:gap-3">
-              <div className="rounded-xl border border-black bg-[#131313]/92 px-3 py-3">
-                <div className="text-[11px] uppercase tracking-[0.14em] text-[#949494]">Live Now</div>
-                <div className="mt-1 text-2xl font-semibold text-white">{stats.live}</div>
-              </div>
-              <div className="rounded-xl border border-black bg-[#131313]/92 px-3 py-3">
-                <div className="text-[11px] uppercase tracking-[0.14em] text-[#949494]">Total Active</div>
-                <div className="mt-1 text-2xl font-semibold text-white">{stats.total}</div>
-              </div>
-              <div className="rounded-xl border border-black bg-[#131313]/92 px-3 py-3">
-                <div className="text-[11px] uppercase tracking-[0.14em] text-[#949494]">Meetings</div>
-                <div className="mt-1 text-2xl font-semibold text-white">{stats.meeting}</div>
-              </div>
-              <div className="rounded-xl border border-black bg-[#131313]/92 px-3 py-3">
-                <div className="text-[11px] uppercase tracking-[0.14em] text-[#949494]">Broadcasts</div>
-                <div className="mt-1 text-2xl font-semibold text-white">{stats.broadcasting}</div>
-              </div>
-            </div>
-          </div>
-
-          <LiveClassScheduleStatus schedule={liveSchedule} liveSession={joinableLiveSession} />
-        </div>
-      </section>
+    <div className={`lc-page${isWatching ? " lc-page--watching" : ""}`}>
+      {isWatching ? (
+        <h1 className="lc-visually-hidden">{pageTitle}</h1>
+      ) : (
+        <PageHeader
+          title={pageTitle}
+          description={
+            courseId ? "Live classes included with this course." : "Join your class when it goes live."
+          }
+        />
+      )}
 
       {joinState.error ? (
-        <div className="mb-4 rounded-xl border border-red-300/30 bg-red-200/10 px-4 py-3 text-sm text-red-200">
-          {joinState.error}
-        </div>
+        <PageNotification
+          kind="error"
+          title="Couldn't join the class."
+          subtitle={joinState.error}
+          onClose={() => setJoinState((previous) => ({ ...previous, error: "" }))}
+        />
       ) : null}
 
       {joinState.info ? (
-        <div className="mb-4 rounded-xl border border-black bg-[#161616] px-4 py-3 text-sm text-[#D9D9D9]">
-          {joinState.info}
-        </div>
+        <PageNotification
+          kind="info"
+          title={joinState.info}
+          onClose={() => setJoinState((previous) => ({ ...previous, info: "" }))}
+        />
       ) : null}
 
       {activeSession?.mode === "meeting" ? (
-        <MeetingRoomExperience
-          payload={activeSession}
-          onLeave={() => {
-            clearPersistedMeetingSessionId();
-            setActiveSession(null);
-          }}
-          onReconnect={handleReconnectMeeting}
-          audiencePanel
-        />
+        <LiveMeetingFrame>
+          <MeetingRoomExperience
+            payload={activeSession}
+            onLeave={() => {
+              clearPersistedMeetingSessionId();
+              setActiveSession(null);
+            }}
+            onReconnect={handleReconnectMeeting}
+            audiencePanel
+          />
+        </LiveMeetingFrame>
       ) : null}
 
       {activeSession?.mode === "broadcast" ? (
-        <BroadcastViewerTheater
-          title={activeSession.session?.title}
-          sessionId={activeSession.session?.id}
-          streamUrl={activeBroadcastStreamUrl}
-          chatUrl={activeBroadcastResolvedChatUrl}
-          chatFallbackMessage={activeBroadcastChatFallbackMessage}
-          streamStatus={activeSession.broadcast?.stream_status}
-          sessionStatus={activeSession.session?.status}
-          chatEnabled={activeSession.session?.chat_enabled !== false}
-          badgeLabel="Live Broadcast"
-          statusMessage={activeBroadcastStatusMessage}
-          onRefreshStream={handleRefreshActiveBroadcast}
-          onRefreshChat={() => setBroadcastChatLaunchRefreshKey((previous) => previous + 1)}
+        <div className="lc-theater">
+          <BroadcastViewerTheater
+            title={activeSession.session?.title}
+            sessionId={activeSession.session?.id}
+            streamUrl={activeBroadcastStreamUrl}
+            chatUrl={activeBroadcastResolvedChatUrl}
+            chatFallbackMessage={activeBroadcastChatFallbackMessage}
+            streamStatus={activeSession.broadcast?.stream_status}
+            sessionStatus={activeSession.session?.status}
+            chatEnabled={activeSession.session?.chat_enabled !== false}
+            badgeLabel="Live"
+            headerLabel="Now playing"
+            chatTitle="Live chat"
+            statusMessage={activeBroadcastStatusMessage}
+            onRefreshStream={handleRefreshActiveBroadcast}
+            onRefreshChat={() => setBroadcastChatLaunchRefreshKey((previous) => previous + 1)}
+            withContainer={false}
+            actions={<LeaveClassButton onLeave={leaveBroadcast} />}
+          />
+        </div>
+      ) : null}
+
+      {!isWatching && loading ? <PageSkeleton label="Loading live classes" count={2} /> : null}
+
+      {!isWatching && !loading && loadFailed ? (
+        <PageNotification
+          kind="error"
+          title="Couldn't load live classes."
+          subtitle={error}
+          actionLabel="Try again"
+          onAction={retryLoad}
         />
       ) : null}
 
-      <section className="rounded-[26px] border border-black panel-gradient p-4 sm:p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="font-reference text-xl font-semibold text-white">Available Live Sessions</h3>
-            <p className="mt-1 text-xs text-[#949494]">Clean list view with smart filters and one-click join.</p>
-          </div>
-          <span className="text-xs text-[#949494]">
-            {loading ? "Loading..." : `${filteredSessions.length} session${filteredSessions.length === 1 ? "" : "s"}`}
-          </span>
-        </div>
+      {!isWatching && !loading && !loadFailed ? (
+        <>
+          {error ? (
+            <PageNotification
+              kind="warning"
+              title="Showing the last update."
+              subtitle={error}
+              actionLabel="Try again"
+              onAction={retryLoad}
+            />
+          ) : null}
 
-        <div className="mb-4 grid gap-3 md:grid-cols-[1fr_auto]">
-          <input
-            className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2.5 text-sm text-white outline-none focus:border-[#999999]"
-            placeholder="Search by session title or description"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <div className="flex flex-wrap gap-2">
-            {modeOptions.map((option) => (
-              <button
-                key={option.key}
-                type="button"
-                onClick={() => setMode(option.key)}
-                className={`min-h-11 flex-1 rounded-xl border px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition ${
-                  mode === option.key
-                    ? "border-[#D9D9D9] bg-[#D9D9D9] text-[#141414]"
-                    : "border-black bg-[#161616] text-[#CDCDCD] hover:bg-[#1E1E1E]"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
+          <div className="lc-hero">
+            {joinableLiveSession ? (
+              <LiveNowCard
+                session={joinableLiveSession}
+                onJoin={handleJoin}
+                joining={joinState.loadingId === joinableLiveSession.id}
+              />
+            ) : (
+              <NextClassCard schedule={liveSchedule} />
+            )}
           </div>
-        </div>
 
-        {error ? (
-          <div className="mb-4 rounded-xl border border-amber-300/30 bg-amber-100/10 px-4 py-3 text-sm text-amber-200">
-            {error}
-          </div>
-        ) : null}
+          {courseSessions.length > 0 ? (
+            <section className="lc-section" aria-labelledby="lc-sessions-title">
+              <div className="lc-section__header">
+                <h2 id="lc-sessions-title" className="lc-section__title">
+                  All sessions
+                </h2>
+                <p className="lc-section__count">
+                  {stats.total} session{stats.total === 1 ? "" : "s"}
+                  {stats.live > 0 ? ` · ${stats.live} live` : ""}
+                </p>
+              </div>
 
-        {filteredSessions.length > 0 ? (
-          <div className="space-y-3">
-            {filteredSessions.map((session) => (
-              <article
-                key={session.id}
-                className={`grid gap-4 rounded-2xl border panel-gradient p-4 shadow-[0_14px_34px_rgba(0,0,0,0.22)] md:grid-cols-[1fr_auto] md:items-center ${
-                  session.id === highlightedSessionId ? "border-[#D9D9D9]/40" : "border-black"
-                }`}
-              >
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`rounded-full border px-2 py-1 text-[11px] uppercase tracking-[0.12em] ${statusBadgeClass(session.status)}`}
+              {showModeFilter || showSearch ? (
+                <div className="lc-filters">
+                  {showModeFilter ? (
+                    <ContentSwitcher
+                      aria-label="Session type"
+                      className="lc-filters__switch"
+                      selectedIndex={selectedModeIndex}
+                      size="lg"
+                      onChange={({ name }) => setMode(name)}
                     >
-                      {session.status}
-                    </span>
-                    <span className="rounded-full border border-black bg-[#171717] px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-[#CDCDCD]">
-                      {sessionTypeLabel(session.session_type)}
-                    </span>
-                    {session.id === highlightedSessionId ? (
-                      <span className="rounded-full border border-black bg-[#D9D9D9]/10 px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-[#D9D9D9]">
-                        Shared Link
-                      </span>
-                    ) : null}
-                  </div>
-                  <h4 className="mt-2 font-reference text-xl text-white">{session.title}</h4>
-                  <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
-                    {session.description || "Live session with classroom or broadcast format."}
-                  </p>
+                      {SESSION_FILTERS.map((option) => (
+                        <Switch
+                          key={option.key}
+                          name={option.key}
+                          text={option.label}
+                        />
+                      ))}
+                    </ContentSwitcher>
+                  ) : null}
+                  {showSearch ? (
+                    <Search
+                      size="lg"
+                      className="lc-filters__search"
+                      labelText="Search sessions"
+                      placeholder="Search sessions"
+                      closeButtonLabelText="Clear search"
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                    />
+                  ) : null}
                 </div>
-                {isJoinableLiveSession(session) ? (
-                  <Button
-                    className="w-full !bg-red-600 !text-white hover:!bg-red-500 md:w-[190px]"
-                    loading={joinState.loadingId === session.id}
-                    onClick={() => handleJoin(session.id)}
-                  >
-                    Join Live
-                  </Button>
-                ) : (
-                  <div className="w-full rounded-xl border border-white/10 bg-black/35 px-4 py-3 text-center md:w-[190px]">
-                    <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#D7D7D7]">Not live</div>
-                    <div className="mt-1 text-[11px] text-[#858585]">Fri / Sat / Sun</div>
-                    <div className="text-[11px] text-[#858585]">7-8 PM IST</div>
-                  </div>
-                )}
-              </article>
-            ))}
-          </div>
-        ) : (
-          <LiveClassScheduleStatus schedule={liveSchedule} liveSession={null} compact />
-        )}
-      </section>
-    </PageShell>
+              ) : null}
+
+              {filteredSessions.length > 0 ? (
+                <ul className="lc-session-list">
+                  {filteredSessions.map((session) => (
+                    <li key={session.id}>
+                      <SessionTile
+                        session={session}
+                        joinable={isJoinableLiveSession(session)}
+                        highlighted={session.id === highlightedSessionId}
+                        joining={joinState.loadingId === session.id}
+                        onJoin={handleJoin}
+                        scheduleSummary={scheduleSummary}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <EmptyState
+                  icon={SearchIcon}
+                  text="No session matches your search."
+                  action={
+                    <Button
+                      kind="tertiary"
+                      onClick={() => {
+                        setQuery("");
+                        setMode("all");
+                      }}
+                    >
+                      Show all sessions
+                    </Button>
+                  }
+                />
+              )}
+            </section>
+          ) : null}
+        </>
+      ) : null}
+    </div>
   );
 }

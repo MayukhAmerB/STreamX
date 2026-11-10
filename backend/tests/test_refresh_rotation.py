@@ -161,8 +161,10 @@ class RefreshRotationRaceTests(APITestCase):
 
         self.assertEqual(replay.status_code, 401)
 
+    @override_settings(MAX_CONCURRENT_SESSIONS_PER_STUDENT=2)
     def test_session_replaced_on_another_device_still_ends_the_session(self):
         first_refresh = self.login(self.client_class())
+        self.login(self.client_class())
         self.login(self.client_class())
 
         _, stale = self.refresh_with(first_refresh)

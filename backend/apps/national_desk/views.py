@@ -2,7 +2,7 @@ from config.response import api_response
 from django.db.models import Prefetch
 from drf_spectacular.utils import extend_schema
 from rest_framework import permissions
-from rest_framework.throttling import AnonRateThrottle
+from config.throttling import ClientIpAnonRateThrottle
 from rest_framework.views import APIView
 
 from .models import (
@@ -22,7 +22,7 @@ from .serializers import (
 )
 
 
-class NationalDeskThrottle(AnonRateThrottle):
+class NationalDeskThrottle(ClientIpAnonRateThrottle):
     scope = "national_desk"
     rate = "120/min"
 

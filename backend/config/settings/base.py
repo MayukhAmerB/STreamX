@@ -215,9 +215,9 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.AnonRateThrottle",
-        "rest_framework.throttling.UserRateThrottle",
-        "rest_framework.throttling.ScopedRateThrottle",
+        "config.throttling.ClientIpAnonRateThrottle",
+        "config.throttling.ClientIpUserRateThrottle",
+        "config.throttling.ClientIpScopedRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "50/minute",
@@ -239,6 +239,10 @@ REST_FRAMEWORK = {
         "course_enroll": "20/hour",
         "live_class_enroll": "20/hour",
         "lecture_playback": "120/minute",
+        "lecture_engagement_read": env("LECTURE_ENGAGEMENT_READ_RATE", "240/minute"),
+        "lecture_like": env("LECTURE_LIKE_RATE", "60/minute"),
+        "lecture_comment_write": env("LECTURE_COMMENT_WRITE_RATE", "10/minute"),
+        "class_recording_upload": env("CLASS_RECORDING_UPLOAD_RATE", "20/hour"),
         "realtime_session_create": "30/hour",
         "realtime_session_join": "240/hour",
         "realtime_connection_telemetry": "600/hour",
@@ -255,6 +259,12 @@ SPECTACULAR_SETTINGS = {
     "SCHEMA_PATH_PREFIX_TRIM": True,
     "SERVERS": [{"url": "/api", "description": "Current origin API"}],
     "PREPROCESSING_HOOKS": ["config.openapi.preprocess_api_endpoints"],
+    # Explicit names keep new enums from renaming existing components (e.g. StateEnum).
+    "ENUM_NAME_OVERRIDES": {
+        "StateEnum": "apps.join_requests.india_locations.STATE_CHOICES",
+        "ClassRecordingStateEnum": "apps.realtime.recording.models.ClassRecording.STATE_CHOICES",
+        "ClassRecordingSourceEnum": "apps.realtime.recording.models.ClassRecording.SOURCE_CHOICES",
+    },
 }
 
 SIMPLE_JWT = {
@@ -387,6 +397,27 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "no-reply@alsyedinitiative.local"
 CONTACT_RECEIVER_EMAIL = env("CONTACT_RECEIVER_EMAIL", "contact@adlfront.com")
 FFMPEG_BINARY = env("FFMPEG_BINARY", "ffmpeg")
 FFPROBE_BINARY = env("FFPROBE_BINARY", "ffprobe")
+
+# Server-side recording of OBS (Owncast) classes; see apps/realtime/recording/.
+# Off by default: enable once the stream-recorder compose service is deployed.
+STREAM_RECORDER_ENABLED = env_bool("STREAM_RECORDER_ENABLED", False)
+STREAM_RECORDER_SOURCE_URL = env("STREAM_RECORDER_SOURCE_URL", "http://owncast:8080/hls/stream.m3u8").strip()
+STREAM_RECORDER_WORK_DIR = env("STREAM_RECORDER_WORK_DIR", "/recordings/class-recordings").strip()
+STREAM_RECORDER_MAX_BYTES = env_int("STREAM_RECORDER_MAX_BYTES", 30 * 1024 * 1024 * 1024)
+STREAM_RECORDER_MIN_FREE_BYTES = env_int("STREAM_RECORDER_MIN_FREE_BYTES", 5 * 1024 * 1024 * 1024)
+STREAM_RECORDER_MAX_DURATION_SECONDS = env_int("STREAM_RECORDER_MAX_DURATION_SECONDS", 6 * 3600)
+STREAM_RECORDER_RESTART_BACKOFF_SECONDS = env_int("STREAM_RECORDER_RESTART_BACKOFF_SECONDS", 5)
+STREAM_RECORDER_NICE = env_int("STREAM_RECORDER_NICE", 10)
+STREAM_RECORDER_EGRESS_WAIT_SECONDS = env_int("STREAM_RECORDER_EGRESS_WAIT_SECONDS", 1800)
+# Finalize/remux needs free space on the media disk >= input bytes x this factor
+# + STREAM_RECORDER_MIN_FREE_BYTES (concat output + the HLS transcode after it).
+STREAM_RECORDER_FINALIZE_SPACE_FACTOR = float(env("STREAM_RECORDER_FINALIZE_SPACE_FACTOR", "2.0") or 2.0)
+# Captured parts of a failed recording are kept this long for a retry, then swept.
+STREAM_RECORDER_FAILED_RETENTION_DAYS = env_int("STREAM_RECORDER_FAILED_RETENTION_DAYS", 7)
+STREAM_RECORDER_SWEEP_INTERVAL_SECONDS = env_int("STREAM_RECORDER_SWEEP_INTERVAL_SECONDS", 3600)
+STREAM_RECORDER_FINALIZE_QUEUE_SIZE = env_int("STREAM_RECORDER_FINALIZE_QUEUE_SIZE", 32)
+# When on, creating a broadcast session requires target_module_id (enable once the UI sends it).
+REALTIME_BROADCAST_REQUIRE_TARGET_MODULE = env_bool("REALTIME_BROADCAST_REQUIRE_TARGET_MODULE", False)
 COURSE_HLS_SEGMENT_DURATION_SECONDS = max(2, env_int("COURSE_HLS_SEGMENT_DURATION_SECONDS", 4))
 COURSE_HLS_KEYFRAME_INTERVAL_SECONDS = max(
     1,
@@ -404,6 +435,9 @@ SECURITY_MAX_INSPECTION_BODY_BYTES = env_int("SECURITY_MAX_INSPECTION_BODY_BYTES
 AUTH_LOGIN_MAX_FAILURES = env_int("AUTH_LOGIN_MAX_FAILURES", 10)
 AUTH_LOGIN_LOCKOUT_SECONDS = env_int("AUTH_LOGIN_LOCKOUT_SECONDS", 3600)
 AUTH_CONCURRENT_SESSION_EMAILS = env_list("AUTH_CONCURRENT_SESSION_EMAILS", [])
+# Devices a student may stay signed in on; signing in on one more signs out the
+# least recently used. Instructors, staff and the list above are unlimited.
+MAX_CONCURRENT_SESSIONS_PER_STUDENT = max(1, env_int("MAX_CONCURRENT_SESSIONS_PER_STUDENT", 2))
 AUTH_REFRESH_REUSE_GRACE_SECONDS = env_int("AUTH_REFRESH_REUSE_GRACE_SECONDS", 60)
 ACCOUNT_SELF_SERVICE_CREDENTIALS_ENABLED = env_bool("ACCOUNT_SELF_SERVICE_CREDENTIALS_ENABLED", False)
 COURSE_LIST_CACHE_TTL_SECONDS = env_int("COURSE_LIST_CACHE_TTL_SECONDS", 60)
@@ -414,6 +448,8 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = env_int("FILE_UPLOAD_MAX_MEMORY_SIZE", 2621440)
 MAX_VIDEO_UPLOAD_BYTES = env_int("MAX_VIDEO_UPLOAD_BYTES", 5368709120)
 DATA_UPLOAD_MAX_NUMBER_FIELDS = env_int("DATA_UPLOAD_MAX_NUMBER_FIELDS", 1000)
 TRUST_X_FORWARDED_FOR = env_bool("TRUST_X_FORWARDED_FOR", not DEBUG)
+# Internal proxy hops (the nginx gateway) that append to X-Forwarded-For after
+# host nginx records the real client; see config.client_ip.resolve_client_ip.
 TRUSTED_PROXY_COUNT = max(1, env_int("TRUSTED_PROXY_COUNT", 1))
 LIVEKIT_URL = env("LIVEKIT_URL", "")
 LIVEKIT_SERVER_URL = env("LIVEKIT_SERVER_URL", "")
@@ -556,6 +592,15 @@ REALTIME_OWNCAST_STREAM_AUTH_CACHE_TTL_SECONDS = env_int(
     15,
 )
 REALTIME_OWNCAST_OFFLINE_GRACE_SECONDS = env_int("REALTIME_OWNCAST_OFFLINE_GRACE_SECONDS", 45)
+# Owncast /api/status is cached and fetched single-flight across workers, so a
+# class joining at once costs one Owncast call per TTL window.
+REALTIME_OWNCAST_STATUS_CACHE_TTL_SECONDS = env_int("REALTIME_OWNCAST_STATUS_CACHE_TTL_SECONDS", 3)
+REALTIME_OWNCAST_STATUS_TIMEOUT_SECONDS = env_int("REALTIME_OWNCAST_STATUS_TIMEOUT_SECONDS", 3)
+# Host Studio heartbeat: how often LiveKit is asked about the broadcast egress,
+# and how many automatic restarts of a dead egress are allowed per 10 minutes.
+REALTIME_HOST_EGRESS_CHECK_INTERVAL_SECONDS = env_int("REALTIME_HOST_EGRESS_CHECK_INTERVAL_SECONDS", 10)
+REALTIME_HOST_EGRESS_MAX_AUTO_RESTARTS = env_int("REALTIME_HOST_EGRESS_MAX_AUTO_RESTARTS", 5)
+LIVEKIT_EGRESS_STATUS_TIMEOUT_SECONDS = env_int("LIVEKIT_EGRESS_STATUS_TIMEOUT_SECONDS", 5)
 LIVEKIT_EGRESS_LAYOUT = env("LIVEKIT_EGRESS_LAYOUT", "speaker-dark")
 LIVEKIT_EGRESS_TWIRP_TIMEOUT_SECONDS = env_int("LIVEKIT_EGRESS_TWIRP_TIMEOUT_SECONDS", 60)
 

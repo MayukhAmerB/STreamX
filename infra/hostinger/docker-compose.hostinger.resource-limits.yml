@@ -43,8 +43,15 @@ services:
 
   owncast:
     cpus: "${OWNCAST_CPUS:-1.5}"
-    mem_limit: "${OWNCAST_MEM_LIMIT:-1g}"
-    mem_reservation: "${OWNCAST_MEM_RESERVATION:-512m}"
+    # Owncast 0.2.5 runs ffmpeg for every viewer variant and serves HLS for the
+    # whole class; 1g left little headroom, and an OOM kill drops every viewer.
+    # Changing memory or cpu_shares needs a container recreate: never do it
+    # during a live class.
+    mem_limit: "${OWNCAST_MEM_LIMIT:-3g}"
+    mem_reservation: "${OWNCAST_MEM_RESERVATION:-1g}"
+    # 4x the default CPU weight (1024): when the box is saturated the live feed
+    # is served before web, workers and transcoding. Costs nothing when idle.
+    cpu_shares: ${OWNCAST_CPU_SHARES:-4096}
     pids_limit: 512
 
   media:

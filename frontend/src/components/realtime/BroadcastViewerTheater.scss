@@ -1,0 +1,491 @@
+// Live broadcast theater (video + status + chat).
+//
+// Self-contained: the student live pages render it inside the Carbon shell,
+// the instructor Broadcasting page still renders it on the legacy dark site.
+// Colours therefore read Carbon theme tokens (CSS custom properties set on
+// `.cds-app`) with Gray 100 fallbacks, and the legacy frame pins the dark
+// values. No Carbon component CSS is required.
+
+// Gray 100 values, used outside the shell and inside legacy frames.
+@mixin dark-palette {
+  --bvt-text-primary: #f4f4f4;
+  --bvt-text-secondary: #c6c6c6;
+  --bvt-layer: #262626;
+  --bvt-border: #393939;
+  --bvt-icon: #f4f4f4;
+  --bvt-link: #78a9ff;
+  --bvt-hover: rgba(141, 141, 141, 0.16);
+  --bvt-active: rgba(141, 141, 141, 0.4);
+  --bvt-focus: #ffffff;
+  --bvt-disabled: rgba(244, 244, 244, 0.25);
+  --bvt-warning: #f1c21b;
+  --bvt-success: #42be65;
+  --bvt-neutral-bg: #393939;
+  --bvt-neutral-text: #e0e0e0;
+}
+
+$motion: cubic-bezier(0.2, 0, 0.38, 0.9);
+$side-by-side: 75rem; // video + chat columns from 1200px wide screens
+
+.bvt {
+  --bvt-text-primary: var(--cds-text-primary, #f4f4f4);
+  --bvt-text-secondary: var(--cds-text-secondary, #c6c6c6);
+  --bvt-layer: var(--cds-layer-01, #262626);
+  --bvt-border: var(--cds-border-subtle-01, #393939);
+  --bvt-icon: var(--cds-icon-primary, #f4f4f4);
+  --bvt-link: var(--cds-link-primary, #78a9ff);
+  --bvt-hover: var(--cds-background-hover, rgba(141, 141, 141, 0.16));
+  --bvt-active: var(--cds-background-active, rgba(141, 141, 141, 0.4));
+  --bvt-focus: var(--cds-focus, #ffffff);
+  --bvt-disabled: var(--cds-text-disabled, rgba(244, 244, 244, 0.25));
+  --bvt-warning: var(--cds-support-warning, #f1c21b);
+  --bvt-success: var(--cds-support-success, #42be65);
+  --bvt-neutral-bg: var(--cds-tag-background-gray, #393939);
+  --bvt-neutral-text: var(--cds-tag-color-gray, #e0e0e0);
+  --bvt-live-bg: #da1e28;
+  --bvt-live-text: #ffffff;
+  --bvt-header-offset: var(--cds-app-header-height, 0px);
+  --bvt-nav-offset: var(--cds-app-bottom-nav-height, 0px);
+
+  display: grid;
+  min-inline-size: 0;
+  color: var(--bvt-text-primary);
+  gap: 1rem;
+  grid-template-areas:
+    'video'
+    'meta'
+    'chat';
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.cds-legacy-frame .bvt {
+  @include dark-palette;
+}
+
+// ---------------------------------------------------------------------------
+// Video
+// ---------------------------------------------------------------------------
+.bvt__video {
+  min-inline-size: 0;
+  background-color: #000000;
+  grid-area: video;
+}
+
+.bvt__frame {
+  max-inline-size: 100%;
+  margin-inline: auto;
+}
+
+// Phones held sideways (before the player goes fullscreen): fit the whole
+// 16:9 frame between the app header and the tab bar.
+@media (orientation: landscape) and (max-height: 540px) {
+  .bvt__frame {
+    max-inline-size: min(100%, calc((100dvh - var(--bvt-header-offset) - var(--bvt-nav-offset)) * 16 / 9));
+  }
+}
+
+.bvt__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  color: var(--bvt-text-secondary);
+  font-size: 0.875rem;
+  letter-spacing: 0.16px;
+  line-height: 1.43;
+  text-align: center;
+
+  p {
+    max-inline-size: 28rem;
+    margin: 0;
+    color: inherit;
+  }
+}
+
+.bvt__empty--video {
+  aspect-ratio: 16 / 9;
+  background-color: #161616;
+  color: #c6c6c6;
+}
+
+.bvt__empty--chat {
+  block-size: 100%;
+  min-block-size: 10rem;
+}
+
+// ---------------------------------------------------------------------------
+// Title, live tag, actions, status
+// ---------------------------------------------------------------------------
+.bvt__meta {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  padding-inline: var(--bvt-gutter, 0);
+  gap: 0.75rem;
+  grid-area: meta;
+}
+
+.bvt__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.bvt__titles {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  min-inline-size: 0;
+  gap: 0.5rem;
+}
+
+.bvt .bvt__title {
+  margin: 0;
+  color: var(--bvt-text-primary);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  text-transform: none;
+
+  @media (min-width: 42rem) {
+    font-size: 1.25rem;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+}
+
+.bvt__actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.bvt__tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  gap: 0.375rem;
+  letter-spacing: 0.32px;
+  line-height: 1.5rem;
+  min-block-size: 1.5rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.bvt__tag--live {
+  background-color: var(--bvt-live-bg);
+  color: var(--bvt-live-text);
+
+  .bvt__dot {
+    animation: bvt-pulse 2s ease-in-out infinite;
+  }
+}
+
+.bvt__tag--starting,
+.bvt__tag--offline,
+.bvt__tag--ended {
+  background-color: var(--bvt-neutral-bg);
+  color: var(--bvt-neutral-text);
+}
+
+.bvt__dot {
+  display: inline-block;
+  flex: none;
+  border-radius: 50%;
+  background-color: currentColor;
+  block-size: 0.5rem;
+  inline-size: 0.5rem;
+}
+
+@keyframes bvt-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.bvt__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  border-inline-start: 3px solid var(--bvt-warning);
+  background-color: var(--bvt-layer);
+  gap: 0.25rem 0.75rem;
+}
+
+.bvt__status-icon {
+  flex: none;
+  fill: var(--bvt-warning);
+
+  [data-icon-path='inner-path'] {
+    fill: #000000;
+    opacity: 1;
+  }
+}
+
+.bvt__status-text {
+  flex: 1 1 12rem;
+  margin: 0;
+  padding-block: 0.25rem;
+  color: var(--bvt-text-primary);
+  font-size: 0.875rem;
+  letter-spacing: 0.16px;
+  line-height: 1.43;
+}
+
+// ---------------------------------------------------------------------------
+// Buttons (Carbon ghost / icon-only look, no Carbon CSS needed)
+// ---------------------------------------------------------------------------
+.bvt__btn,
+.bvt__icon-btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 110ms $motion;
+
+  svg {
+    display: block;
+    flex: none;
+    fill: currentColor;
+  }
+
+  &:active {
+    background-color: var(--bvt-active);
+  }
+
+  &:focus {
+    outline: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--bvt-focus);
+    outline-offset: -2px;
+  }
+
+  &:disabled {
+    background-color: transparent;
+    color: var(--bvt-disabled);
+    cursor: not-allowed;
+  }
+
+  @media (hover: hover) {
+    &:hover:not(:disabled) {
+      background-color: var(--bvt-hover);
+    }
+  }
+}
+
+.bvt__btn {
+  padding: 0 1rem;
+  color: var(--bvt-link);
+  font-size: 0.875rem;
+  gap: 0.5rem;
+  letter-spacing: 0.16px;
+  min-block-size: 2.5rem;
+  white-space: nowrap;
+}
+
+.bvt__icon-btn {
+  padding: 0;
+  block-size: 2.5rem;
+  color: var(--bvt-icon);
+  inline-size: 2.5rem;
+}
+
+@media (pointer: coarse) {
+  .bvt__btn {
+    min-block-size: 2.75rem;
+  }
+
+  .bvt__icon-btn {
+    block-size: 2.75rem;
+    inline-size: 2.75rem;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Chat
+// ---------------------------------------------------------------------------
+.bvt__chat {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+  min-inline-size: 0;
+  background-color: var(--bvt-layer);
+  grid-area: chat;
+}
+
+.bvt__chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0.25rem 0.25rem 1rem;
+  border-block-end: 1px solid var(--bvt-border);
+  gap: 0.5rem;
+  min-block-size: 3rem;
+}
+
+.bvt__chat[data-open='false'] .bvt__chat-header {
+  border-block-end-color: transparent;
+}
+
+.bvt__chat-heading {
+  min-inline-size: 0;
+}
+
+.bvt .bvt__chat-title {
+  overflow: hidden;
+  margin: 0;
+  color: var(--bvt-text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.16px;
+  line-height: 1.29;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.bvt__chat-status {
+  display: flex;
+  align-items: center;
+  margin: 0.125rem 0 0;
+  color: var(--bvt-text-secondary);
+  font-size: 0.75rem;
+  gap: 0.375rem;
+  letter-spacing: 0.32px;
+  line-height: 1.33;
+
+  .bvt__dot {
+    block-size: 0.375rem;
+    inline-size: 0.375rem;
+  }
+
+  &[data-enabled='true'] .bvt__dot {
+    background-color: var(--bvt-success);
+  }
+}
+
+.bvt__chat-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.bvt__chat-toggle svg {
+  transform: rotate(180deg);
+  transition: transform 150ms $motion;
+}
+
+.bvt__chat[data-open='false'] .bvt__chat-toggle svg {
+  transform: none;
+}
+
+// Phones/tablets: the chat fills the screen under the video.
+.bvt__chat-body {
+  block-size: clamp(
+    20rem,
+    calc(100dvh - var(--bvt-header-offset) - var(--bvt-nav-offset) - 56.25vw - 9rem),
+    40rem
+  );
+}
+
+.bvt__chat[data-open='false'] .bvt__chat-body {
+  display: none;
+}
+
+.bvt__chat-frame {
+  display: block;
+  border: 0;
+  block-size: 100%;
+  inline-size: 100%;
+}
+
+// Wide screens: video left, chat right at the video's height.
+@media (min-width: $side-by-side) {
+  .bvt--with-chat {
+    align-items: start;
+    column-gap: 1.5rem;
+    grid-template-areas:
+      'video chat'
+      'meta chat';
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+    grid-template-rows: auto 1fr;
+  }
+
+  .bvt--with-chat .bvt__chat {
+    align-self: stretch;
+  }
+
+  .bvt__chat-toggle {
+    display: none;
+  }
+
+  .bvt__chat .bvt__chat-body,
+  .bvt__chat[data-open='false'] .bvt__chat-body {
+    display: block;
+    flex: 1 1 0;
+    min-block-size: 0;
+    block-size: auto;
+  }
+
+  .bvt__chat[data-open='false'] .bvt__chat-header {
+    border-block-end-color: var(--bvt-border);
+  }
+}
+
+// Optional framed variant (withContainer).
+.bvt-container {
+  margin-block-end: 1.5rem;
+}
+
+.bvt__visually-hidden {
+  position: absolute;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  margin: -1px;
+  block-size: 1px;
+  clip: rect(0 0 0 0);
+  inline-size: 1px;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bvt__tag--live .bvt__dot {
+    animation: none;
+  }
+
+  .bvt__btn,
+  .bvt__icon-btn,
+  .bvt__chat-toggle svg {
+    transition: none;
+  }
+}

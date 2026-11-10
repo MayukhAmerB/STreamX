@@ -145,6 +145,57 @@ Accept only when:
 - Nginx segment cache is predominantly `HIT`;
 - backend, Nginx, and Owncast logs show no sustained 401/403/5xx burst.
 
+## Live class hardening (Owncast memory, Host Studio egress, sessions)
+
+Run this **between classes only**. Recreating Owncast or LiveKit egress ends
+any broadcast that is running.
+
+```bash
+cd /opt/alsyed/StreamX || exit 1
+set -euo pipefail
+ENV_FILE=./backend/.env.hostinger.production
+# set_env() and COMPOSE=(...) exactly as in the deploy section above.
+
+# Owncast was capped at 1g; the env file overrides the Compose default, so it
+# must change here too. cpu_shares gives Owncast 4x CPU weight under load.
+set_env OWNCAST_MEM_LIMIT 3g
+set_env OWNCAST_MEM_RESERVATION 1g
+set_env OWNCAST_CPU_SHARES 4096
+
+# Optional (defaults shown): students may stay signed in on two devices;
+# instructors, staff and superusers are never limited.
+set_env MAX_CONCURRENT_SESSIONS_PER_STUDENT 2
+
+# Host Studio now always uses participant egress; egress.yaml lowers its CPU
+# cost so egress accepts it. Regenerate the runtime egress config.
+sudo HOSTINGER_ENV_FILE="$ENV_FILE" bash infra/hostinger/prepare-livekit-config.sh
+
+"${COMPOSE[@]}" config -q
+# Build first so the migration runs with the new code (adds users.0012_session_slot).
+"${COMPOSE[@]}" build backend frontend
+"${COMPOSE[@]}" run --rm --no-deps -T --entrypoint python backend manage.py migrate --noinput
+"${COMPOSE[@]}" up -d --no-deps --force-recreate owncast livekit-egress
+"${COMPOSE[@]}" up -d --build --no-deps frontend backend backend-2 backend-3 backend-4
+
+docker inspect streamx-owncast-1 --format '{{.HostConfig.Memory}} {{.HostConfig.CpuShares}}'
+# expect: 3221225472 4096
+```
+
+The broadcast resource profile (`resource-profiles/broadcast.env`) raises
+Owncast's CPU cap to 3.5 vCPU and lowers only the background worker and
+transcoder (0.25 each). The web/DB tier (postgres, pgbouncer, gateway,
+backend and backend-2/3/4, redis) keeps its previous caps: these are CFS
+ceilings, not reservations, so a lower cap throttles the tier even while the
+host is idle -- exactly when every HLS segment request is authorized by the
+backend through nginx `auth_request`. The caps overcommit the 8 vCPU host on
+purpose (~19 vCPU in total); Owncast's priority under contention comes from
+its `cpu_shares` 4096, not from starving other containers. The resource
+profile agent rereads the file on every cycle and applies it with
+`docker update --cpus`, which does not restart containers, so once the
+checkout is updated the new caps apply within one agent cycle whenever
+Broadcast is the selected profile. That is safe during a class. Select Broadcast before every live class (OBS or Host
+Studio): the Meeting profile gives Owncast only 0.75 vCPU.
+
 ## Rollback
 
 If `nginx -t` fails, do not reload. Restore the timestamped Nginx backup. The

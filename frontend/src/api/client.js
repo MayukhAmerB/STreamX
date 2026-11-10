@@ -1,13 +1,28 @@
 import axios from "axios";
 import { resolveApiBaseUrl } from "../utils/backendUrl";
+import { isSessionEviction } from "../utils/sessionEviction";
 
 const unsafeMethods = new Set(["post", "put", "patch", "delete"]);
 let csrfTokenCache = "";
 let csrfBootstrapPromise = null;
+// Set once another device takes this session. Every later 401 is the same
+// eviction, so it is reported once and no further refreshes are attempted
+// until this browser signs in again.
+let sessionEvicted = false;
 
 export const AUTH_SESSION_EXPIRED_EVENT = "auth:session-expired";
 
+export function resetSessionEviction() {
+  sessionEvicted = false;
+}
+
 function notifySessionExpired(detail = {}) {
+  if (isSessionEviction(detail)) {
+    if (sessionEvicted) {
+      return;
+    }
+    sessionEvicted = true;
+  }
   if (typeof window === "undefined") {
     return;
   }
@@ -120,6 +135,9 @@ apiClient.interceptors.request.use(async (config) => {
 apiClient.interceptors.response.use(
   (response) => {
     extractCsrfToken(response);
+    if (String(response?.config?.url || "").includes("/auth/login/")) {
+      resetSessionEviction();
+    }
     return response;
   },
   async (error) => {
@@ -151,6 +169,9 @@ apiClient.interceptors.response.use(
       !error.config._retry &&
       !isRefreshRequest
     ) {
+      if (sessionEvicted) {
+        return Promise.reject(error);
+      }
       error.config._retry = true;
       try {
         await refreshSession(error.config._sentAt);

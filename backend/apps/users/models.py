@@ -154,3 +154,24 @@ class AsyncJob(models.Model):
 
     def __str__(self):
         return f"{self.job_type}:{self.status}:id={self.id}"
+
+
+class SessionSlot(models.Model):
+    """One signed-in device of a session-limited account (see session_policy).
+
+    Tokens carry the slot id as a claim and stay valid only while the slot row
+    exists, so deleting a row signs that device out.
+    """
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="session_slots")
+    slot_id = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "last_seen_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id}:{self.slot_id}"

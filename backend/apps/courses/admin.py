@@ -4,12 +4,21 @@ import json
 from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
+from django.db import transaction
 from django.db.models import Count
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import ngettext
 
+from apps.payments.batch_pass import (
+    active_pass_holder_count,
+    grant_course_to_pass_holders,
+    revoke_course_from_pass_holders,
+)
+from config.audit import log_security_event
+
 from .cache_utils import bump_course_list_cache_version
+from .engagement.admin import LectureEngagementAdminMixin, annotate_engagement_counts
 from .experience_models import CourseReview, PentestingApplication
 from .models import (
     Course,
@@ -232,6 +241,15 @@ class CourseAdminForm(forms.ModelForm):
         ),
     )
 
+    confirm_batch_pass_change = forms.BooleanField(
+        required=False,
+        label="Confirm batch pass change",
+        help_text=(
+            "Required when 'Included in batch pass' is ticked or unticked while students hold "
+            "an active pass. Unticking revokes the course from holders who did not buy it separately."
+        ),
+    )
+
     class Meta:
         model = Course
         fields = "__all__"
@@ -239,6 +257,13 @@ class CourseAdminForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         instance = getattr(self, "instance", None)
+        self._was_in_batch_pass = bool(
+            instance and instance.pk and Course.objects.filter(pk=instance.pk, included_in_batch_pass=True).exists()
+        )
+        self.pass_holder_count = active_pass_holder_count()
+        if "confirm_batch_pass_change" in self.fields:
+            verb = "Revoke this course from" if self._was_in_batch_pass else "Grant this course to"
+            self.fields["confirm_batch_pass_change"].label = f"{verb} {self.pass_holder_count} current pass holders"
         if instance and instance.pk:
             self.fields["card_highlights"].initial = "\n".join(instance.card_highlights or [])
             self.initial["card_highlights"] = self.fields["card_highlights"].initial
@@ -342,6 +367,18 @@ class CourseAdminForm(forms.ModelForm):
 
     def clean_public_curriculum(self):
         return _parse_public_curriculum(self.cleaned_data.get("public_curriculum"))
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if "included_in_batch_pass" not in self.fields:
+            return cleaned_data
+        changes_pass = bool(cleaned_data.get("included_in_batch_pass")) != self._was_in_batch_pass
+        if changes_pass and self.pass_holder_count and not cleaned_data.get("confirm_batch_pass_change"):
+            self.add_error(
+                "confirm_batch_pass_change",
+                f"Tick '{self.fields['confirm_batch_pass_change'].label}' to confirm this batch pass change.",
+            )
+        return cleaned_data
 
 
 class LectureInlineForm(forms.ModelForm):
@@ -590,7 +627,12 @@ class CourseAdmin(admin.ModelAdmin):
                     "'Included in batch pass'. Inclusion: tick it on each new batch so existing pass "
                     "holders are unlocked automatically when it is published."
                 ),
-                "fields": ("batch_pass_payment_enabled", "batch_pass_price", "included_in_batch_pass"),
+                "fields": (
+                    "batch_pass_payment_enabled",
+                    "batch_pass_price",
+                    "included_in_batch_pass",
+                    "confirm_batch_pass_change",
+                ),
             },
         ),
         ("Course facts", {"fields": ("is_flagship", "batch", "duration", "schedule", "class_length", "total_classes", "total_hours", "batch_size", "confirmed_statistics")}),
@@ -855,6 +897,39 @@ class CourseAdmin(admin.ModelAdmin):
             price_value if price_value is not None else "-",
         )
 
+    @transaction.atomic
+    def save_model(self, request, obj, form, change):
+        was_included = bool(change and Course.objects.filter(pk=obj.pk, included_in_batch_pass=True).exists())
+        super().save_model(request, obj, form, change)
+        if was_included == obj.included_in_batch_pass:
+            return
+        if obj.included_in_batch_pass:
+            granted = grant_course_to_pass_holders(obj)
+            log_security_event(
+                "admin.batch_pass_course_included",
+                request=request,
+                course_id=obj.pk,
+                pass_holders=getattr(form, "pass_holder_count", None),
+                granted=granted,
+                published=obj.is_published,
+            )
+            return
+        result = revoke_course_from_pass_holders(obj)
+        log_security_event(
+            "admin.batch_pass_course_excluded",
+            request=request,
+            course_id=obj.pk,
+            pass_holders=getattr(form, "pass_holder_count", None),
+            **result,
+        )
+        if result["revoked"] or result["reduced"]:
+            self.message_user(
+                request,
+                f"Removed from the batch pass: {result['revoked']} enrollment(s) revoked, "
+                f"{result['reduced']} reduced to their own installment access.",
+                level=messages.WARNING,
+            )
+
     @admin.action(description="Mark selected courses as Live")
     def mark_live(self, request, queryset):
         queryset.update(launch_status=Course.STATUS_LIVE)
@@ -987,7 +1062,7 @@ class ModuleAdmin(admin.ModelAdmin):
 
 
 @admin.register(Lecture)
-class LectureAdmin(admin.ModelAdmin):
+class LectureAdmin(LectureEngagementAdminMixin, admin.ModelAdmin):
     form = LectureInlineForm
     list_display = (
         "id",
@@ -996,13 +1071,18 @@ class LectureAdmin(admin.ModelAdmin):
         "course_title",
         "order",
         "is_preview",
+        "is_published",
         "stream_status",
+        "view_count",
+        "like_count",
+        "comment_count",
         "resource_count",
         "updated_at",
     )
     list_display_links = ("id", "title")
     list_filter = (
         "is_preview",
+        "is_published",
         "stream_status",
         "section__course__category",
         "section__course__level",
@@ -1012,7 +1092,17 @@ class LectureAdmin(admin.ModelAdmin):
     autocomplete_fields = ("section",)
     ordering = ("section__course", "section", "order", "id")
     inlines = [LectureResourceInline]
-    readonly_fields = ("stream_status", "stream_manifest_key", "stream_duration_seconds", "stream_error", "created_at", "updated_at")
+    readonly_fields = (
+        "stream_status",
+        "stream_manifest_key",
+        "stream_duration_seconds",
+        "stream_error",
+        "view_count",
+        "like_count",
+        "comment_count",
+        "created_at",
+        "updated_at",
+    )
     save_on_top = True
     list_per_page = 50
     fields = (
@@ -1021,6 +1111,10 @@ class LectureAdmin(admin.ModelAdmin):
         "description",
         "order",
         "is_preview",
+        "is_published",
+        "view_count",
+        "like_count",
+        "comment_count",
         "video_file",
         "remove_uploaded_video",
         "video_key",
@@ -1037,9 +1131,10 @@ class LectureAdmin(admin.ModelAdmin):
         css = {"all": ("admin/css/courses_upload_progress.css",)}
 
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related("section", "section__course").annotate(
+        queryset = super().get_queryset(request).select_related("section", "section__course").annotate(
             _resource_count=Count("resources", distinct=True)
         )
+        return annotate_engagement_counts(queryset)
 
     @admin.display(description="Course")
     def course_title(self, obj):

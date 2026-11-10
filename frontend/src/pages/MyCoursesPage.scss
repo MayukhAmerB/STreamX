@@ -1,0 +1,122 @@
+// My courses (Carbon). Token-only imports: emits no Carbon component CSS.
+@use '../features/app-shell/styles/tokens' as *;
+
+.cds-app .cds-library-stats {
+  display: grid;
+  margin: 0 0 $spacing-06;
+  gap: $spacing-03;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+
+  @include breakpoint(md) {
+    gap: $spacing-05;
+  }
+
+  dt {
+    @include type-style('label-01');
+
+    color: $text-secondary;
+  }
+
+  dd {
+    @include type-style('heading-05');
+
+    margin: $spacing-02 0 0;
+    color: $text-primary;
+  }
+}
+
+.cds-app .cds-library-stats__item {
+  min-block-size: auto;
+  min-inline-size: 0;
+  padding: $spacing-04;
+
+  @include breakpoint(md) {
+    padding: $spacing-05;
+  }
+}
+
+.cds-app .cds-library-callout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-block-end: $spacing-06;
+  gap: $spacing-04;
+
+  svg {
+    fill: $icon-primary;
+  }
+}
+
+.cds-app .cds-library-callout__text {
+  @include type-style('body-02');
+
+  flex: 1 1 12rem;
+}
+
+.cds-app .cds-library-search {
+  margin-block-end: $spacing-06;
+}
+
+// Course tile.
+.cds-app .cds-course-tile {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  min-inline-size: 0;
+}
+
+.cds-app .cds-course-tile__media {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background-color: $layer-accent-01;
+
+  img {
+    position: absolute;
+    display: block;
+    block-size: 100%;
+    inline-size: 100%;
+    inset: 0;
+    object-fit: cover;
+  }
+}
+
+.cds-app .cds-course-tile__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: $spacing-05;
+  gap: $spacing-05;
+}
+
+.cds-app .cds-course-tile__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-02;
+
+  .cds--tag {
+    margin: 0;
+  }
+}
+
+.cds-app .cds-course-tile__title {
+  @include type-style('heading-03');
+
+  color: $text-primary;
+}
+
+.cds-app .cds-course-tile__actions {
+  display: flex;
+  flex-wrap: wrap;
+  margin-block-start: auto;
+  gap: $spacing-03;
+
+  .cds--btn--ghost {
+    padding-inline-end: $spacing-05;
+  }
+}
+
+.cds-app .cds-course-tile__primary {
+  flex: 1 1 100%;
+  max-inline-size: none;
+}

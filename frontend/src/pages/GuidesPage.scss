@@ -1,0 +1,226 @@
+// Guides (Carbon). Token-only imports: emits no Carbon component CSS.
+@use '../features/app-shell/styles/tokens' as *;
+
+// Phone: player, details, then the list. Desktop: player column (sticky)
+// beside the guide list.
+.cds-app .cds-guides {
+  display: grid;
+  align-items: start;
+  gap: $spacing-07;
+  grid-template-columns: minmax(0, 1fr);
+
+  @include breakpoint(lg) {
+    gap: $spacing-07;
+    grid-template-columns: minmax(0, 1.75fr) minmax(17rem, 1fr);
+  }
+}
+
+.cds-app .cds-guides__viewer {
+  min-inline-size: 0;
+
+  @include breakpoint(lg) {
+    position: sticky;
+    inset-block-start: calc(var(--cds-app-header-height) + #{$spacing-05});
+  }
+}
+
+// The video is always shown on black, in both themes.
+.cds-app .cds-guides__stage {
+  overflow: hidden;
+  background-color: #000000;
+}
+
+.cds-app .cds-guides__video {
+  display: block;
+  block-size: 100%;
+  inline-size: 100%;
+  background-color: #000000;
+  object-fit: contain;
+}
+
+.cds-app .cds-guides__stage-message {
+  @include type-style('body-compact-01');
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: $spacing-05;
+  block-size: 100%;
+  color: #c6c6c6;
+  text-align: center;
+
+  .cds--inline-loading {
+    justify-content: center;
+    inline-size: auto;
+  }
+
+  .cds--inline-loading__text {
+    color: #c6c6c6;
+  }
+}
+
+.cds-app .cds-guides__details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding-block-start: $spacing-05;
+  gap: $spacing-03;
+
+  .cds-page-notification,
+  .cds-page-notification-group {
+    margin-block: $spacing-03 0;
+  }
+}
+
+.cds-app .cds-guides__eyebrow {
+  @include type-style('label-01');
+
+  color: $text-secondary;
+}
+
+.cds-app .cds-guides__title {
+  @include type-style('heading-03');
+
+  color: $text-primary;
+
+  @include breakpoint(md) {
+    @include type-style('heading-04');
+  }
+}
+
+.cds-app .cds-guides__description {
+  @include type-style('body-01');
+
+  max-inline-size: 48rem;
+  color: $text-secondary;
+  white-space: pre-line;
+}
+
+.cds-app .cds-guides__next {
+  margin-block-start: $spacing-03;
+}
+
+// Guide list.
+.cds-app .cds-guides__library {
+  min-inline-size: 0;
+}
+
+.cds-app .cds-guides__library-header {
+  display: flex;
+  align-items: center;
+  margin-block-end: $spacing-04;
+  gap: $spacing-03;
+
+  .cds--tag {
+    margin: 0;
+  }
+}
+
+.cds-app .cds-guides__library-title {
+  @include type-style('heading-03');
+
+  color: $text-primary;
+}
+
+.cds-app .cds-guides__list {
+  margin: 0;
+  padding: 0;
+  background-color: $layer-01;
+  list-style: none;
+
+  > li + li {
+    border-block-start: 1px solid $border-subtle-01;
+  }
+}
+
+.cds-app .cds-guide-item {
+  display: flex;
+  align-items: flex-start;
+  padding: $spacing-05;
+  border: 0;
+  margin: 0;
+  background: none;
+  color: $text-primary;
+  cursor: pointer;
+  gap: $spacing-04;
+  inline-size: 100%;
+  min-block-size: 3.5rem;
+  text-align: start;
+  -webkit-tap-highlight-color: transparent;
+
+  &:focus-visible {
+    @include focus-outline('outline');
+  }
+
+  &:active {
+    background-color: $layer-active-01;
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      background-color: $layer-hover-01;
+    }
+  }
+
+  &.is-active {
+    background-color: $layer-selected-01;
+    box-shadow: inset 3px 0 0 $border-interactive;
+  }
+}
+
+.cds-app .cds-guide-item__index {
+  @include type-style('label-01');
+
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background-color: $layer-accent-01;
+  block-size: 1.75rem;
+  color: $text-secondary;
+  inline-size: 1.75rem;
+
+  svg {
+    fill: $icon-on-color;
+  }
+}
+
+.cds-app .cds-guide-item.is-active .cds-guide-item__index {
+  background-color: $interactive;
+}
+
+.cds-app .cds-guide-item__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-inline-size: 0;
+  gap: $spacing-02;
+}
+
+.cds-app .cds-guide-item__title {
+  @include type-style('heading-compact-01');
+
+  color: $text-primary;
+}
+
+.cds-app .cds-guide-item__description {
+  @include type-style('body-compact-01');
+
+  display: -webkit-box;
+  overflow: hidden;
+  color: $text-secondary;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.cds-app .cds-guide-item__tag {
+  flex: none;
+  margin: 0;
+
+  // Phones: the play icon and highlight already mark the current guide.
+  @include breakpoint-down(md) {
+    display: none;
+  }
+}

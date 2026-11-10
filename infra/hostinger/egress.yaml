@@ -16,3 +16,7 @@ cpu_cost:
   web_cpu_cost: 1.0
   track_composite_cpu_cost: 1.0
   track_cpu_cost: 0.5
+  # Host Studio broadcasts always use participant egress (it survives camera <->
+  # screen switches). The default cost (2.0) can exceed the egress container's
+  # CPU quota and make StartParticipantEgress fail with "no available resources".
+  participant_cpu_cost: 1.0

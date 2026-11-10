@@ -78,3 +78,54 @@ services:
     pids_limit: 512
     networks:
       - appnet
+
+  # Server-side recorder for OBS classes (apps/realtime/recording/). It pulls
+  # Owncast's HLS output over the Docker network with ffmpeg stream copy (no
+  # re-encode, typically <5% of one core), writes MPEG-TS parts under
+  # /recordings/class-recordings and finalizes them into module lectures in
+  # /app/media. It is only an HLS viewer of Owncast: if it crashes, the live
+  # class is unaffected. Run exactly one replica.
+  stream-recorder:
+    build:
+      context: ./backend
+    restart: always
+    env_file:
+      - ./backend/.env.hostinger.production
+    environment:
+      RUN_MIGRATIONS: "0"
+      RUN_COLLECTSTATIC: "0"
+    command:
+      [
+        "python",
+        "manage.py",
+        "run_stream_recorder",
+        "--poll-seconds",
+        "${STREAM_RECORDER_POLL_SECONDS:-2}",
+      ]
+    stop_grace_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - backend_media:/app/media
+      - recordings_data:/recordings
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "from pathlib import Path; import sys; cmd = Path('/proc/1/cmdline').read_text().replace(chr(0), ' '); sys.exit(0 if 'run_stream_recorder' in cmd else 1)",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    cpus: "${STREAM_RECORDER_CPUS:-0.5}"
+    mem_limit: "${STREAM_RECORDER_MEM_LIMIT:-768m}"
+    mem_reservation: "${STREAM_RECORDER_MEM_RESERVATION:-256m}"
+    pids_limit: 256
+    networks:
+      - appnet

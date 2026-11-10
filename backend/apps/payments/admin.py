@@ -1,4 +1,5 @@
 from django.contrib import admin, messages
+from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.http import Http404
 from django.template.response import TemplateResponse
@@ -7,9 +8,11 @@ from django.utils.html import format_html
 
 from config.audit import log_security_event
 
+from .batch_pass import activate_batch_pass, deactivate_batch_pass
 from .credentials import issue_credentials_for_paid_user
 from .models import Payment, PaymentWebhookEvent, SuccessfulPaymentUser
 from .models import BatchPass
+from .refunds import record_refund
 
 
 @admin.register(Payment)
@@ -58,7 +61,7 @@ class PaymentAdmin(admin.ModelAdmin):
         "country",
         "state",
     )
-    actions = ("generate_login_credentials",)
+    actions = ("generate_login_credentials", "mark_refunded_and_revoke_access")
     readonly_fields = (
         "terms_snapshot",
         "application",
@@ -95,6 +98,8 @@ class PaymentAdmin(admin.ModelAdmin):
         "failure_reason",
         "last_webhook_event",
         "paid_at",
+        "amount_refunded",
+        "refunded_at",
         "created_at",
         "updated_at",
     )
@@ -136,6 +141,8 @@ class PaymentAdmin(admin.ModelAdmin):
                     "gateway_details",
                     "failure_reason",
                     "paid_at",
+                    "amount_refunded",
+                    "refunded_at",
                 )
             },
         ),
@@ -164,6 +171,45 @@ class PaymentAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if not request.user.is_superuser:
+            actions.pop("mark_refunded_and_revoke_access", None)
+        return actions
+
+    @admin.action(description="Mark refunded and revoke access")
+    def mark_refunded_and_revoke_access(self, request, queryset):
+        """For refunds issued manually in the Razorpay dashboard."""
+        if not request.user.is_superuser:
+            self.message_user(request, "Only superusers can mark payments refunded.", level=messages.ERROR)
+            return
+        refunded = 0
+        for payment in queryset.filter(status=Payment.STATUS_PAID):
+            outcome = record_refund(payment, amount_refunded=payment.amount, full=True)
+            if not outcome.newly_refunded:
+                continue
+            refunded += 1
+            log_security_event(
+                "admin.payment_marked_refunded",
+                request=request,
+                payment_id=payment.id,
+                course_id=payment.course_id,
+                target_user_id=payment.user_id,
+                plan=payment.plan,
+                **outcome.access,
+            )
+            self.log_change(
+                request,
+                outcome.payment,
+                "Marked refunded; revoked {revoked} and reduced {reduced} enrollment(s).".format(**outcome.access),
+            )
+        skipped = queryset.count() - refunded
+        self.message_user(
+            request,
+            f"{refunded} payment(s) marked refunded and access revoked. {skipped} skipped (not paid or already refunded).",
+            level=messages.SUCCESS if refunded else messages.WARNING,
+        )
 
     @admin.action(description="Generate/reset credentials for selected paid buyers")
     def generate_login_credentials(self, request, queryset):
@@ -451,3 +497,25 @@ class BatchPassAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    @transaction.atomic
+    def save_model(self, request, obj, form, change):
+        was_active = BatchPass.objects.filter(pk=obj.pk, is_active=True).exists()
+        super().save_model(request, obj, form, change)
+        if was_active and not obj.is_active:
+            result = deactivate_batch_pass(obj)
+            event = "admin.batch_pass_deactivated"
+        elif obj.is_active and not was_active and obj.payment.status == Payment.STATUS_PAID:
+            activate_batch_pass(obj.payment)
+            result = {}
+            event = "admin.batch_pass_reactivated"
+        else:
+            return
+        log_security_event(
+            event,
+            request=request,
+            batch_pass_id=obj.pk,
+            payment_id=obj.payment_id,
+            target_user_id=obj.user_id,
+            **result,
+        )

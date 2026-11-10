@@ -3,18 +3,35 @@ import { useEffect, useRef, useState } from "react";
 import { reportRealtimeBroadcastPlaybackIssue } from "../../api/realtime";
 import ProtectedPlaybackSurface from "../ProtectedPlaybackSurface";
 import {
+  NATIVE_STALL_PROBE_MS,
+  PROBE_RESULTS,
   RECOVERY_ACTIONS,
+  STREAM_INTERRUPTIONS,
+  STREAM_OFFLINE_SIGNALS,
+  STREAM_TELEMETRY_JITTER_MS,
+  buildStreamOutageReport,
+  classifyStreamInterruption,
   decideHlsErrorAction,
   decideMediaElementEventAction,
   evaluatePlaybackFreeze,
+  findOfflineSlateStart,
+  hasReachedOfflineTail,
   initialHlsRecoveryState,
   isAutoplayBlockedError,
+  isEndedLevelDetails,
+  isPlaylistMissingError,
+  isSessionExpectedLive,
   jitteredBackoffDelay,
   normalizeStreamStatus,
   randomJitterDelay,
   shouldReloadOnStreamLive,
   shouldRenewBootstrapInBackground,
 } from "../../utils/hlsPlaybackRecovery";
+import {
+  STREAM_RECONNECT_PHASES,
+  createLivePlaylistProber,
+  createStreamReconnectController,
+} from "../../utils/streamReconnect";
 
 const PLAYBACK_WATCHDOG_INTERVAL_MS = 5_000;
 const PLAYBACK_REPORT_DEDUP_MS = 30_000;
@@ -112,6 +129,52 @@ function reportPlaybackIssue({ sessionId, issue, retryAttempt, lastReportedIssue
   }).catch(() => {});
 }
 
+// Every viewer sees the same outage at the same moment, so outage telemetry is
+// sent after a random delay instead of all at once.
+function queueStreamOutageReport({ sessionId, report, timers, lastReportedIssueRef }) {
+  if (!sessionId || !report) return;
+  const timerId = window.setTimeout(() => {
+    timers.delete(timerId);
+    reportPlaybackIssue({
+      sessionId,
+      issue: report,
+      retryAttempt: report.retryAttempt,
+      lastReportedIssueRef,
+    });
+  }, randomJitterDelay(STREAM_TELEMETRY_JITTER_MS));
+  timers.add(timerId);
+}
+
+function StreamReconnectOverlay({ offline = false, hadPlayback = true, onRetry }) {
+  const headline = offline
+    ? "Waiting for your internet connection..."
+    : hadPlayback
+      ? "Reconnecting to class..."
+      : "Waiting for the live video to start...";
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-[#161616]/90 px-6 text-center"
+    >
+      <span
+        aria-hidden="true"
+        className="h-8 w-8 animate-spin rounded-full border-2 border-[#525252] border-t-[#F4F4F4] motion-reduce:animate-none"
+      />
+      <span className="text-sm font-medium text-[#F4F4F4]">{headline}</span>
+      <span className="text-xs text-[#C6C6C6]">The video will resume here automatically.</span>
+      <button
+        type="button"
+        data-playback-gesture-ignore="true"
+        onClick={onRetry}
+        className="text-xs font-semibold text-[#C6C6C6] underline decoration-[#C6C6C6]/50 underline-offset-2 transition hover:text-[#F4F4F4] hover:decoration-[#F4F4F4]"
+      >
+        Retry now
+      </button>
+    </div>
+  );
+}
+
 export default function SecureHlsBroadcastPlayer({
   sessionId = null,
   bootstrapUrl = "",
@@ -119,6 +182,7 @@ export default function SecureHlsBroadcastPlayer({
   fallbackEmbedUrl = "",
   refreshKey = 0,
   streamStatus = "",
+  sessionStatus = "",
   title = "Broadcast Stream",
 }) {
   const videoRef = useRef(null);
@@ -131,6 +195,13 @@ export default function SecureHlsBroadcastPlayer({
   const recoveringRef = useRef(false);
   const liveResumeRef = useRef(null);
   const previousStreamStatusRef = useRef(normalizeStreamStatus(streamStatus));
+  // Outage of the broadcast itself ({ startedAt, probeAttempt }); survives the
+  // player rebuild that reattaches to the returned stream.
+  const streamOutageRef = useRef(null);
+  const reconnectControllerRef = useRef(null);
+  const sessionStatusRef = useRef(sessionStatus);
+  const hasEverPlayedRef = useRef(false);
+  const outageReportTimersRef = useRef(new Set());
   const [bootstrapReady, setBootstrapReady] = useState(false);
   const [bootstrapError, setBootstrapError] = useState("");
   const [connectionIssue, setConnectionIssue] = useState(null);
@@ -140,7 +211,11 @@ export default function SecureHlsBroadcastPlayer({
   // "" while playback is normal, "muted" after autoplay only succeeded muted,
   // "blocked" when the browser requires a click before any playback.
   const [autoplayState, setAutoplayState] = useState("");
+  // null while the broadcast is up; { offline, hadPlayback } while waiting for
+  // it to come back.
+  const [streamReconnect, setStreamReconnect] = useState(null);
   const normalizedStreamStatus = normalizeStreamStatus(streamStatus);
+  const sessionExpectedLive = isSessionExpectedLive(sessionStatus);
 
   const retryNow = () => {
     setConnectionIssue({ message: "Retrying the secure video connection..." });
@@ -262,6 +337,33 @@ export default function SecureHlsBroadcastPlayer({
   }, [bootstrapGeneration, bootstrapUrl, hlsUrl, refreshKey, sessionId]);
 
   useEffect(() => {
+    sessionStatusRef.current = sessionStatus;
+    if (sessionExpectedLive) return;
+    // The class really ended: stop waiting for the stream to return.
+    reconnectControllerRef.current?.dispose();
+    streamOutageRef.current = null;
+    setStreamReconnect(null);
+  }, [sessionExpectedLive, sessionStatus]);
+
+  // A different stream starts with a clean outage record.
+  useEffect(
+    () => () => {
+      streamOutageRef.current = null;
+      hasEverPlayedRef.current = false;
+      setStreamReconnect(null);
+    },
+    [hlsUrl, sessionId]
+  );
+
+  useEffect(() => {
+    const timers = outageReportTimersRef.current;
+    return () => {
+      timers.forEach((timerId) => window.clearTimeout(timerId));
+      timers.clear();
+    };
+  }, []);
+
+  useEffect(() => {
     const previousStatus = previousStreamStatusRef.current;
     previousStreamStatusRef.current = normalizedStreamStatus;
     if (!shouldReloadOnStreamLive({ previousStatus, nextStatus: normalizedStreamStatus, recovering: true })) {
@@ -302,10 +404,49 @@ export default function SecureHlsBroadcastPlayer({
     let lastPlaybackTime = video.currentTime || 0;
     let lastPlaybackProgressAt = Date.now();
     let startedAt = Date.now();
+    // Broadcast-offline handling (encoder blip while the class is live).
+    let sawLivePlaylist = false;
+    let offlineSlateStart = null;
+    let holdingForOutage = false;
+    let nativeStallProbe = null;
+    let nativeStallProbed = false;
+    const probePlaylist = createLivePlaylistProber({ url: hlsUrl });
 
     playbackHealthyRef.current = false;
     recoveringRef.current = true;
     setAutoplayState("");
+
+    const reconnect = createStreamReconnectController({
+      probe: probePlaylist,
+      initialAttempt: streamOutageRef.current?.probeAttempt || 0,
+      onProbeAttempt: (attempt) => {
+        if (streamOutageRef.current) streamOutageRef.current.probeAttempt = attempt;
+      },
+      onPhaseChange: (phase) => {
+        if (disposed || phase !== STREAM_RECONNECT_PHASES.WAITING) return;
+        // Everything broadcast before the outage has been watched: stop
+        // playing the offline clip and show the overlay. Playback resumes
+        // through the reattach once the stream is confirmed live again.
+        holdingForOutage = true;
+        hls?.stopLoad();
+        if (!video.paused) video.pause();
+        setConnectionIssue(null);
+        setStreamReconnect({
+          offline: typeof navigator !== "undefined" && navigator.onLine === false,
+          hadPlayback: hasEverPlayedRef.current,
+        });
+      },
+      onReattach: () => {
+        if (disposed) return;
+        // A fresh player attaches at the live edge. This is not a failure, so
+        // it never touches the error ladder or its attempt counter.
+        setStreamReconnect(
+          (current) => current || { offline: false, hadPlayback: hasEverPlayedRef.current }
+        );
+        setPlayerGeneration((current) => current + 1);
+      },
+    });
+    reconnectControllerRef.current = reconnect;
 
     const clearPlayerRetryTimer = () => {
       if (playerRetryTimerRef.current) {
@@ -323,6 +464,51 @@ export default function SecureHlsBroadcastPlayer({
       lastPlaybackTime = video.currentTime || 0;
       lastPlaybackProgressAt = Date.now();
       startedAt = Date.now();
+    };
+
+    // The broadcast stopped producing video. Unless the backend says the class
+    // ended, wait for it to come back instead of giving up. Returns false
+    // when the signal does not mean "reconnect".
+    const enterStreamOutage = (signal, { tailExhausted = false } = {}) => {
+      if (disposed) return false;
+      const interruption = classifyStreamInterruption({ signal, sessionStatus: sessionStatusRef.current });
+      if (interruption !== STREAM_INTERRUPTIONS.STREAM_OFFLINE) return false;
+      if (!reconnect.isActive()) {
+        // Pending error recovery would only fight the outage handling.
+        clearInPlaceTimer();
+        clearPlayerRetryTimer();
+        recoveringRef.current = true;
+        setConnectionIssue(null);
+        if (!streamOutageRef.current) {
+          streamOutageRef.current = { startedAt: Date.now(), probeAttempt: 0 };
+          queueStreamOutageReport({
+            sessionId,
+            report: buildStreamOutageReport({ kind: "offline" }),
+            timers: outageReportTimersRef.current,
+            lastReportedIssueRef,
+          });
+        }
+      }
+      reconnect.streamWentOffline({ tailExhausted });
+      return true;
+    };
+
+    // First real progress after the reattach to the returned stream.
+    const confirmStreamRecovered = () => {
+      const outage = streamOutageRef.current;
+      if (!outage || reconnect.isActive()) return;
+      streamOutageRef.current = null;
+      setStreamReconnect(null);
+      queueStreamOutageReport({
+        sessionId,
+        report: buildStreamOutageReport({
+          kind: "recovered",
+          outageMs: Date.now() - outage.startedAt,
+          attempt: outage.probeAttempt,
+        }),
+        timers: outageReportTimersRef.current,
+        lastReportedIssueRef,
+      });
     };
 
     const markPlaybackHealthy = () => {
@@ -358,7 +544,7 @@ export default function SecureHlsBroadcastPlayer({
     // Try to play; when autoplay with sound is refused, fall back to muted
     // playback and finally to an explicit "click to start" prompt.
     const attemptPlay = () => {
-      if (disposed || pausedByViewer) return;
+      if (disposed || pausedByViewer || holdingForOutage) return;
       const markAutoplayBlocked = () => {
         if (disposed) return;
         autoplayBlocked = true;
@@ -429,6 +615,12 @@ export default function SecureHlsBroadcastPlayer({
       }, delayMs);
     };
     liveResumeRef.current = () => {
+      if (reconnect.isActive()) {
+        // The backend saw the stream come back; check now instead of waiting
+        // for the next backoff step.
+        reconnect.probeSoon(0);
+        return;
+      }
       clearInPlaceTimer();
       recoverInPlace({ seekToLive: true });
     };
@@ -488,6 +680,12 @@ export default function SecureHlsBroadcastPlayer({
     };
 
     const handleOnline = () => {
+      if (reconnect.isActive()) {
+        setConnectionIssue(null);
+        setStreamReconnect((current) => (current ? { ...current, offline: false } : current));
+        reconnect.handleOnline();
+        return;
+      }
       if (!recoveringRef.current) {
         // hls.js was still retrying on its own; nothing to rebuild.
         setConnectionIssue(null);
@@ -497,6 +695,10 @@ export default function SecureHlsBroadcastPlayer({
       scheduleInPlaceRecovery(randomJitterDelay(RECONNECT_JITTER_MS), { seekToLive: true });
     };
     const handleOffline = () => {
+      if (reconnect.isActive()) {
+        setStreamReconnect((current) => (current ? { ...current, offline: true } : current));
+        reconnect.handleOffline();
+      }
       const issue = getPlaybackIssue({ offline: true });
       setConnectionIssue(issue);
       reportPlaybackIssue({
@@ -508,6 +710,10 @@ export default function SecureHlsBroadcastPlayer({
     };
     const handleVisible = () => {
       if (document.visibilityState !== "visible") return;
+      if (reconnect.isActive()) {
+        reconnect.handleVisible();
+        return;
+      }
       resetProgressClock();
       if (hasPlayedFirstFrame && !pausedByViewer && video.readyState < 2) {
         scheduleInPlaceRecovery(randomJitterDelay(RECONNECT_JITTER_MS), { seekToLive: true });
@@ -522,7 +728,7 @@ export default function SecureHlsBroadcastPlayer({
       resetProgressClock();
     };
     const handlePause = () => {
-      if (video.ended) return;
+      if (video.ended || holdingForOutage) return;
       pausedByViewer = true;
       // A paused player is never "reconnecting"; only keep the banner while
       // a rebuild is actually scheduled.
@@ -543,7 +749,24 @@ export default function SecureHlsBroadcastPlayer({
       if (currentTime <= lastPlaybackTime + 0.1) return;
       lastPlaybackTime = currentTime;
       lastPlaybackProgressAt = Date.now();
+      nativeStallProbed = false;
+      if (reconnect.isActive()) {
+        // Stop at the end of the real class content, before the offline clip.
+        if (
+          reconnect.getPhase() === STREAM_RECONNECT_PHASES.DRAINING &&
+          hasReachedOfflineTail({ currentTime, slateStart: offlineSlateStart })
+        ) {
+          reconnect.tailExhausted();
+        }
+        return;
+      }
+      hasEverPlayedRef.current = true;
+      confirmStreamRecovered();
       markPlaybackHealthy();
+    };
+    const handleEnded = () => {
+      if (disposed) return;
+      enterStreamOutage(STREAM_OFFLINE_SIGNALS.MEDIA_ENDED, { tailExhausted: true });
     };
     const handleSeeked = () => {
       lastPlaybackTime = video.currentTime || 0;
@@ -553,6 +776,11 @@ export default function SecureHlsBroadcastPlayer({
     };
     const handleVideoError = () => {
       if (disposed) return;
+      if (reconnect.isActive()) {
+        // Decoding the offline clip is part of the outage, not a failure.
+        reconnect.tailExhausted();
+        return;
+      }
       if (hls && Date.now() - lastMediaRecoveryAt < MEDIA_ERROR_DEDUP_MS) return;
       const decision = decideMediaElementEventAction("error", {
         usingHlsJs: Boolean(hls),
@@ -569,7 +797,54 @@ export default function SecureHlsBroadcastPlayer({
       if (!video.seeking && currentTime > lastPlaybackTime + 0.1) {
         lastPlaybackTime = currentTime;
         lastPlaybackProgressAt = Date.now();
+        nativeStallProbed = false;
         return;
+      }
+
+      const visible = document.visibilityState === "visible";
+      const online = navigator.onLine !== false;
+      if (reconnect.isActive()) {
+        // Waiting for the broadcast: never escalate, only notice when the
+        // buffered tail has run out.
+        if (
+          reconnect.getPhase() === STREAM_RECONNECT_PHASES.DRAINING &&
+          hasReachedOfflineTail({
+            ended: video.ended,
+            currentTime,
+            slateStart: offlineSlateStart,
+            msSinceProgress: Date.now() - lastPlaybackProgressAt,
+            pausedByViewer,
+          })
+        ) {
+          reconnect.tailExhausted();
+        }
+        return;
+      }
+
+      // Native HLS hides the playlist; when playback stalls, check whether
+      // the broadcast itself went offline (once per stall).
+      if (
+        !hls &&
+        hasPlayedFirstFrame &&
+        !pausedByViewer &&
+        !autoplayBlocked &&
+        !video.ended &&
+        visible &&
+        online &&
+        !nativeStallProbe &&
+        !nativeStallProbed &&
+        Date.now() - lastPlaybackProgressAt >= NATIVE_STALL_PROBE_MS
+      ) {
+        nativeStallProbed = true;
+        const stallProbe = new AbortController();
+        nativeStallProbe = stallProbe;
+        void probePlaylist(stallProbe.signal).then((outcome) => {
+          if (nativeStallProbe !== stallProbe) return;
+          nativeStallProbe = null;
+          if (disposed || outcome?.result !== PROBE_RESULTS.OFFLINE) return;
+          if (Date.now() - lastPlaybackProgressAt < NATIVE_STALL_PROBE_MS) return;
+          enterStreamOutage(STREAM_OFFLINE_SIGNALS.PROBE_OFFLINE, { tailExhausted: true });
+        });
       }
 
       const decision = evaluatePlaybackFreeze({
@@ -579,10 +854,16 @@ export default function SecureHlsBroadcastPlayer({
         hasPlayedFirstFrame,
         paused: pausedByViewer || autoplayBlocked,
         ended: video.ended,
-        visible: document.visibilityState === "visible",
-        online: navigator.onLine !== false,
+        expectLive: isSessionExpectedLive(sessionStatusRef.current),
+        awaitingStream: reconnect.isActive(),
+        visible,
+        online,
         consecutiveFreezes,
       });
+      if (decision.action === RECOVERY_ACTIONS.AWAIT_STREAM) {
+        enterStreamOutage(STREAM_OFFLINE_SIGNALS.MEDIA_ENDED, { tailExhausted: true });
+        return;
+      }
       if (decision.action === "resetClock") {
         resetProgressClock();
         return;
@@ -614,6 +895,7 @@ export default function SecureHlsBroadcastPlayer({
     video.addEventListener("seeked", handleSeeked);
     video.addEventListener("volumechange", handleVolumeChange);
     video.addEventListener("error", handleVideoError);
+    video.addEventListener("ended", handleEnded);
 
     if (Hls.isSupported()) {
       hls = new Hls({
@@ -664,8 +946,37 @@ export default function SecureHlsBroadcastPlayer({
         manifestParsed = true;
         attemptPlay();
       });
+      // #EXT-X-ENDLIST on a live class means the encoder dropped (Owncast ends
+      // the playlist and appends its offline clip); hls.js would otherwise
+      // stop reloading and let the video end for good.
+      const handleLevelDetails = (_event, data) => {
+        const details = data?.details;
+        if (disposed || !details) return;
+        if (!isEndedLevelDetails(details)) {
+          sawLivePlaylist = true;
+          return;
+        }
+        offlineSlateStart = findOfflineSlateStart(details.fragments);
+        // Nothing live was seen on this attach (joined or reattached while
+        // offline): never replay the old playlist, wait for the stream.
+        enterStreamOutage(STREAM_OFFLINE_SIGNALS.PLAYLIST_ENDED, { tailExhausted: !sawLivePlaylist });
+      };
+      hls.on(Hls.Events.LEVEL_LOADED, handleLevelDetails);
+      hls.on(Hls.Events.LEVEL_UPDATED, handleLevelDetails);
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data?.fatal || disposed) return;
+        if (reconnect.isActive()) {
+          // hls.js failing on the ended playlist or the offline clip is part
+          // of the outage and never counts toward the error ladder.
+          reconnect.tailExhausted();
+          return;
+        }
+        if (
+          isPlaylistMissingError({ type: data.type, details: data.details, httpStatus: data.response?.code }) &&
+          enterStreamOutage(STREAM_OFFLINE_SIGNALS.PLAYLIST_MISSING, { tailExhausted: !hasPlayedFirstFrame })
+        ) {
+          return;
+        }
         if (
           data.type === Hls.ErrorTypes.MEDIA_ERROR &&
           Date.now() - lastMediaRecoveryAt < MEDIA_ERROR_DEDUP_MS
@@ -695,6 +1006,12 @@ export default function SecureHlsBroadcastPlayer({
       disposed = true;
       liveResumeRef.current = null;
       playbackHealthyRef.current = false;
+      reconnect.dispose();
+      if (reconnectControllerRef.current === reconnect) reconnectControllerRef.current = null;
+      if (nativeStallProbe) {
+        nativeStallProbe.abort();
+        nativeStallProbe = null;
+      }
       clearPlayerRetryTimer();
       clearInPlaceTimer();
       window.clearInterval(playbackWatchdog);
@@ -708,6 +1025,7 @@ export default function SecureHlsBroadcastPlayer({
       video.removeEventListener("seeked", handleSeeked);
       video.removeEventListener("volumechange", handleVolumeChange);
       video.removeEventListener("error", handleVideoError);
+      video.removeEventListener("ended", handleEnded);
       hls?.destroy();
       video.removeAttribute("src");
       video.load();
@@ -716,7 +1034,7 @@ export default function SecureHlsBroadcastPlayer({
 
   if (unsupportedBrowser && fallbackEmbedUrl) {
     return (
-      <ProtectedPlaybackSurface className="aspect-video w-full" watermarkEnabled>
+      <ProtectedPlaybackSurface className="aspect-video w-full" watermarkEnabled live>
         <iframe
           key={`${fallbackEmbedUrl}|${refreshKey}`}
           title={title}
@@ -736,6 +1054,8 @@ export default function SecureHlsBroadcastPlayer({
       videoRef={videoRef}
       videoSessionKey={`${hlsUrl}|${refreshKey}`}
       playbackRates={[1]}
+      live
+      autoFullscreenOnLandscape
     >
       {bootstrapReady ? (
         <video
@@ -767,12 +1087,24 @@ export default function SecureHlsBroadcastPlayer({
           type="button"
           data-playback-gesture-ignore="true"
           onClick={unmuteVideo}
-          className="absolute bottom-3 left-3 z-30 rounded-full border border-white/20 bg-black/70 px-3 py-1.5 text-xs font-semibold text-white shadow-[0_8px_20px_rgba(0,0,0,0.3)] backdrop-blur transition hover:bg-black/85"
+          className="absolute left-3 top-3 z-30 rounded-full border border-white/20 bg-black/70 px-3 py-1.5 text-xs font-semibold text-white shadow-[0_8px_20px_rgba(0,0,0,0.3)] backdrop-blur transition hover:bg-black/85"
         >
           Tap to unmute
         </button>
       ) : null}
-      {bootstrapReady && connectionIssue && autoplayState !== "blocked" ? (
+      {bootstrapReady && streamReconnect && sessionExpectedLive && autoplayState !== "blocked" ? (
+        <StreamReconnectOverlay
+          offline={streamReconnect.offline}
+          hadPlayback={streamReconnect.hadPlayback}
+          onRetry={retryNow}
+        />
+      ) : null}
+      {bootstrapReady && !sessionExpectedLive ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#161616]/90 px-6 text-center text-sm text-[#C6C6C6]">
+          This broadcast session has ended.
+        </div>
+      ) : null}
+      {bootstrapReady && connectionIssue && !streamReconnect && sessionExpectedLive && autoplayState !== "blocked" ? (
         <div className="absolute inset-x-3 top-3 z-30 rounded-xl border border-amber-300/30 bg-[#18140a]/95 px-3 py-2.5 text-center text-xs leading-5 text-amber-100 shadow-[0_12px_30px_rgba(0,0,0,0.34)] backdrop-blur sm:left-1/2 sm:right-auto sm:w-[min(32rem,calc(100%-1.5rem))] sm:-translate-x-1/2">
           <span>{connectionIssue.message}</span>
           <button

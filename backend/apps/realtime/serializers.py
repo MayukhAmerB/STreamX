@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.conf import settings
 from django.urls import reverse
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from config.request_security import (
@@ -11,9 +12,10 @@ from config.request_security import (
 from config.upload_validators import validate_video_upload
 from config.url_utils import get_media_public_url
 
-from apps.courses.models import LiveClass
+from apps.courses.models import LiveClass, Section
 
 from .models import RealtimeSession, RealtimeSessionRecording
+from .recording.serializers import ModuleRefSerializer, module_ref
 from .schedule import attendee_can_join_live_session, get_live_class_schedule_snapshot
 from .services import build_session_join_url, resolve_broadcast_urls, resolve_obs_stream_server_url
 
@@ -31,6 +33,7 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
     chat_embed_url = serializers.SerializerMethodField()
     live_schedule = serializers.SerializerMethodField()
     viewer_can_join_now = serializers.SerializerMethodField()
+    target_module = serializers.SerializerMethodField()
 
     class Meta:
         model = RealtimeSession
@@ -46,6 +49,7 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
             "can_manage",
             "linked_live_class",
             "linked_course",
+            "target_module",
             "room_name",
             "livekit_room_name",
             "meeting_capacity",
@@ -159,6 +163,10 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
             "instructor_id": course.instructor_id,
         }
 
+    @extend_schema_field(ModuleRefSerializer(allow_null=True))
+    def get_target_module(self, obj):
+        return module_ref(getattr(obj, "target_module", None))
+
     def get_live_schedule(self, obj):
         cache_key = "live_class_schedule_snapshot"
         cached = self.context.get(cache_key)
@@ -185,6 +193,13 @@ class RealtimeSessionCreateSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    target_module_id = serializers.PrimaryKeyRelatedField(
+        source="target_module",
+        queryset=Section.objects.all(),
+        required=False,
+        allow_null=True,
+        help_text="Module (Section) of the live class's course that receives the class recording.",
+    )
 
     class Meta:
         model = RealtimeSession
@@ -192,6 +207,7 @@ class RealtimeSessionCreateSerializer(serializers.ModelSerializer):
             "title",
             "description",
             "linked_live_class_id",
+            "target_module_id",
             "session_type",
             "status",
             "room_name",
@@ -270,6 +286,19 @@ class RealtimeSessionCreateSerializer(serializers.ModelSerializer):
             else:
                 detail = "Select a live class for this broadcast session."
             raise serializers.ValidationError({"linked_live_class_id": detail})
+        target_module = attrs.get("target_module")
+        if target_module is not None and target_module.course_id != linked_live_class.linked_course_id:
+            raise serializers.ValidationError(
+                {"target_module_id": "The module must belong to the live class's course."}
+            )
+        if (
+            target_module is None
+            and session_type == RealtimeSession.TYPE_BROADCASTING
+            and bool(getattr(settings, "REALTIME_BROADCAST_REQUIRE_TARGET_MODULE", False))
+        ):
+            raise serializers.ValidationError(
+                {"target_module_id": "Select the module that will receive this class recording."}
+            )
         if meeting_capacity > RealtimeSession.MAX_MEETING_CAPACITY:
             raise serializers.ValidationError(
                 {
@@ -522,3 +551,38 @@ class RealtimeSessionBrowserRecordingUploadSerializer(serializers.Serializer):
                 raise serializers.ValidationError(detail)
             raise serializers.ValidationError("Invalid recording video file.")
         return value
+
+
+class StreamHeartbeatSerializer(serializers.Serializer):
+    publishing = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text="True while the Host Studio has a connected room and a published video track.",
+    )
+
+
+class BroadcastEgressStatusSerializer(serializers.Serializer):
+    running = serializers.BooleanField(
+        allow_null=True,
+        help_text="True while LiveKit reports the egress starting/active; null when it could not be verified.",
+    )
+    status = serializers.CharField(help_text="LiveKit EgressStatus name, e.g. EGRESS_ACTIVE or EGRESS_FAILED.")
+    error = serializers.CharField(allow_blank=True)
+
+
+class StreamHeartbeatDataSerializer(serializers.Serializer):
+    session = serializers.DictField(
+        help_text="The session, in the same shape as GET /api/realtime/sessions/{id}/ returns it.",
+    )
+    egress = BroadcastEgressStatusSerializer(
+        allow_null=True,
+        help_text="Null for OBS sessions and for streams that are not live.",
+    )
+    restarted = serializers.BooleanField(help_text="True when this heartbeat replaced a dead egress.")
+
+
+class StreamHeartbeatResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    data = StreamHeartbeatDataSerializer(allow_null=True)
+    errors = serializers.JSONField(allow_null=True)

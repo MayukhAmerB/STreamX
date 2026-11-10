@@ -407,7 +407,8 @@ class AuthTests(APITestCase):
         refresh_resp = attack_client.post(reverse("auth-refresh"), {}, format="json")
         self.assertEqual(refresh_resp.status_code, 401)
 
-    def test_non_admin_second_login_invalidates_first_device_session(self):
+    @override_settings(MAX_CONCURRENT_SESSIONS_PER_STUDENT=2)
+    def test_student_login_past_the_session_cap_invalidates_the_oldest_device_session(self):
         user = User.objects.create_user(
             email="single-session@test.com",
             password="StrongPass@123",
@@ -431,6 +432,15 @@ class AuthTests(APITestCase):
             format="json",
         )
         self.assertEqual(second_login.status_code, 200)
+        self.assertEqual(first_client.get(reverse("auth-user")).status_code, 200)
+
+        third_client = self.client_class()
+        third_login = third_client.post(
+            reverse("auth-login"),
+            {"email": user.email, "password": "StrongPass@123"},
+            format="json",
+        )
+        self.assertEqual(third_login.status_code, 200)
 
         stale_current_user = first_client.get(reverse("auth-user"))
         self.assertEqual(stale_current_user.status_code, 401)
@@ -439,9 +449,10 @@ class AuthTests(APITestCase):
         stale_refresh = first_client.post(reverse("auth-refresh"), {}, format="json")
         self.assertEqual(stale_refresh.status_code, 401)
         self.assertFalse(stale_refresh.data["success"])
+        self.assertEqual(stale_refresh.data["errors"]["code"], "session_replaced")
 
-        active_current_user = second_client.get(reverse("auth-user"))
-        self.assertEqual(active_current_user.status_code, 200)
+        self.assertEqual(second_client.get(reverse("auth-user")).status_code, 200)
+        self.assertEqual(third_client.get(reverse("auth-user")).status_code, 200)
 
     def test_admin_can_keep_concurrent_sessions_across_devices(self):
         admin_user = User.objects.create_user(
@@ -2826,6 +2837,22 @@ class MyCoursesViewTests(BaseAPITestCase):
 
         self.assertEqual(returned[granted_course.id]["access_source"], "granted")
         self.assertEqual(returned[granted_course.id]["access_label"], "Granted Access")
+
+    def test_my_courses_progress_ignores_unpublished_lectures(self):
+        draft = Lecture.objects.create(section=self.section, title="Draft lecture", order=99, is_published=False)
+        Enrollment.objects.create(user=self.student, course=self.course, payment_status=Enrollment.STATUS_PAID)
+        LectureProgress.objects.create(user=self.student, lecture=self.lecture, completed=True)
+        LectureProgress.objects.create(user=self.student, lecture=draft, completed=True)
+
+        self.login(self.student.email)
+        response = self.client.get(reverse("my-courses"))
+
+        self.assertEqual(response.status_code, 200)
+        course = {item["id"]: item for item in response.data["data"]}[self.course.id]
+        self.assertEqual(course["lecture_count"], 1)
+        self.assertEqual(course["started_lecture_count"], 1)
+        self.assertEqual(course["completed_lecture_count"], 1)
+        self.assertEqual(course["progress_percent"], 100)
 
     def test_my_courses_excludes_pending_enrollments(self):
         Enrollment.objects.create(
@@ -6700,7 +6727,14 @@ class RealtimeSessionTests(APITestCase):
 
     @patch("apps.realtime.services._twirp_post")
     @patch("apps.realtime.services._list_room_participants")
-    def test_start_room_broadcast_egress_uses_track_composite_for_screen_share(self, mock_list_participants, mock_twirp_post):
+    def test_start_room_broadcast_egress_uses_participant_egress_even_with_screen_share(
+        self,
+        mock_list_participants,
+        mock_twirp_post,
+    ):
+        # Track-composite egress was bound to one track SID, so switching
+        # camera <-> screen (or the browser's "Stop sharing") ended the stream.
+        # Participant egress follows the publisher instead.
         mock_list_participants.return_value = [
             {
                 "identity": "host-1-session-77",
@@ -6710,23 +6744,23 @@ class RealtimeSessionTests(APITestCase):
                 ],
             }
         ]
-        mock_twirp_post.return_value = {"egress_id": "EG_track_composite"}
+        mock_twirp_post.return_value = {"egress_id": "EG_participant"}
 
         egress_id = realtime_services.start_room_broadcast_egress(
             room_name="screen-share-room",
             rtmp_target_url="rtmp://owncast:1935/live/test-key",
             participant_identity="host-1-session-77",
+            session_id=77,
         )
 
-        self.assertEqual(egress_id, "EG_track_composite")
+        self.assertEqual(egress_id, "EG_participant")
         self.assertEqual(mock_twirp_post.call_count, 1)
-        self.assertEqual(mock_twirp_post.call_args.args[0], "livekit.Egress/StartTrackCompositeEgress")
+        self.assertEqual(mock_twirp_post.call_args.args[0], "livekit.Egress/StartParticipantEgress")
         self.assertEqual(
             mock_twirp_post.call_args.args[1],
             {
                 "room_name": "screen-share-room",
-                "video_track_id": "TR_screen_share",
-                "audio_track_id": "TR_microphone",
+                "identity": "host-1-session-77",
                 "stream_outputs": [{"urls": ["rtmp://owncast:1935/live/test-key"]}],
             },
         )
@@ -6769,35 +6803,30 @@ class RealtimeSessionTests(APITestCase):
 
     @patch("apps.realtime.services._twirp_post")
     @patch("apps.realtime.services._list_room_participants")
-    def test_start_room_broadcast_egress_falls_back_when_track_composite_fails(
+    def test_start_room_broadcast_egress_targets_the_manager_publishing_in_the_room(
         self,
         mock_list_participants,
         mock_twirp_post,
     ):
+        # An admin pressing Start Live for the instructor's studio must stream
+        # the instructor (the one publishing), not the admin's absent identity.
         mock_list_participants.return_value = [
-            {
-                "identity": "host-1-session-77",
-                "tracks": [
-                    {"sid": "TR_screen_share", "source": "SCREEN_SHARE"},
-                    {"sid": "TR_microphone", "source": "MICROPHONE"},
-                ],
-            }
+            {"identity": "user-9-viewer", "tracks": []},
+            {"identity": "host-5-session-77", "tracks": [{"sid": "TR_cam", "source": "CAMERA"}]},
         ]
-        mock_twirp_post.side_effect = [
-            realtime_services.LiveKitEgressError("track composite failed"),
-            {"egress_id": "EG_participant_fallback"},
-        ]
+        mock_twirp_post.return_value = {"egress_id": "EG_instructor"}
 
         egress_id = realtime_services.start_room_broadcast_egress(
             room_name="fallback-room",
             rtmp_target_url="rtmp://owncast:1935/live/test-key",
             participant_identity="host-1-session-77",
+            session_id=77,
         )
 
-        self.assertEqual(egress_id, "EG_participant_fallback")
-        self.assertEqual(mock_twirp_post.call_count, 2)
-        self.assertEqual(mock_twirp_post.call_args_list[0].args[0], "livekit.Egress/StartTrackCompositeEgress")
-        self.assertEqual(mock_twirp_post.call_args_list[1].args[0], "livekit.Egress/StartParticipantEgress")
+        self.assertEqual(egress_id, "EG_instructor")
+        self.assertEqual(mock_twirp_post.call_count, 1)
+        self.assertEqual(mock_twirp_post.call_args.args[0], "livekit.Egress/StartParticipantEgress")
+        self.assertEqual(mock_twirp_post.call_args.args[1]["identity"], "host-5-session-77")
 
     @override_settings(
         OWNCAST_RTMP_TARGET="rtmp://owncast:1935/live/default-key",
