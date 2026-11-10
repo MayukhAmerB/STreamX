@@ -1,24 +1,30 @@
 /*
  * Shared video controls (ProtectedPlaybackSurface).
  *
- * Self-contained on purpose: the player renders inside the Carbon shell, on
- * legacy dark pages and on the OwlCognito light theme, so it uses its own
- * `pps-` classes and never depends on Carbon component CSS. Like every video
- * player it is always dark; colours follow Carbon's Gray 100 theme.
+ * Self-contained on purpose: the player renders inside User's Corner (the
+ * Carbon shell), including legacy staff pages, so it uses its own `pps-`
+ * classes and never depends on Carbon component CSS. Like every video player
+ * it is always dark: a black glass control bar with the User's Corner
+ * champagne accent on the scrubber and active states (`--uc-*` from the
+ * shell, with the same values as fallbacks).
  */
 
 .pps-surface {
-  --pps-text: #f4f4f4;
-  --pps-text-secondary: #c6c6c6;
-  --pps-text-disabled: rgba(244, 244, 244, 0.38);
-  --pps-accent: #4589ff;
-  --pps-live: #fa4d56;
-  --pps-hover: rgba(255, 255, 255, 0.16);
-  --pps-active: rgba(255, 255, 255, 0.26);
-  --pps-menu-bg: #262626;
-  --pps-menu-hover: #333333;
-  --pps-menu-border: #393939;
-  --pps-focus: #ffffff;
+  --pps-text: var(--uc-text, #f6f1e7);
+  --pps-text-secondary: var(--uc-text-2, #b8b3a8);
+  --pps-text-disabled: rgba(246, 241, 231, 0.38);
+  --pps-accent: var(--uc-accent, #f3e2b3);
+  --pps-accent-hover: var(--uc-accent-hover, #fff0c8);
+  --pps-on-accent: var(--uc-on-accent, #0a0a0a);
+  --pps-live: var(--uc-live, #fa4d56);
+  --pps-hover: rgba(246, 241, 231, 0.12);
+  --pps-active: rgba(246, 241, 231, 0.22);
+  --pps-glass: rgba(0, 0, 0, 0.58);
+  --pps-glass-border: rgba(255, 255, 255, 0.12);
+  --pps-menu-bg: rgba(10, 10, 10, 0.96);
+  --pps-menu-hover: #1a1a1a;
+  --pps-menu-border: rgba(255, 255, 255, 0.12);
+  --pps-focus: var(--uc-accent, #f3e2b3);
   --pps-btn-size: 2.5rem;
   --pps-motion: cubic-bezier(0.2, 0, 0.38, 0.9);
 
@@ -77,7 +83,7 @@
   margin: 0;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: 10px;
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
@@ -103,7 +109,12 @@
   }
 
   .pps-btn--round:hover {
-    background-color: rgba(57, 57, 57, 0.86);
+    background-color: rgba(26, 26, 26, 0.9);
+  }
+
+  .pps-btn--primary:hover {
+    background-color: var(--pps-accent-hover);
+    box-shadow: 0 0 32px rgba(243, 226, 179, 0.45);
   }
 
   .pps-menu__item:hover {
@@ -113,6 +124,12 @@
 
 .pps-btn:active {
   background-color: var(--pps-active);
+  color: var(--pps-accent);
+}
+
+.pps-btn[aria-pressed='true'],
+.pps-btn[aria-expanded='true'] {
+  color: var(--pps-accent);
 }
 
 .pps-btn:focus {
@@ -135,7 +152,7 @@
   font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  letter-spacing: 0.16px;
+  letter-spacing: 0;
 }
 
 .pps-btn--quality {
@@ -154,13 +171,16 @@
   display: none;
 }
 
-/* Round buttons in the centre of the video. */
+/* Round glass buttons in the centre of the video. */
 .pps-btn--round {
+  border: 1px solid var(--pps-glass-border);
   border-radius: 50%;
-  background-color: rgba(22, 22, 22, 0.62);
+  background-color: var(--pps-glass);
   block-size: 3rem;
   inline-size: 3rem;
   min-inline-size: 3rem;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 
 .pps-btn--round:focus-visible {
@@ -168,13 +188,29 @@
 }
 
 .pps-btn--round:disabled {
-  background-color: rgba(22, 22, 22, 0.42);
+  background-color: rgba(0, 0, 0, 0.42);
 }
 
+/* The big play / pause button: champagne with the User's Corner glow. */
 .pps-btn--primary {
+  border-color: transparent;
+  background-color: var(--pps-accent);
   block-size: 4rem;
+  box-shadow: 0 0 24px rgba(243, 226, 179, 0.3);
+  color: var(--pps-on-accent);
   inline-size: 4rem;
   min-inline-size: 4rem;
+}
+
+.pps-btn--primary:active {
+  background-color: var(--pps-accent);
+  color: var(--pps-on-accent);
+}
+
+.pps-btn--primary:disabled {
+  background-color: rgba(243, 226, 179, 0.4);
+  box-shadow: none;
+  color: var(--pps-on-accent);
 }
 
 .pps-surface[data-controls-layout='desktop'] .pps-btn--primary {
@@ -184,7 +220,7 @@
 }
 
 .pps-btn--overlay {
-  background-color: rgba(22, 22, 22, 0.7);
+  background-color: rgba(0, 0, 0, 0.7);
 }
 
 /* ------------------------------------------------------------------ */
@@ -205,20 +241,26 @@
   pointer-events: auto;
 }
 
-/* Leave room for the bottom bar so the centre buttons sit in the open. */
+/* Leave room for the glass bar so the centre buttons sit in the open. */
 .pps-surface[data-controls-layout='touch'] .pps-center {
-  padding-block-end: 1.5rem;
+  padding-block-end: 5rem;
 }
 
 /* ------------------------------------------------------------------ */
 /* Bottom control bar                                                  */
 /* ------------------------------------------------------------------ */
+/* Black glass bar floating just above the bottom edge. */
 .pps-controls {
   position: absolute;
   z-index: 20;
-  padding: 0 0.5rem 0.25rem;
-  inset-block-end: 0;
-  inset-inline: 0;
+  padding: 0.125rem 0.375rem 0.25rem;
+  border: 1px solid var(--pps-glass-border);
+  border-radius: 16px;
+  background-color: var(--pps-glass);
+  inset-block-end: 0.5rem;
+  inset-inline: 0.5rem;
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
   opacity: 1;
   transform: translateY(0);
   transition:
@@ -267,7 +309,7 @@
   color: var(--pps-text);
   font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.16px;
+  letter-spacing: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -281,10 +323,10 @@
   align-items: center;
   padding-inline: 0.5rem;
   color: var(--pps-text);
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.6875rem;
+  font-weight: 700;
   gap: 0.375rem;
-  letter-spacing: 0.32px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -294,19 +336,22 @@
   border-radius: 50%;
   background-color: var(--pps-live);
   block-size: 0.5rem;
+  box-shadow: 0 0 8px rgba(250, 77, 86, 0.8);
   inline-size: 0.5rem;
 }
 
 .pps-badge {
   display: inline-flex;
   align-items: center;
-  padding-inline: 0.5rem;
-  border: 1px solid rgba(244, 244, 244, 0.4);
+  padding-inline: 0.625rem;
+  border: 1px solid rgba(246, 241, 231, 0.3);
+  border-radius: 999px;
   margin-inline: 0.25rem;
   block-size: 1.5rem;
   color: var(--pps-text);
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   white-space: nowrap;
 }
 
@@ -352,10 +397,11 @@
 }
 
 .pps-seek::-webkit-slider-runnable-track {
+  border-radius: 999px;
   background: linear-gradient(
     to right,
     var(--pps-accent) var(--pps-progress, 0%),
-    rgba(244, 244, 244, 0.32) var(--pps-progress, 0%)
+    rgba(246, 241, 231, 0.25) var(--pps-progress, 0%)
   );
   block-size: 0.25rem;
 }
@@ -368,6 +414,7 @@
   appearance: none;
   background-color: var(--pps-accent);
   block-size: 0.875rem;
+  box-shadow: 0 0 10px rgba(243, 226, 179, 0.6);
   inline-size: 0.875rem;
   transform: scale(0);
   transition: transform 110ms var(--pps-motion);
@@ -382,11 +429,13 @@
 
 .pps-seek::-moz-range-track {
   border: 0;
-  background: rgba(244, 244, 244, 0.32);
+  border-radius: 999px;
+  background: rgba(246, 241, 231, 0.25);
   block-size: 0.25rem;
 }
 
 .pps-seek::-moz-range-progress {
+  border-radius: 999px;
   background: var(--pps-accent);
   block-size: 0.25rem;
 }
@@ -395,6 +444,7 @@
   border: 0;
   border-radius: 50%;
   background-color: var(--pps-accent);
+  box-shadow: 0 0 10px rgba(243, 226, 179, 0.6);
   block-size: 0.875rem;
   inline-size: 0.875rem;
 }
@@ -412,8 +462,10 @@
   z-index: 30;
   overflow-y: auto;
   padding-block: 0.25rem;
+  border: 1px solid var(--pps-menu-border);
+  border-radius: 14px;
   background-color: var(--pps-menu-bg);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
   inset-block-end: calc(100% + 0.25rem);
   inset-inline-end: 0;
   max-block-size: 14rem;
@@ -432,8 +484,10 @@
 .pps-menu__title {
   padding: 0.5rem 1rem 0.25rem;
   color: var(--pps-text-secondary);
-  font-size: 0.75rem;
-  letter-spacing: 0.32px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
 }
 
 .pps-menu__item {
@@ -472,6 +526,7 @@
 }
 
 .pps-menu__item[aria-checked='true'] {
+  color: var(--pps-accent);
   font-weight: 600;
 }
 

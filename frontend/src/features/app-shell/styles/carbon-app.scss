@@ -10,6 +10,17 @@
 //     match while the shell is mounted and stop applying the moment the user
 //     navigates back to a public page in the same SPA session.
 @use 'sass:meta';
+@use 'sass:string';
+// Carbon type: Inter (already loaded by index.html for the website) instead
+// of IBM Plex. Configured before any other Carbon module loads it.
+@use '@carbon/type/scss/font-family' with (
+  $font-families: (
+    'mono': string.unquote("ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', monospace"),
+    'sans': string.unquote("'Inter', 'Segoe UI', Arial, system-ui, sans-serif"),
+    'sans-condensed': string.unquote("'Inter', 'Segoe UI', Arial, system-ui, sans-serif"),
+    'serif': string.unquote("'Inter', 'Segoe UI', Arial, system-ui, sans-serif"),
+  )
+);
 @use '@carbon/styles/scss/config' with (
   $css--font-face: false,
   $css--reset: false,
@@ -20,43 +31,7 @@
 @use '@carbon/styles/scss/theme';
 @use '@carbon/styles/scss/utilities/layout' as carbon-layout;
 @use './tokens' as *;
-
-// ---------------------------------------------------------------------------
-// IBM Plex Sans, self-hosted (Latin subset) from @ibm/plex-sans. Only used by
-// elements inside `.cds-app`, so the browser never downloads it on the
-// public website.
-// ---------------------------------------------------------------------------
-$plex-path: '../../../../node_modules/@ibm/plex-sans/fonts/split/woff2';
-$plex-latin1-range: U+0000, U+000D, U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6,
-  U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030,
-  U+2039-203A, U+2044, U+20AC, U+20B9, U+2122, U+2212, U+FB01-FB02;
-
-@font-face {
-  font-family: 'IBM Plex Sans';
-  font-style: normal;
-  font-weight: 300;
-  font-display: swap;
-  src: url('#{$plex-path}/IBMPlexSans-Light-Latin1.woff2') format('woff2');
-  unicode-range: $plex-latin1-range;
-}
-
-@font-face {
-  font-family: 'IBM Plex Sans';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('#{$plex-path}/IBMPlexSans-Regular-Latin1.woff2') format('woff2');
-  unicode-range: $plex-latin1-range;
-}
-
-@font-face {
-  font-family: 'IBM Plex Sans';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('#{$plex-path}/IBMPlexSans-SemiBold-Latin1.woff2') format('woff2');
-  unicode-range: $plex-latin1-range;
-}
+@use './corner-theme' as corner;
 
 // ---------------------------------------------------------------------------
 // Carbon components, every selector scoped under `.cds-app`. Loaded first so
@@ -68,16 +43,15 @@ $plex-latin1-range: U+0000, U+000D, U+0020-007E, U+00A0-00FF, U+0131, U+0152-015
 }
 
 // ---------------------------------------------------------------------------
-// Themes: White (light) and G100 (dark), as CSS custom properties on the
-// shell root only.
+// Theme: User's Corner. Dark only (the site is black everywhere). Carbon G100
+// supplies every token, then the User's Corner palette (one place:
+// _corner-palette.scss) and its Carbon token mapping (_corner-theme.scss)
+// override them. Custom properties on the shell root only.
 // ---------------------------------------------------------------------------
-.cds-app,
-.cds-app[data-carbon-theme='white'] {
-  @include theme.theme(themes.$white);
-}
-
-.cds-app[data-carbon-theme='g100'] {
+.cds-app {
   @include theme.theme(themes.$g100);
+  @include corner-palette-properties;
+  @include corner.corner-carbon-tokens;
 }
 
 // Carbon normally declares its layout (size/density) tokens on `:root`; a
@@ -96,9 +70,10 @@ $plex-latin1-range: U+0000, U+000D, U+0020-007E, U+00A0-00FF, U+0131, U+0152-015
 
   min-block-size: 100vh;
   min-block-size: 100dvh;
-  background-color: $background;
-  color: $text-primary;
-  font-family: font-family('sans');
+  background-color: var(--uc-page);
+  color: var(--uc-text);
+  font-family: var(--uc-font);
+  letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -135,13 +110,10 @@ html:has(.cds-app) {
   }
 }
 
-body:has(.cds-app[data-carbon-theme='white']) {
-  background-color: #ffffff;
+body:has(.cds-app) {
+  background-color: #000000;
 }
 
-body:has(.cds-app[data-carbon-theme='g100']) {
-  background-color: #161616;
-}
-
+@include meta.load-css('./corner-components');
 @include meta.load-css('./shell');
 @include meta.load-css('./building-blocks');

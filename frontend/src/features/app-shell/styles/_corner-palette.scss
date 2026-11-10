@@ -1,0 +1,144 @@
+// User's Corner palette: black, white and grey with a "golden glowing white"
+// (champagne) accent, matching the public landing page.
+//
+// The palette is declared ONCE, as CSS custom properties on `.cds-app`
+// (see `corner-palette-properties` below, emitted by carbon-app.scss).
+// Sass variables here only point at those properties, so page stylesheets
+// can write `$corner-accent` instead of repeating `var(--uc-accent)`.
+// This file emits no CSS on its own.
+
+// --- Raw values (used only by the properties mixin) -----------------------
+$_page: #000000;
+$_surface: #0a0a0a;
+$_surface-2: #111111;
+$_raised: #1a1a1a;
+$_raised-2: #222222;
+$_border: rgba(255, 255, 255, 0.12);
+$_border-strong: rgba(255, 255, 255, 0.22);
+$_border-hover: rgba(255, 255, 255, 0.36);
+$_text: #f6f1e7;
+$_text-2: #b8b3a8;
+$_text-muted: #8a857c;
+$_accent: #f3e2b3;
+$_accent-hover: #fff0c8;
+$_accent-active: #e6d29c;
+$_on-accent: #0a0a0a;
+$_success: #42be65;
+$_warning: #f1c21b;
+$_error: #fa4d56;
+$_font: 'Inter', 'Segoe UI', Arial, system-ui, sans-serif;
+
+/// Emits every `--uc-*` custom property. Included once, on `.cds-app`.
+@mixin corner-palette-properties {
+  color-scheme: dark;
+
+  // Surfaces
+  --uc-page: #{$_page};
+  --uc-surface: #{$_surface};
+  --uc-surface-2: #{$_surface-2};
+  --uc-raised: #{$_raised};
+  --uc-raised-2: #{$_raised-2};
+  --uc-border: #{$_border};
+  --uc-border-strong: #{$_border-strong};
+  --uc-border-hover: #{$_border-hover};
+
+  // Text (warm white / warm greys)
+  --uc-text: #{$_text};
+  --uc-text-2: #{$_text-2};
+  --uc-text-muted: #{$_text-muted};
+
+  // Accent: golden glowing white (champagne)
+  --uc-accent: #{$_accent};
+  --uc-accent-hover: #{$_accent-hover};
+  --uc-accent-active: #{$_accent-active};
+  --uc-on-accent: #{$_on-accent};
+  --uc-accent-soft: rgba(243, 226, 179, 0.08);
+  --uc-accent-soft-strong: rgba(243, 226, 179, 0.14);
+  --uc-accent-line: rgba(243, 226, 179, 0.32);
+  --uc-glow: 0 0 24px rgba(243, 226, 179, 0.25);
+  --uc-glow-strong: 0 0 32px rgba(243, 226, 179, 0.45);
+  --uc-text-glow: 0 0 28px rgba(243, 226, 179, 0.18);
+
+  // Status (always paired with an icon + label)
+  --uc-success: #{$_success};
+  --uc-warning: #{$_warning};
+  --uc-error: #{$_error};
+  --uc-live: #{$_error};
+
+  // Shape + type (landing page language)
+  --uc-radius-card: 24px;
+  --uc-radius-lg: 30px;
+  --uc-radius-md: 16px;
+  --uc-radius-control: 12px;
+  --uc-radius-pill: 999px;
+  --uc-font: #{$_font};
+  --uc-label-tracking: 0.22em;
+  --uc-card-highlight: radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.055) 0%, transparent 38%);
+  --uc-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+
+// --- Sass aliases for page stylesheets ------------------------------------
+$corner-page: var(--uc-page);
+$corner-surface: var(--uc-surface);
+$corner-surface-2: var(--uc-surface-2);
+$corner-raised: var(--uc-raised);
+$corner-raised-2: var(--uc-raised-2);
+$corner-border: var(--uc-border);
+$corner-border-strong: var(--uc-border-strong);
+$corner-border-hover: var(--uc-border-hover);
+$corner-text: var(--uc-text);
+$corner-text-2: var(--uc-text-2);
+$corner-text-muted: var(--uc-text-muted);
+$corner-accent: var(--uc-accent);
+$corner-accent-hover: var(--uc-accent-hover);
+$corner-accent-active: var(--uc-accent-active);
+$corner-on-accent: var(--uc-on-accent);
+$corner-accent-soft: var(--uc-accent-soft);
+$corner-accent-soft-strong: var(--uc-accent-soft-strong);
+$corner-accent-line: var(--uc-accent-line);
+$corner-glow: var(--uc-glow);
+$corner-glow-strong: var(--uc-glow-strong);
+$corner-text-glow: var(--uc-text-glow);
+$corner-success: var(--uc-success);
+$corner-warning: var(--uc-warning);
+$corner-error: var(--uc-error);
+$corner-live: var(--uc-live);
+$corner-radius-card: var(--uc-radius-card);
+$corner-radius-lg: var(--uc-radius-lg);
+$corner-radius-md: var(--uc-radius-md);
+$corner-radius-control: var(--uc-radius-control);
+$corner-radius-pill: var(--uc-radius-pill);
+$corner-font: var(--uc-font);
+$corner-label-tracking: var(--uc-label-tracking);
+$corner-card-highlight: var(--uc-card-highlight);
+$corner-shadow: var(--uc-shadow);
+
+/// Landing-page micro label: 10-11px, uppercase, wide tracking.
+@mixin corner-micro-label($size: 0.6875rem) {
+  font-family: var(--uc-font);
+  font-size: $size;
+  font-weight: 700;
+  letter-spacing: var(--uc-label-tracking);
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+/// Landing-page heading: Inter 800, tight tracking.
+@mixin corner-heading($tracking: -0.035em) {
+  font-family: var(--uc-font);
+  font-weight: 800;
+  letter-spacing: $tracking;
+}
+
+/// Rounded dark card with a thin translucent border.
+@mixin corner-card($radius: var(--uc-radius-card)) {
+  border: 1px solid var(--uc-border);
+  border-radius: $radius;
+  background: var(--uc-card-highlight), var(--uc-surface);
+}
+
+/// 2px champagne focus ring with offset.
+@mixin corner-focus-ring($offset: 2px) {
+  outline: 2px solid var(--uc-accent);
+  outline-offset: $offset;
+}

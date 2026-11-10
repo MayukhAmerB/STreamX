@@ -11,8 +11,9 @@
     gap: $spacing-05;
   }
 
+  // Landing-page stat: uppercase micro-label over a big Inter 800 number.
   dt {
-    @include type-style('label-01');
+    @include corner-micro-label(0.625rem);
 
     color: $text-secondary;
   }
@@ -20,7 +21,7 @@
   dd {
     @include type-style('heading-05');
 
-    margin: $spacing-02 0 0;
+    margin: $spacing-03 0 0;
     color: $text-primary;
   }
 }
@@ -60,6 +61,7 @@
 // Course tile.
 .cds-app .cds-course-tile {
   display: flex;
+  overflow: hidden;
   flex-direction: column;
   padding: 0;
   min-inline-size: 0;
@@ -69,6 +71,7 @@
   position: relative;
   overflow: hidden;
   aspect-ratio: 16 / 9;
+  border-block-end: 1px solid var(--uc-border);
   background-color: $layer-accent-01;
 
   img {
@@ -101,6 +104,8 @@
 
 .cds-app .cds-course-tile__title {
   @include type-style('heading-03');
+
+  overflow-wrap: anywhere;
 
   color: $text-primary;
 }

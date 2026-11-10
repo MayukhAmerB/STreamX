@@ -10,12 +10,26 @@ export const ROLE_ADMIN = "admin";
 export const BOTTOM_NAV_LIMIT = 4;
 export const MORE_ITEM_ID = "more";
 
+/** The whole logged-in area is branded "User's Corner"; this is its home. */
+export const USERS_CORNER_TITLE = "User's Corner";
+export const USERS_CORNER_PATH = "/users-corner";
+
 /**
  * Every destination the shell can show. `icon` is a key resolved to a Carbon
  * icon component by navIcons.js. `bottomNav` marks the phone tab bar items
  * (in order); everything else lives in the "More" sheet on phones.
  */
 export const NAV_ITEMS = [
+  {
+    id: "overview",
+    section: "learn",
+    label: "Overview",
+    shortLabel: "Overview",
+    to: USERS_CORNER_PATH,
+    icon: "overview",
+    match: [/^\/users-corner\/?$/],
+    bottomNav: true,
+  },
   {
     id: "my-courses",
     section: "learn",
@@ -72,7 +86,6 @@ export const NAV_ITEMS = [
     to: "/profile",
     icon: "profile",
     match: [/^\/profile\/?$/],
-    bottomNav: true,
   },
   {
     id: "id-card",
@@ -157,6 +170,7 @@ export const NAV_SECTIONS = [
  * Phases 3-4 add their routes here as they are overhauled.
  */
 export const CARBON_NATIVE_PATHS = [
+  /^\/users-corner\/?$/,
   /^\/my-courses\/?$/,
   /^\/profile\/?$/,
   /^\/learn\/[^/]+\/?$/,
@@ -261,4 +275,29 @@ export function isFlushPage(pathname = "") {
 export function getShellPageMode(pathname = "") {
   const path = String(pathname || "").split(/[?#]/)[0];
   return CARBON_NATIVE_PATHS.some((pattern) => pattern.test(path)) ? "carbon" : "legacy";
+}
+
+/**
+ * Browser tab title inside the shell: "<page> · User's Corner" (the
+ * Overview hub is just "User's Corner").
+ */
+export function getShellDocumentTitle(items = [], pathname = "") {
+  const active = items.find((item) => isNavItemActive(item, pathname));
+  if (!active || active.id === "overview") return USERS_CORNER_TITLE;
+  return `${active.label} · ${USERS_CORNER_TITLE}`;
+}
+
+/**
+ * Big icon tiles on the User's Corner hub: every destination the user may
+ * open (except the hub itself and the "Continue learning" shortcut, which
+ * has its own card), grouped into "Your corner" and "Teaching".
+ */
+export function getCornerTileGroups(auth = {}, options = {}) {
+  const items = getNavItems(auth, options).filter(
+    (item) => item.id !== "overview" && item.id !== "continue-learning"
+  );
+  return [
+    { id: "corner", label: "Your corner", items: items.filter((item) => item.section !== "teach") },
+    { id: "teach", label: "Teaching", items: items.filter((item) => item.section === "teach") },
+  ].filter((group) => group.items.length > 0);
 }

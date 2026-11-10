@@ -1,6 +1,7 @@
 /*
  * carbon-viz.js: a small, dependency-free SVG chart kit for the insights
- * dashboard. IBM Carbon look; marks follow the house data-viz method:
+ * dashboard, drawn in the admin's black / grey / golden-white look. Marks
+ * follow the house data-viz method:
  *
  *   - thin marks: bars <= 24px, 4px rounded data end, square at the baseline;
  *     2px lines; >= 8px markers with a 2px surface ring; area fill at 10%
@@ -14,7 +15,8 @@
  *   - data strings are inserted with textContent only, never innerHTML
  *
  * Colours are read from CSS custom properties on the chart's root at render
- * time (CarbonViz.readTokens), so callers re-render on theme change.
+ * time (CarbonViz.readTokens). A single series wears the accent (--viz-accent);
+ * two or more series take the validated categorical slots in fixed order.
  *
  * Public API (window.CarbonViz):
  *   render(container, chart, opts)   timeseries | ranked | segmented
@@ -84,24 +86,28 @@
       return value || fallback;
     }
     return {
-      series: [v("--viz-series-1", "#0f62fe"), v("--viz-series-2", "#009d9a"), v("--viz-series-3", "#ba4e00")],
+      accent: v("--viz-accent", "#f3e2b3"),
+      series: [v("--viz-series-1", "#bc8930"), v("--viz-series-2", "#4e90d2"), v("--viz-series-3", "#9a4873")],
       status: {
-        good: v("--viz-good", "#24a148"),
+        good: v("--viz-good", "#42be65"),
         warning: v("--viz-warning", "#f1c21b"),
-        critical: v("--viz-critical", "#da1e28"),
-        neutral: v("--viz-neutral", "#8d8d8d")
+        critical: v("--viz-critical", "#fa4d56"),
+        neutral: v("--viz-neutral", "#8a857c")
       },
-      surface: v("--viz-surface", "#f4f4f4"),
-      textPrimary: v("--viz-text-primary", "#161616"),
-      textSecondary: v("--viz-text-secondary", "#525252"),
-      axisText: v("--viz-axis-text", "#6f6f6f"),
-      grid: v("--viz-grid", "#e0e0e0"),
-      baseline: v("--viz-baseline", "#8d8d8d"),
-      deemph: v("--viz-deemph", "#8d8d8d"),
-      hoverWash: v("--viz-hover-wash", "rgba(141,141,141,0.16)"),
-      onFillLight: v("--viz-on-fill-light", "#ffffff"),
-      onFillDark: v("--viz-on-fill-dark", "#161616"),
-      font: cs.fontFamily || "IBM Plex Sans, Helvetica Neue, Arial, sans-serif"
+      // Parts that carry no state ("neutral") in a status breakdown: warm grey
+      // steps, light to dark, so neighbours stay apart without borrowing a hue.
+      neutralSteps: [v("--viz-neutral-1", "#d4cfc4"), v("--viz-neutral-2", "#8f8a81"), v("--viz-neutral-3", "#5a554d")],
+      surface: v("--viz-surface", "#0a0a0a"),
+      textPrimary: v("--viz-text-primary", "#f6f1e7"),
+      textSecondary: v("--viz-text-secondary", "#b8b3a8"),
+      axisText: v("--viz-axis-text", "#8a857c"),
+      grid: v("--viz-grid", "#1d1d1d"),
+      baseline: v("--viz-baseline", "#3d3a35"),
+      deemph: v("--viz-deemph", "#6b665e"),
+      hoverWash: v("--viz-hover-wash", "rgba(255,255,255,0.05)"),
+      onFillLight: v("--viz-on-fill-light", "#f6f1e7"),
+      onFillDark: v("--viz-on-fill-dark", "#0a0a0a"),
+      font: cs.fontFamily || "Inter, Segoe UI, system-ui, sans-serif"
     };
   }
 
@@ -543,7 +549,9 @@
     var n = buckets.length;
     var series = (chart.series || []).slice(0, 3);
     var mark = chart.mark === "area" || chart.mark === "column" ? chart.mark : "line";
-    var colors = series.map(function (_, i) { return tokens.series[i]; });
+    // One series has no identity to carry: it wears the accent. Two or more
+    // take the categorical slots in fixed order (never cycled).
+    var colors = series.length === 1 ? [tokens.accent] : series.map(function (_, i) { return tokens.series[i]; });
 
     if (series.length >= 2) {
       legend(container, series.map(function (s, i) {
@@ -828,7 +836,7 @@
       var top = i * rowH;
       washes.push(svgEl("rect", { x: 0, y: top, width: W, height: rowH, fill: tokens.hoverWash, visibility: "hidden" }, svg));
       var isOther = /^other$/i.test(String(it.label).trim());
-      var fill = isOther ? tokens.deemph : tokens.series[0];
+      var fill = isOther ? tokens.deemph : tokens.accent;
       var barY = stacked ? top + 22 : top + (rowH - barH) / 2;
       var len = Math.max(0, (it.value / maxV) * barMax);
       if (len > 0.5) {
@@ -876,7 +884,7 @@
       var it = items[i];
       var share = total > 0 ? " (" + nf(0, 1).format((it.value / total) * 100) + "% of shown)" : "";
       var isOther = /^other$/i.test(String(it.label).trim());
-      fillTooltip(tip, null, [{ color: isOther ? tokens.deemph : tokens.series[0], value: format(it.value, unit, "full"), label: it.label }]);
+      fillTooltip(tip, null, [{ color: isOther ? tokens.deemph : tokens.accent, value: format(it.value, unit, "full"), label: it.label }]);
       var len = (it.value / maxV) * barMax;
       placeTooltip(tip, wrap, Math.min(W - 8, x0 + len), i * rowH + rowH);
       if (viaKeyboard) live.textContent = it.label + ": " + format(it.value, unit, "full") + share;
@@ -900,7 +908,16 @@
 
   function segmentColors(items, tokens) {
     var slot = 0;
+    var grey = 0;
     return items.map(function (it) {
+      // Good / warning / critical wear their reserved status colour (always with
+      // an icon + label in the legend, tooltip and table). "Neutral" parts carry
+      // no state: they take the warm grey steps in order, then the de-emphasis grey.
+      if (it.status === "neutral") {
+        var g = grey < tokens.neutralSteps.length ? tokens.neutralSteps[grey] : tokens.deemph;
+        grey++;
+        return g;
+      }
       if (it.status && tokens.status[it.status]) return tokens.status[it.status];
       if (/^other$/i.test(String(it.label).trim())) return tokens.deemph;
       // Never generate hues: past the three validated slots, the tail goes gray.
@@ -1051,7 +1068,7 @@
     });
     var li = lastIndex(values);
     if (li >= 0) {
-      svgEl("circle", { cx: x(li), cy: y(values[li]), r: 5, fill: tokens.series[0], stroke: opts.surface || tokens.surface, "stroke-width": 2 }, svg);
+      svgEl("circle", { cx: x(li), cy: y(values[li]), r: 5, fill: tokens.accent, stroke: opts.surface || tokens.surface, "stroke-width": 2 }, svg);
     }
   }
 

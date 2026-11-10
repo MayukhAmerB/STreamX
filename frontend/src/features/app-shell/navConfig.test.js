@@ -4,10 +4,12 @@ import {
   BOTTOM_NAV_LIMIT,
   getActiveNavItemId,
   getBottomNavItems,
+  getCornerTileGroups,
   getLearnCourseId,
   getMoreItems,
   getNavItems,
   getNavSections,
+  getShellDocumentTitle,
   getShellPageMode,
   getUserRoles,
   isMoreActive,
@@ -15,6 +17,8 @@ import {
   isNavItemActive,
   NAV_ITEMS,
   resolveContinueLearningPath,
+  USERS_CORNER_PATH,
+  USERS_CORNER_TITLE,
 } from "./navConfig";
 
 const student = { user: { role: "student" }, isInstructor: false, isAdmin: false };
@@ -36,6 +40,7 @@ describe("nav config", () => {
 
   it("gives students only the learning and account destinations", () => {
     expect(ids(getNavItems(student))).toEqual([
+      "overview",
       "my-courses",
       "continue-learning",
       "live-classes",
@@ -95,13 +100,71 @@ describe("nav config", () => {
     const items = getNavItems(instructor);
     const bottom = getBottomNavItems(items);
     expect(bottom).toHaveLength(BOTTOM_NAV_LIMIT);
-    expect(ids(bottom)).toEqual(["my-courses", "continue-learning", "live-classes", "profile"]);
+    expect(ids(bottom)).toEqual(["overview", "my-courses", "continue-learning", "live-classes"]);
     const more = getMoreItems(items);
-    expect(ids(more)).toEqual(expect.arrayContaining(["guides", "osint-tools", "id-card", "control-center"]));
-    expect(ids(more)).not.toContain("profile");
+    expect(ids(more)).toEqual(
+      expect.arrayContaining(["guides", "osint-tools", "profile", "id-card", "control-center"])
+    );
+    expect(ids(more)).not.toContain("overview");
     expect(more.length + bottom.length).toBe(items.length);
     expect(isMoreActive(items, "/id-card")).toBe(true);
-    expect(isMoreActive(items, "/profile")).toBe(false);
+    // Profile moved to More (it is also in the header's account panel).
+    expect(isMoreActive(items, "/profile")).toBe(true);
+    expect(isMoreActive(items, "/users-corner")).toBe(false);
+  });
+
+  it("makes the User's Corner hub the first destination and the shell's home", () => {
+    expect(USERS_CORNER_PATH).toBe("/users-corner");
+    expect(USERS_CORNER_TITLE).toBe("User's Corner");
+    for (const auth of [student, instructor, admin]) {
+      const [first] = getNavItems(auth);
+      expect(first).toMatchObject({ id: "overview", label: "Overview", to: "/users-corner", bottomNav: true });
+      expect(getNavSections(auth)[0].items[0].id).toBe("overview");
+    }
+    const items = getNavItems(student);
+    expect(getActiveNavItemId(items, "/users-corner")).toBe("overview");
+    expect(getActiveNavItemId(items, "/users-corner/")).toBe("overview");
+    expect(getActiveNavItemId(items, "/users-corner-x")).toBe("");
+    expect(getShellPageMode("/users-corner")).toBe("carbon");
+    expect(isFlushPage("/users-corner")).toBe(false);
+  });
+
+  it("titles browser tabs '<page> · User's Corner'", () => {
+    const items = getNavItems(instructor);
+    expect(getShellDocumentTitle(items, "/users-corner")).toBe("User's Corner");
+    expect(getShellDocumentTitle(items, "/my-courses")).toBe("My courses · User's Corner");
+    expect(getShellDocumentTitle(items, "/courses/3/live")).toBe("Live classes · User's Corner");
+    expect(getShellDocumentTitle(items, "/broadcasting?session=2")).toBe("Broadcasting · User's Corner");
+    expect(getShellDocumentTitle(items, "/somewhere-else")).toBe("User's Corner");
+    expect(getShellDocumentTitle(undefined, "/my-courses")).toBe("User's Corner");
+  });
+
+  it("builds the hub tiles from the same role rules as the nav", () => {
+    const studentGroups = getCornerTileGroups(student);
+    expect(studentGroups.map((group) => group.id)).toEqual(["corner"]);
+    expect(ids(studentGroups[0].items)).toEqual([
+      "my-courses",
+      "live-classes",
+      "guides",
+      "osint-tools",
+      "profile",
+      "id-card",
+    ]);
+    const instructorGroups = getCornerTileGroups(instructor);
+    expect(instructorGroups.map((group) => group.label)).toEqual(["Your corner", "Teaching"]);
+    expect(ids(instructorGroups[1].items)).toEqual([
+      "instructor-dashboard",
+      "new-course",
+      "control-center",
+      "meeting",
+      "broadcasting",
+    ]);
+    const adminTeaching = getCornerTileGroups(admin).find((group) => group.id === "teach");
+    expect(ids(adminTeaching.items)).toEqual(["control-center", "meeting", "broadcasting", "lecture-questions"]);
+    for (const group of [...studentGroups, ...instructorGroups]) {
+      expect(ids(group.items)).not.toContain("overview");
+      expect(ids(group.items)).not.toContain("continue-learning");
+    }
   });
 
   it("knows which shell pages are already Carbon-native", () => {

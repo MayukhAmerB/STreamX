@@ -29,6 +29,7 @@ export function ToastProvider({ children }) {
         {toasts.map((toast) => (
           <ToastNotification
             key={toast.id}
+            lowContrast
             kind={toast.kind}
             title={toast.title}
             subtitle={toast.subtitle}

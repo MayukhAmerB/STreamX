@@ -55,8 +55,10 @@
 .cds-app .cds-osint-guide {
   padding: $spacing-05;
   margin-block-end: $spacing-06;
-  background-color: $layer-01;
+  border: 1px solid var(--uc-border);
   border-inline-start: 3px solid $border-interactive;
+  border-radius: var(--uc-radius-md);
+  background-color: $layer-01;
 
   @include breakpoint(md) {
     padding: $spacing-06;

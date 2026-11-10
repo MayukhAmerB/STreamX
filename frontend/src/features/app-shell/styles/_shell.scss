@@ -1,8 +1,10 @@
-// Layout of the functional app shell: header, side nav, content area,
-// phone bottom navigation and the "More" sheet. Carbon tokens only.
+// Layout of the User's Corner shell: header, side nav, content area, phone
+// bottom navigation and the "More" sheet. Carbon tokens + the User's
+// Corner palette (`--uc-*`, styles/_corner-palette.scss) only.
 @use './tokens' as *;
 
-$header-height: 3rem;
+$header-height-mobile: 3.5rem; // 56px
+$header-height-desktop: 4rem; // 64px, room for the two-line brand block
 $side-nav-width: 16rem;
 $bottom-nav-height: 4rem; // 64px tab bar (+ safe-area inset)
 $safe-top: env(safe-area-inset-top, 0px);
@@ -11,59 +13,278 @@ $safe-left: env(safe-area-inset-left, 0px);
 $safe-right: env(safe-area-inset-right, 0px);
 
 .cds-app {
-  --cds-app-header-height: calc(#{$header-height} + #{$safe-top});
+  --cds-app-header-height: calc(#{$header-height-mobile} + #{$safe-top});
   --cds-app-bottom-nav-height: calc(#{$bottom-nav-height} + #{$safe-bottom});
 }
 
+.cds-app[data-shell-layout='desktop'] {
+  --cds-app-header-height: calc(#{$header-height-desktop} + #{$safe-top});
+}
+
 // ---------------------------------------------------------------------------
-// Header
+// Header (same black bar + hairline as the website navbar)
 // ---------------------------------------------------------------------------
 .cds-app .cds--header {
   block-size: var(--cds-app-header-height);
   padding-block-start: $safe-top;
   padding-inline: $safe-left $safe-right;
+  border-block-end: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: var(--uc-page);
 }
 
-.cds-app .cds--header__name {
+.cds-app a.cds--header__name.uc-header__brand {
   overflow: hidden;
   min-inline-size: 0;
   flex: 0 1 auto;
+  padding: 0 $spacing-03 0 $spacing-05;
+  border: 0;
+  border-radius: var(--uc-radius-control);
+  color: var(--uc-text);
   white-space: nowrap;
 
   > span {
+    display: flex;
     overflow: hidden;
-    text-overflow: ellipsis;
+    min-inline-size: 0;
+  }
+
+  &:focus {
+    border: 0;
+    outline: 2px solid var(--uc-accent);
+    outline-offset: -4px;
+  }
+
+  @include breakpoint(md) {
+    padding-inline: $spacing-06 $spacing-05;
   }
 }
 
-.cds-app .cds-app-header__brand-mark {
-  display: inline-block;
-  inline-size: 1.5rem;
-  block-size: 1.5rem;
-  flex: none;
-  border-radius: 50%;
-  margin-inline-end: $spacing-03;
-  object-fit: cover;
-  vertical-align: middle;
+// Brand block: logo + name + uppercase platform label (website navbar).
+.cds-app .uc-brand {
+  display: inline-flex;
+  min-inline-size: 0;
+  align-items: center;
+  gap: 0.625rem;
 }
 
-// Avatar trigger: room for the 32px avatar inside the 48px action.
+.cds-app .uc-brand__mark {
+  display: inline-flex;
+  overflow: hidden;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  block-size: 2rem;
+  inline-size: 2rem;
+
+  img {
+    display: block;
+    block-size: 100%;
+    inline-size: 100%;
+    object-fit: contain;
+  }
+
+  @include breakpoint(md) {
+    block-size: 2.5rem;
+    inline-size: 2.5rem;
+  }
+}
+
+.cds-app .uc-brand__mark--owl {
+  border: 1px solid rgba(196, 181, 253, 0.35);
+  background-color: rgba(109, 40, 217, 0.18);
+  color: #ddd6fe;
+}
+
+.cds-app .uc-brand__owl {
+  block-size: 80%;
+  inline-size: 80%;
+}
+
+.cds-app .uc-brand__text {
+  display: flex;
+  min-inline-size: 0;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.cds-app .uc-brand__name {
+  overflow: hidden;
+  color: var(--uc-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  text-overflow: ellipsis;
+
+  @include breakpoint(md) {
+    font-size: 0.9375rem;
+  }
+}
+
+.cds-app .uc-brand__platform {
+  display: none;
+  margin-block-start: 0.125rem;
+  color: rgba(218, 218, 218, 0.7);
+  font-size: 0.5625rem;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+
+  @include breakpoint(md) {
+    display: block;
+  }
+}
+
+// Phones: "User's Corner" sits under the brand name instead.
+.cds-app .uc-brand__corner {
+  @include corner-micro-label(0.5625rem);
+
+  margin-block-start: 0.125rem;
+  color: var(--uc-accent);
+  letter-spacing: 0.2em;
+
+  @include breakpoint(md) {
+    display: none;
+  }
+}
+
+// Section title (md and up): hairline divider + champagne micro-label.
+.cds-app .uc-header__section {
+  @include corner-micro-label(0.6875rem);
+
+  display: none;
+  flex: none;
+  align-items: center;
+  color: var(--uc-accent);
+  gap: $spacing-05;
+  text-shadow: var(--uc-text-glow);
+  white-space: nowrap;
+
+  &::before {
+    display: block;
+    background-color: var(--uc-border-strong);
+    block-size: 1.75rem;
+    content: '';
+    inline-size: 1px;
+  }
+
+  @include breakpoint(md) {
+    display: inline-flex;
+  }
+}
+
+.cds-app .cds--header__global {
+  align-items: center;
+  padding-inline-end: $spacing-03;
+  gap: $spacing-02;
+
+  @include breakpoint(md) {
+    padding-inline-end: $spacing-05;
+    gap: $spacing-03;
+  }
+}
+
+// "Back to website": outlined button (website secondary button); icon only
+// on phones (the label stays available to screen readers).
+.cds-app .uc-header__back {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--uc-border-strong);
+  border-radius: var(--uc-radius-control);
+  background-color: rgba(255, 255, 255, 0.02);
+  block-size: 2.75rem;
+  color: var(--uc-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  gap: $spacing-03;
+  inline-size: 2.75rem;
+  text-decoration: none;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+
+  svg {
+    flex: none;
+    fill: currentColor;
+  }
+
+  &:focus-visible {
+    @include corner-focus-ring;
+  }
+
+  &:active {
+    background-color: var(--uc-raised-2);
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      border-color: var(--uc-border-hover);
+      background-color: var(--uc-raised);
+    }
+  }
+
+  @include breakpoint(md) {
+    block-size: 2.5rem;
+    inline-size: auto;
+    padding-inline: $spacing-04 $spacing-05;
+  }
+}
+
+.cds-app .uc-header__back-label {
+  position: absolute;
+  overflow: hidden;
+  block-size: 1px;
+  clip: rect(0 0 0 0);
+  inline-size: 1px;
+  white-space: nowrap;
+
+  @include breakpoint(md) {
+    position: static;
+    overflow: visible;
+    block-size: auto;
+    clip: auto;
+    inline-size: auto;
+  }
+}
+
+// Avatar trigger: a round 48px action.
+.cds-app .cds--header__action {
+  border: 0;
+  border-radius: 50%;
+
+  &.cds--header__action--active {
+    border: 0;
+    background-color: var(--uc-raised);
+  }
+
+  &:focus {
+    border: 0;
+    outline: 2px solid var(--uc-accent);
+    outline-offset: -2px;
+  }
+}
+
 .cds-app .cds--header__action .cds-app-avatar {
   pointer-events: none;
 }
 
-// Avatar inside the header action button.
+// Avatar: warm-white initial on a raised disc with a hairline ring.
 .cds-app .cds-app-avatar {
   display: inline-flex;
   overflow: hidden;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background-color: $layer-accent;
+  background-color: var(--uc-raised);
   block-size: 2rem;
-  color: $text-primary;
+  box-shadow: 0 0 0 1px var(--uc-border-strong);
+  color: var(--uc-text);
   flex: none;
-  font-weight: 600;
+  font-weight: 700;
   inline-size: 2rem;
   font-size: 0.875rem;
   line-height: 1;
@@ -96,10 +317,21 @@ $safe-right: env(safe-area-inset-right, 0px);
   block-size: auto;
   max-block-size: calc(100dvh - var(--cds-app-header-height));
   overflow-y: auto;
+  background-color: var(--uc-surface);
+
+  &.cds--header-panel--expanded {
+    border: 1px solid var(--uc-border);
+    border-block-start: 0;
+    border-end-start-radius: var(--uc-radius-md);
+    box-shadow: var(--uc-shadow);
+    inline-size: 18rem;
+  }
 
   @include breakpoint-down(md) {
     &.cds--header-panel--expanded {
       inline-size: 100%;
+      border-inline: 0;
+      border-end-start-radius: 0;
     }
   }
 }
@@ -113,10 +345,12 @@ $safe-right: env(safe-area-inset-right, 0px);
 }
 
 .cds-app .cds-app-account-panel__name {
-  @include type-style('heading-compact-02');
-
   overflow: hidden;
-  color: $text-primary;
+  color: var(--uc-text);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -125,22 +359,18 @@ $safe-right: env(safe-area-inset-right, 0px);
   @include type-style('label-01');
 
   overflow: hidden;
-  color: $text-secondary;
+  color: var(--uc-text-2);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.cds-app .cds-app-account-panel__section {
-  padding: $spacing-05;
+.cds-app .cds-app-account-panel .cds-app-action-list {
+  padding-block: $spacing-03;
   border-block-end: 1px solid $border-subtle;
 }
 
-.cds-app .cds-app-section-label {
-  @include type-style('label-01');
-
-  display: block;
-  margin-block-end: $spacing-03;
-  color: $text-secondary;
+.cds-app .cds-app-account-panel > .cds-app-action-list__item--danger {
+  margin-block: $spacing-03;
 }
 
 // ---------------------------------------------------------------------------
@@ -155,13 +385,16 @@ $safe-right: env(safe-area-inset-right, 0px);
 .cds-app .cds-app-action-list__item {
   @include type-style('body-compact-01');
 
+  position: relative;
   display: flex;
   align-items: center;
   padding: 0 $spacing-05;
   border: 0;
   background: none;
-  color: $text-primary;
+  color: var(--uc-text);
   cursor: pointer;
+  font-family: var(--uc-font);
+  font-weight: 500;
   gap: $spacing-04;
   inline-size: 100%;
   min-block-size: 3rem;
@@ -171,11 +404,12 @@ $safe-right: env(safe-area-inset-right, 0px);
 
   svg {
     flex: none;
-    fill: $icon-secondary;
+    fill: var(--uc-text-2);
   }
 
   &:focus-visible {
-    @include focus-outline('outline');
+    outline: 2px solid var(--uc-accent);
+    outline-offset: -2px;
   }
 
   &:active {
@@ -183,12 +417,22 @@ $safe-right: env(safe-area-inset-right, 0px);
   }
 
   &[aria-current='page'] {
-    background-color: $background-selected;
-    box-shadow: inset 3px 0 0 $border-interactive;
+    background-color: var(--uc-accent-soft);
     font-weight: 600;
 
+    &::before {
+      position: absolute;
+      border-radius: 0 3px 3px 0;
+      background-color: var(--uc-accent);
+      box-shadow: 0 0 10px rgba(243, 226, 179, 0.55);
+      content: '';
+      inline-size: 3px;
+      inset-block: $spacing-03;
+      inset-inline-start: 0;
+    }
+
     svg {
-      fill: $icon-primary;
+      fill: var(--uc-accent);
     }
   }
 
@@ -200,34 +444,133 @@ $safe-right: env(safe-area-inset-right, 0px);
 }
 
 .cds-app .cds-app-action-list__item--danger {
-  color: $text-error;
+  color: var(--uc-error);
 
   svg {
-    fill: $support-error;
+    fill: var(--uc-error);
   }
 }
 
 // ---------------------------------------------------------------------------
 // Desktop side nav
 // ---------------------------------------------------------------------------
+.cds-app .cds--header ~ .cds-app-sidenav,
 .cds-app .cds-app-sidenav {
-  border-inline-end: 1px solid $border-subtle;
+  border-inline-end: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: var(--uc-page);
+  block-size: calc(100% - var(--cds-app-header-height));
+  color: var(--uc-text-2);
+  inset-block-start: var(--cds-app-header-height);
 }
 
 .cds-app .cds-app-sidenav .cds--side-nav__items {
-  padding-block: $spacing-05;
+  padding-block: $spacing-05 $spacing-07;
+}
+
+// "— USER'S CORNER": the landing page's eyebrow (hairline + micro-label).
+.cds-app .cds-app-sidenav__title {
+  @include corner-micro-label(0.625rem);
+
+  display: flex;
+  align-items: center;
+  padding: $spacing-05 $spacing-06 $spacing-04;
+  color: var(--uc-accent);
+  gap: $spacing-04;
+  list-style: none;
+  text-shadow: var(--uc-text-glow);
+
+  &::before {
+    display: block;
+    flex: none;
+    background-color: var(--uc-accent);
+    block-size: 1px;
+    content: '';
+    inline-size: 1.5rem;
+    opacity: 0.75;
+  }
 }
 
 .cds-app .cds-app-sidenav__heading {
-  @include type-style('label-01');
+  @include corner-micro-label(0.625rem);
 
-  padding: $spacing-06 $spacing-05 $spacing-03;
-  color: $text-secondary;
+  padding: $spacing-07 $spacing-06 $spacing-03;
+  color: var(--uc-text-muted);
   list-style: none;
 }
 
+.cds-app .cds-app-sidenav .cds--side-nav__item {
+  overflow: visible;
+}
+
 .cds-app .cds-app-sidenav .cds--side-nav__link {
-  min-block-size: 2.5rem;
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: var(--uc-radius-control);
+  margin-block: 2px;
+  margin-inline: $spacing-04;
+  inline-size: auto;
+  min-block-size: 2.75rem;
+  padding-inline: $spacing-04;
+  transition: background-color 140ms ease;
+
+  &:focus {
+    outline: 2px solid var(--uc-accent);
+    outline-offset: -2px;
+  }
+
+  .cds--side-nav__icon:not(.cds--side-nav__submenu-chevron) {
+    margin-inline-end: $spacing-04;
+  }
+
+  .cds--side-nav__icon > svg {
+    block-size: 1.125rem;
+    fill: var(--uc-text-2);
+    inline-size: 1.125rem;
+  }
+
+  > .cds--side-nav__link-text {
+    color: var(--uc-text-2);
+    font-family: var(--uc-font);
+    font-size: 0.875rem;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  @media (any-hover: hover) {
+    &:hover {
+      background-color: rgba(246, 241, 231, 0.05);
+
+      > .cds--side-nav__link-text {
+        color: var(--uc-text);
+      }
+
+      .cds--side-nav__icon > svg {
+        fill: var(--uc-text);
+      }
+    }
+  }
+}
+
+.cds-app .cds-app-sidenav .cds--side-nav__link[aria-current='page'],
+.cds-app .cds-app-sidenav .cds--side-nav__link.cds--side-nav__link--current {
+  background-color: var(--uc-accent-soft);
+
+  &::before {
+    border-radius: 0 3px 3px 0;
+    background-color: var(--uc-accent);
+    box-shadow: 0 0 10px rgba(243, 226, 179, 0.55);
+    inset-block: $spacing-03;
+  }
+
+  > .cds--side-nav__link-text {
+    color: var(--uc-text);
+    font-weight: 600;
+  }
+
+  .cds--side-nav__icon > svg {
+    fill: var(--uc-accent);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -253,7 +596,7 @@ $safe-right: env(safe-area-inset-right, 0px);
   padding-inline: $safe-left $safe-right;
 }
 
-// Carbon-native pages: generous Carbon spacing, centred reading width.
+// Carbon-native pages: generous spacing, centred reading width.
 .cds-app .cds-page {
   max-inline-size: 82rem;
   margin-inline: auto;
@@ -274,11 +617,14 @@ $safe-right: env(safe-area-inset-right, 0px);
   padding: 0;
 }
 
-// Pages not yet migrated keep the website's dark (or OwlCognito light) look.
+// Pages not yet migrated (staff tools) keep their website styles, on the
+// same black as the rest of User's Corner. OwlCognito's legacy pages are
+// built for its light violet look, so they keep it.
 .cds-app .cds-legacy-frame {
   min-block-size: calc(100dvh - var(--cds-app-header-height));
   background-color: #000000;
   color: #ffffff;
+  font-family: var(--uc-font);
 }
 
 html[data-site-brand='owlcognito'] .cds-app .cds-legacy-frame {
@@ -297,8 +643,9 @@ html[data-site-brand='owlcognito'] .cds-app .cds-legacy-frame {
   position: fixed;
   z-index: 8000;
   display: grid;
-  border-block-start: 1px solid $border-subtle;
-  background-color: $layer-01;
+  border-block-start: 1px solid rgba(255, 255, 255, 0.1);
+  // Solid: page content scrolling underneath must not bleed through the labels.
+  background-color: #000;
   grid-auto-columns: minmax(0, 1fr);
   grid-auto-flow: column;
   inset-block-end: 0;
@@ -308,8 +655,6 @@ html[data-site-brand='owlcognito'] .cds-app .cds-legacy-frame {
 }
 
 .cds-app .cds-app-bottom-nav__item {
-  @include type-style('label-01');
-
   position: relative;
   display: flex;
   flex-direction: column;
@@ -320,9 +665,14 @@ html[data-site-brand='owlcognito'] .cds-app .cds-legacy-frame {
   margin: 0;
   background: none;
   block-size: $bottom-nav-height;
-  color: $text-secondary;
+  color: var(--uc-text-muted);
   cursor: pointer;
+  font-family: var(--uc-font);
+  font-size: 0.6875rem;
+  font-weight: 600;
   gap: $spacing-02;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
   min-inline-size: 2.75rem;
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
@@ -335,15 +685,17 @@ html[data-site-brand='owlcognito'] .cds-app .cds-legacy-frame {
 
   &::before {
     position: absolute;
+    border-radius: 0 0 3px 3px;
     block-size: 3px;
     background-color: transparent;
     content: '';
     inset-block-start: -1px;
-    inset-inline: 22%;
+    inset-inline: 28%;
   }
 
   &:focus-visible {
-    @include focus-outline('outline');
+    outline: 2px solid var(--uc-accent);
+    outline-offset: -2px;
   }
 
   &:active {
@@ -353,17 +705,21 @@ html[data-site-brand='owlcognito'] .cds-app .cds-legacy-frame {
   @media (hover: hover) {
     &:hover {
       background-color: $background-hover;
-      color: $text-primary;
+      color: var(--uc-text);
     }
   }
 }
 
 .cds-app .cds-app-bottom-nav__item.is-active {
-  color: $text-primary;
-  font-weight: 600;
+  color: var(--uc-text);
+
+  svg {
+    fill: var(--uc-accent);
+  }
 
   &::before {
-    background-color: $border-interactive;
+    background-color: var(--uc-accent);
+    box-shadow: 0 0 12px rgba(243, 226, 179, 0.6);
   }
 }
 
@@ -405,8 +761,14 @@ body:has(.cds-app[data-shell-layout='mobile']) > [data-host-live-badge] {
 .cds-app .cds-app-sheet__panel {
   position: relative;
   display: flex;
+  overflow: hidden;
   flex-direction: column;
-  background-color: $layer-01;
+  border: 1px solid var(--uc-border);
+  border-block-end: 0;
+  border-start-end-radius: var(--uc-radius-card);
+  border-start-start-radius: var(--uc-radius-card);
+  background: var(--uc-card-highlight), var(--uc-surface);
+  box-shadow: 0 -18px 50px rgba(0, 0, 0, 0.6);
   max-block-size: min(85dvh, 40rem);
   overscroll-behavior: contain;
   padding-block-end: $safe-bottom;
@@ -424,17 +786,22 @@ body:has(.cds-app[data-shell-layout='mobile']) > [data-host-live-badge] {
   justify-content: space-between;
   padding-inline-start: $spacing-05;
   border-block-end: 1px solid $border-subtle;
-  min-block-size: 3rem;
+  min-block-size: 3.5rem;
 }
 
 .cds-app .cds-app-sheet__title {
-  @include type-style('heading-compact-02');
+  @include corner-heading(-0.02em);
+
+  color: var(--uc-text);
+  font-size: 1.125rem;
+  line-height: 1.3;
 }
 
 .cds-app .cds-app-sheet__body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  padding-block-end: $spacing-03;
 }
 
 .cds-app .cds-app-sheet__group + .cds-app-sheet__group {
@@ -442,16 +809,11 @@ body:has(.cds-app[data-shell-layout='mobile']) > [data-host-live-badge] {
 }
 
 .cds-app .cds-app-sheet__group-label {
-  @include type-style('label-01');
+  @include corner-micro-label(0.625rem);
 
   display: block;
   padding: $spacing-05 $spacing-05 $spacing-02;
-  color: $text-secondary;
-}
-
-.cds-app .cds-app-sheet__section {
-  padding: $spacing-05;
-  border-block-start: 1px solid $border-subtle;
+  color: var(--uc-text-muted);
 }
 
 @keyframes cds-app-fade-in {
@@ -493,17 +855,6 @@ body:has(.cds-app[data-shell-layout='mobile']) > [data-host-live-badge] {
     max-inline-size: none;
     margin: 0;
   }
-}
-
-// ---------------------------------------------------------------------------
-// Theme switch (content switcher) fills its container.
-// ---------------------------------------------------------------------------
-.cds-app .cds-app-theme-switch {
-  inline-size: 100%;
-}
-
-.cds-app .cds-app-theme-switch .cds--content-switcher-btn {
-  min-block-size: 2.75rem;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,553 @@
+// User's Corner hub (/users-corner). Token-only imports: emits no Carbon
+// component CSS. Landing-page language: black, Inter 800 headings, rounded
+// dark cards with hairline borders, uppercase micro-labels, champagne accent.
+@use '../app-shell/styles/tokens' as *;
+
+.cds-app .uc-hub {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-07;
+
+  @include breakpoint(md) {
+    gap: $spacing-08;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hero: greeting with a soft champagne glow
+// ---------------------------------------------------------------------------
+.cds-app .uc-hub-hero {
+  position: relative;
+  overflow: hidden;
+  padding: $spacing-07 $spacing-06;
+  border: 1px solid var(--uc-border);
+  border-radius: var(--uc-radius-card);
+  background:
+    radial-gradient(circle at 88% -20%, rgba(243, 226, 179, 0.12), transparent 46%),
+    radial-gradient(circle at 0% 120%, rgba(255, 255, 255, 0.05), transparent 42%),
+    #070707;
+
+  @include breakpoint(md) {
+    padding: $spacing-09 $spacing-08;
+    border-radius: var(--uc-radius-lg);
+  }
+}
+
+.cds-app .uc-hub-hero__eyebrow {
+  @include corner-micro-label(0.625rem);
+
+  display: flex;
+  align-items: center;
+  color: var(--uc-text-2);
+  gap: $spacing-04;
+  letter-spacing: 0.24em;
+
+  &::before {
+    display: block;
+    flex: none;
+    background-color: rgba(255, 255, 255, 0.65);
+    block-size: 1px;
+    content: '';
+    inline-size: 2.5rem;
+  }
+
+  @include breakpoint(md) {
+    font-size: 0.6875rem;
+  }
+}
+
+.cds-app .uc-hub-hero__title {
+  @include corner-heading(-0.05em);
+
+  max-inline-size: 40rem;
+  margin-block-start: $spacing-05;
+  color: var(--uc-text);
+  font-size: clamp(2.25rem, 9vw, 3.75rem);
+  line-height: 0.98;
+  overflow-wrap: anywhere;
+  text-shadow: var(--uc-text-glow);
+}
+
+.cds-app .uc-hub-hero__summary {
+  max-inline-size: 36rem;
+  margin-block-start: $spacing-05;
+  color: var(--uc-text-2);
+  font-size: 0.9375rem;
+  line-height: 1.7;
+}
+
+// "Live mentorship ▪ Protected recordings" style list from the landing hero.
+.cds-app .uc-hub-hero__stats {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 0;
+  margin: $spacing-06 0 0;
+  gap: $spacing-03 $spacing-06;
+  list-style: none;
+
+  li {
+    @include corner-micro-label(0.625rem);
+
+    display: flex;
+    align-items: center;
+    color: var(--uc-text-2);
+    gap: $spacing-03;
+    letter-spacing: 0.14em;
+
+    &::before {
+      display: block;
+      flex: none;
+      background-color: var(--uc-accent);
+      block-size: 0.375rem;
+      box-shadow: 0 0 8px rgba(243, 226, 179, 0.6);
+      content: '';
+      inline-size: 0.375rem;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Feature cards: Continue learning + Live
+// ---------------------------------------------------------------------------
+.cds-app .uc-hub__feature {
+  display: grid;
+  gap: $spacing-05;
+  grid-template-columns: minmax(0, 1fr);
+
+  @include breakpoint(lg) {
+    gap: $spacing-06;
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  }
+}
+
+.cds-app .uc-card {
+  @include corner-card(20px);
+
+  display: flex;
+  min-inline-size: 0;
+  flex-direction: column;
+  padding: $spacing-06 $spacing-05;
+  gap: $spacing-04;
+
+  @include breakpoint(md) {
+    padding: $spacing-07;
+    border-radius: var(--uc-radius-card);
+  }
+}
+
+.cds-app .uc-card--is-live {
+  border-color: rgba(250, 77, 86, 0.35);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(250, 77, 86, 0.12), transparent 50%),
+    var(--uc-surface);
+}
+
+.cds-app .uc-card__label {
+  @include corner-micro-label(0.625rem);
+
+  color: var(--uc-text-2);
+  letter-spacing: 0.26em;
+}
+
+.cds-app .uc-card__title {
+  @include corner-heading(-0.03em);
+
+  color: var(--uc-text);
+  font-size: 1.5rem;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+
+  @include breakpoint(md) {
+    font-size: 1.75rem;
+  }
+}
+
+.cds-app .uc-card__text {
+  color: var(--uc-text-2);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.cds-app .uc-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-02;
+
+  .cds--tag {
+    margin: 0;
+  }
+}
+
+.cds-app .uc-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  margin-block-start: auto;
+  gap: $spacing-03;
+  padding-block-start: $spacing-03;
+
+  @include breakpoint-down(md) {
+    > .cds--btn {
+      flex: 1 1 auto;
+      max-inline-size: none;
+    }
+  }
+}
+
+.cds-app .uc-card__progress,
+.cds-app .uc-course__progress {
+  inline-size: 100%;
+}
+
+.cds-app .uc-card__skeleton {
+  padding-block: $spacing-03;
+}
+
+// Continue learning: artwork beside the course from md up.
+.cds-app .uc-continue {
+  display: grid;
+  flex: 1;
+  gap: $spacing-05;
+  grid-template-columns: minmax(0, 1fr);
+
+  @include breakpoint(md) {
+    align-items: stretch;
+    gap: $spacing-06;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  }
+}
+
+.cds-app .uc-continue__art,
+.cds-app .uc-course__art {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background-color: var(--uc-surface-2);
+
+  img {
+    position: absolute;
+    display: block;
+    block-size: 100%;
+    inline-size: 100%;
+    inset: 0;
+    object-fit: cover;
+  }
+}
+
+.cds-app .uc-continue__art {
+  border: 1px solid var(--uc-border);
+  border-radius: var(--uc-radius-md);
+
+  @include breakpoint(md) {
+    aspect-ratio: auto;
+    min-block-size: 11rem;
+  }
+}
+
+.cds-app .uc-continue__body {
+  display: flex;
+  min-inline-size: 0;
+  flex-direction: column;
+  gap: $spacing-04;
+}
+
+// Live tag + pulsing red dot (status: always icon + label).
+.cds-app .uc-live-tag {
+  gap: $spacing-02;
+}
+
+.cds-app .uc-live-dot {
+  display: inline-block;
+  flex: none;
+  border-radius: 50%;
+  margin-inline-end: $spacing-02;
+  animation: uc-live-pulse 2s ease-in-out infinite;
+  background-color: var(--uc-live);
+  block-size: 0.5rem;
+  box-shadow: 0 0 8px rgba(250, 77, 86, 0.8);
+  inline-size: 0.5rem;
+}
+
+@keyframes uc-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sections: My courses preview + tiles
+// ---------------------------------------------------------------------------
+.cds-app .uc-section__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-block-end: $spacing-05;
+  gap: $spacing-03 $spacing-05;
+}
+
+.cds-app .uc-section__title {
+  @include corner-heading(-0.03em);
+
+  color: var(--uc-text);
+  font-size: 1.5rem;
+  line-height: 1.15;
+
+  @include breakpoint(md) {
+    font-size: 1.75rem;
+  }
+}
+
+.cds-app .uc-section__link {
+  @include corner-micro-label(0.6875rem);
+
+  display: inline-flex;
+  align-items: center;
+  padding: $spacing-03 0;
+  color: var(--uc-accent);
+  gap: $spacing-03;
+  letter-spacing: 0.18em;
+  min-block-size: 2.75rem;
+  text-decoration: none;
+
+  svg {
+    fill: currentColor;
+    transition: transform 160ms ease;
+  }
+
+  &:focus-visible {
+    @include corner-focus-ring;
+
+    border-radius: 6px;
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      color: var(--uc-accent-hover);
+
+      svg {
+        transform: translateX(3px);
+      }
+    }
+  }
+}
+
+.cds-app .uc-courses {
+  display: grid;
+  padding: 0;
+  margin: 0;
+  gap: $spacing-05;
+  grid-template-columns: minmax(0, 1fr);
+  list-style: none;
+
+  @include breakpoint(md) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @include breakpoint(xlg) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.cds-app .uc-courses--loading {
+  display: block;
+  padding: $spacing-05;
+  border: 1px solid var(--uc-border);
+  border-radius: var(--uc-radius-card);
+}
+
+// Phones: a compact row (thumbnail beside the course); md+: a card.
+.cds-app .uc-course {
+  @include corner-card(20px);
+
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  min-inline-size: 0;
+  flex-direction: row;
+
+  @include breakpoint(md) {
+    flex-direction: column;
+  }
+
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+
+  @include breakpoint(md) {
+    border-radius: var(--uc-radius-card);
+  }
+
+  &:focus-within {
+    @include corner-focus-ring;
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      border-color: var(--uc-border-hover);
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
+      transform: translateY(-2px);
+    }
+  }
+}
+
+.cds-app .uc-course__art {
+  flex: none;
+  align-self: stretch;
+  border-inline-end: 1px solid var(--uc-border);
+  aspect-ratio: auto;
+  inline-size: 6.5rem;
+
+  @include breakpoint(md) {
+    align-self: auto;
+    border-block-end: 1px solid var(--uc-border);
+    border-inline-end: 0;
+    aspect-ratio: 16 / 9;
+    inline-size: auto;
+  }
+}
+
+.cds-app .uc-course__body {
+  display: flex;
+  min-inline-size: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: $spacing-05 $spacing-04;
+  gap: $spacing-03;
+
+  @include breakpoint(md) {
+    padding: $spacing-05;
+    gap: $spacing-04;
+  }
+}
+
+.cds-app .uc-course__title {
+  @include corner-heading(-0.02em);
+
+  color: var(--uc-text);
+  font-size: 1.125rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+// The title is the card's link; it stretches over the whole card.
+.cds-app .uc-course__link {
+  color: inherit;
+  text-decoration: none;
+
+  &::after {
+    position: absolute;
+    content: '';
+    inset: 0;
+  }
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.cds-app .uc-course__progress {
+  margin-block-start: auto;
+}
+
+// Big icon tiles: icon + one-word label.
+.cds-app .uc-tiles {
+  display: grid;
+  padding: 0;
+  margin: 0;
+  gap: $spacing-04;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  list-style: none;
+
+  @include breakpoint(md) {
+    gap: $spacing-05;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  @include breakpoint(xlg) {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+.cds-app .uc-tile {
+  @include corner-card(20px);
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: $spacing-05;
+  block-size: 100%;
+  color: var(--uc-text);
+  gap: $spacing-06;
+  min-block-size: 8rem;
+  text-decoration: none;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+
+  @include breakpoint(md) {
+    border-radius: var(--uc-radius-card);
+    min-block-size: 9rem;
+  }
+
+  &:focus-visible {
+    @include corner-focus-ring;
+  }
+
+  &:active {
+    background-color: var(--uc-raised);
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      border-color: var(--uc-border-hover);
+      background-color: #0f0f0f;
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
+      transform: translateY(-2px);
+
+      .uc-tile__icon {
+        fill: var(--uc-accent);
+        filter: drop-shadow(0 0 10px rgba(243, 226, 179, 0.45));
+      }
+
+      .uc-tile__arrow {
+        fill: var(--uc-text);
+        transform: translateX(2px);
+      }
+    }
+  }
+}
+
+.cds-app .uc-tile__icon {
+  fill: var(--uc-text);
+  transition:
+    fill 160ms ease,
+    filter 160ms ease;
+}
+
+.cds-app .uc-tile__label {
+  @include corner-heading(-0.02em);
+
+  font-size: 1.125rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.cds-app .uc-tile__arrow {
+  position: absolute;
+  fill: var(--uc-text-muted);
+  inset-block-start: $spacing-05;
+  inset-inline-end: $spacing-05;
+  transition:
+    fill 160ms ease,
+    transform 160ms ease;
+}

@@ -9,7 +9,9 @@ REQUIRED_ASSETS = (
     "admin/css/base.css",
     "admin/css/login.css",
     "admin/css/enterprise.css",
-    "admin/js/theme.js",
+    "admin/js/enterprise-shell.js",
+    "admin/fonts/inter-latin-400-normal.woff2",
+    "admin/fonts/inter-latin-600-normal.woff2",
 )
 
 

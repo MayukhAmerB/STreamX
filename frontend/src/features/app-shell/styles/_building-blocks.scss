@@ -21,22 +21,46 @@
   min-inline-size: 0;
 }
 
-.cds-app .cds-page-header__title {
-  @include type-style('heading-04');
+// "— USER'S CORNER": the landing page's section eyebrow.
+.cds-app .cds-page-header__eyebrow {
+  @include corner-micro-label(0.625rem);
 
-  color: $text-primary;
+  display: flex;
+  align-items: center;
+  margin-block-end: $spacing-04;
+  color: var(--uc-text-muted);
+  gap: $spacing-04;
+
+  &::before {
+    display: block;
+    flex: none;
+    background-color: rgba(255, 255, 255, 0.7);
+    block-size: 1px;
+    content: '';
+    inline-size: 2.5rem;
+  }
+}
+
+// Landing-page heading: Inter 800, tight tracking, large.
+.cds-app .cds-page-header__title {
+  @include corner-heading(-0.04em);
+
+  color: var(--uc-text);
+  font-size: clamp(2rem, 7vw, 2.5rem);
+  line-height: 1.02;
+  overflow-wrap: anywhere;
 
   @include breakpoint(lg) {
-    @include type-style('heading-05');
+    font-size: 2.75rem;
   }
 }
 
 .cds-app .cds-page-header__description {
-  @include type-style('body-01');
-
   max-inline-size: 40rem;
-  margin-block-start: $spacing-03;
-  color: $text-secondary;
+  margin-block-start: $spacing-04;
+  color: var(--uc-text-2);
+  font-size: 0.9375rem;
+  line-height: 1.6;
 }
 
 .cds-app .cds-page-header__actions {
@@ -55,10 +79,12 @@
 
 // Section heading inside a page.
 .cds-app .cds-section-title {
-  @include type-style('heading-03');
+  @include corner-heading(-0.025em);
 
   margin-block-end: $spacing-05;
-  color: $text-primary;
+  color: var(--uc-text);
+  font-size: 1.375rem;
+  line-height: 1.2;
 }
 
 // Responsive tile grid (1 / 2 / 3 columns).
@@ -91,10 +117,13 @@
 }
 
 .cds-app .cds-empty-state__text {
-  @include type-style('heading-02');
+  @include corner-heading(-0.015em);
 
   max-inline-size: 28rem;
-  color: $text-primary;
+  color: var(--uc-text);
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.4;
 }
 
 // Skeletons.
@@ -104,6 +133,8 @@
 
 .cds-app .cds-page-skeleton__tile {
   padding: $spacing-05;
+  border: 1px solid var(--uc-border);
+  border-radius: var(--uc-radius-card);
   background-color: $layer-01;
 }
 

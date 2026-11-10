@@ -5,6 +5,7 @@ import {
   Collaborate,
   Dashboard,
   Education,
+  Home,
   Identification,
   Microphone,
   PlayOutline,
@@ -16,6 +17,7 @@ import {
 
 // Maps navConfig icon keys to Carbon icons (kept separate so navConfig stays pure).
 export const NAV_ICONS = {
+  overview: Home,
   courses: Education,
   continue: PlayOutline,
   live: Video,

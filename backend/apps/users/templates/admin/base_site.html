@@ -3,10 +3,16 @@
 
 {% block title %}{% if title %}{{ title }} | {% endif %}Al syed Initiative Enterprise Control{% endblock %}
 
+{# The admin is dark only: drop Django's dark_mode.css and theme.js (the light/dark/auto toggle). #}
+{% block dark-mode-vars %}{% endblock %}
+
 {% block extrahead %}
   {{ block.super }}
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#000000">
   {# Loaded in extrahead so it comes after page CSS (changelists.css, forms.css) and wins. #}
-  <link rel="preload" href="{% static 'admin/fonts/ibm-plex-sans-latin-400-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{% static 'admin/fonts/inter-latin-400-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{% static 'admin/fonts/inter-latin-600-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{% static 'admin/css/enterprise.css' %}">
   <script>try { if (localStorage.getItem("enterprise.navRail") === "1") document.documentElement.classList.add("enterprise-nav-rail"); } catch (e) {}</script>
   <script src="{% static 'admin/js/enterprise-shell.js' %}" defer></script>
@@ -20,7 +26,7 @@
     </button>
   {% endif %}
   <h1 id="site-name">
-    <a href="{% url 'admin:index' %}"><span class="enterprise-brand-prefix">Al syed Initiative</span> Enterprise Control</a>
+    <a href="{% url 'admin:index' %}"><span class="enterprise-brand-prefix">Al syed Initiative</span> <span class="enterprise-brand-suffix">Enterprise Control</span></a>
   </h1>
 {% endblock %}
 
@@ -51,12 +57,11 @@
       <span class="enterprise-header-label">{% translate 'Log out' %}</span>
     </button>
   </form>
-  {% include "admin/color_theme_toggle.html" %}
 {% endblock %}
 
 {% block nav-global %}{% endblock %}
 
-{# Breadcrumbs live at the top of the content column (Carbon), not above the sidebar. #}
+{# Breadcrumbs live at the top of the content column, not above the sidebar. #}
 {% block nav-breadcrumbs %}{% endblock %}
 {% block pretitle %}
   {% if not is_popup and has_permission %}

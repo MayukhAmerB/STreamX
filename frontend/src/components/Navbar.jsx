@@ -57,6 +57,11 @@ export default function Navbar() {
       <div className="relative mx-auto flex max-w-7xl items-center justify-between gap-2 px-1 py-2.5 text-neutral-950 sm:gap-4 sm:px-2 sm:py-4">
         <BrandLogo className="min-w-0 flex-1 lg:flex-none" />
         <nav className="hidden items-center gap-5 lg:flex">
+          {isAuthenticated ? (
+            <NavLink to="/users-corner" className={navClass}>
+              User&apos;s Corner
+            </NavLink>
+          ) : null}
           <NavLink
             to="/courses"
             className={navClass}
@@ -107,6 +112,12 @@ export default function Navbar() {
               </button>
               {menuOpen ? (
                 <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-black panel-gradient shadow-[0_16px_35px_rgba(0,0,0,0.36)]">
+                  <Link
+                    to="/users-corner"
+                    className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
+                  >
+                    User&apos;s Corner
+                  </Link>
                   <Link
                     to="/courses?view=owned"
                     className="block px-4 py-2.5 text-sm text-[#DFDFDF] transition hover:bg-[#202020]"
@@ -233,6 +244,14 @@ export default function Navbar() {
       {mobileMenuOpen ? (
         <div className="mx-auto mt-1 max-h-[calc(100dvh-4.75rem-env(safe-area-inset-top))] max-w-7xl overflow-y-auto overscroll-contain rounded-2xl border border-black panel-gradient p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-[0_18px_34px_rgba(0,0,0,0.34)] backdrop-blur lg:hidden">
           <nav className="grid gap-1">
+            {isAuthenticated ? (
+              <NavLink
+                to="/users-corner"
+                className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]"
+              >
+                User&apos;s Corner
+              </NavLink>
+            ) : null}
             <NavLink
               to="/courses"
               className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-[#DFDFDF] transition hover:bg-[#1E1E1E]"

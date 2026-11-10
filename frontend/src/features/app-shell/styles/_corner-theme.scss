@@ -1,0 +1,268 @@
+// User's Corner Carbon theme.
+//
+// Carbon G100 is the base (see carbon-app.scss); this mixin re-points every
+// Carbon theme / component token that the shell's components read onto the
+// `--uc-*` palette (styles/_corner-palette.scss), so Carbon keeps its
+// behaviour and accessibility while looking like the landing page.
+
+@mixin corner-carbon-tokens {
+  // --- Background ---------------------------------------------------------
+  --cds-background: var(--uc-page);
+  --cds-background-hover: rgba(246, 241, 231, 0.06);
+  --cds-background-active: rgba(246, 241, 231, 0.12);
+  --cds-background-selected: var(--uc-accent-soft);
+  --cds-background-selected-hover: var(--uc-accent-soft-strong);
+  --cds-background-inverse: var(--uc-text);
+  --cds-background-inverse-hover: #fff8ec;
+  --cds-background-brand: var(--uc-accent);
+
+  // --- Layers (cards on black) -------------------------------------------
+  --cds-layer: var(--uc-surface);
+  --cds-layer-01: var(--uc-surface);
+  --cds-layer-02: var(--uc-surface-2);
+  --cds-layer-03: var(--uc-raised);
+  --cds-layer-background: var(--uc-page);
+  --cds-layer-background-01: var(--uc-page);
+  --cds-layer-background-02: var(--uc-surface);
+  --cds-layer-background-03: var(--uc-surface-2);
+  --cds-layer-hover: #141414;
+  --cds-layer-hover-01: #141414;
+  --cds-layer-hover-02: var(--uc-raised);
+  --cds-layer-hover-03: var(--uc-raised-2);
+  --cds-layer-active: var(--uc-raised-2);
+  --cds-layer-active-01: var(--uc-raised-2);
+  --cds-layer-active-02: #262626;
+  --cds-layer-active-03: #2a2a2a;
+  --cds-layer-selected: var(--uc-accent-soft);
+  --cds-layer-selected-01: var(--uc-accent-soft);
+  --cds-layer-selected-02: var(--uc-accent-soft);
+  --cds-layer-selected-03: var(--uc-accent-soft);
+  --cds-layer-selected-hover: var(--uc-accent-soft-strong);
+  --cds-layer-selected-hover-01: var(--uc-accent-soft-strong);
+  --cds-layer-selected-hover-02: var(--uc-accent-soft-strong);
+  --cds-layer-selected-hover-03: var(--uc-accent-soft-strong);
+  --cds-layer-selected-inverse: var(--uc-accent);
+  --cds-layer-selected-disabled: var(--uc-text-muted);
+  --cds-layer-accent: var(--uc-raised);
+  --cds-layer-accent-01: var(--uc-raised);
+  --cds-layer-accent-02: var(--uc-raised-2);
+  --cds-layer-accent-03: #2a2a2a;
+  --cds-layer-accent-hover: var(--uc-raised-2);
+  --cds-layer-accent-hover-01: var(--uc-raised-2);
+  --cds-layer-accent-hover-02: #2a2a2a;
+  --cds-layer-accent-hover-03: #303030;
+  --cds-layer-accent-active: #303030;
+  --cds-layer-accent-active-01: #303030;
+  --cds-layer-accent-active-02: #363636;
+  --cds-layer-accent-active-03: #3c3c3c;
+
+  // --- Fields ---------------------------------------------------------------
+  --cds-field: var(--uc-surface-2);
+  --cds-field-01: var(--uc-surface-2);
+  --cds-field-02: var(--uc-raised);
+  --cds-field-03: var(--uc-raised-2);
+  --cds-field-hover: var(--uc-raised);
+  --cds-field-hover-01: var(--uc-raised);
+  --cds-field-hover-02: var(--uc-raised-2);
+  --cds-field-hover-03: #2a2a2a;
+
+  // --- Borders --------------------------------------------------------------
+  --cds-border-subtle: var(--uc-border);
+  --cds-border-subtle-00: var(--uc-border);
+  --cds-border-subtle-01: var(--uc-border);
+  --cds-border-subtle-02: var(--uc-border);
+  --cds-border-subtle-03: var(--uc-border);
+  --cds-border-subtle-selected: var(--uc-accent-line);
+  --cds-border-subtle-selected-01: var(--uc-accent-line);
+  --cds-border-subtle-selected-02: var(--uc-accent-line);
+  --cds-border-subtle-selected-03: var(--uc-accent-line);
+  --cds-border-strong: var(--uc-border-strong);
+  --cds-border-strong-01: var(--uc-border-strong);
+  --cds-border-strong-02: var(--uc-border-strong);
+  --cds-border-strong-03: var(--uc-border-strong);
+  --cds-border-tile: var(--uc-border);
+  --cds-border-tile-01: var(--uc-border);
+  --cds-border-tile-02: var(--uc-border);
+  --cds-border-tile-03: var(--uc-border);
+  --cds-border-inverse: var(--uc-text);
+  --cds-border-interactive: var(--uc-accent);
+  --cds-border-disabled: rgba(255, 255, 255, 0.08);
+
+  // --- Text -----------------------------------------------------------------
+  --cds-text-primary: var(--uc-text);
+  --cds-text-secondary: var(--uc-text-2);
+  --cds-text-placeholder: var(--uc-text-muted);
+  --cds-text-helper: var(--uc-text-muted);
+  --cds-text-error: var(--uc-error);
+  --cds-text-inverse: var(--uc-on-accent);
+  --cds-text-on-color: var(--uc-on-accent);
+  --cds-text-on-color-disabled: var(--uc-text-muted);
+  --cds-text-disabled: rgba(246, 241, 231, 0.38);
+
+  // --- Links ----------------------------------------------------------------
+  --cds-link-primary: var(--uc-accent);
+  --cds-link-primary-hover: var(--uc-accent-hover);
+  --cds-link-secondary: var(--uc-accent);
+  --cds-link-visited: var(--uc-accent);
+  --cds-link-inverse: #6b5a2e;
+  --cds-link-inverse-active: var(--uc-on-accent);
+  --cds-link-inverse-hover: #4f421f;
+  --cds-link-inverse-visited: #6b5a2e;
+  --cds-link-text-color: var(--uc-accent);
+  --cds-link-hover-text-color: var(--uc-accent-hover);
+  --cds-link-focus-text-color: var(--uc-accent);
+  --cds-link-visited-text-color: var(--uc-accent);
+
+  // --- Icons ----------------------------------------------------------------
+  --cds-icon-primary: var(--uc-text);
+  --cds-icon-secondary: var(--uc-text-2);
+  --cds-icon-interactive: var(--uc-accent);
+  --cds-icon-on-color: var(--uc-on-accent);
+  --cds-icon-on-color-disabled: var(--uc-text-muted);
+  --cds-icon-inverse: var(--uc-on-accent);
+  --cds-icon-disabled: rgba(246, 241, 231, 0.38);
+
+  // --- Interaction ----------------------------------------------------------
+  --cds-interactive: var(--uc-accent);
+  --cds-focus: var(--uc-accent);
+  --cds-focus-inset: var(--uc-page);
+  --cds-focus-inverse: var(--uc-on-accent);
+  --cds-highlight: rgba(243, 226, 179, 0.2);
+  --cds-overlay: rgba(0, 0, 0, 0.72);
+  --cds-toggle-off: #3a3a3a;
+  --cds-shadow: rgba(0, 0, 0, 0.8);
+  --cds-skeleton-background: var(--uc-surface-2);
+  --cds-skeleton-element: #2a2a2a;
+
+  // --- Status (support) -----------------------------------------------------
+  --cds-support-success: var(--uc-success);
+  --cds-support-warning: var(--uc-warning);
+  --cds-support-error: var(--uc-error);
+  --cds-support-info: var(--uc-accent);
+  --cds-support-caution-major: #ff832b;
+  --cds-support-caution-minor: var(--uc-warning);
+  --cds-support-caution-undefined: #a56eff;
+  --cds-support-success-inverse: #198038;
+  --cds-support-warning-inverse: #8e6a00;
+  --cds-support-error-inverse: #da1e28;
+  --cds-support-info-inverse: #6b5a2e;
+
+  // --- Buttons ----------------------------------------------------------------
+  --cds-button-primary: var(--uc-accent);
+  --cds-button-primary-hover: var(--uc-accent-hover);
+  --cds-button-primary-active: var(--uc-accent-active);
+  --cds-button-secondary: var(--uc-raised);
+  --cds-button-secondary-hover: var(--uc-raised-2);
+  --cds-button-secondary-active: #2a2a2a;
+  --cds-button-tertiary: var(--uc-text);
+  --cds-button-tertiary-hover: var(--uc-raised);
+  --cds-button-tertiary-active: var(--uc-raised-2);
+  --cds-button-danger-primary: var(--uc-error);
+  --cds-button-danger-secondary: var(--uc-error);
+  --cds-button-danger-hover: #ff6b73;
+  --cds-button-danger-active: #d93a43;
+  --cds-button-disabled: var(--uc-raised);
+  --cds-button-separator: var(--uc-page);
+  --cds-button-focus-color: var(--uc-accent);
+  --cds-button-radius: var(--uc-radius-control);
+
+  // --- Notifications (dark cards with a status edge) -----------------------
+  --cds-notification-background-error: #160b0c;
+  --cds-notification-background-success: #0b140e;
+  --cds-notification-background-info: #14120d;
+  --cds-notification-background-warning: #161307;
+  --cds-notification-action-hover: var(--uc-raised);
+  --cds-notification-action-tertiary-inverse: var(--uc-on-accent);
+  --cds-notification-action-tertiary-inverse-active: #2a2a2a;
+  --cds-notification-action-tertiary-inverse-hover: #1a1a1a;
+  --cds-notification-action-tertiary-inverse-text: var(--uc-text);
+  --cds-notification-action-tertiary-inverse-text-on-color-disabled: var(--uc-text-muted);
+
+  // --- Tags: neutral pills, champagne for highlights, status colours -------
+  --cds-tag-background-gray: rgba(246, 241, 231, 0.06);
+  --cds-tag-color-gray: var(--uc-text-2);
+  --cds-tag-hover-gray: rgba(246, 241, 231, 0.12);
+  --cds-tag-border-gray: var(--uc-border-strong);
+  --cds-tag-background-cool-gray: rgba(246, 241, 231, 0.06);
+  --cds-tag-color-cool-gray: var(--uc-text-2);
+  --cds-tag-hover-cool-gray: rgba(246, 241, 231, 0.12);
+  --cds-tag-border-cool-gray: var(--uc-border-strong);
+  --cds-tag-background-warm-gray: rgba(246, 241, 231, 0.06);
+  --cds-tag-color-warm-gray: var(--uc-text-2);
+  --cds-tag-hover-warm-gray: rgba(246, 241, 231, 0.12);
+  --cds-tag-border-warm-gray: var(--uc-border-strong);
+  --cds-tag-background-blue: var(--uc-accent-soft);
+  --cds-tag-color-blue: var(--uc-accent);
+  --cds-tag-hover-blue: var(--uc-accent-soft-strong);
+  --cds-tag-border-blue: var(--uc-accent-line);
+  --cds-tag-background-cyan: var(--uc-accent-soft);
+  --cds-tag-color-cyan: var(--uc-accent);
+  --cds-tag-hover-cyan: var(--uc-accent-soft-strong);
+  --cds-tag-border-cyan: var(--uc-accent-line);
+  --cds-tag-background-teal: rgba(246, 241, 231, 0.06);
+  --cds-tag-color-teal: var(--uc-text);
+  --cds-tag-hover-teal: rgba(246, 241, 231, 0.12);
+  --cds-tag-border-teal: var(--uc-border-strong);
+  --cds-tag-background-purple: rgba(246, 241, 231, 0.06);
+  --cds-tag-color-purple: var(--uc-text);
+  --cds-tag-hover-purple: rgba(246, 241, 231, 0.12);
+  --cds-tag-border-purple: var(--uc-border-strong);
+  --cds-tag-background-magenta: rgba(246, 241, 231, 0.06);
+  --cds-tag-color-magenta: var(--uc-text);
+  --cds-tag-hover-magenta: rgba(246, 241, 231, 0.12);
+  --cds-tag-border-magenta: var(--uc-border-strong);
+  --cds-tag-background-green: rgba(66, 190, 101, 0.12);
+  --cds-tag-color-green: var(--uc-success);
+  --cds-tag-hover-green: rgba(66, 190, 101, 0.2);
+  --cds-tag-border-green: rgba(66, 190, 101, 0.4);
+  --cds-tag-background-red: rgba(250, 77, 86, 0.14);
+  --cds-tag-color-red: #ff8a90;
+  --cds-tag-hover-red: rgba(250, 77, 86, 0.22);
+  --cds-tag-border-red: rgba(250, 77, 86, 0.45);
+  --cds-tag-background-high-contrast: var(--uc-text);
+  --cds-tag-color-high-contrast: var(--uc-on-accent);
+  --cds-tag-background-outline: transparent;
+  --cds-tag-color-outline: var(--uc-text);
+
+  // --- Content switcher / popover / tooltip ---------------------------------
+  --cds-content-switcher-background: transparent;
+  --cds-content-switcher-background-hover: var(--uc-raised);
+  --cds-content-switcher-selected: var(--uc-accent);
+  --cds-popover-background-color: var(--uc-raised);
+  --cds-popover-text-color: var(--uc-text);
+  --cds-popover-border-color: var(--uc-border-strong);
+  --cds-popover-border-radius: 10px;
+  --cds-chat-avatar-user: var(--uc-raised);
+
+  // --- Type: Inter, landing-page weights and tracking -----------------------
+  --cds-font-family: var(--uc-font);
+  --cds-code-01-font-family: ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  --cds-code-02-font-family: ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  --cds-body-01-letter-spacing: 0;
+  --cds-body-02-letter-spacing: 0;
+  --cds-body-compact-01-letter-spacing: 0;
+  --cds-body-compact-02-letter-spacing: 0;
+  --cds-body-short-01-letter-spacing: 0;
+  --cds-body-short-02-letter-spacing: 0;
+  --cds-label-01-letter-spacing: 0.01em;
+  --cds-label-02-letter-spacing: 0.005em;
+  --cds-helper-text-01-letter-spacing: 0.005em;
+  --cds-helper-text-02-letter-spacing: 0;
+  --cds-heading-compact-01-font-weight: 700;
+  --cds-heading-compact-01-letter-spacing: -0.005em;
+  --cds-heading-compact-02-font-weight: 700;
+  --cds-heading-compact-02-letter-spacing: -0.01em;
+  --cds-heading-01-font-weight: 700;
+  --cds-heading-01-letter-spacing: -0.005em;
+  --cds-heading-02-font-weight: 700;
+  --cds-heading-02-letter-spacing: -0.01em;
+  --cds-heading-03-font-weight: 800;
+  --cds-heading-03-letter-spacing: -0.02em;
+  --cds-heading-03-line-height: 1.25;
+  --cds-heading-04-font-weight: 800;
+  --cds-heading-04-letter-spacing: -0.03em;
+  --cds-heading-04-line-height: 1.15;
+  --cds-heading-05-font-weight: 800;
+  --cds-heading-05-letter-spacing: -0.04em;
+  --cds-heading-05-line-height: 1.08;
+}

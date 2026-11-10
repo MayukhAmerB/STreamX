@@ -24,9 +24,11 @@
   }
 }
 
-// The video is always shown on black, in both themes.
+// The video is always shown on black, in a rounded frame.
 .cds-app .cds-guides__stage {
   overflow: hidden;
+  border: 1px solid var(--uc-border);
+  border-radius: var(--uc-radius-md);
   background-color: #000000;
 }
 
@@ -46,7 +48,7 @@
   justify-content: center;
   padding: $spacing-05;
   block-size: 100%;
-  color: #c6c6c6;
+  color: var(--uc-text-2);
   text-align: center;
 
   .cds--inline-loading {
@@ -55,7 +57,7 @@
   }
 
   .cds--inline-loading__text {
-    color: #c6c6c6;
+    color: var(--uc-text-2);
   }
 }
 
@@ -123,8 +125,11 @@
 }
 
 .cds-app .cds-guides__list {
+  overflow: hidden;
   margin: 0;
   padding: 0;
+  border: 1px solid var(--uc-border);
+  border-radius: var(--uc-radius-card);
   background-color: $layer-01;
   list-style: none;
 
@@ -188,6 +193,7 @@
 
 .cds-app .cds-guide-item.is-active .cds-guide-item__index {
   background-color: $interactive;
+  box-shadow: var(--uc-glow);
 }
 
 .cds-app .cds-guide-item__text {

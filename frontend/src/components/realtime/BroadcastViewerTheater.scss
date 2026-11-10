@@ -1,47 +1,47 @@
 // Live broadcast theater (video + status + chat).
 //
-// Self-contained: the student live pages render it inside the Carbon shell,
-// the instructor Broadcasting page still renders it on the legacy dark site.
-// Colours therefore read Carbon theme tokens (CSS custom properties set on
-// `.cds-app`) with Gray 100 fallbacks, and the legacy frame pins the dark
-// values. No Carbon component CSS is required.
+// Self-contained: the student live pages render it as a Carbon page in
+// User's Corner, the instructor Broadcasting page renders it inside the
+// legacy frame. Colours read the shell's Carbon tokens (mapped to the User's
+// Corner palette) with the same palette values as fallbacks, and the legacy
+// frame pins them. No Carbon component CSS is required.
 
-// Gray 100 values, used outside the shell and inside legacy frames.
+// User's Corner values, used outside Carbon pages and inside legacy frames.
 @mixin dark-palette {
-  --bvt-text-primary: #f4f4f4;
-  --bvt-text-secondary: #c6c6c6;
-  --bvt-layer: #262626;
-  --bvt-border: #393939;
-  --bvt-icon: #f4f4f4;
-  --bvt-link: #78a9ff;
-  --bvt-hover: rgba(141, 141, 141, 0.16);
-  --bvt-active: rgba(141, 141, 141, 0.4);
-  --bvt-focus: #ffffff;
-  --bvt-disabled: rgba(244, 244, 244, 0.25);
+  --bvt-text-primary: #f6f1e7;
+  --bvt-text-secondary: #b8b3a8;
+  --bvt-layer: #0a0a0a;
+  --bvt-border: rgba(255, 255, 255, 0.12);
+  --bvt-icon: #f6f1e7;
+  --bvt-link: #f3e2b3;
+  --bvt-hover: rgba(246, 241, 231, 0.06);
+  --bvt-active: rgba(246, 241, 231, 0.12);
+  --bvt-focus: #f3e2b3;
+  --bvt-disabled: rgba(246, 241, 231, 0.38);
   --bvt-warning: #f1c21b;
   --bvt-success: #42be65;
-  --bvt-neutral-bg: #393939;
-  --bvt-neutral-text: #e0e0e0;
+  --bvt-neutral-bg: rgba(246, 241, 231, 0.06);
+  --bvt-neutral-text: #b8b3a8;
 }
 
 $motion: cubic-bezier(0.2, 0, 0.38, 0.9);
 $side-by-side: 75rem; // video + chat columns from 1200px wide screens
 
 .bvt {
-  --bvt-text-primary: var(--cds-text-primary, #f4f4f4);
-  --bvt-text-secondary: var(--cds-text-secondary, #c6c6c6);
-  --bvt-layer: var(--cds-layer-01, #262626);
-  --bvt-border: var(--cds-border-subtle-01, #393939);
-  --bvt-icon: var(--cds-icon-primary, #f4f4f4);
-  --bvt-link: var(--cds-link-primary, #78a9ff);
-  --bvt-hover: var(--cds-background-hover, rgba(141, 141, 141, 0.16));
-  --bvt-active: var(--cds-background-active, rgba(141, 141, 141, 0.4));
-  --bvt-focus: var(--cds-focus, #ffffff);
-  --bvt-disabled: var(--cds-text-disabled, rgba(244, 244, 244, 0.25));
+  --bvt-text-primary: var(--cds-text-primary, #f6f1e7);
+  --bvt-text-secondary: var(--cds-text-secondary, #b8b3a8);
+  --bvt-layer: var(--cds-layer-01, #0a0a0a);
+  --bvt-border: var(--cds-border-subtle-01, rgba(255, 255, 255, 0.12));
+  --bvt-icon: var(--cds-icon-primary, #f6f1e7);
+  --bvt-link: var(--cds-link-primary, #f3e2b3);
+  --bvt-hover: var(--cds-background-hover, rgba(246, 241, 231, 0.06));
+  --bvt-active: var(--cds-background-active, rgba(246, 241, 231, 0.12));
+  --bvt-focus: var(--cds-focus, #f3e2b3);
+  --bvt-disabled: var(--cds-text-disabled, rgba(246, 241, 231, 0.38));
   --bvt-warning: var(--cds-support-warning, #f1c21b);
   --bvt-success: var(--cds-support-success, #42be65);
-  --bvt-neutral-bg: var(--cds-tag-background-gray, #393939);
-  --bvt-neutral-text: var(--cds-tag-color-gray, #e0e0e0);
+  --bvt-neutral-bg: var(--cds-tag-background-gray, rgba(246, 241, 231, 0.06));
+  --bvt-neutral-text: var(--cds-tag-color-gray, #b8b3a8);
   --bvt-live-bg: #da1e28;
   --bvt-live-text: #ffffff;
   --bvt-header-offset: var(--cds-app-header-height, 0px);
@@ -104,8 +104,8 @@ $side-by-side: 75rem; // video + chat columns from 1200px wide screens
 
 .bvt__empty--video {
   aspect-ratio: 16 / 9;
-  background-color: #161616;
-  color: #c6c6c6;
+  background-color: #0a0a0a;
+  color: #b8b3a8;
 }
 
 .bvt__empty--chat {
@@ -153,9 +153,10 @@ $side-by-side: 75rem; // video + chat columns from 1200px wide screens
   text-transform: none;
 
   @media (min-width: 42rem) {
-    font-size: 1.25rem;
-    font-weight: 400;
-    line-height: 1.4;
+    font-size: 1.375rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.25;
   }
 }
 
@@ -223,7 +224,9 @@ $side-by-side: 75rem; // video + chat columns from 1200px wide screens
   flex-wrap: wrap;
   align-items: center;
   padding: 0.5rem 0.5rem 0.5rem 1rem;
+  border: 1px solid var(--bvt-border);
   border-inline-start: 3px solid var(--bvt-warning);
+  border-radius: 12px;
   background-color: var(--bvt-layer);
   gap: 0.25rem 0.75rem;
 }
@@ -259,7 +262,7 @@ $side-by-side: 75rem; // video + chat columns from 1200px wide screens
   justify-content: center;
   margin: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: 10px;
   -webkit-appearance: none;
   appearance: none;
   background-color: transparent;
@@ -334,9 +337,12 @@ $side-by-side: 75rem; // video + chat columns from 1200px wide screens
 // ---------------------------------------------------------------------------
 .bvt__chat {
   display: flex;
+  overflow: hidden;
   flex-direction: column;
   min-block-size: 0;
   min-inline-size: 0;
+  border: 1px solid var(--bvt-border);
+  border-radius: 20px;
   background-color: var(--bvt-layer);
   grid-area: chat;
 }

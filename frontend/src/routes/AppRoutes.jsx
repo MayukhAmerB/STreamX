@@ -37,6 +37,7 @@ const NationalDeskPage = lazy(() => import("../pages/NationalDeskPage"));
 const OsintToolsPage = lazy(() => import("../pages/OsintToolsPage"));
 const ProfilePage = lazy(() => import("../pages/ProfilePage"));
 const TermsPage = lazy(() => import("../pages/TermsPage"));
+const UsersCornerPage = lazy(() => import("../pages/UsersCornerPage"));
 
 export default function AppRoutes() {
   const location = useLocation();
@@ -61,9 +62,10 @@ export default function AppRoutes() {
           <Route path="/courses/:id/payment" element={<CoursePaymentPage />} />
           <Route path="/terms" element={<TermsPage />} />
         </Route>
-        {/* Functional (logged-in) app: lazy Carbon shell with side nav / bottom nav and no website navbar or footer. */}
+        {/* Functional (logged-in) app, "User's Corner": lazy Carbon shell with side nav / bottom nav and no website navbar or footer. */}
         <Route element={<ProtectedRoute />}>
           <Route element={<AppShellLayout />}>
+            <Route path="/users-corner" element={<UsersCornerPage />} />
             <Route path="/my-courses" element={<MyCoursesPage />} />
             <Route path="/learn/:courseId" element={<CoursePlayerPage />} />
             <Route path="/courses/:id/live" element={<LiveClassesPage />} />

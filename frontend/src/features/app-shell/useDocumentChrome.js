@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { THEME_BACKGROUNDS } from "./theme";
+import { SHELL_THEME_COLOR } from "./theme";
 
 function setMetaContent(name, content) {
   const meta = document.querySelector(`meta[name="${name}"]`);
@@ -14,15 +14,25 @@ function setMetaContent(name, content) {
 
 /**
  * While the app shell is mounted: match the browser/OS chrome colour to the
- * Carbon theme and let the layout extend under notches (safe-area insets).
- * Both are restored when the user leaves the shell, so public pages keep the
- * exact meta values from index.html.
+ * black User's Corner, let the layout extend under notches (safe-area
+ * insets) and name the tab "<page> · User's Corner". All are restored when
+ * the user leaves the shell, so public pages keep the exact values from
+ * index.html / main.jsx.
  */
-export function useDocumentChrome(carbonTheme) {
+export function useDocumentChrome(documentTitle = "") {
   useEffect(() => {
     if (typeof document === "undefined") return undefined;
-    return setMetaContent("theme-color", THEME_BACKGROUNDS[carbonTheme] || THEME_BACKGROUNDS.white);
-  }, [carbonTheme]);
+    return setMetaContent("theme-color", SHELL_THEME_COLOR);
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined" || !documentTitle) return undefined;
+    const previous = document.title;
+    document.title = documentTitle;
+    return () => {
+      document.title = previous;
+    };
+  }, [documentTitle]);
 
   useEffect(() => {
     if (typeof document === "undefined") return undefined;

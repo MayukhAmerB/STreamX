@@ -1,10 +1,10 @@
-import { Close } from "@carbon/icons-react";
+import { ArrowLeft, Close } from "@carbon/icons-react";
 import { IconButton } from "@carbon/react";
 import { useEffect, useId, useMemo, useRef } from "react";
+import { Link } from "react-router-dom";
 import { MORE_SHEET_ID } from "./BottomNav";
 import NavActionList from "./NavActionList";
 import SignOutButton from "./SignOutButton";
-import ThemeSwitcher from "./ThemeSwitcher";
 import { useDismiss } from "./useDismiss";
 
 function trapTab(event, container) {
@@ -25,15 +25,14 @@ function trapTab(event, container) {
 }
 
 /**
- * Phone "More" bottom sheet: secondary destinations, appearance and sign out.
+ * Phone "More" bottom sheet: secondary destinations, back to the website and
+ * sign out.
  * Modal dialog semantics: focus moves in, Tab is trapped, Escape / scrim tap
  * closes and focus returns to the More button.
  */
 export default function MoreSheet({
   groups,
   pathname,
-  themePreference,
-  onThemeChange,
   onSignOut,
   onClose,
   returnFocusRef,
@@ -91,10 +90,15 @@ export default function MoreSheet({
               <NavActionList items={group.items} pathname={pathname} onNavigate={onClose} label={group.label || "More"} />
             </div>
           ))}
-          <div className="cds-app-sheet__section">
-            <ThemeSwitcher value={themePreference} onChange={onThemeChange} />
-          </div>
           <div className="cds-app-sheet__group">
+            <ul className="cds-app-action-list" aria-label="Website">
+              <li>
+                <Link to="/" className="cds-app-action-list__item" onClick={onClose}>
+                  <ArrowLeft size={20} aria-hidden="true" />
+                  <span>Back to website</span>
+                </Link>
+              </li>
+            </ul>
             <SignOutButton onSignOut={onSignOut} />
           </div>
         </div>

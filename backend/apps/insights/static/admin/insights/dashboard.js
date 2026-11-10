@@ -5,8 +5,9 @@
  * - One filter row (range switcher + refresh) scopes everything below it.
  * - Refetch keeps the previous render, dimmed; no skeleton flash.
  * - The selected range lives in the URL hash (#range-7d).
- * - Charts re-render on resize (ResizeObserver) and on theme change
- *   (data-theme on <html> and the OS colour-scheme preference).
+ * - Charts re-render on resize (ResizeObserver) and once the web font has
+ *   loaded (text is measured). The admin is dark only, so there is no theme
+ *   change to follow.
  * - Data strings are only ever inserted with textContent.
  *
  * Test hook: if window.__INSIGHTS_FIXTURE__ is defined (an object, or a
@@ -47,7 +48,7 @@
     tableOpen: {}
   };
 
-  // Drawables: chart plots and sparklines, re-rendered on resize/theme change.
+  // Drawables: chart plots and sparklines, re-rendered on resize and font load.
   var drawables = [];
   var tokens = null;
   var uid = 0;
@@ -466,25 +467,6 @@
     window.addEventListener("resize", function () { drawables.forEach(scheduleDraw); });
   }
 
-  /* Theme changes: admin toggle (data-theme on <html>) and the OS preference. */
-  // A timer rather than requestAnimationFrame: rAF is paused in background
-  // tabs, and a theme flip there should still be drawn by the time it's seen.
-  var themeTimer = 0;
-  function onThemeChange() {
-    if (themeTimer) return;
-    themeTimer = window.setTimeout(function () {
-      themeTimer = 0;
-      drawAll(false);
-    }, 16);
-  }
-  if (typeof MutationObserver !== "undefined") {
-    new MutationObserver(onThemeChange).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-  }
-  if (window.matchMedia) {
-    var mq = window.matchMedia("(prefers-color-scheme: dark)");
-    if (mq.addEventListener) mq.addEventListener("change", onThemeChange);
-    else if (mq.addListener) mq.addListener(onThemeChange);
-  }
   // Text measurement depends on the web font: redraw once it has loaded.
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function () { if (state.data) drawAll(false); });

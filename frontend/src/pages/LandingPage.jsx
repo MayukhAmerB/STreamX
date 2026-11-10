@@ -800,10 +800,10 @@ export default function LandingPage() {
                   Browse Courses
                 </Link>
                 <Link
-                  to={isAuthenticated ? "/courses?view=owned" : "/login"}
+                  to={isAuthenticated ? "/users-corner" : "/login"}
                   className="hero-secondary-action inline-flex min-h-12 items-center justify-center rounded-lg border border-white/20 bg-[#090909] px-6 text-sm font-semibold text-white transition hover:border-white/40 hover:bg-[#111111]"
                 >
-                  {isAuthenticated ? "My Learning" : "Get Started"}
+                  {isAuthenticated ? "User's Corner" : "Get Started"}
                 </Link>
               </div>
             </div>

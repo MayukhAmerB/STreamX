@@ -1,0 +1,376 @@
+// User's Corner restyle of the Carbon components used by the shell.
+// Behaviour, markup and accessibility stay Carbon's; only the shape, type
+// and colour move to the landing page language (Inter, rounded dark cards,
+// thin translucent borders, pill tags, champagne primary + outlined
+// secondary buttons). Loaded by carbon-app.scss after the Carbon component
+// CSS, so these selectors (same specificity, later in the file) win.
+@use './tokens' as *;
+
+$_scope: '.cds-app';
+
+// ---------------------------------------------------------------------------
+// Buttons
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--btn {
+  font-family: var(--uc-font);
+  font-weight: 600;
+  letter-spacing: 0;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 160ms ease,
+    color 140ms ease;
+}
+
+#{$_scope} .cds--btn:focus {
+  @include corner-focus-ring;
+}
+
+// Primary: champagne, dark text, soft glow (stronger on hover / focus).
+#{$_scope} .cds--btn--primary {
+  border-color: transparent;
+  background-color: var(--uc-accent);
+  box-shadow: var(--uc-glow);
+  color: var(--uc-on-accent);
+
+  .cds--btn__icon,
+  .cds--btn__icon path:not([data-icon-path]):not([fill='none']) {
+    fill: currentColor;
+  }
+
+  @media (any-hover: hover) {
+    &:hover {
+      background-color: var(--uc-accent-hover);
+      box-shadow: var(--uc-glow-strong);
+      color: var(--uc-on-accent);
+    }
+  }
+
+  &:focus {
+    border-color: transparent;
+    box-shadow: var(--uc-glow-strong);
+  }
+
+  &:active {
+    background-color: var(--uc-accent-active);
+    box-shadow: var(--uc-glow);
+  }
+
+  &:disabled,
+  &.cds--btn--disabled {
+    border-color: var(--uc-border);
+    background-color: var(--uc-raised);
+    box-shadow: none;
+    color: var(--uc-text-muted);
+  }
+}
+
+// Secondary + tertiary: outlined, warm-white text (the landing page's
+// secondary button).
+#{$_scope} .cds--btn--secondary,
+#{$_scope} .cds--btn--tertiary {
+  border: 1px solid var(--uc-border-strong);
+  background-color: rgba(255, 255, 255, 0.02);
+  color: var(--uc-text);
+
+  .cds--btn__icon,
+  .cds--btn__icon path:not([data-icon-path]):not([fill='none']) {
+    fill: currentColor;
+  }
+
+  @media (any-hover: hover) {
+    &:hover {
+      border-color: var(--uc-border-hover);
+      background-color: var(--uc-raised);
+      color: var(--uc-text);
+    }
+  }
+
+  &:focus {
+    border-color: var(--uc-border-hover);
+    background-color: var(--uc-raised);
+    box-shadow: none;
+    color: var(--uc-text);
+  }
+
+  &:active {
+    border-color: var(--uc-border-hover);
+    background-color: var(--uc-raised-2);
+    color: var(--uc-text);
+  }
+
+  &:disabled,
+  &.cds--btn--disabled,
+  &:hover:disabled,
+  &:focus:disabled {
+    border-color: var(--uc-border);
+    background-color: transparent;
+    color: var(--cds-text-disabled);
+  }
+}
+
+// Ghost: quiet warm-white action.
+#{$_scope} .cds--btn--ghost {
+  color: var(--uc-text);
+
+  .cds--btn__icon,
+  .cds--btn__icon path:not([data-icon-path]):not([fill='none']) {
+    fill: currentColor;
+  }
+
+  @media (any-hover: hover) {
+    &:hover {
+      background-color: var(--cds-background-hover);
+      color: var(--uc-text);
+    }
+  }
+
+  &:focus {
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  &:active {
+    background-color: var(--cds-background-active);
+  }
+}
+
+#{$_scope} .cds--btn--ghost.cds--btn--icon-only .cds--btn__icon,
+#{$_scope} .cds--btn--ghost.cds--btn--icon-only .cds--btn__icon path:not([data-icon-path]):not([fill='none']) {
+  fill: var(--uc-text-2);
+}
+
+@media (any-hover: hover) {
+  #{$_scope} .cds--btn--ghost.cds--btn--icon-only:hover .cds--btn__icon,
+  #{$_scope} .cds--btn--ghost.cds--btn--icon-only:hover .cds--btn__icon path:not([data-icon-path]):not([fill='none']) {
+    fill: var(--uc-text);
+  }
+}
+
+#{$_scope} .cds--btn--danger:focus,
+#{$_scope} .cds--btn--danger--ghost:focus,
+#{$_scope} .cds--btn--danger--tertiary:focus {
+  box-shadow: none;
+}
+
+// ---------------------------------------------------------------------------
+// Tiles: rounded dark cards with a thin translucent border.
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--tile {
+  @include corner-card(20px);
+
+  color: var(--uc-text);
+
+  @include breakpoint(md) {
+    border-radius: var(--uc-radius-card);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tags: pills with uppercase micro-labels.
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--tag {
+  @include corner-micro-label(0.625rem);
+
+  border: 1px solid var(--cds-tag-border-gray);
+  border-radius: var(--uc-radius-pill);
+  letter-spacing: 0.16em;
+  min-block-size: 1.5rem;
+  padding-inline: 0.625rem;
+}
+
+#{$_scope} .cds--tag--sm {
+  min-block-size: 1.25rem;
+}
+
+#{$_scope} .cds--tag--blue {
+  border-color: var(--cds-tag-border-blue);
+}
+
+#{$_scope} .cds--tag--cyan {
+  border-color: var(--cds-tag-border-cyan);
+}
+
+#{$_scope} .cds--tag--green {
+  border-color: var(--cds-tag-border-green);
+}
+
+#{$_scope} .cds--tag--red {
+  border-color: var(--cds-tag-border-red);
+}
+
+// ---------------------------------------------------------------------------
+// Inputs: rounded fields with a full hairline border.
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--text-input,
+#{$_scope} .cds--text-area,
+#{$_scope} .cds--search-input,
+#{$_scope} .cds--select-input,
+#{$_scope} .cds--number input[type='number'] {
+  border: 1px solid var(--uc-border-strong);
+  border-radius: var(--uc-radius-control);
+  background-color: var(--uc-surface-2);
+  color: var(--uc-text);
+  font-family: var(--uc-font);
+
+  @media (any-hover: hover) {
+    &:hover {
+      border-color: var(--uc-border-hover);
+    }
+  }
+
+  &:focus {
+    border-color: transparent;
+    outline: 2px solid var(--uc-accent);
+    outline-offset: 0;
+  }
+}
+
+#{$_scope} .cds--text-input--invalid,
+#{$_scope} .cds--text-area--invalid {
+  border-color: var(--uc-error);
+}
+
+#{$_scope} .cds--search-close {
+  border-radius: 0 var(--uc-radius-control) var(--uc-radius-control) 0;
+
+  &::before {
+    background-color: transparent;
+  }
+}
+
+#{$_scope} .cds--label,
+#{$_scope} .cds--form__helper-text {
+  font-family: var(--uc-font);
+}
+
+#{$_scope} .cds--label {
+  color: var(--uc-text-2);
+  font-weight: 600;
+}
+
+// ---------------------------------------------------------------------------
+// Tabs: champagne underline + label on the selected tab.
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--tabs .cds--tabs__nav-item {
+  font-family: var(--uc-font);
+  font-weight: 600;
+}
+
+#{$_scope} .cds--tabs .cds--tabs__nav-item--selected,
+#{$_scope} .cds--tabs .cds--tabs__nav-item--selected:focus {
+  color: var(--uc-accent);
+}
+
+#{$_scope} .cds--tabs .cds--tabs__nav-item--selected .cds--tabs__nav-item-label {
+  color: var(--uc-accent);
+}
+
+#{$_scope} .cds--tabs .cds--tabs__nav-item:focus {
+  outline: 2px solid var(--uc-accent);
+  outline-offset: -2px;
+}
+
+// ---------------------------------------------------------------------------
+// Content switcher: outlined segmented pill, champagne selection.
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--content-switcher {
+  --cds-border-inverse: var(--uc-border-strong);
+}
+
+#{$_scope} .cds--content-switcher-btn {
+  font-family: var(--uc-font);
+  font-weight: 600;
+  color: var(--uc-text-2);
+
+  &.cds--content-switcher--selected {
+    color: var(--uc-on-accent);
+  }
+}
+
+#{$_scope} .cds--content-switcher:not(.cds--content-switcher--icon-only) .cds--content-switcher-btn:first-child {
+  border-end-start-radius: var(--uc-radius-control);
+  border-start-start-radius: var(--uc-radius-control);
+}
+
+#{$_scope} .cds--content-switcher:not(.cds--content-switcher--icon-only) .cds--content-switcher-btn:last-child {
+  border-end-end-radius: var(--uc-radius-control);
+  border-start-end-radius: var(--uc-radius-control);
+}
+
+#{$_scope} .cds--content-switcher-btn::after,
+#{$_scope} .cds--content-switcher-btn:focus::after,
+#{$_scope} .cds--content-switcher-btn:not(.cds--content-switcher--selected):focus::before {
+  border-radius: var(--uc-radius-control);
+}
+
+// ---------------------------------------------------------------------------
+// Notifications: dark rounded cards with a status edge (icon + label kept).
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--inline-notification,
+#{$_scope} .cds--toast-notification,
+#{$_scope} .cds--actionable-notification {
+  overflow: hidden;
+  border-radius: var(--uc-radius-md);
+  color: var(--uc-text);
+  font-family: var(--uc-font);
+}
+
+#{$_scope} .cds--inline-notification--low-contrast::before,
+#{$_scope} .cds--toast-notification--low-contrast::before,
+#{$_scope} .cds--actionable-notification--low-contrast::before {
+  border-radius: var(--uc-radius-md);
+}
+
+#{$_scope} .cds--toast-notification {
+  box-shadow: var(--uc-shadow);
+}
+
+#{$_scope} .cds--inline-notification__title,
+#{$_scope} .cds--toast-notification__title {
+  font-weight: 700;
+}
+
+// ---------------------------------------------------------------------------
+// Progress bar: rounded track, champagne fill.
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--progress-bar__track {
+  overflow: hidden;
+  border-radius: var(--uc-radius-pill);
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+#{$_scope} .cds--progress-bar__bar {
+  border-radius: var(--uc-radius-pill);
+  box-shadow: 0 0 12px rgba(243, 226, 179, 0.35);
+}
+
+#{$_scope} .cds--progress-bar--finished .cds--progress-bar__bar {
+  box-shadow: none;
+}
+
+#{$_scope} .cds--progress-bar__label {
+  font-weight: 600;
+}
+
+// ---------------------------------------------------------------------------
+// Links, skeletons, loading
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--link {
+  font-family: var(--uc-font);
+  font-weight: 600;
+
+  &:focus {
+    outline: 2px solid var(--uc-accent);
+    outline-offset: 2px;
+  }
+}
+
+#{$_scope} .cds--skeleton__text,
+#{$_scope} .cds--skeleton__placeholder {
+  border-radius: 8px;
+}
+
+#{$_scope} .cds--inline-loading__text {
+  font-family: var(--uc-font);
+}

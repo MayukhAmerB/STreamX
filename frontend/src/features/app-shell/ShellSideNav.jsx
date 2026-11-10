@@ -3,9 +3,9 @@ import { SideNav, SideNavItems, SideNavLink } from "@carbon/react";
 import { Fragment } from "react";
 import { Link } from "react-router-dom";
 import { getNavIcon } from "./navIcons";
-import { isNavItemActive } from "./navConfig";
+import { isNavItemActive, USERS_CORNER_TITLE } from "./navConfig";
 
-/** Persistent desktop side navigation (Carbon UI Shell SideNav, >= lg). */
+/** Persistent desktop side navigation for User's Corner (Carbon UI Shell SideNav, >= lg). */
 export default function ShellSideNav({ sections, pathname, adminConsoleUrl }) {
   return (
     <SideNav
@@ -17,6 +17,7 @@ export default function ShellSideNav({ sections, pathname, adminConsoleUrl }) {
       addMouseListeners={false}
     >
       <SideNavItems>
+        <li className="cds-app-sidenav__title">{USERS_CORNER_TITLE}</li>
         {sections.map((section) => (
           <Fragment key={section.id}>
             {section.label ? <li className="cds-app-sidenav__heading">{section.label}</li> : null}

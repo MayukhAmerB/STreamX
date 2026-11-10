@@ -793,12 +793,16 @@ class CourseAdmin(admin.ModelAdmin):
 
         if blockers:
             return format_html(
-                '<span style="color:#b42318;font-weight:700">Blocked:</span> {}',
+                '<span class="enterprise-status enterprise-status--error">'
+                '<svg class="enterprise-icon" aria-hidden="true"><use href="#icon-error"></use></svg>'
+                'Blocked:</span> {}',
                 ", ".join(blockers),
             )
 
         return format_html(
-            '<span style="color:#067647;font-weight:700">Ready for secure purchase</span>'
+            '<span class="enterprise-status enterprise-status--success">'
+            '<svg class="enterprise-icon" aria-hidden="true"><use href="#icon-checkmark"></use></svg>'
+            'Ready for secure purchase</span>'
         )
 
     @admin.display(ordering="_section_count", description="Modules")
@@ -830,7 +834,7 @@ class CourseAdmin(admin.ModelAdmin):
             else:
                 preview_url = obj.thumbnail_file.url
             return format_html(
-                '<img src="{}" alt="{}" style="max-width: 360px; border-radius: 10px; border: 1px solid #ddd;" />',
+                '<img class="enterprise-thumbnail-preview" src="{}" alt="{}" />',
                 preview_url,
                 obj.title,
             )
@@ -839,7 +843,7 @@ class CourseAdmin(admin.ModelAdmin):
                 return "Uploaded thumbnail file path exists in DB but file is missing on storage."
             return "No thumbnail URL"
         return format_html(
-            '<img src="{}" alt="{}" style="max-width: 360px; border-radius: 10px; border: 1px solid #ddd;" />',
+            '<img class="enterprise-thumbnail-preview" src="{}" alt="{}" />',
             obj.thumbnail,
             obj.title,
         )
@@ -1205,7 +1209,7 @@ class LectureQuestionAdmin(admin.ModelAdmin):
     def student_name(self, obj):
         value = obj.user.full_name or obj.user.email
         return format_html(
-            '<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid #3b4a3d;background:#111912;color:#e8f1df;font-weight:600;">{}</span>',
+            '<span class="enterprise-identity-pill">{}</span>',
             value,
         )
 
@@ -1271,14 +1275,14 @@ class EnrollmentAdmin(admin.ModelAdmin):
     def requester_username(self, obj):
         value = obj.user.full_name or obj.user.email
         return format_html(
-            '<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid #3b4a3d;background:#111912;color:#e8f1df;font-weight:600;">{}</span>',
+            '<span class="enterprise-identity-pill">{}</span>',
             value,
         )
 
     @admin.display(description="Email")
     def requester_email(self, obj):
         return format_html(
-            '<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid #3b4a3d;background:#111912;color:#e8f1df;font-weight:600;">{}</span>',
+            '<span class="enterprise-identity-pill">{}</span>',
             obj.user.email,
         )
 
@@ -1286,7 +1290,7 @@ class EnrollmentAdmin(admin.ModelAdmin):
     def requester_phone(self, obj):
         phone = obj.user.phone_number or "Not provided"
         return format_html(
-            '<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid #3b4a3d;background:#111912;color:#f0f6e8;font-weight:600;">{}</span>',
+            '<span class="enterprise-identity-pill">{}</span>',
             phone,
         )
 
@@ -1434,14 +1438,14 @@ class LiveClassEnrollmentAdmin(admin.ModelAdmin):
     def user_full_name(self, obj):
         value = obj.user.full_name or obj.user.email
         return format_html(
-            '<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid #3b4a3d;background:#111912;color:#e8f1df;font-weight:600;">{}</span>',
+            '<span class="enterprise-identity-pill">{}</span>',
             value,
         )
 
     @admin.display(description="User Email")
     def user_email(self, obj):
         return format_html(
-            '<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid #3b4a3d;background:#111912;color:#e8f1df;font-weight:600;">{}</span>',
+            '<span class="enterprise-identity-pill">{}</span>',
             obj.user.email,
         )
 
@@ -1449,7 +1453,7 @@ class LiveClassEnrollmentAdmin(admin.ModelAdmin):
     def user_phone(self, obj):
         phone = obj.user.phone_number or "Not provided"
         return format_html(
-            '<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid #3b4a3d;background:#111912;color:#f0f6e8;font-weight:600;">{}</span>',
+            '<span class="enterprise-identity-pill">{}</span>',
             phone,
         )
 

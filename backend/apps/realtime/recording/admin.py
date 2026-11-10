@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils import timezone
+from django.utils.formats import date_format
 from django.utils.html import format_html
 
 from . import replacement, services
@@ -104,7 +105,12 @@ class ClassRecordingAdmin(admin.ModelAdmin):
         if not obj.recorder_heartbeat_at:
             return "waiting for recorder"
         if timezone.now() - obj.recorder_heartbeat_at > timedelta(seconds=60):
-            return format_html('<strong style="color:#da1e28">offline since {}</strong>', obj.recorder_heartbeat_at)
+            return format_html(
+                '<span class="enterprise-status enterprise-status--error">'
+                '<svg class="enterprise-icon" aria-hidden="true"><use href="#icon-error"></use></svg>'
+                'Offline since {}</span>',
+                date_format(timezone.localtime(obj.recorder_heartbeat_at), "DATETIME_FORMAT"),
+            )
         return f"{obj.part_count} part(s)"
 
     @admin.display(description="Error")

@@ -26,15 +26,9 @@ for model in (Group, Token):
         pass
 
 
-def highlighted_identity(value, color="#e8f1df", border="#3b4a3d", background="#111912"):
+def highlighted_identity(value):
     text = str(value or "Not provided").strip() or "Not provided"
-    return format_html(
-        '<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid {};background:{};color:{};font-weight:600;">{}</span>',
-        border,
-        background,
-        color,
-        text,
-    )
+    return format_html('<span class="enterprise-identity-pill">{}</span>', text)
 
 
 class AdminPasswordVerificationForm(forms.Form):
@@ -61,7 +55,7 @@ class EnrollmentRequesterInlineMixin:
 
     @admin.display(description="Phone")
     def requester_phone(self, obj):
-        return highlighted_identity(getattr(obj.user, "phone_number", None), color="#f0f6e8")
+        return highlighted_identity(getattr(obj.user, "phone_number", None))
 
 
 class CourseEnrollmentInline(EnrollmentRequesterInlineMixin, admin.TabularInline):

@@ -12,6 +12,7 @@ import {
   getMoreItems,
   getNavItems,
   getNavSections,
+  getShellDocumentTitle,
   getShellPageMode,
   isFlushPage,
   isMoreActive,
@@ -21,7 +22,6 @@ import ShellHeader from "./ShellHeader";
 import ShellSideNav from "./ShellSideNav";
 import PageSkeleton from "./ui/PageSkeleton";
 import { ToastProvider } from "./ui/toast";
-import { useAppTheme } from "./useAppTheme";
 import { useBreakpoint } from "./useBreakpoint";
 import { useDocumentChrome } from "./useDocumentChrome";
 import { useLastCourseId } from "./useLastCourseId";
@@ -35,8 +35,10 @@ function groupMoreItems(items) {
 }
 
 /**
- * Carbon app shell for every functional (logged-in) route. Lazily loaded, so
- * Carbon's JS and CSS never ship with the public website bundle.
+ * "User's Corner": the Carbon app shell for every functional (logged-in)
+ * route, styled like the public landing page (black, Inter, champagne
+ * accent). Lazily loaded, so Carbon's JS and CSS never ship with the public
+ * website bundle.
  *
  * Desktop (>= 1056px): Header + persistent SideNav.
  * Phones/tablets: compact Header + bottom tab bar + "More" sheet.
@@ -47,12 +49,9 @@ export default function AppShellLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { isDesktop } = useBreakpoint();
-  const { preference, setPreference, carbonTheme } = useAppTheme();
   const lastCourseId = useLastCourseId(pathname);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreButtonRef = useRef(null);
-
-  useDocumentChrome(carbonTheme);
 
   useEffect(() => {
     setMoreOpen(false);
@@ -65,6 +64,8 @@ export default function AppShellLayout() {
   const moreGroups = useMemo(() => groupMoreItems(getMoreItems(navItems)), [navItems]);
   const accountItems = useMemo(() => navItems.filter((item) => item.section === "account"), [navItems]);
   const adminConsoleUrl = isAdmin ? resolveDjangoAdminUrl() : "";
+
+  useDocumentChrome(getShellDocumentTitle(navItems, pathname));
 
   const closeMore = useCallback(() => setMoreOpen(false), []);
   const handleSignOut = useCallback(async () => {
@@ -80,17 +81,11 @@ export default function AppShellLayout() {
   const page = <Outlet />;
 
   return (
-    <div
-      className="cds-app"
-      data-carbon-theme={carbonTheme}
-      data-shell-layout={isDesktop ? "desktop" : "mobile"}
-    >
+    <div className="cds-app" data-shell-layout={isDesktop ? "desktop" : "mobile"}>
       <ToastProvider>
         <ShellHeader
           user={user}
           accountItems={accountItems}
-          themePreference={preference}
-          onThemeChange={setPreference}
           onSignOut={handleSignOut}
         />
         {isDesktop ? (
@@ -125,8 +120,6 @@ export default function AppShellLayout() {
           <MoreSheet
             groups={moreGroups}
             pathname={pathname}
-            themePreference={preference}
-            onThemeChange={setPreference}
             onSignOut={handleSignOut}
             onClose={closeMore}
             returnFocusRef={moreButtonRef}
