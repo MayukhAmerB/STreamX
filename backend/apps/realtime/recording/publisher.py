@@ -53,9 +53,11 @@ def resolve_module(recording):
 
 
 def storage_name_for(recording, module, suffix=".mp4"):
-    course_slug = slugify(getattr(module.course, "slug", "") or "course") or "course"
+    # Keep the stored name well under Lecture.video_file's max_length: the slug
+    # is capped so long course names can't push the path past the column size.
+    course_slug = (slugify(getattr(module.course, "slug", "") or "course") or "course")[:48].strip("-") or "course"
     stamp = timezone.localtime(recording.started_at or recording.created_at or timezone.now()).strftime("%Y%m%d-%H%M%S")
-    return f"lecture_videos/{course_slug}/module_{module.pk}/class-recording-{recording.pk}-{stamp}{suffix}"
+    return f"lecture_videos/{course_slug}/module_{module.pk}/rec-{recording.pk}-{stamp}{suffix}"
 
 
 def next_lecture_order(module):

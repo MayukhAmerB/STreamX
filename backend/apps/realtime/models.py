@@ -632,7 +632,9 @@ class RealtimeSessionRecording(models.Model):
     livekit_egress_id = models.CharField(max_length=255, blank=True, default="")
     output_file_path = models.CharField(max_length=1024, blank=True, default="")
     output_download_url = models.URLField(blank=True, default="")
-    video_file = models.FileField(upload_to=realtime_recording_upload_path, blank=True, null=True)
+    video_file = models.FileField(
+        upload_to=realtime_recording_upload_path, blank=True, null=True, max_length=500
+    )
     livekit_payload = models.JSONField(default=dict, blank=True)
     error = models.TextField(blank=True, default="")
     started_at = models.DateTimeField(null=True, blank=True)

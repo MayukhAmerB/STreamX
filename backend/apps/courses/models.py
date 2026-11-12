@@ -611,7 +611,11 @@ class Lecture(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
     video_key = models.CharField(max_length=1024, blank=True, default="")
-    video_file = models.FileField(upload_to=lecture_video_upload_path, blank=True, null=True)
+    # 500, not Django's default 100: recorded-class paths include the course
+    # slug and module id and exceeded 100 characters for long course names.
+    video_file = models.FileField(
+        upload_to=lecture_video_upload_path, blank=True, null=True, max_length=500
+    )
     stream_status = models.CharField(
         max_length=20, choices=STREAM_STATUS_CHOICES, default=STREAM_PENDING
     )
