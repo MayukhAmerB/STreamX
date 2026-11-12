@@ -19,6 +19,10 @@ USE_X_FORWARDED_HOST = env_bool("USE_X_FORWARDED_HOST", True)
 USE_X_FORWARDED_PORT = env_bool("USE_X_FORWARDED_PORT", True)
 TRUST_X_FORWARDED_FOR = env_bool("TRUST_X_FORWARDED_FOR", True)
 
+# Report uploads are scanned by the ClamAV daemon (the "clamav" compose
+# service) in production; reports.E001 refuses to start with anything else.
+REPORTS_ANTIVIRUS_SCANNER = env("REPORTS_ANTIVIRUS_SCANNER", "clamd").strip() or "off"
+
 ENFORCE_PRODUCTION_REQUIREMENTS = env_bool("ENFORCE_PRODUCTION_REQUIREMENTS", True)
 ALLOW_SQLITE_IN_PRODUCTION = env_bool("ALLOW_SQLITE_IN_PRODUCTION", False)
 ALLOW_INSECURE_HTTP_ORIGINS = env_bool("ALLOW_INSECURE_HTTP_ORIGINS", False)

@@ -10,6 +10,8 @@ RETENTION_DAYS="${HOSTINGER_BACKUP_RETENTION_DAYS:-14}"
 RETENTION_COUNT="${HOSTINGER_BACKUP_RETENTION_COUNT:-14}"
 INCLUDE_REDIS_BACKUP="${HOSTINGER_BACKUP_INCLUDE_REDIS:-1}"
 OFFSITE_COMMAND="${HOSTINGER_BACKUP_OFFSITE_COMMAND:-}"
+REPORTS_HOST_DIR="${STREAMX_REPORTS_HOST_DIR:-/srv/streamx/reports}"
+LEGACY_REPORTS_VOLUME="${STREAMX_LEGACY_REPORTS_VOLUME:-streamx_backend_private_media}"
 TIMESTAMP="${1:-$(date -u +%Y%m%dT%H%M%SZ)}"
 BACKUP_DIR="$BACKUP_ROOT/$TIMESTAMP"
 
@@ -43,6 +45,32 @@ backup_volume() {
     -v "${BACKUP_DIR}:/backup" \
     alpine:3.20 \
     sh -lc "tar czf \"/backup/${archive_name}\" -C /source ."
+}
+
+# Weekly report files: the noexec host directory once its migration from the
+# old named volume is recorded; before that the old volume (which still holds
+# the newest files); an empty archive on a server that has neither. Never
+# `docker run -v <missing volume>`, which would create an empty volume.
+backup_report_files() {
+  local archive_name="$1"
+  if [[ -f "$REPORTS_HOST_DIR/.migration/legacy-volume.done" ]] || \
+     { [[ -d "$REPORTS_HOST_DIR" ]] && ! docker volume inspect "$LEGACY_REPORTS_VOLUME" >/dev/null 2>&1; }; then
+    log "Archiving report files from $REPORTS_HOST_DIR."
+    docker run --rm \
+      -v "${REPORTS_HOST_DIR}:/source:ro" \
+      -v "${BACKUP_DIR}:/backup" \
+      alpine:3.20 \
+      sh -lc "tar czf \"/backup/${archive_name}\" -C /source --exclude=./.incoming ."
+  elif docker volume inspect "$LEGACY_REPORTS_VOLUME" >/dev/null 2>&1; then
+    log "Archiving report files from the $LEGACY_REPORTS_VOLUME volume (not migrated yet)."
+    backup_volume "$LEGACY_REPORTS_VOLUME" "$archive_name"
+  else
+    log "No report storage yet; writing an empty report archive."
+    local empty_dir
+    empty_dir="$(mktemp -d)"
+    tar czf "${BACKUP_DIR}/${archive_name}" -C "$empty_dir" .
+    rmdir "$empty_dir"
+  fi
 }
 
 verify_gzip_archive() {
@@ -105,7 +133,7 @@ compose exec -T postgres sh -lc 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -
 log "Archiving persistent volumes."
 backup_volume "streamx_backend_media" "backend_media.tar.gz"
 # Weekly report submissions (private; never served by nginx).
-backup_volume "streamx_backend_private_media" "backend_private_media.tar.gz"
+backup_report_files "backend_private_media.tar.gz"
 backup_volume "streamx_recordings_data" "recordings_data.tar.gz"
 backup_volume "streamx_owncast_data" "owncast_data.tar.gz"
 if [ "$INCLUDE_REDIS_BACKUP" = "1" ]; then

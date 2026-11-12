@@ -14,7 +14,7 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import GRADE_ACTION_CHOICES, ReportSubmission, ReportTask
+from .models import GRADE_ACTION_CHOICES, SCAN_STATUS_CHOICES, ReportSubmission, ReportTask
 
 STUDENT_STATUS_CHOICES = ReportSubmission.STATUS_CHOICES
 WINDOW_CHOICES = [("not_open", "Not open"), ("open", "Open"), ("late", "Late window"), ("closed", "Closed")]
@@ -45,6 +45,7 @@ class StoredFileSerializer(serializers.Serializer):
     size = serializers.IntegerField()
     created_at = serializers.DateTimeField()
     preview = serializers.ChoiceField(choices=PREVIEW_CHOICES)
+    scan_status = serializers.ChoiceField(choices=SCAN_STATUS_CHOICES)
     download_url = serializers.CharField()
 
 
@@ -78,6 +79,7 @@ class FeedbackFileSerializer(serializers.Serializer):
     extension = serializers.CharField()
     size = serializers.IntegerField()
     preview = serializers.ChoiceField(choices=PREVIEW_CHOICES)
+    scan_status = serializers.ChoiceField(choices=SCAN_STATUS_CHOICES)
     download_url = serializers.CharField()
 
 

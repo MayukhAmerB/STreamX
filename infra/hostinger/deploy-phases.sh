@@ -174,6 +174,9 @@ ensure_redis_url
 apply_phase_runtime_profile
 apply_phase_resource_profile
 HOSTINGER_ENV_FILE="$ENV_FILE" bash "$SCRIPT_DIR/prepare-livekit-config.sh"
+# Report files live on noexec host directories that compose bind-mounts (and
+# refuses to start without): create/mount them before any container starts.
+bash "$SCRIPT_DIR/prepare-report-storage.sh" prepare
 
 resolve_async_worker_replicas() {
   local replicas_raw
@@ -321,6 +324,10 @@ case "$PHASE" in
     exit 1
     ;;
 esac
+
+# Every container that used the pre-noexec report volume was recreated above:
+# copy what it received meanwhile, verify everything, record the migration.
+bash "$SCRIPT_DIR/prepare-report-storage.sh" finalize
 
 log "Deployment complete for $PHASE"
 compose_main -f "$BASE_COMPOSE" ps

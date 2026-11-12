@@ -6,7 +6,7 @@ from django.db.models import Count, Q
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import ReportCriterion, ReportGradeAudit, ReportSubmission
+from .models import SCAN_CLEAN, ReportCriterion, ReportGradeAudit, ReportSubmission
 from .services import (
     active_student_ids,
     marks_visible_to_student,
@@ -27,8 +27,11 @@ PREVIEW_BY_EXTENSION = {
 }
 
 
-def preview_kind(extension):
+def preview_kind(extension, scan_status=SCAN_CLEAN):
     # SVG is deliberately "none": it is only ever downloaded, never rendered.
+    # A file without a clean virus scan cannot be fetched, so it has no preview.
+    if scan_status != SCAN_CLEAN:
+        return "none"
     return PREVIEW_BY_EXTENSION.get(str(extension or "").lower(), "none")
 
 
@@ -48,7 +51,8 @@ def file_dict(item):
         "content_type": item.content_type,
         "size": item.size,
         "created_at": item.created_at,
-        "preview": preview_kind(item.extension),
+        "preview": preview_kind(item.extension, item.scan_status),
+        "scan_status": item.scan_status,
         "download_url": reverse("reports-file-download", args=[item.pk]),
     }
 
@@ -83,7 +87,8 @@ def feedback_file_dict(grade):
         "name": grade.annotated_file_name,
         "extension": grade.annotated_extension,
         "size": grade.annotated_file_size,
-        "preview": preview_kind(grade.annotated_extension),
+        "preview": preview_kind(grade.annotated_extension, grade.annotated_scan_status),
+        "scan_status": grade.annotated_scan_status,
         "download_url": reverse("reports-feedback-file-download", args=[grade.submission_id]),
     }
 

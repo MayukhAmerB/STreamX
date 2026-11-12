@@ -4622,6 +4622,8 @@ components:
           type: integer
         preview:
           $ref: '#/components/schemas/ReportFilePreviewEnum'
+        scan_status:
+          $ref: '#/components/schemas/ScanStatusEnum'
         download_url:
           type: string
       required:
@@ -4629,6 +4631,7 @@ components:
       - extension
       - name
       - preview
+      - scan_status
       - size
     FirFilingGuide:
       type: object
@@ -6253,6 +6256,16 @@ components:
       description: |-
         * `citizen` - Citizen / Volunteer
         * `lawyer` - Lawyer
+    ScanStatusEnum:
+      enum:
+      - unscanned
+      - clean
+      - infected
+      type: string
+      description: |-
+        * `unscanned` - Not scanned yet
+        * `clean` - Clean
+        * `infected` - Infected (quarantined)
     SectionOption:
       type: object
       properties:
@@ -6465,6 +6478,8 @@ components:
           format: date-time
         preview:
           $ref: '#/components/schemas/ReportFilePreviewEnum'
+        scan_status:
+          $ref: '#/components/schemas/ScanStatusEnum'
         download_url:
           type: string
       required:
@@ -6475,6 +6490,7 @@ components:
       - id
       - name
       - preview
+      - scan_status
       - size
     StoredFileRequest:
       type: object
@@ -6497,6 +6513,8 @@ components:
           format: date-time
         preview:
           $ref: '#/components/schemas/ReportFilePreviewEnum'
+        scan_status:
+          $ref: '#/components/schemas/ScanStatusEnum'
         download_url:
           type: string
           minLength: 1
@@ -6508,6 +6526,7 @@ components:
       - id
       - name
       - preview
+      - scan_status
       - size
     StreamHeartbeatData:
       type: object

@@ -54,6 +54,9 @@ if [[ -n "$pooled_backend_id" && -z "$DEPLOY_PHASE" ]]; then
   exit 1
 fi
 
+log "Preparing the private, noexec report storage."
+bash "$SCRIPT_DIR/prepare-report-storage.sh" prepare
+
 if [[ -n "$DEPLOY_PHASE" ]]; then
   log "Rebuilding the complete $DEPLOY_PHASE topology."
   "$SCRIPT_DIR/deploy-phases.sh" "$DEPLOY_PHASE"
@@ -62,6 +65,7 @@ else
   compose up -d --build
 fi
 wait_for_backend_health
+bash "$SCRIPT_DIR/prepare-report-storage.sh" finalize
 
 log "Running Django production checks."
 compose exec -T backend python manage.py check --deploy

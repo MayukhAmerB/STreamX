@@ -74,6 +74,9 @@ docker exec "$gateway_container" nginx -t
 echo "Building only the backend pool and public frontends."
 "${compose[@]}" build "${services[@]}"
 
+echo "Preparing the private, noexec report storage (compose bind-mounts it)."
+bash "$REPO_ROOT/infra/hostinger/prepare-report-storage.sh" prepare
+
 echo "Validating the new backend image without changing the database."
 "${compose[@]}" run --rm --no-deps -T --entrypoint python backend manage.py check
 "${compose[@]}" run --rm --no-deps -T --entrypoint python backend \

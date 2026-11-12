@@ -8,7 +8,7 @@ to its own staff-only download views instead of a storage URL.
 
 from django.contrib import admin, messages
 from django.db.models import Count
-from django.http import Http404
+from django.http import Http404, HttpResponseRedirect
 from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
 
@@ -21,6 +21,7 @@ from .models import (
     ReportFile,
     ReportGrade,
     ReportGradeAudit,
+    ReportQuarantineRecord,
     ReportSubmission,
     ReportSubmissionVersion,
     ReportTask,
@@ -66,7 +67,12 @@ class _DownloadMixin:
         item = self.model.objects.filter(pk=pk).first()
         if item is None:
             raise Http404
-        return self.file_response(item)
+        try:
+            return self.file_response(item)
+        except DomainError as exc:  # not scanned / infected / missing
+            messages.error(request, exc.message)
+            opts = self.model._meta
+            return HttpResponseRedirect(reverse(f"admin:{opts.app_label}_{opts.model_name}_change", args=[pk]))
 
 
 class ReportCriterionInline(admin.TabularInline):
@@ -176,7 +182,21 @@ class ReportAttachmentAdmin(_DownloadMixin, _ReadOnlyAdmin):
     list_filter = ("extension", "task__course")
     search_fields = ("original_name", "task__title")
     exclude = ("file",)
-    readonly_fields = ("download", "task", "extension", "content_type", "size", "sha256", "uploaded_by", "created_at")
+    readonly_fields = (
+        "download",
+        "task",
+        "extension",
+        "content_type",
+        "size",
+        "sha256",
+        "scan_status",
+        "scanned_at",
+        "scanner",
+        "scan_signature_version",
+        "scan_threat",
+        "uploaded_by",
+        "created_at",
+    )
 
     @admin.display(description="File")
     def download(self, obj):
@@ -194,6 +214,7 @@ class ReportAttachmentAdmin(_DownloadMixin, _ReadOnlyAdmin):
             extension=item.extension,
             content_type=item.content_type,
             inline_requested=False,
+            scan_status=item.scan_status,
         )
 
 
@@ -302,8 +323,17 @@ class ReportSubmissionVersionAdmin(_ReadOnlyAdmin):
 @admin.register(ReportFile)
 class ReportFileAdmin(_DownloadMixin, _ReadOnlyAdmin):
     download_url_name = "reports_reportfile_download"
-    list_display = ("original_name", "owner", "task", "extension", "size_label", "submitted", "created_at")
-    list_filter = ("submitted", "extension", "task__course")
+    list_display = (
+        "original_name",
+        "owner",
+        "task",
+        "extension",
+        "size_label",
+        "submitted",
+        "scan_status",
+        "created_at",
+    )
+    list_filter = ("submitted", "scan_status", "extension", "task__course")
     search_fields = ("original_name", "owner__email", "owner__full_name", "task__title", "sha256")
     exclude = ("file",)
     readonly_fields = (
@@ -315,6 +345,11 @@ class ReportFileAdmin(_DownloadMixin, _ReadOnlyAdmin):
         "size",
         "sha256",
         "submitted",
+        "scan_status",
+        "scanned_at",
+        "scanner",
+        "scan_signature_version",
+        "scan_threat",
         "created_at",
     )
 
@@ -334,6 +369,7 @@ class ReportFileAdmin(_DownloadMixin, _ReadOnlyAdmin):
             extension=item.extension,
             content_type=item.content_type,
             inline_requested=False,
+            scan_status=item.scan_status,
         )
 
 
@@ -353,6 +389,11 @@ class ReportGradeAdmin(_DownloadMixin, _ReadOnlyAdmin):
         "feedback",
         "revision_feedback",
         "annotated_link",
+        "annotated_scan_status",
+        "annotated_scanned_at",
+        "annotated_scanner",
+        "annotated_scan_signature_version",
+        "annotated_scan_threat",
         "graded_version",
         "graded_by",
         "graded_at",
@@ -377,6 +418,7 @@ class ReportGradeAdmin(_DownloadMixin, _ReadOnlyAdmin):
             extension=item.annotated_extension,
             content_type=item.annotated_content_type,
             inline_requested=False,
+            scan_status=item.annotated_scan_status,
         )
 
 
@@ -405,6 +447,35 @@ class ReportGradeAuditAdmin(_ReadOnlyAdmin):
         "new_final_marks",
         "details",
         "created_at",
+    )
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ReportQuarantineRecord)
+class ReportQuarantineRecordAdmin(_ReadOnlyAdmin):
+    """Files the virus scanner blocked. Metadata only (hash, never the bytes)."""
+
+    list_display = ("created_at", "signature", "original_name", "kind", "source", "action", "user", "task")
+    list_filter = ("source", "kind", "action", "created_at")
+    search_fields = ("original_name", "sha256", "signature", "user__email", "task__title")
+    date_hierarchy = "created_at"
+    readonly_fields = (
+        "created_at",
+        "source",
+        "kind",
+        "action",
+        "user",
+        "task",
+        "object_id",
+        "original_name",
+        "size",
+        "sha256",
+        "signature",
+        "scanner",
+        "signature_version",
+        "quarantine_name",
     )
 
     def has_delete_permission(self, request, obj=None):

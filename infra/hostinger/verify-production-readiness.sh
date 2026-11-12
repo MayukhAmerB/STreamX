@@ -142,6 +142,16 @@ else
   else
     fail "Django production checks failed."
   fi
+  if compose exec -T backend python manage.py check_antivirus; then
+    pass "Report virus scanner (clamd) answers with its signature version."
+  else
+    fail "Report virus scanner (clamd) is not answering; report uploads are refused."
+  fi
+  if compose exec -T backend python manage.py check_report_storage --require-noexec; then
+    pass "Report storage is private and mounted noexec,nosuid,nodev."
+  else
+    fail "Report storage is not mounted noexec,nosuid,nodev (run prepare-report-storage.sh)."
+  fi
   pending_migrations="$(compose exec -T backend python manage.py showmigrations --plan 2>/dev/null | grep -E '^\[ \]' || true)"
   if [[ -n "$pending_migrations" ]]; then
     fail "Pending database migrations detected."

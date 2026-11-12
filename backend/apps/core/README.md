@@ -194,7 +194,16 @@ Paths and payload keys are unchanged (`/health/live`, `/healthz`,
   **free disk on MEDIA_ROOT** ≥ `HEALTH_MEDIA_MIN_FREE_BYTES` (512 MiB).
 * Readiness, soft (reported in `warnings`, never 503): disk below
   `HEALTH_MEDIA_WARN_FREE_BYTES` (5 GiB) and circuit-breaker state of every
-  upstream in `upstreams` (read from cache; readiness never calls an upstream).
+  upstream in `upstreams` (read from cache), plus the `HEALTH_SOFT_PROBES`
+  (dotted callables returning `(state, details)`, merged into
+  `upstreams[<name>]` with `probe`; a state other than `ok`/`off` adds
+  `warnings[<name>]`). The only probe today is
+  `apps.reports.antivirus.readiness_probe`: a 1 s clamd PING memoised for
+  15 s, so a clamd restart is a warning while report uploads alone fail closed.
+* Periodic worker hooks: `worker.register_periodic(name, interval_seconds,
+  func)` (from an app's `ready()`) runs `func` on a `process_async_jobs` tick
+  at most once per interval across all workers. Hooks must be cheap, e.g.
+  publish one deduplicated outbox event (the reports re-scan does this).
 * Memoised per process for `HEALTH_READINESS_CACHE_SECONDS` (3s) behind a
   lock; `cached: true` marks a memoised answer. Failure texts are exception
   class names in production (no hosts/SQL), full text with `DEBUG`.

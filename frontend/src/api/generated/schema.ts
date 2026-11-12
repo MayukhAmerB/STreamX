@@ -2278,6 +2278,7 @@ export interface components {
             extension: string;
             size: number;
             preview: components["schemas"]["ReportFilePreviewEnum"];
+            scan_status: components["schemas"]["ScanStatusEnum"];
             download_url: string;
         };
         FirFilingGuide: {
@@ -2971,6 +2972,13 @@ export interface components {
          * @enum {string}
          */
         RoleEnum: "citizen" | "lawyer";
+        /**
+         * @description * `unscanned` - Not scanned yet
+         *     * `clean` - Clean
+         *     * `infected` - Infected (quarantined)
+         * @enum {string}
+         */
+        ScanStatusEnum: "unscanned" | "clean" | "infected";
         SectionOption: {
             id: number;
             title: string;
@@ -3066,6 +3074,7 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             preview: components["schemas"]["ReportFilePreviewEnum"];
+            scan_status: components["schemas"]["ScanStatusEnum"];
             download_url: string;
         };
         StoredFileRequest: {
@@ -3077,6 +3086,7 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             preview: components["schemas"]["ReportFilePreviewEnum"];
+            scan_status: components["schemas"]["ScanStatusEnum"];
             download_url: string;
         };
         StreamHeartbeatData: {

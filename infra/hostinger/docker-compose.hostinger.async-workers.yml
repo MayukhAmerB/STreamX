@@ -19,7 +19,18 @@ services:
         condition: service_healthy
     volumes:
       - backend_media:/app/media
-      - backend_private_media:/app/private_media
+      # Weekly report files: dedicated noexec,nosuid,nodev host directories
+      # (infra/hostinger/prepare-report-storage.sh); never the media volume.
+      - type: bind
+        source: /srv/streamx/reports
+        target: /app/private_media
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /srv/streamx/reports-quarantine
+        target: /app/private_quarantine
+        bind:
+          create_host_path: false
       - recordings_data:/recordings:ro
     healthcheck:
       test:
@@ -35,6 +46,7 @@ services:
       start_period: 20s
     networks:
       - appnet
+      - avnet
 
   worker-2:
     build:
@@ -60,7 +72,18 @@ services:
         condition: service_healthy
     volumes:
       - backend_media:/app/media
-      - backend_private_media:/app/private_media
+      # Weekly report files: dedicated noexec,nosuid,nodev host directories
+      # (infra/hostinger/prepare-report-storage.sh); never the media volume.
+      - type: bind
+        source: /srv/streamx/reports
+        target: /app/private_media
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /srv/streamx/reports-quarantine
+        target: /app/private_quarantine
+        bind:
+          create_host_path: false
       - recordings_data:/recordings:ro
     healthcheck:
       test:
@@ -80,6 +103,7 @@ services:
     pids_limit: 512
     networks:
       - appnet
+      - avnet
 
   # Server-side recorder for OBS classes (apps/realtime/recording/). It pulls
   # Owncast's HLS output over the Docker network with ffmpeg stream copy (no
@@ -112,7 +136,18 @@ services:
         condition: service_healthy
     volumes:
       - backend_media:/app/media
-      - backend_private_media:/app/private_media
+      # Weekly report files: dedicated noexec,nosuid,nodev host directories
+      # (infra/hostinger/prepare-report-storage.sh); never the media volume.
+      - type: bind
+        source: /srv/streamx/reports
+        target: /app/private_media
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /srv/streamx/reports-quarantine
+        target: /app/private_quarantine
+        bind:
+          create_host_path: false
       - recordings_data:/recordings
     healthcheck:
       test:
@@ -132,3 +167,4 @@ services:
     pids_limit: 256
     networks:
       - appnet
+      - avnet

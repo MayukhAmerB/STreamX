@@ -49,7 +49,18 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - backend_media:/app/media
-      - backend_private_media:/app/private_media
+      # Weekly report files: dedicated noexec,nosuid,nodev host directories
+      # (infra/hostinger/prepare-report-storage.sh); never the media volume.
+      - type: bind
+        source: /srv/streamx/reports
+        target: /app/private_media
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /srv/streamx/reports-quarantine
+        target: /app/private_quarantine
+        bind:
+          create_host_path: false
       - recordings_data:/recordings:ro
     healthcheck:
       test:
@@ -65,6 +76,7 @@ services:
       start_period: 40s
     networks:
       - appnet
+      - avnet
 
   frontend:
     build:
@@ -261,6 +273,43 @@ services:
     networks:
       - appnet
 
+  # ClamAV for weekly-report uploads (apps/reports/antivirus.py). Reachable
+  # only from the backend/worker containers on the internal "avnet" network;
+  # "av_egress" exists only so freshclam can download signatures. No published
+  # ports. Uploads fail closed while it is down or still loading; nothing else
+  # depends on it, so a restart never takes the site down.
+  # First boot: the image ships a signature snapshot that Docker copies into the
+  # empty streamx_clamav_db volume; freshclam then updates it and clamd loads
+  # it (1-3 minutes; up to ~10 minutes when a full download is needed).
+  clamav:
+    image: clamav/clamav:1.4.3
+    restart: always
+    environment:
+      # freshclam checks per day (the ClamAV mirrors ask for at most hourly).
+      FRESHCLAM_CHECKS: "12"
+      CLAMAV_NO_MILTERD: "true"
+      CLAMD_STARTUP_TIMEOUT: "1800"
+    volumes:
+      - clamav_db:/var/lib/clamav
+      - ./infra/hostinger/clamav/clamd.conf:/etc/clamav/clamd.conf:ro
+      - ./infra/hostinger/clamav/freshclam.conf:/etc/clamav/freshclam.conf:ro
+    # One signature engine (~1.3 GB RSS with the full database) plus freshclam,
+    # scan buffers and a 220 MB stream; ConcurrentDatabaseReload/TestDatabases
+    # are off in the configs so a reload never needs a second engine.
+    mem_limit: "${CLAMAV_MEM_LIMIT:-3g}"
+    mem_reservation: "${CLAMAV_MEM_RESERVATION:-1536m}"
+    cpus: "${CLAMAV_CPUS:-2.0}"
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 900s
+    networks:
+      - avnet
+      - av_egress
+
 volumes:
   postgres_data:
     name: streamx_postgres_data
@@ -270,10 +319,13 @@ volumes:
     name: streamx_owncast_data
   backend_media:
     name: streamx_backend_media
-  # Weekly report files (apps.reports): private, never mounted into the media
-  # (nginx) container; served only by the authenticated Django download view.
-  backend_private_media:
-    name: streamx_backend_private_media
+  # Weekly report files no longer use a named volume: they live in the
+  # noexec host directories /srv/streamx/reports{,-quarantine} (bind mounts
+  # above). A pre-existing streamx_backend_private_media volume is copied
+  # there once by infra/hostinger/prepare-report-storage.sh and then left
+  # untouched (never deleted automatically).
+  clamav_db:
+    name: streamx_clamav_db
   recordings_data:
     name: streamx_recordings_data
   cases_content:
@@ -285,3 +337,12 @@ networks:
   appnet:
     driver: bridge
     name: streamx_appnet
+  # Backend/workers <-> clamd only; no route to the outside world.
+  avnet:
+    driver: bridge
+    internal: true
+    name: streamx_avnet
+  # Outbound only for freshclam's signature downloads.
+  av_egress:
+    driver: bridge
+    name: streamx_av_egress

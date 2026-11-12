@@ -11,6 +11,7 @@ DRY_RUN="${HOSTINGER_RESTORE_DRY_RUN:-0}"
 VALIDATE_HEALTH="${HOSTINGER_RESTORE_VALIDATE_HEALTH:-1}"
 BACKEND_HEALTH_URL="${HOSTINGER_RESTORE_BACKEND_HEALTH_URL:-http://127.0.0.1:8000/health/ready}"
 BACKEND_HEALTH_HOST_HEADER="${HOSTINGER_RESTORE_BACKEND_HOST_HEADER:-api.alsyedinitiative.com}"
+REPORTS_HOST_DIR="${STREAMX_REPORTS_HOST_DIR:-/srv/streamx/reports}"
 BACKUP_REF="${1:-latest}"
 BACKUP_DIR="$BACKUP_REF"
 
@@ -77,6 +78,23 @@ restore_volume() {
     sh -lc "rm -rf /target/* /target/.[!.]* /target/..?* 2>/dev/null || true; tar xzf \"/backup/${archive_name}\" -C /target"
 }
 
+# Report files go back into the noexec host directory (prepared and mounted
+# by prepare-report-storage.sh), whichever place the backup was taken from.
+restore_report_files() {
+  local archive_name="$1"
+  local archive_path="${BACKUP_DIR}/${archive_name}"
+  if [ ! -f "$archive_path" ]; then
+    log "Skipping missing archive: ${archive_name}"
+    return 0
+  fi
+  bash "$SCRIPT_DIR/prepare-report-storage.sh" prepare
+  docker run --rm \
+    -v "${REPORTS_HOST_DIR}:/target" \
+    -v "${BACKUP_DIR}:/backup:ro" \
+    alpine:3.20 \
+    sh -lc "find /target -mindepth 1 -maxdepth 1 ! -name .migration -exec rm -rf {} +; tar xzf \"/backup/${archive_name}\" -C /target --exclude=./.migration"
+}
+
 validate_post_restore_health() {
   if [ "$VALIDATE_HEALTH" != "1" ]; then
     return 0
@@ -103,6 +121,9 @@ fi
 
 log "Stopping application services before restore."
 compose stop frontend backend media owncast livekit livekit-egress >/dev/null 2>&1 || true
+# Every other container that writes report files (pool replicas, workers) too.
+docker ps -q --filter label=com.docker.compose.project=streamx --filter volume=/app/private_media \
+  | xargs -r docker stop >/dev/null 2>&1 || true
 
 log "Starting PostgreSQL for restore."
 compose up -d postgres >/dev/null
@@ -120,8 +141,8 @@ gzip -dc "${BACKUP_DIR}/postgres.sql.gz" \
 
 log "Restoring persistent volumes."
 restore_volume "streamx_backend_media" "backend_media.tar.gz"
-# Older backups have no private-media archive; restore_volume skips it.
-restore_volume "streamx_backend_private_media" "backend_private_media.tar.gz"
+# Older backups have no private-media archive; restore_report_files skips it.
+restore_report_files "backend_private_media.tar.gz"
 restore_volume "streamx_recordings_data" "recordings_data.tar.gz"
 restore_volume "streamx_owncast_data" "owncast_data.tar.gz"
 if [ "$INCLUDE_REDIS_RESTORE" = "1" ]; then

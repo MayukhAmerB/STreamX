@@ -41,8 +41,15 @@ export function fileHref(file, { inline = false } = {}) {
   return reportsHref(reportFilePath(file), inline ? { inline: 1 } : undefined);
 }
 
+/** Only files with a clean virus scan can be fetched (the server refuses the rest). */
+export function isDownloadable(file) {
+  return !file?.scan_status || file.scan_status === "clean";
+}
+
 /** Why a file has no preview (shown on its card). */
 export function noPreviewReason(file) {
+  if (file?.scan_status === "infected") return "Blocked by the virus scanner.";
+  if (file?.scan_status && file.scan_status !== "clean") return "Waiting for the virus scan.";
   const ext = String(file?.extension || "").toLowerCase();
   if (ext === "svg") return "SVG files are download-only for safety.";
   if (ext === "zip") return "Vault .zip: download to open it in Obsidian.";
@@ -80,9 +87,11 @@ export function FileCard({ file, selected = false, onPreview, actions = null }) 
             Preview
           </Button>
         ) : null}
-        <Button kind="ghost" size="sm" renderIcon={Download} href={fileHref(file)} aria-label={`Download ${file.name}`}>
-          Download
-        </Button>
+        {isDownloadable(file) ? (
+          <Button kind="ghost" size="sm" renderIcon={Download} href={fileHref(file)} aria-label={`Download ${file.name}`}>
+            Download
+          </Button>
+        ) : null}
         {actions}
       </span>
     </li>

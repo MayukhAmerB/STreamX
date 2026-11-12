@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
 # Post-deploy smoke gate: proves what users actually load still works.
 # Fails (exit 1) when the admin's static assets, API readiness, the protected
-# stream gate or the internal-endpoint block regress.
+# stream gate or the internal-endpoint block regress, when the report virus
+# scanner (clamd) does not answer, or when report storage is not noexec.
+#
+# The first deploy with ClamAV waits (bounded, SMOKE_ANTIVIRUS_WAIT_SECONDS,
+# default 600) for freshclam's first signature download and clamd's start.
 #
 # Optional: CLOUDFLARE_API_TOKEN + CLOUDFLARE_ZONE_ID purge the admin asset
 # URLs first, so a previously cached 404 cannot outlive the fix.
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
+ENV_FILE="${HOSTINGER_ENV_FILE:-$REPO_ROOT/backend/.env.hostinger.production}"
+COMPOSE_FILE="${HOSTINGER_COMPOSE_FILE:-$REPO_ROOT/docker-compose.hostinger.yml}"
+ANTIVIRUS_WAIT_SECONDS="${SMOKE_ANTIVIRUS_WAIT_SECONDS:-600}"
 SITE_URL="${SMOKE_SITE_URL:-https://alsyedinitiative.com}"
 API_URL="${SMOKE_API_URL:-https://api.alsyedinitiative.com}"
 CURL=(curl -sS -m 20 -A "streamx-post-deploy-smoke/1.0")
@@ -53,6 +62,21 @@ code="$(status_of "$SITE_URL/hls/stream.m3u8?smoke=$stamp")"
 
 code="$(status_of "$API_URL/api/internal/ops/resource-profile/")"
 [[ "$code" == "404" ]] && pass "internal ops endpoint is not public" || fail "internal ops endpoint exposed -> HTTP $code"
+
+if [[ "${SMOKE_SKIP_CONTAINER_CHECKS:-0}" != "1" ]]; then
+  backend_exec=(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T backend python manage.py)
+  log "Checking the report virus scanner (waits up to ${ANTIVIRUS_WAIT_SECONDS}s on a first deploy)."
+  if "${backend_exec[@]}" check_antivirus --wait-seconds "$ANTIVIRUS_WAIT_SECONDS" --interval 15; then
+    pass "virus scanner answers PING and reports its signature version"
+  else
+    fail "virus scanner (clamd) is not answering; report uploads are refused until it does"
+  fi
+  if "${backend_exec[@]}" check_report_storage --require-noexec; then
+    pass "report storage is private and mounted noexec,nosuid,nodev"
+  else
+    fail "report storage is missing, not writable or not noexec,nosuid,nodev"
+  fi
+fi
 
 if [[ "$failures" -gt 0 ]]; then
   log "$failures check(s) failed."

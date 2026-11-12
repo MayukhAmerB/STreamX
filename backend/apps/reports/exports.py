@@ -9,7 +9,7 @@ import zipfile
 
 from django.utils import timezone
 
-from .models import ReportCriterion, ReportSubmission
+from .models import SCAN_CLEAN, SCAN_INFECTED, ReportCriterion, ReportSubmission
 from .services import course_gradebook, format_marks
 
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
@@ -180,6 +180,23 @@ def iter_task_zip(task):
             )
             version = submission.current_version
             for item in version.files.all().order_by("created_at", "id"):
+                if item.scan_status != SCAN_CLEAN:
+                    # Never ship a file without a clean virus scan, not even to graders.
+                    label = "BLOCKED BY VIRUS SCANNER" if item.scan_status == SCAN_INFECTED else "NOT SCANNED YET"
+                    manifest.append(
+                        [
+                            student.full_name,
+                            student.email,
+                            submission.status,
+                            version.number,
+                            "",
+                            "",
+                            f"{label}: {item.original_name}",
+                            item.size,
+                            item.sha256,
+                        ]
+                    )
+                    continue
                 base = safe_component(item.original_name)
                 arcname = f"{folder}/v{version.number}/{base}"
                 counter = 2

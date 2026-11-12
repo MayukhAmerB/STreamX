@@ -576,19 +576,30 @@ CIRCUIT_BREAKERS = {
     "livekit": {},
     "razorpay": {"failure_threshold": 3, "open_seconds": 60},
     "prometheus": {},
+    # ClamAV (report uploads). Uploads fail closed while it is open.
+    "clamd": {"failure_threshold": 3, "open_seconds": 30},
 }
 # Readiness probe memo and MEDIA_ROOT disk thresholds.
 HEALTH_READINESS_CACHE_SECONDS = env_int("HEALTH_READINESS_CACHE_SECONDS", 3)
 HEALTH_MEDIA_MIN_FREE_BYTES = env_int("HEALTH_MEDIA_MIN_FREE_BYTES", 512 * 1024 * 1024)
 HEALTH_MEDIA_WARN_FREE_BYTES = env_int("HEALTH_MEDIA_WARN_FREE_BYTES", 5 * 1024 * 1024 * 1024)
+# Soft readiness probes: dotted callables returning (state, details). A state
+# other than "ok" is reported under upstreams/warnings but never fails readiness.
+HEALTH_SOFT_PROBES = {"clamd": "apps.reports.antivirus.readiness_probe"}
 # --- Weekly report submissions (apps.reports) ---
 # Private storage for submitted report files. It must NOT be inside MEDIA_ROOT:
-# the nginx media container serves everything under MEDIA_ROOT publicly. In
-# Docker it is its own volume (streamx_backend_private_media -> /app/private_media)
-# that only the backend containers mount; files leave only through the
-# authenticated download view.
+# the nginx media container serves everything under MEDIA_ROOT publicly. On the
+# Hostinger VPS it is the host directory /srv/streamx/reports (a noexec,nosuid,
+# nodev bind mount) mounted at /app/private_media in the backend and worker
+# containers only; files leave only through the authenticated download views.
+# See apps/reports/SECURITY.md.
 REPORTS_PRIVATE_ROOT = env("REPORTS_PRIVATE_ROOT", str(BASE_DIR / "private_media")).strip() or str(
     BASE_DIR / "private_media"
+)
+# Stored files a later re-scan finds infected are moved here (mode 000), never
+# deleted automatically. Its own host directory (/srv/streamx/reports-quarantine).
+REPORTS_QUARANTINE_ROOT = env("REPORTS_QUARANTINE_ROOT", str(BASE_DIR / "private_quarantine")).strip() or str(
+    BASE_DIR / "private_quarantine"
 )
 # Hard ceilings an instructor cannot exceed when configuring a task.
 REPORTS_MAX_FILE_SIZE_MB_CAP = max(1, env_int("REPORTS_MAX_FILE_SIZE_MB_CAP", 200))
@@ -602,14 +613,28 @@ REPORTS_ZIP_MAX_UNCOMPRESSED_BYTES = max(1, env_int("REPORTS_ZIP_MAX_UNCOMPRESSE
 REPORTS_ZIP_MAX_RATIO = max(1, env_int("REPORTS_ZIP_MAX_RATIO", 100))
 # Staged (uploaded but never submitted) files are deleted after this many hours.
 REPORTS_STAGED_UPLOAD_TTL_HOURS = max(1, env_int("REPORTS_STAGED_UPLOAD_TTL_HOURS", 48))
-# Optional antivirus hook: dotted path to a callable(path, *, filename) that
-# raises apps.reports.antivirus.InfectedFile (or returns a ScanResult). Empty =
-# off. "apps.reports.antivirus.clamd_scan" talks to clamd (REPORTS_CLAMD_*).
-REPORTS_ANTIVIRUS_SCANNER = env("REPORTS_ANTIVIRUS_SCANNER", "").strip()
-REPORTS_ANTIVIRUS_FAIL_CLOSED = env_bool("REPORTS_ANTIVIRUS_FAIL_CLOSED", True)
-REPORTS_CLAMD_HOST = env("REPORTS_CLAMD_HOST", "clamav").strip()
-REPORTS_CLAMD_PORT = env_int("REPORTS_CLAMD_PORT", 3310)
-REPORTS_CLAMD_TIMEOUT_SECONDS = max(1, env_int("REPORTS_CLAMD_TIMEOUT_SECONDS", 30))
+# Antivirus (apps.reports.antivirus). Every report, reference and feedback file
+# is scanned before it is stored; any scanner problem rejects the upload (fail
+# closed). "clamd" = the ClamAV daemon below (production default, prod.py);
+# "fake" = in-process marker scanner for tests and local development (flags the
+# EICAR test string and STREAMX-TEST-VIRUS markers); "off" refuses every upload;
+# anything else is the dotted path of a scanner class. reports.E001 refuses to
+# start production with anything but "clamd".
+REPORTS_ANTIVIRUS_SCANNER = env("REPORTS_ANTIVIRUS_SCANNER", "fake").strip() or "off"
+CLAMD_HOST = (env("CLAMD_HOST", "") or env("REPORTS_CLAMD_HOST", "") or "clamav").strip()
+CLAMD_PORT = env_int("CLAMD_PORT", env_int("REPORTS_CLAMD_PORT", 3310))
+# TCP connect timeout, and the per-read/write timeout while streaming and
+# waiting for the verdict (a 200 MB file takes well under a minute; clamd may
+# also pause scans for a few seconds while it reloads its signatures).
+CLAMD_CONNECT_TIMEOUT_SECONDS = max(1, env_int("CLAMD_CONNECT_TIMEOUT_SECONDS", 5))
+CLAMD_TIMEOUT_SECONDS = max(5, env_int("CLAMD_TIMEOUT_SECONDS", 120))
+# Never stream more than this to clamd; must stay below clamd's StreamMaxLength
+# (220M in infra/hostinger/clamav/clamd.conf) and above the largest report file.
+CLAMD_STREAM_MAX_BYTES = max(1, env_int("CLAMD_STREAM_MAX_BYTES", 210 * 1024 * 1024))
+CLAMD_CHUNK_BYTES = min(max(4096, env_int("CLAMD_CHUNK_BYTES", 256 * 1024)), 8 * 1024 * 1024)
+# Stored files are re-scanned with fresh signatures this often (process_async_jobs).
+REPORTS_RESCAN_INTERVAL_HOURS = max(1, env_int("REPORTS_RESCAN_INTERVAL_HOURS", 24))
+REPORTS_RESCAN_BATCH_SIZE = max(1, env_int("REPORTS_RESCAN_BATCH_SIZE", 200))
 # Late-submission digest for the course instructor: one notification per task
 # per window instead of one per late upload.
 REPORTS_LATE_DIGEST_WINDOW_MINUTES = max(5, env_int("REPORTS_LATE_DIGEST_WINDOW_MINUTES", 60))

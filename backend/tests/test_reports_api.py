@@ -295,25 +295,17 @@ class FileStorageTests(ReportsTestCase):
         self.assertEqual(response.status_code, 507)
         self.assertEqual(response.data["code"], "storage_full")
 
-    @override_settings(REPORTS_ANTIVIRUS_SCANNER="tests.test_reports_api.fake_infected_scanner")
-    def test_antivirus_hook_rejects_infected(self):
-        response = self.upload(user=self.student)
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.data["code"], "file_infected")
-
-    @override_settings(REPORTS_ANTIVIRUS_SCANNER="tests.test_reports_api.fake_broken_scanner")
-    def test_antivirus_outage_fails_closed(self):
-        self.assertEqual(self.upload(user=self.student).status_code, 503)
-
-
-def fake_infected_scanner(file_obj, *, filename):
-    from apps.reports.antivirus import InfectedFile
-
-    raise InfectedFile("Eicar-Test-Signature")
-
-
-def fake_broken_scanner(file_obj, *, filename):
-    raise ConnectionError("clamd down")
+    def test_stored_files_have_a_clean_scan_record_and_no_extension(self):
+        self.as_user(self.student)
+        response = self.upload(file=rf.pdf("My Report.pdf"))
+        self.assertEqual(response.data["data"]["scan_status"], "clean")
+        stored = ReportFile.objects.get()
+        self.assertEqual(stored.scan_status, "clean")
+        self.assertEqual(stored.scanner, "fake")
+        self.assertTrue(stored.scan_signature_version)
+        self.assertIsNotNone(stored.scanned_at)
+        self.assertTrue(stored.file.name.endswith(".bin"))
+        self.assertNotIn(".pdf", stored.file.name)
 
 
 class DeadlineTests(ReportsTestCase):

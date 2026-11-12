@@ -6,9 +6,10 @@
 * Readiness (``/health/ready``, ``/readyz``): this replica can do useful work.
   Hard checks (any failure -> HTTP 503): database, cache (when Redis is
   configured), media storage listing, migrations applied, free disk on
-  MEDIA_ROOT. Soft checks never fail readiness: low-disk warning and the
+  MEDIA_ROOT. Soft checks never fail readiness: low-disk warning, the
   circuit-breaker state of upstreams (Owncast, LiveKit, Razorpay...), read
-  from the cache only -- readiness never calls an upstream.
+  from the cache only, and the ``HEALTH_SOFT_PROBES`` (e.g. a 1 s, memoised
+  clamd PING): a dependency restart shows as a warning, never as a 503.
 
 The readiness result is memoised per process for
 ``HEALTH_READINESS_CACHE_SECONDS`` (default 3s) behind a lock, so a burst of
@@ -30,6 +31,7 @@ from django.core.cache import caches
 from django.core.files.storage import default_storage
 from django.db import DEFAULT_DB_ALIAS, connections
 from django.utils import timezone
+from django.utils.module_loading import import_string
 
 from .circuit import breaker_states
 
@@ -160,6 +162,10 @@ def compute_readiness() -> tuple[int, dict]:
     degraded_upstreams = sorted(name for name, state in upstreams.items() if state.get("state") != "closed")
     if degraded_upstreams:
         warnings["upstreams"] = f"Circuit not closed for: {', '.join(degraded_upstreams)}"
+    for name, probe_state in run_soft_probes().items():
+        upstreams[name] = {**dict(upstreams.get(name) or {}), **probe_state}
+        if probe_state.get("probe") not in ("ok", "off"):
+            warnings[name] = f"{name} is {probe_state.get('probe')}"
 
     status_code = 200 if not failures else 503
     payload = {
@@ -179,6 +185,19 @@ def compute_readiness() -> tuple[int, dict]:
         "cached": False,
     }
     return status_code, payload
+
+
+def run_soft_probes() -> dict[str, dict]:
+    """``HEALTH_SOFT_PROBES``: {name: dotted callable -> (state, details)}."""
+    results = {}
+    for name, dotted in dict(getattr(settings, "HEALTH_SOFT_PROBES", {}) or {}).items():
+        try:
+            state, details = import_string(dotted)()
+        except Exception as exc:  # noqa: BLE001 - a soft probe never breaks readiness
+            logger.warning("soft readiness probe %s failed: %s", name, exc)
+            state, details = "error", {"error": _public_error(exc)}
+        results[name] = {"probe": str(state), **dict(details or {})}
+    return results
 
 
 def readiness(*, use_cache: bool = True) -> tuple[int, dict]:

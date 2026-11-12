@@ -18,6 +18,7 @@ from apps.core.outbox import outbox_handler
 from apps.notifications.models import Notification
 from apps.notifications.services import create_notification
 
+from . import rescan as _rescan  # noqa: F401  (registers the reports.rescan_stored_files handler)
 from . import services
 from .models import ReportSubmission, ReportTask
 

@@ -8,30 +8,28 @@ transaction.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import math
 from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
-from config.upload_validators import validate_report_upload
 from django.conf import settings
-from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Prefetch
 from django.utils import timezone
 
-from apps.core.errors import Conflict, DomainError, ValidationFailed
+from apps.core.errors import Conflict, ValidationFailed
 from apps.core.outbox import publish
 from apps.courses.access import active_enrollment_q
 from apps.courses.models import Enrollment
 
-from .antivirus import scan_upload
+from .intake import delete_stored_name, ingest_upload, prune_incoming
 from .models import (
     GRADE_ACTION_DRAFT,
     GRADE_ACTION_GRADE,
     GRADE_ACTION_RETURN,
+    SCAN_UNSCANNED,
     ReportAttachment,
     ReportCriterion,
     ReportFile,
@@ -42,7 +40,6 @@ from .models import (
     ReportTask,
     quantize_marks,
 )
-from .storage import free_bytes
 
 logger = logging.getLogger("apps.reports")
 
@@ -57,12 +54,6 @@ NOTE_MAX_LENGTH = 2000
 FEEDBACK_MAX_LENGTH = 10000
 # A reminder is skipped when a task is published (or moved) this close to its deadline.
 REMINDER_MIN_LEAD = timedelta(hours=1)
-
-
-class StorageFull(DomainError):
-    status = 507
-    code = "storage_full"
-    default_message = "The server is low on storage, so uploads are paused. Try again later."
 
 
 # ---------------------------------------------------------------------------
@@ -112,70 +103,8 @@ def _require_student_can_change(task, submission, at=None):
 
 
 # ---------------------------------------------------------------------------
-# Files
+# Files (validated, virus-scanned and stored by intake.ingest_upload)
 # ---------------------------------------------------------------------------
-def _ensure_disk_space(incoming_bytes):
-    reserve = int(getattr(settings, "REPORTS_MIN_FREE_BYTES", 1024 * 1024 * 1024))
-    try:
-        available = free_bytes()
-    except OSError:
-        logger.exception("reports: private storage is not reachable")
-        raise StorageFull("Uploads are unavailable right now. Try again later.") from None
-    if available < reserve + 2 * int(incoming_bytes or 0):
-        logger.error("reports: refusing upload, only %s bytes free on private storage", available)
-        raise StorageFull()
-
-
-def _sha256(uploaded):
-    digest = hashlib.sha256()
-    for chunk in uploaded.chunks():
-        digest.update(chunk)
-    uploaded.seek(0)
-    return digest.hexdigest()
-
-
-def _clean_original_name(name):
-    base = str(name or "").replace("\\", "/").split("/")[-1].strip()
-    base = "".join(char for char in base if ord(char) >= 32 and char not in '<>:"|?*')
-    return (base or "file")[:255]
-
-
-def _validate_file(uploaded, *, allowed_extensions, max_bytes, field_name="file"):
-    try:
-        return validate_report_upload(
-            uploaded,
-            field_name=field_name,
-            allowed_extensions=allowed_extensions,
-            max_bytes=max_bytes,
-            zip_limits={
-                "max_entries": getattr(settings, "REPORTS_ZIP_MAX_ENTRIES", 2000),
-                "max_uncompressed_bytes": getattr(settings, "REPORTS_ZIP_MAX_UNCOMPRESSED_BYTES", 500 * 1024 * 1024),
-                "max_ratio": getattr(settings, "REPORTS_ZIP_MAX_RATIO", 100),
-            },
-        )
-    except DjangoValidationError as exc:
-        messages = exc.message_dict.get(field_name) if hasattr(exc, "message_dict") else exc.messages
-        message = (messages or ["This file can't be accepted."])[0]
-        raise ValidationFailed(message, details={field_name: [message]}) from None
-
-
-def _store_upload(uploaded, *, allowed_extensions, max_bytes, field_name="file"):
-    """Validate, scan and hash an upload; returns the metadata to save."""
-    if uploaded is None:
-        raise ValidationFailed("Choose a file to upload.", details={field_name: ["Choose a file to upload."]})
-    info = _validate_file(uploaded, allowed_extensions=allowed_extensions, max_bytes=max_bytes, field_name=field_name)
-    _ensure_disk_space(getattr(uploaded, "size", 0))
-    original_name = _clean_original_name(getattr(uploaded, "name", ""))
-    scan_upload(uploaded, filename=original_name, field_name=field_name)
-    return {
-        "original_name": original_name,
-        "extension": info["extension"],
-        "content_type": info["content_type"],
-        "size": int(uploaded.size),
-        "sha256": _sha256(uploaded),
-    }
-
-
 def prune_staged_files(*, owner=None, older_than_hours=None, now=None):
     """Delete staged files (uploaded, never submitted) older than the TTL."""
     now = now or timezone.now()
@@ -188,6 +117,8 @@ def prune_staged_files(*, owner=None, older_than_hours=None, now=None):
         _delete_stored_file(staged.file)
         staged.delete()
         removed += 1
+    if owner is None:
+        prune_incoming()
     return removed
 
 
@@ -213,20 +144,24 @@ def stage_upload(*, task, student, uploaded):
     if staged_files(task, student).count() >= task.max_files:
         message = f"You can attach up to {task.max_files} file{'s' if task.max_files != 1 else ''}. Remove one first."
         raise ValidationFailed(message, details={"file": [message]}, code="validation_too_many_files")
-    meta = _store_upload(uploaded, allowed_extensions=task.allowed_extensions, max_bytes=task.max_file_bytes)
-    staged_total = sum(staged_files(task, student).values_list("size", flat=True))
-    if staged_total + meta["size"] > task.max_total_bytes:
-        limit_mb = task.max_total_bytes // (1024 * 1024)
-        message = f"Together your files would be larger than the {limit_mb} MB limit for this report."
-        raise ValidationFailed(message, details={"file": [message]}, code="validation_total_size")
-    report_file = ReportFile(task=task, owner=student, **meta)
-    report_file.file.save(meta["original_name"], uploaded, save=False)
+    stored = ingest_upload(
+        uploaded,
+        kind="submission",
+        task=task,
+        user=student,
+        allowed_extensions=task.allowed_extensions,
+        max_bytes=task.max_file_bytes,
+    )
     try:
-        report_file.save()
-    except Exception:
-        _delete_stored_file(report_file.file)
+        staged_total = sum(staged_files(task, student).values_list("size", flat=True))
+        if staged_total + stored.size > task.max_total_bytes:
+            limit_mb = task.max_total_bytes // (1024 * 1024)
+            message = f"Together your files would be larger than the {limit_mb} MB limit for this report."
+            raise ValidationFailed(message, details={"file": [message]}, code="validation_total_size")
+        return ReportFile.objects.create(task=task, owner=student, submitted=False, **stored.file_fields())
+    except BaseException:
+        stored.discard()
         raise
-    return report_file
 
 
 def remove_staged_upload(*, task, student, file_id):
@@ -432,13 +367,51 @@ def save_grade(
         message = "Reload the submission and try again."
         raise ValidationFailed(message, details={"expected_revision": [message]}) from None
 
-    annotated_meta = None
+    annotated = None
     if annotated_file is not None:
         cap = int(getattr(settings, "REPORTS_MAX_FILE_SIZE_MB_CAP", 200)) * 1024 * 1024
-        annotated_meta = _store_upload(
-            annotated_file, allowed_extensions=None, max_bytes=cap, field_name="annotated_file"
+        task_for_file = ReportSubmission.objects.select_related("task").get(pk=submission_id).task
+        annotated = ingest_upload(
+            annotated_file,
+            kind="feedback",
+            task=task_for_file,
+            user=grader,
+            allowed_extensions=None,
+            max_bytes=cap,
+            field_name="annotated_file",
         )
+    try:
+        return _save_grade_locked(
+            submission_id=submission_id,
+            grader=grader,
+            action=action,
+            expected_revision=expected_revision,
+            marks=marks,
+            criteria_marks=criteria_marks,
+            feedback=feedback,
+            annotated=annotated,
+            remove_annotated_file=remove_annotated_file,
+            now=now,
+        )
+    except BaseException:
+        if annotated is not None:
+            annotated.discard()
+        raise
 
+
+def _save_grade_locked(
+    *,
+    submission_id,
+    grader,
+    action,
+    expected_revision,
+    marks,
+    criteria_marks,
+    feedback,
+    annotated,
+    remove_annotated_file,
+    now,
+):
     stale_file = None
     with transaction.atomic():
         submission = (
@@ -514,14 +487,19 @@ def save_grade(
                 details["late_penalty"] = format_marks(penalty)
 
         grade.graded_by = grader
-        if annotated_meta is not None:
+        if annotated is not None:
             stale_file = grade.annotated_file.name if grade.annotated_file else None
-            grade.annotated_file_name = annotated_meta["original_name"]
-            grade.annotated_extension = annotated_meta["extension"]
-            grade.annotated_content_type = annotated_meta["content_type"]
-            grade.annotated_file_size = annotated_meta["size"]
-            grade.annotated_file.save(annotated_meta["original_name"], annotated_file, save=False)
-            details["annotated_file"] = annotated_meta["original_name"]
+            grade.annotated_file = annotated.name
+            grade.annotated_file_name = annotated.original_name
+            grade.annotated_extension = annotated.extension
+            grade.annotated_content_type = annotated.content_type
+            grade.annotated_file_size = annotated.size
+            grade.annotated_scan_status = annotated.scan_status
+            grade.annotated_scanned_at = annotated.scanned_at
+            grade.annotated_scanner = annotated.scanner
+            grade.annotated_scan_signature_version = annotated.signature_version
+            grade.annotated_scan_threat = ""
+            details["annotated_file"] = annotated.original_name
         elif remove_annotated_file and grade.annotated_file:
             stale_file = grade.annotated_file.name
             grade.annotated_file = None
@@ -529,6 +507,11 @@ def save_grade(
             grade.annotated_extension = ""
             grade.annotated_content_type = ""
             grade.annotated_file_size = 0
+            grade.annotated_scan_status = SCAN_UNSCANNED
+            grade.annotated_scanned_at = None
+            grade.annotated_scanner = ""
+            grade.annotated_scan_signature_version = ""
+            grade.annotated_scan_threat = ""
             details["annotated_file"] = None
         grade.save()
 
@@ -558,12 +541,7 @@ def save_grade(
 
 
 def _delete_name(name):
-    from .storage import private_report_storage
-
-    try:
-        private_report_storage().delete(name)
-    except OSError:
-        logger.warning("reports: could not delete stored file %s", name)
+    delete_stored_name(name)
 
 
 def release_marks(*, task, actor, now=None):
@@ -730,6 +708,11 @@ def duplicate_task(*, task, actor, shift_days=7):
                 content_type=attachment.content_type,
                 size=attachment.size,
                 sha256=attachment.sha256,
+                scan_status=attachment.scan_status,
+                scanned_at=attachment.scanned_at,
+                scanner=attachment.scanner,
+                scan_signature_version=attachment.scan_signature_version,
+                scan_threat=attachment.scan_threat,
                 uploaded_by=actor,
             )
     return copy
@@ -737,11 +720,12 @@ def duplicate_task(*, task, actor, shift_days=7):
 
 def add_attachment(*, task, uploaded, actor):
     cap = int(getattr(settings, "REPORTS_MAX_FILE_SIZE_MB_CAP", 200)) * 1024 * 1024
-    meta = _store_upload(uploaded, allowed_extensions=None, max_bytes=cap)
-    attachment = ReportAttachment(task=task, uploaded_by=actor, **meta)
-    attachment.file.save(meta["original_name"], uploaded, save=False)
-    attachment.save()
-    return attachment
+    stored = ingest_upload(uploaded, kind="attachment", task=task, user=actor, allowed_extensions=None, max_bytes=cap)
+    try:
+        return ReportAttachment.objects.create(task=task, uploaded_by=actor, **stored.file_fields())
+    except BaseException:
+        stored.discard()
+        raise
 
 
 def delete_attachment(attachment):

@@ -64,6 +64,8 @@ if [[ -n "$backup" ]]; then
     sha256sum -c SHA256SUMS
   )
 fi
+echo 'Preparing the private, noexec report storage.'
+bash infra/hostinger/prepare-report-storage.sh prepare
 echo 'Checking and applying forward migrations.'
 "${compose[@]}" run --rm --no-deps -T --entrypoint python backend manage.py check
 "${compose[@]}" run --rm --no-deps -T --entrypoint python backend manage.py makemigrations --check --dry-run

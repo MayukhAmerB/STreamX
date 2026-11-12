@@ -16,7 +16,18 @@ services:
         condition: service_healthy
     volumes:
       - backend_media:/app/media
-      - backend_private_media:/app/private_media
+      # Weekly report files: dedicated noexec,nosuid,nodev host directories
+      # (infra/hostinger/prepare-report-storage.sh); never the media volume.
+      - type: bind
+        source: /srv/streamx/reports
+        target: /app/private_media
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /srv/streamx/reports-quarantine
+        target: /app/private_quarantine
+        bind:
+          create_host_path: false
       - recordings_data:/recordings:ro
     healthcheck:
       test:
@@ -32,6 +43,7 @@ services:
       start_period: 40s
     networks:
       - appnet
+      - avnet
 
   backend-3:
     build:
@@ -50,7 +62,18 @@ services:
         condition: service_healthy
     volumes:
       - backend_media:/app/media
-      - backend_private_media:/app/private_media
+      # Weekly report files: dedicated noexec,nosuid,nodev host directories
+      # (infra/hostinger/prepare-report-storage.sh); never the media volume.
+      - type: bind
+        source: /srv/streamx/reports
+        target: /app/private_media
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /srv/streamx/reports-quarantine
+        target: /app/private_quarantine
+        bind:
+          create_host_path: false
       - recordings_data:/recordings:ro
     healthcheck:
       test:
@@ -66,6 +89,7 @@ services:
       start_period: 40s
     networks:
       - appnet
+      - avnet
 
   backend-4:
     build:
@@ -84,7 +108,18 @@ services:
         condition: service_healthy
     volumes:
       - backend_media:/app/media
-      - backend_private_media:/app/private_media
+      # Weekly report files: dedicated noexec,nosuid,nodev host directories
+      # (infra/hostinger/prepare-report-storage.sh); never the media volume.
+      - type: bind
+        source: /srv/streamx/reports
+        target: /app/private_media
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /srv/streamx/reports-quarantine
+        target: /app/private_quarantine
+        bind:
+          create_host_path: false
       - recordings_data:/recordings:ro
     healthcheck:
       test:
@@ -100,6 +135,7 @@ services:
       start_period: 40s
     networks:
       - appnet
+      - avnet
 
   payment-backend-1:
     build:
@@ -120,7 +156,18 @@ services:
         condition: service_healthy
     volumes:
       - backend_media:/app/media
-      - backend_private_media:/app/private_media
+      # Weekly report files: dedicated noexec,nosuid,nodev host directories
+      # (infra/hostinger/prepare-report-storage.sh); never the media volume.
+      - type: bind
+        source: /srv/streamx/reports
+        target: /app/private_media
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /srv/streamx/reports-quarantine
+        target: /app/private_quarantine
+        bind:
+          create_host_path: false
       - recordings_data:/recordings:ro
     healthcheck:
       test:
@@ -136,6 +183,7 @@ services:
       start_period: 40s
     networks:
       - appnet
+      - avnet
 
   payment-backend-2:
     build:
@@ -156,7 +204,18 @@ services:
         condition: service_healthy
     volumes:
       - backend_media:/app/media
-      - backend_private_media:/app/private_media
+      # Weekly report files: dedicated noexec,nosuid,nodev host directories
+      # (infra/hostinger/prepare-report-storage.sh); never the media volume.
+      - type: bind
+        source: /srv/streamx/reports
+        target: /app/private_media
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /srv/streamx/reports-quarantine
+        target: /app/private_quarantine
+        bind:
+          create_host_path: false
       - recordings_data:/recordings:ro
     healthcheck:
       test:
@@ -172,3 +231,4 @@ services:
       start_period: 40s
     networks:
       - appnet
+      - avnet

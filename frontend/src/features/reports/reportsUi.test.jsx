@@ -58,6 +58,7 @@ import { classSummary, GradebookTable } from "../../pages/ReportsGradebookPage";
 import { ReportsListView } from "../../pages/ReportsPage";
 import { ReportTaskView } from "../../pages/ReportsTaskPage";
 import CanvasPreview from "./CanvasPreview";
+import { isDownloadable, noPreviewReason } from "./FilePreview";
 import GradingForm, { buildGradePayload, initialGradingValues } from "./GradingForm";
 import Markdown from "./markdown";
 import MarksTrendChart from "./MarksTrendChart";
@@ -430,6 +431,31 @@ describe("previews and charts", () => {
     expect(html).not.toContain("<img");
     expect(html).not.toContain('href="javascript');
     expect(html).toContain("&lt;script&gt;");
+  });
+
+  it("renders an OSINT brief full of SQL and script text as plain text", () => {
+    const brief = [
+      "Select the sources from the leak where the email appears.",
+      "Payloads: `UNION SELECT username FROM users`, <script>alert(1)</script> and ' OR 1=1 --",
+      "<img src=x onerror=alert(1)> <svg onload=alert(1)>",
+    ].join("\n\n");
+    const html = renderToStaticMarkup(<Markdown text={brief} />);
+    expect(html).not.toMatch(/<(script|img|svg)\b/i);
+    expect(html).not.toMatch(/<[a-z][^>]*\son\w+=/i); // no event-handler attribute on any element
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;"); // shown as text instead
+    expect(html).toContain("Select the sources from the leak where the email appears.");
+    expect(html).toContain("<code>UNION SELECT username FROM users</code>");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).toContain("&#x27; OR 1=1 --");
+  });
+
+  it("explains why an unscanned or blocked file cannot be opened", () => {
+    expect(noPreviewReason({ extension: "pdf", scan_status: "unscanned" })).toBe("Waiting for the virus scan.");
+    expect(noPreviewReason({ extension: "pdf", scan_status: "infected" })).toBe("Blocked by the virus scanner.");
+    expect(noPreviewReason({ extension: "svg", scan_status: "clean" })).toContain("download-only");
+    expect(isDownloadable({ scan_status: "clean" })).toBe(true);
+    expect(isDownloadable({ scan_status: "unscanned" })).toBe(false);
+    expect(isDownloadable({ scan_status: "infected" })).toBe(false);
   });
 
   it("charts marks per week with a table view of the same numbers", async () => {

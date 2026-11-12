@@ -78,6 +78,7 @@ jobs:
           test -x infra/hostinger/deploy-safe.sh
           test -x infra/hostinger/release-production.sh
           test -x infra/hostinger/deploy-course-v2.sh
+          test -x infra/hostinger/prepare-report-storage.sh
       - name: Verify internal Prometheus scrape configuration
         run: |
           grep -A 10 'job_name: streamx_backend' infra/observability/prometheus/prometheus.yml | grep -q 'scheme: http'
@@ -107,3 +108,7 @@ jobs:
         run: bash infra/hostinger/tests/test-prepare-livekit-config.sh
       - name: Verify realtime hardening configuration
         run: bash infra/hostinger/tests/test-realtime-hardening-config.sh
+      - name: Verify report storage isolation and ClamAV service
+        run: bash infra/hostinger/tests/test-report-storage-config.sh
+      - name: Test report storage preparation and legacy volume migration
+        run: bash infra/hostinger/tests/test-prepare-report-storage.sh

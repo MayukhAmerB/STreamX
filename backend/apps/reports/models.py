@@ -9,6 +9,12 @@
 * ``ReportFile``: a stored file (private storage, random name). Uploaded files
   are *staged* (``submitted=False``) until the student submits them.
 * ``ReportGrade`` + ``ReportGradeAudit``: the marks and every change to them.
+* ``ReportQuarantineRecord``: metadata (never the bytes) of every file the
+  virus scanner blocked at upload or found later on a re-scan.
+
+Every stored file carries its virus-scan record (``scan_status``,
+``scanned_at``, ``scanner``, ``scan_signature_version``); downloads refuse
+anything that is not ``clean``. See SECURITY.md.
 """
 
 from __future__ import annotations
@@ -39,6 +45,16 @@ GRADE_ACTION_CHOICES = [
     (GRADE_ACTION_DRAFT, "Save draft (under review)"),
     (GRADE_ACTION_GRADE, "Save marks (graded)"),
     (GRADE_ACTION_RETURN, "Return for revision"),
+]
+
+
+SCAN_UNSCANNED = "unscanned"
+SCAN_CLEAN = "clean"
+SCAN_INFECTED = "infected"
+SCAN_STATUS_CHOICES = [
+    (SCAN_UNSCANNED, "Not scanned yet"),
+    (SCAN_CLEAN, "Clean"),
+    (SCAN_INFECTED, "Infected (quarantined)"),
 ]
 
 
@@ -217,6 +233,16 @@ class ReportAttachment(models.Model):
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
+    scan_status = models.CharField(
+        max_length=16,
+        choices=SCAN_STATUS_CHOICES,
+        default=SCAN_UNSCANNED,
+        help_text="Only clean files can be downloaded.",
+    )
+    scanned_at = models.DateTimeField(null=True, blank=True)
+    scanner = models.CharField(max_length=64, blank=True, default="")
+    scan_signature_version = models.CharField(max_length=128, blank=True, default="")
+    scan_threat = models.CharField(max_length=255, blank=True, default="", help_text="Signature found on a re-scan.")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -239,6 +265,16 @@ class ReportFile(models.Model):
     size = models.PositiveBigIntegerField(default=0)
     sha256 = models.CharField(max_length=64, blank=True, default="")
     submitted = models.BooleanField(default=False)
+    scan_status = models.CharField(
+        max_length=16,
+        choices=SCAN_STATUS_CHOICES,
+        default=SCAN_UNSCANNED,
+        help_text="Only clean files can be downloaded.",
+    )
+    scanned_at = models.DateTimeField(null=True, blank=True)
+    scanner = models.CharField(max_length=64, blank=True, default="")
+    scan_signature_version = models.CharField(max_length=128, blank=True, default="")
+    scan_threat = models.CharField(max_length=255, blank=True, default="", help_text="Signature found on a re-scan.")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -343,6 +379,11 @@ class ReportGrade(models.Model):
     annotated_extension = models.CharField(max_length=16, blank=True, default="")
     annotated_content_type = models.CharField(max_length=120, blank=True, default="")
     annotated_file_size = models.PositiveBigIntegerField(default=0)
+    annotated_scan_status = models.CharField(max_length=16, choices=SCAN_STATUS_CHOICES, default=SCAN_UNSCANNED)
+    annotated_scanned_at = models.DateTimeField(null=True, blank=True)
+    annotated_scanner = models.CharField(max_length=64, blank=True, default="")
+    annotated_scan_signature_version = models.CharField(max_length=128, blank=True, default="")
+    annotated_scan_threat = models.CharField(max_length=255, blank=True, default="")
     graded_version = models.ForeignKey(
         ReportSubmissionVersion, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
@@ -394,3 +435,61 @@ class ReportGradeAudit(models.Model):
 
     def __str__(self):
         return f"{self.get_action_display()} on {self.submission_id}"
+
+
+class ReportQuarantineRecord(models.Model):
+    """A file the virus scanner blocked. Metadata only: the bytes are never kept
+    for an upload, and a stored file found infected later sits in the
+    quarantine directory (mode 000) named by ``quarantine_name``."""
+
+    SOURCE_UPLOAD = "upload"
+    SOURCE_RESCAN = "rescan"
+    SOURCE_CHOICES = [(SOURCE_UPLOAD, "Blocked at upload"), (SOURCE_RESCAN, "Found by a re-scan")]
+    KIND_SUBMISSION = "submission"
+    KIND_ATTACHMENT = "attachment"
+    KIND_FEEDBACK = "feedback"
+    KIND_CHOICES = [
+        (KIND_SUBMISSION, "Student report file"),
+        (KIND_ATTACHMENT, "Task reference file"),
+        (KIND_FEEDBACK, "Annotated feedback file"),
+    ]
+    ACTION_REJECTED = "rejected"
+    ACTION_QUARANTINED = "quarantined"
+    ACTION_MISSING = "missing"
+    ACTION_BLOCKED = "blocked"
+    ACTION_CHOICES = [
+        (ACTION_REJECTED, "Rejected, never stored"),
+        (ACTION_QUARANTINED, "Moved to quarantine, downloads blocked"),
+        (ACTION_MISSING, "Downloads blocked (file already gone from storage)"),
+        (ACTION_BLOCKED, "Downloads blocked; moving it failed, move it to quarantine by hand"),
+    ]
+
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    source = models.CharField(max_length=16, choices=SOURCE_CHOICES)
+    kind = models.CharField(max_length=16, choices=KIND_CHOICES)
+    action = models.CharField(max_length=16, choices=ACTION_CHOICES)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="Who uploaded the file.",
+    )
+    task = models.ForeignKey(ReportTask, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    object_id = models.PositiveBigIntegerField(null=True, blank=True, help_text="File / attachment / grade id.")
+    original_name = models.CharField(max_length=255, blank=True, default="")
+    size = models.PositiveBigIntegerField(default=0)
+    sha256 = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    signature = models.CharField(max_length=255, blank=True, default="")
+    scanner = models.CharField(max_length=64, blank=True, default="")
+    signature_version = models.CharField(max_length=128, blank=True, default="")
+    quarantine_name = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "quarantined / blocked file"
+        verbose_name_plural = "quarantined / blocked files"
+
+    def __str__(self):
+        return f"{self.signature or 'blocked'}: {self.original_name}"

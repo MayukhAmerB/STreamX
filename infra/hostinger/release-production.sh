@@ -35,6 +35,9 @@ log "Preparing the root-only LiveKit runtime configuration."
 HOSTINGER_ENV_FILE="${HOSTINGER_ENV_FILE:-$REPO_ROOT/backend/.env.hostinger.production}" \
   bash "$SCRIPT_DIR/prepare-livekit-config.sh"
 
+log "Preparing the private, noexec report storage (compose bind-mounts it)."
+bash "$SCRIPT_DIR/prepare-report-storage.sh" prepare
+
 log "Running migration safety gate."
 "$SCRIPT_DIR/check-migration-safety.sh" "$BASE_REF"
 

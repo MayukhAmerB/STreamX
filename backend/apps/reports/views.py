@@ -1,6 +1,7 @@
 """HTTP mapping for weekly reports (students under /api/reports/, graders under
 /api/reports/manage/). Business rules live in ``services.py``; access rules in
-``access.py``. Files are only ever served by the download views here."""
+``access.py``. Files are only ever served by the download views here, and only
+when their virus-scan record says ``clean`` (see SECURITY.md)."""
 
 from __future__ import annotations
 
@@ -25,7 +26,16 @@ from apps.courses.models import Section
 
 from . import access, presenters, services
 from .exports import course_marks_csv, iter_task_zip, safe_component, task_marks_csv
-from .models import ReportAttachment, ReportCriterion, ReportFile, ReportGrade, ReportSubmission, ReportTask
+from .models import (
+    SCAN_CLEAN,
+    SCAN_INFECTED,
+    ReportAttachment,
+    ReportCriterion,
+    ReportFile,
+    ReportGrade,
+    ReportSubmission,
+    ReportTask,
+)
 from .serializers import (
     AttachmentUploadResponseSerializer,
     GradableCourseListSerializer,
@@ -46,9 +56,14 @@ from .serializers import (
 
 BINARY_RESPONSE = {(200, "application/octet-stream"): OpenApiTypes.BINARY}
 INLINE_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "webp"}
+INLINE_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 # Inline previews (PDF, images) may be framed by the app itself; everything
 # else is a sandboxed attachment that can never run script on our origin.
+# Images are sandboxed too. PDFs are not: Chromium refuses to render a PDF in
+# a sandboxed document, so they get a script-free CSP (default-src 'none')
+# and the browser's own isolated PDF viewer instead.
 INLINE_CSP = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; object-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'"
+INLINE_IMAGE_CSP = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox; frame-ancestors 'self'; base-uri 'none'; form-action 'none'"
 ATTACHMENT_CSP = "default-src 'none'; sandbox; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 
 
@@ -75,8 +90,24 @@ def _bool_param(request, name):
     return str(request.query_params.get(name, "") or "").strip().lower() in {"1", "true", "yes"}
 
 
-def private_file_response(field_file, *, filename, extension, content_type, inline_requested):
-    """Stream a private file with download-safe headers."""
+def require_clean_scan(scan_status):
+    """Refuse any file without a clean virus-scan record (also files uploaded
+    before scanning existed, until ``rescan_report_files`` has checked them)."""
+    if scan_status == SCAN_CLEAN:
+        return
+    if scan_status == SCAN_INFECTED:
+        raise Conflict(
+            "This file was blocked by the virus scanner and can't be downloaded.", code="file_infected"
+        )
+    raise Conflict(
+        "This file hasn't been checked by the virus scanner yet, so it can't be downloaded. Try again later.",
+        code="file_not_scanned",
+    )
+
+
+def private_file_response(field_file, *, filename, extension, content_type, inline_requested, scan_status):
+    """Stream a private file with download-safe headers (clean files only)."""
+    require_clean_scan(scan_status)
     try:
         handle = field_file.open("rb")
     except (OSError, ValueError):
@@ -92,7 +123,12 @@ def private_file_response(field_file, *, filename, extension, content_type, inli
     disposition = "inline" if inline else "attachment"
     response["Content-Disposition"] = f"{disposition}; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename)}"
     response["X-Content-Type-Options"] = "nosniff"
-    response["Content-Security-Policy"] = INLINE_CSP if inline else ATTACHMENT_CSP
+    if not inline:
+        response["Content-Security-Policy"] = ATTACHMENT_CSP
+    elif extension in INLINE_IMAGE_EXTENSIONS:
+        response["Content-Security-Policy"] = INLINE_IMAGE_CSP
+    else:
+        response["Content-Security-Policy"] = INLINE_CSP
     response["Cache-Control"] = "private, no-store"
     response["Cross-Origin-Resource-Policy"] = "same-origin"
     response["Referrer-Policy"] = "no-referrer"
@@ -257,6 +293,7 @@ class SubmissionFileDownloadView(_FileDownloadView):
             extension=item.extension,
             content_type=item.content_type,
             inline_requested=_bool_param(request, "inline"),
+            scan_status=item.scan_status,
         )
 
 
@@ -283,6 +320,7 @@ class AttachmentDownloadView(_FileDownloadView):
             extension=item.extension,
             content_type=item.content_type,
             inline_requested=_bool_param(request, "inline"),
+            scan_status=item.scan_status,
         )
 
 
@@ -316,6 +354,7 @@ class FeedbackFileDownloadView(_FileDownloadView):
             extension=grade.annotated_extension,
             content_type=grade.annotated_content_type,
             inline_requested=_bool_param(request, "inline"),
+            scan_status=grade.annotated_scan_status,
         )
 
 
