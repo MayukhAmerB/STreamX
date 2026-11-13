@@ -1,0 +1,539 @@
+{
+  "_about": "Link-parity contract for the public site (plan 7.3). Hand-maintained: never regenerate it to make a failing test pass. Nothing listed here may disappear. A new href or route needs an entry in allowedHrefAdditions / allowedRouteAdditions; a renamed button needs an entry in renamedButtons (old label -> new label). Scenario data is mocked in linkParity.test.jsx (both tracks open, one live class per action state).",
+  "allowedHrefAdditions": {
+    "navbar": [
+      "https://labs.alsyedinitiative.com"
+    ],
+    "navbarSheet": [
+      "https://labs.alsyedinitiative.com"
+    ],
+    "landing": [],
+    "footer": [
+      "https://labs.alsyedinitiative.com",
+      "/national-desk",
+      "/as-accounts",
+      "/join-alsyed"
+    ]
+  },
+  "allowedRouteAdditions": [],
+  "renamedButtons": {},
+  "requiredAnchors": {
+    "navbar": [],
+    "navbarSheet": [],
+    "landing": [
+      "watch",
+      "about"
+    ],
+    "footer": [
+      "contact"
+    ]
+  },
+  "routes": [
+    "/",
+    "/live-classes",
+    "/about",
+    "/as-accounts",
+    "/national-desk",
+    "/join-alsyed",
+    "/contact",
+    "/faqs",
+    "/hall-of-fame",
+    "/courses",
+    "/courses/:id",
+    "/login",
+    "/courses/:id/register",
+    "/courses/:id/payment",
+    "/terms",
+    "/watch",
+    "*",
+    "LEGACY_CONSOLE_PATH",
+    "${LEGACY_CONSOLE_PATH}/*",
+    "CONSOLE_PATH",
+    "/my-courses",
+    "/learn/:courseId",
+    "/courses/:id/live",
+    "/join-live",
+    "/guides",
+    "/osint-tools",
+    "/profile",
+    "/id-card",
+    "/reports",
+    "/reports/marks",
+    "/reports/tasks/:taskId",
+    "/report-grading",
+    "/report-grading/tasks/new",
+    "/report-grading/tasks/:taskId/edit",
+    "/report-grading/queue",
+    "/report-grading/gradebook",
+    "/control-center",
+    "/meeting",
+    "/broadcasting",
+    "/lecture-questions",
+    "/instructor/dashboard",
+    "/instructor/courses/new",
+    "/instructor/courses/:id/edit"
+  ],
+  "scenarios": {
+    "guest": {
+      "navbar": {
+        "hrefs": [
+          "/",
+          "/about",
+          "/as-accounts",
+          "/contact",
+          "/courses",
+          "/faqs",
+          "/hall-of-fame",
+          "/join-alsyed",
+          "/login",
+          "/national-desk",
+          "/watch"
+        ],
+        "buttons": [
+          "More",
+          "Open navigation menu"
+        ],
+        "anchors": []
+      },
+      "navbarSheet": {
+        "hrefs": [
+          "/",
+          "/about",
+          "/as-accounts",
+          "/contact",
+          "/courses",
+          "/faqs",
+          "/hall-of-fame",
+          "/join-alsyed",
+          "/login",
+          "/national-desk",
+          "/watch"
+        ],
+        "buttons": [
+          "Close navigation menu"
+        ],
+        "anchors": []
+      },
+      "landing": {
+        "hrefs": [
+          "/courses",
+          "/courses/101",
+          "/courses/101#reviews",
+          "/courses/101/live",
+          "/courses/102",
+          "/courses/102#reviews",
+          "/courses/201",
+          "/courses/201#reviews",
+          "/courses/202",
+          "/courses/202#reviews",
+          "/courses?category=osint#course-category-results",
+          "/courses?category=web_pentesting#course-category-results",
+          "/courses?view=owned",
+          "/login",
+          "/watch",
+          "https://www.youtube.com/@thesy3d",
+          "https://www.youtube.com/@thesy3d?sub_confirmation=1",
+          "https://www.youtube.com/watch?v=hWFA4oNF7gk"
+        ],
+        "buttons": [
+          "Enrollment closed",
+          "Play Al Syed Live Stream, published 3 months ago",
+          "Play Destroying the Propaganda Machine, published last month",
+          "Play FREE LIVE Advanced OSINT Class, published 2 months ago",
+          "Play video: Destroying the Propaganda Machine",
+          "Request pending",
+          "Scroll courses backward",
+          "Scroll courses forward"
+        ],
+        "anchors": [
+          "about",
+          "watch",
+          "watch-heading"
+        ]
+      },
+      "footer": {
+        "hrefs": [
+          "/",
+          "/about",
+          "/console",
+          "/contact",
+          "/courses",
+          "/faqs",
+          "/hall-of-fame",
+          "/terms",
+          "/watch",
+          "https://wa.me/919800415583",
+          "https://wa.me/919970875040",
+          "https://www.instagram.com/adlfrontofficial?igsh=MTgwN3Z2ZXZ4aGswYg==",
+          "https://www.youtube.com/@thesy3d",
+          "https://x.com/AdlFront",
+          "mailto:contact@adlfront.com"
+        ],
+        "buttons": [],
+        "anchors": [
+          "contact"
+        ]
+      }
+    },
+    "student": {
+      "navbar": {
+        "hrefs": [
+          "/",
+          "/about",
+          "/as-accounts",
+          "/console",
+          "/contact",
+          "/courses",
+          "/faqs",
+          "/guides",
+          "/hall-of-fame",
+          "/id-card",
+          "/join-alsyed",
+          "/my-courses",
+          "/national-desk",
+          "/profile",
+          "/watch"
+        ],
+        "buttons": [
+          "Account menu for Asha Rao",
+          "More",
+          "Open navigation menu (YouTube live now)",
+          "Open notifications",
+          "Sign out"
+        ],
+        "anchors": []
+      },
+      "navbarSheet": {
+        "hrefs": [
+          "/",
+          "/about",
+          "/as-accounts",
+          "/console",
+          "/contact",
+          "/courses",
+          "/faqs",
+          "/guides",
+          "/hall-of-fame",
+          "/id-card",
+          "/join-alsyed",
+          "/my-courses",
+          "/national-desk",
+          "/profile",
+          "/watch"
+        ],
+        "buttons": [
+          "Close navigation menu",
+          "Sign out"
+        ],
+        "anchors": []
+      },
+      "landing": {
+        "hrefs": [
+          "/console",
+          "/courses",
+          "/courses/101",
+          "/courses/101#reviews",
+          "/courses/101/live",
+          "/courses/101/live?session=55",
+          "/courses/102",
+          "/courses/102#reviews",
+          "/courses/201",
+          "/courses/201#reviews",
+          "/courses/202",
+          "/courses/202#reviews",
+          "/courses?category=osint#course-category-results",
+          "/courses?category=web_pentesting#course-category-results",
+          "/courses?view=owned",
+          "/watch",
+          "https://www.youtube.com/@thesy3d",
+          "https://www.youtube.com/@thesy3d?sub_confirmation=1",
+          "https://www.youtube.com/watch?v=LiVe1234567"
+        ],
+        "buttons": [
+          "Enrollment closed",
+          "Join the live stream",
+          "Play Al Syed Live Stream, published 3 months ago",
+          "Play Destroying the Propaganda Machine, published last month",
+          "Play FREE LIVE Advanced OSINT Class, published 2 months ago",
+          "Request pending",
+          "Scroll courses backward",
+          "Scroll courses forward",
+          "Watch the live stream: Sunday OSINT live"
+        ],
+        "anchors": [
+          "about",
+          "watch",
+          "watch-heading"
+        ]
+      },
+      "footer": {
+        "hrefs": [
+          "/",
+          "/about",
+          "/console",
+          "/contact",
+          "/courses",
+          "/faqs",
+          "/hall-of-fame",
+          "/terms",
+          "/watch",
+          "https://wa.me/919800415583",
+          "https://wa.me/919970875040",
+          "https://www.instagram.com/adlfrontofficial?igsh=MTgwN3Z2ZXZ4aGswYg==",
+          "https://www.youtube.com/@thesy3d",
+          "https://x.com/AdlFront",
+          "mailto:contact@adlfront.com"
+        ],
+        "buttons": [],
+        "anchors": [
+          "contact"
+        ]
+      }
+    },
+    "instructor": {
+      "navbar": {
+        "hrefs": [
+          "/",
+          "/about",
+          "/as-accounts",
+          "/broadcasting",
+          "/console",
+          "/contact",
+          "/control-center",
+          "/courses",
+          "/faqs",
+          "/guides",
+          "/hall-of-fame",
+          "/id-card",
+          "/instructor/dashboard",
+          "/join-alsyed",
+          "/meeting",
+          "/my-courses",
+          "/national-desk",
+          "/profile",
+          "/watch"
+        ],
+        "buttons": [
+          "Account menu for Al Syed",
+          "More",
+          "Open navigation menu",
+          "Open notifications",
+          "Sign out"
+        ],
+        "anchors": []
+      },
+      "navbarSheet": {
+        "hrefs": [
+          "/",
+          "/about",
+          "/as-accounts",
+          "/broadcasting",
+          "/console",
+          "/contact",
+          "/control-center",
+          "/courses",
+          "/faqs",
+          "/guides",
+          "/hall-of-fame",
+          "/id-card",
+          "/instructor/dashboard",
+          "/join-alsyed",
+          "/meeting",
+          "/my-courses",
+          "/national-desk",
+          "/profile",
+          "/watch"
+        ],
+        "buttons": [
+          "Close navigation menu",
+          "Sign out"
+        ],
+        "anchors": []
+      },
+      "landing": {
+        "hrefs": [
+          "/console",
+          "/courses",
+          "/courses/101",
+          "/courses/101#reviews",
+          "/courses/101/live",
+          "/courses/102",
+          "/courses/102#reviews",
+          "/courses/201",
+          "/courses/201#reviews",
+          "/courses/202",
+          "/courses/202#reviews",
+          "/courses?category=osint#course-category-results",
+          "/courses?category=web_pentesting#course-category-results",
+          "/courses?view=owned",
+          "/join-live?session=56",
+          "/watch",
+          "https://www.youtube.com/@thesy3d",
+          "https://www.youtube.com/@thesy3d?sub_confirmation=1",
+          "https://www.youtube.com/watch?v=hWFA4oNF7gk"
+        ],
+        "buttons": [
+          "Enrollment closed",
+          "Play Al Syed Live Stream, published 3 months ago",
+          "Play Destroying the Propaganda Machine, published last month",
+          "Play FREE LIVE Advanced OSINT Class, published 2 months ago",
+          "Play video: Destroying the Propaganda Machine",
+          "Request pending",
+          "Scroll courses backward",
+          "Scroll courses forward"
+        ],
+        "anchors": [
+          "about",
+          "watch",
+          "watch-heading"
+        ]
+      },
+      "footer": {
+        "hrefs": [
+          "/",
+          "/about",
+          "/console",
+          "/contact",
+          "/courses",
+          "/faqs",
+          "/hall-of-fame",
+          "/terms",
+          "/watch",
+          "https://wa.me/919800415583",
+          "https://wa.me/919970875040",
+          "https://www.instagram.com/adlfrontofficial?igsh=MTgwN3Z2ZXZ4aGswYg==",
+          "https://www.youtube.com/@thesy3d",
+          "https://x.com/AdlFront",
+          "mailto:contact@adlfront.com"
+        ],
+        "buttons": [],
+        "anchors": [
+          "contact"
+        ]
+      }
+    },
+    "admin": {
+      "navbar": {
+        "hrefs": [
+          "/",
+          "/about",
+          "/as-accounts",
+          "/broadcasting",
+          "/console",
+          "/contact",
+          "/control-center",
+          "/courses",
+          "/faqs",
+          "/guides",
+          "/hall-of-fame",
+          "/id-card",
+          "/join-alsyed",
+          "/lecture-questions",
+          "/meeting",
+          "/my-courses",
+          "/national-desk",
+          "/profile",
+          "/watch",
+          "https://api.alsyedinitiative.com/admin/"
+        ],
+        "buttons": [
+          "Account menu for Site Admin",
+          "More",
+          "Open navigation menu",
+          "Open notifications",
+          "Sign out"
+        ],
+        "anchors": []
+      },
+      "navbarSheet": {
+        "hrefs": [
+          "/",
+          "/about",
+          "/as-accounts",
+          "/broadcasting",
+          "/console",
+          "/contact",
+          "/control-center",
+          "/courses",
+          "/faqs",
+          "/guides",
+          "/hall-of-fame",
+          "/id-card",
+          "/join-alsyed",
+          "/lecture-questions",
+          "/meeting",
+          "/my-courses",
+          "/national-desk",
+          "/profile",
+          "/watch",
+          "https://api.alsyedinitiative.com/admin/"
+        ],
+        "buttons": [
+          "Close navigation menu",
+          "Sign out"
+        ],
+        "anchors": []
+      },
+      "landing": {
+        "hrefs": [
+          "/console",
+          "/courses",
+          "/courses/101",
+          "/courses/101#reviews",
+          "/courses/101/live",
+          "/courses/102",
+          "/courses/102#reviews",
+          "/courses/201",
+          "/courses/201#reviews",
+          "/courses/202",
+          "/courses/202#reviews",
+          "/courses?category=osint#course-category-results",
+          "/courses?category=web_pentesting#course-category-results",
+          "/courses?view=owned",
+          "/watch",
+          "https://www.youtube.com/@thesy3d",
+          "https://www.youtube.com/@thesy3d?sub_confirmation=1",
+          "https://www.youtube.com/watch?v=hWFA4oNF7gk"
+        ],
+        "buttons": [
+          "Enrollment closed",
+          "Play Al Syed Live Stream, published 3 months ago",
+          "Play Destroying the Propaganda Machine, published last month",
+          "Play FREE LIVE Advanced OSINT Class, published 2 months ago",
+          "Play video: Destroying the Propaganda Machine",
+          "Request pending",
+          "Scroll courses backward",
+          "Scroll courses forward"
+        ],
+        "anchors": [
+          "about",
+          "watch",
+          "watch-heading"
+        ]
+      },
+      "footer": {
+        "hrefs": [
+          "/",
+          "/about",
+          "/console",
+          "/contact",
+          "/courses",
+          "/faqs",
+          "/hall-of-fame",
+          "/terms",
+          "/watch",
+          "https://wa.me/919800415583",
+          "https://wa.me/919970875040",
+          "https://www.instagram.com/adlfrontofficial?igsh=MTgwN3Z2ZXZ4aGswYg==",
+          "https://www.youtube.com/@thesy3d",
+          "https://x.com/AdlFront",
+          "mailto:contact@adlfront.com"
+        ],
+        "buttons": [],
+        "anchors": [
+          "contact"
+        ]
+      }
+    }
+  }
+}

@@ -46,6 +46,8 @@ export default function WatchPage({ store, now }) {
           </Panel>
         ) : model ? (
           <Panel live={Boolean(model.live)}>
+            {/* Keeps the heading order h1 → h2 → h3 (the showcase titles are h3). */}
+            <h2 className="sr-only">Videos from the channel</h2>
             <YouTubeShowcase model={model} variant="page" now={now} withJsonLd />
           </Panel>
         ) : (

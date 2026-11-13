@@ -36,12 +36,18 @@ from config.metrics import (
 from config.pagination import apply_optional_pagination
 from config.request_security import find_disallowed_query_params
 from config.response import api_response
-from config.throttling import ClientIpScopedRateThrottle
+from config.throttling import (
+    ClientIpScopedRateThrottle,
+    RealtimeJoinIpCeilingThrottle,
+    RealtimeJoinUserRateThrottle,
+)
 
+from . import session_list
 from .domain import (
     build_permission_set,
     get_access_decision,
     list_queryset,
+    normalize_session_list_status,
     resolve_participant_state,
     session_payload_for_create,
 )
@@ -60,7 +66,7 @@ from .serializers import (
     StreamHeartbeatResponseSerializer,
     StreamHeartbeatSerializer,
 )
-from .schedule import get_live_class_schedule_snapshot
+from .schedule import attendee_join_max_live_hours, get_live_class_schedule_snapshot, live_session_is_stale
 from .recording import services as class_recording_services
 from .recording.serializers import SessionModuleUpdateSerializer
 from .services import (
@@ -645,7 +651,8 @@ class RealtimeSessionListCreateView(APIView):
             )
 
         session_type = (request.query_params.get("session_type") or "").strip().lower()
-        status_filter = (request.query_params.get("status") or "").strip().lower()
+        if session_type not in {RealtimeSession.TYPE_MEETING, RealtimeSession.TYPE_BROADCASTING}:
+            session_type = ""  # unknown values were always ignored; keep cache keys bounded
         paginate_requested = str(request.query_params.get("paginate", "")).strip().lower() in {
             "1",
             "true",
@@ -654,6 +661,37 @@ class RealtimeSessionListCreateView(APIView):
         page = request.query_params.get("page", "1")
         page_size = request.query_params.get("page_size", "20")
         is_admin = bool(getattr(request.user, "is_staff", False) or getattr(request.user, "is_superuser", False))
+        # Omitted status means active sessions only; "all" stays a staff view.
+        status_filter = normalize_session_list_status(request.query_params.get("status"), is_admin=is_admin)
+
+        payload = None
+        if (
+            not paginate_requested
+            and status_filter in session_list.SHARED_STATUSES
+            and not session_list.is_privileged_user(request.user)
+        ):
+            rows = session_list.shared_rows(request=request, session_type=session_type, status_filter=status_filter)
+            payload = session_list.personalise_shared_rows(rows, request.user)
+        if payload is None:
+            payload = self._direct_payload(
+                request,
+                session_type=session_type,
+                status_filter=status_filter,
+                is_admin=is_admin,
+                paginate_requested=paginate_requested,
+                page=page,
+                page_size=page_size,
+            )
+
+        etag = session_list.build_etag(payload)
+        if session_list.if_none_match_matches(request, etag):
+            return session_list.not_modified(etag)
+        response = api_response(success=True, message="Realtime sessions fetched.", data=payload)
+        response["ETag"] = etag
+        return response
+
+    def _direct_payload(self, request, *, session_type, status_filter, is_admin, paginate_requested, page, page_size):
+        """Per-user rows: staff, instructors, session moderators and paginated lists."""
         cache_ttl = max(0, int(getattr(settings, "REALTIME_SESSION_LIST_CACHE_TTL_SECONDS", 5)))
         cache_key = _build_session_list_cache_key(
             user_id=request.user.id,
@@ -668,7 +706,7 @@ class RealtimeSessionListCreateView(APIView):
         if cache_ttl > 0:
             cached = cache.get(cache_key)
             if cached is not None:
-                return api_response(success=True, message="Realtime sessions fetched.", data=cached)
+                return cached
 
         queryset = list_queryset(
             session_type=session_type,
@@ -681,17 +719,12 @@ class RealtimeSessionListCreateView(APIView):
             default_page_size=20,
             max_page_size=100,
         )
-        # Owncast is the authority for OBS availability. Refresh before
-        # serializing so an ended encoder connection cannot leave a stale
-        # viewer_can_join_now flag on the student-facing live-class page.
-        for session in paged_queryset:
-            if (
-                session.session_type == RealtimeSession.TYPE_BROADCASTING
-                and session.stream_service == RealtimeSession.STREAM_SERVICE_OBS
-                and session.status != RealtimeSession.STATUS_ENDED
-            ):
-                refresh_obs_session_stream_health(session)
-        serializer = RealtimeSessionListSerializer(paged_queryset, many=True, context={"request": request})
+        if page_meta is None:
+            paged_queryset = paged_queryset[: session_list.max_rows()]
+        sessions = list(paged_queryset)
+        # Cached Owncast status, applied in memory: a GET never writes.
+        session_list.apply_in_memory_stream_health(sessions)
+        serializer = RealtimeSessionListSerializer(sessions, many=True, context={"request": request})
         payload = (
             {"results": serializer.data, "pagination": page_meta}
             if page_meta is not None
@@ -699,7 +732,7 @@ class RealtimeSessionListCreateView(APIView):
         )
         if cache_ttl > 0:
             cache.set(cache_key, payload, timeout=cache_ttl)
-        return api_response(success=True, message="Realtime sessions fetched.", data=payload)
+        return payload
 
     def post(self, request):
         if not request.user or not request.user.is_authenticated:
@@ -795,7 +828,9 @@ class RealtimeSessionDetailView(APIView):
                 errors={"detail": access_decision.detail},
                 status_code=access_decision.status_code,
             )
-        refresh_obs_session_stream_health(session)
+        # Cached Owncast status applied in memory only: viewer polls never
+        # write stream_status (the periodic stream-health hook does).
+        refresh_obs_session_stream_health(session, persist=False)
         data = RealtimeSessionListSerializer(session, context={"request": request}).data
         return api_response(success=True, message="Realtime session fetched.", data=data)
 
@@ -845,8 +880,9 @@ class RealtimeSessionDetailView(APIView):
 
 class RealtimeSessionJoinView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    throttle_classes = [ClientIpScopedRateThrottle]
-    throttle_scope = "realtime_session_join"
+    # Per account with a high per-IP ceiling: a whole class behind one NAT
+    # reconnecting at once must not lock everyone out.
+    throttle_classes = [RealtimeJoinUserRateThrottle, RealtimeJoinIpCeilingThrottle]
 
     def post(self, request, pk):
         session = get_object_or_404(RealtimeSession.objects.with_related(), pk=pk)
@@ -893,34 +929,32 @@ class RealtimeSessionJoinView(APIView):
                 errors={"detail": f"Your class schedule is {schedule_snapshot['label']}."},
                 status_code=status.HTTP_409_CONFLICT,
             )
-        if (
-            not is_session_manager
-            and session.session_type != RealtimeSession.TYPE_BROADCASTING
-            and not schedule_snapshot["is_open"]
-        ):
-            _record_join_metric(result="failure", mode="meeting", reason="outside_schedule_window")
+        if not is_session_manager and live_session_is_stale(session):
+            # The host never ended it: an abandoned room must not stay joinable
+            # (and unmoderated) indefinitely. Managers can still enter and end it.
+            _record_join_metric(result="failure", mode="meeting", reason="session_abandoned")
+            max_hours = attendee_join_max_live_hours()
             return api_response(
                 success=False,
-                message="Live class is outside its scheduled time.",
-                errors={"detail": f"Your class schedule is {schedule_snapshot['label']}."},
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
-        # Cached, single-flight Owncast status: a whole class joining at once
-        # must cost one Owncast call, not one blocked worker per student.
-        refresh_obs_session_stream_health(session)
-        if (
-            not is_session_manager
-            and session.session_type == RealtimeSession.TYPE_BROADCASTING
-            and session.stream_service == RealtimeSession.STREAM_SERVICE_OBS
-            and session.stream_status != RealtimeSession.STREAM_LIVE
-        ):
-            _record_join_metric(result="failure", mode="broadcast", reason="stream_not_live")
-            return api_response(
-                success=False,
-                message="Live class has ended or is currently offline.",
-                errors={"detail": "The broadcast is no longer live. It will reopen when the instructor resumes streaming."},
+                message="This live class has already finished.",
+                errors={
+                    "detail": (
+                        f"It started more than {max_hours:g} hours ago. "
+                        "Ask your instructor to start a new session."
+                    )
+                },
                 status_code=status.HTTP_409_CONFLICT,
             )
+        # From here on an attendee's session is live (scheduled ones were refused
+        # above, ended ones at the top). The host started it, so the class is
+        # open whatever the wall clock says: a meeting rejoin at 20:05 IST and a
+        # make-up class both work (the weekly window only labels the schedule).
+        # A broadcast is admitted even while its encoder is offline or
+        # reconnecting; the player shows its own "waiting for video" state.
+        #
+        # Cached, single-flight Owncast status applied in memory only: a whole
+        # class joining at once costs one Owncast call and no row writes.
+        refresh_obs_session_stream_health(session, persist=False)
         if session.status == RealtimeSession.STATUS_SCHEDULED:
             session.mark_live()
         room_name = session.livekit_room_name or session.room_name
@@ -1276,11 +1310,8 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
                 errors={"detail": "Enable OWNCAST_CHAT_BRIDGE_ENABLED to use personalized Owncast chat launch."},
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
-        try:
-            release_expired_owncast_chat_timeouts(timeout=4)
-        except (OwncastConfigError, OwncastAdminError) as exc:
-            realtime_ops_logger.warning("Owncast chat timeout release skipped during launch: %s", exc)
-
+        # Expired chat timeouts are released by the periodic
+        # ``realtime.chat_timeouts`` worker hook, never on this hot path.
         urls = resolve_broadcast_urls(session, request=request)
         chat_embed_url = str(urls.get("chat_embed_url") or "").strip()
         chat_origin = _resolve_owncast_chat_origin(chat_embed_url)
@@ -2953,6 +2984,24 @@ class RealtimeSessionRecordingListView(APIView):
         return api_response(success=True, message="Session recordings fetched.", data=data)
 
 
+def _media_root_file(field_file):
+    """Absolute path of a FileField's file when it is a regular file in MEDIA_ROOT."""
+    from pathlib import Path
+
+    name = str(getattr(field_file, "name", "") or "").replace("\\", "/").strip().lstrip("/")
+    if not name or ".." in name.split("/"):
+        return None
+    media_root = Path(settings.MEDIA_ROOT).resolve()
+    path = media_root / name
+    try:
+        path.resolve().relative_to(media_root)
+    except (ValueError, OSError):
+        return None
+    if path.is_symlink() or not path.is_file():
+        return None
+    return path
+
+
 class RealtimeSessionRecordingDownloadView(APIView):
     authentication_classes = [SessionAuthentication, CookieJWTAuthentication]
     permission_classes = [permissions.IsAuthenticated]
@@ -2975,6 +3024,14 @@ class RealtimeSessionRecordingDownloadView(APIView):
         filename = f"recording-{recording.id}.mp4"
 
         if recording.video_file:
+            # Browser recordings live under MEDIA_ROOT/realtime_recordings/,
+            # which is not public: nginx serves them via X-Accel-Redirect (with
+            # byte ranges) only after the access check above.
+            local_path = _media_root_file(recording.video_file)
+            if local_path is not None:
+                from .recording.media import staff_file_response
+
+                return staff_file_response(request, local_path, download=request.GET.get("download") == "1")
             try:
                 stream = recording.video_file.open("rb")
                 filename = str(recording.video_file.name or filename).replace("\\", "/").split("/")[-1]

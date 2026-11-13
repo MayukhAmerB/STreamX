@@ -3784,7 +3784,25 @@ class LectureResourceAccessTests(BaseAPITestCase):
             )
             self.assertEqual(allowed_response.status_code, 200)
             self.assertIn("attachment;", allowed_response["Content-Disposition"])
-            self.assertGreater(sum(len(chunk) for chunk in allowed_response.streaming_content), 0)
+            # nginx serves the bytes from the internal location after this check;
+            # /media/lecture_resources/ itself is not public.
+            self.assertEqual(
+                allowed_response["X-Accel-Redirect"],
+                f"/_protected_media/{resource.resource_file.name}",
+            )
+            self.assertEqual(allowed_response["Cache-Control"], "private, max-age=300")
+
+            # Without accel-redirect (local development) Django streams the file.
+            with override_settings(COURSE_PROTECTED_MEDIA_USE_ACCEL_REDIRECT=False):
+                streamed = self.client.get(
+                    reverse(
+                        "lecture-resource-download",
+                        kwargs={"lecture_pk": self.lecture.id, "pk": resource.id},
+                    )
+                )
+            self.assertEqual(streamed.status_code, 200)
+            self.assertNotIn("X-Accel-Redirect", streamed)
+            self.assertEqual(b"".join(streamed.streaming_content), b"docx-resource-bytes")
 
     def test_enrolled_student_can_access_url_based_lecture_resource(self):
         resource = LectureResource.objects.create(
@@ -4797,14 +4815,23 @@ class RealtimeSessionTests(APITestCase):
         )
         self.assertEqual(join_response.status_code, 403)
 
-    def test_approved_student_cannot_join_outside_live_class_schedule(self):
+    @override_settings(
+        LIVEKIT_URL="ws://livekit.test",
+        LIVEKIT_API_KEY="devkey",
+        LIVEKIT_API_SECRET="secret",
+    )
+    @patch("apps.realtime.views.build_participant_token", return_value="lk.token")
+    @patch("apps.realtime.views.get_room_participant_count", return_value=3)
+    def test_approved_student_can_rejoin_live_meeting_outside_schedule_window(self, _count, _token):
+        # D1: a meeting that overruns 20:00 IST (or a make-up class) stays open
+        # while the host has it live; the weekly window no longer gates rejoins.
         self.schedule_snapshot_mock.return_value = {
             "is_open": False,
             "label": "Friday, Saturday and Sunday, 7:00 PM to 8:00 PM IST",
         }
         session = RealtimeSession.objects.create(
-            title="Closed Schedule Meeting",
-            description="Approved students must still respect the weekly schedule.",
+            title="Overrunning Meeting",
+            description="Students must be able to rejoin after 20:00 IST.",
             host=self.host,
             session_type=RealtimeSession.TYPE_MEETING,
             linked_live_class=self.live_class,
@@ -4819,9 +4846,39 @@ class RealtimeSessionTests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.data["message"], "Live class is outside its scheduled time.")
-        self.assertIn("Friday, Saturday and Sunday", response.data["errors"]["detail"])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["mode"], "meeting")
+        self.assertTrue(response.data["data"]["session"]["viewer_can_join_now"])
+
+    def test_student_cannot_join_scheduled_session_before_host_starts_it(self):
+        # Scheduled-but-not-live keeps its clear refusal, inside or outside the
+        # window, and an attendee's join never starts the session.
+        for is_open in (True, False):
+            self.schedule_snapshot_mock.return_value = {
+                "is_open": is_open,
+                "label": "Friday, Saturday and Sunday, 7:00 PM to 8:00 PM IST",
+            }
+            for session_type in (RealtimeSession.TYPE_MEETING, RealtimeSession.TYPE_BROADCASTING):
+                session = RealtimeSession.objects.create(
+                    title=f"Not started {session_type} {is_open}",
+                    description="Waiting for the host.",
+                    host=self.host,
+                    session_type=session_type,
+                    linked_live_class=self.live_class,
+                    linked_course=self.meeting_course,
+                    status=RealtimeSession.STATUS_SCHEDULED,
+                )
+                self.login(self.viewer.email)
+                response = self.client.post(
+                    reverse("realtime-session-join", kwargs={"pk": session.id}),
+                    {"display_name": "Viewer User"},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 409)
+                self.assertEqual(response.data["message"], "Live class has not started.")
+                self.assertIn("Friday, Saturday and Sunday", response.data["errors"]["detail"])
+                session.refresh_from_db()
+                self.assertEqual(session.status, RealtimeSession.STATUS_SCHEDULED)
 
     def test_approved_student_can_join_live_broadcast_outside_schedule(self):
         self.schedule_snapshot_mock.return_value = {
@@ -5588,7 +5645,7 @@ class RealtimeSessionTests(APITestCase):
     @override_settings(OWNCAST_CHAT_BRIDGE_ENABLED=True)
     @patch("apps.realtime.services.owncast_set_chat_user_enabled")
     @patch("apps.realtime.views.register_owncast_chat_user")
-    def test_broadcast_chat_launch_releases_expired_chat_timeouts(
+    def test_expired_chat_timeouts_are_released_by_the_worker_not_chat_launch(
         self,
         mock_register_chat_user,
         mock_set_chat_user_enabled,
@@ -5633,6 +5690,20 @@ class RealtimeSessionTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        # Housekeeping is off the launch hot path (B7).
+        mock_set_chat_user_enabled.assert_not_called()
+        timed_out_identity.refresh_from_db()
+        self.assertIsNotNone(timed_out_identity.owncast_timeout_until)
+
+        # The periodic hook queues one release event; its handler re-enables.
+        from apps.core.models import OutboxEvent
+        from apps.core.outbox import drain_outbox
+        from apps.realtime.periodic import EVENT_RELEASE_CHAT_TIMEOUTS, schedule_chat_timeout_release
+
+        schedule_chat_timeout_release()
+        schedule_chat_timeout_release()
+        self.assertEqual(OutboxEvent.objects.filter(event_type=EVENT_RELEASE_CHAT_TIMEOUTS).count(), 1)
+        drain_outbox(batch_size=10)
         mock_set_chat_user_enabled.assert_called_once_with(
             owncast_user_id="timed-out-owncast-user",
             enabled=True,
@@ -7117,10 +7188,14 @@ class RealtimeSessionTests(APITestCase):
             )
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.headers.get("Content-Disposition"),
-            f'inline; filename="{recording.video_file.name.split("/")[-1]}"',
+        self.assertTrue(
+            response.headers.get("Content-Disposition", "").startswith(
+                f'inline; filename="{recording.video_file.name.split("/")[-1]}"'
+            )
         )
+        # Browser recordings are private media: nginx serves them from the
+        # internal location after this access check.
+        self.assertEqual(response["X-Accel-Redirect"], f"/_protected_media/{recording.video_file.name}")
 
     def test_recording_download_resolves_prefixed_absolute_output_path(self):
         with tempfile.TemporaryDirectory() as recordings_root:

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -47,7 +47,9 @@ class LiveClassScheduleTests(SimpleTestCase):
 
         self.assertTrue(attendee_can_join_live_session(session, now=monday_evening))
 
-    def test_stopped_broadcast_is_not_joinable(self):
+    def test_live_broadcast_with_offline_encoder_stays_joinable(self):
+        # D8: while the host has the class live, an encoder blip must not turn
+        # a refresh into a 409; the player shows its own waiting state.
         session = SimpleNamespace(
             status="live",
             STATUS_LIVE="live",
@@ -57,9 +59,11 @@ class LiveClassScheduleTests(SimpleTestCase):
             STREAM_LIVE="live",
         )
 
-        self.assertFalse(attendee_can_join_live_session(session))
+        self.assertTrue(attendee_can_join_live_session(session))
 
-    def test_live_meeting_still_respects_weekly_window(self):
+    def test_live_meeting_is_joinable_outside_weekly_window(self):
+        # D1: the session's live state decides, not the wall clock (a rejoin at
+        # 20:05 IST or a make-up class on Monday).
         monday_evening = datetime(2026, 7, 13, 19, 30, tzinfo=LIVE_CLASS_TIMEZONE)
         session = SimpleNamespace(
             status="live",
@@ -68,7 +72,32 @@ class LiveClassScheduleTests(SimpleTestCase):
             TYPE_BROADCASTING="broadcasting",
         )
 
-        self.assertFalse(attendee_can_join_live_session(session, now=monday_evening))
+        self.assertTrue(attendee_can_join_live_session(session, now=monday_evening))
+
+    def test_live_session_left_running_past_the_bound_is_not_joinable(self):
+        started = datetime(2026, 7, 17, 19, 0, tzinfo=LIVE_CLASS_TIMEZONE)
+        session = SimpleNamespace(status="live", STATUS_LIVE="live", session_type="meeting", started_at=started)
+
+        self.assertTrue(attendee_can_join_live_session(session, now=started + timedelta(hours=5, minutes=59)))
+        self.assertFalse(attendee_can_join_live_session(session, now=started + timedelta(hours=6, minutes=1)))
+        with override_settings(REALTIME_ATTENDEE_JOIN_MAX_LIVE_HOURS=0):
+            self.assertTrue(attendee_can_join_live_session(session, now=started + timedelta(days=3)))
+        with override_settings(REALTIME_ATTENDEE_JOIN_MAX_LIVE_HOURS=12):
+            self.assertTrue(attendee_can_join_live_session(session, now=started + timedelta(hours=11)))
+
+    def test_scheduled_and_ended_sessions_are_not_joinable(self):
+        friday_evening = datetime(2026, 7, 17, 19, 30, tzinfo=LIVE_CLASS_TIMEZONE)
+        for status in ("scheduled", "ended"):
+            for session_type in ("meeting", "broadcasting"):
+                session = SimpleNamespace(
+                    status=status,
+                    STATUS_LIVE="live",
+                    session_type=session_type,
+                    TYPE_BROADCASTING="broadcasting",
+                    stream_status="live",
+                    STREAM_LIVE="live",
+                )
+                self.assertFalse(attendee_can_join_live_session(session, now=friday_evening))
 
 
 class OwncastStreamHealthTests(SimpleTestCase):

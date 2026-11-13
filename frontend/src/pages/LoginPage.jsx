@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { requestPasswordReset } from "../api/auth";
 import Button from "../components/Button";
@@ -9,6 +9,7 @@ import TurnstileWidget from "../components/TurnstileWidget";
 import { useTurnstileChallenge } from "../hooks/useTurnstileChallenge";
 import { useAuth } from "../hooks/useAuth";
 import { apiMessage } from "../utils/api";
+import { returnTargetFromSearch } from "../utils/safeReturnUrl";
 
 function normalizeEmailInput(value) {
   return String(value || "").replace(/\s+/g, "").trim().toLowerCase();
@@ -24,10 +25,31 @@ export default function LoginPage() {
     turnstileEnabled,
     turnstileSiteKey,
     sessionEndedMessage,
+    isAuthenticated,
+    loading: authLoading,
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTo = location.state?.from || "/";
+  // ?next= (e.g. from labs.alsyedinitiative.com): only in-app paths or the trusted labs site.
+  const returnTarget = returnTargetFromSearch(location.search);
+
+  const goAfterLogin = () => {
+    if (returnTarget?.type === "external") {
+      window.location.assign(returnTarget.href);
+      return;
+    }
+    navigate(returnTarget?.path || redirectTo, { replace: true });
+  };
+
+  // Already signed in and sent here with a return address: go straight back.
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && returnTarget) {
+      if (returnTarget.type === "external") window.location.replace(returnTarget.href);
+      else navigate(returnTarget.path, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, isAuthenticated]);
   const turnstile = useTurnstileChallenge(turnstileEnabled);
   const [form, setForm] = useState({ email: "", password: "", otp_code: "" });
   const [loading, setLoading] = useState(false);
@@ -75,7 +97,7 @@ export default function LoginPage() {
         ...(needs2FA ? { otp_code: form.otp_code } : {}),
         ...turnstile.payload,
       });
-      navigate(redirectTo, { replace: true });
+      goAfterLogin();
     } catch (err) {
       const requires2FA = Boolean(err?.response?.data?.errors?.requires_2fa);
       const detail = err?.response?.data?.errors?.detail;
@@ -154,9 +176,9 @@ export default function LoginPage() {
               SECURE LOGIN
             </div>
 
-            <h1 className="mt-4 font-reference text-4xl font-semibold leading-tight text-white">
+            <h2 className="mt-4 font-reference text-4xl font-semibold leading-tight text-white">
               Access the training platform through a controlled login path
-            </h1>
+            </h2>
             <p className="mt-3 max-w-md text-sm leading-7 text-[#BBBBBB]">
               Continue your OSINT and web application pentesting workflow with protected course access,
               instructor-led live sessions, and optional authenticator-based verification.
@@ -198,9 +220,10 @@ export default function LoginPage() {
               <div className="inline-flex items-center gap-2 rounded-full border border-black bg-[#141414] px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#DCDCDC]">
                 {needs2FA ? "2FA REQUIRED" : "LOGIN"}
               </div>
-              <h2 className="mt-3 font-reference text-2xl font-semibold text-white sm:text-3xl">
+              {/* The page h1 at every width (the side panel is hidden on phones). */}
+              <h1 className="mt-3 font-reference text-2xl font-semibold text-white sm:text-3xl">
                 {needs2FA ? "Enter your authenticator code" : "Welcome back"}
-              </h2>
+              </h1>
               <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
                 {needs2FA
                   ? "Your password was accepted. Complete login using the 6-digit code from your authenticator app."

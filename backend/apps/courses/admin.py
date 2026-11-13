@@ -702,6 +702,36 @@ class LectureInline(admin.TabularInline):
     verbose_name_plural = "Video Lectures (upload videos here, then open a lecture to manage optional resources)"
 
 
+class _ProtectedResourceFile:
+    """A FieldFile stand-in whose ``url`` is the staff-only admin download view."""
+
+    def __init__(self, field_file, url):
+        self._field_file = field_file
+        self.url = url
+
+    def __str__(self):
+        return str(self._field_file)
+
+    def __bool__(self):
+        return bool(self._field_file)
+
+
+class ProtectedResourceFileInput(forms.ClearableFileInput):
+    """Links the current resource file through an access-checked admin view.
+
+    /media/lecture_resources/ is not public (nginx media allowlist), so the
+    default ``Currently: <a href="/media/...">`` link would be dead.
+    """
+
+    def format_value(self, value):
+        if self.is_initial(value):
+            instance = getattr(value, "instance", None)
+            if getattr(instance, "pk", None) and getattr(instance, "lecture_id", None):
+                url = reverse("admin:courses_lecture_resource_file", args=[instance.lecture_id, instance.pk])
+                return _ProtectedResourceFile(value, url)
+        return super().format_value(value)
+
+
 class LectureResourceInline(admin.TabularInline):
     model = LectureResource
     extra = 1
@@ -709,6 +739,11 @@ class LectureResourceInline(admin.TabularInline):
     ordering = ("order", "id")
     verbose_name = "Resource File"
     verbose_name_plural = "Resource Files or Links (optional downloads for this lecture)"
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == "resource_file":
+            kwargs["widget"] = ProtectedResourceFileInput
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 
 class GuideVideoAdminForm(forms.ModelForm):
@@ -1424,6 +1459,38 @@ class LectureAdmin(LectureEngagementAdminMixin, admin.ModelAdmin):
     autocomplete_fields = ("section",)
     ordering = ("section__course", "section", "order", "id")
     inlines = [LectureResourceInline]
+
+    def get_urls(self):
+        from django.urls import path
+
+        custom = [
+            path(
+                "<path:object_id>/resources/<int:resource_id>/file/",
+                self.admin_site.admin_view(self.resource_file_view),
+                name="courses_lecture_resource_file",
+            ),
+        ]
+        return custom + super().get_urls()
+
+    def resource_file_view(self, request, object_id, resource_id):
+        """Staff download of a lecture resource (the public /media/ path is closed)."""
+        from django.core.exceptions import PermissionDenied
+        from django.http import Http404
+        from django.shortcuts import get_object_or_404
+
+        from .resource_files import resource_file_response
+
+        try:
+            lecture_id = int(object_id)
+        except (TypeError, ValueError):
+            raise Http404("Lecture not found.") from None
+        resource = get_object_or_404(
+            LectureResource.objects.select_related("lecture"), pk=resource_id, lecture_id=lecture_id
+        )
+        if not self.has_view_permission(request, resource.lecture):
+            raise PermissionDenied
+        return resource_file_response(resource.resource_file)
+
     readonly_fields = (
         "stream_status",
         "stream_manifest_key",

@@ -1,5 +1,14 @@
+# Cap Docker json-file logs per container (50 MB x 5 files) so container
+# logs can never fill the disk.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   worker:
+    logging: *default-logging
     build:
       context: ./backend
     restart: always
@@ -49,6 +58,7 @@ services:
       - avnet
 
   worker-2:
+    logging: *default-logging
     build:
       context: ./backend
     restart: always
@@ -112,6 +122,7 @@ services:
   # /app/media. It is only an HLS viewer of Owncast: if it crashes, the live
   # class is unaffected. Run exactly one replica.
   stream-recorder:
+    logging: *default-logging
     build:
       context: ./backend
     restart: always

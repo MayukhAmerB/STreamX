@@ -4,6 +4,9 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
 import { siteBrand } from "./config/siteBrand";
+import "./styles/fonts.css";
+import "./styles/tokens.css";
+import "./styles/site-theme.css";
 import "./index.css";
 
 document.documentElement.dataset.siteBrand = siteBrand.id;
@@ -24,9 +27,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 
 const bootLoader = document.getElementById("boot-loader");
 if (bootLoader && document.body) {
-  const bootstrapStartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
-  // Long enough to read as a brand moment, short enough not to delay content.
-  const MIN_BOOT_LOADER_MS = 300;
+  // No-flash hand-over (plan §7.1: the old 300 ms hold + 760 ms fade are gone).
+  // #root stays transparent until React has painted (two frames), then the
+  // loader and #root cross-fade in BOOT_FADE_MS (index.html); no extra hold.
+  const BOOT_FADE_MS = 150;
 
   const completeTransition = () => {
     if (bootLoader.isConnected) {
@@ -46,16 +50,11 @@ if (bootLoader && document.body) {
       },
       { once: true }
     );
-    // Fallback in case transitionend does not fire.
-    window.setTimeout(completeTransition, 1100);
+    // Fallback in case transitionend does not fire (reduced motion, hidden tab).
+    window.setTimeout(completeTransition, BOOT_FADE_MS + 100);
   };
 
-  const now = typeof performance !== "undefined" ? performance.now() : Date.now();
-  const remaining = Math.max(0, MIN_BOOT_LOADER_MS - (now - bootstrapStartedAt));
-
-  window.setTimeout(() => {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(beginTransition);
-    });
-  }, remaining);
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(beginTransition);
+  });
 }

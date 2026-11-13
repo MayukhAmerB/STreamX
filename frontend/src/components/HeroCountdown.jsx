@@ -23,7 +23,8 @@ export default function HeroCountdown({ courses = [] }) {
   const courseTitle = activeCountdown.course?.card_title || activeCountdown.course?.title;
 
   return (
-    <aside
+    <div
+      role="group"
       className="mx-auto mb-8 grid max-w-6xl overflow-hidden rounded-2xl border border-red-400/35 bg-[linear-gradient(110deg,rgba(127,29,29,0.96),rgba(69,10,10,0.98))] shadow-[0_18px_54px_rgba(127,29,29,0.32)] lg:grid-cols-[minmax(0,1fr)_auto]"
       aria-label="Enrollment countdown"
     >
@@ -61,6 +62,6 @@ export default function HeroCountdown({ courses = [] }) {
           </span>
         ))}
       </time>
-    </aside>
+    </div>
   );
 }

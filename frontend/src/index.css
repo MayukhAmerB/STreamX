@@ -3,7 +3,8 @@
 @tailwind utilities;
 
 /* Inter, self-hosted (SIL OFL 1.1, public/fonts/inter/LICENSE.txt), latin subset.
-   400 and 800 are preloaded in index.html. */
+   Used by the Console (.cds-app); the public site uses IBM Plex Sans
+   (src/styles/fonts.css, preloaded in index.html) through .site-public. */
 @font-face {
   font-family: "Inter";
   font-style: normal;
@@ -52,7 +53,10 @@
 
 :root {
   color-scheme: light;
-  --site-zoom: 0.9;
+  /* The public site renders at 1:1 (plan §7.1: the old 0.9 zoom is gone).
+     Kept at 1 for code that still reads it. */
+  --site-zoom: 1;
+  --font-sans: "Inter", "Segoe UI", Arial, system-ui, sans-serif;
   --heading-scale: 1;
   --accent-primary: #F4F4F4;
   --accent-primary-hover: #FFFFFF;
@@ -85,19 +89,15 @@ html[data-site-brand="owlcognito"] ::selection {
 }
 
 html {
-  zoom: var(--site-zoom);
   -webkit-text-size-adjust: 100%;
-  scroll-padding-top: 6rem;
+  /* The 48 px sticky header (+ safe area) plus 16 px: anchors never land under it. */
+  scroll-padding-top: calc(4rem + env(safe-area-inset-top));
 }
 
-@supports not (zoom: 1) {
-  body {
-    transform: scale(var(--site-zoom));
-    transform-origin: top left;
-    width: calc(100% / var(--site-zoom));
-    min-height: calc(100vh / var(--site-zoom));
-    overflow-x: hidden;
-  }
+/* Public website (AppLayout): IBM Plex Sans. The Console keeps Inter. */
+.site-public {
+  --font-sans: var(--sc-font-sans);
+  font-family: var(--font-sans);
 }
 
 @font-face {
@@ -118,7 +118,7 @@ body,
 }
 
 body {
-  font-family: "Inter", "Segoe UI", Arial, system-ui, sans-serif;
+  font-family: var(--font-sans);
   background: #000000;
   color: #FFFFFF;
   overflow-x: hidden;
@@ -244,7 +244,7 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: "Inter", "Segoe UI", Arial, system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-weight: 800;
   font-size: calc(1em * var(--heading-scale));
   line-height: 1.08;
@@ -254,12 +254,12 @@ h6 {
 }
 
 .font-editorial {
-  font-family: "Inter", "Segoe UI", Arial, system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-weight: 700;
 }
 
 .font-reference {
-  font-family: "Inter", "Segoe UI", Arial, system-ui, sans-serif;
+  font-family: var(--font-sans);
   font-weight: 800;
 }
 
@@ -413,13 +413,13 @@ html[data-site-brand="owlcognito"] header.sticky {
   box-shadow: 0 10px 28px rgba(76, 29, 149, 0.1);
 }
 
-html[data-site-brand="owlcognito"] footer#contact {
+html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) {
   border-color: rgba(109, 40, 217, 0.32) !important;
   background: linear-gradient(135deg, #ffffff 0%, #f0ebff 100%) !important;
   color: var(--owl-ink);
 }
 
-html[data-site-brand="owlcognito"] footer#contact::after {
+html[data-site-brand="owlcognito"] footer#contact:not([data-theme])::after {
   position: absolute;
   top: 0;
   right: 9%;
@@ -498,26 +498,26 @@ html[data-site-brand="owlcognito"] header.sticky [class~="border-white/30"] {
   border-color: var(--owl-border) !important;
 }
 
-html[data-site-brand="owlcognito"] footer#contact .text-white,
-html[data-site-brand="owlcognito"] footer#contact [class~="text-white"] {
+html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) .text-white,
+html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class~="text-white"] {
   color: var(--owl-ink) !important;
 }
 
-html[data-site-brand="owlcognito"] footer#contact [class*="text-[#A"],
-html[data-site-brand="owlcognito"] footer#contact [class*="text-[#B"],
-html[data-site-brand="owlcognito"] footer#contact [class*="text-[#C"],
-html[data-site-brand="owlcognito"] footer#contact [class*="text-[#D"] {
+html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class*="text-[#A"],
+html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class*="text-[#B"],
+html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class*="text-[#C"],
+html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class*="text-[#D"] {
   color: var(--owl-muted) !important;
 }
 
-html[data-site-brand="owlcognito"] footer#contact [class~="bg-black/40"],
-html[data-site-brand="owlcognito"] footer#contact [class*="bg-[#0"],
-html[data-site-brand="owlcognito"] footer#contact [class*="bg-[#1"] {
+html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class~="bg-black/40"],
+html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class*="bg-[#0"],
+html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class*="bg-[#1"] {
   background-color: #f2eeff !important;
 }
 
-html[data-site-brand="owlcognito"] footer#contact [class~="border-white/10"],
-html[data-site-brand="owlcognito"] footer#contact [class~="border-white/20"] {
+html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class~="border-white/10"],
+html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class~="border-white/20"] {
   border-color: var(--owl-border) !important;
 }
 
@@ -536,11 +536,11 @@ html[data-site-brand="owlcognito"] [data-protected-playback-surface] [class~="te
 
 /* Keep the OwlCognito hierarchy intentional: violet marks structure and action,
    while the content itself stays neutral black on the light surface. */
-html[data-site-brand="owlcognito"] :is(main, footer#contact) :is(h1, h2, h3, h4) {
+html[data-site-brand="owlcognito"] :is(main, footer#contact:not([data-theme])) :is(h1, h2, h3, h4):not([data-theme] *) {
   color: #4c1d95 !important;
 }
 
-html[data-site-brand="owlcognito"] :is(main, footer#contact) :is(p, li, label, dt, dd) {
+html[data-site-brand="owlcognito"] :is(main, footer#contact:not([data-theme])) :is(p, li, label, dt, dd):not([data-theme] *) {
   color: #1f1925;
 }
 
@@ -950,18 +950,6 @@ html[data-site-brand="owlcognito"] [data-protected-playback-surface] :is(h1, h2,
 }
 
 @media (max-width: 767px) {
-  html {
-    zoom: 1;
-    scroll-padding-top: 5rem;
-  }
-
-  @supports not (zoom: 1) {
-    body {
-      width: 100%;
-      min-height: 100vh;
-      transform: none;
-    }
-  }
 
   input,
   select,

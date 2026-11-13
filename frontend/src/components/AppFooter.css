@@ -1,0 +1,440 @@
+/*
+ * Website footer (Syed Carbon, plan §7.3 band 11): g100 band, 2x grid,
+ * radius 0, no glows. Mobile first: Explore and Company side by side on
+ * phones, the full 16-column layout from 1056 px.
+ */
+
+.sf {
+  position: relative;
+  margin-top: 3rem;
+  background-color: var(--cds-background, #161616);
+  color: var(--cds-text-primary, #f4f4f4);
+  font-family: var(--sc-font-sans);
+  border-top: 1px solid var(--cds-border-subtle-00, #393939);
+}
+
+@media (min-width: 640px) {
+  .sf {
+    margin-top: 4rem;
+  }
+}
+
+.sf--flush {
+  margin-top: 0;
+}
+
+/* The landing page jumps to #contact flush under the 48 px header. */
+#contact.sf {
+  scroll-margin-top: -1rem;
+}
+
+.sf__inner,
+.sf__legal-inner {
+  width: 100%;
+  max-width: var(--sc-grid-max-width, 99rem);
+  margin: 0 auto;
+  padding-left: max(var(--sc-grid-margin, 1rem), env(safe-area-inset-left));
+  padding-right: max(var(--sc-grid-margin, 1rem), env(safe-area-inset-right));
+  box-sizing: border-box;
+}
+
+.sf__inner {
+  padding-top: 4rem;
+  padding-bottom: 2rem;
+}
+
+.sf__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2.5rem var(--sc-grid-gutter, 2rem);
+  padding-bottom: 3rem;
+  border-bottom: 1px solid var(--cds-border-subtle-00, #393939);
+}
+
+.sf__brand,
+.sf__support {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.sf__col {
+  min-width: 0;
+}
+
+/*
+ * Phones: compact footer (it was 1,468 px at 390, 12% of the landing page).
+ * Explore and Company run full width in flowing columns, the two support
+ * actions sit side by side when they fit, and Connect is two cells per row.
+ */
+@media (max-width: 671px) {
+  .sf__inner {
+    padding-top: 3rem;
+  }
+
+  .sf__grid {
+    gap: 2rem var(--sc-grid-gutter, 2rem);
+    padding-bottom: 2rem;
+  }
+
+  .sf__col {
+    grid-column: 1 / -1;
+  }
+
+  .sf__col .sf__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+    column-gap: 1rem;
+  }
+
+  .sf__col .sf__heading {
+    margin-bottom: 0.5rem;
+  }
+
+  .sf__support-actions {
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    max-width: none;
+  }
+
+  .sf__description {
+    margin-top: 1rem;
+  }
+}
+
+@media (min-width: 672px) {
+  .sf__grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+
+  .sf__brand {
+    grid-column: span 8;
+  }
+
+  .sf__col {
+    grid-column: span 2;
+  }
+
+  .sf__support {
+    grid-column: span 4;
+  }
+}
+
+@media (min-width: 1056px) {
+  .sf__grid {
+    grid-template-columns: repeat(16, minmax(0, 1fr));
+  }
+
+  .sf__brand {
+    grid-column: span 5;
+  }
+
+  .sf__col {
+    grid-column: span 2;
+  }
+
+  /* Nine Explore links read as two short columns instead of one long one. */
+  .sf__col--explore {
+    grid-column: span 4;
+  }
+
+  .sf__col--explore .sf__list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--sc-grid-gutter, 2rem);
+  }
+
+  /* A short Explore list (OwlCognito) is one column: Brand 5, Explore 3, Company 3, Support 5. */
+  .sf__col--explore.sf__col--short {
+    grid-column: span 3;
+  }
+
+  .sf__col--explore.sf__col--short .sf__list {
+    display: block;
+  }
+
+  .sf__col--short + .sf__col {
+    grid-column: span 3;
+  }
+
+  .sf__support {
+    grid-column: span 5;
+  }
+}
+
+.sf__description {
+  max-width: 28rem;
+  margin: 1.5rem 0 0;
+  color: var(--cds-text-secondary, #c6c6c6);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  letter-spacing: 0.16px;
+}
+
+.sf__kicker {
+  margin: 1rem 0 0;
+  color: var(--cds-text-helper, #a8a8a8);
+  font-size: 0.75rem;
+  letter-spacing: 0.32px;
+}
+
+.sf__heading {
+  margin: 0 0 1rem;
+  color: var(--cds-text-primary, #f4f4f4);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.43;
+  letter-spacing: 0.16px;
+}
+
+.sf__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sf__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  color: var(--cds-text-secondary, #c6c6c6);
+  font-size: 0.875rem;
+  letter-spacing: 0.16px;
+  text-decoration: none;
+  transition: color var(--sc-duration-productive) var(--sc-easing-productive);
+}
+
+.sf__link:hover {
+  color: var(--cds-text-primary, #f4f4f4);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.sf__link.is-disabled,
+.sf__link.is-disabled:hover {
+  flex-wrap: wrap;
+  gap: 0 0.5rem;
+  color: var(--cds-text-disabled, rgba(244, 244, 244, 0.25));
+  text-decoration: none;
+  cursor: not-allowed;
+}
+
+.sf__reason {
+  color: var(--cds-text-helper, #a8a8a8);
+  font-size: 0.75rem;
+  letter-spacing: 0.32px;
+}
+
+.sf__icon-sm {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+}
+
+.sf__support-text {
+  max-width: 26rem;
+  margin: 0;
+  color: var(--cds-text-secondary, #c6c6c6);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  letter-spacing: 0.16px;
+}
+
+.sf__support-actions {
+  display: grid;
+  gap: 1px;
+  max-width: 22rem;
+  margin-top: 1.5rem;
+}
+
+.sf__button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3rem;
+  padding: 0 1rem;
+  border: 1px solid transparent;
+  font-size: 0.875rem;
+  letter-spacing: 0.16px;
+  text-decoration: none;
+  transition:
+    background-color var(--sc-duration-productive) var(--sc-easing-productive),
+    color var(--sc-duration-productive) var(--sc-easing-productive);
+}
+
+.sf__button--primary {
+  background-color: var(--cds-button-primary, #ffffff);
+  color: var(--sk-button-primary-text, #161616);
+}
+
+.sf__button--primary:hover {
+  background-color: var(--cds-button-primary-hover, #e0e0e0);
+}
+
+.sf__button--tertiary {
+  border-color: var(--cds-button-tertiary, #ffffff);
+  color: var(--cds-button-tertiary, #ffffff);
+}
+
+.sf__button--tertiary:hover {
+  background-color: var(--cds-button-tertiary-hover, #f4f4f4);
+  color: var(--cds-text-inverse, #161616);
+}
+
+.sf__link:focus-visible,
+.sf__button:focus-visible,
+.sf__social:focus-visible {
+  outline: 2px solid var(--brand-focus, #ffffff);
+  outline-offset: 2px;
+}
+
+.sf__connect {
+  display: grid;
+  gap: 1.5rem;
+  padding-top: 2rem;
+}
+
+@media (min-width: 1056px) {
+  .sf__connect {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 11fr);
+    align-items: start;
+    gap: var(--sc-grid-gutter, 2rem);
+  }
+}
+
+.sf__connect .sf__heading {
+  margin-bottom: 0.5rem;
+}
+
+.sf__connect-text {
+  margin: 0;
+  color: var(--cds-text-helper, #a8a8a8);
+  font-size: 0.75rem;
+  letter-spacing: 0.32px;
+}
+
+/* Hairline grid drawn by the cells themselves, so an odd count leaves no grey gap. */
+.sf__socials {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0 1px 1px 0;
+  list-style: none;
+}
+
+.sf__socials > li {
+  margin: 0 -1px -1px 0;
+  border: 1px solid var(--cds-border-subtle-00, #393939);
+}
+
+@media (max-width: 1055px) {
+  .sf__socials {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sf__socials > .sf__socials-wide {
+    grid-column: 1 / -1;
+  }
+}
+
+/*
+ * Small phones: the social channels share one row (three, or two without
+ * YouTube) and every phone number and the email get a full row, so nothing is
+ * cut ("+91 99708 750…" at 360 px). Same row count as the 2-up grid.
+ */
+@media (max-width: 479px) {
+  .sf__socials {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .sf__socials > li[data-group="social"] {
+    grid-column: span 3;
+  }
+
+  .sf__socials[data-socials="3"] > li[data-group="social"] {
+    grid-column: span 2;
+  }
+
+  .sf__socials > li[data-group="contact"] {
+    grid-column: 1 / -1;
+  }
+
+  .sf__socials > li[data-group="social"] .sf__social {
+    gap: 0.375rem;
+    padding: 0 0.5rem;
+  }
+
+  .sf__socials .sf__social-label {
+    letter-spacing: 0;
+  }
+}
+
+@media (min-width: 1056px) {
+  .sf__socials {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.sf__social {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  min-height: 3rem;
+  padding: 0 1rem;
+  background-color: var(--cds-background, #161616);
+  color: var(--cds-text-secondary, #c6c6c6);
+  text-decoration: none;
+  transition:
+    background-color var(--sc-duration-productive) var(--sc-easing-productive),
+    color var(--sc-duration-productive) var(--sc-easing-productive);
+}
+
+.sf__social:hover {
+  background-color: var(--cds-layer-01, #262626);
+  color: var(--cds-text-primary, #f4f4f4);
+}
+
+.sf__icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+}
+
+.sf__social-label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.875rem;
+  letter-spacing: 0.16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sf__legal {
+  border-top: 1px solid var(--cds-border-subtle-00, #393939);
+}
+
+.sf__legal-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-top: 1.25rem;
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  color: var(--cds-text-helper, #a8a8a8);
+  font-size: 0.75rem;
+  letter-spacing: 0.32px;
+}
+
+@media (min-width: 672px) {
+  .sf__legal-inner {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf *,
+  .sf {
+    transition: none !important;
+  }
+}

@@ -5,7 +5,9 @@ import { listCourses } from "../api/courses";
 import CourseCategorySelector from "../components/CourseCategorySelector";
 import CourseCard from "../components/CourseCard";
 import PageShell from "../components/PageShell";
+import { EmptyState } from "../site-kit";
 import { apiData } from "../utils/api";
+import { findCatalogTrack, readCatalogTracks, TRACK_STATES } from "../utils/catalogTracks";
 import { hasApprovedCourseAccess } from "../utils/courseAccess";
 import {
   filterCourseCatalog,
@@ -54,6 +56,33 @@ export function getCourseLevelSummary(courses) {
 
 export { hasApprovedCourseAccess };
 
+/**
+ * A track the server reports as not open (e.g. Pentesting with no course on
+ * sale) gets one calm empty state instead of a bare "No courses" (plan §7.2
+ * rule 3), with one real action: the first open track, else Contact.
+ */
+export function getTrackEmptyState(tracks, category) {
+  const track = findCatalogTrack(tracks, category);
+  if (!track || track.state === TRACK_STATES.OPEN) return null;
+  const label = COURSE_CATEGORY_LABELS[category] || track.title || "This track";
+  const openTrack = Object.keys(COURSE_CATEGORY_LABELS)
+    .map((key) => findCatalogTrack(tracks, key))
+    .find((item) => item && item.state === TRACK_STATES.OPEN);
+  const action = openTrack
+    ? { label: `View ${COURSE_CATEGORY_LABELS[openTrack.key] || openTrack.title} courses`, href: getCourseCategoryPath(openTrack.key) }
+    : { label: "Contact us", href: "/contact" };
+  return (
+    <div data-theme="g100" className="course-track-empty">
+      <EmptyState
+        headingLevel={3}
+        title={`${label} opens soon`}
+        body="Coming soon · No courses yet."
+        action={action}
+      />
+    </div>
+  );
+}
+
 export function CourseCatalogContent({
   courses = [],
   loading = false,
@@ -63,7 +92,20 @@ export function CourseCatalogContent({
   summary = getCourseCatalogSummary(courses),
   levelSummary = getCourseLevelSummary(courses),
   catalogLabel = "Course",
+  emptyState = null,
+  trackClosed = false,
 }) {
+  // A closed track (plan §7.2 rule 3): its one calm EmptyState stands alone,
+  // without the search box, zero-count stat tiles or catalog details.
+  if (trackClosed && emptyState && !loading) {
+    return (
+      <div id="course-category-results" className="scroll-mt-24 space-y-6">
+        {/* Placeholder courses of a closed track are not listed: nothing here is purchasable yet. */}
+        {emptyState}
+      </div>
+    );
+  }
+
   return (
     <div
       id="course-category-results"
@@ -92,7 +134,9 @@ export function CourseCatalogContent({
           </div>
         ) : null}
 
-        {!loading && courses.length === 0 ? (
+        {!loading && courses.length === 0 && emptyState && !search ? emptyState : null}
+
+        {!loading && courses.length === 0 && !(emptyState && !search) ? (
           <div className="rounded-2xl border border-black bg-[linear-gradient(135deg,#FFFFFF_0%,#F4F4F4_58%,#E1E1E1_100%)] p-6 text-sm text-[#1D1D1D]">
             {search ? "No courses found." : "No courses are available right now."}
           </div>
@@ -110,7 +154,7 @@ export function CourseCatalogContent({
         ) : null}
       </div>
 
-      <aside className="space-y-4 xl:sticky xl:top-24">
+      <div className="space-y-4 xl:sticky xl:top-24">
         <section className="relative overflow-hidden rounded-[28px] border border-black bg-[#080808] shadow-[0_26px_70px_rgba(0,0,0,0.35)]">
           <div className="absolute inset-0">
             <img
@@ -206,7 +250,7 @@ export function CourseCatalogContent({
             </div>
           </div>
         </section>
-      </aside>
+      </div>
     </div>
   );
 }
@@ -219,6 +263,7 @@ export default function CourseListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [tracks, setTracks] = useState([]);
 
   const requestedCategory = searchParams.get("category") || "";
   const selectedCategory = resolveCourseCategory(requestedCategory);
@@ -235,7 +280,7 @@ export default function CourseListPage() {
           try {
             const response = await listCourses({ catalog: "current" });
             const apiCourses = apiData(response, []);
-            return selectPublicCatalogCourses(apiCourses);
+            return { courses: selectPublicCatalogCourses(apiCourses), tracks: readCatalogTracks(response) };
           } catch (err) {
             lastError = err;
             if (attempt === 0) {
@@ -250,10 +295,11 @@ export default function CourseListPage() {
       };
 
       try {
-        const apiCourses = await fetchCourses();
+        const { courses: apiCourses, tracks: apiTracks } = await fetchCourses();
         if (active) {
           writeCachedCourseCatalog(apiCourses);
           setCourses(apiCourses);
+          setTracks(apiTracks);
           setError("");
         }
       } catch {
@@ -300,6 +346,10 @@ export default function CourseListPage() {
   );
   const summary = useMemo(() => getCourseCatalogSummary(visibleCourses), [visibleCourses]);
   const levelSummary = useMemo(() => getCourseLevelSummary(visibleCourses), [visibleCourses]);
+  const trackEmptyState = useMemo(
+    () => getTrackEmptyState(tracks, selectedCategory),
+    [tracks, selectedCategory]
+  );
 
   return (
     <PageShell
@@ -311,6 +361,7 @@ export default function CourseListPage() {
         selectedCategory={selectedCategory}
         counts={categoryCounts}
         getHref={getCourseCategoryPath}
+        tracks={tracks}
       />
 
       <CourseCatalogContent
@@ -322,6 +373,8 @@ export default function CourseListPage() {
         summary={summary}
         levelSummary={levelSummary}
         catalogLabel={COURSE_CATEGORY_LABELS[selectedCategory]}
+        emptyState={trackEmptyState}
+        trackClosed={Boolean(trackEmptyState)}
       />
     </PageShell>
   );

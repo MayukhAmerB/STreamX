@@ -27,17 +27,20 @@ function SectionFrame({ children, labelledBy, live = false }) {
  * with a skeleton while the first answer loads (no layout shift) and renders
  * nothing at all when the server says the section is off or unavailable.
  */
-export default function YouTubeSection({ store, now }) {
-  const { status, model } = useYouTubeChannel(store);
+/** /#watch deep links: scroll once the section exists (it renders after data arrives). */
+export function useWatchDeepLink(model) {
   const { hash } = useLocation();
   const scrolledFor = useRef("");
-
-  // /#watch deep links: scroll once the section exists (it renders after data arrives).
   useEffect(() => {
     if (hash !== `#${WATCH_SECTION_ID}` || !model || scrolledFor.current === hash) return;
     scrolledFor.current = hash;
     window.requestAnimationFrame?.(() => scrollToWatchSection());
   }, [hash, model]);
+}
+
+export default function YouTubeSection({ store, now }) {
+  const { status, model } = useYouTubeChannel(store);
+  useWatchDeepLink(model);
 
   if (!siteBrand.youtube) return null;
 

@@ -746,7 +746,7 @@ class RealtimeSessionRecordingAdmin(admin.ModelAdmin):
         "livekit_egress_id",
         "output_file_path",
         "output_download_url",
-        "video_file",
+        "video_file_link",
         "size_display",
         "lecture_display",
         "error",
@@ -757,6 +757,9 @@ class RealtimeSessionRecordingAdmin(admin.ModelAdmin):
         "updated_at",
     )
     autocomplete_fields = ("session", "started_by")
+    # Shown read-only through video_file_link (a protected link); the file
+    # widget would link the public /media/ URL, which is closed.
+    exclude = ("video_file",)
     actions = ("delete_selected_recordings",)
 
     class Media:
@@ -867,6 +870,15 @@ class RealtimeSessionRecordingAdmin(admin.ModelAdmin):
 
     def _media_url(self, obj):
         return reverse("admin:realtime_realtimesessionrecording_media", args=[obj.pk])
+
+    @admin.display(description="Video file")
+    def video_file_link(self, obj):
+        # Browser recordings are private media: link the staff-only view, never
+        # the public /media/realtime_recordings/ URL (which now answers 404).
+        name = str(getattr(getattr(obj, "video_file", None), "name", "") or "")
+        if not name or not getattr(obj, "pk", None):
+            return "-"
+        return format_html('<a href="{}?download=1">{}</a>', self._media_url(obj), name)
 
     @admin.display(description="Recording File")
     def recording_player(self, obj):

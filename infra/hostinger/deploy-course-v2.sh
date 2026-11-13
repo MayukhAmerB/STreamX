@@ -70,7 +70,7 @@ echo 'Checking and applying forward migrations.'
 "${compose[@]}" run --rm --no-deps -T --entrypoint python backend manage.py check
 "${compose[@]}" run --rm --no-deps -T --entrypoint python backend manage.py makemigrations --check --dry-run
 "${compose[@]}" run --rm --no-deps -T --entrypoint python backend manage.py migrate --plan
-"${compose[@]}" run --rm --no-deps -T --entrypoint python backend manage.py migrate --noinput
+"${compose[@]}" run --rm --no-deps -T --entrypoint sh backend /app/migrate.sh --noinput
 for service in backend backend-2 backend-3 backend-4 payment-backend-1 payment-backend-2; do
   "${compose[@]}" up -d --no-deps --no-build --wait --wait-timeout 180 "$service"
   docker exec streamx-gateway-1 nginx -t

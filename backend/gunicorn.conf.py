@@ -17,8 +17,10 @@ worker_class = os.getenv("GUNICORN_WORKER_CLASS", "gthread")
 timeout = _env_int("GUNICORN_TIMEOUT", 60)
 graceful_timeout = _env_int("GUNICORN_GRACEFUL_TIMEOUT", 30)
 keepalive = _env_int("GUNICORN_KEEPALIVE", 5)
-max_requests = _env_int("GUNICORN_MAX_REQUESTS", 1000)
-max_requests_jitter = _env_int("GUNICORN_MAX_REQUESTS_JITTER", 100)
+# Recycle workers rarely: each restart costs import CPU and a fresh database
+# connection. The jitter keeps a container's workers from restarting together.
+max_requests = _env_int("GUNICORN_MAX_REQUESTS", 10000)
+max_requests_jitter = _env_int("GUNICORN_MAX_REQUESTS_JITTER", 1000)
 worker_tmp_dir = os.getenv("GUNICORN_WORKER_TMP_DIR", "/dev/shm")
 
 accesslog = "-"

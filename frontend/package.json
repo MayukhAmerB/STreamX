@@ -9,6 +9,8 @@
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "lint": "eslint \"src/**/*.{js,jsx,ts,tsx}\"",
     "typecheck": "tsc --noEmit",
+    "tokens": "node scripts/build-tokens.mjs",
+    "tokens:check": "node scripts/build-tokens.mjs --check",
     "contract:generate": "openapi-typescript ../contracts/openapi.yaml -o src/api/generated/schema.ts",
     "test": "vitest run",
     "quality": "npm run lint && npm run typecheck && npm test && npm run build"

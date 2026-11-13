@@ -195,7 +195,7 @@
 .yt-meta__kicker {
   margin: 0;
   color: var(--yt-text-3);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
@@ -411,7 +411,7 @@
   border-radius: 6px;
   background: var(--yt-accent);
   color: #0a0a0a;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;

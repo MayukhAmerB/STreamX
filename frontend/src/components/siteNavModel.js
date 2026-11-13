@@ -3,6 +3,8 @@
 // phone sheet contain. Kept separate so it can be unit tested per brand.
 
 export const SITE_CONSOLE_PATH = "/console";
+/** The OSINT labs (CTF) site: external, Al Syed brand only (plan §7.3 additions). */
+export const LABS_URL = "https://labs.alsyedinitiative.com";
 
 const LINKS = {
   courses: { id: "courses", label: "Courses", to: "/courses" },
@@ -14,12 +16,13 @@ const LINKS = {
   hallOfFame: { id: "hall-of-fame", label: "Hall of Fame", to: "/hall-of-fame", brandOnly: "alsyed" },
   contact: { id: "contact", label: "Contact", to: "/contact" },
   faqs: { id: "faqs", label: "FAQs", to: "/faqs" },
+  labs: { id: "labs", label: "Labs", href: LABS_URL, external: true, brandOnly: "alsyed" },
 };
 
 /** Centred pill (desktop), in order. "Watch" (YouTube) only where the brand has the channel. */
 const PRIMARY = ["courses", "watch", "about", "nationalDesk", "contact"];
 /** "More" menu (desktop), in order. */
-const MORE = ["accounts", "join", "hallOfFame", "faqs"];
+const MORE = ["accounts", "join", "hallOfFame", "faqs", "labs"];
 
 const visibleFor = (brandId, { youtube = false } = {}) => (link) =>
   (!link.brandOnly || link.brandOnly === brandId) && (!link.needsYouTube || youtube);
@@ -47,13 +50,30 @@ export function getSiteNavGroups(brandId = "alsyed", options = {}) {
     {
       id: "community",
       label: "Al Syed",
-      links: ["nationalDesk", "accounts", "join", "hallOfFame"].map((key) => LINKS[key]).filter(visible),
+      links: ["nationalDesk", "accounts", "join", "hallOfFame", "labs"].map((key) => LINKS[key]).filter(visible),
     },
   ].filter((group) => group.links.length > 0);
 }
 
+/**
+ * Watch (the YouTube channel) in the header, sheet and footer (plan §7.2 rule 4):
+ * - "hidden" when the brand has no channel or the server switched the section off;
+ * - "disabled" ("No videos yet") when it is on but has nothing to play;
+ * - "live" while the channel is on air (the only time the live dot shows);
+ * - "ready" otherwise (also while the first answer is loading).
+ */
+export const WATCH_EMPTY_REASON = "No videos yet";
+
+export function getWatchNavState({ brandHasYouTube = false, youtube = null } = {}) {
+  if (!brandHasYouTube || youtube?.enabled === false) return "hidden";
+  if (youtube?.status === "ready" && !youtube?.model) return "disabled";
+  if (youtube?.model?.live) return "live";
+  return "ready";
+}
+
 /** True when the current path belongs to one of the links (prefix match like NavLink). */
 export function isSiteLinkActive(link, pathname = "") {
+  if (!link?.to) return false;
   const path = String(pathname || "").split(/[?#]/)[0].replace(/\/+$/, "") || "/";
   return path === link.to || path.startsWith(`${link.to}/`);
 }

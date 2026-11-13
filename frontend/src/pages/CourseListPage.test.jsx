@@ -6,6 +6,7 @@ import {
   CourseCatalogContent,
   getCourseCatalogSummary,
   getCourseLevelSummary,
+  getTrackEmptyState,
   resolveCourseCategory,
 } from "./CourseListPage";
 
@@ -108,5 +109,37 @@ describe("CourseListPage catalog rendering", () => {
     expect(html).toContain('href="/courses/22"');
     expect(html).toContain("See Details");
     expect(html).toContain("Coming Soon");
+  });
+});
+
+describe("empty track (plan §7.2 rule 3)", () => {
+  const tracks = [
+    { key: "osint", title: "Open Source Intelligence", state: "open", courseCount: 2, openCourseCount: 2 },
+    { key: "web_pentesting", title: "Web Application & API Security", state: "coming_soon", courseCount: 0, openCourseCount: 0 },
+  ];
+  const render = (emptyState, search = "") =>
+    renderToStaticMarkup(
+      <StaticRouter location="/courses?category=web_pentesting">
+        <CourseCatalogContent courses={[]} loading={false} error="" search={search} setSearch={() => {}} emptyState={emptyState} />
+      </StaticRouter>
+    );
+
+  it("shows one calm empty state for a track that is not open, pointing at the open track", () => {
+    const markup = render(getTrackEmptyState(tracks, "web_pentesting"));
+    expect(markup).toContain("Pentesting opens soon");
+    expect(markup).toContain("Coming soon · No courses yet.");
+    expect(markup).toContain('href="/courses?category=osint#course-category-results"');
+    expect(markup).not.toContain("No courses are available right now.");
+  });
+
+  it("has no empty state for an open or unknown track, and searching still says No courses found", () => {
+    expect(getTrackEmptyState(tracks, "osint")).toBeNull();
+    expect(getTrackEmptyState([], "web_pentesting")).toBeNull();
+    expect(render(getTrackEmptyState(tracks, "web_pentesting"), "zzz")).toContain("No courses found.");
+  });
+
+  it("falls back to Contact when no track is open", () => {
+    const closed = tracks.map((track) => ({ ...track, state: "coming_soon" }));
+    expect(render(getTrackEmptyState(closed, "web_pentesting"))).toContain('href="/contact"');
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import AppFooter from "../components/AppFooter";
 import GlobalPageBackground from "../components/GlobalPageBackground";
@@ -12,13 +12,23 @@ export default function AppLayout() {
   const isOwlCognito = siteBrand.id === "owlcognito";
   const { pathname } = useLocation();
 
+  // Public surface marker on <html>: body-level portals (enquiry modal, toasts)
+  // inherit IBM Plex Sans too (src/styles/site-theme.css).
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.dataset.surface = "public";
+    return () => {
+      delete root.dataset.surface;
+    };
+  }, []);
+
   useEffect(() => {
     applyPageMeta(pathname);
   }, [pathname]);
 
   return (
     <div
-      className={`relative min-h-screen ${
+      className={`site-public relative min-h-screen ${
         isOwlCognito
           ? "owlcognito-app-shell bg-[#fbfaff] text-[#241344]"
           : "bg-black text-white"

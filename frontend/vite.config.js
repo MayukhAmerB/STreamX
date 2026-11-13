@@ -95,8 +95,53 @@ function siteMetaPlugin(env) {
   };
 }
 
+/**
+ * Landing LCP (plan §7.3 budgets): the landing route is a lazy chunk, which
+ * would add a request after the main bundle runs. On "/" only, an inline
+ * script asks the browser to fetch that chunk (and its CSS) in parallel with
+ * the entry bundle. Other routes are unaffected.
+ */
+function landingPreloadPlugin() {
+  return {
+    name: "landing-preload",
+    apply: "build",
+    transformIndexHtml: {
+      order: "post",
+      handler(html, ctx) {
+        const bundle = ctx?.bundle;
+        if (!bundle) return html;
+        const chunks = Object.values(bundle).filter((item) => item.type === "chunk");
+        const entry = chunks.find((chunk) => chunk.isEntry);
+        const isLandingModule = (id) => String(id || "").replace(/\\/g, "/").endsWith("/src/pages/LandingPage.jsx");
+        const landing = chunks.find(
+          (chunk) =>
+            isLandingModule(chunk.facadeModuleId) ||
+            (chunk.isDynamicEntry && (chunk.moduleIds || Object.keys(chunk.modules || {})).some(isLandingModule))
+        );
+        if (!entry || !landing) return html;
+        const loaded = new Set([entry.fileName, ...(entry.imports || [])]);
+        const scripts = [landing.fileName, ...(landing.imports || [])].filter((file) => !loaded.has(file));
+        const loadedCss = new Set(entry.viteMetadata?.importedCss || []);
+        const styles = [
+          ...new Set(
+            scripts.flatMap((file) => [...(bundle[file]?.viteMetadata?.importedCss || [])]).filter((file) => !loadedCss.has(file))
+          ),
+        ];
+        const toUrl = (file) => `/${file}`;
+        const script = `<script>(function(){if(location.pathname!=="/")return;var h=document.head;${JSON.stringify(
+          scripts.map(toUrl)
+        )}.forEach(function(u){var l=document.createElement("link");l.rel="modulepreload";l.href=u;h.appendChild(l);});${JSON.stringify(
+          styles.map(toUrl)
+        )}.forEach(function(u){var l=document.createElement("link");l.rel="preload";l.as="style";l.href=u;h.appendChild(l);});})();</script>`;
+        return html.replace("</head>", `    ${script}
+  </head>`);
+      },
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), siteMetaPlugin(loadEnv(mode, process.cwd(), ""))],
+  plugins: [react(), siteMetaPlugin(loadEnv(mode, process.cwd(), "")), landingPreloadPlugin()],
   css: {
     preprocessorOptions: {
       scss: {

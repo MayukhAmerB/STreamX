@@ -44,3 +44,6 @@ OSINTCTF/private/
 
 # Isolated course experience browser QA data and screenshots
 /tmp/course-v2-qa/
+
+# Local scratch output (may contain secrets) — never commit
+/tmp/

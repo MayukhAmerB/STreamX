@@ -27,6 +27,7 @@ from .access import (
     user_has_course_access,
 )
 from .cache_utils import get_course_list_cache_version, get_live_class_list_cache_version
+from .catalog_tracks import get_catalog_tracks
 from .engagement.views_tracking import record_lecture_view
 from .models import (
     Course,
@@ -222,6 +223,17 @@ def _build_course_enrollment_status_map(*, courses, user):
     return status_map
 
 
+def _course_list_response(payload):
+    """The course list envelope plus the additive, user-independent ``tracks`` block.
+
+    ``tracks`` sits next to ``data`` (not inside it) so clients that read
+    ``data`` as the course array are unaffected.
+    """
+    response = api_response(success=True, message="Courses fetched.", data=payload)
+    response.data["tracks"] = get_catalog_tracks()
+    return response
+
+
 class CourseListCreateView(APIView):
     permission_classes = [PublicReadInstructorWrite]
 
@@ -268,7 +280,7 @@ class CourseListCreateView(APIView):
             )
             cached = cache.get(cache_key)
             if cached is not None:
-                return api_response(success=True, message="Courses fetched.", data=cached)
+                return _course_list_response(cached)
 
         base_queryset = Course.objects.filter(is_published=True).select_related("instructor")
         if catalog == "current":
@@ -308,7 +320,7 @@ class CourseListCreateView(APIView):
                 payload,
                 timeout=getattr(settings, "COURSE_LIST_CACHE_TTL_SECONDS", 60),
             )
-        return api_response(success=True, message="Courses fetched.", data=payload)
+        return _course_list_response(payload)
 
     def post(self, request):
         if not request.user or not request.user.is_authenticated:
@@ -970,29 +982,11 @@ class LectureResourceDownloadView(APIView):
         if resource_url:
             return redirect(resource_url)
 
-        resource_file = getattr(resource, "resource_file", None)
-        file_name = str(getattr(resource_file, "name", "") or "").strip()
-        if not resource_file or not file_name:
-            return HttpResponseNotFound("Lecture resource not found.")
+        # /media/lecture_resources/ is not public: nginx serves the file via
+        # X-Accel-Redirect only after the access check above.
+        from .resource_files import resource_file_response
 
-        try:
-            file_handle = resource_file.storage.open(file_name, "rb")
-        except Exception:
-            return HttpResponseNotFound("Lecture resource not found.")
-
-        content_type, _ = mimetypes.guess_type(file_name)
-        response = FileResponse(
-            file_handle,
-            content_type=content_type or "application/octet-stream",
-            as_attachment=True,
-            filename=Path(file_name).name,
-        )
-        file_size = getattr(resource_file, "size", None)
-        if file_size:
-            response["Content-Length"] = str(file_size)
-        response["Cache-Control"] = "private, max-age=300"
-        response["X-Content-Type-Options"] = "nosniff"
-        return response
+        return resource_file_response(getattr(resource, "resource_file", None))
 
 
 class LectureProgressView(APIView):

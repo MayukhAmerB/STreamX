@@ -10,7 +10,6 @@ from config.request_security import (
     is_safe_public_stream_url,
 )
 from config.upload_validators import validate_video_upload
-from config.url_utils import get_media_public_url
 
 from apps.courses.models import LiveClass, Section
 
@@ -516,9 +515,9 @@ class RealtimeSessionRecordingSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if obj.output_download_url:
             return obj.output_download_url
-        if getattr(obj, "video_file", None):
-            return get_media_public_url(obj.video_file.url, request=request)
-        if obj.output_file_path and obj.pk:
+        # Browser recordings (video_file) are private media: always go through
+        # the access-checked download view, never a public /media/ URL.
+        if (getattr(obj, "video_file", None) or obj.output_file_path) and obj.pk:
             url = reverse("realtime-session-recording-download", kwargs={"recording_id": obj.pk})
             if request:
                 return request.build_absolute_uri(url)

@@ -1,5 +1,14 @@
+# Cap Docker json-file logs per container (50 MB x 5 files) so container
+# logs can never fill the disk.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   gateway:
+    logging: *default-logging
     image: nginx:1.27-alpine
     restart: always
     depends_on:

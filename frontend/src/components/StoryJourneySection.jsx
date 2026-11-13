@@ -1,7 +1,7 @@
 import storyIllustration from "../assets/story-mission.webp";
 import { siteBrand } from "../config/siteBrand";
 
-const journeyBlocks = [
+export const journeyBlocks = [
   {
     title: "Our Story",
     body: `Al Syed Initiative is a cybersecurity education and awareness project under the ADL Front (Advanced Digital Lawforce Front), founded by cyber activist Al Syed. It was created to carry forward his work and mindset by building a generation capable of critical thinking, responsible investigation, and confidence in the digital world.
@@ -16,7 +16,7 @@ By teaching practical skills in ethical hacking, OSINT research, and security an
   },
 ];
 
-const owlCognitoJourneyBlocks = [
+export const owlCognitoJourneyBlocks = [
   {
     title: "Our Approach",
     body: `OwlCognito is a private intelligence learning environment for people who want to investigate public information with care, structure, and professional judgment.

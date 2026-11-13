@@ -1219,16 +1219,37 @@ def fetch_owncast_ip_bans(*, timeout=5):
     return _extract_owncast_collection(payload, "ipBans", "bans", "results", "data", "items")
 
 
-def release_expired_owncast_chat_timeouts(*, timeout=10):
+def expired_owncast_chat_timeouts_queryset(now=None):
+    from .models import OwncastChatIdentity
+
+    return OwncastChatIdentity.objects.filter(
+        owncast_timeout_until__isnull=False,
+        owncast_timeout_until__lte=now or timezone.now(),
+        owncast_disabled_at__isnull=False,
+    ).exclude(owncast_user_id="")
+
+
+def release_expired_owncast_chat_timeouts(*, timeout=10, limit=None):
+    """Re-enable Owncast chat users whose StreamX timeout has expired.
+
+    ``limit`` bounds one run (the periodic hook releases the rest on its next
+    tick). Each row is cleared with a conditional UPDATE, so a moderator who
+    re-timed-out the user meanwhile, or another worker that already released
+    them, is never overwritten.
+
+    Rows are taken least recently attempted first, and a failed attempt touches
+    ``updated_at``: a batch of permanently failing identities (for example a
+    user deleted in Owncast) rotates to the back instead of starving newer
+    expired timeouts forever.
+    """
     from .models import OwncastChatIdentity
 
     now = timezone.now()
-    candidates = OwncastChatIdentity.objects.filter(
-        owncast_timeout_until__isnull=False,
-        owncast_timeout_until__lte=now,
-        owncast_disabled_at__isnull=False,
-    ).exclude(owncast_user_id="")
-    checked = candidates.count()
+    candidates = expired_owncast_chat_timeouts_queryset(now).order_by("updated_at", "pk")
+    if limit is not None:
+        candidates = candidates[: max(1, int(limit))]
+    candidates = list(candidates)
+    checked = len(candidates)
     released = 0
     errors = []
 
@@ -1247,12 +1268,16 @@ def release_expired_owncast_chat_timeouts(*, timeout=10):
                     "error": str(exc),
                 }
             )
+            OwncastChatIdentity.objects.filter(pk=identity.pk).update(updated_at=timezone.now())
             continue
 
-        identity.owncast_disabled_at = None
-        identity.owncast_timeout_until = None
-        identity.save(update_fields=["owncast_disabled_at", "owncast_timeout_until", "updated_at"])
-        released += 1
+        cleared = OwncastChatIdentity.objects.filter(
+            pk=identity.pk,
+            owncast_timeout_until=identity.owncast_timeout_until,
+            owncast_disabled_at__isnull=False,
+        ).update(owncast_disabled_at=None, owncast_timeout_until=None, updated_at=timezone.now())
+        if cleared:
+            released += 1
 
     return {
         "released": released,

@@ -1,5 +1,14 @@
+# Cap Docker json-file logs per container (50 MB x 5 files) so container
+# logs can never fill the disk.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   backend-2:
+    logging: *default-logging
     build:
       context: ./backend
     restart: always
@@ -46,6 +55,7 @@ services:
       - avnet
 
   backend-3:
+    logging: *default-logging
     build:
       context: ./backend
     restart: always
@@ -92,6 +102,7 @@ services:
       - avnet
 
   backend-4:
+    logging: *default-logging
     build:
       context: ./backend
     restart: always
@@ -138,6 +149,7 @@ services:
       - avnet
 
   payment-backend-1:
+    logging: *default-logging
     build:
       context: ./backend
     restart: always
@@ -186,6 +198,7 @@ services:
       - avnet
 
   payment-backend-2:
+    logging: *default-logging
     build:
       context: ./backend
     restart: always

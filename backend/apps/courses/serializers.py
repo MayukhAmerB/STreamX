@@ -385,6 +385,27 @@ class CourseDetailResponseSerializer(serializers.Serializer):
     errors = serializers.JSONField(allow_null=True, required=False)
 
 
+def can_see_instructor_email(request, course):
+    """Only staff and the course's own instructor see the instructor's email.
+
+    Public catalog responses (the course list and course detail) are read by
+    anonymous visitors and cached; the instructor's address is not public data.
+    """
+    user = getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return False
+    return bool(user.is_staff or user.is_superuser or user.id == getattr(course, "instructor_id", None))
+
+
+def public_instructor_payload(course, request):
+    if not getattr(course, "instructor_id", None) or not getattr(course, "instructor", None):
+        return None
+    payload = {"id": course.instructor_id, "full_name": course.instructor.full_name}
+    if can_see_instructor_email(request, course):
+        payload["email"] = course.instructor.email
+    return payload
+
+
 class CourseEnrollmentStatusMixin:
     def get_price(self, obj):
         return format(get_plan_amount(obj, FULL_PLAN), ".2f")
@@ -519,13 +540,7 @@ class CourseListSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeriali
         )
 
     def get_instructor(self, obj):
-        if not getattr(obj, "instructor_id", None) or not getattr(obj, "instructor", None):
-            return None
-        return {
-            "id": obj.instructor_id,
-            "full_name": obj.instructor.full_name,
-            "email": obj.instructor.email,
-        }
+        return public_instructor_payload(obj, self.context.get("request"))
 
     def get_thumbnail(self, obj):
         request = self.context.get("request")
@@ -614,13 +629,7 @@ class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeria
         )
 
     def get_instructor(self, obj):
-        if not getattr(obj, "instructor_id", None) or not getattr(obj, "instructor", None):
-            return None
-        return {
-            "id": obj.instructor_id,
-            "full_name": obj.instructor.full_name,
-            "email": obj.instructor.email,
-        }
+        return public_instructor_payload(obj, self.context.get("request"))
 
     def get_thumbnail(self, obj):
         request = self.context.get("request")

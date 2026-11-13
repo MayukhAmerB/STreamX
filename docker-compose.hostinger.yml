@@ -1,7 +1,16 @@
 name: streamx
 
+# Cap Docker json-file logs per container (50 MB x 5 files) so container
+# logs can never fill the disk.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   postgres:
+    logging: *default-logging
     image: postgres:16-alpine
     restart: always
     environment:
@@ -19,6 +28,7 @@ services:
       - appnet
 
   redis:
+    logging: *default-logging
     image: redis:7-alpine
     restart: always
     command: ["redis-server", "--appendonly", "yes"]
@@ -33,6 +43,7 @@ services:
       - appnet
 
   backend:
+    logging: *default-logging
     build:
       context: ./backend
     restart: always
@@ -79,6 +90,7 @@ services:
       - avnet
 
   frontend:
+    logging: *default-logging
     build:
       context: ./frontend
       args:
@@ -97,6 +109,7 @@ services:
       - appnet
 
   cases:
+    logging: *default-logging
     build:
       context: ./cases
     restart: always
@@ -112,6 +125,7 @@ services:
       - appnet
 
   osint-labs:
+    logging: *default-logging
     build:
       context: ./OSINTCTF
     restart: always
@@ -125,6 +139,7 @@ services:
       - appnet
 
   owlcognito-frontend:
+    logging: *default-logging
     build:
       context: ./frontend
       args:
@@ -145,6 +160,7 @@ services:
       - appnet
 
   media:
+    logging: *default-logging
     image: nginx:1.27-alpine
     restart: always
     volumes:
@@ -161,6 +177,7 @@ services:
       - appnet
 
   transcoder:
+    logging: *default-logging
     build:
       context: ./backend
     restart: always
@@ -202,6 +219,7 @@ services:
       - appnet
 
   livekit:
+    logging: *default-logging
     image: livekit/livekit-server:v1.13.6
     restart: always
     depends_on:
@@ -234,6 +252,7 @@ services:
       - appnet
 
   livekit-egress:
+    logging: *default-logging
     image: livekit/egress:v1.14.1
     restart: always
     depends_on:
@@ -259,6 +278,7 @@ services:
       start_period: 20s
 
   owncast:
+    logging: *default-logging
     image: gabekangas/owncast:0.2.5
     restart: always
     command: ["-streamkey", "${OWNCAST_STREAM_KEY:?Set OWNCAST_STREAM_KEY in environment}"]
@@ -284,6 +304,7 @@ services:
   # empty streamx_clamav_db volume; freshclam then updates it and clamd loads
   # it (1-3 minutes; up to ~10 minutes when a full download is needed).
   clamav:
+    logging: *default-logging
     image: clamav/clamav:1.4.3
     restart: always
     environment:

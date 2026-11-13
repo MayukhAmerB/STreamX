@@ -276,6 +276,13 @@
         }
     };
 
+    // The LMS login page sends the student straight back here (?next= is
+    // validated on the LMS side: only this labs site is accepted).
+    const signInUrl = () => {
+        const back = `${window.location.origin}${window.location.pathname}#exam`;
+        return `${lmsOrigin()}/login?next=${encodeURIComponent(back)}`;
+    };
+
     const csrfToken = async (force = false) => {
         if (state.csrf && !force) return state.csrf;
         const response = await fetch(`${state.apiBase}/auth/csrf/`, {
@@ -384,7 +391,7 @@
         const { kind, message } = state.banner;
         let action = "";
         if (kind === "signed_out") {
-            action = `<a class="btn btn-primary exam-link-btn" href="${esc(`${lmsOrigin()}/login`)}" target="_blank" rel="noopener">${esc(t("signInLink"))}</a>
+            action = `<a class="btn btn-primary exam-link-btn" href="${esc(signInUrl())}">${esc(t("signInLink"))}</a>
                 <button type="button" class="btn exam-secondary-btn" data-action="reload">${esc(t("retry"))}</button>`;
         } else if (kind === "terms") {
             action = `<a class="btn btn-primary exam-link-btn" href="${esc(lmsOrigin())}" target="_blank" rel="noopener">${esc(t("termsLink"))}</a>
@@ -858,6 +865,18 @@
             if (state.detail) renderExam();
             else renderList();
         });
+
+        // Signed in (or accepted the terms) in another tab: re-check on return.
+        const recheck = () => {
+            const kind = state.banner && state.banner.kind;
+            if (document.visibilityState !== "visible") return;
+            if (kind !== "signed_out" && kind !== "terms") return;
+            state.csrf = "";
+            if (state.slug) loadExam(state.slug);
+            else loadExams();
+        };
+        document.addEventListener("visibilitychange", recheck);
+        window.addEventListener("focus", recheck);
 
         if (window.location.hash === "#exam" && navButton) navButton.click();
     };

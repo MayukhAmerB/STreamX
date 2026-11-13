@@ -324,9 +324,19 @@ class RealtimeSession(models.Model):
         ensure_stream_transition(self.stream_status, next_status)
         if self.stream_status == next_status:
             return False
+        previous_status = self.stream_status
         self.stream_status = next_status
         if persist:
-            self.save(update_fields=["stream_status", "updated_at"])
+            # Compare-and-set: a request that loaded a stale row (say "live")
+            # must not resurrect a stream the host stopped in the meantime.
+            now = timezone.now()
+            updated = type(self).objects.filter(pk=self.pk, stream_status=previous_status).update(
+                stream_status=next_status, updated_at=now
+            )
+            if not updated:
+                self.refresh_from_db(fields=["stream_status", "updated_at"])
+                return False
+            self.updated_at = now
         return True
 
     @staticmethod

@@ -83,30 +83,39 @@ export function getCourseCategoryCounts(courses) {
   };
 }
 
-export function readCachedCourseCatalog({ maxAgeMs = COURSE_CATALOG_CACHE_MAX_AGE_MS } = {}) {
+/**
+ * The cached catalog with the time it was written ({ courses, cachedAt }):
+ * lets a page show real cached data with "Last updated hh:mm" when a refresh fails.
+ */
+export function readCachedCourseCatalogEntry({ maxAgeMs = COURSE_CATALOG_CACHE_MAX_AGE_MS } = {}) {
+  const empty = { courses: [], cachedAt: 0 };
   if (!canUseStorage()) {
-    return [];
+    return empty;
   }
 
   try {
     const raw = window.localStorage.getItem(COURSE_CATALOG_CACHE_KEY);
     if (!raw) {
-      return [];
+      return empty;
     }
 
     const parsed = JSON.parse(raw);
     const cachedAt = Number(parsed?.cachedAt || 0);
     const courses = sanitizeCourseCatalogForCache(parsed?.courses);
     if (!courses.length) {
-      return [];
+      return empty;
     }
     if (cachedAt && Date.now() - cachedAt > maxAgeMs) {
-      return [];
+      return empty;
     }
-    return courses;
+    return { courses, cachedAt };
   } catch {
-    return [];
+    return empty;
   }
+}
+
+export function readCachedCourseCatalog(options) {
+  return readCachedCourseCatalogEntry(options).courses;
 }
 
 export function writeCachedCourseCatalog(courses) {

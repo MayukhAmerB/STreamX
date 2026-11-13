@@ -1,0 +1,66 @@
+/* Syed Carbon brand lock-up (header, phone sheet, footer). Token colours from
+   the nearest [data-theme]; radius 0; the logo is decorative next to the name. */
+.brand-shell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 3rem;
+  color: var(--cds-text-primary, #f4f4f4);
+  text-decoration: none;
+}
+
+.brand-shell__mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  overflow: hidden;
+}
+
+.brand-shell__mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.brand-shell__owl {
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--brand-accent, currentColor);
+}
+
+.brand-shell__text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.brand-shell__name {
+  overflow: hidden;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brand-shell__label {
+  overflow: hidden;
+  margin-top: 0.125rem;
+  color: var(--cds-text-secondary, #c6c6c6);
+  font-size: 0.75rem;
+  letter-spacing: 0.32px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brand-shell:focus-visible {
+  outline: 2px solid var(--brand-focus, currentColor);
+  outline-offset: -2px;
+}

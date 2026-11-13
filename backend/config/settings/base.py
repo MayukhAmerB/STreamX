@@ -121,6 +121,17 @@ _db_name = str(DATABASES["default"].get("NAME", "")).strip()
 if "sqlite3" in _db_engine_name and _db_name and not Path(_db_name).is_absolute():
     DATABASES["default"]["NAME"] = str((BASE_DIR / _db_name).resolve())
 DATABASE_CONN_HEALTH_CHECKS = env_bool("DATABASE_CONN_HEALTH_CHECKS", True)
+# Behind PgBouncer (transaction pooling) the pooler already checks its server
+# connections, so Django's per-request "SELECT 1" health check is pure cost.
+# Detected from the DATABASE_URL host; DATABASE_BEHIND_POOLER overrides it.
+_db_host = str(DATABASES["default"].get("HOST", "") or "").strip().lower()
+DATABASE_BEHIND_POOLER = env_bool("DATABASE_BEHIND_POOLER", "pgbouncer" in _db_host)
+if DATABASE_BEHIND_POOLER:
+    DATABASE_CONN_HEALTH_CHECKS = env_bool("DATABASE_POOLER_CONN_HEALTH_CHECKS", False)
+# Server-side cursors (QuerySet.iterator()) cannot cross transactions in
+# PgBouncer transaction mode ("cursor ... does not exist" under load), so they
+# are off for PostgreSQL; iterator() then fetches client-side.
+DATABASE_DISABLE_SERVER_SIDE_CURSORS = env_bool("DATABASE_DISABLE_SERVER_SIDE_CURSORS", True)
 DATABASE_STATEMENT_TIMEOUT_MS = env_int("DATABASE_STATEMENT_TIMEOUT_MS", 15000)
 DATABASE_LOCK_TIMEOUT_MS = env_int("DATABASE_LOCK_TIMEOUT_MS", 10000)
 DATABASE_IDLE_IN_TX_TIMEOUT_MS = env_int("DATABASE_IDLE_IN_TX_TIMEOUT_MS", 30000)
@@ -138,6 +149,10 @@ if "postgresql" in _db_engine:
     db_options.setdefault("connect_timeout", DATABASE_CONNECT_TIMEOUT_SECONDS)
     db_options["options"] = f"{existing_option_string} {hardening_options}".strip()
     DATABASES["default"]["OPTIONS"] = db_options
+    # PgBouncer discards the libpq "options" above (IGNORE_STARTUP_PARAMETERS),
+    # so production also sets these timeouts on the database role:
+    # infra/hostinger/apply-db-role-timeouts.sh.
+    DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = DATABASE_DISABLE_SERVER_SIDE_CURSORS
 
 CACHE_DEFAULT_TIMEOUT_SECONDS = env_int("CACHE_DEFAULT_TIMEOUT_SECONDS", 300)
 REDIS_URL = env("REDIS_URL", "").strip()
@@ -253,7 +268,10 @@ REST_FRAMEWORK = {
         "lecture_comment_write": env("LECTURE_COMMENT_WRITE_RATE", "10/minute"),
         "class_recording_upload": env("CLASS_RECORDING_UPLOAD_RATE", "20/hour"),
         "realtime_session_create": "30/hour",
-        "realtime_session_join": "240/hour",
+        # Per account (config.throttling.RealtimeJoinUserRateThrottle), plus a
+        # high per-IP ceiling: classrooms and carrier NAT share one address.
+        "realtime_session_join": env("REALTIME_SESSION_JOIN_RATE", "240/hour"),
+        "realtime_session_join_ip": env("REALTIME_SESSION_JOIN_IP_RATE", "6000/hour"),
         "realtime_connection_telemetry": "600/hour",
         # Weekly reports: one file per upload request, so the upload budget
         # covers several files per task plus retries.
@@ -340,7 +358,9 @@ SESSION_CACHE_ALIAS = "default"
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", ["http://localhost:5173"])
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOW_HEADERS = (*default_headers, "idempotency-key")
+# If-None-Match/ETag: conditional polling of the realtime session list (304).
+CORS_ALLOW_HEADERS = (*default_headers, "idempotency-key", "if-none-match")
+CORS_EXPOSE_HEADERS = ["ETag"]
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", ["http://localhost:5173"])
 
 if DEBUG:
@@ -525,6 +545,16 @@ REALTIME_DEFAULT_MEETING_CAPACITY = env_int("REALTIME_DEFAULT_MEETING_CAPACITY",
 REALTIME_DEFAULT_MAX_AUDIENCE = env_int("REALTIME_DEFAULT_MAX_AUDIENCE", 500)
 REALTIME_JOIN_TOKEN_TTL_SECONDS = env_int("REALTIME_JOIN_TOKEN_TTL_SECONDS", 10800)
 REALTIME_SESSION_LIST_CACHE_TTL_SECONDS = env_int("REALTIME_SESSION_LIST_CACHE_TTL_SECONDS", 10)
+# Shared (all students) active-session rows, single-flight filled; and the
+# hard cap on unpaginated list responses.
+REALTIME_SESSION_LIST_SHARED_CACHE_TTL_SECONDS = env_int("REALTIME_SESSION_LIST_SHARED_CACHE_TTL_SECONDS", 4)
+REALTIME_SESSION_LIST_MAX_ROWS = env_int("REALTIME_SESSION_LIST_MAX_ROWS", 200)
+# How often the async worker persists OBS stream health (the only writer).
+REALTIME_OBS_STREAM_HEALTH_INTERVAL_SECONDS = env_int("REALTIME_OBS_STREAM_HEALTH_INTERVAL_SECONDS", 5)
+# Attendees may join a live session whatever the weekly clock says, but only for
+# this many hours after it went live: a room the host never ended is abandoned,
+# not a class. Managers are not bound. 0 disables the bound.
+REALTIME_ATTENDEE_JOIN_MAX_LIVE_HOURS = env_int("REALTIME_ATTENDEE_JOIN_MAX_LIVE_HOURS", 6)
 REALTIME_PARTICIPANT_COUNT_CACHE_TTL_SECONDS = env_int("REALTIME_PARTICIPANT_COUNT_CACHE_TTL_SECONDS", 5)
 REALTIME_ENROLLMENT_ACCESS_CACHE_TTL_SECONDS = env_int("REALTIME_ENROLLMENT_ACCESS_CACHE_TTL_SECONDS", 10)
 REALTIME_BROADCAST_URL_CACHE_TTL_SECONDS = env_int("REALTIME_BROADCAST_URL_CACHE_TTL_SECONDS", 15)

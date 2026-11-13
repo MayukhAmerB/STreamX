@@ -3,6 +3,14 @@ import { dedupedGet } from "./requestDedup";
 
 export const listRealtimeSessions = (params = {}) =>
   dedupedGet("/realtime/sessions/", params, () => apiClient.get("/realtime/sessions/", { params }));
+// Conditional list poll: an unchanged list answers 304 (no body); the caller
+// keeps its copy. Used by the shared live-sessions store.
+export const listRealtimeSessionsConditional = (params = {}, etag = "") =>
+  apiClient.get("/realtime/sessions/", {
+    params,
+    headers: etag ? { "If-None-Match": etag } : undefined,
+    validateStatus: (status) => (status >= 200 && status < 300) || status === 304,
+  });
 export const getRealtimeSession = (id) =>
   dedupedGet(`/realtime/sessions/${id}/`, {}, () => apiClient.get(`/realtime/sessions/${id}/`));
 export const createRealtimeSession = (payload) => apiClient.post("/realtime/sessions/", payload);

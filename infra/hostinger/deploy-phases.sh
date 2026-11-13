@@ -217,7 +217,7 @@ phase1() {
   log "Phase 1: stable baseline (app + async worker + observability)."
   compose_main -f "$BASE_COMPOSE" -f "$ASYNC_COMPOSE" up -d --build --remove-orphans
   scale_async_workers -f "$BASE_COMPOSE" -f "$ASYNC_COMPOSE"
-  compose_main -f "$BASE_COMPOSE" exec -T backend python manage.py migrate
+  compose_main -f "$BASE_COMPOSE" exec -T backend sh /app/migrate.sh --noinput
   start_observability
 }
 
@@ -225,7 +225,7 @@ phase2() {
   log "Phase 2: baseline + resource isolation limits."
   compose_main -f "$BASE_COMPOSE" -f "$LIMITS_COMPOSE" -f "$ASYNC_COMPOSE" up -d --build --remove-orphans
   scale_async_workers -f "$BASE_COMPOSE" -f "$LIMITS_COMPOSE" -f "$ASYNC_COMPOSE"
-  compose_main -f "$BASE_COMPOSE" exec -T backend python manage.py migrate
+  compose_main -f "$BASE_COMPOSE" exec -T backend sh /app/migrate.sh --noinput
   start_observability
 }
 
@@ -246,7 +246,7 @@ phase3() {
     -f "$ASYNC_COMPOSE" \
     -f "$POOL_COMPOSE" \
     -f "$GATEWAY_COMPOSE"
-  compose_main -f "$BASE_COMPOSE" exec -T backend python manage.py migrate
+  compose_main -f "$BASE_COMPOSE" exec -T backend sh /app/migrate.sh --noinput
   start_observability
   log "If you want host-nginx to use gateway LB, proxy to 127.0.0.1:8088."
 }
@@ -268,7 +268,7 @@ phase4() {
     -f "$ASYNC_COMPOSE" \
     -f "$PGBOUNCER_COMPOSE" \
     -f "$POSTGRES_TUNING_COMPOSE"
-  compose_main -f "$BASE_COMPOSE" exec -T backend python manage.py migrate
+  compose_main -f "$BASE_COMPOSE" exec -T backend sh /app/migrate.sh --noinput
   start_observability
 }
 
@@ -297,7 +297,7 @@ phase5() {
     -f "$PGBOUNCER_COMPOSE" \
     -f "$PGBOUNCER_POOL_COMPOSE" \
     -f "$POSTGRES_TUNING_COMPOSE"
-  compose_main -f "$BASE_COMPOSE" exec -T backend python manage.py migrate
+  compose_main -f "$BASE_COMPOSE" exec -T backend sh /app/migrate.sh --noinput
   start_observability
   log "If you want host-nginx to use gateway LB, proxy to 127.0.0.1:8088."
 }

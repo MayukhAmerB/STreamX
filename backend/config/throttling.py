@@ -89,3 +89,34 @@ class RefreshIpCeilingThrottle(ClientIpIdentMixin, SimpleRateThrottle):
         if request.method != "POST" or not _presented_refresh_token(request):
             return None
         return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
+
+
+class RealtimeJoinUserRateThrottle(ClientIpIdentMixin, SimpleRateThrottle):
+    """Budget live-class joins per account, not per IP.
+
+    A classroom, campus or mobile carrier NAT puts a whole class behind one
+    address, and a reconnect storm (every meeting drop is a rejoin) would
+    exhaust an IP budget for everyone. Unauthenticated requests are refused by
+    the view's permission check before throttling, but fall back to the
+    client IP just in case.
+    """
+
+    scope = "realtime_session_join"
+
+    def get_cache_key(self, request, view):
+        user = getattr(request, "user", None)
+        if user is not None and getattr(user, "is_authenticated", False):
+            ident = f"user:{user.pk}"
+        else:
+            ident = f"ip:{self.get_ident(request)}"
+        return self.cache_format % {"scope": self.scope, "ident": ident}
+
+
+class RealtimeJoinIpCeilingThrottle(ClientIpIdentMixin, SimpleRateThrottle):
+    """A generous per-IP ceiling on joins, so many accounts behind one address
+    cannot hammer the join path without limit."""
+
+    scope = "realtime_session_join_ip"
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
