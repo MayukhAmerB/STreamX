@@ -127,6 +127,15 @@ FIREWALL_EXEMPTIONS = (
         frozenset({"PATCH"}),
         _fields(("body", 2000)),
     ),
+    # OSINT CTF exam answers: URLs, handles, dork strings and SQL-looking text
+    # are legitimate answers and every attempt must be recorded. Stored through
+    # the ORM, compared as an HMAC, shown in the admin as escaped text.
+    FirewallExemption(
+        "ctf-question-attempts",
+        re.compile(r"/api/ctf/exams/[-\w]+/questions/[-\w]+/attempts/"),
+        frozenset({"POST"}),
+        _fields(("answer", 512)),
+    ),
 )
 
 

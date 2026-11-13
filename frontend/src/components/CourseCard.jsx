@@ -113,7 +113,7 @@ function CourseCard({ course }) {
           </span>
           <Link
             to={`${detailPath}#reviews`}
-            className="owlcognito-course-card-note relative z-20 text-[#A8B0B6] underline-offset-2 transition hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className="owlcognito-course-card-note relative z-20 -my-1.5 inline-flex min-h-6 items-center py-1.5 text-[#A8B0B6] underline-offset-2 transition hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
             aria-label={`${reviewCount} verified reviews for ${safeTitle}`}
           >
             ({reviewCount} {reviewCount === 1 ? "review" : "reviews"})

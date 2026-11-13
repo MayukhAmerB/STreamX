@@ -314,8 +314,8 @@
 }
 
 .as-category-nav-number {
-  color: #66666e;
-  font-size: 9px;
+  color: #8c8c95;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: .08em;
 }
@@ -577,8 +577,8 @@
 
 .as-account-arrow > span {
   white-space: nowrap;
-  color: #73737b;
-  font-size: 8px;
+  color: #9a9aa2;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: .11em;
   text-transform: uppercase;

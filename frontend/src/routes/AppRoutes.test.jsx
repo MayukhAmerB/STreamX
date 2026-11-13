@@ -36,6 +36,8 @@ vi.mock("../pages/TermsPage", async () => {
   };
 });
 vi.mock("../pages/LandingPage", () => ({ default: () => "Landing" }));
+vi.mock("../pages/WatchPage", () => ({ default: () => "Watch" }));
+vi.mock("../pages/NotFoundPage", () => ({ default: () => "NotFound" }));
 vi.mock("../pages/AboutPage", () => ({ default: () => "About" }));
 vi.mock("../pages/CourseListPage", () => ({ default: () => "CourseList" }));
 vi.mock("../pages/JoinLivePage", () => ({ default: () => "JoinLive" }));
@@ -193,4 +195,15 @@ describe("AppRoutes", () => {
   it("sends signed-out visitors from the old Console address to login for /console", async () => {
     expect(await renderAt("/users-corner", authFor("guest"))).toBe("website:Login(from=/console) @/login");
   });
+
+  it("serves the YouTube Watch page inside the website layout", async () => {
+    expect(await renderAt("/watch", authFor("guest"))).toBe("website:Watch @/watch");
+  });
+
+  it.each(["/this-page-does-not-exist", "/courses/12/nope", "/watch/extra"])(
+    "answers an unknown address %s with a real not-found page (no silent redirect home)",
+    async (path) => {
+      expect(await renderAt(path, authFor("guest"))).toBe(`website:NotFound @${path}`);
+    }
+  );
 });

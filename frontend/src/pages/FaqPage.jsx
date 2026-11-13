@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import Button from "../components/Button";
 import PageShell from "../components/PageShell";
 
 const pageBackgroundImage =
@@ -188,13 +187,11 @@ export default function FaqPage() {
                   If your question is not covered here, use the contact page and we will guide you
                   before enrollment.
                 </p>
-                <Link to="/contact" className="mt-4 inline-flex">
-                  <Button
-                    variant="indigoSoft"
-                    className="border-white/20 bg-white/10 text-white hover:bg-white/15"
-                  >
-                    Go To Contact
-                  </Button>
+                <Link
+                  to="/contact"
+                  className="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                >
+                  Go to Contact
                 </Link>
               </div>
             </section>

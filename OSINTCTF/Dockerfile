@@ -3,7 +3,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY server.js ./
-COPY index.html app.js styles.css ./public/
+COPY index.html app.js exam.js styles.css ./public/
 COPY *.png ./public/
 COPY favicon.ico ./public/
 COPY materials ./public/materials

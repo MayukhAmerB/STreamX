@@ -4,17 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="google" content="notranslate" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="preload"
-      as="style"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
-    />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
-    />
+    <!-- Inter is self-hosted (OFL, /fonts/inter): the hero weight and body weight are preloaded. -->
+    <link rel="preload" href="/fonts/inter/inter-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/inter/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <!--site-meta-->
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -22,7 +15,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192x192.png" />
     <link rel="shortcut icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="preload" as="image" href="/logo.jpeg" fetchpriority="high" />
+    <link rel="preload" as="image" href="/logo-256.webp" fetchpriority="high" />
     <meta name="theme-color" content="#050505" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -150,14 +143,15 @@
         transition: opacity 600ms cubic-bezier(0.2, 0.68, 0.2, 1);
       }
     </style>
-    <title>Al syed Initiative</title>
   </head>
   <body class="bg-ink preload-active notranslate" translate="no">
     <div id="boot-loader" role="status" aria-label="Loading Al syed Initiative">
       <div class="loader-content">
         <div class="loader-mark">
           <img
-            src="/logo.jpeg"
+            src="/logo-256.webp"
+            width="100"
+            height="100"
             alt="Al syed Initiative logo"
             class="loader-logo"
             loading="eager"

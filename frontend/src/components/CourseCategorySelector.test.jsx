@@ -28,8 +28,8 @@ describe("CourseCategorySelector", () => {
     expect(html).toContain("Web Application &amp; API Security");
     expect(html).toContain("4 available");
     expect(html).toContain("3 available");
-    expect(html).not.toContain("course-track-osint.png");
-    expect(html).not.toContain("course-track-pentesting.png");
+    expect(html).not.toContain("course-track-osint.webp");
+    expect(html).not.toContain("course-track-pentesting.webp");
     expect(html).toContain('aria-pressed="true"');
   });
 
@@ -44,8 +44,8 @@ describe("CourseCategorySelector", () => {
 
     expect(html).toContain('href="/courses?category=osint#course-category-results"');
     expect(html).toContain('href="/courses?category=web_pentesting#course-category-results"');
-    expect(html).toContain("course-track-osint.png");
-    expect(html).toContain("course-track-pentesting.png");
+    expect(html).toContain("course-track-osint.webp");
+    expect(html).toContain("course-track-pentesting.webp");
     expect(html).toContain("min-w-[72%]");
     expect(html).toContain("last:mr-[28%]");
     expect(html).toContain("sm:last:mr-0");

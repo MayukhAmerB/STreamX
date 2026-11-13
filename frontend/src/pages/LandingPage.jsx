@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import certificateExcellenceImage from "../assets/certificate-excellence.png";
+import certificateExcellenceImage from "../assets/certificate-excellence.webp";
 import { listCourses, listLiveClasses } from "../api/courses";
 import { listRealtimeSessions } from "../api/realtime";
 import Button from "../components/Button";
@@ -8,6 +8,7 @@ import { CourseTrackCards } from "../components/CourseCategorySelector";
 import CourseCardRail from "../components/CourseCardRail";
 import HeroCountdown from "../components/HeroCountdown";
 import StoryJourneySection from "../components/StoryJourneySection";
+import YouTubeSection from "../features/youtube/YouTubeSection";
 import { useAuth } from "../hooks/useAuth";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
 import { selectLandingCourses } from "../utils/landingCourses";
@@ -133,12 +134,9 @@ const fallbackLandingLiveClasses = [
 
 const levelOrder = { beginner: 1, intermediate: 2, advanced: 3 };
 const categoryOrder = { osint: 1, web_pentesting: 2 };
-const monthByLevel = {
-  beginner: { month: 1, label: "Month 1", subtitle: "Foundation" },
-  intermediate: { month: 2, label: "Month 2", subtitle: "Practical Skills" },
-  advanced: { month: 3, label: "Month 3", subtitle: "Investigation & Intelligence" },
-};
 const cornerGlowPanelBg = "bg-[#070707]";
+const liveClassActionClass =
+  "inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-white bg-white px-4 text-sm font-semibold text-black transition hover:border-[#E5E5E5] hover:bg-[#E5E5E5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f3e2b3] focus-visible:ring-offset-2 focus-visible:ring-offset-black";
 const cornerGlowCardBg = "bg-[#0A0A0A]";
 function sortCatalogCourses(courses) {
   return [...courses].sort((a, b) => {
@@ -177,9 +175,21 @@ function _programBulletsForCourse(course) {
   return ["Structured learning path", "Practical workflow-based progression"];
 }
 
-function formatLevel(level) {
-  if (!level) return "Program";
-  return level.charAt(0).toUpperCase() + level.slice(1);
+const DAY_ABBREVIATIONS = [
+  ["Monday", "Mon"],
+  ["Tuesday", "Tue"],
+  ["Wednesday", "Wed"],
+  ["Thursday", "Thu"],
+  ["Friday", "Fri"],
+  ["Saturday", "Sat"],
+  ["Sunday", "Sun"],
+];
+
+/** "Friday, Saturday, Sunday" -> "Fri, Sat, Sun" so three facts fit one row on phones. */
+function formatScheduleDays(value) {
+  const text = String(value || "").trim();
+  if (!text) return "Fri, Sat, Sun";
+  return DAY_ABBREVIATIONS.reduce((out, [full, short]) => out.replace(new RegExp(full, "gi"), short), text);
 }
 
 function formatLiveClassPrice(value) {
@@ -739,7 +749,7 @@ export default function LandingPage() {
 
         <div className="relative mx-auto max-w-[1320px] pt-7 sm:pt-9 lg:pt-10">
           <div className="grid min-h-0 items-center gap-7 pb-7 sm:min-h-[470px] lg:grid-cols-[0.78fr_1.22fr] lg:gap-9 xl:gap-12">
-            <div className="reveal-up hidden py-2 sm:block lg:py-4">
+            <div className="reveal-up py-1 sm:py-2 lg:py-4">
               <p className="hero-eyebrow flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.24em] text-[#B8C0C5] sm:text-xs">
                 <span className="h-px w-10 bg-white/65" aria-hidden="true" />
                 Professional cybersecurity training
@@ -775,7 +785,7 @@ export default function LandingPage() {
               {heroLiveBroadcast ? (
                 <Link
                   to={isAuthenticated ? heroLiveBroadcastJoinPath : "/login"}
-                  className="mt-6 flex w-full max-w-xl items-center justify-between gap-4 rounded-xl border border-red-400/45 bg-red-600 px-5 py-4 text-left text-white shadow-[0_20px_48px_rgba(220,38,38,0.3)] transition hover:bg-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+                  className="mt-6 hidden w-full max-w-xl items-center justify-between gap-4 rounded-xl border border-red-400/45 bg-red-600 px-5 py-4 sm:flex text-left text-white shadow-[0_20px_48px_rgba(220,38,38,0.3)] transition hover:bg-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
                 >
                   <span>
                     <span className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.2em] text-red-100">
@@ -792,16 +802,16 @@ export default function LandingPage() {
                 </Link>
               ) : null}
 
-              <div className="mt-6 flex flex-wrap gap-3">
+              <div className="mt-6 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
                 <Link
                   to="/courses"
-                  className="hero-primary-action inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-6 text-sm font-semibold text-black transition hover:bg-[#E5E5E5]"
+                  className="hero-primary-action inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-6 text-sm font-semibold text-black transition hover:bg-[#E5E5E5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f3e2b3] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                 >
                   Browse Courses
                 </Link>
                 <Link
                   to={isAuthenticated ? "/console" : "/login"}
-                  className="hero-secondary-action inline-flex min-h-12 items-center justify-center rounded-lg border border-white/20 bg-[#090909] px-6 text-sm font-semibold text-white transition hover:border-white/40 hover:bg-[#111111]"
+                  className="hero-secondary-action inline-flex min-h-12 items-center justify-center rounded-lg border border-white/20 bg-[#090909] px-6 text-sm font-semibold text-white transition hover:border-white/40 hover:bg-[#111111] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f3e2b3]"
                 >
                   {isAuthenticated ? "Console" : "Get Started"}
                 </Link>
@@ -821,13 +831,13 @@ export default function LandingPage() {
                 </Link>
               ) : null}
 
-              <div className="mb-5 sm:mb-3 sm:flex sm:items-end sm:justify-between sm:gap-4 sm:border-b sm:border-white/10 sm:pb-3">
+              <div className="mb-4 border-t border-white/10 pt-6 sm:mb-3 sm:flex sm:items-end sm:justify-between sm:gap-4 sm:border-b sm:border-t-0 sm:pb-3 sm:pt-0">
                 <div>
-                  <p className="hero-program-kicker text-[11px] font-bold uppercase tracking-[0.28em] text-[#A3A3A3] sm:text-[9px] sm:tracking-[0.22em]">Featured programs</p>
-                  <h2 className="hero-program-title mt-4 max-w-[430px] font-reference text-[clamp(2.35rem,11vw,3.4rem)] font-semibold leading-[0.98] tracking-[-0.04em] text-white sm:mt-1 sm:max-w-none sm:text-xl sm:leading-normal sm:tracking-[-0.025em]">Choose your training path</h2>
+                  <p className="hero-program-kicker text-[11px] font-bold uppercase tracking-[0.24em] text-[#A3A3A3] sm:text-[10px] sm:tracking-[0.22em]">Featured programs</p>
+                  <h2 className="hero-program-title mt-2 max-w-[430px] font-reference text-[clamp(1.6rem,7vw,2.2rem)] font-semibold leading-[1.02] tracking-[-0.035em] text-white sm:mt-1 sm:max-w-none sm:text-xl sm:leading-normal sm:tracking-[-0.025em]">Choose your training path</h2>
                 </div>
-                <div className="mt-5 flex items-center gap-4 sm:mt-0 sm:block">
-                  <span className="hero-program-count shrink-0 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#999999] sm:text-[8px] sm:tracking-[0.14em]">2 professional tracks</span>
+                <div className="mt-3 flex items-center gap-4 sm:mt-0 sm:block">
+                  <span className="hero-program-count shrink-0 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#A3A3A3] sm:tracking-[0.14em]">2 professional tracks</span>
                   <span className="h-px flex-1 bg-white/25 sm:hidden" aria-hidden="true" />
                 </div>
               </div>
@@ -845,6 +855,8 @@ export default function LandingPage() {
 
       <div className="relative z-10 px-4 pb-20 pt-8">
         <div className="mx-auto max-w-6xl space-y-8">
+          <YouTubeSection />
+
           <SectionCard className="!p-0">
             <div className="grid gap-0 lg:grid-cols-[0.72fr_1.28fr]">
               <div className="flex flex-col justify-center border-b border-white/10 p-5 sm:p-7 lg:border-b-0 lg:border-r lg:p-8">
@@ -867,7 +879,7 @@ export default function LandingPage() {
                     ["Authorization", "Official signature and issue date"],
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-xl border border-white/10 bg-[#0A0A0A] px-4 py-3">
-                      <dt className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[#717171]">
+                      <dt className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8C8C8C]">
                         {label}
                       </dt>
                       <dd className="mt-1.5 text-xs font-semibold text-[#D4D4D4]">{value}</dd>
@@ -881,6 +893,8 @@ export default function LandingPage() {
                   <img
                     src={certificateExcellenceImage}
                     alt={`${siteBrand.name} Certificate of Excellence format`}
+                    width="1600"
+                    height="900"
                     className="block h-auto w-full object-contain"
                     loading="lazy"
                     decoding="async"
@@ -902,7 +916,7 @@ export default function LandingPage() {
                 } flex min-h-28 h-full flex-col justify-center border-b border-white/10 px-5 py-5 last:border-b-0 sm:[&:nth-child(odd)]:border-r lg:border-b-0 lg:border-r lg:last:border-r-0`}
               >
                 <div className="font-reference text-3xl font-semibold text-white">{item.value}</div>
-                <div className="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#777777]">
+                <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8F8F8F]">
                   {item.label}
                 </div>
               </div>
@@ -914,7 +928,7 @@ export default function LandingPage() {
               title="Built for disciplined learning"
               subtitle="A focused cybersecurity education platform for students who value method, evidence, and responsible practice."
             />
-            <div className="mt-7 grid auto-rows-fr gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 lg:grid-cols-3">
+            <div className="mt-7 grid gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 lg:auto-rows-fr lg:grid-cols-3">
             {infoCards.map((card, idx) => (
               <div
                 key={card.title}
@@ -937,7 +951,7 @@ export default function LandingPage() {
               title={`Why learners choose ${siteBrand.name}`}
               subtitle="Cybersecurity training depth with a modern online learning experience focused on professional execution."
             />
-            <div className="mt-6 grid auto-rows-fr gap-4 lg:grid-cols-3">
+            <div className="mt-6 grid gap-4 lg:auto-rows-fr lg:grid-cols-3">
               {whyChoose.map((item, idx) => (
                 <div
                   key={item.title}
@@ -962,7 +976,7 @@ export default function LandingPage() {
               title="How your journey works"
               subtitle="A simple onboarding path into structured cybersecurity learning and hands-on practice."
             />
-            <div className="mt-6 grid auto-rows-fr gap-4 lg:grid-cols-3">
+            <div className="mt-6 grid gap-4 lg:auto-rows-fr lg:grid-cols-3">
               {steps.map((step, idx) => (
                 <div
                   key={step.no}
@@ -985,7 +999,7 @@ export default function LandingPage() {
           <SectionCard className="p-5 sm:p-6">
             <SectionTitle
               title="Live classes"
-              subtitle="Browse our current live OSINT classes and enroll directly from the landing page."
+              subtitle="Current live OSINT classes: three sessions a week, each included with its professional training program."
             />
 
             {landingLiveClassesError ? (
@@ -994,14 +1008,8 @@ export default function LandingPage() {
               </div>
             ) : null}
 
-            <div className="mt-6 grid auto-rows-fr gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-6 grid gap-4 md:auto-rows-fr md:grid-cols-2 xl:grid-cols-3">
               {landingPrograms.map((program, idx) => {
-                const levelKey = String(program?.level || "").toLowerCase();
-                const monthMeta = monthByLevel[levelKey] || {
-                  month: program?.month_number || 0,
-                  label: `Month ${program?.month_number || ""}`.trim(),
-                  subtitle: formatLevel(program?.level),
-                };
                 const enrollmentStatus = String(program.enrollment_status || "").toLowerCase();
                 return (
                 <div
@@ -1011,16 +1019,12 @@ export default function LandingPage() {
                   } owlcognito-live-card flex h-full flex-col rounded-2xl border border-white/10 ${cornerGlowCardBg} p-5 transition-colors hover:border-white/20`}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="rounded-full border border-white/10 bg-[#050505] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A8A8A8]">
-                      {monthMeta.label || `Live Class ${idx + 1}`}
+                    <span className="rounded-full border border-white/10 bg-[#050505] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#B5B5B5]">
+                      Live class
                     </span>
                     <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-300">
                       Live
                     </span>
-                  </div>
-
-                  <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#949494]">
-                    {monthMeta.subtitle}
                   </div>
 
                   <h3 className="mt-4 font-reference text-2xl font-semibold leading-tight text-white">
@@ -1031,11 +1035,11 @@ export default function LandingPage() {
                     {program.description || "OSINT live class track with guided progression."}
                   </p>
 
-                  <div className="mt-4 grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-3">
+                  <div className="mt-4 grid auto-rows-fr grid-cols-3 gap-2">
                     <div className="owlcognito-live-stat h-full rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5">
                       <div className="text-[10px] uppercase tracking-[0.14em] text-[#868686]">Schedule</div>
                       <div className="mt-1 text-xs font-semibold text-[#E0E0E0]">
-                        {program.schedule_days || "Fri / Sat / Sun"}
+                        {formatScheduleDays(program.schedule_days)}
                       </div>
                     </div>
                     <div className="owlcognito-live-stat h-full rounded-xl border border-white/10 bg-[#060606] px-3 py-2.5">
@@ -1063,13 +1067,13 @@ export default function LandingPage() {
                     {program.linked_course_id ? (
                       <Link
                         to={`/courses/${program.linked_course_id}`}
-                        className="rounded-full border border-white/10 bg-[#060606] px-3 py-1 text-xs font-semibold text-[#D4D4D4] transition hover:border-white/25 hover:text-white"
+                        className="inline-flex min-h-7 items-center rounded-full border border-white/10 bg-[#060606] px-3 py-1 text-xs font-semibold text-[#D4D4D4] transition hover:border-white/25 hover:text-white"
                       >
                         Included with {program.linked_course_title || "parent course"}
                       </Link>
                     ) : (
                       <span className="rounded-full border border-white/10 bg-[#060606] px-3 py-1 text-xs font-semibold text-[#AAAAAA]">
-                        Legacy standalone
+                        Standalone class
                       </span>
                     )}
                   </div>
@@ -1082,21 +1086,21 @@ export default function LandingPage() {
                             ? `/courses/${program.linked_course_id}/live`
                             : "/courses?view=owned"
                         }
-                        className="block"
+                        className={liveClassActionClass}
                       >
-                        <Button className="w-full">Access Live Class</Button>
+                        Open live class
                       </Link>
                     ) : enrollmentStatus === "pending" ? (
                       <Button className="w-full" disabled>
-                        Legacy Request Pending
+                        Request pending
                       </Button>
                     ) : program.linked_course_id ? (
-                      <Link to={`/courses/${program.linked_course_id}`} className="block">
-                        <Button className="w-full">Included with Course</Button>
+                      <Link to={`/courses/${program.linked_course_id}`} className={liveClassActionClass}>
+                        View the course
                       </Link>
                     ) : (
                       <Button className="w-full" disabled>
-                        Legacy Enrollment Required
+                        Enrollment closed
                       </Button>
                     )}
                   </div>
@@ -1115,20 +1119,18 @@ export default function LandingPage() {
                     Join our flagship course and learn OSINT plus web application pentesting with a structured workflow.
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                   <Link
                     to="/courses"
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/15 px-5 text-sm font-semibold text-white transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f3e2b3]"
                   >
-                    <button className="rounded-xl border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/5">
-                      Explore
-                    </button>
+                    Explore courses
                   </Link>
                   <Link
                     to={featuredLiveCourseLink}
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-black transition hover:bg-[#E8E8E8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f3e2b3] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                   >
-                    <button className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-[#E8E8E8]">
-                      Join Now
-                    </button>
+                    Join now
                   </Link>
                 </div>
               </div>

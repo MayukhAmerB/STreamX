@@ -3,6 +3,8 @@ import "./Navbar.css";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { siteBrand } from "../config/siteBrand";
+import { scrollToWatchSection } from "../features/youtube/watchAnchor";
+import { useYouTubeChannel } from "../features/youtube/youTubeStore";
 import { useAuth } from "../hooks/useAuth";
 import { resolveDjangoAdminUrl } from "../utils/backendUrl";
 import BrandLogo from "./BrandLogo";
@@ -51,6 +53,28 @@ function ConsoleIcon({ className = "" }) {
       <path d="M5 6.5 7 8l-2 1.5M8.5 10H11" />
     </svg>
   );
+}
+
+/** Small pulsing red dot + "Live" shown next to "Watch" while the channel is live. */
+function LiveIndicator() {
+  return (
+    <span className="snav__live">
+      <span className="snav__live-dot" aria-hidden="true" />
+      Live
+    </span>
+  );
+}
+
+/**
+ * On the landing page "Watch" scrolls to the section (smoothly, below the
+ * sticky header); everywhere else, or if the section is hidden, it opens /watch.
+ */
+function watchClickHandler(pathname) {
+  return (event) => {
+    if (pathname === "/" && scrollToWatchSection()) {
+      event.preventDefault();
+    }
+  };
 }
 
 /** Moves focus between the links of an open menu with the arrow keys. */
@@ -248,9 +272,10 @@ function trapTab(event, container) {
 }
 
 /** Phone / tablet: a full-screen sheet with grouped links and the main action at the bottom. */
-function MobileSheet({ id, isAuthenticated, user, siteGroups, accountGroups, onSignOut, onClose, returnFocusRef }) {
+function MobileSheet({ id, isAuthenticated, user, siteGroups, accountGroups, onSignOut, onClose, returnFocusRef, pathname, isLive }) {
   const panelRef = useRef(null);
   const titleId = useId();
+  const navigate = useNavigate();
 
   useEffect(() => {
     panelRef.current?.focus();
@@ -317,10 +342,33 @@ function MobileSheet({ id, isAuthenticated, user, siteGroups, accountGroups, onS
               <ul className="snav-sheet__list">
                 {group.links.map((link) => (
                   <li key={link.id}>
-                    <NavLink to={link.to} className="snav-sheet__link" onClick={onClose}>
-                      <span>{link.label}</span>
-                      <ArrowIcon className="snav-sheet__arrow" />
-                    </NavLink>
+                    {link.id === "watch" ? (
+                      <NavLink
+                        to={link.to}
+                        className="snav-sheet__link"
+                        onClick={(event) => {
+                          onClose();
+                          if (pathname === "/") {
+                            event.preventDefault();
+                            // Let the sheet unlock page scrolling first.
+                            window.requestAnimationFrame(() => {
+                              if (!scrollToWatchSection()) navigate(link.to);
+                            });
+                          }
+                        }}
+                      >
+                        <span className="snav-sheet__label">
+                          {link.label}
+                          {isLive ? <LiveIndicator /> : null}
+                        </span>
+                        <ArrowIcon className="snav-sheet__arrow" />
+                      </NavLink>
+                    ) : (
+                      <NavLink to={link.to} className="snav-sheet__link" onClick={onClose}>
+                        <span>{link.label}</span>
+                        <ArrowIcon className="snav-sheet__arrow" />
+                      </NavLink>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -401,8 +449,11 @@ export default function Navbar() {
   const menuButtonRef = useRef(null);
   const sheetId = useId();
 
-  const { primary, more } = getSiteNavLinks(siteBrand.id);
-  const siteGroups = getSiteNavGroups(siteBrand.id);
+  const youtube = useYouTubeChannel();
+  const navOptions = { youtube: siteBrand.youtube && youtube.enabled !== false };
+  const isLive = navOptions.youtube && Boolean(youtube.model?.live);
+  const { primary, more } = getSiteNavLinks(siteBrand.id, navOptions);
+  const siteGroups = getSiteNavGroups(siteBrand.id, navOptions);
   const accountGroups = isAuthenticated
     ? getAccountMenuGroups({ isInstructor, isAdmin, djangoAdminUrl: isAdmin ? resolveDjangoAdminUrl() : "" })
     : [];
@@ -452,9 +503,13 @@ export default function Navbar() {
               <li key={link.id}>
                 <NavLink
                   to={link.to}
-                  className={({ isActive }) => `snav__link${isActive ? " is-active" : ""}`}
+                  className={({ isActive }) =>
+                    `snav__link${isActive ? " is-active" : ""}${link.id === "watch" && isLive ? " is-live" : ""}`
+                  }
+                  onClick={link.id === "watch" ? watchClickHandler(pathname) : undefined}
                 >
                   {link.shortLabel || link.label}
+                  {link.id === "watch" && isLive ? <LiveIndicator /> : null}
                 </NavLink>
               </li>
             ))}
@@ -490,7 +545,9 @@ export default function Navbar() {
             type="button"
             className="snav__icon-btn snav__menu-btn"
             onClick={() => setMobileMenuOpen((value) => !value)}
-            aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-label={
+              mobileMenuOpen ? "Close navigation menu" : `Open navigation menu${isLive ? " (YouTube live now)" : ""}`
+            }
             aria-expanded={mobileMenuOpen}
             aria-controls={mobileMenuOpen ? sheetId : undefined}
             aria-haspopup="dialog"
@@ -498,6 +555,7 @@ export default function Navbar() {
             <svg aria-hidden="true" viewBox="0 0 16 16" className="snav__icon" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
               <path d="M2.5 5h11M2.5 11h11" />
             </svg>
+            {isLive && !mobileMenuOpen ? <span className="snav__menu-live" aria-hidden="true" /> : null}
           </button>
         </div>
       </div>
@@ -512,6 +570,8 @@ export default function Navbar() {
           onSignOut={onLogout}
           onClose={closeMobileMenu}
           returnFocusRef={menuButtonRef}
+          pathname={pathname}
+          isLive={isLive}
         />
       ) : null}
     </header>

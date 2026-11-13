@@ -58,10 +58,10 @@ describe("getCourseDetailPriceLabel", () => {
 
   it("uses course-specific artwork while keeping admin imagery highest priority", () => {
     expect(getCourseDetailArtwork({ category: "osint" })).toBe(
-      "/course-art/osint-detail-operations-v1.png"
+      "/course-art/osint-detail-operations-v1.webp"
     );
     expect(getCourseDetailArtwork({ category: "web_pentesting" })).toBe(
-      "/course-art/pentesting-detail-lab-v1.png"
+      "/course-art/pentesting-detail-lab-v1.webp"
     );
     expect(
       getCourseDetailArtwork({

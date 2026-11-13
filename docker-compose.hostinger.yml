@@ -117,6 +117,8 @@ services:
     restart: always
     environment:
       CERTIFICATION_ANSWER_SECRET: ${CERTIFICATION_ANSWER_SECRET:-}
+      # The Examination tab sends answers to the LMS API (recorded in Postgres).
+      LABS_LMS_API_BASE: ${LABS_LMS_API_BASE:-https://alsyedinitiative.com/api}
     ports:
       - "127.0.0.1:8092:8080"
     networks:

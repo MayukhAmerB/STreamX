@@ -117,3 +117,8 @@ if _lan_ips:
 # Default to that local folder unless explicitly overridden.
 if str(LIVEKIT_RECORDING_LOCAL_OUTPUT_ROOT or "").strip() in {"", "/recordings"}:
     LIVEKIT_RECORDING_LOCAL_OUTPUT_ROOT = str((BASE_DIR.parent / "infra" / "recordings").resolve())
+
+# Local labs app (OSINTCTF/server.js on port 8092) calling /api/ctf/.
+_dev_labs_origins = ["http://localhost:8092", "http://127.0.0.1:8092"]
+CTF_LABS_ORIGINS = list(dict.fromkeys([*CTF_LABS_ORIGINS, *_dev_labs_origins]))
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys([*CSRF_TRUSTED_ORIGINS, *_dev_labs_origins]))

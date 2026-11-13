@@ -42,6 +42,8 @@ urlpatterns = [
     path("api/national-desk/", include("apps.national_desk.urls")),
     path("api/join/", include("apps.join_requests.urls")),
     path("api/reports/", include("apps.reports.urls")),
+    path("api/site/", include("apps.site_media.urls")),
+    path("api/ctf/", include("apps.ctf.urls")),
     path("api/", include("apps.courses.urls")),
     path("api/payment/", include("apps.payments.urls")),
 ]

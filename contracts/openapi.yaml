@@ -1093,6 +1093,132 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /ctf/exams/:
+    get:
+      operationId: ctf_exams_list
+      tags:
+      - ctf
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamList'
+          description: ''
+  /ctf/exams/{slug}/:
+    get:
+      operationId: ctf_exams_retrieve
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamDetail'
+          description: ''
+  /ctf/exams/{slug}/questions/{key}/attempts/:
+    post:
+      operationId: ctf_exams_questions_attempts_create
+      description: |-
+        DRF APIView/ViewSet mixin. Put it FIRST in the bases.
+
+        Runs after authentication/permissions/throttling (inside ``initial``) so
+        the owner is the authenticated user and rejected requests never claim keys.
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttemptRequestRequest'
+        required: true
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttemptResponse'
+          description: ''
+  /ctf/exams/{slug}/start/:
+    post:
+      operationId: ctf_exams_start_create
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipationResponse'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipationResponse'
+          description: ''
+  /ctf/exams/{slug}/submit/:
+    post:
+      operationId: ctf_exams_submit_create
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipationResponse'
+          description: ''
   /enrollment-leads/:
     post:
       operationId: enrollment_leads_create
@@ -4094,6 +4220,24 @@ paths:
       responses:
         '204':
           description: No response body
+  /site/youtube/:
+    get:
+      operationId: site_youtube_retrieve
+      description: |-
+        Public YouTube section data: channel, live status, featured and latest videos.
+
+        Anonymous (no cookies read), throttled per IP, briefly cacheable. Upstream
+        trouble never surfaces as an error: the payload falls back to cached data
+        or ``available: false`` and the website hides the section.
+      tags:
+      - Website
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/YouTubeChannelResponse'
+          description: ''
 components:
   schemas:
     ActionTypeEnum:
@@ -4113,6 +4257,41 @@ components:
           $ref: '#/components/schemas/StoredFile'
       required:
       - attachment
+    AttemptRequestRequest:
+      type: object
+      properties:
+        answer:
+          type: string
+          minLength: 1
+          maxLength: 512
+      required:
+      - answer
+    AttemptResponse:
+      type: object
+      properties:
+        attempt:
+          $ref: '#/components/schemas/AttemptResult'
+        participation:
+          $ref: '#/components/schemas/Participation'
+      required:
+      - attempt
+      - participation
+    AttemptResult:
+      type: object
+      properties:
+        attempt_number:
+          type: integer
+        correct:
+          type: boolean
+        points_awarded:
+          type: integer
+        attempts_remaining:
+          type: integer
+      required:
+      - attempt_number
+      - attempts_remaining
+      - correct
+      - points_awarded
     AuditEntry:
       type: object
       properties:
@@ -4591,6 +4770,74 @@ components:
       - id
       - max_marks
       - name
+    CtfExamWindowEnum:
+      enum:
+      - not_open
+      - open
+      - closed
+      type: string
+      description: |-
+        * `not_open` - Not open yet
+        * `open` - Open
+        * `closed` - Closed
+    CtfMaterialKindEnum:
+      enum:
+      - image
+      - file
+      type: string
+      description: |-
+        * `image` - Image
+        * `file` - File
+    CtfParticipationStatusEnum:
+      enum:
+      - active
+      - submitted
+      - expired
+      type: string
+      description: |-
+        * `active` - In progress
+        * `submitted` - Submitted
+        * `expired` - Time over
+    CtfQuestionCategoryEnum:
+      enum:
+      - socmint
+      - geoint
+      - chronolocation
+      - imint
+      - dorking
+      - orgint
+      - techint
+      - archives
+      - transport
+      - finint
+      - people
+      - crypto
+      type: string
+      description: |-
+        * `socmint` - SOCMINT (social media)
+        * `geoint` - GEOINT (geolocation)
+        * `chronolocation` - Chronolocation
+        * `imint` - IMINT (imagery)
+        * `dorking` - Search-engine dorking
+        * `orgint` - Organisational intelligence
+        * `techint` - Technical / infrastructure
+        * `archives` - Web archives
+        * `transport` - Transport (aviation, maritime, rail)
+        * `finint` - Financial and corporate records
+        * `people` - People search
+        * `crypto` - Crypto / blockchain
+    CtfQuestionDifficultyEnum:
+      enum:
+      - medium
+      - hard
+      - expert
+      - insane
+      type: string
+      description: |-
+        * `medium` - Medium
+        * `hard` - Hard
+        * `expert` - Expert
+        * `insane` - Insane
     EventEnum:
       enum:
       - connecting
@@ -4611,6 +4858,129 @@ components:
         * `connection_failed` - connection_failed
         * `quality_changed` - quality_changed
         * `relay_fallback` - relay_fallback
+    ExamDetail:
+      type: object
+      properties:
+        exam:
+          $ref: '#/components/schemas/ExamInfo'
+        participation:
+          allOf:
+          - $ref: '#/components/schemas/Participation'
+          nullable: true
+        server_time:
+          type: string
+          format: date-time
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Question'
+      required:
+      - exam
+      - participation
+      - questions
+      - server_time
+    ExamInfo:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          $ref: '#/components/schemas/LocalizedText'
+        status:
+          $ref: '#/components/schemas/ReportTaskStatusEnum'
+        window:
+          $ref: '#/components/schemas/CtfExamWindowEnum'
+        opens_at:
+          type: string
+          format: date-time
+          nullable: true
+        closes_at:
+          type: string
+          format: date-time
+          nullable: true
+        briefing:
+          $ref: '#/components/schemas/LocalizedLines'
+        rules:
+          $ref: '#/components/schemas/LocalizedLines'
+        time_limit_minutes:
+          type: integer
+          nullable: true
+        question_count:
+          type: integer
+        total_points:
+          type: integer
+        can_start:
+          type: boolean
+      required:
+      - briefing
+      - can_start
+      - closes_at
+      - opens_at
+      - question_count
+      - rules
+      - slug
+      - status
+      - time_limit_minutes
+      - title
+      - total_points
+      - window
+    ExamList:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExamSummary'
+        server_time:
+          type: string
+          format: date-time
+      required:
+      - results
+      - server_time
+    ExamSummary:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          $ref: '#/components/schemas/LocalizedText'
+        status:
+          $ref: '#/components/schemas/ReportTaskStatusEnum'
+        window:
+          $ref: '#/components/schemas/CtfExamWindowEnum'
+        opens_at:
+          type: string
+          format: date-time
+          nullable: true
+        closes_at:
+          type: string
+          format: date-time
+          nullable: true
+        time_limit_minutes:
+          type: integer
+          nullable: true
+        question_count:
+          type: integer
+        total_points:
+          type: integer
+        can_start:
+          type: boolean
+        participation:
+          allOf:
+          - $ref: '#/components/schemas/Participation'
+          nullable: true
+      required:
+      - can_start
+      - closes_at
+      - opens_at
+      - participation
+      - question_count
+      - slug
+      - status
+      - time_limit_minutes
+      - title
+      - total_points
+      - window
     FeedbackFile:
       type: object
       properties:
@@ -5381,6 +5751,30 @@ components:
         * `beginner` - Beginner
         * `intermediate` - Intermediate
         * `advanced` - Advanced
+    LocalizedLines:
+      type: object
+      properties:
+        en:
+          type: array
+          items:
+            type: string
+        ur:
+          type: array
+          items:
+            type: string
+      required:
+      - en
+      - ur
+    LocalizedText:
+      type: object
+      properties:
+        en:
+          type: string
+        ur:
+          type: string
+      required:
+      - en
+      - ur
     ManageTask:
       type: object
       description: Create/update input and the grader's view of a task.
@@ -5606,6 +6000,23 @@ components:
       - course
       - due_at
       - title
+    Material:
+      type: object
+      properties:
+        label:
+          $ref: '#/components/schemas/LocalizedText'
+        url:
+          type: string
+          description: Path on the labs site, e.g. /materials/exams/<folder>/photo.jpg
+        kind:
+          $ref: '#/components/schemas/CtfMaterialKindEnum'
+        alt:
+          $ref: '#/components/schemas/LocalizedText'
+      required:
+      - alt
+      - kind
+      - label
+      - url
     ModuleOption:
       type: object
       properties:
@@ -5795,6 +6206,43 @@ components:
       - page_size
       - pages
       - total
+    Participation:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/CtfParticipationStatusEnum'
+        started_at:
+          type: string
+          format: date-time
+        deadline_at:
+          type: string
+          format: date-time
+          nullable: true
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        score:
+          type: integer
+        solved_count:
+          type: integer
+        wrong_count:
+          type: integer
+      required:
+      - deadline_at
+      - score
+      - solved_count
+      - started_at
+      - status
+      - submitted_at
+      - wrong_count
+    ParticipationResponse:
+      type: object
+      properties:
+        participation:
+          $ref: '#/components/schemas/Participation'
+      required:
+      - participation
     PatchedLectureCommentWriteRequest:
       type: object
       properties:
@@ -5985,6 +6433,42 @@ components:
         * `mobile` - mobile
         * `desktop` - desktop
         * `unknown` - unknown
+    Prompt:
+      type: object
+      properties:
+        en:
+          $ref: '#/components/schemas/PromptBody'
+        ur:
+          $ref: '#/components/schemas/PromptBody'
+      required:
+      - en
+      - ur
+    PromptBody:
+      type: object
+      properties:
+        briefing:
+          type: array
+          items:
+            type: string
+        artifact:
+          type: string
+        search_patterns:
+          type: array
+          items:
+            type: string
+        task:
+          type: string
+        constraints:
+          type: string
+        answer_format:
+          type: string
+      required:
+      - answer_format
+      - artifact
+      - briefing
+      - constraints
+      - search_patterns
+      - task
     QualityEnum:
       enum:
       - excellent
@@ -5999,6 +6483,48 @@ components:
         * `poor` - poor
         * `lost` - lost
         * `unknown` - unknown
+    Question:
+      type: object
+      properties:
+        key:
+          type: string
+        order:
+          type: integer
+        category:
+          $ref: '#/components/schemas/CtfQuestionCategoryEnum'
+        difficulty:
+          $ref: '#/components/schemas/CtfQuestionDifficultyEnum'
+        points:
+          type: integer
+        title:
+          $ref: '#/components/schemas/LocalizedText'
+        prompt:
+          $ref: '#/components/schemas/Prompt'
+        materials:
+          type: array
+          items:
+            $ref: '#/components/schemas/Material'
+        max_attempts:
+          type: integer
+        attempts_used:
+          type: integer
+        solved:
+          type: boolean
+        points_awarded:
+          type: integer
+      required:
+      - attempts_used
+      - category
+      - difficulty
+      - key
+      - materials
+      - max_attempts
+      - order
+      - points
+      - points_awarded
+      - prompt
+      - solved
+      - title
     RealtimeBroadcastPlaybackIssueReasonEnum:
       enum:
       - network
@@ -7245,6 +7771,119 @@ components:
       - note
       - number
       - submitted_at
+    YouTubeChannelInfo:
+      type: object
+      properties:
+        title:
+          type: string
+        handle:
+          type: string
+        url:
+          type: string
+          format: uri
+        subscribe_url:
+          type: string
+          format: uri
+      required:
+      - handle
+      - subscribe_url
+      - title
+      - url
+    YouTubeChannelPayload:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        available:
+          type: boolean
+        section:
+          $ref: '#/components/schemas/YouTubeSection'
+        channel:
+          $ref: '#/components/schemas/YouTubeChannelInfo'
+        live:
+          $ref: '#/components/schemas/YouTubeLive'
+        featured:
+          allOf:
+          - $ref: '#/components/schemas/YouTubeVideo'
+          nullable: true
+        latest:
+          type: array
+          items:
+            $ref: '#/components/schemas/YouTubeVideo'
+        fetched_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - available
+      - channel
+      - enabled
+      - featured
+      - fetched_at
+      - latest
+      - live
+      - section
+    YouTubeChannelResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/YouTubeChannelPayload'
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    YouTubeLive:
+      type: object
+      properties:
+        is_live:
+          type: boolean
+        video_id:
+          type: string
+          nullable: true
+          pattern: ^[A-Za-z0-9_-]{11}$
+        title:
+          type: string
+      required:
+      - is_live
+      - title
+      - video_id
+    YouTubeSection:
+      type: object
+      properties:
+        title:
+          type: string
+        subtitle:
+          type: string
+      required:
+      - subtitle
+      - title
+    YouTubeVideo:
+      type: object
+      properties:
+        video_id:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{11}$
+        title:
+          type: string
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        thumbnail:
+          type: string
+          format: uri
+      required:
+      - published_at
+      - thumbnail
+      - title
+      - video_id
   securitySchemes:
     bearerJWT:
       type: http

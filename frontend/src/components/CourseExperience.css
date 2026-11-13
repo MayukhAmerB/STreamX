@@ -388,6 +388,7 @@
 }
 .course-detail-v2 .detail-back-link {
   display: inline-flex;
+  min-height: 44px;
   align-items: center;
   gap: 10px;
   color: #c9c9c9;
@@ -637,8 +638,8 @@
 }
 .course-detail-v2 .detail-fact-strip dt {
   margin: 0 0 8px;
-  color: #777;
-  font-size: 9px;
+  color: #8f8f8f;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: .16em;
 }
@@ -978,8 +979,8 @@
 .course-detail-v2 .detail-learning-list small {
   display: block;
   margin: 1px 0 5px;
-  color: #717171;
-  font-size: 8px;
+  color: #8f8f8f;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -1011,7 +1012,7 @@
 .course-detail-v2 .detail-benefit-index {
   display: block;
   margin-bottom: 34px;
-  color: #747474;
+  color: #8f8f8f;
   font-size: 10px;
   font-weight: 750;
   letter-spacing: .15em;
@@ -1290,8 +1291,11 @@
   padding-top: 20px;
 }
 .course-detail-v2 .detail-enroll-footer a {
-  color: #aaa;
-  font-size: 11px;
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  color: #b5b5b5;
+  font-size: 12px;
   text-decoration: underline;
   text-underline-offset: 4px;
 }
@@ -1376,8 +1380,8 @@
   font-weight: 700;
 }
 .course-detail-v2 .detail-review-meta-label {
-  color: #707070;
-  font-size: 8px;
+  color: #8f8f8f;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: .13em;
   text-transform: uppercase;

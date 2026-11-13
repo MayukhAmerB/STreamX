@@ -196,6 +196,7 @@ class ExemptFieldsTests(ReportsTestCase):
                 ("reports-task-submit", ("POST",), "(?:json|form):note", 2000),
                 ("lecture-comments", ("POST",), "(?:json|form):body", 2000),
                 ("lecture-comment-detail", ("PATCH",), "(?:json|form):body", 2000),
+                ("ctf-question-attempts", ("POST",), "(?:json|form):answer", 512),
             }
         )
         self.assertEqual(listed, expected)

@@ -9,6 +9,14 @@ const BODY_LIMIT_BYTES = 8192;
 const ATTEMPT_WINDOW_MS = 60_000;
 const ATTEMPT_LIMIT = 30;
 const CERTIFICATION_ANSWER_SECRET = process.env.CERTIFICATION_ANSWER_SECRET || "";
+const DEFAULT_LMS_API_BASE = "https://alsyedinitiative.com/api";
+// Where the Examination tab sends answers (the LMS API, which records every
+// attempt). Only http(s) URLs are accepted; anything else falls back.
+const LMS_API_BASE = resolveLmsApiBase(process.env.LABS_LMS_API_BASE);
+const LMS_API_ORIGIN = new URL(LMS_API_BASE).origin;
+// Student evidence files are served as-is; never anything a browser would
+// execute or render as a document on the labs origin.
+const BLOCKED_MATERIAL_EXTENSIONS = new Set([".htm", ".html", ".js", ".mjs", ".shtml", ".svg", ".svgz", ".xht", ".xhtml", ".xml"]);
 
 const answerHashes = {
   realworld: [
@@ -67,6 +75,7 @@ const contentTypes = {
   ".csv": "text/csv; charset=utf-8",
   ".db": "application/octet-stream",
   ".enc": "application/octet-stream",
+  ".gif": "image/gif",
   ".html": "text/html; charset=utf-8",
   ".ico": "image/x-icon",
   ".jpg": "image/jpeg",
@@ -82,12 +91,15 @@ const contentTypes = {
   ".sh": "text/plain; charset=utf-8",
   ".sql": "text/plain; charset=utf-8",
   ".txt": "text/plain; charset=utf-8",
+  ".webp": "image/webp",
+  ".zip": "application/zip",
 };
 
 const attempts = new Map();
 const rootPublicFiles = new Set([
   "/index.html",
   "/app.js",
+  "/exam.js",
   "/styles.css",
   "/favicon.ico",
   "/favicon-16x16.png",
@@ -96,6 +108,39 @@ const rootPublicFiles = new Set([
   "/favicon-192x192.png",
   "/apple-touch-icon.png",
 ]);
+
+function resolveLmsApiBase(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return DEFAULT_LMS_API_BASE;
+  try {
+    const url = new URL(raw);
+    if ((url.protocol !== "https:" && url.protocol !== "http:") || url.username || url.password || url.search || url.hash) {
+      throw new Error("unsupported");
+    }
+    return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
+  } catch {
+    console.warn("LABS_LMS_API_BASE is not a valid http(s) URL; using the default.");
+    return DEFAULT_LMS_API_BASE;
+  }
+}
+
+function contentSecurityPolicy() {
+  return [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
+    "script-src-attr 'none'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data:",
+    `connect-src 'self' https://cloudflareinsights.com ${LMS_API_ORIGIN}`,
+    "form-action 'self'",
+    "frame-src 'none'",
+    "worker-src 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-ancestors 'self'",
+  ].join("; ");
+}
 
 function securityHeaders(res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -108,10 +153,7 @@ function securityHeaders(res) {
     "Permissions-Policy",
     "accelerometer=(), autoplay=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()",
   );
-  res.setHeader(
-    "Content-Security-Policy",
-    "default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://cloudflareinsights.com; form-action 'self'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'",
-  );
+  res.setHeader("Content-Security-Policy", contentSecurityPolicy());
 }
 
 function sendJson(res, status, body) {
@@ -249,7 +291,8 @@ function resolvePublicFile(urlPath) {
 
   const requestPath = decoded === "/" ? "/index.html" : decoded;
   const isRootImage = /^\/[^/]+\.png$/i.test(requestPath);
-  const isStudentMaterial = requestPath.startsWith("/materials/");
+  const isStudentMaterial = requestPath.startsWith("/materials/")
+    && !BLOCKED_MATERIAL_EXTENSIONS.has(path.extname(requestPath).toLowerCase());
   if (!rootPublicFiles.has(requestPath) && !isRootImage && !isStudentMaterial) {
     return null;
   }
@@ -296,6 +339,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === "/api/config" && req.method === "GET") {
+    sendJson(res, 200, { lmsApiBase: LMS_API_BASE });
+    return;
+  }
+
   if (url.pathname === "/api/validate" && req.method === "POST") {
     await validateAnswer(req, res);
     return;
@@ -314,6 +362,10 @@ const server = http.createServer(async (req, res) => {
   serveStatic(req, res, url.pathname);
 });
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`AL SYED OSINT labs listening on ${PORT}`);
-});
+if (require.main === module) {
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`AL SYED OSINT labs listening on ${PORT}`);
+  });
+}
+
+module.exports = { server, resolveLmsApiBase, resolvePublicFile, contentSecurityPolicy, LMS_API_BASE };

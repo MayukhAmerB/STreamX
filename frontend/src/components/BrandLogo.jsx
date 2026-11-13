@@ -18,10 +18,11 @@ export default function BrandLogo({ to = "/", className = "" }) {
           <OwlCognitoMark className="h-8 w-8 sm:h-9 sm:w-9" />
         ) : (
           <img
-            src="/logo.jpeg"
+            src="/logo-256.webp"
             alt="Al syed Initiative logo"
+            width="256"
+            height="256"
             className="h-full w-full object-contain"
-            loading="lazy"
             decoding="async"
           />
         )}

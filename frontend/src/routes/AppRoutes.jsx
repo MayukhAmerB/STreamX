@@ -46,6 +46,8 @@ const ReportsTaskEditorPage = lazy(() => import("../pages/ReportsTaskEditorPage"
 const ReportsTaskPage = lazy(() => import("../pages/ReportsTaskPage"));
 const TermsPage = lazy(() => import("../pages/TermsPage"));
 const UsersCornerPage = lazy(() => import("../pages/UsersCornerPage"));
+const WatchPage = lazy(() => import("../pages/WatchPage"));
+const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
 
 /**
  * The Console used to live at /users-corner. Shared links keep working: they
@@ -78,6 +80,9 @@ export default function AppRoutes() {
           <Route path="/courses/:id/register" element={<PentestingRegistrationPage />} />
           <Route path="/courses/:id/payment" element={<CoursePaymentPage />} />
           <Route path="/terms" element={<TermsPage />} />
+          {siteBrand.youtube ? <Route path="/watch" element={<WatchPage />} /> : null}
+          {/* Unknown website addresses get a real "not found" page (noindex), not a silent redirect home. */}
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
         {/* Old Console address: redirect before the auth check so the login round trip lands on /console. */}
         <Route path={LEGACY_CONSOLE_PATH} element={<LegacyConsoleRedirect />} />
@@ -118,7 +123,6 @@ export default function AppRoutes() {
             </Route>
           </Route>
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );

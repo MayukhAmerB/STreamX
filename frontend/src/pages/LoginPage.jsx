@@ -285,7 +285,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={handleResetRequest}
-                  className="text-xs font-medium text-[#BBBBBB] transition hover:text-white"
+                  className="-my-2 inline-flex min-h-8 items-center py-2 text-xs font-medium text-[#BBBBBB] transition hover:text-white"
                 >
                   Forgot password?
                 </button>
@@ -310,7 +310,7 @@ export default function LoginPage() {
               </p>
               <Link
                 to="/courses"
-                className="text-xs font-semibold uppercase tracking-[0.12em] text-[#DBDBDB] hover:text-white"
+                className="-my-2 inline-flex min-h-8 items-center py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#DBDBDB] hover:text-white"
               >
                 Browse Courses
               </Link>

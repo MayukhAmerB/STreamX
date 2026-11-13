@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "exam": {
+    "slug": "fixture-exam",
+    "title": {"en": "Fixture OSINT Exam", "ur": "فکسچر امتحان"},
+    "briefing": {"en": ["A synthetic exam used only by the test suite."], "ur": []},
+    "rules": {"en": ["Answers are fake.", "Every attempt is recorded."], "ur": ["جوابات فرضی ہیں۔"]},
+    "opens_at": "2026-01-01T09:00:00+05:30",
+    "closes_at": "2099-01-01T17:00:00+05:30",
+    "time_limit_minutes": 120,
+    "default_max_attempts": 5
+  },
+  "questions": [
+    {
+      "key": "q01-fake-harbour",
+      "order": 1,
+      "category": "geoint",
+      "difficulty": "expert",
+      "points": 300,
+      "max_attempts": 3,
+      "title": {"en": "Fake harbour", "ur": ""},
+      "prompt": {
+        "en": {
+          "briefing": ["A synthetic photo of a harbour."],
+          "artifact": "fixture-artifact-001",
+          "search_patterns": ["site:example.invalid harbour"],
+          "task": "Name the fictional harbour.",
+          "constraints": "Use the fixture only.",
+          "answer_format": "Harbour name"
+        },
+        "ur": {"task": "فرضی بندرگاہ کا نام بتائیں۔"}
+      },
+      "materials": [
+        {
+          "label": {"en": "Harbour photo", "ur": ""},
+          "path": "/materials/exams/fixture-exam-0123456789abcdef0123456789abcdef/harbour.jpg",
+          "kind": "image",
+          "alt": {"en": "A synthetic harbour"}
+        }
+      ],
+      "normalization": ["nfkc", "trim", "collapse_whitespace", "casefold", "strip_punctuation"],
+      "answers": ["Zzfixture Harbour", "Port Zzfixture"],
+      "sources": [{"publisher": "Example", "title": "Not real", "url": "https://example.invalid/", "published_at": "2025-01-01"}],
+      "solution": "FIXTURE-SOLUTION-TEXT-MUST-NEVER-BE-STORED"
+    },
+    {
+      "key": "q02-fake-handle",
+      "order": 2,
+      "category": "socmint",
+      "difficulty": "hard",
+      "points": 200,
+      "title": {"en": "Fake handle"},
+      "prompt": {"en": {"task": "Find the fictional account handle."}},
+      "normalization": ["nfkc", "trim", "casefold", "strip_url_scheme", "strip_www", "strip_trailing_slash", "strip_leading_at"],
+      "answers": ["@zzfixture_handle"]
+    },
+    {
+      "key": "q03-fake-date",
+      "order": 3,
+      "category": "chronolocation",
+      "difficulty": "insane",
+      "points": 500,
+      "max_attempts": null,
+      "title": {"en": "Fake date"},
+      "prompt": {"en": {"briefing": ["When was the fictional photo taken?"], "answer_format": "YYYYMMDD"}},
+      "normalization": ["digits_only"],
+      "answers": ["1999-12-31"],
+      "solution": "FIXTURE-SOLUTION-TEXT-MUST-NEVER-BE-STORED"
+    }
+  ]
+}

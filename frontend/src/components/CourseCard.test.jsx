@@ -103,7 +103,7 @@ describe("CourseCard", () => {
     expect(html).toContain("18 total hours");
     expect(html).toContain("42 lectures");
     expect(html).toContain("Advanced");
-    expect(html).toContain('src="/course-art/osint-program-v2.png"');
+    expect(html).toContain('src="/course-art/osint-program-v2.webp"');
   });
 
   it("does not invent ratings when a course has no approved reviews", () => {

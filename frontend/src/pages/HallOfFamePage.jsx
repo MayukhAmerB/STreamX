@@ -93,7 +93,7 @@ export default function HallOfFamePage() {
                   {batch.name}
                 </h2>
                 <span className="h-px flex-1 bg-gradient-to-r from-[#6A5222] to-transparent" aria-hidden="true" />
-                <span className="whitespace-nowrap text-[8px] font-semibold uppercase tracking-[0.14em] text-[#766A50] sm:text-[10px] sm:tracking-[0.2em]">
+                <span className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-[#A08F68] sm:text-[10px] sm:tracking-[0.2em]">
                   {batch.students.length} certified
                 </span>
               </div>
@@ -113,7 +113,7 @@ export default function HallOfFamePage() {
                             <path d="m12 3 2.5 5.1 5.6.8-4 3.9.9 5.5-5-2.6-5 2.6.9-5.5-4-3.9 5.6-.8L12 3Z" fill="currentColor" />
                           </svg>
                         </span>
-                        <span className="text-right text-[8px] font-semibold uppercase tracking-[0.16em] text-[#766A50] sm:text-[9px] sm:tracking-[0.22em]">
+                        <span className="text-right text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A08F68] sm:text-[10px] sm:tracking-[0.22em]">
                           Certified Student
                         </span>
                       </div>

@@ -9,9 +9,9 @@ describe("resolveCourseArtwork", () => {
   });
 
   it("uses bundled artwork for the two flagship categories", () => {
-    expect(resolveCourseArtwork({ category: "osint" })).toBe("/course-art/osint-program-v2.png");
+    expect(resolveCourseArtwork({ category: "osint" })).toBe("/course-art/osint-program-v2.webp");
     expect(resolveCourseArtwork({ category: "web_pentesting" }))
-      .toBe("/course-art/pentesting-program-v2.png");
+      .toBe("/course-art/pentesting-program-v2.webp");
   });
 
   it("does not invent artwork for an unknown category", () => {
@@ -20,6 +20,6 @@ describe("resolveCourseArtwork", () => {
 
   it("can recover the bundled category artwork after an admin image fails", () => {
     expect(resolveCourseArtworkFallback("web_pentesting"))
-      .toBe("/course-art/pentesting-program-v2.png");
+      .toBe("/course-art/pentesting-program-v2.webp");
   });
 });

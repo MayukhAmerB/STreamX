@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 
-import osintTrackLogo from "../assets/course-track-osint.png";
-import pentestingTrackLogo from "../assets/course-track-pentesting.png";
+import osintTrackLogo from "../assets/course-track-osint.webp";
+import pentestingTrackLogo from "../assets/course-track-pentesting.webp";
 
 export const COURSE_TRACKS = [
   {
@@ -181,7 +181,7 @@ export function CourseCategorySections({
           const content = (
             <>
               <div className="min-w-0">
-                <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[#737373]">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8F8F8F]">
                   {String(index + 1).padStart(2, "0")} / {count} available
                 </span>
                 <h3 className="mt-3 font-reference text-xl font-semibold text-white sm:text-2xl">

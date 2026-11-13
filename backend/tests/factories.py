@@ -128,3 +128,56 @@ def make_realtime_session(*, host=None, **overrides):
     }
     fields.update(overrides)
     return RealtimeSession.objects.create(host=host or make_instructor(), **fields)
+
+
+def make_ctf_exam(*, eligible_courses=(), **overrides):
+    """A published, open exam (1 hour limit) whose answer key matches the
+    current pepper. Pass ``eligible_courses=[course]`` to let students in."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.ctf.answers import answer_key_id
+    from apps.ctf.models import CtfExam
+
+    n = _next()
+    now = timezone.now()
+    fields = {
+        "slug": f"factory-exam-{n}",
+        "title": f"Factory Exam {n}",
+        "status": CtfExam.STATUS_PUBLISHED,
+        "opens_at": now - timedelta(hours=1),
+        "closes_at": now + timedelta(days=1),
+        "time_limit_minutes": 60,
+        "default_max_attempts": 5,
+        "answer_key_id": answer_key_id(),
+    }
+    fields.update(overrides)
+    exam = CtfExam.objects.create(**fields)
+    if eligible_courses:
+        exam.eligible_courses.set(list(eligible_courses))
+    return exam
+
+
+def make_ctf_question(*, exam=None, answers=("fake answer",), normalization=None, **overrides):
+    """A question whose accepted answers are hashed exactly as the loader does."""
+    from apps.ctf.answers import hash_answers, validate_rules
+    from apps.ctf.models import CtfQuestion
+
+    exam = exam or make_ctf_exam()
+    n = _next()
+    rules = validate_rules(normalization)
+    fields = {
+        "key": f"q{n}",
+        "order": n,
+        "category": "geoint",
+        "difficulty": "hard",
+        "points": 100,
+        "title": {"en": f"Question {n}", "ur": ""},
+        "prompt": {"en": {"task": "Find the thing.", "answer_format": "Exact name"}},
+        "materials": [],
+    }
+    fields.update(overrides)
+    fields["normalization"] = rules
+    fields["answer_hashes"] = hash_answers(exam.slug, fields["key"], answers, rules)
+    return CtfQuestion.objects.create(exam=exam, **fields)

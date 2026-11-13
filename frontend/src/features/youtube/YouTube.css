@@ -1,0 +1,611 @@
+/*
+ * Website YouTube block (landing "Watch" section and the /watch page).
+ * Landing language: black, Inter, bordered dark cards, champagne accent;
+ * YouTube's own red only where people expect it (live badge, play hover).
+ * Every rule is scoped to .yt-* so nothing else changes.
+ */
+
+/* Tokens live on :root so pieces used outside .yt-showcase (the section's
+   live badge, the Watch page fallback buttons) get them too. */
+:root {
+  --yt-accent: #f3e2b3;
+  --yt-accent-hover: #fff0c8;
+  --yt-red: #e5162b;
+  --yt-red-hover: #f42d41;
+  --yt-text-2: #b4b4b4;
+  --yt-text-3: #999999;
+  --yt-border: rgba(255, 255, 255, 0.1);
+}
+
+.yt-showcase {
+  display: grid;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+.yt-stage,
+.yt-latest,
+.yt-channel {
+  min-width: 0;
+}
+
+/* --- player ------------------------------------------------------------- */
+
+.yt-player {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  background: #050505;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.5);
+}
+
+.yt-showcase.is-live .yt-player {
+  border-color: rgba(229, 22, 43, 0.45);
+  box-shadow: 0 0 0 1px rgba(229, 22, 43, 0.18), 0 28px 80px rgba(229, 22, 43, 0.14);
+}
+
+.yt-lite {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: #000;
+  cursor: pointer;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.yt-lite:focus-visible {
+  outline: 3px solid var(--yt-accent);
+  outline-offset: -3px;
+}
+
+.yt-lite__poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.yt-lite:hover .yt-lite__poster {
+  transform: scale(1.02);
+}
+
+.yt-lite__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 45%, rgba(0, 0, 0, 0.5) 100%);
+}
+
+.yt-lite__play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 72px;
+  height: 51px;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.55));
+}
+
+.yt-lite__play-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.yt-lite__play-bg {
+  fill: #1c1c1c;
+  fill-opacity: 0.86;
+  transition: fill 160ms ease, fill-opacity 160ms ease;
+}
+
+.yt-lite:hover .yt-lite__play-bg,
+.yt-lite:focus-visible .yt-lite__play-bg {
+  fill: var(--yt-red);
+  fill-opacity: 1;
+}
+
+.yt-lite--active {
+  cursor: default;
+}
+
+.yt-lite__frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.yt-player__badge {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* --- live ---------------------------------------------------------------- */
+
+.yt-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  background: var(--yt-red);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.16), 0 10px 26px rgba(229, 22, 43, 0.45);
+}
+
+.yt-live-dot {
+  position: relative;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.yt-live-dot::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  opacity: 0;
+  animation: yt-live-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.yt-live-dot--light {
+  color: #fff;
+}
+
+@keyframes yt-live-ping {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.8;
+  }
+  80%,
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+/* --- meta under the player ------------------------------------------------ */
+
+.yt-meta {
+  padding-top: 1.1rem;
+}
+
+.yt-meta__kicker {
+  margin: 0;
+  color: var(--yt-text-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.yt-meta__live {
+  color: #ff8a94;
+}
+
+.yt-meta__title {
+  margin: 0.55rem 0 0;
+  color: #fff;
+  font-size: clamp(1.2rem, 1rem + 1vw, 1.65rem);
+  font-weight: 800;
+  line-height: 1.18;
+  letter-spacing: -0.025em;
+}
+
+.yt-meta__date {
+  margin: 0.5rem 0 0;
+  color: var(--yt-text-2);
+  font-size: 0.875rem;
+}
+
+.yt-meta__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-top: 0.9rem;
+}
+
+/* --- buttons and links ----------------------------------------------------- */
+
+.yt-btn {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0 1.1rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+}
+
+.yt-btn:focus-visible,
+.yt-link:focus-visible,
+.yt-card:focus-visible {
+  outline: 2px solid var(--yt-accent);
+  outline-offset: 3px;
+}
+
+.yt-btn--primary {
+  background: var(--yt-accent);
+  color: #0a0a0a;
+  box-shadow: 0 0 0 1px rgba(243, 226, 179, 0.55), 0 0 22px rgba(243, 226, 179, 0.22);
+}
+
+.yt-btn--primary:hover {
+  background: var(--yt-accent-hover);
+  box-shadow: 0 0 0 1px rgba(243, 226, 179, 0.8), 0 0 30px rgba(243, 226, 179, 0.38);
+}
+
+.yt-btn--ghost {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: #0a0a0a;
+  color: #fff;
+}
+
+.yt-btn--ghost:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: #141414;
+}
+
+.yt-btn--live {
+  background: var(--yt-red);
+  color: #fff;
+  box-shadow: 0 12px 30px rgba(229, 22, 43, 0.3);
+}
+
+.yt-btn--live:hover {
+  background: var(--yt-red-hover);
+}
+
+.yt-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 0.4rem;
+  color: #d9d9d9;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.25);
+  text-underline-offset: 4px;
+}
+
+.yt-link:hover {
+  color: #fff;
+  text-decoration-color: rgba(255, 255, 255, 0.7);
+}
+
+.yt-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.yt-icon-sm {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.yt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+/* --- latest videos -------------------------------------------------------- */
+
+.yt-latest__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.yt-latest__title {
+  margin: 0;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.yt-latest__hint {
+  color: var(--yt-text-3);
+  font-size: 12px;
+}
+
+.yt-latest__list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.yt-card-item {
+  min-width: 0;
+}
+
+.yt-card {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--yt-border);
+  border-radius: 14px;
+  background: #0a0a0a;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.yt-card:hover {
+  border-color: rgba(255, 255, 255, 0.26);
+  background: #101010;
+}
+
+.yt-card.is-selected {
+  border-color: rgba(243, 226, 179, 0.6);
+  box-shadow: 0 0 0 1px rgba(243, 226, 179, 0.25), 0 0 24px rgba(243, 226, 179, 0.12);
+}
+
+.yt-card__thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #111;
+}
+
+.yt-card__thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.yt-card__now {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  background: var(--yt-accent);
+  color: #0a0a0a;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.yt-card__body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem 0.85rem 0.85rem;
+}
+
+.yt-card__title {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 650;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.yt-card__date {
+  color: var(--yt-text-3);
+  font-size: 12px;
+}
+
+/* Landing section on phones: a swipeable row. */
+.yt-showcase--section .yt-latest__list {
+  grid-auto-columns: minmax(220px, 74%);
+  grid-auto-flow: column;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 0.5rem;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+}
+
+.yt-showcase--section .yt-card-item {
+  scroll-snap-align: start;
+}
+
+/* Watch page: a grid. */
+@media (min-width: 640px) {
+  .yt-showcase--section .yt-latest__list {
+    grid-auto-columns: minmax(240px, 42%);
+  }
+
+  .yt-showcase--page .yt-latest__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .yt-showcase--section {
+    grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+    align-items: start;
+    gap: 1.75rem;
+  }
+
+  .yt-showcase--section .yt-channel {
+    grid-column: 1 / -1;
+  }
+
+  .yt-showcase--section .yt-latest__list {
+    grid-auto-flow: row;
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-columns: auto;
+    overflow: visible;
+    padding-bottom: 0;
+  }
+
+  .yt-showcase--section .yt-card {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .yt-showcase--section .yt-card__thumb {
+    width: 42%;
+    flex-shrink: 0;
+  }
+
+  .yt-showcase--section .yt-card__body {
+    justify-content: center;
+    padding: 0.6rem 0.8rem;
+  }
+
+  .yt-showcase--page .yt-latest__list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* --- channel strip -------------------------------------------------------- */
+
+.yt-channel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.yt-channel__id {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.yt-channel__mark {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: #0d0d0d;
+  color: #ff2d3f;
+}
+
+.yt-channel__name {
+  display: block;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.yt-channel__handle {
+  display: block;
+  color: var(--yt-text-3);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 479px) {
+  .yt-actions {
+    width: 100%;
+  }
+
+  .yt-actions .yt-btn {
+    flex: 1 1 100%;
+  }
+}
+
+/* --- skeleton while the first answer is on its way ------------------------ */
+
+.yt-skeleton {
+  display: grid;
+  gap: 1rem;
+}
+
+.yt-skeleton__player {
+  aspect-ratio: 16 / 9;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: linear-gradient(110deg, #0b0b0b 30%, #141414 50%, #0b0b0b 70%) 0 0 / 200% 100%;
+  animation: yt-shimmer 1.6s linear infinite;
+}
+
+.yt-skeleton__line {
+  height: 14px;
+  width: 60%;
+  border-radius: 6px;
+  background: #121212;
+}
+
+@keyframes yt-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .yt-skeleton {
+    grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+    gap: 1.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yt-live-dot::after,
+  .yt-skeleton__player {
+    animation: none;
+  }
+
+  .yt-lite__poster,
+  .yt-lite:hover .yt-lite__poster {
+    transform: none;
+    transition: none;
+  }
+}

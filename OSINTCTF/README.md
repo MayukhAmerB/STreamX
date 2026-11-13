@@ -30,3 +30,30 @@ Open `http://127.0.0.1:8092/`.
 The root `docker-compose.hostinger.yml` exposes this service only on
 `127.0.0.1:8092`. Host Nginx publishes it through
 `infra/hostinger/nginx/labs-subdomain.conf`.
+
+## Examination tab (graded, recorded)
+
+The `05 EXAMINATION` tab (`exam.js`) is different from the practice labs:
+
+- It calls the LMS API (`/api/ctf/`) from the browser with the student's LMS
+  session (`credentials: "include"`). The LMS checks every answer and stores
+  every attempt, right or wrong, in Postgres; scores are in Django admin under
+  "OSINT CTF examinations".
+- `GET /api/config` returns `{lmsApiBase}` from `LABS_LMS_API_BASE`
+  (default `https://alsyedinitiative.com/api`); the CSP `connect-src` allows
+  that origin only.
+- Nothing about the exam is stored in the browser, and no answer or hash is in
+  any file served here.
+- Exam content lives in `private/exams/<slug>.json` (git- and Docker-ignored)
+  and is loaded into the LMS with
+  `python manage.py load_ctf_exam --file - < OSINTCTF/private/exams/<slug>.json`.
+  Evidence files go in `materials/exams/<slug>-<32 random hex>/`.
+- `/materials/` never serves `.html`, `.svg`, `.js` or `.xml` files.
+
+Local end-to-end run: start the backend on `127.0.0.1:8000`, then
+
+```bash
+LABS_LMS_API_BASE=http://127.0.0.1:8000/api PORT=8092 node server.js
+```
+
+Server tests: `node --test OSINTCTF/tests/server.test.js` (not shipped in the image).

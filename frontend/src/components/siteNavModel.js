@@ -6,6 +6,7 @@ export const SITE_CONSOLE_PATH = "/console";
 
 const LINKS = {
   courses: { id: "courses", label: "Courses", to: "/courses" },
+  watch: { id: "watch", label: "Watch", to: "/watch", needsYouTube: true },
   about: { id: "about", label: "About Us", shortLabel: "About", to: "/about" },
   accounts: { id: "accounts", label: "AS-Accounts", to: "/as-accounts", brandOnly: "alsyed" },
   nationalDesk: { id: "national-desk", label: "National Desk", to: "/national-desk", brandOnly: "alsyed" },
@@ -15,32 +16,34 @@ const LINKS = {
   faqs: { id: "faqs", label: "FAQs", to: "/faqs" },
 };
 
-/** Centred pill (desktop), in order. */
-const PRIMARY = ["courses", "about", "nationalDesk", "contact"];
+/** Centred pill (desktop), in order. "Watch" (YouTube) only where the brand has the channel. */
+const PRIMARY = ["courses", "watch", "about", "nationalDesk", "contact"];
 /** "More" menu (desktop), in order. */
 const MORE = ["accounts", "join", "hallOfFame", "faqs"];
 
-const visibleFor = (brandId) => (link) => !link.brandOnly || link.brandOnly === brandId;
+const visibleFor = (brandId, { youtube = false } = {}) => (link) =>
+  (!link.brandOnly || link.brandOnly === brandId) && (!link.needsYouTube || youtube);
 
 /**
- * Desktop navigation: up to four primary links, the rest under "More".
- * OwlCognito has no Al Syed programmes, so its four links need no "More".
+ * Desktop navigation: the key links in the pill, the rest under "More".
+ * OwlCognito has no Al Syed programmes, so its links need no "More".
+ * `youtube` adds "Watch" (the YouTube channel) right after Courses.
  */
-export function getSiteNavLinks(brandId = "alsyed") {
-  const visible = visibleFor(brandId);
+export function getSiteNavLinks(brandId = "alsyed", options = {}) {
+  const visible = visibleFor(brandId, options);
   const primary = PRIMARY.map((key) => LINKS[key]).filter(visible);
   const more = MORE.map((key) => LINKS[key]).filter(visible);
-  if (primary.length + more.length <= 5) {
+  if (primary.length + more.length <= 5 + (options.youtube ? 1 : 0)) {
     return { primary: [...primary, ...more], more: [] };
   }
   return { primary, more };
 }
 
 /** Phone sheet groups: every website link, grouped. */
-export function getSiteNavGroups(brandId = "alsyed") {
-  const visible = visibleFor(brandId);
+export function getSiteNavGroups(brandId = "alsyed", options = {}) {
+  const visible = visibleFor(brandId, options);
   return [
-    { id: "explore", label: "Explore", links: ["courses", "about", "contact", "faqs"].map((key) => LINKS[key]) },
+    { id: "explore", label: "Explore", links: ["courses", "watch", "about", "contact", "faqs"].map((key) => LINKS[key]).filter(visible) },
     {
       id: "community",
       label: "Al Syed",

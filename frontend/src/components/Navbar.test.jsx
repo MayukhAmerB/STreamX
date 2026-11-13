@@ -1,8 +1,9 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { StaticRouter } from "react-router-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AuthContext } from "../context/AuthContext";
+import { act, fire, renderTree } from "../test-utils/renderTree";
 import Navbar from "./Navbar";
 import {
   getAccountMenuGroups,
@@ -12,6 +13,11 @@ import {
   getSiteNavLinks,
   isSiteLinkActive,
 } from "./siteNavModel";
+
+// The navbar reads the shared YouTube store; tests set what it returns.
+const youtubeState = vi.hoisted(() => ({ current: { status: "idle", model: null, enabled: true } }));
+vi.mock("../features/youtube/youTubeStore", () => ({ useYouTubeChannel: () => youtubeState.current }));
+const liveModel = { live: { videoId: "LiVe1234567", title: "Live" }, featured: null, latest: [] };
 
 const ids = (links) => links.map((link) => link.id);
 const asha = { id: 7, full_name: "Asha Rao", email: "asha.rao@example.com", role: "student", terms_acceptance_required: false };
@@ -142,5 +148,72 @@ describe("Navbar", () => {
     const html = render();
     expect(html).toMatch(/^<header class="snav sticky top-0 z-20" data-scrolled="false">/);
     expect(html).toContain('<div class="snav__backdrop" aria-hidden="true"></div>');
+  });
+});
+
+describe("Navbar: Watch (YouTube)", () => {
+  afterEach(() => {
+    youtubeState.current = { status: "idle", model: null, enabled: true };
+  });
+
+  it("adds Watch right after Courses, only where the brand has the channel", () => {
+    expect(ids(getSiteNavLinks("alsyed", { youtube: true }).primary)).toEqual([
+      "courses",
+      "watch",
+      "about",
+      "national-desk",
+      "contact",
+    ]);
+    expect(ids(getSiteNavLinks("alsyed").primary)).not.toContain("watch");
+    expect(ids(getSiteNavLinks("owlcognito").primary)).not.toContain("watch");
+    expect(ids(getSiteNavLinks("owlcognito", { youtube: true }).primary)).toEqual(["courses", "watch", "about", "contact", "faqs"]);
+    expect(ids(getSiteNavGroups("alsyed", { youtube: true })[0].links)).toEqual(["courses", "watch", "about", "contact", "faqs"]);
+  });
+
+  it("links Watch to /watch in the pill", () => {
+    const html = render();
+    expect(html).toMatch(/<a class="snav__link" href="\/watch"[^>]*>Watch<\/a>/);
+    expect(html).not.toContain("snav__live");
+  });
+
+  it("hides Watch once the server says the section is off", () => {
+    youtubeState.current = { status: "ready", model: null, enabled: false };
+    expect(render()).not.toContain('href="/watch"');
+  });
+
+  it("shows a pulsing live dot on Watch while the channel is live", () => {
+    youtubeState.current = { status: "ready", model: liveModel, enabled: true };
+    const html = render();
+    expect(html).toMatch(/<a class="snav__link is-live" href="\/watch"[^>]*>Watch<span class="snav__live"><span class="snav__live-dot" aria-hidden="true"><\/span>Live<\/span><\/a>/);
+  });
+
+  it("shows the live dot in the phone menu too", async () => {
+    youtubeState.current = { status: "ready", model: liveModel, enabled: true };
+    // Just enough of a browser for the sheet's effects (the suite runs in Node).
+    const noop = () => {};
+    vi.stubGlobal("window", {
+      scrollY: 0,
+      addEventListener: noop,
+      removeEventListener: noop,
+      matchMedia: () => ({ matches: false, addEventListener: noop, removeEventListener: noop }),
+      requestAnimationFrame: () => 0,
+    });
+    vi.stubGlobal("document", { body: { style: {} }, addEventListener: noop, removeEventListener: noop });
+    const tree = await renderTree(
+      <AuthContext.Provider value={{ user: null, isAuthenticated: false, isInstructor: false, isAdmin: false, logout: async () => {} }}>
+        <StaticRouter location="/about">
+          <Navbar />
+        </StaticRouter>
+      </AuthContext.Provider>
+    );
+    await fire(tree.getByLabel("button", "Open navigation menu"), "onClick");
+    const sheetWatch = tree.find(
+      (node) => node.type === "a" && String(node.props.className).includes("snav-sheet__link") && node.props.href === "/watch"
+    );
+    expect(sheetWatch).not.toBeNull();
+    expect(tree.find((node) => node.props?.className === "snav__live")).not.toBeNull();
+    await act(async () => {});
+    await tree.unmount();
+    vi.unstubAllGlobals();
   });
 });

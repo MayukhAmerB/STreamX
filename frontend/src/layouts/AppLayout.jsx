@@ -1,13 +1,20 @@
-import { Outlet } from "react-router-dom";
+import { useEffect } from "react";
+import { Outlet, useLocation } from "react-router-dom";
 import AppFooter from "../components/AppFooter";
 import GlobalPageBackground from "../components/GlobalPageBackground";
 import Navbar from "../components/Navbar";
 import SafeRender from "../components/SafeRender";
 import TermsGate from "../components/TermsGate";
+import { applyPageMeta } from "../config/pageMeta";
 import { siteBrand } from "../config/siteBrand";
 
 export default function AppLayout() {
   const isOwlCognito = siteBrand.id === "owlcognito";
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    applyPageMeta(pathname);
+  }, [pathname]);
 
   return (
     <div

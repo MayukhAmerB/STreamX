@@ -1,4 +1,4 @@
-import storyIllustration from "../assets/story-mission.jpg";
+import storyIllustration from "../assets/story-mission.webp";
 import { siteBrand } from "../config/siteBrand";
 
 const journeyBlocks = [

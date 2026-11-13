@@ -1161,9 +1161,15 @@ export default function NationalDeskPage() {
               key={p.key}
               type="button"
               aria-label={`Go to ${p.label}`}
+              aria-current={p.key === active ? "true" : undefined}
               onClick={() => goTo(p.key)}
-              className={`h-2 rounded-full transition-all ${p.key === active ? "w-6 bg-white" : "w-2 bg-white/25 hover:bg-white/50"}`}
-            />
+              className="group inline-flex h-8 min-w-8 items-center justify-center rounded-full px-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            >
+              <span
+                aria-hidden="true"
+                className={`block h-2 rounded-full transition-all ${p.key === active ? "w-6 bg-white" : "w-2 bg-white/25 group-hover:bg-white/50"}`}
+              />
+            </button>
           ))}
         </div>
         <button

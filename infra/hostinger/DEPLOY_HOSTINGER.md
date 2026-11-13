@@ -139,6 +139,28 @@ sudo bash infra/hostinger/network/setup-nginx-rate-limits.sh
 
 Reference: `infra/hostinger/network/README.md`
 
+## 7b) OSINT CTF examinations (labs.alsyedinitiative.com)
+
+The labs Examination tab records every answer in Postgres through `/api/ctf/`.
+
+1. Add a pepper to `backend/.env.hostinger.production` (once; keep it secret and backed up):
+   `CTF_ANSWER_PEPPER=<python -c "import secrets; print(secrets.token_urlsafe(48))">`
+   Without it the LMS still starts, but the exam API answers 503 `ctf_not_configured`
+   (`check` reports `ctf.I001`). A pepper shorter than 32 characters or equal to
+   `DJANGO_SECRET_KEY` fails the deploy check (`ctf.E001`).
+2. `CTF_LABS_ORIGINS` defaults to `https://labs.alsyedinitiative.com`; only set it if the labs host changes.
+3. Rebuild/restart `backend` (migration `ctf.0001_initial` creates the new tables only) and `osint-labs`.
+4. Load an exam from the private file (it never enters an image or git):
+   `docker compose --env-file backend/.env.hostinger.production -f docker-compose.hostinger.yml exec -T backend python manage.py load_ctf_exam --file - --dry-run < OSINTCTF/private/exams/<slug>.json`
+   then the same without `--dry-run`. Copy the evidence folder `OSINTCTF/materials/exams/<slug>-<hex>/`
+   with the labs build. Then in Django admin -> OSINT CTF examinations: set the window, time limit and
+   eligible batches, and use the "Publish" action.
+5. Scores: admin -> CTF participations (filter by exam and batch, CSV export). Every answer: admin -> CTF attempts.
+   Correct attempts contain the right answer in plain text: give "view CTF attempt" only to trusted staff.
+
+No nginx change is needed: the labs page calls `https://alsyedinitiative.com/api/ctf/...` directly and the
+apex `/api/` location already proxies to Django.
+
 ## 8) Operations
 
 Logs:

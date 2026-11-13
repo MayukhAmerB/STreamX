@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { siteBrand } from "../config/siteBrand";
+import { useYouTubeChannel } from "../features/youtube/youTubeStore";
 import BrandLogo from "./BrandLogo";
 
 const baseQuickLinks = [
@@ -22,6 +23,7 @@ const socialLinks = [
     kind: "instagram",
   },
   { label: "X", href: "https://x.com/AdlFront", kind: "x" },
+  ...(siteBrand.youtube ? [{ label: "YouTube", href: "https://www.youtube.com/@thesy3d", kind: "youtube" }] : []),
   { label: "+91 99708 75040", href: "https://wa.me/919970875040", kind: "whatsapp" },
   { label: "+91 98004 15583", href: "https://wa.me/919800415583", kind: "whatsapp" },
   { label: "contact@adlfront.com", href: "mailto:contact@adlfront.com", kind: "email" },
@@ -58,6 +60,15 @@ function SocialIcon({ kind }) {
     );
   }
 
+  if (kind === "youtube") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0">
+        <rect x="2.5" y="5" width="19" height="14" rx="4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M10 9.2v5.6l4.8-2.8L10 9.2Z" fill="currentColor" />
+      </svg>
+    );
+  }
+
   if (kind === "whatsapp") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 shrink-0">
@@ -81,7 +92,7 @@ function FooterSocialLink({ href, label, kind }) {
     <a
       href={href}
       target={isMail ? undefined : "_blank"}
-      rel={isMail ? undefined : "noreferrer"}
+      rel={isMail ? undefined : "noopener noreferrer"}
       title={label}
       aria-label={label}
       className="inline-flex min-h-11 min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-[#0D0D0D] px-3 text-[#BDBDBD] transition hover:border-white/25 hover:bg-[#151515] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
@@ -94,9 +105,14 @@ function FooterSocialLink({ href, label, kind }) {
 
 export default function AppFooter() {
   const year = new Date().getFullYear();
+  // "Watch" follows the same switch as the navbar (brand + the admin's section toggle).
+  const youtube = useYouTubeChannel();
+  const withWatch = siteBrand.youtube && youtube.enabled !== false
+    ? [...baseQuickLinks.slice(0, 2), { label: "Watch", to: "/watch" }, ...baseQuickLinks.slice(2)]
+    : baseQuickLinks;
   const quickLinks = siteBrand.id === "owlcognito"
-    ? baseQuickLinks
-    : [...baseQuickLinks, { label: "Hall of Fame", to: "/hall-of-fame" }];
+    ? withWatch
+    : [...withWatch, { label: "Hall of Fame", to: "/hall-of-fame" }];
 
   return (
     <footer
@@ -115,14 +131,14 @@ export default function AppFooter() {
             <p className="mt-5 max-w-md text-sm leading-7 text-[#969696]">
               {siteBrand.footerDescription}
             </p>
-            <div className="mt-6 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#777777]">
+            <div className="mt-6 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#8F8F8F]">
               <span className="h-px w-8 bg-white/70" aria-hidden="true" />
               {siteBrand.footerKicker}
             </div>
           </section>
 
           <section className="lg:col-span-2">
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white">Explore</h3>
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white">Explore</h2>
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 sm:mt-4 sm:grid-cols-1">
               {quickLinks.map((item) => (
                 <FooterLink key={item.label} to={item.to} label={item.label} />
@@ -131,7 +147,7 @@ export default function AppFooter() {
           </section>
 
           <section className="lg:col-span-2">
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white">Company</h3>
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white">Company</h2>
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 sm:mt-4 sm:grid-cols-1">
               {companyLinks.map((item) => (
                 <FooterLink key={item.label} to={item.to} label={item.label} />
@@ -140,7 +156,7 @@ export default function AppFooter() {
           </section>
 
           <section className="rounded-2xl border border-white/10 bg-[#0B0B0B] p-5 sm:col-span-2 lg:col-span-3">
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white">Need support?</h3>
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white">Need support?</h2>
             <p className="mt-3 text-sm leading-6 text-[#969696]">
               Need help with enrollment, live classes, or account setup?
             </p>
@@ -164,8 +180,8 @@ export default function AppFooter() {
         <section className="pt-7 sm:pt-8">
           <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
             <div>
-              <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white">Connect</h3>
-              <p className="mt-2 text-xs text-[#777777]">Official channels for support and platform updates.</p>
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white">Connect</h2>
+              <p className="mt-2 text-xs text-[#8F8F8F]">Official channels for support and platform updates.</p>
             </div>
             <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:justify-end">
             {socialLinks.map((item) => (
@@ -182,7 +198,7 @@ export default function AppFooter() {
       </div>
 
       <div className="relative border-t border-white/10 bg-black/40">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-5 text-center text-[10px] uppercase tracking-[0.16em] text-[#777777] sm:flex-row sm:px-6 sm:text-left lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 py-5 text-center text-[10px] uppercase tracking-[0.16em] text-[#8F8F8F] sm:flex-row sm:px-6 sm:text-left lg:px-8">
           <span>{"\u00A9"} {year} {siteBrand.name}. All rights reserved.</span>
           <span>Secure Learning Infrastructure</span>
         </div>

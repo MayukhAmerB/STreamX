@@ -7,7 +7,7 @@ import { siteBrand } from "./config/siteBrand";
 import "./index.css";
 
 document.documentElement.dataset.siteBrand = siteBrand.id;
-document.title = siteBrand.documentTitle;
+if (!document.title) document.title = siteBrand.documentTitle;
 
 // Developer credit: Ibrahim Mohsin Mayukh Bhatt
 const routedApp = (
@@ -25,7 +25,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 const bootLoader = document.getElementById("boot-loader");
 if (bootLoader && document.body) {
   const bootstrapStartedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
-  const MIN_BOOT_LOADER_MS = 900;
+  // Long enough to read as a brand moment, short enough not to delay content.
+  const MIN_BOOT_LOADER_MS = 300;
 
   const completeTransition = () => {
     if (bootLoader.isConnected) {

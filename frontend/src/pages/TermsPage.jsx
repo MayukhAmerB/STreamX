@@ -91,9 +91,9 @@ export default function TermsPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#BDBDBD]">
             Legal Document
           </p>
-          <h1 className="mt-2 font-reference text-3xl font-semibold text-white">
+          <h2 className="mt-2 font-reference text-3xl font-semibold text-white">
             AlsyedInitiative Terms and Conditions
-          </h1>
+          </h2>
           <p className="mt-2 text-sm leading-6 text-[#C7C7C7]">
             Read this document carefully. Continued platform access requires affirmative consent.
           </p>
@@ -152,8 +152,11 @@ export default function TermsPage() {
             ) : (
               <div className="mt-3 space-y-3 text-sm leading-6 text-[#BFBFBF]">
                 <p>Sign in to accept these Terms for your account.</p>
-                <Link to="/login" className="block">
-                  <Button className="w-full">Login to Accept</Button>
+                <Link
+                  to="/login"
+                  className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-white bg-white px-4 text-sm font-semibold text-black transition hover:border-[#E5E5E5] hover:bg-[#E5E5E5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                >
+                  Sign in to accept
                 </Link>
               </div>
             )}

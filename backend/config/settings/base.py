@@ -63,6 +63,8 @@ INSTALLED_APPS = [
     "apps.notifications.apps.NotificationsConfig",
     "apps.insights.apps.InsightsConfig",
     "apps.reports.apps.ReportsConfig",
+    "apps.site_media.apps.SiteMediaConfig",
+    "apps.ctf.apps.CtfConfig",
 ]
 
 MIDDLEWARE = [
@@ -74,6 +76,8 @@ if ENABLE_WHITENOISE_STATIC:
     MIDDLEWARE.append("whitenoise.middleware.WhiteNoiseMiddleware")
 MIDDLEWARE += [
     "corsheaders.middleware.CorsMiddleware",
+    # The labs site may only write to the CTF exam API (see config/labs_origin.py).
+    "config.labs_origin.LabsOriginScopeMiddleware",
     "config.security.SuspiciousInputFirewallMiddleware",
     "config.security.APISecurityHeadersMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -257,6 +261,13 @@ REST_FRAMEWORK = {
         "report_submit": env("REPORT_SUBMIT_RATE", "60/hour"),
         "report_grade": env("REPORT_GRADE_RATE", "1200/hour"),
         "report_export": env("REPORT_EXPORT_RATE", "60/hour"),
+        # Public website YouTube section (GET /api/site/youtube/), per client IP. Generous:
+        # classrooms share one NAT address and every open tab polls once a minute.
+        "site_youtube": env("SITE_YOUTUBE_RATE", "300/minute"),
+        # OSINT CTF exams (apps.ctf). Per student; the per-question attempt cap
+        # is the real brute-force limit.
+        "ctf_attempt": env("CTF_ATTEMPT_RATE", "30/minute"),
+        "ctf_read": env("CTF_READ_RATE", "240/minute"),
     },
 }
 
@@ -286,6 +297,15 @@ SPECTACULAR_SETTINGS = {
         "ReportFileTypeEnum": "apps.reports.serializers.FILE_TYPE_CHOICES",
         # Pinned so the reports enums above cannot rename this existing component.
         "StatusEnum": "apps.national_desk.models.TrackerUpdate.STATUS_CHOICES",
+        # CtfExam.STATUS_CHOICES has the same values as ReportTask (draft/published/closed),
+        # so it shares ReportTaskStatusEnum; a second override would be a duplicate.
+        # Pinned so the CTF question "category" enum cannot rename the course one.
+        "CategoryEnum": "apps.courses.models.Course.CATEGORY_CHOICES",
+        "CtfExamWindowEnum": "apps.ctf.models.CtfExam.WINDOW_CHOICES",
+        "CtfParticipationStatusEnum": "apps.ctf.models.CtfParticipation.STATUS_CHOICES",
+        "CtfQuestionCategoryEnum": "apps.ctf.models.CATEGORY_CHOICES",
+        "CtfQuestionDifficultyEnum": "apps.ctf.models.DIFFICULTY_CHOICES",
+        "CtfMaterialKindEnum": "apps.ctf.serializers.MATERIAL_KIND_CHOICES",
     },
 }
 
@@ -334,6 +354,20 @@ if DEBUG:
     ]
     CORS_ALLOWED_ORIGINS = list(dict.fromkeys([*CORS_ALLOWED_ORIGINS, *dev_frontend_origins]))
     CSRF_TRUSTED_ORIGINS = list(dict.fromkeys([*CSRF_TRUSTED_ORIGINS, *dev_frontend_origins]))
+
+# --- OSINT CTF exams (apps.ctf) ---
+# The labs site calls /api/ctf/ from the browser with the student's cookies.
+# It is trusted for CSRF, but CORS is enabled for it ONLY on /api/ctf/ and the
+# CSRF/refresh endpoints (apps/ctf/signals.py), and every other write from a
+# labs origin is refused (config/labs_origin.py). Never add it to
+# CORS_ALLOWED_ORIGINS.
+CTF_LABS_ORIGINS = env_list("CTF_LABS_ORIGINS", ["https://labs.alsyedinitiative.com"])
+if DEBUG:
+    CTF_LABS_ORIGINS = _dedupe_preserve_order([*CTF_LABS_ORIGINS, "http://localhost:8092", "http://127.0.0.1:8092"])
+CSRF_TRUSTED_ORIGINS = _dedupe_preserve_order([*CSRF_TRUSTED_ORIGINS, *CTF_LABS_ORIGINS])
+# HMAC key for exam answer hashes. A separate secret (not SECRET_KEY), at
+# least 32 characters; rotating it requires reloading every exam file.
+CTF_ANSWER_PEPPER = env("CTF_ANSWER_PEPPER", "").strip()
 
 SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", False)
 USE_X_FORWARDED_HOST = env_bool("USE_X_FORWARDED_HOST", True)
@@ -578,7 +612,15 @@ CIRCUIT_BREAKERS = {
     "prometheus": {},
     # ClamAV (report uploads). Uploads fail closed while it is open.
     "clamd": {"failure_threshold": 3, "open_seconds": 30},
+    # Public YouTube feed / live page for the website (apps.site_media). Fail soft.
+    "youtube": {"failure_threshold": 3, "open_seconds": 120},
 }
+# Website YouTube section (apps.site_media.youtube): cache windows and timeouts.
+YOUTUBE_FEED_CACHE_SECONDS = max(60, env_int("YOUTUBE_FEED_CACHE_SECONDS", 900))
+YOUTUBE_LIVE_CACHE_SECONDS = max(15, env_int("YOUTUBE_LIVE_CACHE_SECONDS", 60))
+YOUTUBE_FEED_TIMEOUT_SECONDS = max(1, env_int("YOUTUBE_FEED_TIMEOUT_SECONDS", 4))
+YOUTUBE_LIVE_TIMEOUT_SECONDS = max(1, env_int("YOUTUBE_LIVE_TIMEOUT_SECONDS", 5))
+YOUTUBE_LIVE_CHECK_ENABLED = env_bool("YOUTUBE_LIVE_CHECK_ENABLED", True)
 # Readiness probe memo and MEDIA_ROOT disk thresholds.
 HEALTH_READINESS_CACHE_SECONDS = env_int("HEALTH_READINESS_CACHE_SECONDS", 3)
 HEALTH_MEDIA_MIN_FREE_BYTES = env_int("HEALTH_MEDIA_MIN_FREE_BYTES", 512 * 1024 * 1024)

@@ -16,8 +16,8 @@ const CATEGORY_META = {
     label: "OSINT",
     longLabel: "Open Source Intelligence",
     shortMark: "OS",
-    heroImage: "/course-art/osint-detail-operations-v1.png",
-    supportImage: "/course-art/osint-program-v2.png",
+    heroImage: "/course-art/osint-detail-operations-v1.webp",
+    supportImage: "/course-art/osint-program-v2.webp",
     visualEyebrow: "Investigation environment",
     visualTitle: "From scattered public data to verified intelligence",
   },
@@ -25,8 +25,8 @@ const CATEGORY_META = {
     label: "Pentesting",
     longLabel: "Web Application & API Security",
     shortMark: "PT",
-    heroImage: "/course-art/pentesting-detail-lab-v1.png",
-    supportImage: "/course-art/pentesting-program-v2.png",
+    heroImage: "/course-art/pentesting-detail-lab-v1.webp",
+    supportImage: "/course-art/pentesting-program-v2.webp",
     visualEyebrow: "Authorized security lab",
     visualTitle: "Learn the workflow behind professional application testing",
   },
@@ -106,6 +106,10 @@ function CourseArtwork({ course, category, showImage }) {
     <img
       className="detail-hero-art"
       src={getCourseDetailArtwork(course)}
+      width="1280"
+      height="720"
+      decoding="async"
+      fetchpriority="high"
       alt={
         showImage
           ? course.image_alt || `${course.title} course artwork`
@@ -169,7 +173,8 @@ export default function ProfessionalCoursePage() {
 
   if (!course || !experience) {
     return (
-      <div className="course-experience" role="status">
+      // Hold the page's height while loading so the footer does not jump (CLS).
+      <div className="course-experience min-h-[100svh]" role="status">
         Loading course...
       </div>
     );

@@ -498,6 +498,9 @@ document.addEventListener("DOMContentLoaded", () => {
         renderQuestions("blackmeridian");
         renderQuestions("certification");
         updateProgressIndicators();
+
+        // 5. Let the Examination tab (exam.js) follow the language toggle.
+        window.dispatchEvent(new CustomEvent("labs:langchange", { detail: { lang } }));
     };
 
     const renderQuestions = (category) => {

@@ -613,6 +613,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ctf/exams/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ctf_exams_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ctf/exams/{slug}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ctf_exams_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ctf/exams/{slug}/questions/{key}/attempts/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description DRF APIView/ViewSet mixin. Put it FIRST in the bases.
+         *
+         *     Runs after authentication/permissions/throttling (inside ``initial``) so
+         *     the owner is the authenticated user and rejected requests never claim keys.
+         */
+        post: operations["ctf_exams_questions_attempts_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ctf/exams/{slug}/start/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ctf_exams_start_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ctf/exams/{slug}/submit/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ctf_exams_submit_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/enrollment-leads/": {
         parameters: {
             query?: never;
@@ -2060,6 +2146,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/site/youtube/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Public YouTube section data: channel, live status, featured and latest videos.
+         *
+         *     Anonymous (no cookies read), throttled per IP, briefly cacheable. Upstream
+         *     trouble never surfaces as an error: the payload falls back to cached data
+         *     or ``available: false`` and the website hides the section.
+         */
+        get: operations["site_youtube_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2073,6 +2182,19 @@ export interface components {
         ActionTypeEnum: "audio" | "pdf" | "video";
         AttachmentUploadResponse: {
             attachment: components["schemas"]["StoredFile"];
+        };
+        AttemptRequestRequest: {
+            answer: string;
+        };
+        AttemptResponse: {
+            attempt: components["schemas"]["AttemptResult"];
+            participation: components["schemas"]["Participation"];
+        };
+        AttemptResult: {
+            attempt_number: number;
+            correct: boolean;
+            points_awarded: number;
+            attempts_remaining: number;
         };
         AuditEntry: {
             id: number;
@@ -2262,6 +2384,50 @@ export interface components {
             max_marks: string;
         };
         /**
+         * @description * `not_open` - Not open yet
+         *     * `open` - Open
+         *     * `closed` - Closed
+         * @enum {string}
+         */
+        CtfExamWindowEnum: "not_open" | "open" | "closed";
+        /**
+         * @description * `image` - Image
+         *     * `file` - File
+         * @enum {string}
+         */
+        CtfMaterialKindEnum: "image" | "file";
+        /**
+         * @description * `active` - In progress
+         *     * `submitted` - Submitted
+         *     * `expired` - Time over
+         * @enum {string}
+         */
+        CtfParticipationStatusEnum: "active" | "submitted" | "expired";
+        /**
+         * @description * `socmint` - SOCMINT (social media)
+         *     * `geoint` - GEOINT (geolocation)
+         *     * `chronolocation` - Chronolocation
+         *     * `imint` - IMINT (imagery)
+         *     * `dorking` - Search-engine dorking
+         *     * `orgint` - Organisational intelligence
+         *     * `techint` - Technical / infrastructure
+         *     * `archives` - Web archives
+         *     * `transport` - Transport (aviation, maritime, rail)
+         *     * `finint` - Financial and corporate records
+         *     * `people` - People search
+         *     * `crypto` - Crypto / blockchain
+         * @enum {string}
+         */
+        CtfQuestionCategoryEnum: "socmint" | "geoint" | "chronolocation" | "imint" | "dorking" | "orgint" | "techint" | "archives" | "transport" | "finint" | "people" | "crypto";
+        /**
+         * @description * `medium` - Medium
+         *     * `hard` - Hard
+         *     * `expert` - Expert
+         *     * `insane` - Insane
+         * @enum {string}
+         */
+        CtfQuestionDifficultyEnum: "medium" | "hard" | "expert" | "insane";
+        /**
          * @description * `connecting` - connecting
          *     * `connected` - connected
          *     * `reconnecting` - reconnecting
@@ -2273,6 +2439,49 @@ export interface components {
          * @enum {string}
          */
         EventEnum: "connecting" | "connected" | "reconnecting" | "reconnected" | "disconnected" | "connection_failed" | "quality_changed" | "relay_fallback";
+        ExamDetail: {
+            exam: components["schemas"]["ExamInfo"];
+            participation: components["schemas"]["Participation"] | null;
+            /** Format: date-time */
+            server_time: string;
+            questions: components["schemas"]["Question"][];
+        };
+        ExamInfo: {
+            slug: string;
+            title: components["schemas"]["LocalizedText"];
+            status: components["schemas"]["ReportTaskStatusEnum"];
+            window: components["schemas"]["CtfExamWindowEnum"];
+            /** Format: date-time */
+            opens_at: string | null;
+            /** Format: date-time */
+            closes_at: string | null;
+            briefing: components["schemas"]["LocalizedLines"];
+            rules: components["schemas"]["LocalizedLines"];
+            time_limit_minutes: number | null;
+            question_count: number;
+            total_points: number;
+            can_start: boolean;
+        };
+        ExamList: {
+            results: components["schemas"]["ExamSummary"][];
+            /** Format: date-time */
+            server_time: string;
+        };
+        ExamSummary: {
+            slug: string;
+            title: components["schemas"]["LocalizedText"];
+            status: components["schemas"]["ReportTaskStatusEnum"];
+            window: components["schemas"]["CtfExamWindowEnum"];
+            /** Format: date-time */
+            opens_at: string | null;
+            /** Format: date-time */
+            closes_at: string | null;
+            time_limit_minutes: number | null;
+            question_count: number;
+            total_points: number;
+            can_start: boolean;
+            participation: components["schemas"]["Participation"] | null;
+        };
         FeedbackFile: {
             name: string;
             extension: string;
@@ -2556,6 +2765,14 @@ export interface components {
          * @enum {string}
          */
         LevelEnum: "beginner" | "intermediate" | "advanced";
+        LocalizedLines: {
+            en: string[];
+            ur: string[];
+        };
+        LocalizedText: {
+            en: string;
+            ur: string;
+        };
         /** @description Create/update input and the grader's view of a task. */
         ManageTask: {
             readonly id: number;
@@ -2651,6 +2868,13 @@ export interface components {
             marks_visibility: components["schemas"]["ReportMarksVisibilityEnum"];
             criteria?: components["schemas"]["CriterionInputRequest"][];
         };
+        Material: {
+            label: components["schemas"]["LocalizedText"];
+            /** @description Path on the labs site, e.g. /materials/exams/<folder>/photo.jpg */
+            url: string;
+            kind: components["schemas"]["CtfMaterialKindEnum"];
+            alt: components["schemas"]["LocalizedText"];
+        };
         ModuleOption: {
             id: number;
             title: string;
@@ -2724,6 +2948,21 @@ export interface components {
             pages: number;
             has_next: boolean;
             has_previous: boolean;
+        };
+        Participation: {
+            status: components["schemas"]["CtfParticipationStatusEnum"];
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            deadline_at: string | null;
+            /** Format: date-time */
+            submitted_at: string | null;
+            score: number;
+            solved_count: number;
+            wrong_count: number;
+        };
+        ParticipationResponse: {
+            participation: components["schemas"]["Participation"];
         };
         PatchedLectureCommentWriteRequest: {
             body?: string;
@@ -2816,6 +3055,18 @@ export interface components {
          * @enum {string}
          */
         PlatformEnum: "mobile" | "desktop" | "unknown";
+        Prompt: {
+            en: components["schemas"]["PromptBody"];
+            ur: components["schemas"]["PromptBody"];
+        };
+        PromptBody: {
+            briefing: string[];
+            artifact: string;
+            search_patterns: string[];
+            task: string;
+            constraints: string;
+            answer_format: string;
+        };
         /**
          * @description * `excellent` - excellent
          *     * `good` - good
@@ -2825,6 +3076,20 @@ export interface components {
          * @enum {string}
          */
         QualityEnum: "excellent" | "good" | "poor" | "lost" | "unknown";
+        Question: {
+            key: string;
+            order: number;
+            category: components["schemas"]["CtfQuestionCategoryEnum"];
+            difficulty: components["schemas"]["CtfQuestionDifficultyEnum"];
+            points: number;
+            title: components["schemas"]["LocalizedText"];
+            prompt: components["schemas"]["Prompt"];
+            materials: components["schemas"]["Material"][];
+            max_attempts: number;
+            attempts_used: number;
+            solved: boolean;
+            points_awarded: number;
+        };
         /**
          * @description * `network` - network
          *     * `authorization` - authorization
@@ -3344,6 +3609,48 @@ export interface components {
             minutes_late: number;
             is_revision: boolean;
             files: components["schemas"]["StoredFile"][];
+        };
+        YouTubeChannelInfo: {
+            title: string;
+            handle: string;
+            /** Format: uri */
+            url: string;
+            /** Format: uri */
+            subscribe_url: string;
+        };
+        YouTubeChannelPayload: {
+            enabled: boolean;
+            available: boolean;
+            section: components["schemas"]["YouTubeSection"];
+            channel: components["schemas"]["YouTubeChannelInfo"];
+            live: components["schemas"]["YouTubeLive"];
+            featured: components["schemas"]["YouTubeVideo"] | null;
+            latest: components["schemas"]["YouTubeVideo"][];
+            /** Format: date-time */
+            fetched_at: string | null;
+        };
+        YouTubeChannelResponse: {
+            success: boolean;
+            message: string;
+            data: components["schemas"]["YouTubeChannelPayload"];
+            errors: unknown;
+        };
+        YouTubeLive: {
+            is_live: boolean;
+            video_id: string | null;
+            title: string;
+        };
+        YouTubeSection: {
+            title: string;
+            subtitle: string;
+        };
+        YouTubeVideo: {
+            video_id: string;
+            title: string;
+            /** Format: date-time */
+            published_at: string | null;
+            /** Format: uri */
+            thumbnail: string;
         };
     };
     responses: never;
@@ -4606,6 +4913,124 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    ctf_exams_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExamList"];
+                };
+            };
+        };
+    };
+    ctf_exams_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExamDetail"];
+                };
+            };
+        };
+    };
+    ctf_exams_questions_attempts_create: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                key: string;
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttemptRequestRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttemptResponse"];
+                };
+            };
+        };
+    };
+    ctf_exams_start_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipationResponse"];
+                };
+            };
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipationResponse"];
+                };
+            };
+        };
+    };
+    ctf_exams_submit_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipationResponse"];
                 };
             };
         };
@@ -7623,6 +8048,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    site_youtube_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["YouTubeChannelResponse"];
+                };
             };
         };
     };

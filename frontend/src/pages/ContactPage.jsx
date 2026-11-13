@@ -145,8 +145,8 @@ export default function ContactPage() {
               Reach us directly or send a message from the contact form
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[#BBBBBB]">
-              Connect through Instagram, X, both WhatsApp numbers, or primary email. The form below
-              is wired to the Django backend contact email endpoint.
+              Message us on WhatsApp, Instagram or X, e-mail the team, or use the form below. We
+              usually reply within one working day.
             </p>
           </div>
 
@@ -186,7 +186,7 @@ export default function ContactPage() {
             <section className="rounded-2xl border border-black panel-gradient p-6 backdrop-blur-sm">
               <h2 className="font-reference text-2xl font-semibold text-white">Send a Message</h2>
               <p className="mt-3 text-sm leading-6 text-[#BBBBBB]">
-                This form sends email through the backend contact endpoint and SMTP configuration.
+                Tell us what you need help with and how to reach you. Your message goes straight to our team.
               </p>
 
               <form onSubmit={onSubmit} className="mt-5 space-y-4">
