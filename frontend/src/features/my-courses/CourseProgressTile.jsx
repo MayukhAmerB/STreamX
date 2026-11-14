@@ -7,10 +7,11 @@ import { resolveCourseArtwork, resolveCourseArtworkFallback } from "../../utils/
 import { formatCourseCategory, getCourseActionLabel, getCourseProgress } from "../../utils/courseProgress";
 
 /**
- * One owned course: artwork, title, progress and a single clear primary
- * action (Start / Continue / Review), with Live and Details as secondary.
+ * One owned course: artwork, title, progress and one clear action (Start /
+ * Continue / Review), with Live and Details as ghost links. Only the course
+ * to continue (`accent`) gets the champagne button: one per screen.
  */
-export default function CourseProgressTile({ course }) {
+export default function CourseProgressTile({ course, accent = false }) {
   const courseId = Number(course?.id || 0);
   const title = course?.title || "Your course";
   const progress = getCourseProgress(course);
@@ -44,7 +45,8 @@ export default function CourseProgressTile({ course }) {
             as={Link}
             to={`/learn/${courseId}`}
             renderIcon={PlayFilledAlt}
-            className="cds-course-tile__primary"
+            kind={accent ? "primary" : "tertiary"}
+            className={`cds-course-tile__primary${accent ? " cds-course-tile__primary--accent" : ""}`}
             aria-label={`${getCourseActionLabel(progress)}: ${title}`}
           >
             {getCourseActionLabel(progress)}

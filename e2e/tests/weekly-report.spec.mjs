@@ -162,7 +162,9 @@ test("weekly report: self-service targets, duplicate, virus block, late, graded"
     await signIn(staff, manifest, "admin");
     const grader = await staff.newPage();
     await grader.clock.setFixedTime(new Date(MONDAY_AFTER_DEADLINE));
-    await grader.goto(`/report-grading/queue?course=${manifest.course.id}`);
+    // Grading lives in the Admin workspace (UI overhaul §4.3), Queue first.
+    await grader.goto(`/console/admin/grading/queue?course=${manifest.course.id}`);
+    await expect(grader.getByRole("heading", { level: 1, name: "Grading" })).toBeVisible();
     // Grouped week -> target -> oldest; the late badge is on the Globex row.
     await expect(grader.getByText("Week of 9–15 Nov", { exact: true })).toBeVisible();
     await expect(grader.getByText("Globex Corporation (1)")).toBeVisible();
@@ -187,10 +189,9 @@ test("weekly report: self-service targets, duplicate, virus block, late, graded"
     await expect(card.getByRole("list", { name: /Your reports for Week of 9–15 Nov/ }).getByRole("button", { name: /Globex Corporation/ })).toContainText(
       "Graded 7/10"
     );
+    // "My marks" folds into Coursework › Grades: the old URL lands on /gradebook (plan §3.3).
     await page.goto("/reports/marks");
-    await expect(page.getByText("7/10").first()).toBeVisible();
-    await expect(page.getByText("Late", { exact: true }).first()).toBeVisible();
-    await page.goto("/gradebook");
+    await expect(page).toHaveURL(/\/gradebook$/);
     await expect(page.getByRole("row", { name: /Week of 9–15 Nov reports.*7\/10/ })).toBeVisible();
   });
 });

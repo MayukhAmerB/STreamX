@@ -96,6 +96,7 @@ def reset_view(request):
         clock.reset()
         call_command("flush", interactive=False, verbosity=0)
         cache.clear()
+        _forget_feature_stub_state()
         _apply_clock(body.get("clock"))
         _manifest = seed()
     return JsonResponse({"manifest": _manifest, "clock": clock.describe()})
@@ -247,10 +248,48 @@ def _fixture_exam_attempts(body):
     }
 
 
+# >>> UI overhaul (WS-0 stubs; WS-I owns them afterwards) >>>
+def _forget_feature_stub_state():
+    """The WS-0 feature stub keeps overrides in memory; a reset forgets them
+    (WS-F stores them in the database, which ``flush`` already empties)."""
+    from apps.core import features
+
+    forget = getattr(features, "_reset_stub_state_for_tests", None)
+    if callable(forget):
+        forget()
+
+
+def _fixture_features(body):
+    """Read or set the feature switches (``{"set": {"teaching": true}}``); see ui_fixtures."""
+    from .ui_fixtures import features_fixture
+
+    return features_fixture(body)
+
+
+def _fixture_attention(body):
+    """The admin attention payload (``apps.console_api.attention``) for the seeded admin."""
+    from .ui_fixtures import attention_fixture
+
+    return attention_fixture(body)
+
+
+def _fixture_admin_queues(body):
+    """Fill the admin "needs attention" queues (WS-I visual/a11y pages); see ui_fixtures."""
+    from .ui_fixtures import admin_queues_fixture
+
+    return admin_queues_fixture(body)
+
+
+# <<< UI overhaul <<<
+
+
 FIXTURES = {
     "no-courses": _fixture_no_courses,
     "leads": _fixture_lead_count,
     "exam-attempts": _fixture_exam_attempts,
+    "features": _fixture_features,
+    "attention": _fixture_attention,
+    "admin-queues": _fixture_admin_queues,
 }
 
 

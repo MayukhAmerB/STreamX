@@ -211,7 +211,7 @@ nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filte
 
 <footer>
   <div class="f-logo"><em>AL</em> SYED Initiative</div>
-  <div class="f-copy">Copyright 2025 AL SYED. All rights reserved.</div>
+  <div class="f-copy">Copyright <span id="f-copy-year">2026</span> AL SYED. All rights reserved.</div>
 </footer>
 
 <!-- MODAL -->
@@ -286,6 +286,7 @@ nav{position:sticky;top:0;z-index:200;background:rgba(8,8,8,0.95);backdrop-filte
 </div>
 
 <script>
+(function(){var y=document.getElementById('f-copy-year');if(y)y.textContent=String(new Date().getFullYear());})();
 const API_BASE = '/api/campaigns';
 const JOINED_KEY = 'as_joined_v2';
 const VISITOR_KEY = 'as_campaign_visitor_v1';

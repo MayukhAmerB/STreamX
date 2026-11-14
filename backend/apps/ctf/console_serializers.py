@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from apps.users.identity_serializers import StudentIdentitySerializer
+
 from .console import STATE_CHOICES
 from .models import CATEGORY_CHOICES, DIFFICULTY_CHOICES, MAX_ATTEMPTS_CAP, CtfExam, CtfParticipation
 from .serializers import MATERIAL_KIND_CHOICES
@@ -174,6 +176,7 @@ class StudentRefSerializer(serializers.Serializer):
 
 
 class ResultRowSerializer(serializers.Serializer):
+    identity = StudentIdentitySerializer(required=False, help_text="Roll number, real name, handle, stats (first).")
     rank = serializers.IntegerField()
     student = StudentRefSerializer()
     batch = BatchSerializer(allow_null=True)

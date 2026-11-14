@@ -2238,13 +2238,13 @@ export default function MeetingRoomExperience({
   const connectionStatusToneClass = (() => {
     const normalized = String(connectionLabel || "").toLowerCase();
     if (normalized.includes("reconnect")) {
-      return "border-amber-200/20 bg-amber-100/8 text-amber-100";
+      return "border-[#F3E2B3]/30 bg-[#F3E2B3]/[0.08] text-[#F3E2B3]";
     }
     if (normalized.includes("connect")) {
       return "border-[#C0C0C0]/30 bg-[#C0C0C0]/14 text-[#F1F1F1]";
     }
     if (normalized.includes("fail") || normalized.includes("left") || normalized.includes("disconnect")) {
-      return "border-red-300/25 bg-red-300/10 text-red-100";
+      return "border-white/60 bg-white/[0.08] text-[#fafafa]";
     }
     return "border-black bg-[#161616]/80 text-[#E1E1E1]";
   })();
@@ -2454,7 +2454,7 @@ export default function MeetingRoomExperience({
               ) : null}
               <Button
                 variant="danger"
-                className="rounded-full border-red-400/40 bg-red-600 px-4 py-2 text-white shadow-none hover:bg-red-500"
+                className="rounded-md border-white bg-[#fafafa] px-4 py-2 text-black shadow-none hover:bg-white/90"
                 onClick={handleDeleteLatestRecording}
                 loading={recordingState.loading}
                 disabled={!recordingState.latestCompleted?.id || Boolean(recordingState.active)}

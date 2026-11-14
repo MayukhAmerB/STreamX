@@ -22,3 +22,9 @@ class CoreConfig(AppConfig):
         # functions; importing them here fills the registry in every process
         # (web workers publish, the async worker drains).
         autodiscover_modules("outbox_handlers")
+        # Feature switches (UI overhaul plan §5.1): ``apps/<app>/features.py``
+        # calls ``apps.core.features.register_feature(...)``; core registers
+        # ``teaching`` itself.
+        from . import features  # noqa: F401
+
+        autodiscover_modules("features")

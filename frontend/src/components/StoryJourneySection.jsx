@@ -42,7 +42,7 @@ export default function StoryJourneySection({ className = "" }) {
       <div className="relative z-10 grid lg:grid-cols-[1.1fr_0.9fr]">
         <div className="p-5 sm:p-7 lg:py-8 lg:pl-8 lg:pr-6">
           <div className="inline-flex items-center border-l-2 border-white/60 pl-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#8F8F8F]">
-            {isOwlCognito ? "Private intelligence learning" : "Founded in 2026"}
+            {isOwlCognito ? "Private intelligence learning" : "Founded in 2025"}
           </div>
 
           <div className="mt-5 space-y-6">

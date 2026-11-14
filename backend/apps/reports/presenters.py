@@ -287,11 +287,16 @@ def week_label_for(task):
     return week.label() if week else ""
 
 
-def queue_item(submission, signals=None, week_labels=None):
+def queue_item(submission, signals=None, week_labels=None, identity_block=None):
     grade = getattr(submission, "grade", None)
     signals = signals or {}
     task = submission.task
+    if identity_block is None:
+        from apps.users import identity
+
+        identity_block = identity.block_for_user(submission.student, record=submission)
     return {
+        "identity": identity_block,
         "id": submission.pk,
         "task": gradebook_task_dict(task),
         "student": person(submission.student),
@@ -333,7 +338,11 @@ def submission_detail(submission, neighbours):
         .select_related("actor")
         .order_by("-created_at", "-id")[:50]
     )
+    from apps.users import identity
+
     return {
+        # Owner rule: the student block comes first (snapshot at submission + most recent handle).
+        "identity": identity.block_for_user(submission.student, record=submission, course_id=task.course_id),
         "id": submission.pk,
         "target_name": submission.target_name or task.title,
         "different_target_confirmed": submission.different_target_confirmed,

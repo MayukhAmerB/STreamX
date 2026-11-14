@@ -1,0 +1,268 @@
+// Console restyle of the Carbon components (UI overhaul plan §2.1, §2.5). OWNER: WS-A.
+// Behaviour, markup and accessibility stay Carbon's. The look is Carbon g100
+// with the Syed Carbon rules: Plex, square (one surface radius token), pills
+// only for tags, monochrome focus, white primary, outline secondary, and
+// champagne only where a page opts in (`.sc-button--accent`, once per view).
+// Motion: colour only on hover (fast-01), press instant, no lift, no glow.
+// Loaded by carbon-app.scss after the Carbon component CSS, so these
+// selectors (same specificity, later in the file) win.
+@use './tokens' as *;
+
+$_scope: '.cds-app';
+
+// ---------------------------------------------------------------------------
+// Buttons: 40 px desktop, 48 px touch.
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--btn {
+  border-radius: var(--sc-radius-surface);
+  font-family: var(--sc-font-sans);
+  letter-spacing: 0;
+  transition:
+    background-color var(--sc-duration-fast-01) var(--sc-ease-standard-productive),
+    border-color var(--sc-duration-fast-01) var(--sc-ease-standard-productive),
+    color var(--sc-duration-fast-01) var(--sc-ease-standard-productive);
+}
+
+#{$_scope} .cds--btn:focus {
+  @include sc-focus-ring;
+
+  box-shadow: inset 0 0 0 1px var(--sc-surface-page);
+}
+
+#{$_scope} .cds--btn .cds--btn__icon,
+#{$_scope} .cds--btn .cds--btn__icon path:not([data-icon-path]):not([fill='none']) {
+  fill: currentColor;
+}
+
+// Primary: white on dark (the next best action uses .sc-button--accent instead).
+#{$_scope} .cds--btn--primary {
+  border-color: transparent;
+  color: var(--sc-accent-on);
+
+  &:hover,
+  &:active,
+  &:focus {
+    color: var(--sc-accent-on);
+  }
+}
+
+// The ONE champagne button per view (Console "Resume", "Join live", admin "Review").
+#{$_scope} .cds--btn.sc-button--accent {
+  border-color: transparent;
+  background-color: var(--sc-accent);
+  color: var(--sc-accent-on);
+
+  &:hover {
+    background-color: var(--sc-accent-hover);
+    color: var(--sc-accent-on);
+  }
+
+  &:active {
+    background-color: var(--sc-accent-active);
+  }
+}
+
+#{$_scope} .cds--btn--primary:disabled,
+#{$_scope} .cds--btn--primary.cds--btn--disabled,
+#{$_scope} .cds--btn.sc-button--accent:disabled {
+  border-color: transparent;
+  background-color: var(--cds-button-disabled);
+  color: var(--cds-text-on-color-disabled);
+}
+
+// Secondary + tertiary: 1 px outline, primary text.
+#{$_scope} .cds--btn--secondary,
+#{$_scope} .cds--btn--tertiary {
+  border: 1px solid var(--sc-border-strong);
+  background-color: transparent;
+  color: var(--sc-text-primary);
+
+  &:hover {
+    border-color: #8d8d8d;
+    background-color: var(--sc-surface-hover-01);
+    color: var(--sc-text-primary);
+  }
+
+  &:focus {
+    border-color: var(--sc-border-strong);
+    background-color: transparent;
+    color: var(--sc-text-primary);
+  }
+
+  &:active {
+    background-color: var(--sc-surface-selected-01);
+    color: var(--sc-text-primary);
+  }
+
+  &:disabled,
+  &.cds--btn--disabled,
+  &:hover:disabled,
+  &:focus:disabled {
+    border-color: var(--sc-border-subtle);
+    background-color: transparent;
+    color: var(--sc-text-disabled);
+  }
+}
+
+// Ghost: toolbars and quiet actions.
+#{$_scope} .cds--btn--ghost {
+  color: var(--sc-text-primary);
+
+  &:hover {
+    background-color: var(--sc-surface-hover-01);
+    color: var(--sc-text-primary);
+  }
+
+  &:focus {
+    border-color: transparent;
+  }
+
+  &:active {
+    background-color: var(--sc-surface-selected-01);
+  }
+}
+
+#{$_scope} .cds--btn--ghost.cds--btn--icon-only .cds--btn__icon,
+#{$_scope} .cds--btn--ghost.cds--btn--icon-only .cds--btn__icon path:not([data-icon-path]):not([fill='none']) {
+  fill: var(--sc-icon-secondary);
+}
+
+#{$_scope} .cds--btn--ghost.cds--btn--icon-only:hover .cds--btn__icon,
+#{$_scope} .cds--btn--ghost.cds--btn--icon-only:hover .cds--btn__icon path:not([data-icon-path]):not([fill='none']) {
+  fill: var(--sc-icon-primary);
+}
+
+// Touch targets: 48 px primary actions on phones (Carbon lg is 48 px).
+@media (max-width: 41.98rem) {
+  #{$_scope} .cds--btn:not(.cds--btn--sm):not(.cds--btn--icon-only):not(.cds--btn--ghost) {
+    min-block-size: 3rem;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tiles: square layer, no border, no shadow (elevation from layers). The
+// Console uses only the plain <Tile>, so this replaces Carbon's tile module.
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--tile {
+  position: relative;
+  display: block;
+  min-block-size: 4rem;
+  min-inline-size: 8rem;
+  padding: 1rem;
+  border-radius: var(--sc-radius-surface);
+  background-color: var(--sc-surface-01);
+  color: var(--sc-text-primary);
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+}
+
+// ---------------------------------------------------------------------------
+// Tags: pills (the second shape token), sentence case, label-01.
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--tag {
+  border-radius: var(--sc-radius-pill);
+  font-family: var(--sc-font-sans);
+  font-size: var(--sc-type-label-01-size);
+  letter-spacing: var(--sc-type-label-01-letter-spacing);
+  text-transform: none;
+}
+
+// Colour on a tag means status only (§2.1: live/error red, success green,
+// warning amber; info blue is the kit's StatusTag). Carbon's decorative hues
+// (role labels, categories: blue, purple, cyan, teal, magenta, cool/warm
+// gray) read as the neutral gray tag, so the Console stays black/white/grey.
+#{$_scope} {
+  @each $hue in (blue, purple, cyan, teal, magenta, cool-gray, warm-gray) {
+    --cds-tag-background-#{$hue}: var(--cds-tag-background-gray);
+    --cds-tag-color-#{$hue}: var(--cds-tag-color-gray);
+    --cds-tag-hover-#{$hue}: var(--cds-tag-hover-gray);
+    --cds-tag-border-#{$hue}: var(--cds-tag-border-gray);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Fields: Carbon g100 bottom-border fields, square, white focus ring.
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--text-input,
+#{$_scope} .cds--text-area,
+#{$_scope} .cds--search-input,
+#{$_scope} .cds--select-input,
+#{$_scope} .cds--number input[type='number'] {
+  border-radius: var(--sc-radius-surface);
+  font-family: var(--sc-font-sans);
+  transition: border-color var(--sc-duration-fast-01) var(--sc-ease-standard-productive);
+}
+
+#{$_scope} .cds--label,
+#{$_scope} .cds--form__helper-text {
+  font-family: var(--sc-font-sans);
+}
+
+#{$_scope} .cds--label {
+  color: var(--sc-text-secondary);
+}
+
+// M18: the error helper fades in (fast-02), no slide, no shake.
+#{$_scope} .cds--form-requirement {
+  animation: sc-fade var(--sc-duration-fast-02) var(--sc-ease-standard-productive);
+}
+
+// ---------------------------------------------------------------------------
+// Tabs: white label and indicator on the selected tab (not blue, not champagne).
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--tabs .cds--tabs__nav-item {
+  font-family: var(--sc-font-sans);
+}
+
+#{$_scope} .cds--tabs .cds--tabs__nav-item--selected,
+#{$_scope} .cds--tabs .cds--tabs__nav-item--selected .cds--tabs__nav-item-label {
+  color: var(--sc-text-primary);
+}
+
+// ---------------------------------------------------------------------------
+// Notifications and toasts: square, Plex; toasts carry the one floating shadow.
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--inline-notification {
+  border-radius: var(--sc-radius-surface);
+  font-family: var(--sc-font-sans);
+}
+
+// ---------------------------------------------------------------------------
+// Progress bar: white fill, no glow (Carbon's own motion is kept).
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--progress-bar__track {
+  background-color: var(--sc-surface-02);
+}
+
+#{$_scope} .cds--progress-bar__bar {
+  background-color: var(--sc-text-primary);
+}
+
+#{$_scope} .cds--progress-bar--finished .cds--progress-bar__bar {
+  background-color: var(--sc-status-success);
+}
+
+// ---------------------------------------------------------------------------
+// Modal: square, Plex; the scrim is the shared overlay.
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--modal-container {
+  border-radius: var(--sc-radius-surface);
+}
+
+#{$_scope} .cds--modal-header__heading {
+  font-family: var(--sc-font-sans);
+  font-weight: 400;
+}
+
+// ---------------------------------------------------------------------------
+// Popover / tooltip / toggletip: square with the floating shadow.
+// ---------------------------------------------------------------------------
+#{$_scope} .cds--popover-content {
+  border-radius: var(--sc-radius-surface);
+  box-shadow: var(--sc-shadow-floating);
+}
+
+#{$_scope} .cds--skeleton__text,
+#{$_scope} .cds--skeleton__placeholder {
+  border-radius: var(--sc-radius-surface);
+}

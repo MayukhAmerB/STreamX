@@ -44,13 +44,18 @@ class LectureCommentSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(CommentAuthorSerializer)
     def get_author(self, obj):
+        from apps.profiles.handles import is_staff_like, public_handle
+
         user = obj.user
         instructor_id = self.context.get("course_instructor_id")
-        return {
-            "id": user.id,
-            "display_name": (user.full_name or "").strip() or "Learner",
-            "is_instructor": bool(instructor_id and instructor_id == user.id),
-        }
+        is_instructor = bool(instructor_id and instructor_id == user.id)
+        # Owner privacy rule: students appear by their handle only; the course
+        # instructor and staff teach under their own name.
+        if is_instructor or is_staff_like(user):
+            name = (user.full_name or "").strip() or "Instructor"
+        else:
+            name = (self.context.get("author_handles") or {}).get(user.id) or public_handle(user)
+        return {"id": user.id, "display_name": name, "is_instructor": is_instructor}
 
     def get_is_mine(self, obj) -> bool:
         viewer = self._viewer()

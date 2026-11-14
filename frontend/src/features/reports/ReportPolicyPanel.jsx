@@ -1,5 +1,5 @@
 import { Save } from "@carbon/icons-react";
-import { Button, InlineLoading, InlineNotification, Select, SelectItem, TextInput, Toggle } from "@carbon/react";
+import { Button, InlineLoading, InlineNotification, Select, SelectItem, TextInput } from "@carbon/react";
 import { useEffect, useState } from "react";
 import { apiData, apiMessage } from "../../utils/api";
 import { getCoursePolicy, updateCoursePolicy } from "./reportsApi";
@@ -41,8 +41,9 @@ export default function ReportPolicyPanel({ courseId, notify }) {
       .then((response) => {
         if (!alive) return;
         const policy = apiData(response, null);
-        setState({ policy, loading: false, error: "" });
+        // Draft first: an unbatched render must never see "loaded, no draft".
         setDraft({ ...policy, max_targets_per_week: policy?.max_targets_per_week ?? "" });
+        setState({ policy, loading: false, error: "" });
       })
       .catch((error) => alive && setState({ policy: null, loading: false, error: apiMessage(error, "Please try again.") }));
     return () => {
@@ -74,14 +75,29 @@ export default function ReportPolicyPanel({ courseId, notify }) {
         Weekly reports
       </h2>
       <p className="rpt-muted">{describePolicy(state.policy)}</p>
-      <Toggle
-        id={`rpt-policy-self-service-${courseId}`}
-        labelText="Self-service weekly reports"
-        labelA="Off: you set each week's target"
-        labelB="On: students name their targets, weeks are automatic"
-        toggled={Boolean(draft.self_service)}
-        onToggle={(value) => setDraft((current) => ({ ...current, self_service: value }))}
-      />
+      {/* A plain role="switch" button: the Console bundle ships no Carbon
+          Toggle styles, and this matches the curriculum "Free preview" switch. */}
+      <div className="rpt-switch-field">
+        <button
+          type="button"
+          role="switch"
+          id={`rpt-policy-self-service-${courseId}`}
+          aria-checked={Boolean(draft.self_service)}
+          aria-describedby={`rpt-policy-self-service-${courseId}-help`}
+          className="rpt-switch"
+          onClick={() => setDraft((current) => ({ ...current, self_service: !current.self_service }))}
+        >
+          <span className="rpt-switch__track" aria-hidden="true">
+            <span className="rpt-switch__knob" />
+          </span>
+          <span className="rpt-switch__label">Self-service weekly reports</span>
+        </button>
+        <p id={`rpt-policy-self-service-${courseId}-help`} className="rpt-muted">
+          {draft.self_service
+            ? "On: students name their targets, weeks are automatic."
+            : "Off: you set each week's target."}
+        </p>
+      </div>
       <div className="rpt-policy__fields">
         <TextInput
           id={`rpt-policy-max-${courseId}`}

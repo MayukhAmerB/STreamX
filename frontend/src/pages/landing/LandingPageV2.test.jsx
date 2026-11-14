@@ -9,6 +9,7 @@ import HeroBand, { HeroCountdownStrip, TrackTiles } from "./HeroBand";
 import { assignBandThemes } from "./LandingPageV2";
 import LiveClassesBand, { formatLiveClassPrice, liveClassAction } from "./LiveClassesBand";
 import { isLandingV2Enabled } from "./landingFlag";
+import { AboutBand, countUpStats } from "./StoryBands";
 import { isLiveClassOnAir, liveBroadcastJoinPath, selectFeaturedCoursePath, selectHeroLiveBroadcast } from "./useLandingData";
 
 const html = (element) => renderToStaticMarkup(<StaticRouter location="/">{element}</StaticRouter>);
@@ -276,5 +277,63 @@ describe("landing data helpers", () => {
     expect(selectFeaturedCoursePath(COURSES)).toBe("/courses/101");
     expect(selectFeaturedCoursePath([COURSES[1]])).toBe("/courses");
     expect(selectFeaturedCoursePath([])).toBe("/courses");
+  });
+});
+
+describe("landing v2: motion layer (UI overhaul plan M5, M9, M15)", () => {
+  it("rolls the countdown with the shared RollingDigits, one per unit", () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.parse("2026-11-13T12:00:00Z") });
+    try {
+      const far = [{ id: 1, title: "OSINT", hero_countdown_end_at: "2026-11-15T14:30:00Z" }];
+      const markup = html(<HeroCountdownStrip courses={far} />);
+      expect(markup.match(/class="sc-rolling-digits"/g)).toHaveLength(3);
+      // Each unit is announced once as its final value (2 days, 2 hours, 30 minutes).
+      const announced = [...markup.matchAll(/class="sc-rolling-digits"><span class="sc-visually-hidden">(\d+)<\/span>/g)].map((m) => m[1]);
+      expect(announced).toEqual(["02", "02", "30"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("counts up only plain counts, keeps the suffix and leaves ratios as text", () => {
+    const stats = countUpStats([
+      { value: "1000+", label: "Students trained" },
+      { value: "98%", label: "Learner satisfaction" },
+      { value: "6x", label: "Practical labs per module" },
+      { value: "1:1", label: "Mentor support" },
+    ]);
+    expect(stats.map((item) => typeof item.value)).toEqual(["object", "object", "object", "string"]);
+    expect(stats[0].value.props.value).toBe(1000);
+    expect(stats[0].value.props.format(1000)).toBe("1000+");
+    expect(stats[1].value.props.format(97.6)).toBe("98%");
+    expect(stats[2].value.props.format(6)).toBe("6x");
+    expect(stats[3].value).toBe("1:1");
+  });
+
+  it("shows only live figures in the About band and hides the strip without them", () => {
+    // Before the figures arrive (and when the API fails) there is no strip at all.
+    const empty = html(<AboutBand />);
+    expect(empty).not.toContain("lp-stats");
+    for (const fake of ["1000+", "98%", "6x", "1:1"]) expect(empty).not.toContain(fake);
+    // Server/no-JS markup already shows the final, honest figures.
+    const markup = html(
+      <AboutBand
+        stats={[
+          { key: "students_enrolled", label: "Students enrolled", value: "130+", count: 130, plus: true },
+          { key: "average_rating", label: "Average course rating", value: "4.6/5", count: null, plus: false, note: "from 12 reviews" },
+        ]}
+      />,
+    );
+    expect(markup).toContain("lp-stats");
+    expect(markup).toContain("130+");
+    expect(markup).toContain("4.6/5");
+    expect(markup).toContain("from 12 reviews");
+  });
+
+  it("keeps the hero h1 and its eyebrow rule static markup (the rule draws in CSS only)", () => {
+    const markup = html(<HeroBand courses={COURSES} tracks={[OPEN, SOON]} />);
+    expect(markup).toContain('class="lp-eyebrow lp-eyebrow--rule"');
+    expect(markup).toMatch(/<h1 id="lp-hero-title" class="lp-hero__title">/);
+    expect(markup).not.toContain("data-reveal");
   });
 });

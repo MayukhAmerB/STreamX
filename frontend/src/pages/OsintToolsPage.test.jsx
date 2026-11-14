@@ -99,4 +99,18 @@ describe("OsintToolsPage", () => {
     expect(tree.text()).toContain("Clear filters");
     await tree.unmount();
   });
+
+  it("folds categories so the page stays short, and opens them while searching or on tap", async () => {
+    const closed = renderToStaticMarkup(<OsintToolsView />);
+    expect((closed.match(/aria-expanded="false"/g) || []).length).toBe(10);
+    expect(closed).not.toContain('aria-expanded="true"');
+    const searching = renderToStaticMarkup(<OsintToolsView initialQuery="whois" />);
+    expect(searching).not.toContain('aria-expanded="false"');
+
+    const tree = await renderTree(<OsintToolsView />);
+    const toggle = tree.find((node) => node.type === "button" && node.props["aria-expanded"] === false);
+    await act(() => toggle.props.onClick());
+    expect(tree.all((node) => node.type === "button" && node.props["aria-expanded"] === true)).toHaveLength(1);
+    await tree.unmount();
+  });
 });

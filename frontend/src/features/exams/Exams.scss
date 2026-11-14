@@ -23,9 +23,9 @@
 
   .exm-card {
     padding: $spacing-05;
-    border: 1px solid var(--uc-border);
-    border-radius: var(--uc-radius-card);
-    background: var(--uc-surface);
+    border: 1px solid var(--sc-border-subtle, var(--uc-border));
+    border-radius: var(--sc-radius-surface, 0);
+    background: var(--sc-surface-01, var(--uc-surface));
   }
 
   .exm-back {
@@ -56,6 +56,31 @@
     flex-wrap: wrap;
     align-items: center;
     gap: $spacing-03;
+  }
+
+  // Section heading with its one action on the right (Results · Export CSV).
+  .exm-row--head {
+    justify-content: space-between;
+    margin-block-end: $spacing-04;
+
+    .exm-subtitle {
+      margin-block-end: 0;
+    }
+  }
+
+  // Detail header: tags, then the ghost buttons. On phones the buttons take
+  // their own row, pulled into the gutter so their labels line up with the text.
+  .exm-head-actions__buttons {
+    gap: 0;
+
+    @media (max-width: 41.98rem) {
+      flex-basis: 100%;
+      margin-inline-start: -1rem;
+    }
+  }
+
+  .exm-after-chips {
+    margin-block-start: $spacing-04;
   }
 
   .exm-row--spaced {
@@ -159,8 +184,17 @@
 
   .exm-table-wrap {
     overflow-x: auto;
-    border: 1px solid var(--uc-border);
-    border-radius: var(--uc-radius-control);
+    border: 1px solid var(--sc-border-subtle, var(--uc-border));
+    border-radius: var(--sc-radius-surface, 0);
+
+    // Edge fade while columns hide sideways (useScrollCue sets data-cue).
+    &[data-cue='end'] {
+      mask-image: linear-gradient(to right, #000 calc(100% - 3rem), transparent);
+    }
+
+    &[data-cue='start'] {
+      mask-image: linear-gradient(to left, #000 calc(100% - 3rem), transparent);
+    }
 
     &:focus-visible {
       @include corner-focus-ring;
@@ -191,7 +225,15 @@
     }
 
     a {
-      color: var(--uc-accent);
+      color: var(--sc-text-primary, var(--uc-text));
+      font-weight: 600;
+      text-decoration: underline;
+      text-decoration-color: var(--sc-border-strong, #6f6f6f);
+      text-underline-offset: 0.2em;
+
+      &:hover {
+        text-decoration-color: currentColor;
+      }
     }
   }
 
@@ -283,5 +325,173 @@
 
     display: block;
     color: var(--uc-text-muted);
+  }
+
+  // --- UI overhaul (WS-D2): T2 list, import panel, T3 detail -------------------
+  .exm-page {
+    .cds-page-header {
+      margin-block-end: $spacing-05;
+    }
+
+    // The page template spaces the sections; no extra margins on top of it.
+    .sc-template__main > .exm-section {
+      margin-block: 0;
+    }
+  }
+
+  .exm-visually-hidden {
+    position: absolute;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    block-size: 1px;
+    inline-size: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    white-space: nowrap;
+  }
+
+  .exm-import {
+    display: grid;
+    padding: $spacing-05;
+    border: 1px solid var(--sc-border-subtle, var(--uc-border));
+    border-radius: var(--sc-radius-surface, 0);
+    background: var(--sc-surface-01, var(--uc-surface));
+    gap: $spacing-05;
+
+    @include breakpoint(lg) {
+      align-items: start;
+      padding: $spacing-06;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+
+      > .exm-preview,
+      > .cds-page-notification,
+      > .cds-page-notification-group {
+        grid-column: 1 / -1;
+      }
+    }
+
+    .exm-subtitle {
+      margin-block-end: $spacing-03;
+    }
+  }
+
+  .exm-import__controls {
+    display: grid;
+    gap: $spacing-04;
+    min-inline-size: 0;
+  }
+
+  .exm-import__file {
+    @include type-style('body-compact-01');
+
+    margin: 0;
+    color: var(--uc-text);
+    overflow-wrap: anywhere;
+  }
+
+  .exm-window {
+    display: inline-block;
+    min-inline-size: 12rem;
+    white-space: normal;
+  }
+
+  .exm-num-cell {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .exm-detail {
+    display: grid;
+    gap: $spacing-06;
+    grid-template-columns: minmax(0, 1fr);
+
+    @include breakpoint(lg) {
+      align-items: start;
+      grid-template-columns: minmax(0, 2fr) minmax(18rem, 1fr);
+    }
+  }
+
+  .exm-detail__aside {
+    display: grid;
+    gap: $spacing-05;
+
+    .exm-section {
+      margin-block: 0;
+    }
+
+    @include breakpoint(lg) {
+      position: sticky;
+      inset-block-start: calc(var(--cds-app-header-height, 3rem) + #{$spacing-05});
+      grid-column: 2;
+      grid-row: 1;
+    }
+  }
+
+  .exm-detail__main {
+    min-inline-size: 0;
+
+    @include breakpoint(lg) {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    > .exm-section:first-child {
+      margin-block-start: 0;
+    }
+  }
+
+  .exm-publish {
+    padding: $spacing-05;
+    border: 1px solid var(--sc-border-subtle, var(--uc-border));
+    background: var(--sc-surface-01, var(--uc-surface));
+  }
+
+  .exm-note {
+    max-inline-size: 60ch;
+
+    svg {
+      margin-inline-end: $spacing-02;
+      fill: currentColor;
+      vertical-align: -0.2em;
+    }
+
+    a {
+      display: inline;
+      min-block-size: 0;
+      color: var(--uc-text);
+    }
+  }
+
+  .exm-upload-btn {
+    @include type-style('body-compact-01');
+
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 2.5rem;
+    padding-inline: $spacing-04;
+    border: 1px solid var(--sc-border-strong, var(--uc-border-strong));
+    color: var(--uc-text);
+    cursor: pointer;
+    gap: $spacing-03;
+    transition: background-color 70ms linear;
+
+    svg {
+      fill: currentColor;
+    }
+
+    &:hover {
+      background: var(--sc-surface-hover-01, rgba(255, 255, 255, 0.06));
+    }
+
+    &:focus-within {
+      outline: 2px solid var(--sc-focus, #fff);
+      outline-offset: 2px;
+    }
+
+    &.is-busy {
+      cursor: progress;
+      opacity: 0.7;
+    }
   }
 }

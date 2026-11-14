@@ -19,6 +19,36 @@ let csrfBootstrapPromise = null;
 let evictionMode = null;
 
 export const AUTH_SESSION_EXPIRED_EVENT = "auth:session-expired";
+// A feature switch (UI overhaul plan §5.4) answered 403 `feature_disabled`:
+// the viewer's capabilities are stale. AuthContext re-fetches them and the
+// open page swaps to its "switched off" state.
+export const CAPABILITIES_STALE_EVENT = "capabilities:stale";
+export const FEATURE_DISABLED_CODE = "feature_disabled";
+
+/** `{ feature, reason }` when `error` is a 403 feature_disabled answer, else null. */
+export function featureDisabledDetail(error) {
+  const response = error?.response;
+  const data = response?.data;
+  if (response?.status !== 403 || !data || typeof data !== "object") {
+    return null;
+  }
+  const errors = data.errors && typeof data.errors === "object" ? data.errors : {};
+  const code = data.code || errors.code;
+  if (code !== FEATURE_DISABLED_CODE) {
+    return null;
+  }
+  return {
+    feature: String(errors.feature || data.feature || ""),
+    reason: String(data.detail || errors.detail || data.message || ""),
+  };
+}
+
+function notifyCapabilitiesStale(detail) {
+  if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") {
+    return;
+  }
+  window.dispatchEvent(new CustomEvent(CAPABILITIES_STALE_EVENT, { detail }));
+}
 
 export function resetSessionEviction() {
   evictionMode = null;
@@ -165,6 +195,11 @@ apiClient.interceptors.response.use(
   },
   async (error) => {
     extractCsrfToken(error?.response);
+    const disabled = featureDisabledDetail(error);
+    if (disabled) {
+      notifyCapabilitiesStale(disabled);
+      return Promise.reject(error);
+    }
     const requestUrl = error?.config?.url || "";
     const isRefreshRequest = requestUrl.includes("/auth/refresh/");
     // The server refused this request because this device only keeps its

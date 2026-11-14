@@ -477,6 +477,11 @@ class ReportSubmission(models.Model):
         default=1, help_text="Optimistic-concurrency token; bumped by every submission and grading change."
     )
     late_digest_sent_at = models.DateTimeField(null=True, blank=True)
+    # Student identity at submission time (apps.users.identity; additive, backfilled by
+    # ``manage.py backfill_identity_snapshots``). Shown before the record's own fields.
+    student_roll_number = models.CharField(max_length=16, null=True, blank=True, editable=False)
+    student_name_snapshot = models.CharField(max_length=255, null=True, blank=True, editable=False)
+    student_handle_snapshot = models.CharField(max_length=30, null=True, blank=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

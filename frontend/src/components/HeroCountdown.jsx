@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { RollingDigits } from "../site-kit/motion";
 import { selectActiveCourseCountdown } from "../utils/courseCountdown";
 
 const TIMER_UNITS = [
@@ -9,6 +10,7 @@ const TIMER_UNITS = [
   ["seconds", "Seconds"],
 ];
 
+/** Rollback landing (VITE_LANDING_V2=off) countdown; digits roll like the v2 strip (M9). */
 export default function HeroCountdown({ courses = [] }) {
   const [now, setNow] = useState(() => Date.now());
 
@@ -54,7 +56,7 @@ export default function HeroCountdown({ courses = [] }) {
         {TIMER_UNITS.map(([key, label]) => (
           <span key={key} className="flex min-w-[70px] flex-col items-center justify-center px-3 py-3 sm:min-w-[86px] sm:px-5">
             <strong className="font-reference text-2xl font-semibold tabular-nums text-white sm:text-3xl">
-              {String(activeCountdown.parts[key]).padStart(2, "0")}
+              <RollingDigits value={String(activeCountdown.parts[key]).padStart(2, "0")} />
             </strong>
             <span className="mt-1 text-[8px] font-bold uppercase tracking-[0.18em] text-red-100/75 sm:text-[9px]">
               {label}

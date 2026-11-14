@@ -19,6 +19,8 @@ from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 
+from apps.users.identity_admin import IDENTITY_LIST_DISPLAY, StudentIdentityAdminMixin
+
 from . import answers, exports
 from .models import CtfAttempt, CtfExam, CtfExamResult, CtfMaterial, CtfParticipation, CtfQuestion
 
@@ -313,11 +315,12 @@ class CtfAttemptInline(admin.TabularInline):
 
 
 @admin.register(CtfParticipation)
-class CtfParticipationAdmin(_ReadOnlyAdmin):
+class CtfParticipationAdmin(StudentIdentityAdminMixin, _ReadOnlyAdmin):
     model = CtfParticipation
+    # Owner rule: roll number, real name, handle, stats first; then the record.
     list_display = (
+        *IDENTITY_LIST_DISPLAY,
         "student_email",
-        "student_name",
         "exam",
         "batch_course",
         "status",
@@ -404,9 +407,11 @@ class QuestionListFilter(admin.SimpleListFilter):
 
 
 @admin.register(CtfAttempt)
-class CtfAttemptAdmin(_ReadOnlyAdmin):
+class CtfAttemptAdmin(StudentIdentityAdminMixin, _ReadOnlyAdmin):
     model = CtfAttempt
+    identity_record_attr = "participation"
     list_display = (
+        *IDENTITY_LIST_DISPLAY,
         "created_at",
         "student_email",
         "exam",
@@ -426,7 +431,7 @@ class CtfAttemptAdmin(_ReadOnlyAdmin):
     )
     date_hierarchy = "created_at"
     search_fields = ("user__email", "user__full_name", "submitted_answer")
-    list_select_related = ("exam", "user", "question")
+    list_select_related = ("exam", "user", "question", "participation")
     ordering = ("-created_at", "-id")
     actions = ("export_attempts_csv",)
     fields = (
@@ -472,10 +477,10 @@ class CtfAttemptAdmin(_ReadOnlyAdmin):
 
 # --- Phase 3: gradebook entries and Console-uploaded evidence (read only) ---
 @admin.register(CtfExamResult)
-class CtfExamResultAdmin(admin.ModelAdmin):
+class CtfExamResultAdmin(StudentIdentityAdminMixin, admin.ModelAdmin):
     """Written by ctf.scheduler when an exam closes; never edited by hand."""
 
-    list_display = ("exam", "user", "batch_course", "score", "total_points", "rank", "status", "finalized_at", "notified_at")
+    list_display = (*IDENTITY_LIST_DISPLAY, "exam", "user", "batch_course", "score", "total_points", "rank", "status", "finalized_at", "notified_at")
     list_filter = ("exam", ("batch_course", admin.RelatedOnlyFieldListFilter))
     search_fields = ("user__email", "user__full_name", "exam__slug")
     list_select_related = ("exam", "user", "batch_course")
@@ -502,3 +507,6 @@ class CtfMaterialAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+# Monthly OSINT CTF seasons (season_admin.py registers its own admins).
+from . import season_admin  # noqa: E402,F401

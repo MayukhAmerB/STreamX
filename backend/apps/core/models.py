@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -90,3 +91,67 @@ class OutboxEvent(models.Model):
 
     def __str__(self):
         return f"{self.event_type}#{self.pk} ({self.status})"
+
+
+# --- feature switches (UI overhaul plan §5.1; owner WS-F) ---------------------
+#
+# Feature *definitions* live in code (``apps.core.features`` registry). These
+# tables hold only admin overrides and their append-only history, so a new
+# switch never needs a migration and an unknown key is ignored.
+
+
+class FeatureFlag(models.Model):
+    """One row per feature an admin has switched (absent = registry default)."""
+
+    key = models.SlugField(max_length=64, unique=True)
+    enabled = models.BooleanField()
+    # Optional user-facing reason shown while the feature is off ("Teaching opens 1 Dec").
+    reason_override = models.CharField(max_length=160, blank=True, default="")
+    # Optimistic concurrency: every change bumps it; writers send the version they saw.
+    version = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+
+    class Meta:
+        ordering = ["key"]
+        verbose_name = "Feature"
+        verbose_name_plural = "Features"
+
+    def __str__(self):
+        return f"{self.key}: {'on' if self.enabled else 'off'}"
+
+    def clean(self):
+        from config.model_validators import validate_no_active_content
+
+        validate_no_active_content(self.reason_override, "reason_override")
+
+
+class FeatureFlagChange(models.Model):
+    """Append-only audit of every feature switch change (who, when, why)."""
+
+    key = models.SlugField(max_length=64, db_index=True)
+    # The effective state before the change (null only when it was unknown).
+    from_enabled = models.BooleanField(null=True, blank=True)
+    to_enabled = models.BooleanField()
+    reason_before = models.CharField(max_length=160, blank=True, default="")
+    reason_after = models.CharField(max_length=160, blank=True, default="")
+    note = models.CharField(max_length=500, blank=True, default="")
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    # Survives the user being deleted.
+    changed_by_email = models.EmailField(blank=True, default="")
+    changed_at = models.DateTimeField(default=timezone.now, db_index=True)
+    request_id = models.CharField(max_length=64, blank=True, default="")
+    ip = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-changed_at", "-id"]
+        verbose_name = "Feature history entry"
+        verbose_name_plural = "Feature history"
+        indexes = [models.Index(fields=["key", "-changed_at"], name="core_featurechange_key_idx")]
+
+    def __str__(self):
+        return f"{self.key}: {self.from_enabled} -> {self.to_enabled} ({self.changed_at:%Y-%m-%d %H:%M})"

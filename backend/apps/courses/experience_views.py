@@ -22,7 +22,9 @@ def confirmed_reviews(course):
 
 
 def review_roll_number(review):
-    return f"AL-SYD-{review.student_id:05d}"
+    from apps.users.identity import roll_number
+
+    return roll_number(review.student_id)
 
 
 def course_statistics(course):
@@ -109,6 +111,11 @@ class CourseExperienceView(APIView):
                 ).all()
             ]
 
+        page_reviews = list(reviews[(page - 1) * 10 : page * 10])
+        from apps.profiles.handles import public_handles
+
+        # Owner privacy rule: reviewers appear by their profile handle only.
+        author_handles = public_handles({review.student_id for review in page_reviews})
         data = {
             **course_statistics(course),
             "facts": {
@@ -128,11 +135,11 @@ class CourseExperienceView(APIView):
                 {
                     "rating": review.rating,
                     "text": review.text,
-                    "author": review_roll_number(review),
+                    "author": author_handles.get(review.student_id) or "",
                     "verified": True,
                     "date": review.created_at,
                 }
-                for review in reviews[(page - 1) * 10 : page * 10]
+                for review in page_reviews
             ],
             "has_more": reviews.count() > page * 10,
             "can_review": eligible,
@@ -222,6 +229,10 @@ class PentestingApplicationView(APIView):
 
     def post(self, request, pk):
         course = get_object_or_404(Course, pk=pk, is_published=True, category=Course.CATEGORY_WEB_PENTESTING)
+        # Pentesting "coming soon" switch: 403 feature_disabled before any other rule.
+        from .features import require_course_acquisition
+
+        require_course_acquisition(course)
         if course.registration_closed or course.launch_status != Course.STATUS_LIVE:
             raise ValidationError("Registration is not currently open.")
         serializer = ApplicationInput(data=request.data)

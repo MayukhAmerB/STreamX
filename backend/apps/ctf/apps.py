@@ -30,3 +30,13 @@ class CtfConfig(AppConfig):
             interval_seconds=scheduler.interval_seconds(),
             func=scheduler.schedule_tick,
         )
+
+        # Monthly OSINT CTF seasons: open, close, finalise, deliver XP
+        # (EXISTS queries, then at most one deduplicated outbox event).
+        from . import season_scheduler
+
+        register_periodic(
+            "ctf.seasons",
+            interval_seconds=season_scheduler.interval_seconds(),
+            func=season_scheduler.schedule_tick,
+        )

@@ -1,0 +1,163 @@
+// Carbon bridge (BUILD_PLAN D2, PHILOSOPHY §3). OWNER: WS-KIT.
+//
+// The Console keeps @carbon/react for complex widgets (DataTable, Modal
+// internals, notifications, studio controls). This file, loaded LAST by
+// carbon-app.scss, restyles every Carbon widget onto the HackPath tokens at
+// once:
+// - colours: every --cds-* token re-declared through the palette law
+//   (generated mixin, black / greys / white / golden white only);
+// - type: Geist (variable) for UI, Geist Mono for code;
+// - shape: shadcn radius (.625rem) on tiles, panels, modals and notifications,
+//   8px on buttons and fields, pills stay pills (tags);
+// - focus: 2px golden-white outline, 2px offset;
+// - canvas: pure black page, #0a0a0a layers, white/10 hairlines.
+// Only colours, radius and outline are set here; motion stays transform/opacity.
+@use './carbon-bridge-tokens' as bridge;
+
+$_scope: '.cds-app';
+$_radius: var(--radius, 0.625rem);
+$_radius-control: calc(var(--radius, 0.625rem) - 2px);
+$_focus: rgb(var(--ring, 243 226 179));
+
+#{$_scope} {
+  @include bridge.carbon-bridge-tokens;
+
+  --cds-body-compact-01-font-family: var(--font-sans);
+  --sc-radius-surface: #{$_radius};
+
+  background-color: #000;
+  color: #fafafa;
+  font-family: var(--font-sans, 'Geist', 'Geist Fallback', ui-sans-serif, system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+}
+
+#{$_scope} code,
+#{$_scope} kbd,
+#{$_scope} pre,
+#{$_scope} .cds--snippet {
+  font-family: var(--font-mono, 'Geist Mono', ui-monospace, monospace);
+}
+
+// ---------------------------------------------------------------- shape
+
+#{$_scope} .cds--btn,
+#{$_scope} .cds--text-input,
+#{$_scope} .cds--text-area,
+#{$_scope} .cds--select-input,
+#{$_scope} .cds--search-input,
+#{$_scope} .cds--number input[type='number'],
+#{$_scope} .cds--date-picker__input,
+#{$_scope} .cds--list-box,
+#{$_scope} .cds--dropdown,
+#{$_scope} .cds--content-switcher,
+#{$_scope} .cds--overflow-menu-options,
+#{$_scope} .cds--file__drop-container {
+  border-radius: $_radius-control;
+}
+
+#{$_scope} .cds--content-switcher-btn:first-child {
+  border-start-start-radius: $_radius-control;
+  border-end-start-radius: $_radius-control;
+}
+
+#{$_scope} .cds--content-switcher-btn:last-child {
+  border-start-end-radius: $_radius-control;
+  border-end-end-radius: $_radius-control;
+}
+
+#{$_scope} .cds--tile,
+#{$_scope} .cds--inline-notification,
+#{$_scope} .cds--toast-notification,
+#{$_scope} .cds--actionable-notification,
+#{$_scope} .cds--data-table-container,
+#{$_scope} .cds--accordion,
+#{$_scope} .cds--skeleton__placeholder {
+  border-radius: $_radius;
+}
+
+#{$_scope} .cds--data-table-container {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#{$_scope} .cds--tag {
+  border-radius: 9999px;
+}
+
+// Inputs: a quiet field with a white/18 hairline; the golden underline marks focus.
+#{$_scope} .cds--text-input,
+#{$_scope} .cds--text-area,
+#{$_scope} .cds--select-input,
+#{$_scope} .cds--search-input,
+#{$_scope} .cds--number input[type='number'] {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background-color: #0a0a0a;
+}
+
+// ------------------------------------------------- modals (portalled too)
+
+.cds--modal-container {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: $_radius;
+  background-color: #111;
+}
+
+.cds--modal {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+// ---------------------------------------------------------------- focus
+
+#{$_scope} :focus-visible {
+  outline: 2px solid $_focus;
+  outline-offset: 2px;
+}
+
+#{$_scope} .cds--btn:focus,
+#{$_scope} .cds--text-input:focus,
+#{$_scope} .cds--text-area:focus,
+#{$_scope} .cds--select-input:focus,
+#{$_scope} .cds--search-input:focus {
+  outline: 2px solid $_focus;
+  outline-offset: 2px;
+}
+
+// --------------------------------------------- notifications without hue
+// Carbon draws a coloured left bar per kind; ours is a white (or golden for
+// warnings) rule, and the icon + title carry the meaning.
+
+#{$_scope} .cds--inline-notification,
+#{$_scope} .cds--actionable-notification,
+#{$_scope} .cds--toast-notification {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: #0a0a0a;
+  color: #fafafa;
+}
+
+#{$_scope} .cds--inline-notification::before,
+#{$_scope} .cds--actionable-notification::before,
+#{$_scope} .cds--toast-notification::before {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+#{$_scope} .cds--inline-notification--warning,
+#{$_scope} .cds--inline-notification--warning-alt,
+#{$_scope} .cds--actionable-notification--warning,
+#{$_scope} .cds--actionable-notification--warning-alt {
+  border-inline-start: 3px solid $_focus;
+}
+
+#{$_scope} .cds--inline-notification--error,
+#{$_scope} .cds--actionable-notification--error,
+#{$_scope} .cds--inline-notification--success,
+#{$_scope} .cds--actionable-notification--success,
+#{$_scope} .cds--inline-notification--info,
+#{$_scope} .cds--actionable-notification--info {
+  border-inline-start: 3px solid #fafafa;
+}
+
+#{$_scope} .cds--inline-notification__icon,
+#{$_scope} .cds--actionable-notification__icon,
+#{$_scope} .cds--toast-notification__icon {
+  fill: currentColor;
+}

@@ -42,6 +42,7 @@ from config.throttling import (
     RealtimeJoinUserRateThrottle,
 )
 
+from apps.users import teaching
 from apps.users.session_policy import note_live_class_attendance, token_session_slot
 
 from . import lifecycle as live_lifecycle
@@ -256,6 +257,9 @@ def _build_same_origin_owncast_stream_urls(*, session, user, request):
 
 
 def _resolve_owncast_display_name(user):
+    """The account name the bridge keeps OUT of Owncast chat (staff moderation
+    data only). Chat itself shows the viewer's Owncast handle, never this name:
+    the bridge clears a stored chat name equal to it (owner privacy rule)."""
     full_name = str(getattr(user, "full_name", "") or "").strip()
     if full_name:
         return full_name[:80]
@@ -267,6 +271,20 @@ def _resolve_owncast_display_name(user):
             return local_part[:80]
 
     return "Viewer"
+
+
+def _owncast_chat_handle(user):
+    """The Owncast chat name a NEW chat identity is registered with.
+
+    Owner privacy rule (handle only): other students see a student's profile
+    handle in live-class chat, never the real name. Staff and instructors get
+    Owncast's own generated name (their account name is the platform name the
+    bridge keeps out of chat)."""
+    from apps.profiles.handles import is_staff_like, public_handle
+
+    if user is None or is_staff_like(user):
+        return ""
+    return public_handle(user)[:80]
 
 
 def _clean_owncast_display_name(value, *, max_length=80):
@@ -469,7 +487,19 @@ def _render_owncast_chat_bridge_html(*, bridge_token, access_token, display_name
 
 
 def _can_manage_session(user, session):
-    return bool(getattr(session, "is_moderator_allowed", None) and session.is_moderator_allowed(user))
+    allowed = bool(getattr(session, "is_moderator_allowed", None) and session.is_moderator_allowed(user))
+    if not allowed and _teaching_switch_refuses(user, session):
+        # Teachers section off: say so (403 feature_disabled) instead of a bare refusal.
+        raise teaching.disabled_error()
+    return allowed
+
+
+def _teaching_switch_refuses(user, session):
+    """True when only the Teachers section switch stops this instructor managing ``session``."""
+    if not teaching.acts_as_instructor(user) or teaching.teaching_enabled():
+        return False
+    user_id = getattr(user, "id", None)
+    return bool(user_id and user_id in {session.host_id, session.get_instructor_user_id()})
 
 
 def _build_session_list_cache_key(
@@ -746,7 +776,10 @@ class RealtimeSessionListCreateView(APIView):
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
         is_admin = bool(getattr(request.user, "is_staff", False) or getattr(request.user, "is_superuser", False))
-        is_instructor = str(getattr(request.user, "role", "")).strip().lower() == "instructor"
+        # Teachers section off: a non-staff instructor gets 403 feature_disabled
+        # with the reason; classes already on air are not affected.
+        teaching.require_teaching(request.user)
+        is_instructor = teaching.teaching_allowed(request.user)
         if not (is_admin or is_instructor):
             return api_response(
                 success=False,
@@ -977,6 +1010,14 @@ class RealtimeSessionJoinView(APIView):
         # If a newer sign-in evicts this device mid-class, it finishes this
         # class with a banner (apps/users/live_grace.py).
         note_live_class_attendance(request.user, request.auth, session.pk)
+        # Attendance (apps.attendance): starts the student's clock in Redis only;
+        # fail-safe, never raises and never queries the database.
+        try:
+            from apps.attendance.hooks import on_live_join
+
+            on_live_join(session=session, user=request.user, is_manager=is_session_manager)
+        except Exception:  # noqa: BLE001 - attendance must never break joining a class
+            pass
         room_name = session.livekit_room_name or session.room_name
 
         permissions_set = build_permission_set(session, request.user, access_decision)
@@ -1075,7 +1116,15 @@ class RealtimeSessionJoinView(APIView):
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        display_name = serializer.validated_data.get("display_name") or request.user.full_name or request.user.email
+        from apps.profiles.handles import is_staff_like, public_display_name
+
+        # Owner privacy rule: other participants see a student's handle only (the
+        # client-sent name is honoured for instructors and staff).
+        display_name = (
+            (serializer.validated_data.get("display_name") or public_display_name(request.user))
+            if is_staff_like(request.user)
+            else public_display_name(request.user)
+        )
         identity = build_stable_meeting_identity(
             user_id=request.user.id,
             slot_id=token_session_slot(request.auth) if request.auth is not None else None,
@@ -1365,7 +1414,7 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
 
         if not access_token:
             try:
-                chat_user = register_owncast_chat_user(display_name="")
+                chat_user = register_owncast_chat_user(display_name=_owncast_chat_handle(request.user))
             except (OwncastConfigError, OwncastAdminError) as exc:
                 return api_response(
                     success=False,

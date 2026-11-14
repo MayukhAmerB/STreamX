@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { StaticRouter } from "react-router-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { filterCourses, getStudentLibraryStats, MyCoursesView, SEARCH_THRESHOLD } from "./MyCoursesPage";
+import { filterCourses, getStudentLibraryStats, MyCoursesView, pickAccentCourseId, SEARCH_THRESHOLD } from "./MyCoursesPage";
 
 const course = (overrides = {}) => ({
   id: 29,
@@ -84,7 +84,22 @@ describe("MyCoursesView", () => {
 
   it("shows a skeleton while loading", () => {
     const html = render({ loading: true });
-    expect(html).toContain("cds--skeleton");
+    // The kit's skeleton waits 300 ms before it draws (no flash); it is announced at once.
+    expect(html).toContain("cds-page-skeleton");
     expect(html).toContain("Loading your courses");
+  });
+});
+
+describe("one champagne action", () => {
+  it("goes to the course in progress, else the first unfinished one", () => {
+    expect(pickAccentCourseId([{ id: 1, progress_percent: 100 }, { id: 2, progress_percent: 0 }, { id: 3, progress_percent: 40 }])).toBe(3);
+    expect(pickAccentCourseId([{ id: 1, progress_percent: 100 }, { id: 2, progress_percent: 0 }])).toBe(2);
+    expect(pickAccentCourseId([{ id: 1, progress_percent: 100 }])).toBeNull();
+  });
+
+  it("renders no stat chips and exactly one accent button", () => {
+    const html = render({ courses: [course(), course({ id: 31, title: "Second", progress_percent: 0, completed_lecture_count: 0, started_lecture_count: 0 })] });
+    expect(html).not.toContain("cds-stat-chip");
+    expect((html.match(/cds-course-tile__primary--accent/g) || []).length).toBe(1);
   });
 });

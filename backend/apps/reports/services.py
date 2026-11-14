@@ -373,6 +373,10 @@ def submit_locked(*, task, submission, student, wanted_ids, note, now, draft_fil
     submission.is_late = is_late
     submission.minutes_late = minutes_late
     submission.revision += 1
+    # Owner rule: who submitted (roll number, real name, handle) is frozen on the record.
+    from apps.users.identity import apply_snapshot
+
+    apply_snapshot(submission, student)
     submission.save()
 
     if is_late and not is_revision and submission.late_digest_sent_at is None:

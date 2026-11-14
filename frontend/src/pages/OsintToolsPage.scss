@@ -133,38 +133,150 @@
   color: $text-secondary;
 }
 
-// Category groups (All tools).
-.cds-app .cds-osint-group + .cds-osint-group {
-  margin-block-start: $spacing-09;
+// Category groups (All tools): folding rows, closed by default (WS-C).
+.cds-app .cds-osint-groups {
+  border-block-start: 1px solid var(--sc-border-subtle, #393939);
+}
+
+.cds-app .cds-osint-group {
+  border-block-end: 1px solid var(--sc-border-subtle, #393939);
+}
+
+.cds-app .cds-osint-group__heading {
+  margin: 0;
+}
+
+.cds-app .cds-osint-group__toggle {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: $spacing-05;
+  inline-size: 100%;
+  min-block-size: 4rem;
+  padding: $spacing-04 $spacing-03 $spacing-04 0;
+  border: 0;
+  background: none;
+  color: $text-primary;
+  cursor: pointer;
+  font: inherit;
+  text-align: start;
+  transition: background-color var(--sc-duration-fast-01, 70ms) var(--sc-ease-standard-productive, ease);
+
+  &:hover {
+    background-color: var(--sc-surface-hover-01, #333333);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--brand-focus, #ffffff);
+    outline-offset: -2px;
+  }
+}
+
+.cds-app .cds-osint-group__chevron {
+  fill: $text-secondary;
+  transition: transform var(--sc-duration-fast-02, 110ms) var(--sc-ease-standard-productive, ease);
+}
+
+.cds-app .cds-osint-group--open .cds-osint-group__chevron {
+  transform: rotate(180deg);
+}
+
+.cds-app .cds-osint-group__text {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-01;
+  min-inline-size: 0;
 }
 
 .cds-app .cds-osint-group__title {
-  @include type-style('heading-03');
+  @include type-style('heading-compact-02');
 
   color: $text-primary;
 }
 
 .cds-app .cds-osint-group__focus {
-  @include type-style('body-01');
+  @include type-style('body-compact-01');
 
-  max-inline-size: 48rem;
-  margin-block: $spacing-02 $spacing-05;
+  display: -webkit-box;
+  overflow: hidden;
   color: $text-secondary;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
-// Tool card.
+.cds-app .cds-osint-group__count {
+  @include type-style('label-01');
+
+  color: $text-secondary;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cds-app .cds-osint-group__body {
+  padding-block-end: $spacing-05;
+  animation: cds-osint-fade var(--sc-duration-fast-02, 110ms) var(--sc-ease-entrance-productive, ease) both;
+}
+
+@keyframes cds-osint-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cds-app .cds-osint-group__chevron,
+  .cds-app .cds-osint-group__toggle {
+    transition: none;
+  }
+
+  .cds-app .cds-osint-group__body {
+    animation: none;
+  }
+}
+
+// Tool rows: name + type | what it is for | Open.
+.cds-app .cds-osint-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .cds-app .cds-osint-tool {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 15rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: $spacing-03 $spacing-06;
   min-inline-size: 0;
-  gap: $spacing-04;
+  padding: $spacing-04 0 $spacing-04 2.25rem;
+  border-block-start: 1px solid var(--sc-border-subtle, #393939);
+
+  @media (max-width: 671.98px) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: $spacing-02 $spacing-04;
+    padding-inline-start: 0;
+
+    .cds-osint-tool__use {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+
+    .cds-osint-tool__actions {
+      grid-column: 2;
+      grid-row: 1;
+    }
+  }
 }
 
 .cds-app .cds-osint-tool__head {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: $spacing-03;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $spacing-02 $spacing-03;
+  min-inline-size: 0;
 
   .cds--tag {
     margin: 0;
@@ -172,27 +284,31 @@
 }
 
 .cds-app .cds-osint-tool__name {
-  @include type-style('heading-compact-02');
+  @include type-style('heading-compact-01');
 
+  margin: 0;
   color: $text-primary;
   overflow-wrap: anywhere;
 }
 
 .cds-app .cds-osint-tool__use {
-  @include type-style('body-01');
+  @include type-style('body-compact-01');
 
-  flex: 1;
+  margin: 0;
   color: $text-secondary;
 }
 
 .cds-app .cds-osint-tool__actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   min-block-size: 2.5rem;
 }
 
 .cds-app .cds-osint-tool__reference {
   @include type-style('helper-text-01');
 
+  max-inline-size: 9rem;
   color: $text-helper;
+  text-align: end;
 }

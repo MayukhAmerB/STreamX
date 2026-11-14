@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from apps.users.identity_serializers import StudentIdentitySerializer
+
 KIND_CHOICES = [("report", "Weekly report"), ("exam", "CTF exam")]
 
 
@@ -62,6 +64,7 @@ class UnifiedGradebookTotalsSerializer(serializers.Serializer):
 
 
 class UnifiedGradebookRowSerializer(serializers.Serializer):
+    identity = StudentIdentitySerializer(required=False, help_text="Roll number, real name, handle, stats (first).")
     student = UnifiedGradebookStudentSerializer()
     cells = UnifiedGradebookCellSerializer(many=True)
     totals = UnifiedGradebookTotalsSerializer()
@@ -82,6 +85,7 @@ class UnifiedStudentCourseSectionSerializer(serializers.Serializer):
 
 
 class UnifiedStudentGradebookSerializer(serializers.Serializer):
+    identity = StudentIdentitySerializer(required=False, help_text="Roll number, real name, handle, stats (first).")
     student = UnifiedGradebookStudentSerializer()
     courses = UnifiedStudentCourseSectionSerializer(many=True)
     generated_at = serializers.DateTimeField()

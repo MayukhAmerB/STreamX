@@ -773,7 +773,12 @@ class SubmissionQueueView(_GraderView):
         page = list(queryset[:500])
         signals = presenters.queue_signals(page)
         labels = {item.task_id: presenters.week_label_for(item.task) for item in page if item.task.week_start}
-        results = [presenters.queue_item(item, signals, labels) for item in page]
+        from apps.users import identity
+
+        blocks = identity.identity_blocks([(item.student, item) for item in page])
+        results = [
+            presenters.queue_item(item, signals, labels, block) for item, block in zip(page, blocks, strict=True)
+        ]
         return _ok(SubmissionQueueSerializer, {"results": results, "counts": counts})
 
 
@@ -862,12 +867,20 @@ class GradebookView(_GraderView):
         if course is None:
             raise NotFound("Course not found.", code="course_not_found")
         book = services.course_gradebook(course)
+        from apps.users import identity
+
+        blocks = identity.identity_blocks([(row["student"], None) for row in book["rows"]], course_id=course.pk)
         payload = {
             "course": presenters.ref(course),
             "tasks": [presenters.gradebook_task_dict(task) for task in book["tasks"]],
             "rows": [
-                {"student": presenters.person(row["student"]), "cells": row["cells"], "totals": row["totals"]}
-                for row in book["rows"]
+                {
+                    "identity": block,
+                    "student": presenters.person(row["student"]),
+                    "cells": row["cells"],
+                    "totals": row["totals"],
+                }
+                for row, block in zip(book["rows"], blocks, strict=True)
             ],
         }
         return _ok(GradebookSerializer, payload)

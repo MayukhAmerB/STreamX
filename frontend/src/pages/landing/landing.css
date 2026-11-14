@@ -945,9 +945,6 @@
   text-transform: none;
 }
 
-.lp-watch .yt-live-badge .yt-live-dot {
-  background-color: var(--brand-live);
-}
 
 .lp-watch .yt-meta {
   padding-top: 0;
@@ -1521,10 +1518,204 @@
 
 /* ---------------------------------------------------------------- motion */
 
+/*
+ * Landing scroll layer (UI overhaul plan M15) and hover (M4). Felt more than
+ * seen: only transform and opacity animate, nothing loops, the h1 and the
+ * LCP image never move, and content is visible without JavaScript. Every
+ * scroll-linked piece sits behind @supports; without it the page keeps the
+ * IntersectionObserver Reveal (site kit) or simply stays static.
+ */
+
+/* (b) The hero eyebrow rule draws once on load (slow-01, entrance-expressive). */
+.lp-hero .lp-eyebrow--rule::before {
+  height: var(--sc-accent-rule-width, 2px);
+  transform-origin: left center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion="reduce"]) .lp-hero .lp-eyebrow--rule::before {
+    animation: lp-rule-draw var(--sc-duration-slow-01, 400ms) var(--sc-ease-entrance-expressive, cubic-bezier(0, 0, 0.3, 1)) 150ms both;
+  }
+}
+
+@keyframes lp-rule-draw {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/*
+ * M4: a clickable tile answers with colour, a 2 px top rule that grows from
+ * the left and a 4 px arrow nudge. No lift, no zoom, no shadow. The track
+ * tile is the hero's featured tile, so its rule is champagne; course cards
+ * use the band's primary text colour.
+ */
+a.lp-track::before,
+.lp-course::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  height: 2px;
+  background-color: var(--cds-text-primary);
+  content: "";
+  pointer-events: none;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--sc-duration-moderate-02, 240ms) var(--sc-ease-standard-productive, cubic-bezier(0.2, 0, 0.38, 0.9));
+}
+
+a.lp-track::before {
+  background-color: var(--brand-accent, #f3e2b3);
+}
+
+.lp-course--closed::before {
+  content: none;
+}
+
+.lp-track__cta svg {
+  transition: transform var(--sc-duration-fast-02, 110ms) var(--sc-ease-standard-productive, cubic-bezier(0.2, 0, 0.38, 0.9));
+}
+
+@media (hover: hover) {
+  a.lp-track:hover::before,
+  .lp-course:hover::before {
+    transform: scaleX(1);
+  }
+
+  a.lp-track:hover .lp-track__cta svg {
+    transform: translateX(var(--sc-motion-distance-01, 4px));
+  }
+}
+
+a.lp-track:focus-visible::before,
+.lp-course:focus-within::before {
+  transform: scaleX(1);
+}
+
+/*
+ * (c) Band reveals ride a view timeline where the browser has one: each
+ * Reveal block fades and rises 16 px while it enters the bottom of the
+ * viewport (entry 0-35 %), so it is never stuck hidden and scrolling back
+ * reverses it smoothly. The JS IntersectionObserver path stays as the
+ * fallback; here it is neutralised so the two never fight.
+ */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    :root:not([data-motion="reduce"]) .lp .sk-reveal,
+    :root:not([data-motion="reduce"]) .lp .sk-reveal[data-reveal] {
+      opacity: 1;
+      transform: none;
+      transition: none;
+      animation: lp-reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 35%;
+    }
+
+    /* (d) The journey connector fills as its band crosses the viewport. */
+    :root:not([data-motion="reduce"]) .lp-journey__steps {
+      view-timeline: --lp-journey block;
+    }
+
+    :root:not([data-motion="reduce"]) .lp-journey__steps .sk-progress__step:not(:last-child)::after {
+      position: absolute;
+      top: 2rem;
+      bottom: 0;
+      left: 0.9375rem;
+      width: 2px;
+      background-color: var(--cds-text-primary);
+      content: "";
+      transform-origin: center top;
+      animation: lp-connector-fill-y linear both;
+      animation-timeline: --lp-journey;
+      animation-range: entry 40% cover 55%;
+    }
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) and (min-width: 672px) {
+    :root:not([data-motion="reduce"]) .lp-journey__steps .sk-progress__step:not(:last-child)::after {
+      top: 0.9375rem;
+      right: calc(-1 * var(--sc-grid-gutter) + 0.5rem);
+      bottom: auto;
+      left: 2.5rem;
+      width: auto;
+      height: 2px;
+      transform-origin: left center;
+      animation-name: lp-connector-fill-x;
+    }
+  }
+}
+
+@keyframes lp-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(var(--sc-motion-distance-03, 16px));
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes lp-connector-fill-x {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes lp-connector-fill-y {
+  from {
+    transform: scaleY(0);
+  }
+
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* Reduced motion (OS or the Profile toggle): the finished page, nothing moves. */
 @media (prefers-reduced-motion: reduce) {
   .lp *,
   .lp *::before,
   .lp *::after {
+    animation: none !important;
     transition-duration: 0ms !important;
+  }
+
+  a.lp-track:hover .lp-track__cta svg {
+    transform: none;
+  }
+}
+
+:root[data-motion="reduce"] .lp *,
+:root[data-motion="reduce"] .lp *::before,
+:root[data-motion="reduce"] .lp *::after {
+  animation: none !important;
+  transition-duration: 0ms !important;
+}
+
+:root[data-motion="reduce"] a.lp-track:hover .lp-track__cta svg {
+  transform: none;
+}
+
+/* Printing (and full-page captures for print): every band at its final state. */
+@media print {
+  .lp *,
+  .lp *::before,
+  .lp *::after {
+    animation: none !important;
+    transition: none !important;
   }
 }

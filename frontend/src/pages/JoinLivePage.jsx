@@ -27,6 +27,8 @@ import {
 import { formatScheduleSummary } from "../features/live-classes/schedule";
 import { useAuth } from "../hooks/useAuth";
 import useAdaptiveRealtimeSessionPolling from "../hooks/useAdaptiveRealtimeSessionPolling";
+import useLivePresence from "../features/engagement-ui/useLivePresence";
+import useAttendancePresence from "../features/attendance/useAttendancePresence";
 import {
   clearPersistedMeetingSessionId,
   persistMeetingSessionId,
@@ -39,6 +41,7 @@ import {
   isJoinableLiveSession,
   resolveLiveClassSchedule,
 } from "../utils/liveClassSchedule";
+import { liveJoinDisplayName } from "../features/profiles/publicName";
 
 const ACTIVE_BROADCAST_STORAGE_KEY = "streamx:join-live:active-broadcast";
 
@@ -112,6 +115,10 @@ export default function JoinLivePage() {
   const [error, setError] = useState("");
   const [joinState, setJoinState] = useState({ loadingId: null, error: "", info: "" });
   const [activeSession, setActiveSession] = useState(() => readPersistedBroadcastPayload());
+  // Live-attendance XP: one presence ping a minute while the class is open and visible.
+  useLivePresence(activeSession?.session?.id || null);
+  // Attendance: once a minute while this live page is visible (live classes only).
+  useAttendancePresence(activeSession?.session?.id || null);
   const [broadcastChatLaunch, setBroadcastChatLaunch] = useState({
     sessionId: null,
     sourceUrl: "",
@@ -182,7 +189,7 @@ export default function JoinLivePage() {
         (session) => String(session.id) === String(sessionId),
       );
       const response = await joinRealtimeSession(sessionId, {
-        display_name: user?.full_name || "",
+        display_name: liveJoinDisplayName(user),
         prefer_broadcast: requestedSession?.session_type === "broadcasting",
       });
       const data = apiData(response, null);
@@ -205,7 +212,7 @@ export default function JoinLivePage() {
       (session) => String(session.id) === String(sessionId),
     );
     const response = await joinRealtimeSession(sessionId, {
-      display_name: user?.full_name || "",
+      display_name: liveJoinDisplayName(user),
       prefer_broadcast: requestedSession?.session_type === "broadcasting",
     });
     const data = apiData(response, null);

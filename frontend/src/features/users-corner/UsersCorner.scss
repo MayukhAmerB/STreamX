@@ -155,9 +155,9 @@
 }
 
 .cds-app .uc-next--live {
-  border-color: rgba(250, 77, 86, 0.4);
+  border-color: rgba(243, 226, 179, 0.4);
   background:
-    radial-gradient(circle at 100% 0%, rgba(250, 77, 86, 0.16), transparent 55%),
+    radial-gradient(circle at 100% 0%, rgba(243, 226, 179, 0.16), transparent 55%),
     rgba(10, 10, 10, 0.9);
 }
 
@@ -279,7 +279,7 @@
   animation: uc-live-pulse 2s ease-in-out infinite;
   background-color: var(--uc-live);
   block-size: 0.5rem;
-  box-shadow: 0 0 8px rgba(250, 77, 86, 0.8);
+  box-shadow: 0 0 8px rgba(243, 226, 179, 0.8);
   inline-size: 0.5rem;
 }
 

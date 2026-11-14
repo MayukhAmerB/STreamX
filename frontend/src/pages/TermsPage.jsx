@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { fetchTerms } from "../api/auth";
 import { registerPushSubscription } from "../api/notifications";
-import Button from "../components/Button";
-import PageShell from "../components/PageShell";
 import { useAuth } from "../hooks/useAuth";
+import { Band, Button, Column, Skeleton } from "../site-kit";
 import { apiData, apiMessage } from "../utils/api";
 import { requestNotificationPermission, subscribeToBrowserPush } from "../utils/pushNotifications";
+import { ArrowRight } from "./landing/LandingParts";
+import "./landing/sitePages.css";
 
 const fallbackTerms = {
   title: "Terms and Conditions",
@@ -82,98 +83,90 @@ export default function TermsPage() {
   };
 
   return (
-    <PageShell
-      title={terms.title}
-      subtitle={`Last updated ${terms.last_updated}. Active version ${terms.version}.`}
-    >
-      <section className="mx-auto max-w-5xl overflow-hidden rounded-[28px] border border-black bg-[#080808] shadow-[0_24px_70px_rgba(0,0,0,0.45)]">
-        <div className="border-b border-white/10 bg-gradient-to-r from-[#151515] via-[#101010] to-[#1F1F1F] px-5 py-5 sm:px-7">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#BDBDBD]">
-            Legal Document
+    <div className="sp sp-terms">
+      <Band theme="g100" labelledBy="sp-terms-title">
+        <Column sm={4} md={8} lg={11}>
+          <p className="sp-eyebrow sp-eyebrow--draw">Legal</p>
+          <h1 id="sp-terms-title" className="sp-title">
+            {terms.title}
+          </h1>
+          <p className="sp-lead">
+            Last updated {terms.last_updated}. Version <span className="sp-code">{terms.version}</span>
           </p>
-          <h2 className="mt-2 font-reference text-3xl font-semibold text-white">
-            AlsyedInitiative Terms and Conditions
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-[#C7C7C7]">
-            Read this document carefully. Continued platform access requires affirmative consent.
-          </p>
-        </div>
+        </Column>
 
-        <div className="grid gap-5 p-5 sm:p-7 lg:grid-cols-[1fr_300px]">
-          <article className="rounded-2xl border border-white/10 bg-black/45 p-4 sm:p-5">
-            {loading ? (
-              <p className="text-sm text-[#BBBBBB]">Loading Terms...</p>
-            ) : (
-              <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-7 text-[#DCDCDC]">
-                {terms.body}
-              </pre>
-            )}
-          </article>
+        <Column sm={4} md={8} lg={10} className="sp-terms__body">
+          {loading ? (
+            <Skeleton lines={8} label="Loading the Terms" />
+          ) : (
+            <article className="sp-terms__text" aria-label="Terms and Conditions text">
+              {terms.body}
+            </article>
+          )}
+        </Column>
 
-          <aside className="h-fit rounded-2xl border border-white/10 bg-[#121212] p-4">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#E6E6E6]">
-              Consent Status
+        <Column sm={4} md={8} lg={5} start={12} className="sp-terms__aside">
+          <section className="sp-panel" aria-labelledby="sp-terms-consent">
+            <h2 id="sp-terms-consent" className="sp-h2">
+              Your consent
             </h2>
             {user ? (
               <>
-                <p className="mt-3 text-sm leading-6 text-[#BFBFBF]">
-                  Signed in as <span className="font-semibold text-white">{user.email}</span>.
+                <p className="sp-terms__meta">
+                  Signed in as <strong>{user.email}</strong>
                 </p>
                 {acceptanceRequired ? (
                   <>
-                    <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-black/30 p-3 text-sm leading-6 text-[#E3E3E3]">
-                      <input
-                        type="checkbox"
-                        className="mt-1 h-4 w-4 accent-white"
-                        checked={checked}
-                        onChange={(event) => setChecked(event.target.checked)}
-                      />
-                      <span>I have read, understood, and agree to these Terms and Conditions. I understand browser push notifications are optional.</span>
+                    <label className="sp-check">
+                      <input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} />
+                      <span>
+                        I have read, understood, and agree to these Terms and Conditions. I understand browser push
+                        notifications are optional.
+                      </span>
                     </label>
                     <Button
-                      type="button"
-                      className="mt-4 w-full"
+                      fullWidth
                       disabled={!checked}
+                      disabledReason={!checked ? "Tick the agreement first." : ""}
                       loading={submitting}
                       onClick={handleAccept}
+                      icon={<ArrowRight />}
                     >
                       I Agree
                     </Button>
                   </>
                 ) : (
-                  <div className="mt-4 rounded-xl border border-emerald-300/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100">
-                    Your account has accepted the current Terms version.
-                  </div>
+                  <p className="sp-message sp-message--success" role="status">
+                    Accepted. Your account has agreed to the current version.
+                  </p>
                 )}
-                <p className="mt-3 text-xs leading-5 text-[#9F9F9F]">
-                  Browser push permission is optional. You can deny the prompt and still continue; bell notifications remain available inside the platform.
+                <p className="sp-field__hint sp-terms__note">
+                  Browser push permission is optional. You can deny the prompt and still continue; the bell keeps your
+                  notifications inside the platform.
                 </p>
               </>
             ) : (
-              <div className="mt-3 space-y-3 text-sm leading-6 text-[#BFBFBF]">
-                <p>Sign in to accept these Terms for your account.</p>
-                <Link
-                  to="/login"
-                  className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-white bg-white px-4 text-sm font-semibold text-black transition hover:border-[#E5E5E5] hover:bg-[#E5E5E5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-                >
+              <>
+                <p className="sp-terms__meta">Sign in to accept these Terms for your account.</p>
+                <Button href="/login" kind="secondary" fullWidth icon={<ArrowRight />}>
                   Sign in to accept
-                </Link>
-              </div>
+                </Button>
+              </>
             )}
 
             {status.error ? (
-              <div className="mt-3 rounded-xl border border-red-300/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+              <p className="sp-message sp-message--error" role="alert">
                 {status.error}
-              </div>
+              </p>
             ) : null}
             {status.success ? (
-              <div className="mt-3 rounded-xl border border-emerald-300/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-100">
+              <p className="sp-message sp-message--success" role="status">
                 {status.success}
-              </div>
+              </p>
             ) : null}
-          </aside>
-        </div>
-      </section>
-    </PageShell>
+          </section>
+        </Column>
+      </Band>
+    </div>
   );
 }

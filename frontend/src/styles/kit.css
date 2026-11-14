@@ -1,0 +1,124 @@
+/*
+ * Kit helper classes (PHILOSOPHY §3.2 "Utilities to add"). OWNER: WS-KIT.
+ * Inlined into src/index.css (before @tailwind), so @layer works and every
+ * class can still be overridden by a utility.
+ */
+
+@layer components {
+  /* Handwritten full stop after a display line (exact recipe, PHILOSOPHY §2.2). */
+  .hand-period {
+    display: inline-block;
+    margin-left: -0.08em;
+    font-family: var(--font-hand);
+    font-size: 0.52em;
+    font-weight: 400;
+    line-height: 1;
+    opacity: 0.82;
+    transform: translateY(0.16em) rotate(-12deg);
+  }
+
+  /* 10px uppercase eyebrow at 0.14em in the text floor (#8a8a8a, AA). */
+  .eyebrow {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    line-height: 15px;
+    text-transform: uppercase;
+    color: rgb(var(--subtle-foreground));
+  }
+
+  /* Hairline grid: one rounded frame at md+, children share 1px white/10 lines. */
+  .hairline-grid {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  @media (min-width: 768px) {
+    .hairline-grid {
+      gap: 0;
+      overflow: hidden;
+      border-top: 1px solid var(--border);
+      border-left: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+
+    .hairline-grid > * {
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+  }
+
+  /* Stat strip: one border-y band, centred cells. */
+  .stat-strip {
+    display: grid;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding-block: 1rem;
+    font-size: 11px;
+    color: rgb(var(--subtle-foreground));
+  }
+
+  .stat-strip > * {
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  @media (min-width: 640px) {
+    .stat-strip {
+      padding-block: 1.25rem;
+      font-size: 0.875rem;
+    }
+  }
+
+  /* Underline-only field (sign-in): golden underline on focus (ours, for a11y). */
+  .underline-field {
+    height: 2.5rem;
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid var(--input);
+    border-radius: 0;
+    background: transparent;
+    padding-inline: 0;
+    font-size: 0.875rem;
+    color: #ffffff;
+    transition: border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .underline-field::placeholder {
+    color: rgb(var(--placeholder));
+  }
+
+  .underline-field:focus,
+  .underline-field:focus-visible {
+    border-bottom-color: rgb(var(--accent));
+    outline: none;
+    box-shadow: 0 1px 0 0 rgb(var(--accent));
+  }
+
+  .underline-field[aria-invalid="true"] {
+    border-bottom-style: dashed;
+    border-bottom-color: #ffffff;
+  }
+
+  /* The inverted card state (M3): white surface, black text, line art inverted. */
+  .card-invert {
+    background-color: #ffffff;
+    color: #000000;
+  }
+
+  /* Visually hidden, still announced. */
+  .kit-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .underline-field {
+    transition: none;
+  }
+}

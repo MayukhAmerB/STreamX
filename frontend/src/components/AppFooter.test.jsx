@@ -29,9 +29,11 @@ describe("AppFooter (Syed Carbon)", () => {
     expect(html).toContain("Secure Learning Infrastructure");
   });
 
-  it("follows the landing page's last band directly (no top gap) only on /", () => {
-    expect(render("/")).toMatch(/class="sf sf--flush"/);
-    expect(render("/about")).not.toContain("sf--flush");
+  it("is the same black footer on every page (T7), ending in the decorative giant wordmark", () => {
+    // The landing now ends on the black pricing band, so it keeps the footer's top rhythm like every page.
+    expect(render("/")).toMatch(/^<footer id="contact" data-theme="g100" class="sf">/);
+    expect(render("/about")).toMatch(/^<footer id="contact" data-theme="g100" class="sf">/);
+    expect(render("/")).toMatch(/<div class="hp-wordmark" aria-hidden="true"><span class="hp-wordmark__text">Al<span class="hp-wordmark__hand">Syed<\/span><\/span><\/div>/);
   });
 
   it("applies the header's Watch rule: hidden when off, disabled with a reason when empty", () => {

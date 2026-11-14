@@ -1,7 +1,7 @@
 import "./OsintToolsPage.scss";
 
-import { Launch, Search as SearchIcon } from "@carbon/icons-react";
-import { Button, InlineNotification, Search, SelectableTag, Tag, Tile } from "@carbon/react";
+import { ChevronDown, Launch, Search as SearchIcon } from "@carbon/icons-react";
+import { Button, InlineNotification, Search, SelectableTag, Tag } from "@carbon/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EmptyState, PageHeader } from "../features/app-shell/ui";
 import {
@@ -17,9 +17,10 @@ import {
 
 const pluralTools = (count) => `${count} tool${count === 1 ? "" : "s"}`;
 
+/** One tool as a compact row: name and type, what it is for, and Open. */
 export function ToolCard({ tool }) {
   return (
-    <Tile className="cds-osint-tool">
+    <li className="cds-osint-tool">
       <div className="cds-osint-tool__head">
         <h3 className="cds-osint-tool__name">{tool.name}</h3>
         <Tag type="gray" size="sm" className="cds-osint-tool__type">
@@ -34,7 +35,7 @@ export function ToolCard({ tool }) {
             href={tool.url}
             target="_blank"
             rel="noreferrer"
-            kind="tertiary"
+            kind="ghost"
             size="md"
             renderIcon={Launch}
             aria-label={`Open ${tool.name} (opens in a new tab)`}
@@ -45,17 +46,39 @@ export function ToolCard({ tool }) {
           <span className="cds-osint-tool__reference">Reference only. No direct link.</span>
         )}
       </div>
-    </Tile>
+    </li>
   );
 }
 
 function ToolGrid({ tools }) {
   return (
-    <div className="cds-tile-grid cds-osint-grid">
+    <ul className="cds-osint-list">
       {tools.map((tool) => (
         <ToolCard key={tool.name} tool={tool} />
       ))}
-    </div>
+    </ul>
+  );
+}
+
+/** A category that folds: closed by default so the page stays short; open while filtering. */
+function ToolGroup({ group, open, onToggle }) {
+  const id = `cds-osint-group-${group.category.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  return (
+    <section className={`cds-osint-group${open ? " cds-osint-group--open" : ""}`} aria-labelledby={`${id}-title`}>
+      <h2 className="cds-osint-group__heading" id={`${id}-title`}>
+        <button type="button" className="cds-osint-group__toggle" aria-expanded={open} aria-controls={id} onClick={onToggle}>
+          <ChevronDown size={20} aria-hidden="true" className="cds-osint-group__chevron" />
+          <span className="cds-osint-group__text">
+            <span className="cds-osint-group__title">{group.title}</span>
+            <span className="cds-osint-group__focus">{group.category.focus}</span>
+          </span>
+          <span className="cds-osint-group__count">{pluralTools(group.tools.length)}</span>
+        </button>
+      </h2>
+      <div id={id} className="cds-osint-group__body" hidden={!open}>
+        <ToolGrid tools={group.tools} />
+      </div>
+    </section>
   );
 }
 
@@ -115,6 +138,15 @@ export function OsintToolsView({ initialClueId = ALL_CLUES, initialQuery = "" })
       row.scrollTo?.({ left: Math.max(0, left - 16), behavior: "smooth" });
     }
   }, [clueId]);
+
+  const [openGroups, setOpenGroups] = useState(() => new Set());
+  const toggleGroup = (title) =>
+    setOpenGroups((current) => {
+      const next = new Set(current);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      return next;
+    });
 
   const clearFilters = () => {
     setQuery("");
@@ -197,18 +229,16 @@ export function OsintToolsView({ initialClueId = ALL_CLUES, initialQuery = "" })
       ) : clue ? (
         <ToolGrid tools={groups[0].tools} />
       ) : (
-        groups.map((group) => (
-          <section key={group.category.title} className="cds-osint-group" aria-label={group.title}>
-            <div className="cds-osint-group__head">
-              <h2 className="cds-osint-group__title">{group.title}</h2>
-              <Tag type="gray" size="sm">
-                {group.tools.length}
-              </Tag>
-            </div>
-            <p className="cds-osint-group__focus">{group.category.focus}</p>
-            <ToolGrid tools={group.tools} />
-          </section>
-        ))
+        <div className="cds-osint-groups">
+          {groups.map((group) => (
+            <ToolGroup
+              key={group.category.title}
+              group={group}
+              open={Boolean(trimmedQuery) || openGroups.has(group.category.title)}
+              onToggle={() => toggleGroup(group.category.title)}
+            />
+          ))}
+        </div>
       )}
     </>
   );

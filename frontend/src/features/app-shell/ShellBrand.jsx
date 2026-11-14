@@ -1,28 +1,19 @@
 import OwlCognitoMark from "../../components/OwlCognitoMark";
 import { siteBrand } from "../../config/siteBrand";
-import { CONSOLE_TITLE } from "./navConfig";
 
 /**
- * The website navbar's brand block (same logo asset / OwlCognito mark, name
- * and uppercase platform label), restyled for the black shell header. On
- * phones the platform label gives way to "Console".
+ * Brand block of the Console header (plan §3.1): the 24 px mark and the
+ * brand name. No platform label and no "Console" eyebrow: the workspace and
+ * page are named by the breadcrumb.
  */
 export default function ShellBrand() {
   const isOwlCognito = siteBrand.id === "owlcognito";
   return (
-    <span className="uc-brand">
-      <span className={`uc-brand__mark${isOwlCognito ? " uc-brand__mark--owl" : ""}`} aria-hidden="true">
-        {isOwlCognito ? (
-          <OwlCognitoMark className="uc-brand__owl" />
-        ) : (
-          <img src="/logo.jpeg" alt="" decoding="async" />
-        )}
+    <span className="cds-app-brand">
+      <span className={`cds-app-brand__mark${isOwlCognito ? " cds-app-brand__mark--owl" : ""}`} aria-hidden="true">
+        {isOwlCognito ? <OwlCognitoMark className="cds-app-brand__owl" /> : <img src="/logo.jpeg" alt="" decoding="async" />}
       </span>
-      <span className="uc-brand__text">
-        <span className="uc-brand__name">{siteBrand.name}</span>
-        <span className="uc-brand__platform">{siteBrand.platformLabel}</span>
-        <span className="uc-brand__corner">{CONSOLE_TITLE}</span>
-      </span>
+      <span className="cds-app-brand__name">{siteBrand.name}</span>
     </span>
   );
 }

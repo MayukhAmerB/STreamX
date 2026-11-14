@@ -24,6 +24,7 @@ import {
   flattenCourseLectures,
   hasFullCourseAccess,
   isLectureLocked,
+  membershipAccessLabel,
   pickInitialLecture,
   resolveAdjacentLectures,
   resolveLectureDescriptions,
@@ -36,6 +37,7 @@ import { useLectureEngagement } from "./useLectureEngagement";
 import { useLecturePlayback } from "./useLecturePlayback";
 import { useLectureNotes, useLectureQuestions } from "./useLectureStudyTools";
 import { usePlayerShortcuts } from "./usePlayerShortcuts";
+import { isStaffLike } from "../profiles/publicName";
 
 export const UP_NEXT_SECONDS = 5;
 export const DESKTOP_TABS = ["overview", "comments", "notes", "questions"];
@@ -245,7 +247,9 @@ export default function CoursePlayer({ courseId }) {
   const author = useMemo(
     () => ({
       id: user?.id ?? null,
-      display_name: user?.full_name || user?.email?.split("@")[0] || "You",
+      // Owner rule (handle only): never echo the real name or e-mail into the
+      // comment list; the server returns the handle once the comment is saved.
+      display_name: isStaffLike(user) ? user?.full_name || "You" : "You",
       is_instructor: Boolean(user && course?.instructor?.id === user.id),
     }),
     [user, course?.instructor?.id]
@@ -415,6 +419,7 @@ export default function CoursePlayer({ courseId }) {
               total={adjacent.total}
               locked={locked}
               fullAccess={fullAccess}
+              accessLabel={membershipAccessLabel(course)}
             />
             <LessonActions
               engagement={engagement}

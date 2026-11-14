@@ -1,0 +1,57 @@
+// Console Carbon theme (UI overhaul plan §2.1). OWNER: WS-A.
+//
+// Carbon g100 is the base and is already right (page #161616, layer-01
+// #262626, layer-02 #393939, Plex, square). This mixin only adds the Syed
+// Carbon brand on top, the same mapping as the site's dark bands
+// (src/styles/site-theme.css): monochrome buttons, links, interactive accents
+// and focus. Champagne is not a Carbon token here: it is opt-in per element
+// (`.sc-button--accent`, the active-nav bar, rules), at most once per view.
+
+@mixin console-carbon-tokens {
+  color-scheme: dark;
+
+  // Brand tokens the shared kit reads (src/styles/tokens.css sets them only on [data-theme]).
+  --brand-focus: #ffffff;
+  --brand-live: #fa4d56;
+  --brand-success: #42be65;
+  --brand-accent: var(--sc-accent);
+  --brand-accent-rule: var(--sc-accent);
+
+  // Interaction: white on dark, never Carbon blue, never champagne.
+  --cds-interactive: #f4f4f4;
+  --cds-border-interactive: #f4f4f4;
+  --cds-focus: #ffffff;
+  --cds-focus-inset: #161616;
+  --cds-focus-inverse: #161616;
+  --cds-icon-interactive: #f4f4f4;
+  --cds-highlight: rgba(244, 244, 244, 0.16);
+
+  // Links: monochrome and underlined (see _carbon-overrides.scss).
+  --cds-link-primary: #f4f4f4;
+  --cds-link-primary-hover: #ffffff;
+  --cds-link-secondary: #c6c6c6;
+  --cds-link-visited: #c6c6c6;
+  --cds-link-inverse: #161616;
+
+  // Buttons: primary white (text #161616 set in the overrides), secondary
+  // and tertiary are outlines, danger stays Carbon red.
+  --cds-button-primary: #ffffff;
+  --cds-button-primary-hover: #e0e0e0;
+  --cds-button-primary-active: #c6c6c6;
+  --cds-button-secondary: transparent;
+  --cds-button-secondary-hover: #333333;
+  --cds-button-secondary-active: #393939;
+  --cds-button-tertiary: #f4f4f4;
+  --cds-button-tertiary-hover: #f4f4f4;
+  --cds-button-tertiary-active: #c6c6c6;
+  --cds-button-separator: #161616;
+
+  // Selected content switcher / tabs: white, not blue.
+  --cds-content-switcher-selected: #f4f4f4;
+  --cds-background-brand: #f4f4f4;
+  --cds-support-info: #4589ff;
+
+  // Overlays and the one floating shadow.
+  --cds-overlay: rgba(0, 0, 0, 0.6);
+  --cds-shadow: rgba(0, 0, 0, 0.3);
+}

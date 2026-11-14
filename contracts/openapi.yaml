@@ -4,6 +4,331 @@ info:
   version: 1.0.0
   description: Versioned API contract for StreamX frontends and operational clients.
 paths:
+  /admin/activity/:
+    get:
+      operationId: admin_activity_list
+      parameters:
+      - in: query
+        name: before
+        schema:
+          type: integer
+      - in: query
+        name: group
+        schema:
+          type: string
+      - in: query
+        name: limit
+        schema:
+          type: integer
+      tags:
+      - admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /admin/attention/:
+    get:
+      operationId: admin_attention_retrieve
+      tags:
+      - admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /admin/features/:
+    get:
+      operationId: admin_features_list
+      tags:
+      - admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /admin/features/{key}/:
+    post:
+      operationId: admin_features_update
+      parameters:
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /admin/recordings/:
+    get:
+      operationId: admin_recordings_list
+      parameters:
+      - in: query
+        name: filter
+        schema:
+          type: string
+          enum:
+          - ''
+          - failed
+          - needs_review
+          - processing
+          - published
+      - in: query
+        name: page
+        schema:
+          type: integer
+      tags:
+      - admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /admin/recordings/{item_id}/:
+    get:
+      operationId: admin_recordings_retrieve
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /admin/recordings/{item_id}/actions/:
+    post:
+      operationId: admin_recordings_action
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+        required: true
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /admin/requests/:
+    get:
+      operationId: admin_requests_list
+      parameters:
+      - in: query
+        name: kind
+        schema:
+          type: string
+          enum:
+          - all
+          - course
+          - live_class
+      - in: query
+        name: page
+        schema:
+          type: integer
+      - in: query
+        name: q
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - approved
+          - pending
+          - rejected
+      tags:
+      - admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /admin/requests/actions/:
+    post:
+      operationId: admin_requests_action
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /admin/search/:
+    get:
+      operationId: admin_search_retrieve
+      parameters:
+      - in: query
+        name: q
+        schema:
+          type: string
+        required: true
+      tags:
+      - admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /admin/system/health/:
+    get:
+      operationId: admin_health_retrieve
+      tags:
+      - admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /admin/system/health/retry/:
+    post:
+      operationId: admin_health_retry
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /as-accounts/:
     get:
       operationId: social_accounts_directory_list
@@ -19,6 +344,283 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SocialAccountDirectoryResponse'
+          description: ''
+  /attendance/me/classes/:
+    get:
+      operationId: attendance_me_classes_retrieve
+      tags:
+      - attendance
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /attendance/me/summary/:
+    get:
+      operationId: attendance_me_summary_retrieve
+      tags:
+      - attendance
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /attendance/sessions/{session_id}/leave/:
+    post:
+      operationId: attendance_sessions_leave_create_by_id
+      description: '``POST`` (or ``navigator.sendBeacon``) when the live page closes:
+        stops the clock.'
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - attendance
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /attendance/sessions/{session_id}/presence/:
+    post:
+      operationId: attendance_sessions_presence_create_by_id
+      description: '``POST`` once a minute while a live class page is open and visible.'
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - attendance
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /attendance/staff/courses/:
+    get:
+      operationId: attendance_staff_courses_retrieve
+      description: Batches the viewer can report on (filter options).
+      tags:
+      - attendance
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /attendance/staff/low-attendance/:
+    get:
+      operationId: attendance_staff_low_attendance_retrieve
+      tags:
+      - attendance
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /attendance/staff/matrix/:
+    get:
+      operationId: attendance_staff_matrix_retrieve
+      tags:
+      - attendance
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /attendance/staff/policy/:
+    get:
+      operationId: attendance_staff_policy_retrieve
+      description: Read the attendance rule; staff may change it (audited by ``updated_by``).
+      tags:
+      - attendance
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    patch:
+      operationId: attendance_staff_policy_partial_update
+      description: Read the attendance rule; staff may change it (audited by ``updated_by``).
+      tags:
+      - attendance
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /attendance/staff/sessions/:
+    get:
+      operationId: attendance_staff_sessions_retrieve
+      tags:
+      - attendance
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /attendance/staff/sessions/{session_id}/override/:
+    post:
+      operationId: attendance_staff_sessions_override_create_by_id
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - attendance
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /attendance/staff/sessions/{session_id}/roster/:
+    get:
+      operationId: attendance_staff_sessions_roster_retrieve_by_id
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - attendance
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
           description: ''
   /auth/2fa/disable/:
     post:
@@ -468,6 +1070,359 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /calendar/feed/{token}.ics:
+    get:
+      operationId: calendar_feed_.ics_retrieve_by_id
+      description: 'The personal ``.ics`` feed (no sign-in: the signed token is the
+        credential).'
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - calendar
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /calendar/me/events/:
+    get:
+      operationId: calendar_me_events_retrieve
+      tags:
+      - calendar
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /calendar/me/feed/:
+    get:
+      operationId: calendar_me_feed_retrieve
+      description: GET the subscription link, POST to create / replace it, DELETE
+        to revoke it.
+      tags:
+      - calendar
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: calendar_me_feed_create
+      description: GET the subscription link, POST to create / replace it, DELETE
+        to revoke it.
+      tags:
+      - calendar
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    delete:
+      operationId: calendar_me_feed_destroy
+      description: GET the subscription link, POST to create / replace it, DELETE
+        to revoke it.
+      tags:
+      - calendar
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '204':
+          description: No response body
+  /calendar/public/upcoming/:
+    get:
+      operationId: calendar_public_upcoming_retrieve
+      description: Upcoming live classes for the public landing page (cached 60 s).
+      tags:
+      - calendar
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /calendar/staff/events/:
+    get:
+      operationId: calendar_staff_events_retrieve
+      tags:
+      - calendar
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /calendar/staff/exceptions/{exception_id}/:
+    delete:
+      operationId: calendar_staff_exceptions_destroy_by_id
+      parameters:
+      - in: path
+        name: exception_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - calendar
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '204':
+          description: No response body
+  /calendar/staff/options/:
+    get:
+      operationId: calendar_staff_options_retrieve
+      description: Courses, live classes and hosts the viewer may schedule.
+      tags:
+      - calendar
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /calendar/staff/schedules/:
+    get:
+      operationId: calendar_staff_schedules_retrieve
+      tags:
+      - calendar
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: calendar_staff_schedules_create
+      tags:
+      - calendar
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /calendar/staff/schedules/{schedule_id}/:
+    get:
+      operationId: calendar_staff_schedules_retrieve_by_id
+      parameters:
+      - in: path
+        name: schedule_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - calendar
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    patch:
+      operationId: calendar_staff_schedules_partial_update_by_id
+      parameters:
+      - in: path
+        name: schedule_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - calendar
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    delete:
+      operationId: calendar_staff_schedules_destroy_by_id
+      description: 'Pauses the schedule: upcoming classes are cancelled, history is
+        kept.'
+      parameters:
+      - in: path
+        name: schedule_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - calendar
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '204':
+          description: No response body
+  /calendar/staff/schedules/{schedule_id}/exceptions/:
+    post:
+      operationId: calendar_staff_schedules_exceptions_create_by_id
+      parameters:
+      - in: path
+        name: schedule_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - calendar
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /calendar/staff/schedules/preview/:
+    post:
+      operationId: calendar_staff_schedules_preview_create
+      description: The dates a schedule would create, before saving (nothing is written).
+      tags:
+      - calendar
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /campaigns/:
     get:
       operationId: campaigns_retrieve
@@ -747,6 +1702,447 @@ paths:
               additionalProperties: {}
       security:
       - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /catalog/:
+    get:
+      operationId: catalog_retrieve
+      description: Public catalogue (no auth, no user data).
+      tags:
+      - catalog
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /certification/hall-of-fame/:
+    get:
+      operationId: certification_hall_of_fame_retrieve
+      tags:
+      - certification
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /certification/me/:
+    get:
+      operationId: certification_me_retrieve
+      tags:
+      - certification
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /certification/me/letters/{ref}/:
+    get:
+      operationId: certification_me_letters_retrieve_by_id
+      parameters:
+      - in: path
+        name: ref
+        schema:
+          type: string
+        required: true
+      tags:
+      - certification
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /certification/me/preferences/:
+    get:
+      operationId: certification_me_preferences_retrieve
+      tags:
+      - certification
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    put:
+      operationId: certification_me_preferences_update
+      tags:
+      - certification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    patch:
+      operationId: certification_me_preferences_partial_update
+      tags:
+      - certification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /certification/staff/decisions/{id}/:
+    get:
+      operationId: certification_staff_decisions_retrieve_by_id
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - certification
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /certification/staff/decisions/{id}/confirm-revocation/:
+    post:
+      operationId: certification_staff_decisions_confirm_revocation_create_by_id
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - certification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /certification/staff/decisions/{id}/dismiss-revocation/:
+    post:
+      operationId: certification_staff_decisions_dismiss_revocation_create_by_id
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - certification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /certification/staff/deliveries/{id}/resend/:
+    post:
+      operationId: certification_staff_deliveries_resend_create_by_id
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - certification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /certification/staff/exams/{slug}/regrade/:
+    post:
+      operationId: certification_staff_exams_regrade_create_by_id
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - certification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /certification/staff/hall-of-fame/{id}/handle/:
+    post:
+      operationId: certification_staff_hall_of_fame_handle_create_by_id
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - certification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /certification/staff/hall-of-fame/{id}/hide/:
+    post:
+      operationId: certification_staff_hall_of_fame_hide_create_by_id
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - certification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /certification/staff/hall-of-fame/{id}/restore/:
+    post:
+      operationId: certification_staff_hall_of_fame_restore_create_by_id
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - certification
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /console/today/:
+    get:
+      operationId: console_today_retrieve
+      parameters:
+      - in: query
+        name: workspace
+        schema:
+          type: string
+          enum:
+          - learn
+          - teach
+      tags:
+      - console
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
       responses:
         '200':
           content:
@@ -1440,6 +2836,35 @@ paths:
               schema:
                 $ref: '#/components/schemas/ExamDetail'
           description: ''
+  /ctf/exams/{slug}/identity/:
+    get:
+      operationId: ctf_exam_identity_retrieve
+      description: |-
+        ``GET /api/ctf/exams/<slug>/identity/``: the candidate block for one exam paper.
+
+        Lives under ``/api/ctf/`` so the labs Examination tab can read it (the
+        labs origin is scoped to the CTF API, config/labs_origin.py). Once the
+        student started, the handle is the snapshot taken at start and the most
+        recent handle is shown next to it; stats are scoped to their batch. Only
+        the caller's own data is returned, so no exam access check is needed.
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentIdentity'
+          description: ''
   /ctf/exams/{slug}/materials/{material_id}/:
     get:
       operationId: ctf_exams_materials_retrieve
@@ -1558,6 +2983,130 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParticipationResponse'
           description: ''
+  /ctf/labs/directory/:
+    get:
+      operationId: ctf_labs_directory_retrieve
+      description: '``GET /api/labs/directory/``: the free challenge directory (public).'
+      tags:
+      - ctf
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /ctf/labs/directory/{slug}/progress/:
+    post:
+      operationId: ctf_labs_directory_progress_create_by_id
+      description: '``POST /api/labs/directory/<slug>/progress/`` ``{done, flag?}``:
+        self-reported progress (+ flag for hosted).'
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /ctf/labs/entitlement/:
+    get:
+      operationId: ctf_labs_entitlement_retrieve
+      description: '``GET /api/labs/entitlement/``: the signed-in viewer''s labs access.'
+      tags:
+      - ctf
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /ctf/labs/pass/:
+    post:
+      operationId: ctf_labs_pass_create
+      description: '``POST /api/labs/pass/``: a short-lived signed pass the labs server
+        verifies locally.'
+      tags:
+      - ctf
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /ctf/labs/policy/:
+    get:
+      operationId: ctf_labs_policy_retrieve
+      description: '``GET /api/labs/policy/``: whether the labs are members-only (public,
+        cached 30 s).'
+      tags:
+      - ctf
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /ctf/materials/{token}/:
     get:
       operationId: ctf_materials_file_retrieve
@@ -1582,6 +3131,844 @@ paths:
               schema:
                 type: string
                 format: binary
+          description: ''
+  /ctf/seasons/{slug}/:
+    get:
+      operationId: ctf_seasons_retrieve
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Season'
+          description: ''
+  /ctf/seasons/{slug}/leaderboard/:
+    get:
+      operationId: ctf_seasons_leaderboard_retrieve
+      parameters:
+      - in: query
+        name: limit
+        schema:
+          type: integer
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Leaderboard'
+          description: ''
+  /ctf/seasons/{slug}/submit/:
+    post:
+      operationId: ctf_seasons_submit_create
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitRequestRequest'
+        required: true
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitResponse'
+          description: ''
+  /ctf/seasons/certificates/{slug}/:
+    get:
+      operationId: ctf_seasons_certificate_retrieve
+      description: Public verification of a Finalist certificate (works even while
+        the switch is off).
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Certificate'
+          description: ''
+  /ctf/seasons/cosmetics/:
+    get:
+      operationId: ctf_seasons_cosmetics_retrieve
+      description: '``?user_ids=1,2,3`` (at most 100) -> active Golden Aura / frame
+        / title per user.'
+      parameters:
+      - in: query
+        name: user_ids
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CosmeticsMap'
+          description: ''
+  /ctf/seasons/current/:
+    get:
+      operationId: ctf_seasons_current_retrieve
+      tags:
+      - ctf
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentSeason'
+          description: ''
+  /ctf/seasons/hall-of-fame/:
+    get:
+      operationId: ctf_seasons_hall_of_fame_retrieve
+      tags:
+      - ctf
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HallOfFame'
+          description: ''
+  /ctf/seasons/me/:
+    get:
+      operationId: ctf_seasons_me_retrieve
+      tags:
+      - ctf
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MySeasonSummary'
+          description: ''
+  /engagement/achievements/:
+    get:
+      operationId: engagement_achievements_retrieve
+      tags:
+      - engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/achievements/{slug}/:
+    get:
+      operationId: engagement_achievements_retrieve_by_id
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/achievements/{slug}/card.png:
+    get:
+      operationId: engagement_achievements_card.png_retrieve_by_id
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/achievements/{slug}/certificate.pdf:
+    get:
+      operationId: engagement_achievements_certificate.pdf_retrieve_by_id
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/badges/:
+    get:
+      operationId: engagement_badges_retrieve
+      tags:
+      - engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/certificates/{ref}/:
+    get:
+      operationId: engagement_certificates_retrieve_by_id
+      description: '``GET /api/engagement/certificates/<ref>/``: verify a certificate.'
+      parameters:
+      - in: path
+        name: ref
+        schema:
+          type: string
+        required: true
+      tags:
+      - engagement
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/certificates/{ref}/certificate.pdf:
+    get:
+      operationId: engagement_certificates_certificate.pdf_retrieve_by_id
+      parameters:
+      - in: path
+        name: ref
+        schema:
+          type: string
+        required: true
+      tags:
+      - engagement
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/certificates/{ref}/certificate.png:
+    get:
+      operationId: engagement_certificates_certificate.png_retrieve_by_id
+      parameters:
+      - in: path
+        name: ref
+        schema:
+          type: string
+        required: true
+      tags:
+      - engagement
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/certificates/{ref}/preview.png:
+    get:
+      operationId: engagement_certificates_preview.png_retrieve_by_id
+      parameters:
+      - in: path
+        name: ref
+        schema:
+          type: string
+        required: true
+      tags:
+      - engagement
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/certificates/{ref}/share/:
+    get:
+      operationId: engagement_certificates_share_retrieve_by_id
+      description: |-
+        ``GET .../share/``: a tiny HTML page with Open Graph tags for link-preview crawlers.
+
+        Crawlers (LinkedIn, WhatsApp, X, Slack) do not run JavaScript, so the SPA
+        page cannot give them the certificate image. The gateway can send crawler
+        user agents asking for ``/certificates/<ref>`` here; people are forwarded
+        to the page at once.
+      parameters:
+      - in: path
+        name: ref
+        schema:
+          type: string
+        required: true
+      tags:
+      - engagement
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/journey/:
+    get:
+      operationId: engagement_journey_retrieve
+      tags:
+      - engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/journey/dismiss/:
+    post:
+      operationId: engagement_journey_dismiss_create
+      tags:
+      - engagement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/leaderboard/:
+    get:
+      operationId: engagement_leaderboard_retrieve
+      tags:
+      - engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/levels/:
+    get:
+      operationId: engagement_levels_retrieve
+      description: Every rank, its threshold and what it unlocks, how to earn XP,
+        and where the caller stands.
+      tags:
+      - engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/live/{session_id}/presence/:
+    post:
+      operationId: engagement_live_presence_create_by_id
+      description: '``POST`` once a minute while a live class is open and visible.'
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - engagement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/me/:
+    get:
+      operationId: engagement_me_retrieve
+      tags:
+      - engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/me/level-seen/:
+    post:
+      operationId: engagement_me_level_seen_create
+      description: 'The UI showed the level-up moment: acknowledge it (it is shown
+        once).'
+      tags:
+      - engagement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/settings/:
+    get:
+      operationId: engagement_settings_retrieve
+      tags:
+      - engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    patch:
+      operationId: engagement_settings_partial_update
+      tags:
+      - engagement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/staff/badges/:
+    post:
+      operationId: engagement_staff_badges_create
+      tags:
+      - engagement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/staff/certificates/{ref}/:
+    get:
+      operationId: engagement_staff_certificates_retrieve_by_id
+      description: '``GET``: the certificate with its holder id and full audit trail.'
+      parameters:
+      - in: path
+        name: ref
+        schema:
+          type: string
+        required: true
+      tags:
+      - engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/staff/certificates/{ref}/correct-name/:
+    post:
+      operationId: engagement_staff_certificates_correct_name_create_by_id
+      description: '``POST {recipient_name, reason}``: correct the printed name (same
+        reference, revision + 1).'
+      parameters:
+      - in: path
+        name: ref
+        schema:
+          type: string
+        required: true
+      tags:
+      - engagement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/staff/certificates/{ref}/reinstate/:
+    post:
+      operationId: engagement_staff_certificates_reinstate_create_by_id
+      parameters:
+      - in: path
+        name: ref
+        schema:
+          type: string
+        required: true
+      tags:
+      - engagement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/staff/certificates/{ref}/revoke/:
+    post:
+      operationId: engagement_staff_certificates_revoke_create_by_id
+      parameters:
+      - in: path
+        name: ref
+        schema:
+          type: string
+        required: true
+      tags:
+      - engagement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/staff/leaderboard/:
+    get:
+      operationId: engagement_staff_leaderboard_retrieve
+      tags:
+      - engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/staff/xp/:
+    post:
+      operationId: engagement_staff_xp_create
+      tags:
+      - engagement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/staff/xp/{event_id}/revoke/:
+    post:
+      operationId: engagement_staff_xp_revoke_create_by_id
+      parameters:
+      - in: path
+        name: event_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - engagement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
           description: ''
   /enrollment-leads/:
     post:
@@ -1853,6 +4240,130 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/JoinFormSettingsResponse'
+          description: ''
+  /labs/directory/:
+    get:
+      operationId: labs_directory_retrieve
+      description: '``GET /api/labs/directory/``: the free challenge directory (public).'
+      tags:
+      - labs
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /labs/directory/{slug}/progress/:
+    post:
+      operationId: labs_directory_progress_create_by_id
+      description: '``POST /api/labs/directory/<slug>/progress/`` ``{done, flag?}``:
+        self-reported progress (+ flag for hosted).'
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - labs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /labs/entitlement/:
+    get:
+      operationId: labs_entitlement_retrieve
+      description: '``GET /api/labs/entitlement/``: the signed-in viewer''s labs access.'
+      tags:
+      - labs
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /labs/pass/:
+    post:
+      operationId: labs_pass_create
+      description: '``POST /api/labs/pass/``: a short-lived signed pass the labs server
+        verifies locally.'
+      tags:
+      - labs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /labs/policy/:
+    get:
+      operationId: labs_policy_retrieve
+      description: '``GET /api/labs/policy/``: whether the labs are members-only (public,
+        cached 30 s).'
+      tags:
+      - labs
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
           description: ''
   /lecture-comments/{comment_id}/:
     patch:
@@ -2599,6 +5110,49 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /me/capabilities/:
+    get:
+      operationId: me_capabilities_retrieve
+      description: |-
+        ``GET /api/me/capabilities/`` (Appendix A.1) with ``ETag`` / ``If-None-Match`` -> 304.
+
+        The same payload is embedded as ``capabilities`` in ``GET /api/auth/user/``
+        so the Console needs no extra request at boot; this endpoint is what it
+        polls (window focus, every 5 min, and after any ``feature_disabled``).
+      tags:
+      - me
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /me/identity/:
+    get:
+      operationId: me_identity_retrieve
+      parameters:
+      - in: query
+        name: course
+        schema:
+          type: integer
+        description: Scope the stats to one batch.
+      tags:
+      - me
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentIdentity'
+          description: ''
   /my-courses/:
     get:
       operationId: my_courses_retrieve
@@ -2758,6 +5312,188 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /payment/platform/orders/:
+    post:
+      operationId: payment_platform_orders_create
+      description: |-
+        DRF APIView/ViewSet mixin. Put it FIRST in the bases.
+
+        Runs after authentication/permissions/throttling (inside ``initial``) so
+        the owner is the authenticated user and rejected requests never claim keys.
+      tags:
+      - payment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /payment/platform/orders/verify/:
+    post:
+      operationId: payment_platform_orders_verify_create
+      tags:
+      - payment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /payment/subscriptions/:
+    post:
+      operationId: payment_subscriptions_create
+      description: |-
+        DRF APIView/ViewSet mixin. Put it FIRST in the bases.
+
+        Runs after authentication/permissions/throttling (inside ``initial``) so
+        the owner is the authenticated user and rejected requests never claim keys.
+      tags:
+      - payment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /payment/subscriptions/{id}/cancel/:
+    post:
+      operationId: payment_subscriptions_cancel_create_by_id
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - payment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /payment/subscriptions/mine/:
+    get:
+      operationId: payment_subscriptions_mine_retrieve
+      tags:
+      - payment
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /payment/subscriptions/verify/:
+    post:
+      operationId: payment_subscriptions_verify_create
+      tags:
+      - payment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /payment/verify/:
     post:
       operationId: payment_verify_create
@@ -2804,6 +5540,391 @@ paths:
       - cookieJWT: []
       - bearerJWT: []
       - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /profiles/me/:
+    get:
+      operationId: profiles_me_retrieve
+      tags:
+      - profiles
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /profiles/me/draft/:
+    put:
+      operationId: profiles_me_draft_update
+      tags:
+      - profiles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /profiles/me/handle/:
+    post:
+      operationId: profiles_me_handle_create
+      tags:
+      - profiles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /profiles/me/handle/prompt/dismiss/:
+    post:
+      operationId: profiles_me_handle_prompt_dismiss_create
+      description: '``POST``: the student keeps the automatic handle; the one-time
+        prompt is not shown again.'
+      tags:
+      - profiles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /profiles/me/images/:
+    post:
+      operationId: profiles_me_images_create
+      tags:
+      - profiles
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /profiles/me/images/{image_id}/:
+    delete:
+      operationId: profiles_me_images_destroy_by_id
+      parameters:
+      - in: path
+        name: image_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - profiles
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '204':
+          description: No response body
+  /profiles/me/preview/:
+    get:
+      operationId: profiles_me_preview_retrieve
+      tags:
+      - profiles
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /profiles/me/publish/:
+    post:
+      operationId: profiles_me_publish_create
+      tags:
+      - profiles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /profiles/me/settings/:
+    patch:
+      operationId: profiles_me_settings_partial_update
+      tags:
+      - profiles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /profiles/me/unpublish/:
+    post:
+      operationId: profiles_me_unpublish_create
+      tags:
+      - profiles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /profiles/media/{image_id}/:
+    get:
+      operationId: profiles_media_retrieve_by_id
+      parameters:
+      - in: path
+        name: image_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - profiles
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /profiles/moderation/profiles/{handle}/hide/:
+    post:
+      operationId: profiles_moderation_profiles_hide_create_by_id
+      parameters:
+      - in: path
+        name: handle
+        schema:
+          type: string
+        required: true
+      tags:
+      - profiles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /profiles/moderation/profiles/{handle}/restore/:
+    post:
+      operationId: profiles_moderation_profiles_restore_create_by_id
+      parameters:
+      - in: path
+        name: handle
+        schema:
+          type: string
+        required: true
+      tags:
+      - profiles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /profiles/moderation/reports/:
+    get:
+      operationId: profiles_moderation_reports_retrieve
+      tags:
+      - profiles
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /profiles/moderation/reports/{report_id}/dismiss/:
+    post:
+      operationId: profiles_moderation_reports_dismiss_create_by_id
+      parameters:
+      - in: path
+        name: report_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - profiles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /profiles/u/{handle}/:
+    get:
+      operationId: profiles_u_retrieve_by_id
+      parameters:
+      - in: path
+        name: handle
+        schema:
+          type: string
+        required: true
+      tags:
+      - profiles
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /profiles/u/{handle}/report/:
+    post:
+      operationId: profiles_u_report_create_by_id
+      parameters:
+      - in: path
+        name: handle
+        schema:
+          type: string
+        required: true
+      tags:
+      - profiles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
       responses:
         '200':
           content:
@@ -5421,6 +8542,25 @@ paths:
       responses:
         '204':
           description: No response body
+  /site/stats/:
+    get:
+      operationId: site_stats_retrieve
+      description: |-
+        Public website figures (students, live classes, recorded hours, certificates,
+        CTF cases, course rating), counted from real records and cached for 10 minutes.
+
+        Anonymous (no cookies read), throttled per IP, counts only (no personal
+        data). A figure below its display minimum is ``null``; the website hides it,
+        and hides the whole strip when nothing is available or the request fails.
+      tags:
+      - Website
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiteStatsResponse'
+          description: ''
   /site/youtube/:
     get:
       operationId: site_youtube_retrieve
@@ -5599,7 +8739,37 @@ components:
       type: string
       description: |-
         * `osint` - OSINT
-        * `web_pentesting` - Web Application Pentesting
+        * `web_pentesting` - Pentesting
+    Certificate:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        name:
+          type: string
+        season:
+          type: string
+        season_title:
+          type: string
+        month:
+          type: string
+        rank:
+          type: integer
+          nullable: true
+        issued_at:
+          type: string
+          format: date-time
+        slug:
+          type: string
+      required:
+      - issued_at
+      - month
+      - name
+      - rank
+      - season
+      - season_title
+      - slug
+      - valid
     ChunkAck:
       type: object
       properties:
@@ -6117,6 +9287,36 @@ components:
       - open
       - scheduled
       - server_time
+    Cosmetics:
+      type: object
+      properties:
+        aura:
+          type: boolean
+        frame:
+          type: boolean
+        frame_tier:
+          type: string
+        title:
+          type: string
+        until:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - aura
+      - frame
+      - frame_tier
+      - title
+      - until
+    CosmeticsMap:
+      type: object
+      properties:
+        users:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/Cosmetics'
+      required:
+      - users
     CourseDetailContract:
       type: object
       description: |-
@@ -6507,6 +9707,24 @@ components:
         * `hard` - Hard
         * `expert` - Expert
         * `insane` - Insane
+    CurrentSeason:
+      type: object
+      properties:
+        season:
+          allOf:
+          - $ref: '#/components/schemas/Season'
+          nullable: true
+        rewards:
+          type: array
+          items:
+            $ref: '#/components/schemas/RewardRule'
+        server_time:
+          type: string
+          format: date-time
+      required:
+      - rewards
+      - season
+      - server_time
     DraftFile:
       type: object
       properties:
@@ -6980,6 +10198,10 @@ components:
     GradebookRow:
       type: object
       properties:
+        identity:
+          allOf:
+          - $ref: '#/components/schemas/StudentIdentity'
+          description: Roll number, real name, handle, stats (first).
         student:
           $ref: '#/components/schemas/Person'
         cells:
@@ -7151,6 +10373,65 @@ components:
       - title
       - week_number
       - week_start
+    HallOfFame:
+      type: object
+      properties:
+        seasons:
+          type: array
+          items:
+            $ref: '#/components/schemas/HallOfFameSeason'
+      required:
+      - seasons
+    HallOfFameRow:
+      type: object
+      properties:
+        rank:
+          type: integer
+        name:
+          type: string
+        solve_seconds:
+          type: integer
+          nullable: true
+        wrong_attempts:
+          type: integer
+        score_seconds:
+          type: integer
+          nullable: true
+        tier:
+          type: string
+      required:
+      - name
+      - rank
+      - score_seconds
+      - solve_seconds
+      - tier
+      - wrong_attempts
+    HallOfFameSeason:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        month:
+          type: string
+        solvers:
+          type: integer
+        finalised_at:
+          type: string
+          format: date-time
+          nullable: true
+        finalists:
+          type: array
+          items:
+            $ref: '#/components/schemas/HallOfFameRow'
+      required:
+      - finalised_at
+      - finalists
+      - month
+      - slug
+      - solvers
+      - title
     JoinApplicationCreateRequest:
       type: object
       properties:
@@ -7414,6 +10695,74 @@ components:
       required:
       - hero_image_url
       - topics
+    Leaderboard:
+      type: object
+      properties:
+        season:
+          type: string
+        final:
+          type: boolean
+        solvers:
+          type: integer
+        participants:
+          type: integer
+        penalty_seconds:
+          type: integer
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaderboardRow'
+        me:
+          allOf:
+          - $ref: '#/components/schemas/LeaderboardRow'
+          nullable: true
+        generated_at:
+          type: string
+          format: date-time
+      required:
+      - final
+      - generated_at
+      - me
+      - participants
+      - penalty_seconds
+      - rows
+      - season
+      - solvers
+    LeaderboardRow:
+      type: object
+      properties:
+        rank:
+          type: integer
+        name:
+          type: string
+        solved_at:
+          type: string
+          format: date-time
+        solve_seconds:
+          type: integer
+        wrong_attempts:
+          type: integer
+        attempts:
+          type: integer
+        score_seconds:
+          type: integer
+        first_blood:
+          type: boolean
+        is_me:
+          type: boolean
+        cosmetics:
+          $ref: '#/components/schemas/Cosmetics'
+      required:
+      - attempts
+      - cosmetics
+      - first_blood
+      - is_me
+      - name
+      - rank
+      - score_seconds
+      - solve_seconds
+      - solved_at
+      - wrong_attempts
     LectureComment:
       type: object
       description: Student-facing comment. Never exposes emails or moderation metadata.
@@ -8009,6 +11358,48 @@ components:
       - course
       - tasks
       - totals
+    MySeasonSummary:
+      type: object
+      properties:
+        handle:
+          type: string
+        display_name:
+          type: string
+        cosmetics:
+          $ref: '#/components/schemas/Cosmetics'
+        streak_months:
+          type: integer
+        seasons_solved:
+          type: integer
+        xp_earned:
+          type: integer
+        trophies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reward'
+        badges:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reward'
+        cosmetic_rewards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reward'
+        certificates:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reward'
+      required:
+      - badges
+      - certificates
+      - cosmetic_rewards
+      - cosmetics
+      - display_name
+      - handle
+      - seasons_solved
+      - streak_months
+      - trophies
+      - xp_earned
     MyWeek:
       type: object
       properties:
@@ -8379,6 +11770,18 @@ components:
       - email
       - full_name
       - id
+    PhaseEnum:
+      enum:
+      - upcoming
+      - open
+      - closed
+      - results
+      type: string
+      description: |-
+        * `upcoming` - upcoming
+        * `open` - open
+        * `closed` - closed
+        * `results` - results
     PlanEnum:
       enum:
       - monthly
@@ -9201,6 +12604,10 @@ components:
     ResultRow:
       type: object
       properties:
+        identity:
+          allOf:
+          - $ref: '#/components/schemas/StudentIdentity'
+          description: Roll number, real name, handle, stats (first).
         rank:
           type: integer
         student:
@@ -9289,6 +12696,74 @@ components:
           default: false
           description: 'false: put the replaced video back. true: switch to the uploaded
             video again.'
+    Reward:
+      type: object
+      properties:
+        kind:
+          type: string
+        title:
+          type: string
+        season:
+          type: string
+        month:
+          type: string
+        rank:
+          type: integer
+          nullable: true
+        tier:
+          type: string
+        points:
+          type: integer
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+          nullable: true
+        active:
+          type: boolean
+        permanent:
+          type: boolean
+        streak:
+          type: integer
+          nullable: true
+        certificate_slug:
+          type: string
+          nullable: true
+      required:
+      - active
+      - certificate_slug
+      - ends_at
+      - kind
+      - month
+      - permanent
+      - points
+      - rank
+      - season
+      - starts_at
+      - streak
+      - tier
+      - title
+    RewardRule:
+      type: object
+      properties:
+        key:
+          type: string
+        who:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+        lasts:
+          type: string
+      required:
+      - detail
+      - key
+      - lasts
+      - title
+      - who
     RoleEnum:
       enum:
       - citizen
@@ -9335,6 +12810,128 @@ components:
       - opens_at
       - slug
       - title
+    Season:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        tagline:
+          type: string
+        month:
+          type: string
+        status:
+          type: string
+        phase:
+          $ref: '#/components/schemas/PhaseEnum'
+        opens_at:
+          type: string
+          format: date-time
+        closes_at:
+          type: string
+          format: date-time
+        difficulty:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        solvers:
+          type: integer
+        participants:
+          type: integer
+        penalty_seconds:
+          type: integer
+        max_attempts:
+          type: integer
+        solve_xp:
+          type: integer
+        can_play:
+          type: boolean
+        play_reason:
+          type: string
+        content_visible:
+          type: boolean
+        brief:
+          type: string
+          nullable: true
+        question:
+          type: string
+          nullable: true
+        flag_format:
+          type: string
+          nullable: true
+        materials_url:
+          type: string
+          nullable: true
+        me:
+          allOf:
+          - $ref: '#/components/schemas/SeasonEntry'
+          nullable: true
+      required:
+      - brief
+      - can_play
+      - closes_at
+      - content_visible
+      - difficulty
+      - flag_format
+      - materials_url
+      - max_attempts
+      - me
+      - month
+      - opens_at
+      - participants
+      - penalty_seconds
+      - phase
+      - play_reason
+      - question
+      - skills
+      - slug
+      - solve_xp
+      - solvers
+      - status
+      - tagline
+      - title
+    SeasonEntry:
+      type: object
+      properties:
+        joined:
+          type: boolean
+        solved:
+          type: boolean
+        solved_at:
+          type: string
+          format: date-time
+          nullable: true
+        solve_seconds:
+          type: integer
+          nullable: true
+        score_seconds:
+          type: integer
+          nullable: true
+        attempts:
+          type: integer
+        wrong_attempts:
+          type: integer
+        attempts_left:
+          type: integer
+        disqualified:
+          type: boolean
+        rank:
+          type: integer
+          nullable: true
+      required:
+      - attempts
+      - attempts_left
+      - disqualified
+      - joined
+      - rank
+      - score_seconds
+      - solve_seconds
+      - solved
+      - solved_at
+      - wrong_attempts
     SectionOption:
       type: object
       properties:
@@ -9370,6 +12967,71 @@ components:
       - student
       - submission_id
       - target_name
+    SiteStatsPayload:
+      type: object
+      properties:
+        stats:
+          $ref: '#/components/schemas/SiteStatsValues'
+        available:
+          type: boolean
+        generated_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - available
+      - generated_at
+      - stats
+    SiteStatsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/SiteStatsPayload'
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    SiteStatsValues:
+      type: object
+      description: '``null`` = below the display minimum (the website hides that figure).'
+      properties:
+        students_enrolled:
+          type: integer
+          nullable: true
+        live_classes_delivered:
+          type: integer
+          nullable: true
+        recorded_hours:
+          type: integer
+          nullable: true
+        certificates_issued:
+          type: integer
+          nullable: true
+        ctf_cases:
+          type: integer
+          nullable: true
+        average_rating:
+          type: number
+          format: double
+          nullable: true
+        rating_count:
+          type: integer
+          nullable: true
+      required:
+      - average_rating
+      - certificates_issued
+      - ctf_cases
+      - live_classes_delivered
+      - rating_count
+      - recorded_hours
+      - students_enrolled
     SocialAccount:
       type: object
       properties:
@@ -9751,6 +13413,87 @@ components:
       - late_penalty
       - max_marks
       - raw_marks
+    StudentIdentity:
+      type: object
+      properties:
+        roll_number:
+          type: string
+          description: AL-SYD-<user id, 5 digits>.
+        real_name:
+          type: string
+        handle:
+          type: string
+          nullable: true
+          description: At submission time on a record; null = no handle.
+        handle_most_recent:
+          type: string
+          nullable: true
+        handle_changed:
+          type: boolean
+        stats:
+          allOf:
+          - $ref: '#/components/schemas/StudentIdentityStats'
+          nullable: true
+        snapshot:
+          type: boolean
+          description: True when roll/name/handle come from the record's snapshot.
+        user_id:
+          type: integer
+      required:
+      - handle
+      - handle_changed
+      - handle_most_recent
+      - real_name
+      - roll_number
+      - snapshot
+      - stats
+      - user_id
+    StudentIdentityStats:
+      type: object
+      properties:
+        xp:
+          type: integer
+          nullable: true
+          description: Null while the engagement switch is off.
+        rank:
+          type: string
+          nullable: true
+          description: Engagement level title (null while engagement is off).
+        attendance_percent:
+          type: number
+          format: double
+          nullable: true
+          description: Attended = 40+ minutes live.
+        attendance_attended:
+          type: integer
+        attendance_total:
+          type: integer
+        reports_submitted:
+          type: integer
+        reports_graded:
+          type: integer
+        reports_graded_average:
+          type: number
+          format: double
+          nullable: true
+        exam_score:
+          type: number
+          format: double
+          nullable: true
+          description: Average % of finalized exam results.
+        exams_taken:
+          type: integer
+      required:
+      - attendance_attended
+      - attendance_percent
+      - attendance_total
+      - exam_score
+      - exams_taken
+      - rank
+      - reports_graded
+      - reports_graded_average
+      - reports_submitted
+      - xp
     StudentRef:
       type: object
       properties:
@@ -10055,6 +13798,10 @@ components:
     SubmissionDetail:
       type: object
       properties:
+        identity:
+          allOf:
+          - $ref: '#/components/schemas/StudentIdentity'
+          description: Roll number, real name, handle, stats (first).
         id:
           type: integer
         task:
@@ -10174,6 +13921,10 @@ components:
     SubmissionQueueItem:
       type: object
       properties:
+        identity:
+          allOf:
+          - $ref: '#/components/schemas/StudentIdentity'
+          description: Roll number, real name, handle, stats (first).
         id:
           type: integer
         task:
@@ -10263,6 +14014,62 @@ components:
       required:
       - created
       - task
+    SubmitRequestRequest:
+      type: object
+      properties:
+        answer:
+          type: string
+          maxLength: 512
+      required:
+      - answer
+    SubmitResponse:
+      type: object
+      properties:
+        joined:
+          type: boolean
+        solved:
+          type: boolean
+        solved_at:
+          type: string
+          format: date-time
+          nullable: true
+        solve_seconds:
+          type: integer
+          nullable: true
+        score_seconds:
+          type: integer
+          nullable: true
+        attempts:
+          type: integer
+        wrong_attempts:
+          type: integer
+        attempts_left:
+          type: integer
+        disqualified:
+          type: boolean
+        rank:
+          type: integer
+          nullable: true
+        correct:
+          type: boolean
+        practice:
+          type: boolean
+        already_solved:
+          type: boolean
+      required:
+      - already_solved
+      - attempts
+      - attempts_left
+      - correct
+      - disqualified
+      - joined
+      - practice
+      - rank
+      - score_seconds
+      - solve_seconds
+      - solved
+      - solved_at
+      - wrong_attempts
     SubmitTargetRequestRequest:
       type: object
       properties:
@@ -10677,6 +14484,10 @@ components:
     UnifiedGradebookRow:
       type: object
       properties:
+        identity:
+          allOf:
+          - $ref: '#/components/schemas/StudentIdentity'
+          description: Roll number, real name, handle, stats (first).
         student:
           $ref: '#/components/schemas/UnifiedGradebookStudent'
         cells:
@@ -10746,6 +14557,10 @@ components:
     UnifiedStudentGradebook:
       type: object
       properties:
+        identity:
+          allOf:
+          - $ref: '#/components/schemas/StudentIdentity'
+          description: Roll number, real name, handle, stats (first).
         student:
           $ref: '#/components/schemas/UnifiedGradebookStudent'
         courses:

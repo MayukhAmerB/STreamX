@@ -44,23 +44,23 @@ export default function SessionEvictedDialog({
   const copy = COPY[variant] || COPY["signed-out"];
 
   return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/80 px-4 py-6 backdrop-blur-sm">
       <div
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="session-evicted-title"
         aria-describedby="session-evicted-description"
         data-variant={variant}
-        className="w-full max-w-md rounded-[20px] border border-white/15 bg-[#080808] p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-[0_32px_90px_rgba(0,0,0,0.72)] sm:p-6"
+        className="w-full max-w-md rounded-[10px] border border-white/10 bg-[#0a0a0a] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:p-8"
       >
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#BDBDBD]">{copy.eyebrow}</p>
-        <h2 id="session-evicted-title" className="mt-2 font-reference text-2xl font-semibold text-white">
+        <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#8a8a8a]">{copy.eyebrow}</p>
+        <h2 id="session-evicted-title" className="mt-3 text-3xl font-normal leading-tight text-white">
           {copy.title}
         </h2>
-        <p id="session-evicted-description" className="mt-3 text-sm leading-6 text-[#C7C7C7]">
+        <p id="session-evicted-description" className="mt-3 text-sm leading-6 text-[#a1a1a1]">
           {copy.description}
         </p>
-        <div className="mt-5 grid gap-2 sm:grid-cols-2">
+        <div className="mt-8 grid gap-3 sm:grid-cols-2">
           <Button type="button" autoFocus disabled={signingOut} onClick={onUseThisDevice}>
             {copy.primary}
           </Button>

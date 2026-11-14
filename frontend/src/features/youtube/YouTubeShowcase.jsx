@@ -2,6 +2,7 @@ import "./YouTube.css";
 
 import { useId, useMemo, useRef, useState } from "react";
 
+import { LiveDot } from "../../site-kit/motion";
 import LiteYouTubeEmbed from "./LiteYouTubeEmbed";
 import {
   buildVideoJsonLd,
@@ -35,7 +36,7 @@ function ExternalArrow() {
 export function LiveBadge({ className = "" }) {
   return (
     <span className={`yt-live-badge ${className}`.trim()}>
-      <span className="yt-live-dot" aria-hidden="true" />
+      <LiveDot state="live" />
       Live now
     </span>
   );
@@ -159,7 +160,7 @@ export default function YouTubeShowcase({ model, variant = "section", now = Date
           <div className="yt-meta__actions">
             {isLiveCurrent ? (
               <button type="button" className="yt-btn yt-btn--live" onClick={joinLive}>
-                <span className="yt-live-dot yt-live-dot--light" aria-hidden="true" />
+                <LiveDot state="live" />
                 Join the live stream
               </button>
             ) : null}

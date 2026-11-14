@@ -5,6 +5,7 @@ import { siteBrand } from "../../config/siteBrand";
 import { DEFAULT_LIVE_CLASS_SCHEDULE } from "../../utils/liveClassSchedule";
 import LegacyPageFrame from "../app-shell/LegacyPageFrame";
 import { useToast } from "../app-shell/ui";
+import { LiveDot as KitLiveDot } from "../../site-kit/motion";
 import { downloadCalendarFile } from "./calendarDownload";
 import { sessionStatusLabel, sessionTypeLabel } from "./liveSessions";
 import { buildLiveScheduleIcs, formatNextClass, formatScheduleSummary } from "./schedule";
@@ -18,9 +19,13 @@ function runJoin(onJoin, sessionId) {
     .catch(() => {});
 }
 
-/** Pulsing red dot used with every "Live" label. */
-export function LiveDot() {
-  return <span className="lc-live-dot" aria-hidden="true" />;
+/** The one live indicator (kit LiveDot, M8: 3 pings then rests) with every "Live" label. */
+export function LiveDot({ state = "live" }) {
+  return (
+    <span className="lc-live-dot">
+      <KitLiveDot state={state} />
+    </span>
+  );
 }
 
 function hostLine(session) {

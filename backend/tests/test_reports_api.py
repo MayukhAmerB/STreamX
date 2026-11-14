@@ -774,7 +774,10 @@ class ExportTests(ReportsTestCase):
         self.assertTrue(response["Content-Type"].startswith("text/csv"))
         self.assertIn("attachment;", response["Content-Disposition"])
         text = response.content.decode("utf-8-sig")
-        self.assertIn("Student,Email,Target: Acme Corp (/10)", text)
+        # Owner rule: roll number, real name, handle, stats first; then Email and the record columns.
+        self.assertTrue(text.splitlines()[0].startswith("Roll number,Real name,Handle,Handle (most recent),"))
+        self.assertIn("Exam score %,Email,Target: Acme Corp (/10)", text)
+        self.assertIn(f"AL-SYD-{evil.pk:05d}", text)
         self.assertIn("'=cmd", text)
         self.assertIn("7.5", text)
         response = self.client.get(reverse("reports-manage-export"), {"task": self.task.pk})

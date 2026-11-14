@@ -225,9 +225,12 @@ def batch_gradebook(course, *, now=None):
     student_ids = set(report_rows) | {user_id for _exam, user_id in results} | {
         user_id for _exam, user_id in participations
     }
-    students = get_user_model().objects.filter(pk__in=student_ids).order_by("full_name", "email", "id")
+    students = list(get_user_model().objects.filter(pk__in=student_ids).order_by("full_name", "email", "id"))
+    from apps.users import identity
+
+    blocks = identity.identity_blocks([(student, None) for student in students], course_id=course.pk)
     rows = []
-    for student in students:
+    for student, block in zip(students, blocks, strict=True):
         cells = []
         report_row = report_rows.get(student.pk)
         for index, column in enumerate(report_columns):
@@ -239,7 +242,7 @@ def batch_gradebook(course, *, now=None):
             cells.append(
                 exam_cell(column, exam, results.get((exam.pk, student.pk)), participations.get((exam.pk, student.pk)))
             )
-        rows.append({"student": person(student), "cells": cells, "totals": totals(cells)})
+        rows.append({"identity": block, "student": person(student), "cells": cells, "totals": totals(cells)})
     return {
         "course": course_dict(course),
         "columns": report_columns + exam_columns,
@@ -301,7 +304,14 @@ def student_gradebook(student, *, viewer, now=None):
                 "totals": totals(all_cells),
             }
         )
-    return {"student": person(student), "courses": sections, "generated_at": now}
+    from apps.users import identity
+
+    return {
+        "identity": identity.block_for_user(student),
+        "student": person(student),
+        "courses": sections,
+        "generated_at": now,
+    }
 
 
 def my_gradebook(user, *, now=None):
@@ -339,7 +349,11 @@ def my_gradebook(user, *, now=None):
         section["cells"].append(exam_cell(column, exam, result, participation))
 
     ordered = sorted(sections.values(), key=lambda item: item["course"].title.lower())
+    from apps.users import identity
+
     return {
+        # The student's own header: only marks they can already see count.
+        "identity": identity.block_for_user(user, include_unreleased=False),
         "student": person(user),
         "courses": [
             {
@@ -358,15 +372,20 @@ def my_gradebook(user, *, now=None):
 # CSV
 # ---------------------------------------------------------------------------
 def batch_csv_rows(book):
-    header = ["Student name", "Student email"]
+    from apps.users import identity
+
+    # Owner rule: the student block (roll number, real name, handle, stats) comes first.
+    header = [*identity.IDENTITY_HEADER, "Student email"]
     for column in book["columns"]:
         label = "Report" if column["kind"] == KIND_REPORT else "Exam"
         maximum = f" /{column['max']:g}" if isinstance(column["max"], (int, float)) else ""
         header.append(f"{label}: {column['title']}{maximum}")
     header += ["Reports %", "Exams %", "Overall %", "Missing", "Late"]
     yield header
-    for row in book["rows"]:
-        values = [row["student"]["full_name"], row["student"]["email"]]
+    course_id = (book.get("course") or {}).get("id") if isinstance(book.get("course"), dict) else None
+    blocks = identity.identity_blocks([(row["student"], None) for row in book["rows"]], course_id=course_id)
+    for row, block in zip(book["rows"], blocks, strict=True):
+        values = [*identity.identity_cells(block), row["student"]["email"]]
         for cell in row["cells"]:
             if cell["value"] is not None:
                 values.append(f"{cell['value']:g}")

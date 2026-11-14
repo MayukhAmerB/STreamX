@@ -1,42 +1,84 @@
+// Exams (UI overhaul plan §3.5, T2 list). OWNER: WS-D2. Mounted at
+// /console/{teach,admin}/exams and the old /console/exams. Staff import an
+// exam JSON through a drop zone (server dry run first: counts only, the answer
+// key never leaves the server); every disabled button says why.
 import "../features/exams/Exams.scss";
 
 import { DocumentImport, Flag, Upload } from "@carbon/icons-react";
-import { Button, Tag } from "@carbon/react";
-import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { EmptyState, PageHeader, PageNotification, PageSkeleton } from "../features/app-shell/ui";
+import { Button } from "@carbon/react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { DropZone, EmptyState, ErrorState, PageHeader, PageNotification, PageSkeleton, ResponsiveTable, StatusTag, T2List } from "../features/app-shell/ui";
 import { formatWindow, previewLines, stateMeta, uploadProblems } from "../features/exams/examModel";
 import { listConsoleExams, previewExamFile, uploadExamFile } from "../features/exams/examsApi";
+import { useWorkspaceRoot } from "../features/grading/workspaceRoot";
 import { apiData, apiMessage } from "../utils/api";
 
+const EXAM_STATUS = { draft: "draft", scheduled: "scheduled", published: "published", closed: "off" };
+
+/** StatusTag for an exam state (one vocabulary; "Closed" reads as Off-grey). */
+export function ExamStateTag({ state }) {
+  return <StatusTag status={EXAM_STATUS[state] || "draft"}>{stateMeta(state).label}</StatusTag>;
+}
+
+/** Where exam links point: the workspace tree, or the old /console/exams URL. */
+export function useExamsBase() {
+  const { pathname } = useLocation();
+  const root = useWorkspaceRoot();
+  return /^\/console\/(teach|admin)\//.test(pathname) ? `${root}/exams` : "/console/exams";
+}
+
+/** Why "Check file" / "Load exam" are disabled ("" when enabled). */
+export function uploadReasons({ fileName, preview, problems = [], busy = "" }) {
+  const checked = Boolean(preview && !problems.length);
+  if (busy) return { check: "Working…", load: "Working…", checked };
+  if (!fileName) return { check: "Choose a file first.", load: "Choose a file first.", checked };
+  return { check: "", load: checked ? "" : "Check the file before loading it.", checked };
+}
+
 /**
- * Upload an exam JSON: "Check file" runs the server dry run (counts only,
- * the answer key never leaves the server); "Load exam" is enabled only after
- * the same file passed the check.
+ * Import an exam JSON: "Check file" runs the server dry run; "Load exam" is
+ * enabled only after the same file passed the check.
  */
 export function ExamUploadPanel({ fileName, preview, problems = [], error = "", busy = "", onPickFile, onCheck, onLoad }) {
-  const checked = Boolean(preview && !problems.length);
+  const reasons = uploadReasons({ fileName, preview, problems, busy });
+  const reason = reasons.load || reasons.check;
+  // The drop zone's <label> also holds a decorative "Choose a file" cue; name the
+  // input exactly "Exam file" so it is found by that label (TODO(WS-A): keep
+  // the cue outside the <label> and drop this).
+  const controlsRef = useRef(null);
+  useEffect(() => {
+    controlsRef.current?.querySelector?.('input[type="file"]')?.setAttribute("aria-label", "Exam file");
+  });
   return (
-    <section className="exm-section exm-card" aria-labelledby="exm-upload-title">
-      <h2 id="exm-upload-title" className="exm-subtitle">
-        Upload an exam file
-      </h2>
-      <p className="exm-muted">
-        Choose the exam JSON. Check it first: the server validates it and shows what would change, without saving anything.
-      </p>
-      <div className="exm-row exm-row--spaced">
-        <label className="exm-file-input">
-          <span className="exm-muted">Exam file (.json) </span>
-          <input type="file" accept="application/json,.json" aria-label="Exam file" onChange={(event) => onPickFile?.(event.target.files?.[0] || null)} />
-        </label>
-        <Button kind="secondary" size="md" renderIcon={DocumentImport} disabled={!fileName || Boolean(busy)} onClick={onCheck}>
-          {busy === "check" ? "Checking…" : "Check file"}
-        </Button>
-        <Button kind="primary" size="md" renderIcon={Upload} disabled={!checked || Boolean(busy)} onClick={onLoad}>
-          {busy === "load" ? "Loading…" : "Load exam"}
-        </Button>
+    <section className="exm-import" aria-labelledby="exm-upload-title">
+      <div className="exm-import__text">
+        <h2 id="exm-upload-title" className="exm-subtitle">
+          Import an exam
+        </h2>
+        <p className="exm-muted">Check the JSON first: the server validates it and shows what would change, without saving anything.</p>
       </div>
-      {!checked && fileName && !busy ? <p className="exm-reason">Check the file before loading it.</p> : null}
+      <div className="exm-import__controls" ref={controlsRef}>
+        <DropZone accept="application/json,.json" label="Exam file" onFiles={(files) => onPickFile?.(files?.[0] || null)} />
+        {fileName ? (
+          <p className="exm-import__file">
+            <span className="exm-muted">Chosen:</span> {fileName}
+          </p>
+        ) : null}
+        <div className="exm-row">
+          <Button kind="secondary" size="md" renderIcon={DocumentImport} disabled={Boolean(reasons.check)} aria-describedby="exm-upload-reason" onClick={onCheck}>
+            {busy === "check" ? "Checking…" : "Check file"}
+          </Button>
+          <Button kind="primary" size="md" renderIcon={Upload} disabled={Boolean(reasons.load)} aria-describedby="exm-upload-reason" onClick={onLoad}>
+            {busy === "load" ? "Loading…" : "Load exam"}
+          </Button>
+        </div>
+        {reason && !busy ? (
+          <p id="exm-upload-reason" className="exm-reason">
+            {reason}
+          </p>
+        ) : null}
+      </div>
       {error ? <PageNotification kind="error" title="The file could not be checked." subtitle={error} /> : null}
       {problems.length ? (
         <div className="exm-preview" role="alert">
@@ -48,7 +90,7 @@ export function ExamUploadPanel({ fileName, preview, problems = [], error = "", 
           </ul>
         </div>
       ) : null}
-      {checked ? (
+      {reasons.checked ? (
         <div className="exm-preview" aria-live="polite">
           <p className="exm-check-label">Dry run passed. Nothing has been saved yet.</p>
           <ul>
@@ -62,54 +104,30 @@ export function ExamUploadPanel({ fileName, preview, problems = [], error = "", 
   );
 }
 
-export function ExamListTable({ exams = [] }) {
+export function examColumns() {
+  return [
+    { key: "title", header: "Exam", render: (exam) => exam.title },
+    { key: "state", header: "State", render: (exam) => <ExamStateTag state={exam.state} /> },
+    { key: "window", header: "Window (IST)", render: (exam) => <span className="exm-window">{formatWindow(exam)}</span> },
+    { key: "batches", header: "Batches", render: (exam) => (exam.batches?.length ? exam.batches.map((batch) => batch.title).join(", ") : "None") },
+    { key: "questions", header: "Questions", render: (exam) => <span className="exm-num-cell">{exam.question_count}</span> },
+    { key: "ready", header: "Ready", render: (exam) => (exam.ready === null || exam.ready === undefined ? "–" : exam.ready ? "Yes" : "Not yet") },
+    { key: "students", header: "Students", render: (exam) => <span className="exm-num-cell">{exam.stats?.participants ?? 0}</span> },
+  ];
+}
+
+/** ResponsiveTable draws the sideways-scroll fade and turns rows into cards on phones. */
+export function ExamListTable({ exams = [], basePath = "/console/exams" }) {
   return (
-    <div className="exm-table-wrap" tabIndex={0} role="region" aria-label="Exams (scrolls sideways)">
-      <table className="exm-table">
-        <thead>
-          <tr>
-            <th scope="col">Exam</th>
-            <th scope="col">State</th>
-            <th scope="col">Window (IST)</th>
-            <th scope="col">Batches</th>
-            <th scope="col" className="exm-num">
-              Questions
-            </th>
-            <th scope="col">Ready</th>
-            <th scope="col" className="exm-num">
-              Students
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {exams.map((exam) => {
-            const meta = stateMeta(exam.state);
-            return (
-              <tr key={exam.slug}>
-                <th scope="row">
-                  <Link to={`/console/exams/${exam.slug}`}>{exam.title}</Link>
-                </th>
-                <td>
-                  <Tag type={meta.tag} size="sm">
-                    {meta.label}
-                  </Tag>
-                </td>
-                <td>{formatWindow(exam)}</td>
-                <td>{exam.batches.length ? exam.batches.map((batch) => batch.title).join(", ") : "None"}</td>
-                <td className="exm-num">{exam.question_count}</td>
-                <td>{exam.ready === null || exam.ready === undefined ? "–" : exam.ready ? "Yes" : "Not yet"}</td>
-                <td className="exm-num">{exam.stats.participants}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className="exm-list">
+      <ResponsiveTable columns={examColumns()} rows={exams.map((exam) => ({ ...exam, id: exam.slug }))} getRowHref={(exam) => `${basePath}/${exam.slug}`} />
     </div>
   );
 }
 
 export default function ConsoleExamsPage() {
   const navigate = useNavigate();
+  const base = useExamsBase();
   const [state, setState] = useState({ exams: [], canManage: false, loading: true, error: "" });
   const [file, setFile] = useState(null);
   const [upload, setUpload] = useState({ preview: null, problems: [], error: "", busy: "" });
@@ -138,7 +156,7 @@ export default function ConsoleExamsPage() {
       const response = kind === "check" ? await previewExamFile(file) : await uploadExamFile(file);
       const data = apiData(response, {});
       if (kind === "load") {
-        navigate(`/console/exams/${data.report.slug}`);
+        navigate(`${base}/${data.report.slug}`);
         return;
       }
       setUpload({ preview: data.report, problems: [], error: "", busy: "" });
@@ -148,31 +166,43 @@ export default function ConsoleExamsPage() {
     }
   };
 
+  let list;
+  if (state.loading) list = <PageSkeleton label="Loading exams" count={2} />;
+  else if (state.error) list = <ErrorState error={`Couldn't load exams. ${state.error}`} onRetry={load} />;
+  else if (!state.exams.length) {
+    list = (
+      <EmptyState
+        icon={Flag}
+        title={state.canManage ? "No exams yet." : "No exam is assigned to your batches yet."}
+        body={state.canManage ? "Import an exam file above to start." : "Exams appear here once staff assign one to a batch you teach."}
+      />
+    );
+  } else list = <ExamListTable exams={state.exams} basePath={base} />;
+
   return (
-    <>
-      <PageHeader title="Exams" description="Load OSINT CTF exams, choose batches, schedule them and follow the results." />
-      {state.canManage ? (
-        <ExamUploadPanel
-          fileName={file?.name || ""}
-          {...upload}
-          onPickFile={onPickFile}
-          onCheck={() => run("check")}
-          onLoad={() => run("load")}
-        />
-      ) : null}
-      <section className="exm-section" aria-labelledby="exm-list-title">
-        <h2 id="exm-list-title" className="exm-subtitle">
-          {state.canManage ? "All exams" : "Exams for your batches"}
-        </h2>
-        {state.loading ? <PageSkeleton label="Loading exams" count={2} /> : null}
-        {!state.loading && state.error ? (
-          <PageNotification kind="error" title="Couldn't load exams." subtitle={state.error} actionLabel="Try again" onAction={load} />
-        ) : null}
-        {!state.loading && !state.error && !state.exams.length ? (
-          <EmptyState icon={Flag} text={state.canManage ? "No exams yet. Upload an exam file to start." : "No exam is assigned to your batches yet."} />
-        ) : null}
-        {!state.loading && state.exams.length ? <ExamListTable exams={state.exams} /> : null}
-      </section>
-    </>
+    <div className="exm-page">
+      <T2List
+        header={
+          <PageHeader
+            eyebrow={null}
+            title="Exams"
+            description={state.canManage ? "Import OSINT CTF exams, choose batches, schedule them and follow the results." : "Exams for the batches you teach, and their results."}
+          />
+        }
+        main={
+          <>
+            {state.canManage ? (
+              <ExamUploadPanel fileName={file?.name || ""} {...upload} onPickFile={onPickFile} onCheck={() => run("check")} onLoad={() => run("load")} />
+            ) : null}
+            <section className="exm-section" aria-labelledby="exm-list-title">
+              <h2 id="exm-list-title" className="exm-subtitle">
+                {state.canManage ? "All exams" : "Exams for your batches"}
+              </h2>
+              {list}
+            </section>
+          </>
+        }
+      />
+    </div>
   );
 }

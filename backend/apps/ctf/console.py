@@ -165,16 +165,22 @@ def results(exam, *, user):
     board = scheduler.leaderboard(exam)
     if scope is not None:
         board = board.filter(batch_course_id__in=scope)
+    from apps.users import identity
+
+    board = list(board)
+    blocks = identity.identity_blocks([(item.user, item) for item in board])
     rows = []
     previous_key = None
     rank = 0
-    for position, participation in enumerate(board, 1):
+    for position, (participation, block) in enumerate(zip(board, blocks, strict=True), 1):
         key = (participation.score, participation.last_correct_at)
         if key != previous_key:
             rank, previous_key = position, key
         student = participation.user
         rows.append(
             {
+                # Owner rule: the student block (snapshot at start + most recent handle) comes first.
+                "identity": block,
                 "rank": rank,
                 "student": {"id": student.pk, "full_name": getattr(student, "full_name", "") or "", "email": student.email},
                 "batch": batch_dict(participation.batch_course) if participation.batch_course else None,

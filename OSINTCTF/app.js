@@ -95,7 +95,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // ----------------------------------------------------
     const translations = {
         en: {
-            brandLabs: "LABS",
+            brandLabs: "Labs",
             navHub: "CTF HUB",
             navLabs: "OSINT LABS",
             navBlackMeridian: "BLACK MERIDIAN",
@@ -108,10 +108,10 @@ document.addEventListener("DOMContentLoaded", () => {
             hubDescTitle: "The Zenith Footprint",
             hubDescP1: "Welcome, Investigator. We need your live OSINT skills to identify an unknown operator and trace their digital footprint.",
             hubDescP2: "This is a live, expert-level Open Source Intelligence investigation. Begin with the target's public profile (<code>@xcfwjoo310</code>), discover the operator's wider footprint, and build the evidence chain yourself.",
-            hubRulesTitle: "🔑 Scoring Rules",
+            hubRulesTitle: "Scoring rules",
             hubRulePoints: "<strong>Max Points per Question:</strong> 1.0 point.",
             hubRuleScore: "<strong>Overall Score:</strong> Your total score is calculated dynamically based on solved questions (Max total: 10.0 points).",
-            hubInstructionsTitle: "🚀 Instructions",
+            hubInstructionsTitle: "Instructions",
             hubInstructionsDesc: "Select <strong>OSINT LABS</strong> to receive investigative objectives. Prompts intentionally omit file paths, repository names, branches, encodings, and tools. Pivot between public identities and artifacts until the evidence supports an exact answer.",
             labSubheading: "ACTIVE INVESTIGATION",
             labTitle: "The Zenith Footprint",
@@ -147,10 +147,10 @@ document.addEventListener("DOMContentLoaded", () => {
             hubDescTitle: "زینتھ فٹ پرنٹ",
             hubDescP1: "خوش آمدید، تفتیش کار۔ ایک نامعلوم آپریٹر کی شناخت اور اس کے ڈیجیٹل فٹ پرنٹ کو ٹریس کرنے کے لیے ہمیں آپ کی لائیو OSINT صلاحیتوں کی ضرورت ہے۔",
             hubDescP2: "یہ ایک لائیو، ماہر سطح کی اوپن سورس انٹیلیجنس تفتیش ہے۔ ٹارگٹ کے عوامی پروفائل (<code>@xcfwjoo310</code>) سے آغاز کریں، آپریٹر کا وسیع ڈیجیٹل نقش دریافت کریں، اور شواہد کی مکمل زنجیر خود بنائیں۔",
-            hubRulesTitle: "🔑 اسکورنگ کے قواعد",
+            hubRulesTitle: "اسکورنگ کے قواعد",
             hubRulePoints: "<strong>ہر سوال کے لیے زیادہ سے زیادہ پوائنٹس:</strong> 1.0 پوائنٹ۔",
             hubRuleScore: "<strong>مجموعی اسکور:</strong> آپ کے کل اسکور کا حساب متحرک طور پر حل شدہ سوالات کی بنیاد پر کیا جاتا ہے (کل زیادہ سے زیادہ: 10.0 پوائنٹس)۔",
-            hubInstructionsTitle: "🚀 ہدایات",
+            hubInstructionsTitle: "ہدایات",
             hubInstructionsDesc: "تحقیقی مقاصد دیکھنے کے لیے <strong>او ایس آئی این ٹی لیبز</strong> منتخب کریں۔ سوالات جان بوجھ کر فائل پاتھ، ریپوزٹری نام، برانچ، انکوڈنگ اور مطلوبہ ٹول ظاہر نہیں کرتے۔ درست جواب تک پہنچنے کے لیے عوامی شناختوں اور شواہد کے درمیان خود روابط قائم کریں۔",
             labSubheading: "سرگرم تحقیقات",
             labTitle: "زینتھ فٹ پرنٹ",
@@ -535,7 +535,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             let scoreBadgeHtml = "";
             if (isSolved) {
-                scoreBadgeHtml = `<span class="q-badge score-badge" id="score-badge-${category}-${idx}" style="background-color: rgba(0, 255, 102, 0.1); color: var(--accent-green); border: 1px solid rgba(0, 255, 102, 0.2);">1.0 / 1.0 ${safePointsSuffix}</span>`;
+                scoreBadgeHtml = `<span class="q-badge score-badge is-solved" id="score-badge-${category}-${idx}">1.0 / 1.0 ${safePointsSuffix}</span>`;
             } else {
                 scoreBadgeHtml = `<span class="q-badge score-badge" id="score-badge-${category}-${idx}">${safePotential}</span>`;
             }
@@ -546,8 +546,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             card.innerHTML = `
                 <div class="q-header">
-                    <h4>${safeHeaderPrefix} ${idx + 1}</h4>
-                    <div style="display: flex; gap: 8px; align-items: center;">
+                    <h4><span class="q-index">${String(idx + 1).padStart(2, "0")}</span> ${safeHeaderPrefix} ${idx + 1}</h4>
+                    <div class="q-badges">
                         ${scoreBadgeHtml}
                         <span class="q-badge">${category.toUpperCase()} • Q${idx + 1}</span>
                     </div>
@@ -556,6 +556,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 ${evidenceImageHtml}
                 <div class="answer-row">
                     <input type="text" class="answer-input" id="input-${category}-${idx}"
+                           aria-label="${safeHeaderPrefix} ${idx + 1}"
                            placeholder="${safePlaceholder}" ${isSolved ? "disabled" : ""}>
                     <button class="btn ${isSolved ? "btn-success" : "btn-primary"}" id="btn-${category}-${idx}" ${isSolved ? "disabled" : ""}>
                         ${isSolved ? safeSolvedLabel : safeSubmitLabel}
@@ -610,9 +611,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         const scoreBadge = card.querySelector(`#score-badge-${category}-${idx}`);
                         if (scoreBadge) {
                             scoreBadge.textContent = `1.0 / 1.0 ${dict.ptsSuffix}`;
-                            scoreBadge.style.backgroundColor = "rgba(0, 255, 102, 0.1)";
-                            scoreBadge.style.color = "var(--accent-green)";
-                            scoreBadge.style.borderColor = "rgba(0, 255, 102, 0.2)";
+                            scoreBadge.classList.add("is-solved");
                         }
 
                         saveState();
@@ -705,12 +704,88 @@ document.addEventListener("DOMContentLoaded", () => {
 
     navButtons.forEach(btn => {
         btn.addEventListener("click", () => {
-            navButtons.forEach(b => b.classList.remove("active"));
+            navButtons.forEach(b => {
+                b.classList.remove("active");
+                b.removeAttribute("aria-current");
+            });
             tabContents.forEach(tc => tc.classList.remove("active"));
 
             btn.classList.add("active");
+            btn.setAttribute("aria-current", "page");
+            // On narrow screens the tabs are a scrolling strip: keep the active one in view.
+            if (typeof btn.scrollIntoView === "function") {
+                btn.scrollIntoView({ block: "nearest", inline: "nearest" });
+            }
             const tabId = btn.getAttribute("data-tab");
             document.getElementById(`tab-${tabId}`).classList.add("active");
+            // Deep links (#hub, #realworld, #blackmeridian, #certification):
+            // the address follows the tab without adding history entries.
+            // exam.js owns #exam for the Examination tab.
+            if (tabId !== "exam" && window.location.hash !== `#${tabId}`) {
+                window.history.replaceState(null, "", `#${tabId}`);
+            }
         });
     });
+
+    // ----------------------------------------------------
+    // 6. DEEP LINKS (#hub, #realworld, #blackmeridian, #certification, #exam)
+    // ----------------------------------------------------
+    const navButtonFor = (tabId) => Array.from(navButtons)
+        .find((button) => button.getAttribute("data-tab") === tabId);
+    const tabFromHash = () => {
+        const tabId = decodeURIComponent(window.location.hash.replace(/^#/, ""));
+        return navButtonFor(tabId) ? tabId : "";
+    };
+    const openTab = (tabId) => {
+        const button = navButtonFor(tabId);
+        if (button && !button.classList.contains("active")) button.click();
+    };
+
+    // #exam on first load is opened by exam.js once it has initialised.
+    const initialTab = tabFromHash();
+    if (initialTab && initialTab !== "exam") openTab(initialTab);
+    // Web fonts change the tab widths: re-centre the active tab once they load.
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => {
+            const active = document.querySelector(".nav-btn.active");
+            if (active && typeof active.scrollIntoView === "function") {
+                active.scrollIntoView({ block: "nearest", inline: "nearest" });
+            }
+        }).catch(() => {});
+    }
+
+    // Typed or linked hash changes, and the back/forward buttons.
+    window.addEventListener("hashchange", () => {
+        const tabId = tabFromHash();
+        if (tabId) openTab(tabId);
+    });
+
+    // In-page links to a lab (the hub's lab cards, the brand).
+    document.querySelectorAll("[data-goto]").forEach((link) => {
+        link.addEventListener("click", (event) => {
+            const tabId = link.getAttribute("data-goto");
+            if (!navButtonFor(tabId)) return;
+            event.preventDefault();
+            openTab(tabId);
+            if (tabId === "hub" && window.location.hash !== "#hub") {
+                window.history.replaceState(null, "", "#hub");
+            }
+            const content = document.querySelector(".content-area");
+            if (content) content.scrollIntoView({ block: "start" });
+        });
+    });
+
+    // Access chips on tabs 01-04: "Open" while the labs are open to everyone
+    // (today). If the server reports that a membership is required, they read
+    // "Members" instead. Display only: access is enforced by the server.
+    fetch("/api/config", { credentials: "same-origin" })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((config) => {
+            if (!config || config.membershipRequired !== true) return;
+            document.querySelectorAll("[data-access-chip]").forEach((chip) => {
+                chip.textContent = "Members";
+                chip.classList.add("nav-chip-members");
+            });
+        })
+        .catch(() => {});
 });

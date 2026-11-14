@@ -1,0 +1,996 @@
+/*
+ * Auth surfaces (WS-AUTH): split-screen sign-in, password reset, the
+ * Pentesting registration form, the coming-soon panel and the checkout
+ * chrome. HackPath philosophy (PHILOSOPHY.md §2.7 "Sign-in", T6) under the
+ * palette law: black canvas, a #0a0a0a rounded panel, a 60 px weight-400
+ * headline, underline fields and one golden-white submit.
+ *
+ * Self-contained on purpose: the values are the measured spec, scoped to
+ * `.au-*`, so the page renders the same before and after the kit lands.
+ * Fonts come from the kit's global @font-face (variables with fallbacks).
+ */
+
+.au-page,
+.au-scope {
+  --au-canvas: #000;
+  --au-panel: #0a0a0a;
+  --au-raised: #111;
+  --au-text: #fafafa;
+  --au-body: #d4d4d4;
+  --au-muted: #a1a1a1;
+  --au-subtle: #8a8a8a;
+  --au-placeholder: #737373;
+  --au-hair: rgb(255 255 255 / 0.1);
+  --au-hair-soft: rgb(255 255 255 / 0.06);
+  --au-hair-strong: rgb(255 255 255 / 0.18);
+  --au-underline: rgb(255 255 255 / 0.35);
+  --au-accent: #f3e2b3;
+  --au-accent-strong: #f8edcf;
+  --au-accent-deep: #e6d29c;
+  --au-accent-ink: #0a0a0a;
+  --au-radius: 0.625rem;
+  --au-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --au-sans: var(--font-sans, Geist, "Geist Fallback", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif);
+  --au-mono: var(--font-mono, "Geist Mono", "Geist Mono Fallback", ui-monospace, "SFMono-Regular", Consolas, monospace);
+  font-family: var(--au-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---------- page + split grid ---------- */
+
+.au-page {
+  box-sizing: border-box;
+  min-height: 100svh;
+  background: var(--au-canvas);
+  padding: 0.75rem;
+  color: var(--au-text);
+}
+
+.au-page *,
+.au-page *::before,
+.au-page *::after {
+  box-sizing: border-box;
+}
+
+@media (min-width: 640px) {
+  .au-page {
+    padding: 1.25rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .au-page {
+    padding: 2rem;
+  }
+}
+
+.au-split {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 1440px;
+  min-height: calc(100svh - 1.5rem);
+  margin: 0 auto;
+}
+
+@media (min-width: 640px) {
+  .au-split {
+    min-height: calc(100svh - 2.5rem);
+  }
+}
+
+@media (min-width: 1024px) {
+  .au-split {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-height: calc(100svh - 4rem);
+  }
+}
+
+/* ---------- left art (lg only): radial hairlines around our mark ---------- */
+
+.au-art {
+  position: relative;
+  display: none;
+  overflow: hidden;
+  min-height: 680px;
+}
+
+@media (min-width: 1024px) {
+  .au-art {
+    display: block;
+    position: sticky;
+    top: 2rem;
+    height: calc(100svh - 4rem);
+    max-height: 1100px;
+  }
+}
+
+.au-art__line {
+  position: absolute;
+  pointer-events: none;
+}
+
+.au-art__line--h {
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: rgb(255 255 255 / 0.08);
+}
+
+.au-art__line--v {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: rgb(255 255 255 / 0.08);
+}
+
+.au-art__line--d1,
+.au-art__line--d2 {
+  top: 50%;
+  left: 50%;
+  width: 520px;
+  height: 1px;
+  background: rgb(255 255 255 / 0.05);
+}
+
+.au-art__line--d1 {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.au-art__line--d2 {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.au-art__hub {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: 7rem;
+  height: 7rem;
+  place-items: center;
+  background: var(--au-canvas);
+  transform: translate(-50%, -50%);
+}
+
+.au-art__mark {
+  display: block;
+  width: 5.5rem;
+  height: 5.5rem;
+  object-fit: contain;
+  /* Our mark is fine grey linework on black: lift the lines to near-white so
+     it reads like their solid round mark (black ground stays black). */
+  filter: grayscale(1) brightness(2.1) contrast(1.15);
+}
+
+.au-art__mark--owl {
+  color: var(--au-text);
+}
+
+.au-art__brand {
+  position: absolute;
+  top: 2.25rem;
+  left: 2.5rem;
+  color: var(--au-text);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+  text-decoration: none;
+}
+
+.au-art__credit {
+  position: absolute;
+  bottom: 2.25rem;
+  left: 2.5rem;
+  margin: 0;
+  color: var(--au-subtle);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+/* ---------- right panel ---------- */
+
+.au-panel {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border-radius: var(--au-radius);
+  background: var(--au-panel);
+  padding: 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .au-panel {
+    padding: 2.5rem;
+  }
+}
+
+.au-panel__top {
+  display: flex;
+  min-height: 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.au-panel__brand {
+  color: var(--au-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  text-decoration: none;
+}
+
+@media (min-width: 1024px) {
+  .au-panel__brand {
+    visibility: hidden;
+  }
+}
+
+.au-corner {
+  margin-left: auto;
+  color: var(--au-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  text-decoration: none;
+  transition: color 150ms var(--au-ease);
+}
+
+.au-corner:hover {
+  color: var(--au-text);
+}
+
+.au-panel__body {
+  width: 100%;
+  max-width: 42rem;
+  margin-top: 6rem;
+}
+
+.au-panel--long .au-panel__body {
+  margin-top: 3rem;
+}
+
+@media (min-width: 640px) {
+  .au-panel__body {
+    margin-top: 8rem;
+  }
+
+  .au-panel--long .au-panel__body {
+    margin-top: 4rem;
+  }
+}
+
+.au-panel__foot {
+  margin-top: auto;
+  padding-top: 3rem;
+  color: var(--au-subtle);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.au-panel__foot p {
+  margin: 0;
+}
+
+/* ---------- headline ---------- */
+
+.au-kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 1.25rem;
+  color: var(--au-subtle);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  line-height: 1rem;
+  text-transform: uppercase;
+}
+
+.au-kicker__lead {
+  color: var(--au-accent);
+}
+
+.au-kicker__dash {
+  width: 2rem;
+  height: 1px;
+  background: rgb(255 255 255 / 0.2);
+}
+
+.au-title {
+  margin: 0;
+  color: var(--au-text);
+  font-size: 3rem;
+  font-weight: 400;
+  letter-spacing: normal;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 640px) {
+  .au-title {
+    font-size: 3.75rem;
+  }
+}
+
+.au-sub {
+  max-width: 36rem;
+  margin: 0.75rem 0 0;
+  color: var(--au-subtle);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+/* ---------- form ---------- */
+
+.au-form {
+  margin-top: 3.5rem;
+}
+
+.au-grid {
+  display: grid;
+  gap: 2rem;
+}
+
+@media (min-width: 640px) {
+  .au-grid--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 2.5rem;
+  }
+}
+
+.au-span-2 {
+  grid-column: 1 / -1;
+}
+
+.au-field {
+  min-width: 0;
+}
+
+.au-label {
+  display: block;
+  color: var(--au-subtle);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1rem;
+}
+
+.au-label-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.au-label__req {
+  color: var(--au-muted);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+}
+
+.au-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--au-underline);
+  transition: border-color 150ms var(--au-ease), box-shadow 150ms var(--au-ease);
+}
+
+.au-control:focus-within {
+  border-bottom-color: var(--au-accent);
+  box-shadow: 0 1px 0 0 var(--au-accent);
+}
+
+.au-control[data-invalid="true"] {
+  border-bottom-color: var(--au-text);
+  border-bottom-style: dashed;
+}
+
+.au-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 2.75rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--au-text);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  outline: none;
+  appearance: none;
+}
+
+@media (min-width: 640px) {
+  .au-input {
+    height: 2.5rem;
+    font-size: 0.875rem;
+  }
+}
+
+.au-input::placeholder {
+  color: var(--au-placeholder);
+  opacity: 1;
+}
+
+.au-input:-webkit-autofill,
+.au-input:-webkit-autofill:hover,
+.au-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--au-text);
+  caret-color: var(--au-text);
+  transition: background-color 9999s ease-out 0s;
+}
+
+textarea.au-input {
+  height: auto;
+  min-height: 6rem;
+  padding: 0.5rem 0;
+  resize: vertical;
+}
+
+select.au-input {
+  padding-right: 1.5rem;
+  cursor: pointer;
+}
+
+select.au-input option {
+  background: var(--au-panel);
+  color: var(--au-text);
+}
+
+.au-select-chevron {
+  position: absolute;
+  right: 0;
+  width: 1rem;
+  height: 1rem;
+  color: var(--au-subtle);
+  pointer-events: none;
+}
+
+.au-reveal {
+  display: inline-grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 auto;
+  margin-right: -0.5rem;
+  place-items: center;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--au-muted);
+  cursor: pointer;
+  transition: color 150ms var(--au-ease);
+}
+
+.au-reveal:hover {
+  color: var(--au-text);
+}
+
+.au-reveal svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.au-hint {
+  display: block;
+  margin-top: 0.5rem;
+  color: var(--au-subtle);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.au-field-error {
+  --au-knock: #0a0a0a;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.375rem;
+  margin: 0.5rem 0 0;
+  color: var(--au-text);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.au-field-error svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex: 0 0 auto;
+  margin-top: 0.125rem;
+}
+
+.au-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  margin-top: 0.75rem;
+}
+
+.au-link,
+.au-textbtn {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--au-subtle);
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1.5rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 150ms var(--au-ease);
+}
+
+.au-link:hover,
+.au-textbtn:hover {
+  color: var(--au-text);
+}
+
+.au-link--strong {
+  color: var(--au-body);
+  text-decoration: underline;
+  text-decoration-color: rgb(255 255 255 / 0.35);
+  text-underline-offset: 3px;
+}
+
+.au-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  color: var(--au-muted);
+  font-size: 0.8125rem;
+  line-height: 1.375rem;
+  cursor: pointer;
+}
+
+.au-check input {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  margin: 0.1875rem 0 0;
+  accent-color: var(--au-text);
+  cursor: pointer;
+}
+
+/* ---------- buttons ---------- */
+
+.au-submit {
+  position: relative;
+  display: inline-flex;
+  width: 100%;
+  height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 0;
+  border-radius: calc(var(--au-radius) - 2px);
+  background: var(--au-accent);
+  padding: 0 1.5rem;
+  color: var(--au-accent-ink);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 150ms var(--au-ease), color 150ms var(--au-ease);
+}
+
+.au-submit:hover {
+  background: var(--au-accent-strong);
+}
+
+.au-submit:active {
+  background: var(--au-accent-deep);
+}
+
+.au-submit__chev {
+  width: 1rem;
+  height: 1rem;
+  transition: transform 200ms var(--au-ease);
+}
+
+.au-submit:hover .au-submit__chev {
+  transform: translateX(4px);
+}
+
+.au-submit[aria-disabled="true"],
+.au-submit[aria-busy="true"] {
+  cursor: not-allowed;
+}
+
+.au-submit[aria-disabled="true"] {
+  border: 1px dashed rgb(255 255 255 / 0.25);
+  background: rgb(255 255 255 / 0.06);
+  color: var(--au-muted);
+}
+
+.au-submit[aria-disabled="true"] .au-submit__chev {
+  display: none;
+}
+
+.au-submit[aria-busy="true"] {
+  background: var(--au-accent-deep);
+}
+
+.au-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 999px;
+  animation: au-spin 700ms linear infinite;
+}
+
+@keyframes au-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.au-btn {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: calc(var(--au-radius) - 2px);
+  padding: 0 1.25rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 150ms var(--au-ease), border-color 150ms var(--au-ease), color 150ms var(--au-ease);
+}
+
+.au-btn svg {
+  width: 1rem;
+  height: 1rem;
+  transition: transform 200ms var(--au-ease);
+}
+
+.au-btn:hover svg {
+  transform: translateX(4px);
+}
+
+.au-btn--primary {
+  background: var(--au-text);
+  color: #000;
+}
+
+.au-btn--primary:hover {
+  background: rgb(250 250 250 / 0.88);
+}
+
+.au-btn--secondary {
+  border-color: rgb(255 255 255 / 0.2);
+  background: transparent;
+  color: var(--au-text);
+}
+
+.au-btn--secondary:hover {
+  background: rgb(255 255 255 / 0.08);
+}
+
+.au-btn[aria-disabled="true"],
+.au-btn:disabled {
+  border: 1px dashed rgb(255 255 255 / 0.25);
+  background: rgb(255 255 255 / 0.06);
+  color: var(--au-muted);
+  cursor: not-allowed;
+}
+
+.au-btn[aria-disabled="true"] svg,
+.au-btn:disabled svg {
+  transform: none;
+}
+
+.au-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2.5rem;
+}
+
+.au-reason {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  color: var(--au-muted);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+
+.au-reason svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  margin-top: 0.125rem;
+}
+
+/* ---------- messages: icon + word + luminance, never hue ---------- */
+
+.au-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  margin: 1.5rem 0 0;
+  border: 1px solid var(--au-hair-strong);
+  border-radius: calc(var(--au-radius) - 2px);
+  padding: 0.75rem 0.875rem;
+  color: var(--au-body);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+
+.au-msg svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  margin-top: 0.125rem;
+}
+
+.au-msg__label {
+  font-weight: 600;
+}
+
+/* critical = inverse (highest luminance) */
+.au-msg--error {
+  border-color: var(--au-text);
+  background: var(--au-text);
+  color: #000;
+}
+
+/* attention = golden-white text + golden-white/40 border */
+.au-msg--warning {
+  border-color: rgb(243 226 179 / 0.4);
+  color: var(--au-accent);
+}
+
+.au-msg--success {
+  border-color: rgb(255 255 255 / 0.3);
+  color: var(--au-text);
+}
+
+.au-msg > div > div + div {
+  margin-top: 0.25rem;
+}
+
+/* ---------- notice (eyebrow + title + body) ---------- */
+
+.au-notice {
+  display: flex;
+  gap: 1rem;
+  border: 1px solid var(--au-hair);
+  border-radius: var(--au-radius);
+  background: #070707;
+  padding: 1.25rem 1.5rem;
+}
+
+.au-notice__icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+  margin-top: 0.125rem;
+  color: var(--au-subtle);
+}
+
+.au-eyebrow {
+  margin: 0;
+  color: var(--au-subtle);
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  line-height: 0.9375rem;
+  text-transform: uppercase;
+}
+
+.au-notice__title {
+  margin: 0.375rem 0 0;
+  color: var(--au-text);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+}
+
+.au-notice__body {
+  margin: 0.25rem 0 0;
+  color: var(--au-muted);
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+}
+
+/* status pill: soon = dashed white/25 + clock + word */
+.au-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border: 1px dashed rgb(255 255 255 / 0.25);
+  border-radius: 999px;
+  padding: 0.25rem 0.625rem;
+  color: var(--au-muted);
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  line-height: 0.9375rem;
+  text-transform: uppercase;
+}
+
+.au-status svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+/* ---------- steps (numbered rail, like the timeline) ---------- */
+
+.au-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.au-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--au-subtle);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.au-steps__n {
+  font-family: var(--au-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.au-steps li[aria-current="step"] {
+  color: var(--au-text);
+  font-weight: 500;
+}
+
+.au-steps li[data-done="true"] {
+  color: var(--au-muted);
+}
+
+/* review list */
+.au-review {
+  margin: 2rem 0 0;
+  border-top: 1px solid var(--au-hair);
+}
+
+.au-review > div {
+  display: grid;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--au-hair);
+  padding: 0.875rem 0;
+}
+
+@media (min-width: 640px) {
+  .au-review > div {
+    grid-template-columns: 14rem minmax(0, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+.au-review dt {
+  color: var(--au-subtle);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.au-review dd {
+  margin: 0;
+  color: var(--au-text);
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.au-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--au-muted);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  text-decoration: none;
+  transition: color 150ms var(--au-ease);
+}
+
+.au-back:hover {
+  color: var(--au-text);
+}
+
+.au-back svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* ---------- focus: golden ring everywhere ---------- */
+
+.au-page :focus-visible,
+.au-scope :focus-visible {
+  outline: 2px solid var(--au-accent);
+  outline-offset: 2px;
+}
+
+.au-page .au-input:focus-visible,
+.au-scope .au-input:focus-visible {
+  outline: none;
+}
+
+.au-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .au-page *,
+  .au-scope * {
+    transition: none !important;
+  }
+
+  .au-submit:hover .au-submit__chev,
+  .au-btn:hover svg {
+    transform: none;
+  }
+
+  .au-spinner {
+    animation: none;
+    border-right-color: currentColor;
+    opacity: 0.6;
+  }
+}
+
+@media (forced-colors: active) {
+  .au-submit,
+  .au-btn {
+    border: 1px solid ButtonText;
+  }
+
+  .au-control:focus-within {
+    border-bottom-color: Highlight;
+  }
+}
+
+/* ---------- small layout helpers ---------- */
+
+.au-submit-wrap {
+  margin-top: 2.5rem;
+}
+
+.au-turnstile {
+  margin-top: 1.5rem;
+  min-height: 65px;
+}
+
+.au-coming {
+  margin-top: 2.5rem;
+}
+
+.au-form > .au-msg:first-of-type {
+  margin-top: 2rem;
+}
+
+/* One handwritten accent word per display headline (Handlee 400, 1em). */
+.au-hand {
+  font-family: var(--font-hand, Handlee, "Segoe Print", "Bradley Hand", cursive);
+  font-weight: 400;
+}

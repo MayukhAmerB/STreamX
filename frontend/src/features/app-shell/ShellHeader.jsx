@@ -1,97 +1,98 @@
-import { ArrowLeft } from "@carbon/icons-react";
-import {
-  Header,
-  HeaderGlobalAction,
-  HeaderGlobalBar,
-  HeaderName,
-  HeaderPanel,
-  SkipToContent,
-} from "@carbon/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { ArrowLeft, Search } from "@carbon/icons-react";
+import { useMemo } from "react";
+import { Link } from "react-router-dom";
+import NotificationBell from "../../components/NotificationBell";
 import { siteBrand } from "../../config/siteBrand";
-import NavActionList from "./NavActionList";
-import { CONSOLE_PATH, CONSOLE_TITLE } from "./navConfig";
+import AccountMenu from "./AccountMenu";
+import { CONSOLE_TITLE } from "./navConfig";
 import ShellBrand from "./ShellBrand";
-import SignOutButton from "./SignOutButton";
-import UserAvatar from "./UserAvatar";
-import { useDismiss } from "./useDismiss";
 
-const ACCOUNT_PANEL_ID = "cds-app-account-panel";
+function isApplePlatform() {
+  if (typeof navigator === "undefined") return false;
+  const platform = navigator.userAgentData?.platform || navigator.platform || "";
+  return /mac|iphone|ipad|ipod/i.test(platform);
+}
+
+/** Desktop breadcrumb: "Admin / Grading" (plan §3.1). */
+function Breadcrumbs({ items }) {
+  if (!items?.length) return null;
+  return (
+    <nav className="cds-app-header__crumbs" aria-label="Breadcrumb">
+      <ol>
+        {items.map((crumb, index) => {
+          const last = index === items.length - 1;
+          return (
+            <li key={`${crumb.label}-${index}`}>
+              {crumb.to ? (
+                <Link to={crumb.to}>{crumb.label}</Link>
+              ) : (
+                <span aria-current={last ? "page" : undefined}>{crumb.label}</span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+/** "Jump to… Ctrl K": a field-shaped button on desktop, a search icon on phones. */
+function PaletteTrigger({ compact, onOpen }) {
+  const shortcut = useMemo(() => (isApplePlatform() ? "⌘K" : "Ctrl K"), []);
+  if (compact) {
+    return (
+      <button type="button" className="cds-app-icon-button" aria-label="Jump to" aria-keyshortcuts="Control+K Meta+K" onClick={onOpen}>
+        <Search size={20} aria-hidden="true" />
+      </button>
+    );
+  }
+  return (
+    <button type="button" className="cds-app-jump" aria-keyshortcuts="Control+K Meta+K" onClick={onOpen}>
+      <Search size={16} aria-hidden="true" className="cds-app-jump__icon" />
+      <span className="cds-app-jump__label">Jump to…</span>
+      <kbd className="cds-app-jump__kbd" aria-hidden="true">
+        {shortcut}
+      </kbd>
+      <span className="cds--visually-hidden"> ({shortcut})</span>
+    </button>
+  );
+}
 
 /**
- * Carbon UI Shell header for the Console: the website's brand block (links
- * to the Console home), the section title, "Back to website", and an
- * avatar button that opens the account panel (profile links, sign out).
+ * Console header, 48 px (plan §3.1). Left: brand (links to this workspace's
+ * home) and the breadcrumb on desktop; on phones, deeper pages and focus
+ * mode show a back arrow with the page title instead. Right: Jump to…
+ * (command palette), the notifications bell and the avatar menu.
  */
-export default function ShellHeader({ user, accountItems, onSignOut }) {
-  const [open, setOpen] = useState(false);
-  const triggerRef = useRef(null);
-  const panelRef = useRef(null);
-  const { pathname } = useLocation();
-  const dismissRefs = useMemo(() => [triggerRef, panelRef], []);
-  const close = useCallback(() => setOpen(false), []);
-
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
-
-  useDismiss({ open, refs: dismissRefs, onDismiss: close, returnFocusRef: triggerRef });
-
-  const displayName = user?.full_name || "Your account";
-
+export default function ShellHeader({ nav, user, isDesktop, homePath, backOfficeUrl, onOpenPalette, onSignOut }) {
+  const showBack = nav.focus || (!isDesktop && !nav.isRoot);
   return (
-    <Header aria-label={`${siteBrand.name} ${CONSOLE_TITLE}`}>
-      <SkipToContent href="#main-content">Skip to main content</SkipToContent>
-      <HeaderName
-        as={Link}
-        to={CONSOLE_PATH}
-        prefix=""
-        className="uc-header__brand"
-        aria-label={`${siteBrand.name}, ${CONSOLE_TITLE} home`}
-      >
-        <ShellBrand />
-      </HeaderName>
-      <span className="uc-header__section">{CONSOLE_TITLE}</span>
-      <HeaderGlobalBar>
-        <Link to="/" className="uc-header__back">
-          <ArrowLeft size={20} aria-hidden="true" />
-          <span className="uc-header__back-label">Back to website</span>
-        </Link>
-        <HeaderGlobalAction
-          ref={triggerRef}
-          aria-label="Account and settings"
-          aria-expanded={open}
-          aria-controls={ACCOUNT_PANEL_ID}
-          isActive={open}
-          tooltipAlignment="end"
-          onClick={() => setOpen((value) => !value)}
-        >
-          <UserAvatar user={user} />
-        </HeaderGlobalAction>
-      </HeaderGlobalBar>
-      <HeaderPanel
-        ref={panelRef}
-        id={ACCOUNT_PANEL_ID}
-        className="cds-app-account-panel"
-        expanded={open}
-        addFocusListeners={false}
-        aria-label="Account and settings"
-      >
-        {open ? (
-          <>
-            <div className="cds-app-account-panel__user">
-              <UserAvatar user={user} size="lg" />
-              <div style={{ minWidth: 0 }}>
-                <div className="cds-app-account-panel__name">{displayName}</div>
-                {user?.email ? <div className="cds-app-account-panel__email">{user.email}</div> : null}
-              </div>
-            </div>
-            <NavActionList items={accountItems} pathname={pathname} onNavigate={close} label="Account" />
-            <SignOutButton onSignOut={onSignOut} />
-          </>
+    <header className="cds-app-header" aria-label={`${siteBrand.name} ${CONSOLE_TITLE}`}>
+      <a className="cds-app-skip" href="#main-content">
+        Skip to main content
+      </a>
+      <div className="cds-app-header__start">
+        {showBack ? (
+          <Link className="cds-app-icon-button cds-app-header__back" to={nav.backTo} aria-label={`Back to ${nav.backLabel || "previous page"}`}>
+            <ArrowLeft size={20} aria-hidden="true" />
+          </Link>
         ) : null}
-      </HeaderPanel>
-    </Header>
+        {showBack && !isDesktop ? (
+          <span className="cds-app-header__title">{nav.title}</span>
+        ) : (
+          <>
+            <Link className="cds-app-header__brand" to={homePath} aria-label={`${siteBrand.name}, ${CONSOLE_TITLE} home`}>
+              <ShellBrand />
+            </Link>
+            {isDesktop ? <Breadcrumbs items={nav.breadcrumbs} /> : null}
+          </>
+        )}
+      </div>
+      <div className="cds-app-header__end">
+        <PaletteTrigger compact={!isDesktop} onOpen={onOpenPalette} />
+        <NotificationBell variant="console" />
+        <AccountMenu user={user} backOfficeUrl={backOfficeUrl} onSignOut={onSignOut} />
+      </div>
+    </header>
   );
 }

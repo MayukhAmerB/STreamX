@@ -182,7 +182,22 @@ class Course(models.Model):
     CATEGORY_WEB_PENTESTING = "web_pentesting"
     CATEGORY_CHOICES = [
         (CATEGORY_OSINT, "OSINT"),
-        (CATEGORY_WEB_PENTESTING, "Web Application Pentesting"),
+        (CATEGORY_WEB_PENTESTING, "Pentesting"),
+    ]
+
+    # Catalogue tiers (HackPath-style tier sections on /courses). Blank = no
+    # tier: OSINT and legacy courses group by category instead.
+    TIER_FOUNDATIONS = "foundations"
+    TIER_OFFENSIVE = "offensive"
+    TIER_DEFENSIVE = "defensive"
+    TIER_ADVANCED = "advanced"
+    TIER_QUICK_WINS = "quick_wins"
+    TIER_CHOICES = [
+        (TIER_FOUNDATIONS, "Foundations"),
+        (TIER_OFFENSIVE, "Offensive security"),
+        (TIER_DEFENSIVE, "Defensive security"),
+        (TIER_ADVANCED, "Advanced operations"),
+        (TIER_QUICK_WINS, "Quick wins"),
     ]
 
     LEVEL_BEGINNER = "beginner"
@@ -314,6 +329,27 @@ class Course(models.Model):
         related_name="courses",
     )
     is_published = models.BooleanField(default=False)
+    tier = models.CharField(
+        max_length=24,
+        choices=TIER_CHOICES,
+        blank=True,
+        default="",
+        help_text="Catalogue tier on the public course list (Pentesting). Leave blank for OSINT courses.",
+    )
+    tier_order = models.PositiveSmallIntegerField(
+        default=0, help_text="Position inside its tier on the public course list (lowest first)."
+    )
+    membership_always_included = models.BooleanField(
+        default=False,
+        help_text=(
+            "CTF Labs members can always play this course's published recordings, "
+            "whatever the month's membership bundle contains."
+        ),
+    )
+    # Provenance of rows written by ``manage.py seed_pentesting_catalog``; the
+    # hash of the seed-owned fields tells an admin edit apart from seed output.
+    seed_source = models.CharField(max_length=32, blank=True, default="", editable=False)
+    seed_hash = models.CharField(max_length=64, blank=True, default="", editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -324,6 +360,7 @@ class Course(models.Model):
             models.Index(fields=["is_published", "category", "level", "launch_status"]),
             models.Index(fields=["instructor", "is_published"]),
             models.Index(fields=["created_at"]),
+            models.Index(fields=["category", "tier", "tier_order"], name="courses_cat_tier_order_idx"),
         ]
 
     def clean(self):

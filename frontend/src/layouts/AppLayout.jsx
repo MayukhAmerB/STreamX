@@ -7,13 +7,15 @@ import SafeRender from "../components/SafeRender";
 import TermsGate from "../components/TermsGate";
 import { applyPageMeta } from "../config/pageMeta";
 import { siteBrand } from "../config/siteBrand";
+// HackPath-philosophy design language for every public page (black canvas,
+// Geist, white in luminance steps, one golden-white accent; hp-* classes).
+import "../marketing/hp.css";
 
 export default function AppLayout() {
-  const isOwlCognito = siteBrand.id === "owlcognito";
   const { pathname } = useLocation();
 
   // Public surface marker on <html>: body-level portals (enquiry modal, toasts)
-  // inherit IBM Plex Sans too (src/styles/site-theme.css).
+  // inherit the website font too (src/styles/site-theme.css).
   useLayoutEffect(() => {
     const root = document.documentElement;
     root.dataset.surface = "public";
@@ -26,14 +28,10 @@ export default function AppLayout() {
     applyPageMeta(pathname);
   }, [pathname]);
 
+  // One monochrome system for both brands (BUILD_PLAN D11, owner question Q3
+  // default): black canvas, white text and the dark (g100) site-kit theme.
   return (
-    <div
-      className={`site-public relative min-h-screen ${
-        isOwlCognito
-          ? "owlcognito-app-shell bg-[#fbfaff] text-[#241344]"
-          : "bg-black text-white"
-      }`}
-    >
+    <div className="site-public hp relative min-h-screen bg-black text-white" data-theme="g100" data-site-layout={siteBrand.id}>
       <SafeRender fallback={null}>
         <GlobalPageBackground />
       </SafeRender>

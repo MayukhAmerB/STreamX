@@ -1,12 +1,17 @@
-// Layout of the Console shell: header, side nav, content area, phone
-// bottom navigation and the "More" sheet. Carbon tokens + the User's
-// Corner palette (`--uc-*`, styles/_corner-palette.scss) only.
+// Console shell layout (UI overhaul plan §3.1, motion M11/M13/M16/M19).
+// OWNER: WS-B. Header (48 px), side nav (232 px / 64 px rail), content
+// area, phone tab bar, More sheet, popovers (account, notifications).
+//
+// Colours, type and motion come from the Syed Carbon tokens (`--sc-*`,
+// WS-A) through the local `--shell-*` aliases below; each alias carries the
+// plan's value as a fallback so the shell is right before and after the
+// token rollout. Only transform and opacity animate; colour changes are
+// ≤110 ms; nothing animates a width (M16).
 @use './tokens' as *;
 
-$header-height-mobile: 3.5rem; // 56px
-$header-height-desktop: 4rem; // 64px, room for the two-line brand block
-$side-nav-width: 16rem;
-$side-nav-rail-width: 4.5rem; // collapsed icon rail
+$header-height: 3.5rem; // 56px (HackPath-style h-14 bar, hairline under it)
+$side-nav-width: 15rem; // 240px
+$side-nav-rail-width: 4rem; // 64px
 $bottom-nav-height: 4rem; // 64px tab bar (+ safe-area inset)
 $safe-top: env(safe-area-inset-top, 0px);
 $safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -14,69 +19,191 @@ $safe-left: env(safe-area-inset-left, 0px);
 $safe-right: env(safe-area-inset-right, 0px);
 
 .cds-app {
-  --cds-app-header-height: calc(#{$header-height-mobile} + #{$safe-top});
+  --cds-app-header-height: calc(#{$header-height} + #{$safe-top});
   --cds-app-bottom-nav-height: calc(#{$bottom-nav-height} + #{$safe-bottom});
+
+  // HackPath design language for the Console (PHILOSOPHY.md §3, ours).
+  // `--hp-*` are the Learn workstream's literal values; each prefers the kit's
+  // shared token when it exists, so the shell matches the site exactly once
+  // the kit lands and is already right before it does.
+  --hp-bg: #000000;
+  --hp-surface: #070707; // catalogue cells
+  --hp-card: #0a0a0a; // cards, panels, popovers
+  --hp-raised: #111111; // dialogs, the highlighted card
+  --hp-tint: rgba(255, 255, 255, 0.025); // lesson rows
+  --hp-chip: rgba(255, 255, 255, 0.04);
+  --hp-hover: rgba(255, 255, 255, 0.06);
+  --hp-pressed: rgba(255, 255, 255, 0.1);
+  --hp-border: rgba(255, 255, 255, 0.1);
+  --hp-border-soft: rgba(255, 255, 255, 0.06);
+  --hp-border-strong: rgba(255, 255, 255, 0.18);
+  --hp-border-hover: rgba(255, 255, 255, 0.25);
+  --hp-text: #fafafa;
+  --hp-text-2: #d4d4d4; // list items, white/72-90
+  --hp-muted: #a1a1a1; // body copy, white/48-58 (8.0:1)
+  --hp-subtle: #8a8a8a; // the floor for any text (5.6:1 on black)
+  --hp-placeholder: #737373; // placeholders only
+  --hp-accent: #f3e2b3; // golden white: one element per viewport
+  --hp-accent-strong: #f8edcf;
+  --hp-accent-deep: #e6d29c;
+  --hp-accent-ink: #0a0a0a;
+  --hp-accent-wash: rgba(243, 226, 179, 0.08);
+  --hp-accent-line: rgba(243, 226, 179, 0.4);
+  --hp-ring: #f3e2b3;
+  --hp-radius-sm: 6px;
+  --hp-radius-md: 8px; // buttons
+  --hp-radius: 10px; // cards, frames, panels
+  --hp-radius-xl: 14px; // lesson rows, terminal
+  --hp-radius-2xl: 18px; // art frames
+  --hp-sans: var(--font-sans, "Geist", "Geist Fallback", "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif);
+  --hp-mono: var(--font-mono, "Geist Mono", "Geist Mono Fallback", "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace);
+  --hp-hand: var(--font-hand, "Handlee", "Segoe Print", "Bradley Hand", cursive);
+  --hp-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --hp-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --hp-ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+  --hp-shadow-window: 0 30px 80px rgba(0, 0, 0, 0.6);
+
+  // Local aliases (plan §2.1-§2.2). The chrome is the page canvas: black.
+  --shell-bg: var(--hp-bg);
+  --shell-layer: var(--hp-card);
+  --shell-hover: var(--hp-hover);
+  --shell-pressed: var(--hp-pressed);
+  --shell-border: var(--hp-border);
+  --shell-border-strong: var(--hp-border-strong);
+  --shell-text: var(--hp-text);
+  --shell-text-2: var(--hp-muted);
+  --shell-text-3: var(--hp-subtle);
+  --shell-text-disabled: #6b6b6b;
+  --shell-accent: var(--hp-accent);
+  --shell-accent-wash: var(--hp-accent-wash);
+  --shell-success: var(--hp-text);
+  --shell-focus: var(--hp-ring);
+  --shell-overlay: rgba(0, 0, 0, 0.72);
+  --shell-shadow: var(--hp-shadow-window);
+  --shell-font: var(--hp-sans);
+  --shell-mono: var(--hp-mono);
+  --shell-radius-pill: 999px;
+  --shell-fast-01: var(--sc-duration-fast-01, 70ms);
+  --shell-fast-02: var(--sc-duration-fast-02, 110ms);
+  --shell-moderate-01: var(--sc-duration-moderate-01, 150ms);
+  --shell-moderate-02: var(--sc-duration-moderate-02, 240ms);
+  --shell-ease-productive: var(--sc-ease-standard-productive, cubic-bezier(0.2, 0, 0.38, 0.9));
+  --shell-ease-expressive: var(--sc-ease-standard-expressive, cubic-bezier(0.4, 0.14, 0.3, 1));
+  --shell-ease-enter: var(--sc-ease-entrance-expressive, cubic-bezier(0, 0, 0.3, 1));
+  --shell-ease-enter-productive: var(--sc-ease-entrance-productive, cubic-bezier(0, 0, 0.38, 0.9));
+  --shell-ease-exit: var(--sc-ease-exit-expressive, cubic-bezier(0.4, 0.14, 1, 1));
 }
 
-.cds-app[data-shell-layout='desktop'] {
-  --cds-app-header-height: calc(#{$header-height-desktop} + #{$safe-top});
+// Focus mode (T5) on phones: no tab bar, so nothing reserves its height.
+.cds-app[data-shell-layout='mobile'][data-focus='true'] {
+  --cds-app-bottom-nav-height: #{$safe-bottom};
+}
+
+@mixin shell-focus-ring($offset: -2px) {
+  outline: 2px solid var(--shell-focus);
+  outline-offset: $offset;
+}
+
+@mixin visually-hidden {
+  position: absolute;
+  overflow: hidden;
+  block-size: 1px;
+  clip: rect(0 0 0 0);
+  inline-size: 1px;
+  white-space: nowrap;
 }
 
 // ---------------------------------------------------------------------------
-// Header (same black bar + hairline as the website navbar)
+// Header (48 px, page colour, one hairline)
 // ---------------------------------------------------------------------------
-.cds-app .cds--header {
+.cds-app .cds-app-header {
+  position: fixed;
+  z-index: 8000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-block-end: 1px solid var(--shell-border);
+  background-color: var(--shell-bg);
   block-size: var(--cds-app-header-height);
+  font-family: var(--shell-font);
+  inset-block-start: 0;
+  inset-inline: 0;
   padding-block-start: $safe-top;
   padding-inline: $safe-left $safe-right;
-  border-block-end: 1px solid rgba(255, 255, 255, 0.1);
-  background-color: var(--uc-page);
 }
 
-.cds-app a.cds--header__name.uc-header__brand {
-  overflow: hidden;
-  min-inline-size: 0;
-  flex: 0 1 auto;
-  padding: 0 $spacing-03 0 $spacing-05;
-  border: 0;
-  border-radius: var(--uc-radius-control);
-  color: var(--uc-text);
-  white-space: nowrap;
-
-  > span {
-    display: flex;
-    overflow: hidden;
-    min-inline-size: 0;
-  }
+.cds-app .cds-app-skip {
+  @include visually-hidden;
 
   &:focus {
-    border: 0;
-    outline: 2px solid var(--uc-accent);
-    outline-offset: -4px;
-  }
-
-  @include breakpoint(md) {
-    padding-inline: $spacing-06 $spacing-05;
+    position: fixed;
+    z-index: 9500;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 $spacing-05;
+    background-color: var(--shell-text);
+    block-size: $header-height;
+    clip: auto;
+    color: #161616;
+    inline-size: auto;
+    inset-block-start: $safe-top;
+    inset-inline-start: 0;
+    outline: none;
   }
 }
 
-// Brand block: logo + name + uppercase platform label (website navbar).
-.cds-app .uc-brand {
-  display: inline-flex;
-  min-inline-size: 0;
+.cds-app .cds-app-header__start,
+.cds-app .cds-app-header__end {
+  display: flex;
   align-items: center;
-  gap: 0.625rem;
+  block-size: 100%;
+  min-inline-size: 0;
 }
 
-.cds-app .uc-brand__mark {
+.cds-app .cds-app-header__start {
+  flex: 1 1 auto;
+}
+
+.cds-app .cds-app-header__end {
+  flex: none;
+}
+
+.cds-app .cds-app-header__brand {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  padding-inline: $spacing-05;
+  block-size: 100%;
+  color: var(--shell-text);
+  text-decoration: none;
+  transition: background-color var(--shell-fast-01) var(--shell-ease-productive);
+
+  &:focus-visible {
+    @include shell-focus-ring;
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      background-color: var(--shell-hover);
+    }
+  }
+}
+
+.cds-app .cds-app-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-03;
+  min-inline-size: 0;
+}
+
+.cds-app .cds-app-brand__mark {
   display: inline-flex;
   overflow: hidden;
   flex: none;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
-  block-size: 2rem;
-  inline-size: 2rem;
+  block-size: 1.5rem;
+  inline-size: 1.5rem;
 
   img {
     display: block;
@@ -84,210 +211,215 @@ $safe-right: env(safe-area-inset-right, 0px);
     inline-size: 100%;
     object-fit: contain;
   }
-
-  @include breakpoint(md) {
-    block-size: 2.5rem;
-    inline-size: 2.5rem;
-  }
 }
 
-.cds-app .uc-brand__mark--owl {
+.cds-app .cds-app-brand__mark--owl {
   border: 1px solid rgba(196, 181, 253, 0.35);
-  background-color: rgba(109, 40, 217, 0.18);
   color: #ddd6fe;
 }
 
-.cds-app .uc-brand__owl {
+.cds-app .cds-app-brand__owl {
   block-size: 80%;
   inline-size: 80%;
 }
 
-.cds-app .uc-brand__text {
-  display: flex;
-  min-inline-size: 0;
-  flex-direction: column;
-  line-height: 1.2;
-}
-
-.cds-app .uc-brand__name {
+.cds-app .cds-app-brand__name {
   overflow: hidden;
-  color: var(--uc-text);
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: 600;
-  letter-spacing: -0.025em;
+  letter-spacing: 0;
+  line-height: 1.5rem;
   text-overflow: ellipsis;
-
-  @include breakpoint(md) {
-    font-size: 0.9375rem;
-  }
-}
-
-.cds-app .uc-brand__platform {
-  display: none;
-  margin-block-start: 0.125rem;
-  color: rgba(218, 218, 218, 0.7);
-  font-size: 0.5625rem;
-  font-weight: 400;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-
-  @include breakpoint(md) {
-    display: block;
-  }
-}
-
-// Phones: "Console" sits under the brand name instead.
-.cds-app .uc-brand__corner {
-  @include corner-micro-label(0.5625rem);
-
-  margin-block-start: 0.125rem;
-  color: var(--uc-accent);
-  letter-spacing: 0.2em;
-
-  @include breakpoint(md) {
-    display: none;
-  }
-}
-
-// Section title (md and up): hairline divider + champagne micro-label.
-.cds-app .uc-header__section {
-  @include corner-micro-label(0.6875rem);
-
-  display: none;
-  flex: none;
-  align-items: center;
-  color: var(--uc-accent);
-  gap: $spacing-05;
-  text-shadow: var(--uc-text-glow);
   white-space: nowrap;
+}
+
+// Breadcrumb (desktop): hairline divider, then "Admin / Grading".
+.cds-app .cds-app-header__crumbs {
+  display: flex;
+  align-items: center;
+  min-inline-size: 0;
+  block-size: 100%;
 
   &::before {
-    display: block;
-    background-color: var(--uc-border-strong);
-    block-size: 1.75rem;
+    flex: none;
+    margin-inline-end: $spacing-05;
+    background-color: var(--shell-border);
+    block-size: 1rem;
     content: '';
     inline-size: 1px;
   }
 
-  @include breakpoint(md) {
+  ol {
+    display: flex;
+    align-items: center;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    min-inline-size: 0;
+  }
+
+  li {
     display: inline-flex;
+    align-items: center;
+    min-inline-size: 0;
+    color: var(--shell-text-2);
+    font-size: 0.875rem;
+    letter-spacing: 0.16px;
+    line-height: 1.25rem;
+    white-space: nowrap;
+  }
+
+  li + li::before {
+    margin-inline: $spacing-03;
+    color: var(--shell-text-3);
+    content: '/';
+  }
+
+  a {
+    color: var(--shell-text-2);
+    text-decoration: none;
+    transition: color var(--shell-fast-01) var(--shell-ease-productive);
+
+    &:hover {
+      color: var(--shell-text);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    &:focus-visible {
+      @include shell-focus-ring(2px);
+    }
+  }
+
+  [aria-current='page'] {
+    color: var(--shell-text);
   }
 }
 
-.cds-app .cds--header__global {
-  align-items: center;
+// Phones: back arrow + page title on deeper pages (and in focus mode).
+.cds-app .cds-app-header__title {
+  overflow: hidden;
   padding-inline-end: $spacing-03;
-  gap: $spacing-02;
-
-  @include breakpoint(md) {
-    padding-inline-end: $spacing-05;
-    gap: $spacing-03;
-  }
+  color: var(--shell-text);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-// "Back to website": outlined button (website secondary button); icon only
-// on phones (the label stays available to screen readers).
-.cds-app .uc-header__back {
+// 48 px square header actions (also used in the sheet).
+.cds-app .cds-app-icon-button {
+  position: relative;
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--uc-border-strong);
-  border-radius: var(--uc-radius-control);
-  background-color: rgba(255, 255, 255, 0.02);
-  block-size: 2.75rem;
-  color: var(--uc-text);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  gap: $spacing-03;
-  inline-size: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  block-size: $header-height;
+  color: var(--shell-text-2);
+  cursor: pointer;
+  inline-size: $header-height;
   text-decoration: none;
   transition:
-    background-color 140ms ease,
-    border-color 140ms ease;
-  white-space: nowrap;
+    background-color var(--shell-fast-01) var(--shell-ease-productive),
+    color var(--shell-fast-01) var(--shell-ease-productive);
   -webkit-tap-highlight-color: transparent;
 
   svg {
-    flex: none;
     fill: currentColor;
   }
 
   &:focus-visible {
-    @include corner-focus-ring;
+    @include shell-focus-ring;
   }
 
   &:active {
-    background-color: var(--uc-raised-2);
+    background-color: var(--shell-pressed);
+  }
+
+  &.is-open {
+    background-color: var(--shell-layer);
+    color: var(--shell-text);
   }
 
   @media (hover: hover) {
     &:hover {
-      border-color: var(--uc-border-hover);
-      background-color: var(--uc-raised);
+      background-color: var(--shell-hover);
+      color: var(--shell-text);
     }
   }
-
-  @include breakpoint(md) {
-    block-size: 2.5rem;
-    inline-size: auto;
-    padding-inline: $spacing-04 $spacing-05;
-  }
 }
 
-.cds-app .uc-header__back-label {
-  position: absolute;
-  overflow: hidden;
-  block-size: 1px;
-  clip: rect(0 0 0 0);
-  inline-size: 1px;
-  white-space: nowrap;
-
-  @include breakpoint(md) {
-    position: static;
-    overflow: visible;
-    block-size: auto;
-    clip: auto;
-    inline-size: auto;
-  }
-}
-
-// Avatar trigger: a round 48px action.
-.cds-app .cds--header__action {
+// "Jump to… Ctrl K": a 280 px field-shaped button (desktop).
+.cds-app .cds-app-jump {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 $spacing-03 0 $spacing-04;
   border: 0;
-  border-radius: 50%;
+  border-block-end: 1px solid var(--shell-border-strong);
+  margin-inline-end: $spacing-03;
+  background-color: var(--shell-layer);
+  block-size: 2rem;
+  color: var(--shell-text-3);
+  cursor: pointer;
+  font-family: var(--shell-font);
+  font-size: 0.875rem;
+  gap: $spacing-03;
+  inline-size: 17.5rem;
+  letter-spacing: 0.16px;
+  text-align: start;
+  transition:
+    background-color var(--shell-fast-01) var(--shell-ease-productive),
+    color var(--shell-fast-01) var(--shell-ease-productive);
 
-  &.cds--header__action--active {
-    border: 0;
-    background-color: var(--uc-raised);
+  &:focus-visible {
+    @include shell-focus-ring;
   }
 
-  &:focus {
-    border: 0;
-    outline: 2px solid var(--uc-accent);
-    outline-offset: -2px;
+  @media (hover: hover) {
+    &:hover {
+      background-color: #333333;
+      color: var(--shell-text-2);
+    }
   }
 }
 
-.cds-app .cds--header__action .cds-app-avatar {
-  pointer-events: none;
+.cds-app .cds-app-jump__icon {
+  flex: none;
+  fill: currentColor;
 }
 
-// Avatar: warm-white initial on a raised disc with a hairline ring.
+.cds-app .cds-app-jump__label {
+  flex: 1;
+}
+
+.cds-app .cds-app-jump__kbd {
+  padding: 0 $spacing-02;
+  border: 1px solid var(--shell-border);
+  color: var(--shell-text-3);
+  font-family: var(--shell-mono);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+// Avatar: photo or initial on a pill.
 .cds-app .cds-app-avatar {
   display: inline-flex;
   overflow: hidden;
+  flex: none;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background-color: var(--uc-raised);
+  border: 1px solid var(--shell-border-strong);
+  border-radius: var(--shell-radius-pill);
+  background-color: var(--shell-layer);
   block-size: 2rem;
-  box-shadow: 0 0 0 1px var(--uc-border-strong);
-  color: var(--uc-text);
-  flex: none;
-  font-weight: 700;
-  inline-size: 2rem;
+  color: var(--shell-text);
   font-size: 0.875rem;
+  font-weight: 600;
+  inline-size: 2rem;
   line-height: 1;
 
   img {
@@ -299,204 +431,615 @@ $safe-right: env(safe-area-inset-right, 0px);
 }
 
 .cds-app .cds-app-avatar--lg {
-  block-size: 3rem;
-  inline-size: 3rem;
-  font-size: 1.25rem;
+  block-size: 2.5rem;
+  font-size: 1rem;
+  inline-size: 2.5rem;
 }
 
 .cds-app .cds-app-avatar--xl {
   block-size: 5rem;
-  inline-size: 5rem;
   font-size: 2rem;
+  inline-size: 5rem;
 }
 
-// Account panel (opens from the avatar).
-.cds-app .cds-app-account-panel {
+.cds-app .cds-app-account__trigger .cds-app-avatar {
+  pointer-events: none;
+}
+
+// ---------------------------------------------------------------------------
+// Popovers (account menu, notifications): one floating layer (M11).
+// ---------------------------------------------------------------------------
+.cds-app .cds-app-popover {
+  position: fixed;
+  z-index: 8100;
   display: flex;
+  overflow: hidden;
   flex-direction: column;
+  background-color: var(--shell-layer);
+  box-shadow: var(--shell-shadow);
+  font-family: var(--shell-font);
   inset-block-start: var(--cds-app-header-height);
-  block-size: auto;
-  max-block-size: calc(100dvh - var(--cds-app-header-height));
-  overflow-y: auto;
-  background-color: var(--uc-surface);
+  inset-inline-end: $safe-right;
+  max-block-size: calc(100dvh - var(--cds-app-header-height) - #{$spacing-05});
+  max-inline-size: calc(100vw - #{$spacing-05});
+  animation: cds-app-pop-in var(--shell-fast-02) var(--shell-ease-enter-productive);
 
-  &.cds--header-panel--expanded {
-    border: 1px solid var(--uc-border);
-    border-block-start: 0;
-    border-end-start-radius: var(--uc-radius-md);
-    box-shadow: var(--uc-shadow);
-    inline-size: 18rem;
-  }
-
-  @include breakpoint-down(md) {
-    &.cds--header-panel--expanded {
-      inline-size: 100%;
-      border-inline: 0;
-      border-end-start-radius: 0;
-    }
+  &[hidden] {
+    display: none;
   }
 }
 
-.cds-app .cds-app-account-panel__user {
+.cds-app .cds-app-account__panel {
+  overflow-y: auto;
+  inline-size: 18rem;
+}
+
+// Phones: popovers span the screen under the header (no ragged left gap).
+.cds-app[data-shell-layout='mobile'] .cds-app-popover {
+  inline-size: auto;
+  inset-inline: $safe-left $safe-right;
+  max-inline-size: none;
+}
+
+.cds-app .cds-app-account__user {
   display: flex;
   align-items: center;
-  padding: $spacing-06 $spacing-05;
-  border-block-end: 1px solid $border-subtle;
+  padding: $spacing-05;
   gap: $spacing-04;
 }
 
-.cds-app .cds-app-account-panel__name {
+.cds-app .cds-app-account__text {
+  display: flex;
+  min-inline-size: 0;
+  flex-direction: column;
+}
+
+.cds-app .cds-app-account__name {
   overflow: hidden;
-  color: var(--uc-text);
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  line-height: 1.3;
+  color: var(--shell-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.cds-app .cds-app-account-panel__email {
-  @include type-style('label-01');
-
+.cds-app .cds-app-account__email {
   overflow: hidden;
-  color: var(--uc-text-2);
+  color: var(--shell-text-3);
+  font-size: 0.75rem;
+  letter-spacing: 0.32px;
+  line-height: 1rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.cds-app .cds-app-account-panel .cds-app-action-list {
-  padding-block: $spacing-03;
-  border-block-end: 1px solid $border-subtle;
-}
-
-.cds-app .cds-app-account-panel > .cds-app-action-list__item--danger {
-  margin-block: $spacing-03;
-}
-
-// ---------------------------------------------------------------------------
-// Shared action list (account panel + More sheet): icon + label rows.
-// ---------------------------------------------------------------------------
-.cds-app .cds-app-action-list {
+.cds-app .cds-app-account__list {
+  padding: $spacing-02 0;
+  border-block-start: 1px solid var(--shell-border);
   margin: 0;
-  padding: 0;
   list-style: none;
 }
 
-.cds-app .cds-app-action-list__item {
-  @include type-style('body-compact-01');
+// Notifications panel.
+.cds-app .cds-app-bell {
+  display: inline-flex;
+}
 
+.cds-app .cds-app-bell__icon {
+  flex: none;
+}
+
+.cds-app .cds-app-bell__badge {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.25rem;
+  border-radius: var(--shell-radius-pill);
+  background-color: var(--shell-text);
+  block-size: 1rem;
+  color: #161616;
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  inset-block-start: 0.5rem;
+  inset-inline-end: 0.375rem;
+  line-height: 1;
+  min-inline-size: 1rem;
+  animation: cds-app-badge-in var(--shell-moderate-01) var(--shell-ease-enter-productive);
+}
+
+.cds-app .cds-app-bell__panel {
+  inline-size: 22.5rem;
+}
+
+.cds-app .cds-app-bell__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: $spacing-05 $spacing-05 $spacing-04;
+  border-block-end: 1px solid var(--shell-border);
+  gap: $spacing-05;
+}
+
+.cds-app .cds-app-bell__title {
+  margin: 0;
+  color: var(--shell-text);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+}
+
+.cds-app .cds-app-bell__count {
+  margin: 0;
+  color: var(--shell-text-3);
+  font-size: 0.75rem;
+  letter-spacing: 0.32px;
+  line-height: 1rem;
+}
+
+.cds-app .cds-app-text-button {
+  padding: 0 $spacing-03;
+  border: 0;
+  background: none;
+  block-size: 2rem;
+  color: var(--shell-text-2);
+  cursor: pointer;
+  font-family: var(--shell-font);
+  font-size: 0.875rem;
+  transition:
+    background-color var(--shell-fast-01) var(--shell-ease-productive),
+    color var(--shell-fast-01) var(--shell-ease-productive);
+
+  &:hover:not(:disabled) {
+    background-color: var(--shell-hover);
+    color: var(--shell-text);
+  }
+
+  &:focus-visible {
+    @include shell-focus-ring;
+  }
+
+  &:disabled {
+    color: var(--shell-text-disabled);
+    cursor: not-allowed;
+  }
+}
+
+.cds-app .cds-app-bell__list {
+  overflow-y: auto;
+  max-block-size: 26rem;
+  overscroll-behavior: contain;
+  padding-block: $spacing-02;
+}
+
+.cds-app .cds-app-bell__empty {
+  margin: 0;
+  padding: $spacing-05;
+  color: var(--shell-text-3);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.cds-app .cds-app-bell__item {
+  display: grid;
+  align-items: start;
+  padding: $spacing-04 $spacing-05;
+  border: 0;
+  background: none;
+  color: var(--shell-text-2);
+  column-gap: $spacing-04;
+  cursor: pointer;
+  font-family: var(--shell-font);
+  grid-template-columns: 0.375rem minmax(0, 1fr);
+  inline-size: 100%;
+  text-align: start;
+  transition: background-color var(--shell-fast-01) var(--shell-ease-productive);
+
+  &:hover {
+    background-color: var(--shell-hover);
+  }
+
+  &:focus-visible {
+    @include shell-focus-ring;
+  }
+}
+
+.cds-app .cds-app-bell__dot {
+  border-radius: var(--shell-radius-pill);
+  margin-block-start: 0.4375rem;
+  block-size: 0.375rem;
+  inline-size: 0.375rem;
+}
+
+.cds-app .cds-app-bell__item.is-unread .cds-app-bell__dot {
+  background-color: var(--shell-text);
+}
+
+.cds-app .cds-app-bell__text {
+  display: flex;
+  min-inline-size: 0;
+  flex-direction: column;
+  gap: $spacing-01;
+}
+
+.cds-app .cds-app-bell__item-title {
+  color: var(--shell-text);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.cds-app .cds-app-bell__item.is-unread .cds-app-bell__item-title {
+  font-weight: 600;
+}
+
+.cds-app .cds-app-bell__item-body {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.cds-app .cds-app-bell__item-time {
+  color: var(--shell-text-3);
+  font-size: 0.75rem;
+  letter-spacing: 0.32px;
+  line-height: 1rem;
+}
+
+// ---------------------------------------------------------------------------
+// Nav rows: side nav, More sheet and account menu share one row.
+// ---------------------------------------------------------------------------
+.cds-app .cds-app-nav-row {
   position: relative;
   display: flex;
   align-items: center;
   padding: 0 $spacing-05;
   border: 0;
+  margin: 0;
   background: none;
-  color: var(--uc-text);
+  color: var(--shell-text-2);
   cursor: pointer;
-  font-family: var(--uc-font);
-  font-weight: 500;
+  font-family: var(--shell-font);
+  font-size: 0.875rem;
+  font-weight: 400;
   gap: $spacing-04;
   inline-size: 100%;
-  min-block-size: 3rem;
+  letter-spacing: 0.16px;
+  line-height: 1.25rem;
+  min-block-size: 2.5rem;
   text-align: start;
   text-decoration: none;
+  transition:
+    background-color var(--shell-fast-01) var(--shell-ease-productive),
+    color var(--shell-fast-01) var(--shell-ease-productive);
   -webkit-tap-highlight-color: transparent;
 
-  svg {
-    flex: none;
-    fill: var(--uc-text-2);
-  }
-
   &:focus-visible {
-    outline: 2px solid var(--uc-accent);
-    outline-offset: -2px;
+    @include shell-focus-ring;
   }
 
   &:active {
-    background-color: $background-active;
-  }
-
-  &[aria-current='page'] {
-    background-color: var(--uc-accent-soft);
-    font-weight: 600;
-
-    &::before {
-      position: absolute;
-      border-radius: 0 3px 3px 0;
-      background-color: var(--uc-accent);
-      box-shadow: 0 0 10px rgba(243, 226, 179, 0.55);
-      content: '';
-      inline-size: 3px;
-      inset-block: $spacing-03;
-      inset-inline-start: 0;
-    }
-
-    svg {
-      fill: var(--uc-accent);
-    }
+    background-color: var(--shell-pressed);
   }
 
   @media (hover: hover) {
     &:hover {
-      background-color: $background-hover;
+      background-color: var(--shell-hover);
+      color: var(--shell-text);
+    }
+  }
+
+  &[aria-current='page'] {
+    background-color: var(--shell-accent-wash);
+    color: var(--shell-text);
+    font-weight: 600;
+  }
+}
+
+.cds-app .cds-app-nav-row__icon {
+  flex: none;
+  fill: currentColor;
+}
+
+.cds-app .cds-app-nav-row__label {
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cds-app .cds-app-nav-row__trail {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  margin-inline-start: auto;
+  color: var(--shell-text-3);
+  fill: currentColor;
+}
+
+// "Free" / "Members" micro-chip before an external row's new-tab icon
+// (HackPath FREE micro-badge: 10px, rounded, white/15 border).
+.cds-app .cds-app-nav-row__chip {
+  flex: none;
+  margin-inline-start: auto;
+  padding: 0 0.375rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: var(--shell-text-2);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  line-height: 1rem;
+  text-transform: uppercase;
+
+  + .cds-app-nav-row__trail {
+    margin-inline-start: 0;
+  }
+}
+
+.cds-app .cds-app-sidenav--rail .cds-app-nav-row__chip {
+  display: none;
+}
+
+// "Something is due": a quiet 6 px dot (status is never champagne).
+.cds-app .cds-app-nav-row__dot {
+  display: inline-block;
+  border-radius: var(--shell-radius-pill);
+  background-color: var(--shell-text);
+  block-size: 0.375rem;
+  inline-size: 0.375rem;
+}
+
+// Disabled with a reason: focusable, muted, explains itself on focus/hover.
+.cds-app .cds-app-nav-row--disabled {
+  color: var(--shell-text-disabled);
+  cursor: not-allowed;
+
+  .sc-disabled-reason__label {
+    display: contents;
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      background: none;
+      color: var(--shell-text-disabled);
     }
   }
 }
 
-.cds-app .cds-app-action-list__item--danger {
-  color: var(--uc-error);
+// "Reduce motion" switch row.
+.cds-app .cds-app-switch {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  padding: 0.125rem;
+  border-radius: var(--shell-radius-pill);
+  margin-inline-start: auto;
+  background-color: var(--shell-border-strong);
+  block-size: 1.5rem;
+  inline-size: 3rem;
+  transition: background-color var(--shell-fast-02) var(--shell-ease-productive);
+}
 
-  svg {
-    fill: var(--uc-error);
+.cds-app .cds-app-switch__knob {
+  display: block;
+  border-radius: var(--shell-radius-pill);
+  background-color: var(--shell-text);
+  block-size: 1.25rem;
+  inline-size: 1.25rem;
+  transition: transform var(--shell-fast-01) var(--shell-ease-productive);
+}
+
+.cds-app .cds-app-switch.is-on {
+  background-color: var(--shell-success);
+
+  .cds-app-switch__knob {
+    transform: translateX(1.5rem);
+  }
+}
+
+// "New" dot on a workspace that just became available (M20).
+.cds-app .cds-app-new-dot {
+  display: inline-block;
+  border-radius: var(--shell-radius-pill);
+  margin-inline-start: $spacing-02;
+  background-color: var(--shell-text);
+  block-size: 0.375rem;
+  inline-size: 0.375rem;
+  vertical-align: super;
+}
+
+// ---------------------------------------------------------------------------
+// Workspace switch (side nav top, More sheet)
+// ---------------------------------------------------------------------------
+.cds-app .cds-app-workspace .sc-segmented {
+  display: flex;
+  inline-size: 100%;
+}
+
+.cds-app .cds-app-workspace .sc-segmented__option {
+  flex: 1 1 0;
+  justify-content: center;
+}
+
+// In the narrow nav and the sheet the reason sits under the switch (in the
+// flow, announced politely) instead of the kit's floating toggletip, which
+// would cover the nav or run off a phone screen. aria-describedby still
+// points at the kit's text, so screen readers hear it on focus.
+.cds-app .cds-app-workspace .sc-segmented__tip {
+  display: none;
+}
+
+.cds-app .cds-app-workspace__reason {
+  margin: $spacing-03 0 0;
+  color: var(--shell-text-2);
+  font-family: var(--shell-font);
+  font-size: 0.75rem;
+  letter-spacing: 0.32px;
+  line-height: 1rem;
+  animation: cds-app-fade-in var(--shell-fast-02) linear;
+
+  &:empty {
+    margin: 0;
   }
 }
 
 // ---------------------------------------------------------------------------
 // Desktop side nav
 // ---------------------------------------------------------------------------
-.cds-app .cds--header ~ .cds-app-sidenav,
 .cds-app .cds-app-sidenav {
-  border-inline-end: 1px solid rgba(255, 255, 255, 0.1);
-  background-color: var(--uc-page);
-  block-size: calc(100% - var(--cds-app-header-height));
-  color: var(--uc-text-2);
-  inset-block-start: var(--cds-app-header-height);
+  position: fixed;
+  z-index: 7000;
+  display: flex;
+  flex-direction: column;
+  border-inline-end: 1px solid var(--shell-border);
+  background-color: var(--shell-bg);
+  font-family: var(--shell-font);
+  inline-size: calc(#{$side-nav-width} + #{$safe-left});
+  inset-block: var(--cds-app-header-height) 0;
+  inset-inline-start: 0;
+  padding-inline-start: $safe-left;
 }
 
-.cds-app .cds--header ~ .cds-app-sidenav.cds--side-nav--expanded {
-  transition: inline-size 180ms ease;
+.cds-app .cds-app-sidenav__workspace {
+  flex: none;
+  padding: $spacing-05 $spacing-05 $spacing-03;
 }
 
-.cds-app .cds-app-sidenav .cds--side-nav__items {
-  padding-block: $spacing-05 $spacing-07;
+.cds-app .cds-app-sidenav__scroll {
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  overscroll-behavior: contain;
+  padding-block: $spacing-03 $spacing-05;
+  scrollbar-color: var(--shell-border-strong) transparent;
+  scrollbar-width: thin;
 }
 
-// "Collapse menu" toggle pinned under the items.
+.cds-app .cds-app-sidenav__list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.cds-app .cds-app-sidenav__section + .cds-app-sidenav__section {
+  margin-block-start: $spacing-03;
+}
+
+.cds-app .cds-app-sidenav__heading {
+  margin: 0;
+  padding: $spacing-05 $spacing-05 $spacing-03;
+  color: var(--shell-text-3);
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.32px;
+  line-height: 1rem;
+}
+
+// M13: one 2×24 champagne bar that slides to the current row.
+.cds-app .cds-app-sidenav__indicator {
+  position: absolute;
+  z-index: 1;
+  background-color: var(--shell-accent);
+  block-size: 1.5rem;
+  inline-size: 2px;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  opacity: 0;
+  pointer-events: none;
+
+  &[data-ready] {
+    transition:
+      transform var(--shell-moderate-02) var(--shell-ease-expressive),
+      opacity var(--shell-fast-02) linear;
+  }
+}
+
+// Admin groups: disclosures (M12: chevron turns, content does not animate height).
+.cds-app .cds-app-sidenav__group + .cds-app-sidenav__group {
+  margin-block-start: $spacing-01;
+}
+
+.cds-app .cds-app-sidenav__group-toggle,
+.cds-app .cds-app-sheet__group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 $spacing-05;
+  border: 0;
+  background: none;
+  color: var(--shell-text-3);
+  cursor: pointer;
+  font-family: var(--shell-font);
+  inline-size: 100%;
+  text-align: start;
+  transition:
+    background-color var(--shell-fast-01) var(--shell-ease-productive),
+    color var(--shell-fast-01) var(--shell-ease-productive);
+
+  &:focus-visible {
+    @include shell-focus-ring;
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      background-color: var(--shell-hover);
+      color: var(--shell-text);
+    }
+  }
+
+  &[aria-expanded='true'] .cds-app-sidenav__chevron {
+    transform: rotate(180deg);
+  }
+}
+
+.cds-app .cds-app-sidenav__group-toggle {
+  block-size: 2rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.32px;
+  line-height: 1rem;
+}
+
+.cds-app .cds-app-sidenav__group.is-current > .cds-app-sidenav__group-toggle {
+  color: var(--shell-text);
+}
+
+.cds-app .cds-app-sidenav__chevron {
+  flex: none;
+  fill: currentColor;
+  transition: transform var(--shell-fast-02) var(--shell-ease-productive);
+}
+
+.cds-app .cds-app-sidenav__group-body:not([hidden]) {
+  animation: cds-app-fade-in var(--shell-fast-02) linear;
+}
+
 .cds-app .cds-app-sidenav__footer {
   flex: none;
-  padding: $spacing-03 $spacing-05 $spacing-05;
-  border-block-start: 1px solid rgba(255, 255, 255, 0.08);
+  padding: $spacing-03 0;
+  border-block-start: 1px solid var(--shell-border);
 }
 
 .cds-app .cds-app-sidenav__toggle {
   display: flex;
   align-items: center;
-  padding: 0 $spacing-04;
+  padding: 0 $spacing-05;
   border: 0;
-  border-radius: var(--uc-radius-control);
   background: none;
-  block-size: 2.75rem;
-  color: var(--uc-text-muted);
+  block-size: 2.5rem;
+  color: var(--shell-text-3);
   cursor: pointer;
-  font-family: var(--uc-font);
-  font-size: 0.8125rem;
-  font-weight: 500;
+  font-family: var(--shell-font);
+  font-size: 0.875rem;
   gap: $spacing-04;
   inline-size: 100%;
+  letter-spacing: 0.16px;
   transition:
-    background-color 140ms ease,
-    color 140ms ease;
+    background-color var(--shell-fast-01) var(--shell-ease-productive),
+    color var(--shell-fast-01) var(--shell-ease-productive);
 
   svg {
     flex: none;
@@ -504,14 +1047,13 @@ $safe-right: env(safe-area-inset-right, 0px);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--uc-accent);
-    outline-offset: -2px;
+    @include shell-focus-ring;
   }
 
-  @media (any-hover: hover) {
+  @media (hover: hover) {
     &:hover {
-      background-color: rgba(246, 241, 231, 0.05);
-      color: var(--uc-text);
+      background-color: var(--shell-hover);
+      color: var(--shell-text);
     }
   }
 }
@@ -520,219 +1062,37 @@ $safe-right: env(safe-area-inset-right, 0px);
   white-space: nowrap;
 }
 
-// External destinations (Labs): a small "leaves the Console" icon.
-.cds-app .cds-app-sidenav .cds--side-nav__link-text {
-  display: inline-flex;
-  align-items: center;
-  gap: $spacing-03;
-}
-
-.cds-app .cds-app-sidenav__external {
-  flex: none;
-  fill: var(--uc-text-muted);
-}
-
-.cds-app .cds-app-action-list__external {
-  margin-inline-start: auto;
-  fill: var(--uc-text-muted) !important;
-}
-
-// "— CONSOLE": the landing page's eyebrow (hairline + micro-label).
-.cds-app .cds-app-sidenav__title {
-  @include corner-micro-label(0.625rem);
-
-  display: flex;
-  align-items: center;
-  padding: $spacing-05 $spacing-06 $spacing-04;
-  color: var(--uc-accent);
-  gap: $spacing-04;
-  list-style: none;
-  text-shadow: var(--uc-text-glow);
-
-  &::before {
-    display: block;
-    flex: none;
-    background-color: var(--uc-accent);
-    block-size: 1px;
-    content: '';
-    inline-size: 1.5rem;
-    opacity: 0.75;
-  }
-}
-
-.cds-app .cds-app-sidenav__heading {
-  @include corner-micro-label(0.625rem);
-
-  padding: $spacing-06 $spacing-06 $spacing-03;
-  color: var(--uc-text-muted);
-  list-style: none;
-}
-
-.cds-app .cds-app-sidenav__title + .cds-app-sidenav__heading {
-  padding-block-start: $spacing-05;
-}
-
-// ---------------------------------------------------------------------------
-// Collapsed icon rail (desktop, remembered per viewer).
-// ---------------------------------------------------------------------------
-.cds-app[data-shell-layout='desktop'][data-sidenav='rail'] .cds-app__main {
-  margin-inline-start: $side-nav-rail-width;
-}
-
-.cds-app[data-shell-layout='desktop'] .cds-app__main {
-  transition: margin-inline-start 180ms ease;
-}
-
-.cds-app .cds--header ~ .cds-app-sidenav.cds-app-sidenav--rail.cds--side-nav--expanded {
-  inline-size: $side-nav-rail-width;
-}
-
-@mixin rail-visually-hidden {
-  position: absolute;
-  overflow: hidden;
-  block-size: 1px;
-  clip: rect(0 0 0 0);
-  inline-size: 1px;
-  white-space: nowrap;
-}
-
+// Collapsed rail (M16): the layout switches instantly; labels fade in on expand.
 .cds-app .cds-app-sidenav--rail {
-  // Headings collapse into short hairlines; their text stays for screen readers.
-  .cds-app-sidenav__title,
-  .cds-app-sidenav__heading {
-    position: relative;
-    display: block;
-    padding: $spacing-05 0 $spacing-03;
-    block-size: auto;
-    color: transparent;
-    text-shadow: none;
+  inline-size: calc(#{$side-nav-rail-width} + #{$safe-left});
 
-    &::before {
-      display: block;
-      margin-inline: auto;
-      background-color: var(--uc-border-strong);
-      block-size: 1px;
-      content: '';
-      inline-size: 1.5rem;
-      opacity: 1;
-    }
-  }
-
-  .cds-app-sidenav__title {
-    padding-block-start: $spacing-03;
-    font-size: 0;
-
-    &::before {
-      background-color: var(--uc-accent);
-      box-shadow: 0 0 8px rgba(243, 226, 179, 0.6);
-    }
-  }
-
-  .cds-app-sidenav__heading-text {
-    @include rail-visually-hidden;
-  }
-
-  .cds--side-nav__link {
-    justify-content: center;
-    margin-inline: $spacing-03;
-    padding-inline: 0;
-
-    .cds--side-nav__icon:not(.cds--side-nav__submenu-chevron) {
-      margin-inline-end: 0;
-    }
-
-    > .cds--side-nav__link-text {
-      @include rail-visually-hidden;
-    }
-  }
-
-  .cds-app-sidenav__footer {
-    padding-inline: $spacing-03;
-  }
-
+  .cds-app-nav-row,
   .cds-app-sidenav__toggle {
     justify-content: center;
     padding: 0;
   }
 
+  .cds-app-nav-row {
+    min-block-size: 3rem;
+  }
+
+  .cds-app-nav-row__label,
+  .cds-app-nav-row__trail:not(.cds-app-nav-row__trail--signal),
   .cds-app-sidenav__toggle-label {
-    @include rail-visually-hidden;
+    @include visually-hidden;
+  }
+
+  // Live / due hints stay visible as a small badge on the icon.
+  .cds-app-nav-row__trail--signal {
+    position: absolute;
+    margin: 0;
+    inset-block-start: 0.625rem;
+    inset-inline-start: calc(50% + 0.375rem);
   }
 }
 
-.cds-app .cds-app-sidenav .cds--side-nav__item {
-  overflow: visible;
-}
-
-.cds-app .cds-app-sidenav .cds--side-nav__link {
-  position: relative;
-  display: flex;
-  align-items: center;
-  border-radius: var(--uc-radius-control);
-  margin-block: 2px;
-  margin-inline: $spacing-04;
-  inline-size: auto;
-  min-block-size: 2.75rem;
-  padding-inline: $spacing-04;
-  transition: background-color 140ms ease;
-
-  &:focus {
-    outline: 2px solid var(--uc-accent);
-    outline-offset: -2px;
-  }
-
-  .cds--side-nav__icon:not(.cds--side-nav__submenu-chevron) {
-    margin-inline-end: $spacing-04;
-  }
-
-  .cds--side-nav__icon > svg {
-    block-size: 1.125rem;
-    fill: var(--uc-text-2);
-    inline-size: 1.125rem;
-  }
-
-  > .cds--side-nav__link-text {
-    color: var(--uc-text-2);
-    font-family: var(--uc-font);
-    font-size: 0.875rem;
-    font-weight: 500;
-    letter-spacing: 0;
-  }
-
-  @media (any-hover: hover) {
-    &:hover {
-      background-color: rgba(246, 241, 231, 0.05);
-
-      > .cds--side-nav__link-text {
-        color: var(--uc-text);
-      }
-
-      .cds--side-nav__icon > svg {
-        fill: var(--uc-text);
-      }
-    }
-  }
-}
-
-.cds-app .cds-app-sidenav .cds--side-nav__link[aria-current='page'],
-.cds-app .cds-app-sidenav .cds--side-nav__link.cds--side-nav__link--current {
-  background-color: var(--uc-accent-soft);
-
-  &::before {
-    border-radius: 0 3px 3px 0;
-    background-color: var(--uc-accent);
-    box-shadow: 0 0 10px rgba(243, 226, 179, 0.55);
-    inset-block: $spacing-03;
-  }
-
-  > .cds--side-nav__link-text {
-    color: var(--uc-text);
-    font-weight: 600;
-  }
-
-  .cds--side-nav__icon > svg {
-    fill: var(--uc-accent);
-  }
+.cds-app .cds-app-sidenav:not(.cds-app-sidenav--rail) .cds-app-nav-row__label {
+  animation: cds-app-fade-in var(--shell-fast-02) linear;
 }
 
 // ---------------------------------------------------------------------------
@@ -741,8 +1101,8 @@ $safe-right: env(safe-area-inset-right, 0px);
 .cds-app .cds-app__main {
   display: block;
   min-block-size: 100dvh;
-  padding-block-start: var(--cds-app-header-height);
   overflow-x: clip;
+  padding-block-start: var(--cds-app-header-height);
 
   &:focus {
     outline: none;
@@ -750,7 +1110,11 @@ $safe-right: env(safe-area-inset-right, 0px);
 }
 
 .cds-app[data-shell-layout='desktop'] .cds-app__main {
-  margin-inline-start: $side-nav-width;
+  margin-inline-start: calc(#{$side-nav-width} + #{$safe-left});
+}
+
+.cds-app[data-shell-layout='desktop'][data-sidenav='rail'] .cds-app__main {
+  margin-inline-start: calc(#{$side-nav-rail-width} + #{$safe-left});
 }
 
 .cds-app[data-shell-layout='mobile'] .cds-app__main {
@@ -758,14 +1122,14 @@ $safe-right: env(safe-area-inset-right, 0px);
   padding-inline: $safe-left $safe-right;
 }
 
-// Carbon-native pages: generous spacing, centred reading width.
+// Carbon-native pages: 1200 px reading width, 48 px padding (16 px on phones).
 .cds-app .cds-page {
-  max-inline-size: 82rem;
+  max-inline-size: calc(75rem + #{$spacing-09} * 2);
+  padding: $spacing-06 $spacing-05 $spacing-09;
   margin-inline: auto;
-  padding: $spacing-07 $spacing-05 $spacing-09;
 
   @include breakpoint(md) {
-    padding: $spacing-08 $spacing-07 $spacing-10;
+    padding: $spacing-07 $spacing-07 $spacing-10;
   }
 
   @include breakpoint(lg) {
@@ -773,20 +1137,19 @@ $safe-right: env(safe-area-inset-right, 0px);
   }
 }
 
-// Edge-to-edge Carbon pages (course player) lay themselves out.
+// Edge-to-edge Carbon pages (course player, live) lay themselves out.
 .cds-app .cds-page.cds-page--flush {
   max-inline-size: none;
   padding: 0;
 }
 
-// Pages not yet migrated (staff tools) keep their website styles, on the
-// same black as the rest of Console. OwlCognito's legacy pages are
-// built for its light violet look, so they keep it.
+// Pages not yet migrated keep their website styles on the Console black.
+// OwlCognito's legacy pages keep its light violet look.
 .cds-app .cds-legacy-frame {
-  min-block-size: calc(100dvh - var(--cds-app-header-height));
   background-color: #000000;
   color: #ffffff;
   font-family: var(--uc-font);
+  min-block-size: calc(100dvh - var(--cds-app-header-height));
 }
 
 html[data-site-brand='owlcognito'] .cds-app .cds-legacy-frame {
@@ -799,21 +1162,41 @@ html[data-site-brand='owlcognito'] .cds-app .cds-legacy-frame {
 }
 
 // ---------------------------------------------------------------------------
-// Phone / tablet bottom navigation
+// Phone / tablet tab bar
 // ---------------------------------------------------------------------------
 .cds-app .cds-app-bottom-nav {
   position: fixed;
   z-index: 8000;
   display: grid;
-  border-block-start: 1px solid rgba(255, 255, 255, 0.1);
+  border-block-start: 1px solid var(--shell-border);
   // Solid: page content scrolling underneath must not bleed through the labels.
-  background-color: #000;
+  background-color: var(--shell-bg);
+  font-family: var(--shell-font);
   grid-auto-columns: minmax(0, 1fr);
   grid-auto-flow: column;
   inset-block-end: 0;
   inset-inline: 0;
   padding-block-end: $safe-bottom;
   padding-inline: $safe-left $safe-right;
+}
+
+// M13: a 24×2 champagne bar above the current tab's icon, sliding between tabs.
+.cds-app .cds-app-bottom-nav__indicator {
+  position: absolute;
+  z-index: 1;
+  background-color: var(--shell-accent);
+  block-size: 2px;
+  inline-size: 1.5rem;
+  inset-block-start: -1px;
+  inset-inline-start: 0;
+  opacity: 0;
+  pointer-events: none;
+
+  &[data-ready] {
+    transition:
+      transform var(--shell-moderate-02) var(--shell-ease-expressive),
+      opacity var(--shell-fast-02) linear;
+  }
 }
 
 .cds-app .cds-app-bottom-nav__item {
@@ -827,16 +1210,17 @@ html[data-site-brand='owlcognito'] .cds-app .cds-legacy-frame {
   margin: 0;
   background: none;
   block-size: $bottom-nav-height;
-  color: var(--uc-text-muted);
+  color: var(--shell-text-3);
   cursor: pointer;
-  font-family: var(--uc-font);
-  font-size: 0.6875rem;
-  font-weight: 600;
+  font-family: var(--shell-font);
+  font-size: 0.75rem;
+  font-weight: 400;
   gap: $spacing-02;
-  letter-spacing: 0.01em;
-  line-height: 1.2;
+  letter-spacing: 0.32px;
+  line-height: 1rem;
   min-inline-size: 2.75rem;
   text-decoration: none;
+  transition: color var(--shell-fast-01) var(--shell-ease-productive);
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   user-select: none;
@@ -845,44 +1229,35 @@ html[data-site-brand='owlcognito'] .cds-app .cds-legacy-frame {
     fill: currentColor;
   }
 
-  &::before {
-    position: absolute;
-    border-radius: 0 0 3px 3px;
-    block-size: 3px;
-    background-color: transparent;
-    content: '';
-    inset-block-start: -1px;
-    inset-inline: 28%;
-  }
-
   &:focus-visible {
-    outline: 2px solid var(--uc-accent);
-    outline-offset: -2px;
+    @include shell-focus-ring;
   }
 
   &:active {
-    background-color: $background-active;
+    background-color: var(--shell-pressed);
   }
 
   @media (hover: hover) {
     &:hover {
-      background-color: $background-hover;
-      color: var(--uc-text);
+      color: var(--shell-text);
     }
   }
 }
 
 .cds-app .cds-app-bottom-nav__item.is-active {
-  color: var(--uc-text);
+  color: var(--shell-text);
+}
 
-  svg {
-    fill: var(--uc-accent);
-  }
+.cds-app .cds-app-bottom-nav__icon {
+  position: relative;
+  display: inline-flex;
+}
 
-  &::before {
-    background-color: var(--uc-accent);
-    box-shadow: 0 0 12px rgba(243, 226, 179, 0.6);
-  }
+.cds-app .cds-app-bottom-nav__signal {
+  position: absolute;
+  display: inline-flex;
+  inset-block-start: -0.125rem;
+  inset-inline-end: -0.5rem;
 }
 
 .cds-app .cds-app-bottom-nav__label {
@@ -892,16 +1267,13 @@ html[data-site-brand='owlcognito'] .cds-app .cds-legacy-frame {
   white-space: nowrap;
 }
 
-// Host Studio's "You are live. Return to Host Studio" badge is appended to
-// <body> with [data-host-live-badge] (services/realtime/hostStudioController.js) at bottom: 16px with an
-// inline z-index of 1000, which would sit under the phone tab bar. Lift it
-// above the tab bar while the mobile shell is mounted.
+// Host Studio's "You are live" badge (appended to <body>) sits above the tab bar.
 body:has(.cds-app[data-shell-layout='mobile']) > [data-host-live-badge] {
   bottom: calc(#{$bottom-nav-height} + #{$safe-bottom} + #{$spacing-05}) !important;
 }
 
 // ---------------------------------------------------------------------------
-// "More" bottom sheet
+// "More" sheet (M11: slides up, slides down on close, scrim fades)
 // ---------------------------------------------------------------------------
 .cds-app .cds-app-sheet {
   position: fixed;
@@ -909,15 +1281,15 @@ body:has(.cds-app[data-shell-layout='mobile']) > [data-host-live-badge] {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
+  font-family: var(--shell-font);
   inset: 0;
 }
 
 .cds-app .cds-app-sheet__scrim {
   position: absolute;
-  border: 0;
-  background-color: $overlay;
+  background-color: var(--shell-overlay);
   inset: 0;
-  animation: cds-app-fade-in $duration-moderate-01 motion(entrance, productive);
+  animation: cds-app-fade-in var(--shell-moderate-01) var(--shell-ease-enter-productive);
 }
 
 .cds-app .cds-app-sheet__panel {
@@ -925,38 +1297,85 @@ body:has(.cds-app[data-shell-layout='mobile']) > [data-host-live-badge] {
   display: flex;
   overflow: hidden;
   flex-direction: column;
-  border: 1px solid var(--uc-border);
-  border-block-end: 0;
-  border-start-end-radius: var(--uc-radius-card);
-  border-start-start-radius: var(--uc-radius-card);
-  background: var(--uc-card-highlight), var(--uc-surface);
-  box-shadow: 0 -18px 50px rgba(0, 0, 0, 0.6);
-  max-block-size: min(85dvh, 40rem);
+  border-block-start: 1px solid var(--shell-border);
+  background-color: var(--shell-layer);
+  max-block-size: 85dvh;
   overscroll-behavior: contain;
   padding-block-end: $safe-bottom;
   padding-inline: $safe-left $safe-right;
-  animation: cds-app-sheet-in $duration-moderate-02 motion(entrance, expressive);
+  transition: transform var(--shell-fast-02) var(--shell-ease-productive);
+  animation: cds-app-sheet-in var(--shell-moderate-02) var(--shell-ease-enter);
 
   &:focus {
     outline: none;
   }
 }
 
-.cds-app .cds-app-sheet__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-inline-start: $spacing-05;
-  border-block-end: 1px solid $border-subtle;
-  min-block-size: 3.5rem;
+.cds-app .cds-app-sheet.is-closing {
+  pointer-events: none;
+
+  .cds-app-sheet__scrim {
+    animation: cds-app-fade-out var(--shell-moderate-01) var(--shell-ease-exit) forwards;
+  }
+
+  .cds-app-sheet__panel {
+    animation: cds-app-sheet-out var(--shell-moderate-01) var(--shell-ease-exit) forwards;
+  }
 }
 
-.cds-app .cds-app-sheet__title {
-  @include corner-heading(-0.02em);
+.cds-app .cds-app-sheet__header {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: $spacing-05 $spacing-02 $spacing-04 $spacing-05;
+  border-block-end: 1px solid var(--shell-border);
+  gap: $spacing-03;
+  touch-action: none;
+}
 
-  color: var(--uc-text);
-  font-size: 1.125rem;
-  line-height: 1.3;
+.cds-app .cds-app-sheet__grab {
+  position: absolute;
+  border-radius: var(--shell-radius-pill);
+  background-color: var(--shell-border-strong);
+  block-size: 4px;
+  inline-size: 2rem;
+  inset-block-start: $spacing-03;
+  inset-inline-start: calc(50% - 1rem);
+}
+
+.cds-app .cds-app-sheet__user {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: $spacing-04;
+  min-inline-size: 0;
+}
+
+.cds-app .cds-app-sheet__user-text {
+  display: flex;
+  min-inline-size: 0;
+  flex-direction: column;
+}
+
+.cds-app .cds-app-sheet__user-name {
+  overflow: hidden;
+  color: var(--shell-text);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cds-app .cds-app-sheet__user-email {
+  overflow: hidden;
+  color: var(--shell-text-3);
+  font-size: 0.75rem;
+  letter-spacing: 0.32px;
+  line-height: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cds-app .cds-app-sheet__body {
@@ -966,28 +1385,45 @@ body:has(.cds-app[data-shell-layout='mobile']) > [data-host-live-badge] {
   padding-block-end: $spacing-03;
 }
 
+.cds-app .cds-app-sheet__workspace {
+  padding: $spacing-05 $spacing-05 $spacing-03;
+}
+
 .cds-app .cds-app-sheet__group + .cds-app-sheet__group {
-  border-block-start: 1px solid $border-subtle;
+  border-block-start: 1px solid var(--shell-border);
 }
 
 .cds-app .cds-app-sheet__group-label {
-  @include corner-micro-label(0.625rem);
-
-  display: block;
+  margin: 0;
   padding: $spacing-05 $spacing-05 $spacing-02;
-  color: var(--uc-text-muted);
+  color: var(--shell-text-3);
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.32px;
+  line-height: 1rem;
 }
 
-@keyframes cds-app-fade-in {
-  from {
-    opacity: 0;
-  }
+.cds-app .cds-app-sheet__list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
 }
 
-@keyframes cds-app-sheet-in {
-  from {
-    transform: translateY(100%);
-  }
+// 56 px rows on phones.
+.cds-app .cds-app-sheet .cds-app-nav-row,
+.cds-app .cds-app-sheet__group-toggle {
+  font-size: 1rem;
+  letter-spacing: 0;
+  line-height: 1.5rem;
+  min-block-size: 3.5rem;
+}
+
+.cds-app .cds-app-sheet__group-toggle {
+  color: var(--shell-text);
+}
+
+.cds-app .cds-app-sheet__group-toggle + .cds-app-sheet__list .cds-app-nav-row {
+  padding-inline-start: $spacing-07;
 }
 
 // ---------------------------------------------------------------------------
@@ -1020,9 +1456,78 @@ body:has(.cds-app[data-shell-layout='mobile']) > [data-host-live-badge] {
 }
 
 // ---------------------------------------------------------------------------
-// Motion: respect the OS setting everywhere in the shell.
+// Keyframes (transform and opacity only)
 // ---------------------------------------------------------------------------
+@keyframes cds-app-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes cds-app-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes cds-app-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes cds-app-sheet-out {
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes cds-app-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes cds-app-badge-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reduced motion (OS setting or the viewer's "Reduce motion"): no
+// translation, no loops, fades of 100 ms or less (plan §1.7, §2.2).
+// ---------------------------------------------------------------------------
+@mixin shell-reduced-motion {
+  .cds-app-sheet__panel,
+  .cds-app-sheet.is-closing .cds-app-sheet__panel,
+  .cds-app-popover,
+  .cds-app-bell__badge,
+  .cds-app-sidenav__indicator,
+  .cds-app-bottom-nav__indicator,
+  .cds-app-sidenav__chevron,
+  .cds-app-switch__knob {
+    animation: none;
+    transition: none;
+  }
+
+  .cds-app-sheet__scrim,
+  .cds-app-workspace__reason,
+  .cds-app-sidenav__group-body,
+  .cds-app-sidenav .cds-app-nav-row__label {
+    animation-duration: 100ms;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .cds-app {
+    @include shell-reduced-motion;
+  }
+
+  // Pages inside the shell that still rely on the old blanket rule (until
+  // the Syed Carbon motion tokens cover them, WS-A).
   .cds-app *,
   .cds-app *::before,
   .cds-app *::after {
@@ -1031,4 +1536,366 @@ body:has(.cds-app[data-shell-layout='mobile']) > [data-host-live-badge] {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+:root[data-motion='reduce'] .cds-app {
+  @include shell-reduced-motion;
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+// ===========================================================================
+// Learn workspace pages in the HackPath design language (PHILOSOPHY.md §3,
+// T8 inner app page, T-LESSON). OWNER: WS-LEARN (console-student).
+//
+// Scoped to the main column of the Learn workspace, the same way WS-STAFF
+// scopes Teach/Admin (features/admin/staff-theme.scss), so the global Carbon
+// bridge (Kit) and the staff pages stay theirs. It
+//   1. removes every remaining hue (status = icon + word + luminance; the one
+//      accent is golden white);
+//   2. gives the shared page pieces the T8 anatomy: 30→36 px 700 title,
+//      muted sub, tab bar between two hairlines with a solid white active tab;
+//   3. squares Carbon shapes to the kit (8 px controls, 10 px cards).
+// Only colour, opacity and transform transition; reduced motion turns them off.
+// ===========================================================================
+$learn-scope: ".cds-app[data-workspace='learn'] .cds-app__main";
+
+#{$learn-scope} {
+  // --- 1. No hue: status by luminance, the accent is golden white ---------
+  --brand-live: #f3e2b3;
+  --brand-success: #fafafa;
+  --brand-focus: #f3e2b3;
+  --sc-status-success: #fafafa;
+  --sc-status-warning: #f3e2b3;
+  --sc-status-error: #fafafa;
+  --sc-status-info: #d4d4d4;
+  --sc-status-live: #f3e2b3;
+  --sc-support-success: #fafafa;
+  --sc-support-error: #fafafa;
+  --uc-success: #fafafa;
+  --uc-warning: #f3e2b3;
+  --uc-error: #fafafa;
+  --uc-live: #f3e2b3;
+  --cds-focus: #f3e2b3;
+  --cds-support-error: #fafafa;
+  --cds-support-success: #fafafa;
+  --cds-support-warning: #f3e2b3;
+  --cds-support-info: #d4d4d4;
+  --cds-support-caution-major: #f3e2b3;
+  --cds-support-caution-minor: #f3e2b3;
+  --cds-notification-background-error: #0a0a0a;
+  --cds-notification-background-success: #0a0a0a;
+  --cds-notification-background-info: #0a0a0a;
+  --cds-notification-background-warning: #0a0a0a;
+
+  @each $family in ("magenta", "purple", "blue", "cyan", "teal", "green", "gray", "cool-gray", "warm-gray") {
+    --cds-tag-background-#{$family}: rgb(255 255 255 / 6%);
+    --cds-tag-color-#{$family}: #d4d4d4;
+    --cds-tag-hover-#{$family}: rgb(255 255 255 / 10%);
+  }
+
+  --cds-tag-background-red: rgb(243 226 179 / 12%);
+  --cds-tag-color-red: #f3e2b3;
+  --cds-tag-hover-red: rgb(243 226 179 / 18%);
+
+  .sc-status-tag {
+    --sc-tag-bg: transparent;
+    --sc-tag-fg: #d4d4d4;
+    --sc-tag-icon: #d4d4d4;
+
+    border-color: rgb(255 255 255 / 18%);
+    font-weight: 500;
+  }
+
+  .sc-status-tag--success {
+    --sc-tag-fg: #fafafa;
+    --sc-tag-icon: #fafafa;
+
+    border-color: rgb(255 255 255 / 30%);
+  }
+
+  .sc-status-tag--info,
+  .sc-status-tag--neutral {
+    --sc-tag-fg: #d4d4d4;
+    --sc-tag-icon: #d4d4d4;
+  }
+
+  .sc-status-tag--warning,
+  .sc-status-tag--live {
+    --sc-tag-fg: #f3e2b3;
+    --sc-tag-icon: #f3e2b3;
+
+    border-color: rgb(243 226 179 / 40%);
+  }
+
+  .sc-status-tag--error {
+    --sc-tag-bg: #fafafa;
+    --sc-tag-fg: #000;
+    --sc-tag-icon: #000;
+
+    border-color: #fafafa;
+  }
+
+  .cds--tag {
+    border: 1px solid rgb(255 255 255 / 14%);
+    border-radius: 999px;
+    font-weight: 500;
+  }
+
+  :is(.cds--inline-notification, .cds--actionable-notification) {
+    border: 1px solid var(--hp-border);
+    border-radius: 0.625rem;
+    background: var(--hp-card);
+    color: var(--hp-text);
+  }
+
+  :is(.cds--inline-notification--warning, .cds--actionable-notification--warning) {
+    border-color: rgb(243 226 179 / 40%);
+  }
+
+  :is(.cds--inline-notification__icon, .cds--actionable-notification__icon) {
+    fill: var(--hp-text);
+  }
+
+  // --- 2. T8 page pieces ---------------------------------------------------
+  .cds-page-header__eyebrow {
+    color: var(--hp-accent);
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    line-height: 0.9375rem;
+    text-transform: uppercase;
+
+    &::before {
+      display: none;
+    }
+  }
+
+  .cds-page-header__title {
+    color: var(--hp-text);
+    font-family: var(--hp-sans);
+    font-size: 1.875rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+
+    @media (min-width: 40rem) {
+      font-size: 2.25rem;
+    }
+  }
+
+  .cds-page-header__description {
+    max-inline-size: 42rem;
+    color: var(--hp-muted);
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+  }
+
+  // Carbon line tabs -> a row between two hairlines, active = solid white.
+  .cds--tabs:not(.cds--tabs--contained) {
+    min-block-size: 0;
+    padding-block: 0.5rem;
+    border-block: 1px solid var(--hp-border);
+
+    .cds--tab--list {
+      gap: 0.25rem;
+    }
+
+    .cds--tabs__nav-item {
+      min-block-size: 2.5rem;
+      padding: 0.5rem 1rem;
+      border: 0;
+      border-radius: 0.5rem;
+      background: transparent;
+      box-shadow: none;
+      color: var(--hp-muted);
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition:
+        background-color 150ms var(--hp-ease),
+        color 150ms var(--hp-ease);
+
+      &:hover {
+        background: var(--hp-hover);
+        color: var(--hp-text);
+      }
+
+      &:focus,
+      &:focus-visible {
+        outline: 2px solid var(--hp-ring);
+        outline-offset: 2px;
+      }
+    }
+
+    .cds--tabs__nav-item--selected,
+    .cds--tabs__nav-item--selected:hover {
+      background: #fafafa;
+      color: #000;
+
+      .cds--tabs__nav-item-label {
+        color: #000;
+      }
+    }
+
+    // Carbon draws the selected underline with a box-shadow / ::after.
+    .cds--tabs__nav-item::after,
+    .cds--tabs__nav-item--selected::after {
+      display: none;
+    }
+  }
+
+  // Router tab bars (kit ScrollTabs: Coursework "This week · Grades · Exams").
+  .sc-scroll-tabs {
+    border-block: 1px solid var(--hp-border);
+
+    &::before {
+      background: linear-gradient(90deg, #000, transparent);
+    }
+
+    &::after {
+      background: linear-gradient(270deg, #000, transparent);
+    }
+
+    ul {
+      gap: 0.25rem;
+      padding-block: 0.5rem;
+      box-shadow: none;
+    }
+
+    a,
+    button {
+      min-block-size: 2.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      color: var(--hp-muted);
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition:
+        background-color 150ms var(--hp-ease),
+        color 150ms var(--hp-ease);
+
+      &:hover {
+        background: var(--hp-hover);
+        color: var(--hp-text);
+      }
+
+      &[aria-current='page'] {
+        background: #fafafa;
+        color: #000;
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--hp-ring);
+        outline-offset: -2px;
+      }
+    }
+
+    [aria-current='page'] .sc-scroll-tabs__badge {
+      background: rgb(0 0 0 / 10%);
+      color: #000;
+    }
+  }
+
+  .sc-scroll-tabs__bar {
+    display: none;
+  }
+
+  // --- 3. Carbon shapes: 8 px controls, 10 px surfaces ----------------------
+  .cds--btn {
+    border-radius: 0.5rem;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  .cds--btn--secondary,
+  .cds--btn--tertiary {
+    border-color: rgb(255 255 255 / 18%);
+    background-color: transparent;
+    color: var(--hp-text);
+
+    &:hover {
+      background-color: rgb(255 255 255 / 8%);
+      color: var(--hp-text);
+    }
+  }
+
+  .cds--btn:disabled,
+  .cds--btn.cds--btn--disabled {
+    border-color: rgb(255 255 255 / 10%);
+    background-color: rgb(255 255 255 / 6%);
+    color: var(--hp-subtle);
+  }
+
+  :is(.cds--text-input, .cds--text-area, .cds--select-input, .cds--search-input) {
+    border: 1px solid rgb(255 255 255 / 14%);
+    border-radius: 0.5rem;
+    background-color: var(--hp-card);
+
+    &:hover {
+      border-color: rgb(255 255 255 / 24%);
+    }
+
+    &:focus,
+    &:focus-visible {
+      border-color: var(--hp-accent);
+      outline: 2px solid rgb(243 226 179 / 45%);
+      outline-offset: 1px;
+    }
+  }
+
+  .cds--tile {
+    border: 1px solid var(--hp-border);
+    border-radius: 0.625rem;
+    background-color: var(--hp-card);
+  }
+
+  // --- Learn pages: headings at the kit's weights ---------------------------
+  // Player (T-LESSON): lesson title 600, panel titles 600.
+  .cp-lesson-header__title {
+    font-family: var(--hp-sans);
+    font-weight: 600;
+    letter-spacing: -0.025em;
+  }
+
+  .cp-panel-title,
+  .cp-section-title {
+    font-weight: 600;
+  }
+
+  // Weekly report (T-LESSON "Exercises" card): hairline card, no golden wash.
+  .rpt-hero {
+    border-color: var(--hp-border);
+    background: var(--hp-card);
+  }
+
+  .rpt-hero__title {
+    font-weight: 600;
+    letter-spacing: -0.025em;
+  }
+
+  .rpt-eyebrow {
+    color: var(--hp-subtle);
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    line-height: 0.9375rem;
+    text-transform: uppercase;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #{$learn-scope} .cds--tabs .cds--tabs__nav-item {
+    transition: none;
+  }
+}
+
+:root[data-motion='reduce'] #{$learn-scope} .cds--tabs .cds--tabs__nav-item {
+  transition: none;
 }

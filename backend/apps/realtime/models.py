@@ -454,17 +454,31 @@ class RealtimeSession(models.Model):
             return self.linked_live_class.linked_course.instructor_id
         return None
 
+    def _teaching_switched_off_for(self, user):
+        """Teachers section off (``apps.users.teaching``): a non-staff instructor
+        loses host/owner controls, except of a class already on air, which
+        keeps them until it ends (plan §5.3 in-flight rule)."""
+        from apps.users import teaching
+
+        return self.status != self.STATUS_LIVE and teaching.teaching_blocked(user)
+
     def is_instructor_owner(self, user):
         if not user or not getattr(user, "is_authenticated", False):
             return False
         instructor_user_id = self.get_instructor_user_id()
-        return bool(instructor_user_id and getattr(user, "id", None) == instructor_user_id)
+        if not (instructor_user_id and getattr(user, "id", None) == instructor_user_id):
+            return False
+        return not self._teaching_switched_off_for(user)
 
     def is_moderator_allowed(self, user):
         if not user or not getattr(user, "is_authenticated", False):
             return False
         is_admin = bool(getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))
-        return bool(is_admin or user.id == self.host_id or self.is_instructor_owner(user))
+        if is_admin:
+            return True
+        if user.id == self.host_id and not self._teaching_switched_off_for(user):
+            return True
+        return self.is_instructor_owner(user)
 
     def is_presenter_allowed(self, user):
         if self.is_moderator_allowed(user):

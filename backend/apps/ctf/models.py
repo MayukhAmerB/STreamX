@@ -264,6 +264,11 @@ class CtfParticipation(models.Model):
     wrong_count = models.PositiveIntegerField(default=0)
     attempt_count = models.PositiveIntegerField(default=0)
     last_correct_at = models.DateTimeField(null=True, blank=True, help_text="Leaderboard tie-break.")
+    # Student identity at submission time (apps.users.identity; additive, backfilled by
+    # ``manage.py backfill_identity_snapshots``). Shown before the record's own fields.
+    student_roll_number = models.CharField(max_length=16, null=True, blank=True, editable=False)
+    student_name_snapshot = models.CharField(max_length=255, null=True, blank=True, editable=False)
+    student_handle_snapshot = models.CharField(max_length=30, null=True, blank=True, editable=False)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -415,6 +420,11 @@ class CtfExamResult(models.Model):
     rank = models.PositiveIntegerField(null=True, blank=True, help_text="Position among the exam's students.")
     finalized_at = models.DateTimeField(default=timezone.now)
     notified_at = models.DateTimeField(null=True, blank=True)
+    # Student identity at submission time (apps.users.identity; additive, backfilled by
+    # ``manage.py backfill_identity_snapshots``). Shown before the record's own fields.
+    student_roll_number = models.CharField(max_length=16, null=True, blank=True, editable=False)
+    student_name_snapshot = models.CharField(max_length=255, null=True, blank=True, editable=False)
+    student_handle_snapshot = models.CharField(max_length=30, null=True, blank=True, editable=False)
 
     class Meta:
         ordering = ("exam", "rank", "id")
@@ -436,3 +446,13 @@ class CtfExamResult(models.Model):
         if not self.total_points:
             return None
         return round(self.score * 100.0 / self.total_points, 1)
+
+
+# Monthly OSINT CTF seasons (apps/ctf/season_models.py), registered in this app.
+from .season_models import (  # noqa: E402,F401
+    CtfSeason,
+    CtfSeasonAttempt,
+    CtfSeasonAudit,
+    CtfSeasonEntry,
+    CtfSeasonReward,
+)

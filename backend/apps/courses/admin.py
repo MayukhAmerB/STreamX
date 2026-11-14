@@ -2,6 +2,7 @@ import ast
 import copy
 import json
 
+from config.audit import log_security_event
 from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
@@ -31,8 +32,8 @@ from apps.payments.plans import (
     resolve_course_plans,
     validation_messages,
 )
-from config.audit import log_security_event
 
+from . import enrollment_actions
 from .cache_utils import bump_course_list_cache_version
 from .engagement.admin import LectureEngagementAdminMixin, annotate_engagement_counts
 from .experience_models import CourseReview, PentestingApplication
@@ -316,6 +317,13 @@ def _payment_card_fieldsets():
             )
         )
     return tuple(fieldsets)
+
+
+def _in_tab(tab, fieldsets):
+    """Tag each fieldset with the ``tab-<key>`` class used by the course form tabs."""
+    return tuple(
+        (name, {**options, "classes": (*options.get("classes", ()), f"tab-{tab}")}) for name, options in fieldsets
+    )
 
 
 def _card_form_value(key, value):
@@ -840,10 +848,12 @@ class CourseAdmin(admin.ModelAdmin):
     list_display_links = ("id", "title")
     list_filter = (
         "category",
+        "tier",
         "level",
         "launch_status",
         "registration_closed",
         "is_published",
+        "membership_always_included",
         "created_at",
         "updated_at",
     )
@@ -856,6 +866,7 @@ class CourseAdmin(admin.ModelAdmin):
         "instructor",
     )
     readonly_fields = (
+        "seed_source",
         "confirmed_statistics",
         "payment_cards_overview",
         "slug",
@@ -871,7 +882,8 @@ class CourseAdmin(admin.ModelAdmin):
         "updated_at",
     )
     autocomplete_fields = ("instructor",)
-    save_on_top = True
+    # The save bar is sticky at the bottom of every change form, so no top copy.
+    save_on_top = False
     list_per_page = 25
     actions = (
         "mark_live",
@@ -881,171 +893,202 @@ class CourseAdmin(admin.ModelAdmin):
         "publish_courses",
         "unpublish_courses",
     )
+    # Course form tabs (UI plan §4.8): Basics · Pricing · Schedule & batch ·
+    # Page copy · Publishing. Each fieldset carries a "tab-<key>" class; the
+    # admin's change_form.html renders an anchor list (no JS) that
+    # enterprise-shell.js turns into tabs. The save bar is sticky at the bottom.
+    form_tabs = (
+        ("basics", "Basics"),
+        ("pricing", "Pricing"),
+        ("schedule", "Schedule & batch"),
+        ("page", "Page copy"),
+        ("publishing", "Publishing"),
+    )
+    form_tab_for_inlines = "schedule"
     fieldsets = (
-        (
-            "Homepage card",
-            {
-                "description": (
-                    "Controls the public program card. Keep the default information-led layout; "
-                    "optional images must be course-contextual."
-                ),
-                "fields": (
-                    "card_title",
-                    "card_subtitle",
-                    "card_summary",
-                    "card_highlights",
-                    "image_alt",
-                    "show_course_image",
-                ),
-            },
+        *_in_tab(
+            "basics",
+            (
+                ("Course", {"fields": ("title", "slug", "category", "level", "description")}),
+                ("Instructor", {"fields": ("instructor", "instructor_admin_link")}),
+            ),
         ),
-        (
-            "Homepage countdown",
-            {
-                "description": (
-                    "Optional red enrollment countdown shown below the homepage hero. "
-                    "The timer hides automatically when no future deadline is configured."
+        *_in_tab(
+            "pricing",
+            (
+                (
+                    "Payment cards",
+                    {
+                        "description": (
+                            "The plans a student chooses from on the payment page. Each card below is one "
+                            "plan: switch it on, set its price, and word the card. Show 2 to 4 cards, or none "
+                            "to turn off online purchase. Prices are charged exactly as set here; a price "
+                            "change only affects checkouts started after you save."
+                        ),
+                        "classes": ("payment-cards-overview",),
+                        "fields": ("payment_cards_overview", "purchase_readiness"),
+                    },
                 ),
-                "fields": ("hero_countdown_label", "hero_countdown_end_at"),
-            },
-        ),
-        ("Batch and extended facts", {"fields": ("start_date", "total_hours_label", "batch_size_label")}),
-        (
-            "Payment cards",
-            {
-                "description": (
-                    "The plans a student chooses from on the payment page. Each card below is one "
-                    "plan: switch it on, set its price, and word the card. Show 2 to 4 cards, or none "
-                    "to turn off online purchase. Prices are charged exactly as set here; a price "
-                    "change only affects checkouts started after you save."
+                *_payment_card_fieldsets(),
+                (
+                    "All future batches pass: course inclusion",
+                    {
+                        "description": (
+                            "Tick 'Included in batch pass' on each new batch so existing pass holders are "
+                            "unlocked automatically when it is published. Selling the pass is the "
+                            "'All future batches pass' payment card above."
+                        ),
+                        "fields": (
+                            "included_in_batch_pass",
+                            "confirm_batch_pass_change",
+                        ),
+                    },
                 ),
-                "classes": ("payment-cards-overview",),
-                "fields": ("payment_cards_overview", "purchase_readiness"),
-            },
+            ),
         ),
-        *_payment_card_fieldsets(),
-        (
-            "All future batches pass: course inclusion",
-            {
-                "description": (
-                    "Tick 'Included in batch pass' on each new batch so existing pass holders are "
-                    "unlocked automatically when it is published. Selling the pass is the "
-                    "'All future batches pass' payment card above."
+        *_in_tab(
+            "schedule",
+            (
+                ("Batch and extended facts", {"fields": ("start_date", "total_hours_label", "batch_size_label")}),
+                (
+                    "Course facts",
+                    {
+                        "fields": (
+                            "is_flagship",
+                            "batch",
+                            "duration",
+                            "schedule",
+                            "class_length",
+                            "total_classes",
+                            "total_hours",
+                            "batch_size",
+                            "confirmed_statistics",
+                        )
+                    },
                 ),
-                "fields": (
-                    "included_in_batch_pass",
-                    "confirm_batch_pass_change",
+                (
+                    "Homepage countdown",
+                    {
+                        "description": (
+                            "Optional red enrollment countdown shown below the homepage hero. "
+                            "The timer hides automatically when no future deadline is configured."
+                        ),
+                        "fields": ("hero_countdown_label", "hero_countdown_end_at"),
+                    },
                 ),
-            },
+            ),
         ),
-        ("Course facts", {"fields": ("is_flagship", "batch", "duration", "schedule", "class_length", "total_classes", "total_hours", "batch_size", "confirmed_statistics")}),
-        (
-            "Frontend Container Map (Read First)",
-            {
-                "description": "Use the sections below to keep admin inputs aligned with frontend cards/containers.",
-                "fields": ("frontend_container_guide",),
-            },
-        ),
-        (
-            "Container 1: Hero Header",
-            {
-                "fields": (
-                    "category",
-                    "level",
-                    "launch_status",
-                    "registration_closed",
-                    "title",
-                    "description",
-                    "slug",
-                )
-            },
-        ),
-        (
-            "Container 2: Hero Left Cards",
-            {
-                "description": "The price shown here is the One-time payment card's price (Payment cards above).",
-                "fields": ("about_the_course",),
-            },
-        ),
-        (
-            "Optional course-context image",
-            {
-                "fields": (
-                    "thumbnail",
-                    "thumbnail_file",
-                    "thumbnail_preview",
-                    "course_overview",
-                )
-            },
-        ),
-        (
-            "Container 4: What You Will Cover (Chip Row)",
-            {
-                "description": (
-                    "Enter one item per line. Each line becomes one frontend chip."
+        *_in_tab(
+            "page",
+            (
+                (
+                    "How this page maps to the website",
+                    {
+                        "description": "Use the sections below to keep admin inputs aligned with frontend cards/containers.",
+                        "fields": ("frontend_container_guide",),
+                    },
                 ),
-                "fields": (
-                    "what_you_will_learn",
+                (
+                    "Homepage card",
+                    {
+                        "description": (
+                            "Controls the public program card. Keep the default information-led layout; "
+                            "optional images must be course-contextual."
+                        ),
+                        "fields": (
+                            "card_title",
+                            "card_subtitle",
+                            "card_summary",
+                            "card_highlights",
+                            "image_alt",
+                            "show_course_image",
+                        ),
+                    },
                 ),
-            },
+                (
+                    "Container 2: Hero Left Cards",
+                    {
+                        "description": "The price shown here is the One-time payment card's price (Pricing tab).",
+                        "fields": ("about_the_course",),
+                    },
+                ),
+                (
+                    "Optional course-context image",
+                    {
+                        "fields": (
+                            "thumbnail",
+                            "thumbnail_file",
+                            "thumbnail_preview",
+                            "course_overview",
+                        )
+                    },
+                ),
+                (
+                    "Container 4: What You Will Cover (Chip Row)",
+                    {
+                        "description": "Enter one item per line. Each line becomes one frontend chip.",
+                        "fields": ("what_you_will_learn",),
+                    },
+                ),
+                (
+                    "Container 5: Expected Outcomes (Outcome Cards)",
+                    {
+                        "description": "Enter one item per line. Each line becomes one outcome card.",
+                        "fields": ("expected_outcomes",),
+                    },
+                ),
+                (
+                    "Catalog Card: Program Features",
+                    {
+                        "description": (
+                            "Controls the feature rows shown on this course's public catalog card. "
+                            "Use one row per line in icon | title | description format."
+                        ),
+                        "fields": ("course_card_features",),
+                    },
+                ),
+                (
+                    "Container 6: Enrollment Panel (Right Side)",
+                    {"fields": ("enrollment_message", "enrollment_container_source")},
+                ),
+                (
+                    "Container 7: Course Snapshot Card",
+                    {"fields": ("snapshot_category", "snapshot_level", "snapshot_instructor")},
+                ),
+                (
+                    "Container 8: Course Roadmap (Modules/Lectures)",
+                    {
+                        "description": (
+                            "The public roadmap enriches the sales page without changing lesson modules or videos. "
+                            "Student lesson content remains controlled from Modules page."
+                        ),
+                        "fields": (
+                            "public_curriculum",
+                            "section_count_display",
+                            "lecture_count_display",
+                            "module_admin_link",
+                        ),
+                    },
+                ),
+            ),
         ),
-        (
-            "Container 5: Expected Outcomes (Outcome Cards)",
-            {
-                "description": "Enter one item per line. Each line becomes one outcome card.",
-                "fields": (
-                    "expected_outcomes",
+        *_in_tab(
+            "publishing",
+            (
+                ("Publishing", {"fields": ("is_published", "launch_status", "registration_closed")}),
+                (
+                    "Catalogue tier and memberships",
+                    {
+                        "description": (
+                            "Tier = the section on the public course list (Pentesting). "
+                            "Always included = CTF Labs members can play this course's published recordings every month."
+                        ),
+                        "fields": ("tier", "tier_order", "membership_always_included", "seed_source"),
+                    },
                 ),
-            },
+                ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
+            ),
         ),
-        (
-            "Catalog Card: Program Features",
-            {
-                "description": (
-                    "Controls the feature rows shown on this course's public catalog card. "
-                    "Use one row per line in icon | title | description format."
-                ),
-                "fields": ("course_card_features",),
-            },
-        ),
-        (
-            "Container 6: Enrollment Panel (Right Side)",
-            {
-                "fields": (
-                    "enrollment_message",
-                    "enrollment_container_source",
-                ),
-            },
-        ),
-        (
-            "Container 7: Course Snapshot Card",
-            {
-                "fields": (
-                    "snapshot_category",
-                    "snapshot_level",
-                    "snapshot_instructor",
-                    "instructor",
-                    "instructor_admin_link",
-                ),
-            },
-        ),
-        (
-            "Container 8: Course Roadmap (Modules/Lectures)",
-            {
-                "description": (
-                    "The public roadmap enriches the sales page without changing lesson modules or videos. "
-                    "Student lesson content remains controlled from Modules page."
-                ),
-                "fields": (
-                    "public_curriculum",
-                    "section_count_display",
-                    "lecture_count_display",
-                    "module_admin_link",
-                ),
-            },
-        ),
-        ("Publishing", {"fields": ("is_published",)}),
-        ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
     )
 
     def get_queryset(self, request):
@@ -1689,14 +1732,15 @@ class EnrollmentAdmin(admin.ModelAdmin):
             phone,
         )
 
-    def get_model_perms(self, request):
-        # Managed from Users admin via inlines to keep enrollment control centralized.
-        return {}
+    # Visible in the sidebar again ("Students & sales > Enrolment requests").
+    # Bulk actions go through apps.courses.enrollment_actions row by row, like
+    # the Console Requests page: save() and signals run, LogEntry and the
+    # audit log are written and the student is notified.
 
     @admin.action(description="Approve selected enrollment requests")
     def approve_enrollment_requests(self, request, queryset):
-        updated = queryset.exclude(payment_status=Enrollment.STATUS_PAID).update(
-            payment_status=Enrollment.STATUS_PAID
+        updated = enrollment_actions.apply_to_queryset(
+            enrollment_actions.KIND_COURSE, queryset, enrollment_actions.ACTION_APPROVE, by=request.user, request=request
         )
         self.message_user(
             request,
@@ -1711,8 +1755,8 @@ class EnrollmentAdmin(admin.ModelAdmin):
 
     @admin.action(description="Reject selected enrollment requests")
     def reject_enrollment_requests(self, request, queryset):
-        updated = queryset.exclude(payment_status=Enrollment.STATUS_FAILED).update(
-            payment_status=Enrollment.STATUS_FAILED
+        updated = enrollment_actions.apply_to_queryset(
+            enrollment_actions.KIND_COURSE, queryset, enrollment_actions.ACTION_REJECT, by=request.user, request=request
         )
         self.message_user(
             request,
@@ -1832,10 +1876,6 @@ class LiveClassEnrollmentAdmin(admin.ModelAdmin):
     actions = ("approve_enrollment_requests", "reject_enrollment_requests")
     fields = ("user_full_name", "user_email", "user_phone", "user", "live_class", "status", "created_at")
 
-    def get_model_perms(self, request):
-        # Managed from Users admin via inlines to keep enrollment control centralized.
-        return {}
-
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("user", "live_class")
 
@@ -1864,8 +1904,8 @@ class LiveClassEnrollmentAdmin(admin.ModelAdmin):
 
     @admin.action(description="Approve selected live-class enrollment requests")
     def approve_enrollment_requests(self, request, queryset):
-        updated = queryset.exclude(status=LiveClassEnrollment.STATUS_APPROVED).update(
-            status=LiveClassEnrollment.STATUS_APPROVED
+        updated = enrollment_actions.apply_to_queryset(
+            enrollment_actions.KIND_LIVE_CLASS, queryset, enrollment_actions.ACTION_APPROVE, by=request.user, request=request
         )
         self.message_user(
             request,
@@ -1880,8 +1920,8 @@ class LiveClassEnrollmentAdmin(admin.ModelAdmin):
 
     @admin.action(description="Reject selected live-class enrollment requests")
     def reject_enrollment_requests(self, request, queryset):
-        updated = queryset.exclude(status=LiveClassEnrollment.STATUS_REJECTED).update(
-            status=LiveClassEnrollment.STATUS_REJECTED
+        updated = enrollment_actions.apply_to_queryset(
+            enrollment_actions.KIND_LIVE_CLASS, queryset, enrollment_actions.ACTION_REJECT, by=request.user, request=request
         )
         self.message_user(
             request,
@@ -2079,7 +2119,8 @@ class EnrollmentRequestNotificationAdmin(admin.ModelAdmin):
         return False
 
 
-admin.site.site_header = "Al syed Initiative Admin"
-admin.site.site_title = "Al syed Initiative Admin"
-admin.site.index_title = "Course, Modules, and Enrollment Management"
+# One product name for the back office (UI plan decision D9).
+admin.site.site_header = settings.ADMIN_SITE_NAME
+admin.site.site_title = settings.ADMIN_SITE_NAME
+admin.site.index_title = "Overview"
 

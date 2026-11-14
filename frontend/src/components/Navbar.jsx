@@ -3,9 +3,11 @@ import "./Navbar.css";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { siteBrand } from "../config/siteBrand";
+import useCapabilities from "../features/capabilities/useCapabilities";
 import { scrollToWatchSection } from "../features/youtube/watchAnchor";
 import { useYouTubeChannel } from "../features/youtube/youTubeStore";
 import { useAuth } from "../hooks/useAuth";
+import { LiveDot } from "../site-kit/motion";
 import { resolveDjangoAdminUrl } from "../utils/backendUrl";
 import BrandLogo from "./BrandLogo";
 import NotificationBell from "./NotificationBell";
@@ -58,11 +60,19 @@ function ConsoleIcon({ className = "" }) {
   );
 }
 
-/** Live dot + "Live" next to "Watch", shown only while the channel is on air. */
+function LockIcon({ className = "" }) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 16 16" fill="currentColor">
+      <path d="M12 7h-1V4a3 3 0 0 0-6 0v3H4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1zM6 4a2 2 0 0 1 4 0v3H6zm6 10H4V8h8z" />
+    </svg>
+  );
+}
+
+/** The shared LiveDot (M8) + "Live" next to "Watch", shown only while the channel is on air. */
 function LiveIndicator() {
   return (
     <span className="snav__live">
-      <span className="snav__live-dot" aria-hidden="true" />
+      <LiveDot state="live" />
       Live
     </span>
   );
@@ -83,7 +93,7 @@ function watchClickHandler(pathname) {
 /** Moves focus between the links of an open menu with the arrow keys. */
 function handleMenuArrows(event, container) {
   if (!container || !["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
-  const items = [...container.querySelectorAll("a[href], button:not([disabled])")];
+  const items = [...container.querySelectorAll('a[href], button:not([disabled]), [aria-disabled="true"][tabindex="0"]')];
   if (items.length === 0) return;
   event.preventDefault();
   const index = items.indexOf(document.activeElement);
@@ -134,7 +144,47 @@ function useDisclosure() {
   return { open, setOpen, triggerRef, panelRef, onTriggerKeyDown };
 }
 
-function MenuLink({ link, className, onNavigate }) {
+/**
+ * A row the viewer could use later (e.g. Teach while the section is switched
+ * off): focusable, no href, a lock and the server's reason under the label.
+ */
+function DisabledMenuRow({ link, className, reasonClassName }) {
+  const reasonId = useId();
+  return (
+    <span className={`${className} is-disabled`} role="link" aria-disabled="true" tabIndex={0} aria-describedby={reasonId}>
+      <span className="snav__row-label">
+        <span>{link.label}</span>
+        <LockIcon className="snav__lock" />
+      </span>
+      <span id={reasonId} className={reasonClassName}>
+        {link.reason}
+      </span>
+    </span>
+  );
+}
+
+function MenuLink({ link, className, onNavigate, watchState, pathname }) {
+  if (link.state === "disabled") {
+    return <DisabledMenuRow link={link} className={className} reasonClassName="snav__menu-reason" />;
+  }
+  if (link.id === "watch" && watchState === "disabled") {
+    return <DisabledMenuRow link={{ ...link, reason: WATCH_EMPTY_REASON }} className={className} reasonClassName="snav__menu-reason" />;
+  }
+  if (link.id === "watch") {
+    return (
+      <NavLink
+        to={link.to}
+        className={className}
+        onClick={(event) => {
+          watchClickHandler(pathname)(event);
+          onNavigate?.();
+        }}
+      >
+        <span>{link.label}</span>
+        {watchState === "live" ? <LiveIndicator /> : null}
+      </NavLink>
+    );
+  }
   if (link.external) {
     return (
       <a href={link.href} target="_blank" rel="noopener noreferrer" className={className} onClick={onNavigate}>
@@ -173,7 +223,7 @@ function DisabledWatchItem({ label, className }) {
   );
 }
 
-function MoreMenu({ links, pathname }) {
+function MoreMenu({ links, pathname, watchState }) {
   const menuId = useId();
   const { open, setOpen, triggerRef, panelRef, onTriggerKeyDown } = useDisclosure();
   const active = links.some((link) => isSiteLinkActive(link, pathname));
@@ -206,12 +256,40 @@ function MoreMenu({ links, pathname }) {
         <ul className="snav__menu-list">
           {links.map((link) => (
             <li key={link.id}>
-              <MenuLink link={link} className="snav__menu-item" onNavigate={() => setOpen(false)} />
+              <MenuLink link={link} className="snav__menu-item" onNavigate={() => setOpen(false)} watchState={watchState} pathname={pathname} />
             </li>
           ))}
         </ul>
       </div>
     </li>
+  );
+}
+
+/** One centred link: internal (NavLink), external (Labs, new tab) or Watch with its states. */
+function PrimaryLink({ link, pathname, watchState }) {
+  const isLive = watchState === "live";
+  if (link.id === "watch" && watchState === "disabled") {
+    return <DisabledWatchItem label={link.shortLabel || link.label} className="snav__link" />;
+  }
+  if (link.external) {
+    return (
+      <a href={link.href} target="_blank" rel="noopener noreferrer" className="snav__link">
+        {link.shortLabel || link.label}
+        <ExternalIcon className="snav__external" />
+        <span className="sr-only"> (opens in a new tab)</span>
+      </a>
+    );
+  }
+  return (
+    <NavLink
+      to={link.to}
+      className={({ isActive }) => `snav__link${isActive ? " is-active" : ""}${link.id === "watch" && isLive ? " is-live" : ""}`}
+      onClick={link.id === "watch" ? watchClickHandler(pathname) : undefined}
+    >
+      {link.shortLabel || link.label}
+      {link.chip ? <span className="snav__chip">{link.chip}</span> : null}
+      {link.id === "watch" && isLive ? <LiveIndicator /> : null}
+    </NavLink>
   );
 }
 
@@ -301,6 +379,9 @@ function trapTab(event, container) {
 /** One row of the phone sheet. */
 function SheetLink({ link, onClose, pathname, navigate, watchState }) {
   const reasonId = useId();
+  if (link.state === "disabled") {
+    return <DisabledMenuRow link={link} className="snav-sheet__link snav-sheet__link--stacked" reasonClassName="snav-sheet__reason" />;
+  }
   if (link.external) {
     return (
       <a href={link.href} target="_blank" rel="noopener noreferrer" className="snav-sheet__link" onClick={onClose}>
@@ -469,11 +550,11 @@ function MobileSheet({ id, isAuthenticated, user, siteGroups, accountGroups, onS
           ) : (
             <>
               <Link to="/courses" className="snav__cta snav__cta--block" onClick={onClose}>
-                Browse courses
+                Start learning
                 <ArrowIcon className="snav__icon" />
               </Link>
               <Link to="/login" className="snav__ghost snav__ghost--block" onClick={onClose}>
-                Sign in
+                Log in
               </Link>
             </>
           )}
@@ -491,7 +572,8 @@ function MobileSheet({ id, isAuthenticated, user, siteGroups, accountGroups, onS
  * height in every state, so anchors (scroll-padding-top) never end up under it.
  */
 export default function Navbar() {
-  const { user, isAuthenticated, isInstructor, isAdmin, logout } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
+  const { caps } = useCapabilities();
   const navigate = useNavigate();
   const location = useLocation();
   const { pathname } = location;
@@ -506,9 +588,10 @@ export default function Navbar() {
   const isLive = watchState === "live";
   const { primary, more } = getSiteNavLinks(siteBrand.id, navOptions);
   const siteGroups = getSiteNavGroups(siteBrand.id, navOptions);
-  const accountGroups = isAuthenticated
-    ? getAccountMenuGroups({ isInstructor, isAdmin, djangoAdminUrl: isAdmin ? resolveDjangoAdminUrl() : "" })
-    : [];
+  // Teaching and Admin rows come from the server's capabilities (plan §6.7).
+  const accountGroups = isAuthenticated ? getAccountMenuGroups({ caps, djangoAdminUrl: resolveDjangoAdminUrl() }) : [];
+  // Landing only (M15a): the header hairline fades in over the first 48 px of scroll.
+  const hairline = pathname === "/" ? "scroll" : "always";
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -545,6 +628,7 @@ export default function Navbar() {
       className="snav"
       data-theme="g100"
       data-scrolled={scrolled ? "true" : "false"}
+      data-hairline={hairline}
       data-menu-open={mobileMenuOpen ? "true" : "false"}
     >
       <div className="snav__bar">
@@ -554,23 +638,10 @@ export default function Navbar() {
           <ul className="snav__pill">
             {primary.map((link) => (
               <li key={link.id}>
-                {link.id === "watch" && watchState === "disabled" ? (
-                  <DisabledWatchItem label={link.shortLabel || link.label} className="snav__link" />
-                ) : (
-                  <NavLink
-                    to={link.to}
-                    className={({ isActive }) =>
-                      `snav__link${isActive ? " is-active" : ""}${link.id === "watch" && isLive ? " is-live" : ""}`
-                    }
-                    onClick={link.id === "watch" ? watchClickHandler(pathname) : undefined}
-                  >
-                    {link.shortLabel || link.label}
-                    {link.id === "watch" && isLive ? <LiveIndicator /> : null}
-                  </NavLink>
-                )}
+                <PrimaryLink link={link} pathname={pathname} watchState={watchState} />
               </li>
             ))}
-            {more.length > 0 ? <MoreMenu links={more} pathname={pathname} /> : null}
+            {more.length > 0 ? <MoreMenu links={more} pathname={pathname} watchState={watchState} /> : null}
           </ul>
         </nav>
 
@@ -590,10 +661,10 @@ export default function Navbar() {
           ) : (
             <>
               <Link to="/login" className="snav__ghost snav__ghost--bar">
-                Sign in
+                Log in
               </Link>
               <Link to="/courses" className="snav__cta snav__cta--bar snav__cta--guest">
-                Browse courses
+                Start learning
               </Link>
             </>
           )}
@@ -612,7 +683,11 @@ export default function Navbar() {
             <svg aria-hidden="true" viewBox="0 0 16 16" className="snav__icon" fill="currentColor">
               <path d="M2 3h12v1H2zM2 7.5h12v1H2zM2 12h12v1H2z" />
             </svg>
-            {isLive && !mobileMenuOpen ? <span className="snav__menu-live" aria-hidden="true" /> : null}
+            {isLive && !mobileMenuOpen ? (
+              <span className="snav__menu-live">
+                <LiveDot state="live" />
+              </span>
+            ) : null}
           </button>
         </div>
       </div>

@@ -14,7 +14,7 @@ function PlayerChrome({ children, live = false }) {
         <div className="pointer-events-none absolute inset-x-5 bottom-4 flex items-center gap-3 text-white/80">
           <span className="inline-block h-0 w-0 border-y-[6px] border-l-[10px] border-y-transparent border-l-white/80" />
           <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/25">
-            <div className={`h-full ${live ? "w-1/3 bg-red-600" : "w-0 bg-white"}`} />
+            <div className={`h-full ${live ? "w-1/3 bg-[#F3E2B3]" : "w-0 bg-white"}`} />
           </div>
           <span className="text-xs font-semibold">{live ? "LIVE" : "OFFLINE"}</span>
           <span className="text-[10px] font-semibold uppercase tracking-[0.12em]">Full</span>
@@ -104,8 +104,8 @@ export default function LiveClassViewingStage({
         <div className="absolute inset-0 flex items-center justify-center px-6 pb-12 text-center">
           {liveSession ? (
             <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-red-500/45 bg-red-950/50 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.18em] text-red-200">
-                <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500 shadow-[0_0_16px_rgba(239,68,68,0.9)]" />
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#F3E2B3]/40 bg-black/60 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#F3E2B3]">
+                <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#F3E2B3] shadow-[0_0_14px_rgba(243,226,179,0.6)] motion-reduce:animate-none" />
                 Class is live now
               </div>
               <h2 className="mt-5 font-reference text-2xl font-semibold text-white sm:text-4xl">
@@ -118,7 +118,7 @@ export default function LiveClassViewingStage({
                 type="button"
                 onClick={() => onJoin(liveSession.id)}
                 disabled={joining}
-                className="mt-7 inline-flex min-h-14 min-w-[220px] items-center justify-center rounded-xl bg-red-600 px-8 py-4 text-base font-extrabold uppercase tracking-[0.1em] text-white shadow-[0_18px_38px_rgba(220,38,38,0.3)] transition hover:bg-red-500 disabled:cursor-wait disabled:opacity-65"
+                className="mt-7 inline-flex min-h-14 min-w-[220px] items-center justify-center rounded-md bg-[#F3E2B3] px-8 py-4 text-base font-semibold text-[#0a0a0a] shadow-[0_6px_18px_rgba(243,226,179,0.15)] transition-colors hover:bg-[#F8EDCF] motion-reduce:transition-none disabled:cursor-wait disabled:opacity-65"
               >
                 {joining ? "Connecting..." : "Join Live Class"}
               </button>
@@ -157,13 +157,13 @@ export default function LiveClassViewingStage({
         </div>
         <span className={`rounded-full border px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] ${
           liveSession
-            ? "border-red-500/45 bg-red-950/35 text-red-300"
+            ? "border-[#F3E2B3]/40 bg-[#F3E2B3]/[0.06] text-[#F3E2B3]"
             : "border-white/10 bg-[#141414] text-[#8E8E8E]"
         }`}>
           {liveSession ? "Live" : "Scheduled"}
         </span>
       </div>
-      {error ? <p className="mt-3 text-sm text-red-300">{error}</p> : null}
+      {error ? <p className="mt-3 text-sm text-[#fafafa]">{error}</p> : null}
       <div className="mt-4 flex justify-end">
         <LegacyFallbackLink href={legacyHref} />
       </div>

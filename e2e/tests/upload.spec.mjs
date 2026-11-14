@@ -79,8 +79,10 @@ test("recording upload: drop + refresh + resume replaces the auto-recording; tok
 
   let uploadId;
   await test.step("upload starts; the connection drops after 2 chunks and the page keeps retrying", async () => {
+    // The old URL lands on the Admin workspace's Upload page (UI overhaul §4.3).
     await page.goto("/console/recordings/upload");
-    await expect(page.getByRole("heading", { name: "Upload class recording" })).toBeVisible();
+    await expect(page).toHaveURL(/\/console\/admin\/recordings\/upload$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Upload class recording" })).toBeVisible();
     await classSelect().selectOption(String(obs.id));
     await expect(page.getByText(/Replaces the video of/)).toBeVisible();
     await fileInput().setInputFiles(recordingFile);
@@ -146,7 +148,10 @@ test("recording upload: drop + refresh + resume replaces the auto-recording; tok
 
   let token;
   await test.step("a personal upload token (desktop uploader) creates the lecture of a class without a recording", async () => {
-    await page.getByLabel("Token name").fill("Laptop OBS");
+    // UI overhaul: upload tokens sit in a secondary "Desktop uploader" disclosure below the task.
+    const tokenName = page.getByLabel("Token name");
+    if (!(await tokenName.isVisible())) await page.locator("summary", { hasText: "Desktop uploader" }).click();
+    await tokenName.fill("Laptop OBS");
     await page.getByRole("button", { name: "Create upload token" }).click();
     token = (await page.getByTestId("new-upload-token").textContent()).trim();
     expect(token.startsWith("asu_")).toBe(true);

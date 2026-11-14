@@ -1,4 +1,4 @@
-import { createContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AUTH_SESSION_EXPIRED_EVENT, resetSessionEviction } from "../api/client";
 import {
@@ -22,6 +22,9 @@ import SessionEvictedDialog from "../components/SessionEvictedDialog";
 // Phase 2: an evicted device finishes a playing live class with a banner.
 import LiveEvictionBanner from "../components/realtime/LiveEvictionBanner";
 import { useLiveClassActive } from "../services/realtime/liveClassGuard";
+// UI overhaul (WS-F): what the viewer may use in the Console (Appendix A.1).
+import { CAPABILITIES_POLL_MS, CAPABILITIES_STALE_EVENT, fetchCapabilities } from "../features/capabilities/api";
+import { noteCapabilities } from "../features/capabilities/reveal";
 
 export const AuthContext = createContext(null);
 
@@ -80,6 +83,49 @@ export function AuthProvider({ children }) {
   // null, or { mode: "live" | "final", classEnded } (see SessionEvictionPrompt).
   const [sessionEviction, setSessionEviction] = useState(null);
   const hasBootstrappedRef = useRef(false);
+  // Capabilities arrive embedded in the user and are then re-checked on window
+  // focus, every 5 minutes and after any 403 feature_disabled (plan §5.4).
+  const [capabilities, setCapabilitiesState] = useState(null);
+  const capabilitiesJsonRef = useRef("null");
+  const capabilitiesRequestRef = useRef(null);
+  const userIdRef = useRef(null);
+
+  const setCapabilities = useCallback((next) => {
+    const value = next && typeof next === "object" ? next : null;
+    const json = JSON.stringify(value);
+    if (json === capabilitiesJsonRef.current) {
+      return;
+    }
+    capabilitiesJsonRef.current = json;
+    if (value) {
+      noteCapabilities(userIdRef.current, value);
+    }
+    setCapabilitiesState(value);
+  }, []);
+
+  const refreshCapabilities = useCallback(() => {
+    if (userIdRef.current == null) {
+      return Promise.resolve(null);
+    }
+    if (capabilitiesRequestRef.current) {
+      return capabilitiesRequestRef.current;
+    }
+    const userId = userIdRef.current;
+    const request = fetchCapabilities()
+      .then((response) => {
+        const next = apiData(response, null);
+        if (next && userIdRef.current === userId) {
+          setCapabilities(next);
+        }
+        return next;
+      })
+      .catch(() => null) // keep the last known state; the server still enforces every rule
+      .finally(() => {
+        capabilitiesRequestRef.current = null;
+      });
+    capabilitiesRequestRef.current = request;
+    return request;
+  }, [setCapabilities]);
 
   function setAuthenticatedUser(data, { newSession = false } = {}) {
     if (data) {
@@ -91,7 +137,15 @@ export function AuthProvider({ children }) {
       // that is finishing its live class must keep the banner.
       setSessionEviction(null);
     }
+    userIdRef.current = data?.id ?? null;
+    setCapabilities(data?.capabilities ?? null);
     setUser(data);
+  }
+
+  function clearUser() {
+    userIdRef.current = null;
+    setCapabilities(null);
+    setUser(null);
   }
 
   async function refreshUser() {
@@ -99,7 +153,7 @@ export function AuthProvider({ children }) {
       const response = await fetchCurrentUser();
       setAuthenticatedUser(apiData(response));
     } catch {
-      setUser(null);
+      clearUser();
     } finally {
       setLoading(false);
     }
@@ -153,6 +207,10 @@ export function AuthProvider({ children }) {
         setSessionEviction((current) => (current?.mode === "final" && next.mode === "live" ? current : next));
         return;
       }
+      // Same as clearUser(), with only stable setters and refs (no effect deps).
+      userIdRef.current = null;
+      capabilitiesJsonRef.current = "null";
+      setCapabilitiesState(null);
       setUser(null);
       setLoading(false);
     };
@@ -162,6 +220,32 @@ export function AuthProvider({ children }) {
       window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
     };
   }, []);
+
+  const signedInUserId = user?.id ?? null;
+  useEffect(() => {
+    if (signedInUserId == null || typeof window === "undefined") {
+      return undefined;
+    }
+    const refresh = () => {
+      refreshCapabilities();
+    };
+    const doc = typeof document === "undefined" ? null : document;
+    const onVisible = () => {
+      if (doc?.visibilityState === "visible") {
+        refresh();
+      }
+    };
+    window.addEventListener("focus", refresh);
+    window.addEventListener(CAPABILITIES_STALE_EVENT, refresh);
+    doc?.addEventListener("visibilitychange", onVisible);
+    const timer = setInterval(refresh, CAPABILITIES_POLL_MS);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener(CAPABILITIES_STALE_EVENT, refresh);
+      doc?.removeEventListener("visibilitychange", onVisible);
+      clearInterval(timer);
+    };
+  }, [signedInUserId, refreshCapabilities]);
 
   const login = async (payload) => {
     const response = await loginUser(payload);
@@ -176,14 +260,14 @@ export function AuthProvider({ children }) {
     } finally {
       resetSessionEviction();
       setSessionEviction(null);
-      setUser(null);
+      clearUser();
     }
   };
 
   const signInOnThisDevice = () => {
     setSessionEndedMessage(SESSION_EVICTED_LOGIN_MESSAGE);
     setSessionEviction(null);
-    setUser(null);
+    clearUser();
   };
 
   const acceptTerms = async ({ accepted = true, terms_version } = {}) => {
@@ -200,6 +284,8 @@ export function AuthProvider({ children }) {
       isAuthenticated: Boolean(user),
       isInstructor: user?.role === "instructor",
       isAdmin: Boolean(user?.is_admin),
+      capabilities,
+      refreshCapabilities,
       webPushEnabled,
       webPushPublicKey,
       turnstileEnabled,
@@ -215,6 +301,8 @@ export function AuthProvider({ children }) {
     [
       user,
       loading,
+      capabilities,
+      refreshCapabilities,
       webPushEnabled,
       webPushPublicKey,
       turnstileEnabled,

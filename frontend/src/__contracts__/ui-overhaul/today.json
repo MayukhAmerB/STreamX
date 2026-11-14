@@ -1,0 +1,51 @@
+{
+  "learn": {
+    "workspace": "learn",
+    "next_up": {
+      "kind": "live_now",
+      "title": "OSINT Live: Fri batch",
+      "subtitle": "Started 7:02 pm",
+      "action": { "label": "Join live", "href": "/courses/12/live" },
+      "image": "/media/course_thumbnails/osint-foundations.avif",
+      "progress": null,
+      "starts_at": null,
+      "due_at": null
+    },
+    "also": [
+      { "kind": "report_due", "label": "Week of 9–15 Nov", "due_at": "2026-11-15T23:59:00+05:30", "href": "/reports/tasks/88" },
+      { "kind": "resume", "label": "Resume OSINT Foundations · Lesson 4", "due_at": null, "href": "/learn/12" }
+    ],
+    "courses": [
+      { "id": 12, "title": "OSINT Foundations", "progress": 0.4, "href": "/learn/12", "image": "/media/course_thumbnails/osint-foundations.avif" }
+    ],
+    "teach": null
+  },
+  "learn_browse": {
+    "workspace": "learn",
+    "next_up": {
+      "kind": "browse",
+      "title": "You're not enrolled yet",
+      "subtitle": "Pick a course to start learning.",
+      "action": { "label": "Browse courses", "href": "/courses" },
+      "image": null,
+      "progress": null,
+      "starts_at": null,
+      "due_at": null
+    },
+    "also": [],
+    "courses": [],
+    "teach": null
+  },
+  "teach": {
+    "workspace": "teach",
+    "next_up": null,
+    "also": [],
+    "courses": [],
+    "teach": {
+      "to_grade": { "count": 12, "oldest_at": "2026-11-11T10:15:00+05:30", "href": "/console/teach/grading" },
+      "host_next": { "session_id": 5, "starts_at": "2026-11-20T19:00:00+05:30", "href": "/console/teach/classes/5/studio" },
+      "recordings": { "processing": 1, "to_publish": 1, "href": "/console/teach/recordings" },
+      "exams_open": { "count": 1, "submitted": 23, "eligible": 40, "href": "/console/teach/exams" }
+    }
+  }
+}

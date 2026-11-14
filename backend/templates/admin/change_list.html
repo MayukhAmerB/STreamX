@@ -1,0 +1,58 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls admin_list enterprise_admin %}
+{# Plain title, Console banner, filters disclosure, scrollable results and an empty state (UI plan §4.8). #}
+
+{% block title %}{{ cl.opts|enterprise_model_title }} | {% enterprise_site_name %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% translate 'Overview' %}</a>
+&rsaquo; {{ cl.opts|enterprise_model_title }}
+</div>
+{% endblock %}
+
+{% block content_title %}
+  <div class="enterprise-page-header">
+    <div class="enterprise-page-heading">
+      <h1>{{ cl.opts|enterprise_model_title }}</h1>
+      <p class="enterprise-page-description">{% if cl.result_count != cl.full_result_count and cl.full_result_count is not None %}{{ cl.result_count }} of {{ cl.full_result_count }} shown{% else %}{{ cl.result_count }} in total{% endif %}</p>
+    </div>
+    {% if not is_popup %}
+      <ul class="object-tools">
+        {% block object-tools-items %}
+          {% change_list_object_tools %}
+        {% endblock %}
+      </ul>
+    {% endif %}
+  </div>
+  {% enterprise_console_home cl.opts as console_home %}
+  {% if console_home and not is_popup %}{% include "admin/includes/console_banner.html" with home=console_home %}{% endif %}
+{% endblock %}
+
+{% block object-tools %}{% endblock %}
+
+{% block result_list %}
+  {% if action_form and actions_on_top and cl.show_admin_actions and cl.result_count %}{% admin_actions %}{% endif %}
+  {% if cl.result_count %}
+    {% result_list cl %}
+  {% else %}
+    {% include "admin/includes/changelist_empty.html" %}
+  {% endif %}
+  {% if action_form and actions_on_bottom and cl.show_admin_actions and cl.result_count %}{% admin_actions %}{% endif %}
+{% endblock %}
+
+{% block pagination %}{% if cl.result_count %}{% pagination cl %}{% endif %}{% endblock %}
+
+{% block filters %}
+  {% if cl.has_filters %}
+    {% enterprise_active_filter_count cl as active_filters %}
+    <details class="enterprise-filters" open data-filters>
+      <summary class="enterprise-filters-toggle">
+        <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-settings-adjust"></use></svg>
+        <span>Filters{% if active_filters %} ({{ active_filters }}){% endif %}</span>
+        <svg class="enterprise-icon enterprise-sidenav-chevron" aria-hidden="true"><use href="#icon-chevron-down"></use></svg>
+      </summary>
+      {{ block.super }}
+    </details>
+  {% endif %}
+{% endblock %}

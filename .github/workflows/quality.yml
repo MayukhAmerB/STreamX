@@ -96,6 +96,8 @@ jobs:
         run: bash infra/hostinger/tests/test-deploy-nginx-config.sh
       - name: Verify gateway-backed public routing
         run: bash infra/hostinger/tests/test-gateway-routing-config.sh
+      - name: Verify certificate link-preview routing for crawlers
+        run: bash infra/hostinger/tests/test-certificate-link-preview-config.sh
       - name: Verify monitor Nginx security headers
         run: bash infra/hostinger/tests/test-monitor-nginx-config.sh
       - name: Verify course release commit guard

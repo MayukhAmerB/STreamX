@@ -1,0 +1,91 @@
+{
+  "student": {
+    "version": 1,
+    "features": { "teaching": { "enabled": false } },
+    "workspaces": {
+      "learn": { "state": "enabled" },
+      "teach": { "state": "hidden" },
+      "admin": { "state": "hidden" }
+    },
+    "items": {
+      "teach-today": { "state": "hidden" },
+      "teach-courses": { "state": "hidden" },
+      "teach-classes": { "state": "hidden" },
+      "teach-recordings": { "state": "hidden" },
+      "teach-grading": { "state": "hidden" },
+      "teach-exams": { "state": "hidden" }
+    }
+  },
+  "instructor_off": {
+    "version": 1,
+    "features": { "teaching": { "enabled": false } },
+    "workspaces": {
+      "learn": { "state": "enabled" },
+      "teach": { "state": "disabled", "reason": "Teaching tools are switched off for now. An admin can turn them on." },
+      "admin": { "state": "hidden" }
+    },
+    "items": {
+      "teach-today": { "state": "disabled", "reason": "Teaching tools are switched off for now. An admin can turn them on." },
+      "teach-courses": { "state": "disabled", "reason": "Teaching tools are switched off for now. An admin can turn them on." },
+      "teach-classes": { "state": "disabled", "reason": "Teaching tools are switched off for now. An admin can turn them on." },
+      "teach-recordings": { "state": "disabled", "reason": "Teaching tools are switched off for now. An admin can turn them on." },
+      "teach-grading": { "state": "disabled", "reason": "Teaching tools are switched off for now. An admin can turn them on." },
+      "teach-exams": { "state": "disabled", "reason": "Teaching tools are switched off for now. An admin can turn them on." }
+    }
+  },
+  "instructor_on": {
+    "version": 2,
+    "features": { "teaching": { "enabled": true } },
+    "workspaces": {
+      "learn": { "state": "enabled" },
+      "teach": { "state": "enabled" },
+      "admin": { "state": "hidden" }
+    },
+    "items": {
+      "teach-today": { "state": "enabled" },
+      "teach-courses": { "state": "enabled" },
+      "teach-classes": { "state": "enabled" },
+      "teach-recordings": { "state": "enabled" },
+      "teach-grading": { "state": "enabled" },
+      "teach-exams": { "state": "enabled" }
+    }
+  },
+  "staff_off": {
+    "version": 1,
+    "features": { "teaching": { "enabled": false } },
+    "workspaces": {
+      "learn": { "state": "enabled" },
+      "teach": { "state": "hidden" },
+      "admin": { "state": "enabled" }
+    },
+    "status": [
+      { "key": "teaching", "label": "Teachers section", "enabled": false, "manage_url": "/console/admin/settings/features" }
+    ],
+    "items": {
+      "teach-today": { "state": "hidden" },
+      "teach-courses": { "state": "hidden" },
+      "teach-classes": { "state": "hidden" },
+      "teach-recordings": { "state": "hidden" },
+      "teach-grading": { "state": "hidden" },
+      "teach-exams": { "state": "hidden" }
+    }
+  },
+  "staff_on": {
+    "version": 2,
+    "features": { "teaching": { "enabled": true } },
+    "workspaces": {
+      "learn": { "state": "enabled" },
+      "teach": { "state": "hidden" },
+      "admin": { "state": "enabled" }
+    },
+    "status": [],
+    "items": {
+      "teach-today": { "state": "hidden" },
+      "teach-courses": { "state": "hidden" },
+      "teach-classes": { "state": "hidden" },
+      "teach-recordings": { "state": "hidden" },
+      "teach-grading": { "state": "hidden" },
+      "teach-exams": { "state": "hidden" }
+    }
+  }
+}

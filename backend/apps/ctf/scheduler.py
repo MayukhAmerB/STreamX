@@ -257,6 +257,9 @@ def finalize_exam_results(exam, now):
                     question_count=question_count,
                     rank=rank,
                     finalized_at=now,
+                    student_roll_number=participation.student_roll_number,
+                    student_name_snapshot=participation.student_name_snapshot,
+                    student_handle_snapshot=participation.student_handle_snapshot,
                 )
             )
         CtfExamResult.objects.bulk_create(rows, ignore_conflicts=True, batch_size=500)

@@ -1,0 +1,641 @@
+// Teach › Courses and the course editor (UI overhaul WS-D2). Syed Carbon:
+// g100 layers, radius token (0; pill only for the switch), one champagne
+// action per view, transform/opacity/colour motion only. Phone first.
+
+.tch-page {
+  --tch-text: var(--sc-text-primary, var(--uc-text, #f4f4f4));
+  --tch-text-2: var(--sc-text-secondary, #c6c6c6);
+  --tch-muted: var(--sc-text-helper, #a8a8a8);
+  --tch-layer: var(--sc-surface-01, #1c1c1c);
+  --tch-layer-2: var(--sc-surface-02, #262626);
+  --tch-layer-hover: var(--sc-surface-hover-01, #262626);
+  --tch-border: var(--sc-border-subtle, #393939);
+  --tch-border-strong: var(--sc-border-strong, #6f6f6f);
+  --tch-accent: var(--sc-accent, #f3e2b3);
+  --tch-accent-wash: var(--sc-accent-wash, rgba(243, 226, 179, 0.08));
+  --tch-success: var(--sc-support-success, #fafafa);
+  --tch-error: var(--sc-support-error, #fafafa);
+  --tch-radius: var(--sc-radius-surface, 0);
+  --tch-pill: var(--sc-radius-pill, 999px);
+  --tch-fast: var(--sc-duration-fast-01, 70ms);
+  --tch-fast-2: var(--sc-duration-fast-02, 110ms);
+  --tch-moderate: var(--sc-duration-moderate-01, 150ms);
+  --tch-ease: var(--sc-ease-standard-productive, cubic-bezier(0.2, 0, 0.38, 0.9));
+  --tch-enter: var(--sc-ease-entrance-productive, cubic-bezier(0, 0, 0.38, 0.9));
+
+  color: var(--tch-text);
+
+  .cds-page-header {
+    margin-block-end: 1rem;
+  }
+}
+
+.tch-muted {
+  margin: 0;
+  color: var(--tch-muted);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.tch-none {
+  padding-block: 1.5rem;
+}
+
+.tch-link {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 2.75rem;
+  color: var(--tch-text);
+  font-size: 0.875rem;
+  gap: 0.5rem;
+  text-decoration: none;
+
+  svg {
+    fill: currentColor;
+    transition: transform var(--tch-fast-2) var(--tch-ease);
+  }
+
+  &:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+
+  &:hover svg {
+    transform: translateX(4px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sc-focus, #fff);
+    outline-offset: 2px;
+  }
+}
+
+.tch-course-cell__title {
+  font-weight: 600;
+}
+
+.tch-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tch-disabled-action {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 3rem;
+  padding-inline: 1rem;
+  border: 1px solid var(--tch-border);
+  color: var(--sc-text-disabled, #8d8d8d);
+  cursor: not-allowed;
+  font-size: 0.875rem;
+  gap: 0.5rem;
+
+  svg {
+    fill: currentColor;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sc-focus, #fff);
+    outline-offset: 2px;
+  }
+}
+
+.tch-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-block: 0 1rem;
+  gap: 0.5rem 1rem;
+
+  .cds--inline-notification {
+    flex: 1 1 20rem;
+    max-inline-size: none;
+    margin: 0;
+  }
+}
+
+.tch-tab-body {
+  // The page template already spaces the tabs from the body.
+  margin-block-start: 0;
+  animation: tch-enter var(--tch-moderate) var(--tch-enter) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+:root[data-motion='reduce'] .tch-tab-body {
+  animation: none;
+}
+
+@keyframes tch-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+// --- Overview form (T4: one 640 px column) ----------------------------------------
+.tch-overview,
+.tch-form {
+  max-inline-size: 40rem;
+}
+
+.tch-form {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.tch-overview .sc-sticky-actions,
+.tch-page .sc-template__actions .sc-sticky-actions {
+  margin-block-start: 1.5rem;
+}
+
+// See Grading.scss: no tab bar on desktop, so the bar sits on the window edge.
+.cds-app[data-shell-layout='desktop'] .tch-page .sc-sticky-actions {
+  inset-block-end: 0;
+}
+
+.tch-label {
+  margin-block-end: 0.5rem;
+  color: var(--tch-text-2);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  line-height: 1rem;
+}
+
+.tch-cover {
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.tch-cover__body {
+  display: grid;
+  align-items: start;
+  gap: 1rem;
+
+  @media (min-width: 42rem) {
+    &:has(.tch-cover__preview) {
+      grid-template-columns: 12rem minmax(0, 1fr);
+    }
+  }
+}
+
+.tch-cover__preview {
+  display: grid;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--tch-border);
+  background: var(--tch-layer);
+  place-items: center;
+
+  img {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+  }
+}
+
+.tch-disclosure {
+  margin-block-start: 0.75rem;
+
+  > summary {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 2.75rem;
+    color: var(--tch-text-2);
+    cursor: pointer;
+    font-size: 0.875rem;
+    gap: 0.5rem;
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    &::before {
+      content: '';
+      inline-size: 0.5rem;
+      block-size: 0.5rem;
+      border-inline-end: 1px solid currentColor;
+      border-block-end: 1px solid currentColor;
+      transform: rotate(-45deg);
+      transition: transform var(--tch-fast-2) var(--tch-ease);
+    }
+
+    &:hover {
+      color: var(--tch-text);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--sc-focus, #fff);
+      outline-offset: 2px;
+    }
+  }
+
+  &[open] > summary::before {
+    transform: rotate(45deg);
+  }
+}
+
+.tch-video {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.tch-video__file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0;
+  color: var(--tch-text);
+  font-size: 0.875rem;
+  gap: 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.tch-field-error {
+  margin: 0;
+  color: var(--sc-text-error, #fafafa);
+  font-size: 0.75rem;
+}
+
+// --- Curriculum ---------------------------------------------------------------------
+.tch-curriculum,
+.tch-live {
+  display: grid;
+  gap: 1rem;
+  max-inline-size: 56rem;
+}
+
+.tch-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+}
+
+.tch-section-title {
+  margin: 0;
+  color: var(--tch-text);
+  font-size: 1.25rem;
+  font-weight: 400;
+  line-height: 1.75rem;
+}
+
+.tch-hint {
+  display: none;
+
+  @media (hover: hover) and (min-width: 42rem) {
+    display: block;
+  }
+}
+
+.tch-modules,
+.tch-lectures {
+  display: grid;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.tch-modules {
+  gap: 1rem;
+}
+
+.tch-module {
+  border: 1px solid var(--tch-border);
+  border-radius: var(--tch-radius);
+  background: var(--tch-layer);
+  transition: border-color var(--tch-fast) linear, opacity var(--tch-fast-2) linear;
+
+  &[data-dragging='true'] {
+    opacity: 0.5;
+  }
+
+  &[data-drop-target='true'] {
+    border-color: var(--tch-accent);
+  }
+}
+
+.tch-module__head {
+  display: grid;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  column-gap: 0.75rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  row-gap: 0.5rem;
+
+  &:focus-visible {
+    outline: 2px solid var(--sc-focus, #fff);
+    outline-offset: -2px;
+  }
+
+  @media (min-width: 42rem) {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+}
+
+.tch-module__head:not(:has(.tch-handle)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tch-handle {
+  cursor: grab;
+  fill: var(--tch-muted);
+
+  // Phones have no drag and drop: the Move buttons and Alt+arrows remain.
+  @media (max-width: 41.98rem) {
+    display: none;
+  }
+}
+
+.tch-module__text {
+  display: grid;
+  min-inline-size: 0;
+  gap: 0.125rem;
+}
+
+.tch-module__title {
+  display: flex;
+  align-items: baseline;
+  margin: 0;
+  color: var(--tch-text);
+  font-size: 1rem;
+  font-weight: 600;
+  gap: 0.5rem;
+  line-height: 1.5rem;
+  overflow-wrap: anywhere;
+}
+
+.tch-module__index,
+.tch-lecture__index {
+  color: var(--tch-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+.tch-module__actions,
+.tch-lecture__actions,
+.tch-move {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.tch-module__actions {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+
+  @media (min-width: 42rem) {
+    grid-column: auto;
+  }
+}
+
+.tch-module__empty {
+  padding: 0 1rem 0.75rem;
+}
+
+.tch-lectures {
+  border-block-start: 1px solid var(--tch-border);
+}
+
+.tch-lecture {
+  display: grid;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-block-end: 1px solid var(--tch-border);
+  background: var(--tch-layer);
+  column-gap: 0.75rem;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  min-block-size: 3rem;
+  row-gap: 0.25rem;
+  transition: background-color var(--tch-fast) linear, opacity var(--tch-fast-2) linear;
+
+  &:last-child {
+    border-block-end: 0;
+  }
+
+  &:hover {
+    background: var(--tch-layer-hover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sc-focus, #fff);
+    outline-offset: -2px;
+  }
+
+  &[data-dragging='true'] {
+    opacity: 0.5;
+  }
+
+  &[data-drop-target='true'] {
+    background: var(--tch-accent-wash);
+  }
+
+  @media (min-width: 42rem) {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+  }
+}
+
+.tch-lecture:not(:has(.tch-handle)) {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.tch-lecture__text {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.tch-lecture__title {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+.tch-lecture__actions {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+
+  @media (min-width: 42rem) {
+    grid-column: auto;
+  }
+}
+
+.tch-tag {
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--tch-border-strong);
+  border-radius: var(--tch-pill);
+  color: var(--tch-text-2);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+// Free preview switch (role="switch"): knob slides with transform only.
+.tch-switch {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 2.5rem;
+  padding: 0 0.5rem;
+  border: 0;
+  background: none;
+  color: var(--tch-text-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  gap: 0.5rem;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sc-focus, #fff);
+    outline-offset: 2px;
+  }
+}
+
+.tch-switch__track {
+  position: relative;
+  display: inline-block;
+  inline-size: 2rem;
+  block-size: 1rem;
+  border-radius: var(--tch-pill);
+  background: var(--tch-border-strong);
+  transition: background-color var(--tch-fast) linear;
+}
+
+.tch-switch__knob {
+  position: absolute;
+  inset-block-start: 0.125rem;
+  inset-inline-start: 0.125rem;
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  border-radius: var(--tch-pill);
+  background: var(--sc-icon-on-color, #f4f4f4);
+  transition: transform var(--tch-fast) var(--tch-ease);
+}
+
+.tch-switch[aria-checked='true'] {
+  color: var(--tch-text);
+
+  .tch-switch__track {
+    background: var(--tch-success);
+  }
+
+  .tch-switch__knob {
+    transform: translateX(1rem);
+  }
+}
+
+.tch-inline-form {
+  display: grid;
+  padding: 1rem;
+  border-block-start: 1px solid var(--tch-border);
+  background: var(--tch-layer-2);
+  gap: 1rem;
+}
+
+.tch-modules + .tch-inline-form,
+.tch-curriculum > .tch-inline-form {
+  border: 1px solid var(--tch-border);
+}
+
+.tch-inline-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.tch-add {
+  justify-self: start;
+}
+
+.tch-module > .tch-add {
+  margin: 0.25rem 0.5rem 0.5rem;
+}
+
+// --- Live classes -------------------------------------------------------------------
+.tch-live__list {
+  display: grid;
+  padding: 0;
+  margin: 0;
+  border-block-start: 1px solid var(--tch-border);
+  list-style: none;
+}
+
+.tch-live__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-block-end: 1px solid var(--tch-border);
+  background: var(--tch-layer);
+  gap: 0.5rem 1rem;
+}
+
+.tch-live__text {
+  display: grid;
+  min-inline-size: 0;
+  gap: 0.125rem;
+}
+
+.tch-live__title {
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tch-switch__knob,
+  .tch-switch__track,
+  .tch-link svg,
+  .tch-module,
+  .tch-lecture {
+    transition: none;
+  }
+}
+
+// Phones: the drag handle is hidden, so its grid column goes too.
+@media (max-width: 41.98rem) {
+  .tch-module__head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tch-lecture {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+}
+
+// Catalogue tier (read-only; hackpath BUILD_PLAN §2.2): label, value, hint.
+.tch-tier {
+  display: grid;
+  gap: 0.25rem;
+  padding-block-start: 1rem;
+  border-block-start: 1px solid var(--tch-border);
+}
+
+.tch-tier__value {
+  margin: 0;
+  color: var(--tch-text, #fafafa);
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.tch-tier__order {
+  color: var(--tch-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}

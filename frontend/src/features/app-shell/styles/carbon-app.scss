@@ -11,14 +11,15 @@
 //     navigates back to a public page in the same SPA session.
 @use 'sass:meta';
 @use 'sass:string';
-// Carbon type: Inter (already loaded by index.html for the website) instead
-// of IBM Plex. Configured before any other Carbon module loads it.
+// Carbon type: IBM Plex Sans + Plex Mono, self-hosted by the site
+// (src/styles/fonts.css), so the Console, the site and the admin share one
+// voice (UI overhaul §2.1). Configured before any other Carbon module loads it.
 @use '@carbon/type/scss/font-family' with (
   $font-families: (
-    'mono': string.unquote("ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', monospace"),
-    'sans': string.unquote("'Inter', 'Segoe UI', Arial, system-ui, sans-serif"),
-    'sans-condensed': string.unquote("'Inter', 'Segoe UI', Arial, system-ui, sans-serif"),
-    'serif': string.unquote("'Inter', 'Segoe UI', Arial, system-ui, sans-serif"),
+    'mono': string.unquote("'IBM Plex Mono', ui-monospace, Menlo, Consolas, 'Liberation Mono', monospace"),
+    'sans': string.unquote("'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif"),
+    'sans-condensed': string.unquote("'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif"),
+    'serif': string.unquote("'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif"),
   )
 );
 @use '@carbon/styles/scss/config' with (
@@ -31,7 +32,7 @@
 @use '@carbon/styles/scss/theme';
 @use '@carbon/styles/scss/utilities/layout' as carbon-layout;
 @use './tokens' as *;
-@use './corner-theme' as corner;
+@use './carbon-theme' as console;
 
 // ---------------------------------------------------------------------------
 // Carbon components, every selector scoped under `.cds-app`. Loaded first so
@@ -43,15 +44,15 @@
 }
 
 // ---------------------------------------------------------------------------
-// Theme: Console. Dark only (the site is black everywhere). Carbon G100
-// supplies every token, then the Console palette (one place:
-// _corner-palette.scss) and its Carbon token mapping (_corner-theme.scss)
-// override them. Custom properties on the shell root only.
+// Theme: Console, dark only. Carbon g100 supplies every token (the same g100
+// as the site's dark bands); _carbon-theme.scss adds the monochrome brand
+// mapping and _palette.scss keeps the old --uc-* names as aliases of the
+// generated --sc-* tokens. Custom properties on the shell root only.
 // ---------------------------------------------------------------------------
 .cds-app {
   @include theme.theme(themes.$g100);
-  @include corner-palette-properties;
-  @include corner.corner-carbon-tokens;
+  @include console.console-carbon-tokens;
+  @include console-alias-properties;
 }
 
 // Carbon normally declares its layout (size/density) tokens on `:root`; a
@@ -70,9 +71,10 @@
 
   min-block-size: 100vh;
   min-block-size: 100dvh;
-  background-color: var(--uc-page);
-  color: var(--uc-text);
-  font-family: var(--uc-font);
+  background-color: var(--sc-surface-page);
+  color: var(--sc-text-primary);
+  font-family: var(--sc-font-sans);
+  font-synthesis-weight: none;
   letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -111,9 +113,28 @@ html:has(.cds-app) {
 }
 
 body:has(.cds-app) {
-  background-color: #000000;
+  background-color: #000;
 }
 
-@include meta.load-css('./corner-components');
+// Keyframes the Console styles use (the shared motion kit defines the same).
+@keyframes sc-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes sc-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@include meta.load-css('./carbon-overrides');
 @include meta.load-css('./shell');
 @include meta.load-css('./building-blocks');
+// WS-KIT: the HackPath bridge (palette-law Carbon tokens, Geist, .625rem, golden focus). Last, so it wins.
+@include meta.load-css('./carbon-bridge');

@@ -1,0 +1,248 @@
+/* Public achievement verification (/achievements/:slug). OWNER: WS-LEARN.
+   HackPath philosophy: black canvas, hairline card, centred, one golden
+   element (the "Verified" mark). Literal fallbacks keep it right before the
+   kit tokens load. */
+.av-page {
+  --av-sans: var(--font-sans, "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif);
+  --av-mono: var(--font-mono, "Geist Mono", ui-monospace, monospace);
+  display: flex;
+  justify-content: center;
+  min-height: 100svh;
+  padding: 7rem 1.25rem 5rem;
+  background: #000;
+  color: #fafafa;
+  font-family: var(--av-sans);
+}
+
+.av-frame {
+  width: 100%;
+  max-width: 40rem;
+}
+
+.av-kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 1.5rem;
+  color: #8a8a8a;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  line-height: 16px;
+  text-transform: uppercase;
+}
+
+.av-kicker__first {
+  color: #f3e2b3;
+}
+
+.av-kicker__rule {
+  width: 2rem;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.av-status {
+  color: #a1a1a1;
+}
+
+.av-card {
+  padding: 2rem 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: #0a0a0a;
+}
+
+@media (min-width: 640px) {
+  .av-card {
+    padding: 2.5rem;
+  }
+}
+
+.av-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.av-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid rgba(243, 226, 179, 0.4);
+  border-radius: 999px;
+  color: #f3e2b3;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.av-badge--critical {
+  border-color: #fafafa;
+  background: #fafafa;
+  color: #000;
+}
+
+.av-kind {
+  margin: 0 0 0.5rem;
+  color: #8a8a8a;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.av-title {
+  margin: 0;
+  color: #fafafa;
+  font-size: clamp(2rem, 1.4rem + 2.5vw, 3rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.av-body {
+  margin: 1rem 0 0;
+  color: #a1a1a1;
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.av-facts {
+  display: grid;
+  gap: 0;
+  margin: 2rem 0 0;
+  border-block: 1px solid rgba(255, 255, 255, 0.1);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.av-facts > div {
+  padding: 1rem 0.75rem;
+}
+
+.av-facts > div + div {
+  border-inline-start: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.av-facts dt {
+  color: #8a8a8a;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.av-facts dd {
+  margin: 0.375rem 0 0;
+  color: #fafafa;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .av-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .av-facts > div + div {
+    border-inline-start: 0;
+    border-block-start: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}
+
+.av-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.av-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  color: #fafafa;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.av-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.av-button--primary {
+  border-color: #fafafa;
+  background: #fafafa;
+  color: #000;
+}
+
+.av-button--primary:hover {
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.av-button:focus-visible,
+.av-foot a:focus-visible {
+  outline: 2px solid #f3e2b3;
+  outline-offset: 2px;
+}
+
+.av-sr {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.av-foot {
+  margin-top: 2rem;
+  font-size: 0.875rem;
+}
+
+.av-foot a {
+  color: #a1a1a1;
+}
+
+.av-foot a:hover {
+  color: #fafafa;
+}
+
+.av-page .eg-medal .eg-medal__frame,
+.av-page .eg-medal .eg-medal__inner,
+.av-page .eg-medal .eg-medal__glyph {
+  fill: none;
+  stroke: #fafafa;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.1;
+}
+
+.av-page .eg-medal .eg-medal__pip {
+  fill: #fafafa;
+}
+
+.av-page .eg-medal.is-locked .eg-medal__frame {
+  stroke: #8a8a8a;
+  stroke-dasharray: 1.6 1.2;
+}
+
+.av-page .eg-medal.is-locked .eg-medal__glyph {
+  stroke: #8a8a8a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .av-button {
+    transition: none;
+  }
+}

@@ -21,6 +21,7 @@ import {
 } from "../features/reports/reportModel";
 import StatusChip, { LateChip } from "../features/reports/StatusChip";
 import useNow from "../features/reports/useNow";
+import MyIdentityHeader from "../features/identity/StudentIdentityHeader";
 import { apiData, apiMessage } from "../utils/api";
 import { taskMeta } from "./ReportsPage";
 
@@ -335,7 +336,7 @@ function SubmitPanel({ task, now, onSubmitted, onCancel, replacing }) {
 }
 
 /** Presentational task page (also used by tests and the screenshot harness). */
-export function ReportTaskView({ task, now = Date.now(), onSubmitted }) {
+export function ReportTaskView({ task, now = Date.now(), onSubmitted, identity = null }) {
   const [replacing, setReplacing] = useState(false);
   const [lastTask, setLastTask] = useState(task);
   if (lastTask !== task) {
@@ -352,6 +353,8 @@ export function ReportTaskView({ task, now = Date.now(), onSubmitted }) {
       <Link to="/reports" className="rpt-back">
         <ArrowLeft size={16} aria-hidden="true" /> All reports
       </Link>
+      {/* Owner rule: roll number, real name, handle, stats lead the submission screen. */}
+      {identity}
       <header className="rpt-task__header">
         <p className="rpt-eyebrow">{taskMeta(task)}</p>
         <h1 className="rpt-task__title">{task.title}</h1>
@@ -489,5 +492,12 @@ export default function ReportsTaskPage() {
   if (state.error && !state.task) {
     return <PageNotification kind="error" title="Couldn't load this report." subtitle={state.error} actionLabel="Try again" onAction={load} />;
   }
-  return <ReportTaskView task={state.task} now={now} onSubmitted={(task) => setState((current) => ({ ...current, task }))} />;
+  return (
+    <ReportTaskView
+      task={state.task}
+      now={now}
+      identity={<MyIdentityHeader courseId={state.task?.course?.id} />}
+      onSubmitted={(task) => setState((current) => ({ ...current, task }))}
+    />
+  );
 }

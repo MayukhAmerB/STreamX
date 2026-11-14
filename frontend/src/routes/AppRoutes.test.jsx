@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { MemoryRouter, useLocation } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+import capabilities from "../__contracts__/ui-overhaul/capabilities.json";
 
 import { AuthContext } from "../context/AuthContext";
 import { act, renderTree } from "../test-utils/renderTree";
@@ -61,6 +63,21 @@ vi.mock("../pages/EditCoursePage", async () => {
   };
 });
 
+// New workspace pages (other workstreams) are labelled stand-ins too.
+vi.mock("../features/console-home/ConsoleHomePage", () => ({ default: () => "Console" }));
+vi.mock("../features/admin/AdminHomePage", () => ({ default: () => "AdminHome" }));
+vi.mock("../features/teach-today/TeachTodayPage", () => ({ default: () => "TeachToday" }));
+vi.mock("../features/teach-courses/CourseEditorPage", () => ({ default: () => "CourseEditor" }));
+vi.mock("../pages/ConsoleRecordingUploadPage", () => ({ default: () => "RecordingUpload" }));
+vi.mock("../pages/ReportsMarksPage", () => ({ default: () => "ReportsMarks" }));
+
+// Capabilities: Teaching on unless a test says otherwise.
+const capsState = { caps: null, loading: false };
+vi.mock("../features/capabilities/useCapabilities", () => ({
+  default: () => ({ ...capsState, refresh: () => Promise.resolve(capsState.caps) }),
+  resetCapabilitiesCache: () => {},
+}));
+
 const users = {
   student: { id: 1, role: "student", is_admin: false },
   instructor: { id: 2, role: "instructor", is_admin: false },
@@ -98,10 +115,11 @@ async function renderAt(path, auth) {
       </MemoryRouter>
     </AuthContext.Provider>
   );
-  // Let the lazy route modules resolve.
-  for (let attempt = 0; attempt < 20 && tree.text().includes("loading"); attempt += 1) {
+  // Let the lazy route modules resolve (Carbon is slow to import cold).
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline && (tree.text().includes("loading") || /^shell: @/.test(tree.text()))) {
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
   }
   const text = tree.text();
@@ -109,10 +127,19 @@ async function renderAt(path, auth) {
   return text;
 }
 
-describe("AppRoutes", () => {
+beforeAll(async () => {
+  await Promise.all([import("./RoleGate"), import("./WorkspaceGuard"), import("../features/app-shell/WorkspaceRedirect")]);
+}, 60000);
+
+beforeEach(() => {
+  capsState.caps = capabilities.instructor_on;
+  capsState.loading = false;
+});
+
+const NOT_FOUND = "This page does not exist";
+
+describe("AppRoutes", { timeout: 30000 }, () => {
   it.each([
-    ["/control-center", "admin", "ControlCenter"],
-    ["/control-center", "instructor", "ControlCenter"],
     ["/meeting", "admin", "Meeting"],
     ["/meeting", "instructor", "Meeting"],
     ["/broadcasting", "instructor", "Broadcasting"],
@@ -121,7 +148,7 @@ describe("AppRoutes", () => {
     ["/instructor/dashboard", "instructor", "InstructorDashboard"],
     ["/instructor/courses/new", "instructor", "CreateCourse"],
     ["/instructor/courses/77/edit", "instructor", "EditCourse(77)"],
-  ])("renders staff route %s for %s inside the app shell", async (path, kind, page) => {
+  ])("keeps old staff route %s for %s inside the app shell until its new home is live", async (path, kind, page) => {
     expect(await renderAt(path, authFor(kind))).toBe(`shell:${page} @${path}`);
   });
 
@@ -130,19 +157,49 @@ describe("AppRoutes", () => {
   });
 
   it.each([
-    // requireModerator -> /join-live
-    ["/control-center", "student", "shell:JoinLive @/join-live"],
-    ["/meeting", "student", "shell:JoinLive @/join-live"],
-    ["/broadcasting", "student", "shell:JoinLive @/join-live"],
-    // requireAdmin -> /join-live
-    ["/lecture-questions", "student", "shell:JoinLive @/join-live"],
-    ["/lecture-questions", "instructor", "shell:JoinLive @/join-live"],
-    // requireInstructor -> /
-    ["/instructor/dashboard", "student", "website:Landing @/"],
-    ["/instructor/courses/new", "admin", "website:Landing @/"],
-    ["/instructor/courses/5/edit", "student", "website:Landing @/"],
-  ])("redirects %s for a %s exactly as before", async (path, kind, expected) => {
-    expect(await renderAt(path, authFor(kind))).toBe(expected);
+    ["admin", "shell:AdminHome @/console/admin"],
+    ["instructor", "shell:TeachToday @/console/teach"],
+    ["student", "shell:Console @/console"],
+  ])("sends %s from the removed Control center to their workspace home (D7)", async (kind, expected) => {
+    expect(await renderAt("/control-center", authFor(kind))).toBe(expected);
+  });
+
+  it("redirects the old upload URL to the workspace upload page", async () => {
+    expect(await renderAt("/console/recordings/upload?class=4", authFor("admin"))).toBe("shell:RecordingUpload @/console/admin/recordings/upload?class=4");
+    expect(await renderAt("/console/recordings/upload", authFor("instructor"))).toBe("shell:RecordingUpload @/console/teach/recordings/upload");
+  });
+
+  it.each([
+    ["/meeting", "student"],
+    ["/broadcasting", "student"],
+    ["/lecture-questions", "student"],
+    ["/lecture-questions", "instructor"],
+    ["/instructor/dashboard", "student"],
+    ["/instructor/courses/5/edit", "student"],
+    ["/console/recordings/upload", "student"],
+  ])("answers %s for a %s with not found inside the shell (never the website home)", async (path, kind) => {
+    const text = await renderAt(path, authFor(kind));
+    expect(text).toContain("shell:");
+    expect(text).toContain(NOT_FOUND);
+    expect(text.endsWith(`@${path}`)).toBe(true);
+  });
+
+  it("sends staff opening an instructor link to the Admin workspace", async () => {
+    expect(await renderAt("/instructor/courses/new", authFor("admin"))).toBe("shell:CourseEditor @/console/admin/courses/new");
+  });
+
+  it("shows instructors the switched-off page on old teaching URLs while Teaching is off", async () => {
+    capsState.caps = capabilities.instructor_off;
+    for (const path of ["/meeting", "/report-grading", "/instructor/dashboard"]) {
+      const text = await renderAt(path, authFor("instructor"));
+      expect(text, path).toContain("Teaching is switched off");
+      expect(text, path).toContain(capabilities.instructor_off.workspaces.teach.reason);
+      expect(text.endsWith(`@${path}`), path).toBe(true);
+    }
+  });
+
+  it("keeps My marks until the Coursework hub takes it over", async () => {
+    expect(await renderAt("/reports/marks", authFor("student"))).toBe("shell:ReportsMarks @/reports/marks");
   });
 
   it.each(["/broadcasting", "/meeting", "/control-center", "/lecture-questions", "/instructor/dashboard", "/instructor/courses/5/edit", "/guides", "/id-card"])(
@@ -159,7 +216,7 @@ describe("AppRoutes", () => {
 
   it("shows the session check while auth is loading", async () => {
     const text = await renderAt("/broadcasting", authFor("guest", { loading: true }));
-    expect(text).toContain("Checking session...");
+    expect(text).toContain("Checking your session…");
     expect(text).toContain("@/broadcasting");
   });
 

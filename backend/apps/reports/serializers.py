@@ -14,6 +14,8 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework import serializers
 
+from apps.users.identity_serializers import StudentIdentitySerializer
+
 from .models import GRADE_ACTION_CHOICES, SCAN_STATUS_CHOICES, ReportSubmission, ReportTask
 
 STUDENT_STATUS_CHOICES = ReportSubmission.STATUS_CHOICES
@@ -352,6 +354,7 @@ class ManageTaskListSerializer(serializers.Serializer):
 
 
 class SubmissionQueueItemSerializer(serializers.Serializer):
+    identity = StudentIdentitySerializer(required=False, help_text="Roll number, real name, handle, stats (first).")
     id = serializers.IntegerField()
     task = GradebookTaskSerializer()
     student = PersonSerializer()
@@ -441,6 +444,7 @@ class Sha256MatchSerializer(serializers.Serializer):
 
 
 class SubmissionDetailSerializer(serializers.Serializer):
+    identity = StudentIdentitySerializer(required=False, help_text="Roll number, real name, handle, stats (first).")
     id = serializers.IntegerField()
     task = GradingTaskSerializer()
     student = PersonSerializer()
@@ -486,6 +490,7 @@ class GradeRequestSerializer(serializers.Serializer):
 
 
 class GradebookRowSerializer(serializers.Serializer):
+    identity = StudentIdentitySerializer(required=False, help_text="Roll number, real name, handle, stats (first).")
     student = PersonSerializer()
     cells = GradebookCellSerializer(many=True)
     totals = GradebookTotalsSerializer()

@@ -65,3 +65,27 @@ test("exam-core.js is served and LMS evidence images are allowed by the CSP", as
   assert.match(csp, /img-src 'self' data: https:\/\/lms\.example\.test;/);
   assert.doesNotMatch(csp, /img-src[^;]*\*/);
 });
+
+test("self-hosted fonts are served as font/woff2; nothing else under /fonts/", async () => {
+  for (const font of [
+    "/fonts/geist/geist-latin-wght-normal.woff2",
+    "/fonts/geist-mono/geist-mono-latin-wght-normal.woff2",
+    "/fonts/handlee/handlee-latin-400-normal.woff2",
+  ]) {
+    const response = await fetch(`${base}${font}`);
+    assert.equal(response.status, 200, font);
+    assert.equal(response.headers.get("content-type"), "font/woff2");
+    assert.match(response.headers.get("cache-control"), /max-age/);
+    await response.arrayBuffer();
+  }
+  for (const blocked of ["/fonts/geist/OFL.txt", "/fonts/../server.js", "/fonts/other/x.woff2", "/fonts/geist/x.woff"]) {
+    assert.equal(resolvePublicFile(blocked), null, blocked);
+  }
+});
+
+test("the CSP allows fonts and styles from this origin only (no Google Fonts)", () => {
+  const csp = contentSecurityPolicy();
+  assert.match(csp, /font-src 'self';/);
+  assert.match(csp, /style-src 'self' 'unsafe-inline';/);
+  assert.doesNotMatch(csp, /googleapis|gstatic/);
+});

@@ -1,0 +1,154 @@
+// Lecture questions list (UI overhaul WS-D2). Syed Carbon tokens with
+// today's Console values as fallbacks; status is icon + word.
+
+.qst {
+  --qst-text: var(--sc-text-primary, var(--uc-text, #f4f4f4));
+  --qst-text-2: var(--sc-text-secondary, #c6c6c6);
+  --qst-muted: var(--sc-text-helper, #a8a8a8);
+  --qst-layer: var(--sc-surface-01, #1c1c1c);
+  --qst-border: var(--sc-border-subtle, #393939);
+  --qst-border-strong: var(--sc-border-strong, #6f6f6f);
+  --qst-pill: var(--sc-radius-pill, 999px);
+
+  display: grid;
+  color: var(--qst-text);
+  gap: 1rem;
+}
+
+.qst-muted {
+  color: var(--qst-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.qst-list {
+  display: grid;
+  padding: 0;
+  margin: 0;
+  border-block-start: 1px solid var(--qst-border);
+  list-style: none;
+}
+
+.qst-card {
+  display: grid;
+  padding: 1rem;
+  border-block-end: 1px solid var(--qst-border);
+  background: var(--qst-layer);
+  gap: 0.5rem;
+}
+
+.qst-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.qst-card__who {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.qst-card__name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+.qst-card__where {
+  margin: 0;
+  color: var(--qst-text-2);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.qst-card__question {
+  margin: 0;
+  max-inline-size: 72ch;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.qst-card__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+}
+
+.qst-link {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 2.75rem;
+  color: var(--qst-text);
+  font-size: 0.875rem;
+  gap: 0.5rem;
+  text-decoration: none;
+
+  svg {
+    fill: currentColor;
+    transition: transform var(--sc-duration-fast-02, 110ms) var(--sc-ease-standard-productive, ease);
+  }
+
+  &:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+
+  &:hover svg {
+    transform: translateX(4px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--sc-focus, #fff);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    svg {
+      transition: none;
+    }
+  }
+}
+
+.qst-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--qst-border-strong);
+  border-radius: var(--qst-pill);
+  color: var(--qst-text);
+  font-size: 0.75rem;
+  gap: 0.25rem;
+  line-height: 1rem;
+  white-space: nowrap;
+
+  svg {
+    fill: var(--qst-text-2);
+  }
+}
+
+.qst-status--new svg {
+  fill: var(--sc-support-info, #d4d4d4);
+}
+
+.qst-status--answered {
+  border-color: rgba(255, 255, 255, 0.5);
+
+  svg {
+    fill: var(--sc-support-success, #fafafa);
+  }
+}
+
+.qst-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}

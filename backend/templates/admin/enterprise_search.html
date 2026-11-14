@@ -1,0 +1,46 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+{# Search page: the no-JS fallback of the Ctrl/Cmd+K palette (same service as /api/admin/search/). #}
+
+{% block bodyclass %}{{ block.super }} enterprise-search-page{% endblock %}
+
+{% block content_title %}
+  <div class="enterprise-page-header">
+    <div class="enterprise-page-heading">
+      <h1>Search</h1>
+      <p class="enterprise-page-description">People, courses, payments, classes, exams, recordings and report tasks.</p>
+    </div>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <form class="enterprise-search-form" method="get" role="search">
+    <label class="enterprise-visually-hidden" for="enterprise-search-q">Search</label>
+    <input type="search" id="enterprise-search-q" name="q" value="{{ q }}" placeholder="Search people, courses, payments" autocomplete="off" autofocus>
+    <button type="submit" class="button default">Search</button>
+  </form>
+  {% if q %}
+    {% if q|length < min_chars %}
+      <p class="enterprise-admin-muted">Type at least {{ min_chars }} characters.</p>
+    {% elif payload.groups %}
+      {% for group in payload.groups %}
+        <section class="enterprise-section enterprise-search-group" aria-labelledby="search-{{ group.key }}">
+          <h2 class="enterprise-eyebrow enterprise-section-title" id="search-{{ group.key }}">{{ group.label }}</h2>
+          <ul class="enterprise-rows" role="list">
+            {% for item in group.items %}
+              <li class="enterprise-row">
+                <a class="enterprise-row-title" href="{{ item.href }}">{{ item.title }}</a>
+                {% if item.subtitle %}<span class="enterprise-row-meta">{{ item.subtitle }}</span>{% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
+      {% endfor %}
+    {% else %}
+      <div class="enterprise-empty" role="status">
+        <p class="enterprise-empty-title">Nothing matches &ldquo;{{ q }}&rdquo;</p>
+        <p class="enterprise-empty-body">Try an email, a name, an order id or a course title.</p>
+      </div>
+    {% endif %}
+  {% endif %}
+{% endblock %}

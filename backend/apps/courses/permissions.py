@@ -1,13 +1,24 @@
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
+from apps.users import teaching
+
 from .access import user_has_course_access
+
+
+def _instructor_or_feature_disabled(user):
+    """Instructor role required; while Teaching is off a non-staff instructor
+    gets 403 ``feature_disabled`` with the calm reason (plan §5.3)."""
+    if not teaching.has_instructor_role(user):
+        return False
+    teaching.require_teaching(user)
+    return True
 
 
 class IsInstructor(BasePermission):
     message = "Instructor role required."
 
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.role == "instructor")
+        return _instructor_or_feature_disabled(request.user)
 
 
 class PublicReadInstructorWrite(BasePermission):
@@ -18,11 +29,7 @@ class PublicReadInstructorWrite(BasePermission):
     def has_permission(self, request, view):
         if request.method in SAFE_METHODS:
             return True
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and request.user.role == "instructor"
-        )
+        return _instructor_or_feature_disabled(request.user)
 
 
 class IsCourseInstructor(BasePermission):
@@ -30,9 +37,7 @@ class IsCourseInstructor(BasePermission):
 
     def has_object_permission(self, request, view, obj):
         course = getattr(obj, "course", None)
-        if course is not None:
-            return course.instructor_id == request.user.id
-        return obj.instructor_id == request.user.id
+        return teaching.owns_course(request.user, course if course is not None else obj)
 
 
 class IsEnrolledInCourse(BasePermission):

@@ -10,6 +10,8 @@ import CourseCardRail from "../../components/CourseCardRail";
 import HeroCountdown from "../../components/HeroCountdown";
 import StoryJourneySection from "../../components/StoryJourneySection";
 import YouTubeSection from "../../features/youtube/YouTubeSection";
+import { siteStatValues } from "../../marketing/SiteStatStrip";
+import { useSiteStats } from "../../marketing/siteStats";
 import { useAuth } from "../../hooks/useAuth";
 import { selectLandingCourses } from "../../utils/landingCourses";
 import { getCourseCategoryPath } from "../../utils/courseCatalog";
@@ -18,7 +20,6 @@ import { siteBrand } from "../../config/siteBrand";
 import {
   INFO_CARDS as infoCards,
   JOURNEY_STEPS as steps,
-  LANDING_STATS as stats,
   WHY_CHOOSE as whyChoose,
 } from "./landingContent";
 import {
@@ -157,6 +158,7 @@ function BestsellersSection({ courses }) {
 export default function LandingPageV1() {
   const isOwlCognito = siteBrand.id === "owlcognito";
   const { isAuthenticated } = useAuth();
+  const stats = siteStatValues(useSiteStats().items);
   const { catalog, liveClasses, liveBroadcast: heroLiveBroadcast } = useLandingData(isAuthenticated);
   const catalogCourses = catalog.courses;
   const landingPrograms = liveClasses.items;
@@ -362,6 +364,7 @@ export default function LandingPageV1() {
             </div>
           </SectionCard>
 
+          {stats.length ? (
           <div className="grid overflow-hidden rounded-[20px] border border-white/10 bg-[#070707] sm:grid-cols-2 lg:grid-cols-4">
             {stats.map((item, idx) => (
               <div
@@ -377,6 +380,7 @@ export default function LandingPageV1() {
               </div>
             ))}
           </div>
+          ) : null}
 
           <section id="about" className="scroll-mt-24 rounded-[22px] border border-white/10 bg-[#070707] p-5 sm:p-7">
             <SectionTitle

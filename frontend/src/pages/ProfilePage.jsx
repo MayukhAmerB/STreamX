@@ -6,6 +6,8 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { updateProfile } from "../api/auth";
 import UserAvatar from "../features/app-shell/UserAvatar";
+import CertificationSettings from "../features/certification/CertificationSettings";
+import { useMotionPreference } from "../features/app-shell/motionPreference";
 import { PageHeader, PageNotification, useToast } from "../features/app-shell/ui";
 import { useAuth } from "../hooks/useAuth";
 import { apiMessage } from "../utils/api";
@@ -25,6 +27,46 @@ export function formatMemberSince(value) {
   return date.toLocaleDateString(undefined, { year: "numeric", month: "short" });
 }
 
+/**
+ * "Reduce motion" (plan §1.7, WCAG 2.3.3): on top of the device setting, this
+ * browser shows final states with no movement (`<html data-motion="reduce">`).
+ */
+export function MotionSetting({ reduced = false, onChange }) {
+  const on = Boolean(reduced);
+  return (
+    <Tile className="cds-profile-form-tile cds-profile-motion">
+      <h2 className="cds-profile-motion__title">Display</h2>
+      <div className="cds-profile-motion__row">
+        <span className="cds-profile-motion__text">
+          <span className="cds-profile-motion__label" id="profile-reduce-motion-label">
+            Reduce motion
+          </span>
+          <span className="cds-profile-motion__help" id="profile-reduce-motion-help">
+            No sliding cards or counting numbers on this device. Your device&apos;s own setting is always respected.
+          </span>
+        </span>
+        <button
+          type="button"
+          role="switch"
+          id="profile-reduce-motion"
+          className="cds-profile-switch"
+          aria-checked={on}
+          aria-labelledby="profile-reduce-motion-label"
+          aria-describedby="profile-reduce-motion-help"
+          onClick={() => onChange?.(!on)}
+        >
+          <span className="cds-profile-switch__track" aria-hidden="true">
+            <span className="cds-profile-switch__knob" />
+          </span>
+          <span className="cds-profile-switch__state" aria-hidden="true">
+            {on ? "On" : "Off"}
+          </span>
+        </button>
+      </div>
+    </Tile>
+  );
+}
+
 /** Presentational profile view (used directly by tests and the visual harness). */
 export function ProfileView({
   user,
@@ -38,6 +80,9 @@ export function ProfileView({
   onPhoneChange,
   onPhotoSelect,
   onSubmit,
+  reducedMotion = false,
+  onReducedMotionChange,
+  extraSettings = null,
 }) {
   const fileInputRef = useRef(null);
   const fileInputId = useId();
@@ -139,6 +184,10 @@ export function ProfileView({
           </form>
         </Tile>
 
+        <MotionSetting reduced={reducedMotion} onChange={onReducedMotionChange} />
+
+        {extraSettings}
+
         <PageNotification
           kind="info"
           title="Password and 2-step sign-in"
@@ -202,9 +251,14 @@ export default function ProfilePage() {
     }
   };
 
+  const [reducedMotion, setReducedMotion] = useMotionPreference();
+
   return (
     <ProfileView
       user={user}
+      reducedMotion={reducedMotion}
+      onReducedMotionChange={setReducedMotion}
+      extraSettings={<CertificationSettings />}
       name={name}
       phone={phone}
       previewUrl={filePreview}

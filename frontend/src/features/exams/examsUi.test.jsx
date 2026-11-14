@@ -3,7 +3,7 @@ import { StaticRouter } from "react-router-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { BatchGradebookTable, StudentSections } from "../../pages/GradebookPage";
-import { ExamListTable, ExamUploadPanel } from "../../pages/ConsoleExamsPage";
+import { ExamListTable, ExamUploadPanel, uploadReasons } from "../../pages/ConsoleExamsPage";
 import { MaterialsPanel, PublishBar, ReadinessChecklist, ResultsPanel } from "../../pages/ConsoleExamDetailPage";
 import { ExamConsoleCardView, staffExamCard } from "./ExamConsoleCard";
 
@@ -87,6 +87,22 @@ describe("Console exams", () => {
     const good = html(<ExamUploadPanel fileName="exam.json" preview={preview} />);
     expect(good).toContain("Dry run passed. Nothing has been saved yet.");
     expect(good).not.toMatch(/disabled=""[^>]*>Load exam/);
+  });
+
+  it("explains every disabled import button", () => {
+    expect(uploadReasons({ fileName: "" })).toMatchObject({ check: "Choose a file first.", load: "Choose a file first." });
+    expect(uploadReasons({ fileName: "exam.json" })).toMatchObject({ check: "", load: "Check the file before loading it." });
+    expect(uploadReasons({ fileName: "exam.json", preview: { slug: "x" } })).toMatchObject({ check: "", load: "", checked: true });
+    expect(uploadReasons({ fileName: "exam.json", preview: { slug: "x" }, problems: ["bad"] }).load).toBe("Check the file before loading it.");
+    const empty = html(<ExamUploadPanel fileName="" />);
+    expect(empty).toContain("Choose a file first.");
+    expect(empty).toMatch(/disabled=""[^>]*>[^<]*(<[^>]*>[^<]*)*Check file/);
+    // The drop zone's input is the "Exam file" field (the E2E journey picks it by that label).
+    expect(empty).toMatch(/<label[^>]*>(<span[^>]*>)?Exam file</);
+  });
+
+  it("links exams inside the workspace tree", () => {
+    expect(html(<ExamListTable exams={[exam()]} basePath="/console/admin/exams" />)).toContain('href="/console/admin/exams/week-5"');
   });
 
   it("lists exams with their state and links to the detail page", () => {

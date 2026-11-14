@@ -1,0 +1,27 @@
+{
+  "feature_disabled": {
+    "success": false,
+    "message": "Teaching tools are switched off for now. An admin can turn them on.",
+    "data": null,
+    "errors": {
+      "detail": "Teaching tools are switched off for now. An admin can turn them on.",
+      "feature": "teaching",
+      "code": "feature_disabled"
+    },
+    "code": "feature_disabled",
+    "detail": "Teaching tools are switched off for now. An admin can turn them on."
+  },
+  "feature_changed_meanwhile": {
+    "success": false,
+    "message": "Someone changed this switch meanwhile. Review and try again.",
+    "data": null,
+    "errors": {
+      "detail": "Someone changed this switch meanwhile. Review and try again.",
+      "feature": "teaching",
+      "version": 1,
+      "code": "feature_changed_meanwhile"
+    },
+    "code": "feature_changed_meanwhile",
+    "detail": "Someone changed this switch meanwhile. Review and try again."
+  }
+}

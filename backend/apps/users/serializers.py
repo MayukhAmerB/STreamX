@@ -34,6 +34,9 @@ class UserSerializer(serializers.ModelSerializer):
     is_admin = serializers.SerializerMethodField()
     terms_required_version = serializers.SerializerMethodField()
     terms_acceptance_required = serializers.SerializerMethodField()
+    # What this viewer may use in the Console (UI overhaul Appendix A.1), so
+    # the Console boot needs no extra request.
+    capabilities = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -52,9 +55,18 @@ class UserSerializer(serializers.ModelSerializer):
             "notifications_consented_at",
             "terms_required_version",
             "terms_acceptance_required",
+            "capabilities",
             "created_at",
             "updated_at",
         )
+
+    def get_capabilities(self, obj) -> dict:
+        from .capabilities import build_capabilities
+
+        try:
+            return build_capabilities(obj)
+        except Exception:  # noqa: BLE001 - never block sign-in; the Console falls back to /api/me/capabilities/
+            return None
 
     def get_profile_image_url(self, obj):
         request = self.context.get("request")

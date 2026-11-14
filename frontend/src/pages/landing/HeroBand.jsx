@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { COURSE_TRACKS } from "../../components/CourseCategorySelector";
 import { Band, Button, ClickableTile, Column, InlineNotification, Link, Tag } from "../../site-kit";
+import { RollingDigits } from "../../site-kit/motion";
 import { describeTrackAvailability } from "../../utils/catalogTracks";
 import { getCourseCategoryPath } from "../../utils/courseCatalog";
 import { getCountdownParts, selectActiveCourseCountdown } from "../../utils/courseCountdown";
@@ -79,9 +80,10 @@ const TIMER_UNITS = [
 ];
 
 /**
- * Enrollment countdown (plan §7.1 motion): neutral colours, updates once a
- * minute and every second only in the last hour, with a pause control
- * (WCAG 2.2.2). Same label and course title as before.
+ * Enrollment countdown (plan §7.1 motion, M9): neutral colours, updates once
+ * a minute and every second only in the last hour; only the digit that
+ * changed rolls (the shared RollingDigits), and the pause control stops the
+ * updates and so the rolls (WCAG 2.2.2). Same label and course title as before.
  */
 export function HeroCountdownStrip({ courses }) {
   const [now, setNow] = useState(() => Date.now());
@@ -113,7 +115,9 @@ export function HeroCountdownStrip({ courses }) {
       <time dateTime={deadline} className="lp-countdown__timer" role="timer" aria-live="off" data-units={units.length}>
         {units.map(([key, label]) => (
           <span key={key} className="lp-countdown__unit">
-            <span className="lp-countdown__value">{String(parts[key]).padStart(2, "0")}</span>
+            <span className="lp-countdown__value">
+              <RollingDigits value={String(parts[key]).padStart(2, "0")} />
+            </span>
             <span className="lp-countdown__unit-label">{label}</span>
           </span>
         ))}

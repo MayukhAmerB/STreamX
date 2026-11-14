@@ -1,8 +1,13 @@
-// Shared building blocks for Carbon pages: page header, empty state,
-// skeletons, section headings, responsive tile grid.
+// Shared building blocks for Console pages (UI overhaul plan §2.1, §2.5). OWNER: WS-A.
+// Page header v2, section heading, tile grid, empty state v2, skeletons,
+// stat chips and the progress meter, all on the Syed Carbon tokens: Plex,
+// sentence case, square layers, one champagne rule, no glows.
 @use './tokens' as *;
 
-// Page header: title, one-line description, primary action.
+// ---------------------------------------------------------------------------
+// Page header: breadcrumbs, title (Plex 400 32/40, phone 28/36), one line,
+// actions on the right (stacked full width on phones).
+// ---------------------------------------------------------------------------
 .cds-app .cds-page-header {
   display: flex;
   flex-direction: column;
@@ -14,6 +19,7 @@
     align-items: flex-end;
     justify-content: space-between;
     margin-block-end: $spacing-08;
+    gap: $spacing-07;
   }
 }
 
@@ -21,59 +27,71 @@
   min-inline-size: 0;
 }
 
-// "— CONSOLE": the landing page's section eyebrow (same as the hub's).
-.cds-app .cds-page-header__eyebrow {
-  @include corner-micro-label(0.625rem);
-
+.cds-app .cds-page-header__breadcrumbs ol {
   display: flex;
-  align-items: center;
-  margin-block-end: $spacing-05;
-  color: var(--uc-accent);
-  gap: $spacing-05;
-  letter-spacing: 0.22em;
-  text-shadow: var(--uc-text-glow);
+  flex-wrap: wrap;
+  margin: 0 0 $spacing-03;
+  padding: 0;
+  list-style: none;
 
-  &::before {
-    display: block;
-    flex: none;
-    background-color: var(--uc-accent);
-    block-size: 1px;
-    content: '';
-    inline-size: 2rem;
-    opacity: 0.7;
+  li {
+    @include sc-label;
+
+    display: inline-flex;
+    align-items: center;
+    color: var(--sc-text-secondary);
   }
 
-  @include breakpoint(md) {
-    font-size: 0.6875rem;
+  li + li::before {
+    margin-inline: $spacing-03;
+    color: var(--sc-text-helper);
+    content: '/';
+  }
+
+  a {
+    color: var(--sc-text-secondary);
+    text-decoration: none;
+    transition: color var(--sc-duration-fast-01) var(--sc-ease-standard-productive);
+
+    &:hover {
+      color: var(--sc-text-primary);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    &:focus-visible {
+      @include sc-focus-ring;
+    }
   }
 }
 
-// Landing-page heading: Inter 800, tight tracking, large.
+// Optional context line with the one champagne rule (e.g. today's date on Home).
+.cds-app .cds-page-header__eyebrow {
+  @include sc-eyebrow;
+
+  margin-block-end: $spacing-04;
+}
+
 .cds-app .cds-page-header__title {
-  @include corner-heading(-0.04em);
+  @include sc-page-title;
 
-  color: var(--uc-text);
-  font-size: clamp(2rem, 7vw, 2.5rem);
-  line-height: 1.02;
+  color: var(--sc-text-primary);
   overflow-wrap: anywhere;
-
-  @include breakpoint(lg) {
-    font-size: 2.75rem;
-  }
 }
 
 .cds-app .cds-page-header__description {
   max-inline-size: 40rem;
-  margin-block-start: $spacing-04;
-  color: var(--uc-text-2);
-  font-size: 0.9375rem;
-  line-height: 1.6;
+  margin-block-start: $spacing-03;
+  color: var(--sc-text-secondary);
+  font-size: var(--sc-type-body-02-size);
+  line-height: var(--sc-type-body-02-line-height);
 }
 
 .cds-app .cds-page-header__actions {
   display: flex;
   flex-wrap: wrap;
   flex: none;
+  align-items: center;
   gap: $spacing-03;
 
   @include breakpoint-down(md) {
@@ -84,14 +102,97 @@
   }
 }
 
-// Section heading inside a page.
+// Overflow ("More actions") menu: a floating layer, M11 menu motion.
+.cds-app .sc-overflow {
+  position: relative;
+}
+
+.cds-app .sc-overflow__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  block-size: 2.5rem;
+  color: var(--sc-text-primary);
+  cursor: pointer;
+  inline-size: 2.5rem;
+  transition: background-color var(--sc-duration-fast-01) var(--sc-ease-standard-productive);
+
+  svg {
+    fill: currentColor;
+  }
+
+  &:hover,
+  &[aria-expanded='true'] {
+    background-color: var(--sc-surface-hover-01);
+  }
+
+  &:focus-visible {
+    @include sc-focus-ring(-2px);
+  }
+
+  @include breakpoint-down(md) {
+    block-size: 3rem;
+    inline-size: 3rem;
+  }
+}
+
+.cds-app .sc-overflow__menu {
+  position: absolute;
+  z-index: 6000;
+  min-inline-size: 12rem;
+  margin: $spacing-02 0 0;
+  padding: $spacing-02 0;
+  animation: sc-menu-in var(--sc-duration-fast-02) var(--sc-ease-entrance-productive);
+  background-color: var(--sc-surface-02);
+  box-shadow: var(--sc-shadow-floating);
+  inset-inline-end: 0;
+  list-style: none;
+}
+
+.cds-app .sc-overflow__item {
+  display: flex;
+  align-items: center;
+  padding: 0 $spacing-05;
+  border: 0;
+  background: transparent;
+  block-size: 2.5rem;
+  color: var(--sc-text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--sc-type-body-01-size);
+  inline-size: 100%;
+  text-align: start;
+  text-decoration: none;
+
+  &:hover {
+    background-color: var(--sc-surface-hover-01);
+  }
+
+  &:focus-visible {
+    @include sc-focus-ring(-2px);
+  }
+}
+
+.cds-app .sc-overflow__item--danger {
+  color: var(--cds-text-error, #ff8389);
+}
+
+@keyframes sc-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+// Section heading inside a page (heading-03).
 .cds-app .cds-section-title {
-  @include corner-heading(-0.025em);
+  @include sc-section-title;
 
   margin-block-end: $spacing-05;
-  color: var(--uc-text);
-  font-size: 1.375rem;
-  line-height: 1.2;
+  color: var(--sc-text-primary);
 }
 
 // Responsive tile grid (1 / 2 / 3 columns).
@@ -109,44 +210,99 @@
   }
 }
 
-// Empty state: icon + one sentence + one action.
+// ---------------------------------------------------------------------------
+// Empty state v2: 32 px icon, one sentence, one action. Left aligned, like
+// the site kit's empty state.
+// ---------------------------------------------------------------------------
 .cds-app .cds-empty-state {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: $spacing-10 $spacing-06;
-  gap: $spacing-05;
-  text-align: center;
+  align-items: flex-start;
+  padding: $spacing-07 $spacing-06;
+  background-color: var(--sc-surface-01);
+  gap: $spacing-04;
 
-  svg {
-    fill: $icon-secondary;
+  @include breakpoint(md) {
+    padding: $spacing-09 $spacing-07;
   }
 }
 
-.cds-app .cds-empty-state__text {
-  @include corner-heading(-0.015em);
-
-  max-inline-size: 28rem;
-  color: var(--uc-text);
-  font-size: 1.125rem;
-  font-weight: 700;
-  line-height: 1.4;
+.cds-app .cds-empty-state__icon {
+  margin-block-end: $spacing-03;
+  fill: var(--sc-icon-secondary);
 }
 
-// Skeletons.
+.cds-app .cds-empty-state__text {
+  @include sc-section-title;
+
+  max-inline-size: 32rem;
+  margin: 0;
+  color: var(--sc-text-primary);
+}
+
+.cds-app .cds-empty-state__body {
+  max-inline-size: 32rem;
+  margin: 0;
+  color: var(--sc-text-secondary);
+  font-size: var(--sc-type-body-01-size);
+  line-height: var(--sc-type-body-01-line-height);
+}
+
+.cds-app .cds-empty-state__action {
+  margin-block-start: $spacing-04;
+}
+
+// ---------------------------------------------------------------------------
+// Skeletons: exact footprint, transform shimmer x3 (M3).
+// ---------------------------------------------------------------------------
+.cds-app .cds-page-skeleton {
+  animation: sc-fade var(--sc-duration-moderate-01) var(--sc-ease-entrance-productive);
+}
+
 .cds-app .cds-page-skeleton__header {
+  display: grid;
   margin-block-end: $spacing-08;
+  gap: $spacing-03;
 }
 
 .cds-app .cds-page-skeleton__tile {
   padding: $spacing-05;
-  border: 1px solid var(--uc-border);
-  border-radius: var(--uc-radius-card);
-  background-color: $layer-01;
+  background-color: var(--sc-surface-01);
 }
 
-.cds-app .cds-page-skeleton .cds--skeleton__placeholder {
-  inline-size: 100%;
+.cds-app .cds-page-skeleton__tile,
+.cds-app .cds-page-skeleton__form,
+.cds-app .cds-page-skeleton__field {
+  display: grid;
+  gap: $spacing-04;
+}
+
+.cds-app .cds-page-skeleton__form {
+  max-inline-size: 40rem;
+  gap: $spacing-06;
+}
+
+.cds-app .cds-page-skeleton__field {
+  gap: $spacing-03;
+}
+
+.cds-app .cds-page-skeleton__rows {
+  display: grid;
+  background-color: var(--sc-border-subtle);
+  gap: 1px;
+}
+
+.cds-app .cds-page-skeleton__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-05;
+  background-color: var(--sc-surface-01);
+  gap: $spacing-05;
+}
+
+.cds-app .cds-page-skeleton--waiting {
+  min-block-size: 50vh;
 }
 
 // Inline notification spacing within pages.
@@ -164,14 +320,15 @@
 }
 
 // ---------------------------------------------------------------------------
-// Micro-stat chips (hub greeting band + My courses).
+// Stat chips: square layer tiles separated by 1 px (the site's data stat).
 // ---------------------------------------------------------------------------
 .cds-app .cds-stat-chips {
   display: grid;
-  max-inline-size: 40rem;
+  max-inline-size: 48rem;
   margin: 0;
-  gap: $spacing-03;
-  grid-template-columns: repeat(auto-fit, minmax(7.25rem, 1fr));
+  background-color: var(--sc-border-subtle);
+  gap: 1px;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
 }
 
 .cds-app .cds-stat-chip {
@@ -179,59 +336,45 @@
   min-inline-size: 0;
   flex-direction: column-reverse;
   justify-content: flex-end;
-  padding: $spacing-03 $spacing-05;
-  border: 1px solid var(--uc-border);
-  border-radius: var(--uc-radius-md);
-  background: rgba(255, 255, 255, 0.025);
-  gap: 2px;
+  padding: $spacing-04 $spacing-05;
+  background-color: var(--sc-surface-01);
+  gap: $spacing-02;
 }
 
 .cds-app .cds-stat-chip__label {
-  @include corner-micro-label(0.5625rem);
+  @include sc-label;
 
-  color: var(--uc-text-2);
-  letter-spacing: 0.18em;
+  color: var(--sc-text-secondary);
 }
 
 .cds-app .cds-stat-chip__value {
-  @include corner-heading(-0.04em);
-
   margin: 0;
-  color: var(--uc-text);
-  font-size: 1.5rem;
+  color: var(--sc-text-primary);
+  font-size: var(--sc-type-number-m-size);
   font-variant-numeric: tabular-nums;
-  line-height: 1.15;
+  font-weight: 400;
+  line-height: var(--sc-type-number-m-line-height);
 }
 
 .cds-app .cds-stat-chip__suffix {
-  margin-inline-start: 1px;
-  color: var(--uc-text-2);
-  font-size: 0.875rem;
-  font-weight: 700;
+  margin-inline-start: 2px;
+  color: var(--sc-text-secondary);
+  font-size: var(--sc-type-body-01-size);
 }
 
+// The accent chip keeps a champagne top rule (a rule, not a fill).
 .cds-app .cds-stat-chip--accent {
-  border-color: var(--uc-accent-line);
-  background: var(--uc-accent-soft);
-
-  .cds-stat-chip__value {
-    color: var(--uc-accent);
-    text-shadow: var(--uc-text-glow);
-  }
-
-  .cds-stat-chip__suffix {
-    color: var(--uc-accent);
-  }
+  box-shadow: inset 0 2px 0 var(--sc-accent);
 }
 
 .cds-app .cds-stat-chip--skeleton {
   flex-direction: column;
   gap: $spacing-03;
-  min-block-size: 3.875rem;
+  min-block-size: 4.25rem;
 }
 
 // ---------------------------------------------------------------------------
-// Progress meter: "30% complete · 6 of 20 lessons done" + slim bar.
+// Progress meter: "30% complete · 6 of 20 lessons done" + the shared Meter (M6).
 // ---------------------------------------------------------------------------
 .cds-app .cds-meter {
   display: flex;
@@ -251,69 +394,36 @@
 .cds-app .cds-meter__value {
   display: inline-flex;
   align-items: center;
-  color: var(--uc-text);
-  font-size: 0.8125rem;
+  color: var(--sc-text-primary);
+  font-size: var(--sc-type-label-01-size);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
   gap: $spacing-02;
+  letter-spacing: var(--sc-type-label-01-letter-spacing);
 }
 
 .cds-app .cds-meter__icon {
-  fill: var(--uc-success);
+  fill: var(--sc-status-success);
 }
 
 .cds-app .cds-meter__summary {
-  color: var(--uc-text-2);
-  font-size: 0.75rem;
-}
+  @include sc-label;
 
-.cds-app .cds-meter__track {
-  position: relative;
-  overflow: hidden;
-  border-radius: var(--uc-radius-pill);
-  background-color: rgba(255, 255, 255, 0.1);
-  block-size: 4px;
-}
-
-.cds-app .cds-meter__fill {
-  display: block;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--uc-accent-active), var(--uc-accent));
-  block-size: 100%;
-  box-shadow: 0 0 10px rgba(243, 226, 179, 0.5);
-  max-inline-size: 100%;
-  transition: inline-size 400ms ease;
-}
-
-.cds-app .cds-meter--done .cds-meter__fill {
-  background: var(--uc-success);
-  box-shadow: 0 0 10px rgba(66, 190, 101, 0.45);
+  color: var(--sc-text-secondary);
 }
 
 // ---------------------------------------------------------------------------
 // Skeleton bars shaped like the final content.
 // ---------------------------------------------------------------------------
-@keyframes uc-skeleton-shimmer {
-  from {
-    background-position: 100% 0;
-  }
-
-  to {
-    background-position: -100% 0;
-  }
-}
-
 .cds-app .cds-skeleton-bar {
   display: block;
-  border-radius: 6px;
   block-size: 0.75rem;
   inline-size: 60%;
 
-  @include corner-skeleton;
+  @include sc-skeleton;
 }
 
 .cds-app .cds-skeleton-bar--label {
-  block-size: 0.5rem;
+  block-size: 0.75rem;
   inline-size: 3.5rem;
 }
 
@@ -323,7 +433,7 @@
 }
 
 .cds-app .cds-skeleton-bar--tag {
-  border-radius: var(--uc-radius-pill);
+  border-radius: var(--sc-radius-pill);
   block-size: 1.25rem;
   inline-size: 4.5rem;
 }
@@ -338,13 +448,27 @@
 }
 
 .cds-app .cds-skeleton-bar--track {
-  border-radius: var(--uc-radius-pill);
   block-size: 4px;
   inline-size: 100%;
 }
 
 .cds-app .cds-skeleton-bar--button {
-  border-radius: var(--uc-radius-control);
-  block-size: 2.75rem;
+  block-size: 2.5rem;
   inline-size: 9rem;
+}
+
+// ---------------------------------------------------------------------------
+// Reduced motion: the token values already drop travel and long durations;
+// these remove what remains (no menu travel, no skeleton fade).
+// ---------------------------------------------------------------------------
+@media (prefers-reduced-motion: reduce) {
+  .cds-app .sc-overflow__menu,
+  .cds-app .cds-page-skeleton {
+    animation: none;
+  }
+}
+
+:root[data-motion='reduce'] .cds-app .sc-overflow__menu,
+:root[data-motion='reduce'] .cds-app .cds-page-skeleton {
+  animation: none;
 }

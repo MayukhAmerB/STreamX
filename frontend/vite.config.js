@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -8,10 +9,10 @@ import react from "@vitejs/plugin-react";
 // (src/config/pageMeta.js). Keep in step with src/config/siteBrand.js.
 const BRAND_META = {
   alsyed: {
-    title: "Al syed Initiative | Cybersecurity Training",
+    title: "Al syed Initiative | Live OSINT Training, Labs & CTF",
     siteName: "Al syed Initiative",
     description:
-      "Practical OSINT and web application penetration testing training with live classes, protected recordings, mentor support and verified certificates.",
+      "Live OSINT classes every Fri, Sat and Sun, weekly marked reports, real investigation labs and certificates anyone can verify. Start free; Pentesting coming soon.",
     origin: "https://alsyedinitiative.com",
     image: "/og-image.jpg",
     imageAlt: "Al Syed Initiative: professional cybersecurity training",
@@ -128,7 +129,18 @@ function landingPreloadPlugin() {
           ),
         ];
         const toUrl = (file) => `/${file}`;
-        const script = `<script>(function(){if(location.pathname!=="/")return;var h=document.head;${JSON.stringify(
+        // HackPath hero (WS-KIT): the Qur'an 20:114 calligraphy is the landing LCP image. Preload the
+        // wide SVG above 640 px and the stacked one at or below, with high priority, on "/" only.
+        const heroAsset = (needle) =>
+          Object.values(bundle).find((item) => item.type === "asset" && item.fileName.includes(needle) && item.fileName.endsWith(".svg"));
+        const heroes = [
+          [heroAsset("hero-quran-20-114-stacked"), "(max-width: 640px)"],
+          [Object.values(bundle).find((item) => item.type === "asset" && /hero-quran-20-114(?!-stacked)[^/]*\.svg$/.test(item.fileName)), "(min-width: 641px)"],
+        ].filter(([asset]) => asset);
+        const heroLinks = heroes
+          .map(([asset, media]) => `var i=document.createElement("link");i.rel="preload";i.as="image";i.href=${JSON.stringify(toUrl(asset.fileName))};i.media=${JSON.stringify(media)};i.setAttribute("fetchpriority","high");h.appendChild(i);`)
+          .join("");
+        const script = `<script>(function(){if(location.pathname!=="/")return;var h=document.head;${heroLinks}${JSON.stringify(
           scripts.map(toUrl)
         )}.forEach(function(u){var l=document.createElement("link");l.rel="modulepreload";l.href=u;h.appendChild(l);});${JSON.stringify(
           styles.map(toUrl)
@@ -140,8 +152,31 @@ function landingPreloadPlugin() {
   };
 }
 
+/**
+ * Dev-only component gallery (WS-KIT): `npm run dev` serves src/kit/gallery/index.html
+ * at /__kit. It is not a build input, so it never ships in production.
+ */
+function kitGalleryPlugin() {
+  return {
+    name: "kit-gallery",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        const [pathname, query = ""] = String(req.url || "").split("?");
+        if (pathname === "/__kit" || pathname === "/__kit/") req.url = `/src/kit/gallery/index.html${query ? `?${query}` : ""}`;
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), siteMetaPlugin(loadEnv(mode, process.cwd(), "")), landingPreloadPlugin()],
+  plugins: [react(), siteMetaPlugin(loadEnv(mode, process.cwd(), "")), landingPreloadPlugin(), kitGalleryPlugin()],
+  resolve: {
+    alias: {
+      "@kit": path.resolve(path.dirname(fileURLToPath(import.meta.url)), "src/kit"),
+    },
+  },
   css: {
     preprocessorOptions: {
       scss: {

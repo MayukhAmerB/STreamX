@@ -101,29 +101,10 @@ $tap-target: 2.75rem; // 44px
 // Live dot + tags
 // ---------------------------------------------------------------------------
 .cds-app .lc-live-dot {
-  display: inline-block;
+  display: inline-flex;
   flex: none;
-  border-radius: 50%;
+  align-items: center;
   margin-inline-end: $spacing-02;
-  animation: lc-live-pulse 2s ease-in-out infinite;
-  background-color: currentColor;
-  block-size: 0.5rem;
-  inline-size: 0.5rem;
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
-}
-
-@keyframes lc-live-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.35;
-  }
 }
 
 .cds-app .lc-tags {
@@ -147,9 +128,9 @@ $tap-target: 2.75rem; // 44px
   display: flex;
   flex-direction: column;
   padding: $spacing-06 $spacing-05;
-  border-color: rgba(250, 77, 86, 0.35);
+  border-color: rgba(243, 226, 179, 0.35);
   background:
-    radial-gradient(circle at 100% 0%, rgba(250, 77, 86, 0.12), transparent 50%),
+    radial-gradient(circle at 100% 0%, rgba(243, 226, 179, 0.12), transparent 50%),
     var(--uc-surface);
   box-shadow: inset 0.25rem 0 0 $support-error;
   gap: $spacing-06;

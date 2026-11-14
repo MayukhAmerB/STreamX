@@ -36,7 +36,8 @@ test("exam console: dry run, readiness gate, schedule, auto-open and auto-close"
   const slug = manifest.console_exam_slug;
 
   await test.step("upload: the server dry run shows counts only and saves nothing", async () => {
-    await page.goto("/console/exams");
+    // Exams live in the Admin workspace (UI overhaul §4.3).
+    await page.goto("/console/admin/exams");
     await page.getByLabel("Exam file", { exact: true }).and(page.locator("input[type=file]")).setInputFiles(examFile(slug));
     await expect(page.getByRole("button", { name: "Load exam" })).toBeDisabled();
     await expect(page.getByText("Check the file before loading it.")).toBeVisible();
@@ -46,7 +47,7 @@ test("exam console: dry run, readiness gate, schedule, auto-open and auto-close"
     await expect(page.getByRole("link", { name: "E2E Console exam" })).toHaveCount(0);
     await page.getByRole("button", { name: "Load exam" }).click();
     // Loading opens the new exam's page.
-    await expect(page).toHaveURL(new RegExp(`/console/exams/${slug}$`));
+    await expect(page).toHaveURL(new RegExp(`/console/admin/exams/${slug}$`));
     await expect(page.getByRole("heading", { level: 1, name: "E2E Console exam" })).toBeVisible();
   });
 

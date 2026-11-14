@@ -3,8 +3,12 @@ import { StaticRouter } from "react-router-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { RecordingDropZone, UploadProgress, UploadResult, UploadTokensPanel } from "../../pages/ConsoleRecordingUploadPage";
+import { ChunkTrack } from "./UploadPieces";
 import {
+  chunkFractions,
   fileMatchesRecord,
+  formatClock,
+  uploadStatusTag,
   formatBytes,
   formatEta,
   isRecordingFile,
@@ -77,8 +81,9 @@ describe("recording upload model", () => {
 describe("recording upload UI", () => {
   it("drop zone is a labelled file input accepting recordings", () => {
     const markup = html(<RecordingDropZone file={null} onFile={() => {}} />);
-    expect(markup).toContain('aria-label="Recording file"');
-    expect(markup).toContain("Drop the OBS recording here");
+    // The shared DropZone labels its input; the label names the recording file.
+    expect(markup).toMatch(/<label[^>]*>.*recording file/);
+    expect(markup).toContain("Drop the OBS recording file here");
     expect(markup).toContain(".mkv");
     expect(html(<RecordingDropZone file={{ name: "class.mkv", size: 2 * 1024 ** 3 }} onFile={() => {}} />)).toContain("2.0 GB");
   });
@@ -129,5 +134,51 @@ describe("recording upload UI", () => {
     expect(markup).toContain("Revoked");
     expect(markup).toContain("Automatically remux to mp4");
     expect(markup).toContain("Settings → Output → Recording");
+  });
+});
+
+describe("chunk track (M7)", () => {
+  const MIB = 1024 ** 2;
+  const base = { totalBytes: 200 * MIB, chunkCount: 7, sentBytes: 0, resumedBytes: 0, percent: 0 };
+
+  it("fills one cell per 32 MB part, left to right", () => {
+    expect(chunkFractions({ ...base, chunkBytes: 32 * MIB, sentBytes: 48 * MIB })).toEqual([1, 0.5, 0, 0, 0, 0, 0]);
+    const done = chunkFractions({ ...base, chunkBytes: 32 * MIB, sentBytes: 200 * MIB });
+    expect(done.every((fraction) => fraction === 1)).toBe(true);
+    // The last part is 8 MB: half of it sent is half a cell.
+    expect(chunkFractions({ ...base, chunkBytes: 32 * MIB, sentBytes: 196 * MIB })[6]).toBe(0.5);
+    expect(chunkFractions({ chunkCount: 0 })).toEqual([]);
+  });
+
+  it("labels time and statuses", () => {
+    expect(formatClock(12)).toBe("0:12");
+    expect(formatClock(65)).toBe("1:05");
+    expect(uploadStatusTag({ status: "completed", result: { action: "replaced" } })).toEqual({ status: "published", label: "Replaced auto-recording" });
+    expect(uploadStatusTag({ status: "uploading", status_label: "Uploading" })).toEqual({ status: "processing", label: "Uploading" });
+    expect(uploadStatusTag({ status: "failed" }).status).toBe("failed");
+    expect(uploadStatusTag({ status: "aborted", status_label: "Cancelled" })).toEqual({ status: "off", label: "Cancelled" });
+  });
+
+  it("moves cells with transform only", () => {
+    const markup = html(<ChunkTrack progress={{ ...base, sentBytes: 48 * MIB }} chunkBytes={32 * MIB} phase="uploading" />);
+    expect(markup.match(/rup-track__cell[" ]/g)).toHaveLength(7);
+    expect(markup).toContain("transform:scaleX(0.5)");
+    expect(markup).not.toMatch(/width:/);
+  });
+
+  it("offline: a static hatch and the time since the drop, no pulses", () => {
+    const markup = html(<ChunkTrack progress={{ ...base, sentBytes: 64 * MIB }} chunkBytes={32 * MIB} phase="retrying" />);
+    expect(markup).toContain("is-offline");
+    expect(markup).toContain("Reconnecting · 0:00");
+    expect(markup).not.toContain("is-resumed");
+  });
+
+  it("resume: only the parts already on the server pulse", () => {
+    const markup = html(<ChunkTrack progress={{ ...base, sentBytes: 64 * MIB, resumedBytes: 64 * MIB }} chunkBytes={32 * MIB} phase="uploading" />);
+    expect(markup.match(/is-resumed/g)).toHaveLength(2);
+  });
+
+  it("verifying shows the indeterminate bar", () => {
+    expect(html(<ChunkTrack progress={{ ...base, sentBytes: 200 * MIB }} chunkBytes={32 * MIB} phase="completing" />)).toContain("rup-track__verify");
   });
 });

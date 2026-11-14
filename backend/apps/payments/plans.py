@@ -195,6 +195,18 @@ COURSE_BLOCK_MESSAGES = {
     "registration_closed": "Registration for this batch is closed.",
     "price_not_configured": "Pricing will be announced soon.",
 }
+FEATURE_DISABLED_BLOCK = "feature_disabled"
+
+
+def course_block_message(block):
+    """Sentence for a ``course_purchase_block`` code (the switch reason for feature_disabled)."""
+    if block == FEATURE_DISABLED_BLOCK:
+        from apps.core import features
+
+        return features.reason_for("pentesting")
+    return COURSE_BLOCK_MESSAGES.get(block, COURSE_BLOCK_MESSAGES["course_unpublished"])
+
+
 INSTRUCTOR_OWN_COURSE_MESSAGE = "Instructors cannot purchase their own course."
 OWNS_PASS_MESSAGE = "You already hold the all future batches pass."
 OWNS_COURSE_MESSAGE = "You already have access to this course."
@@ -211,6 +223,11 @@ def course_open_for_enrollment(course):
 
 def course_purchase_block(course):
     """Machine code for why nobody can buy this course right now, or ""."""
+    # Pentesting "coming soon" switch first: its reason is the one to show.
+    from apps.courses.features import course_acquisition_blocked
+
+    if course_acquisition_blocked(course):
+        return FEATURE_DISABLED_BLOCK
     if not getattr(settings, "DIRECT_COURSE_PAYMENTS_ENABLED", False):
         return "checkout_disabled"
     if not course.is_published:
@@ -270,7 +287,7 @@ def plan_unavailable_reason(course, plan, user=None, *, course_block=_UNSET, enr
     """Human-readable reason this viewer cannot buy ``plan`` now, or None."""
     block = course_purchase_block(course) if course_block is _UNSET else course_block
     if block:
-        return COURSE_BLOCK_MESSAGES.get(block, COURSE_BLOCK_MESSAGES["course_unpublished"])
+        return course_block_message(block)
     if not is_plan_enabled(course, plan):
         return "This plan is not offered for this course."
     if _authenticated(user) and user.id == course.instructor_id:

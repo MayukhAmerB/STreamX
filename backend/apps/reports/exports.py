@@ -9,6 +9,8 @@ import zipfile
 
 from django.utils import timezone
 
+from apps.users import identity
+
 from .models import SCAN_CLEAN, SCAN_INFECTED, ReportCriterion, ReportSubmission
 from .services import course_gradebook, format_marks
 
@@ -42,15 +44,17 @@ def _write_rows(rows):
 def course_marks_csv(course):
     book = course_gradebook(course)
     tasks = book["tasks"]
-    header = ["Student", "Email"]
+    # Owner rule: the student block (roll number, real name, handle, stats) comes first.
+    header = [*identity.IDENTITY_HEADER, "Email"]
     for task in tasks:
         label = f"W{task.week_number} " if task.week_number else ""
         header.append(f"{label}{task.title} (/{format_marks(task.max_marks)})")
     header += ["Total", "Out of (graded)", "Percent", "Graded", "Missing", "Late"]
     rows = [header]
-    for row in book["rows"]:
+    blocks = identity.identity_blocks([(row["student"], None) for row in book["rows"]], course_id=course.pk)
+    for row, block in zip(book["rows"], blocks, strict=True):
         student = row["student"]
-        line = [student.full_name or "", student.email]
+        line = [*identity.identity_cells(block), student.email]
         for cell in row["cells"]:
             if cell["final_marks"] is not None:
                 line.append(format_marks(cell["final_marks"]))
@@ -74,7 +78,7 @@ def course_marks_csv(course):
 def task_marks_csv(task):
     criteria = list(ReportCriterion.objects.filter(task=task).order_by("order", "id"))
     header = [
-        "Student",
+        *identity.IDENTITY_HEADER,
         "Email",
         "Status",
         "Submitted at",
@@ -89,8 +93,9 @@ def task_marks_csv(task):
     header += [f"{item.name} (/{format_marks(item.max_marks)})" for item in criteria]
     header += ["Graded by", "Graded at", "Feedback"]
     auto = task.origin == "auto"
+    target_at = len(identity.IDENTITY_HEADER) + 1  # right after Email
     if auto:  # self-service week: one row per target
-        header.insert(2, "Target")
+        header.insert(target_at, "Target")
     rows = [header]
     submissions = (
         ReportSubmission.objects.filter(task=task)
@@ -98,12 +103,16 @@ def task_marks_csv(task):
         .select_related("student", "grade", "grade__graded_by")
         .order_by("student__full_name", "student__email", "target_key", "id")
     )
-    for submission in submissions:
+    submissions = list(submissions)
+    blocks = identity.identity_blocks(
+        [(submission.student, submission) for submission in submissions], course_id=task.course_id
+    )
+    for submission, block in zip(submissions, blocks, strict=True):
         grade = getattr(submission, "grade", None)
         stored = (grade.criteria_marks or {}) if grade else {}
         graded_by = grade.graded_by if grade else None
         row = [
-            submission.student.full_name or "",
+            *identity.identity_cells(block),
             submission.student.email,
             submission.get_status_display(),
             _local(submission.submitted_at),
@@ -120,7 +129,7 @@ def task_marks_csv(task):
             grade.feedback if grade else "",
         ]
         if auto:
-            row.insert(2, submission.target_name)
+            row.insert(target_at, submission.target_name)
         rows.append(row)
     return _write_rows(rows)
 
@@ -174,11 +183,16 @@ def iter_task_zip(task):
         .order_by("student__full_name", "student__email")
     )
     sink = _ZipSink()
-    manifest = [["Student", "Email", "Status", "Version", "Submitted at", "Late", "File", "Size (bytes)", "SHA-256"]]
+    manifest = [
+        [*identity.IDENTITY_HEADER, "Email", "Status", "Version", "Submitted at", "Late", "File", "Size (bytes)", "SHA-256"]
+    ]
     with zipfile.ZipFile(sink, mode="w", compression=zipfile.ZIP_DEFLATED, allowZip64=True) as archive:
         used = set()
-        for submission in submissions.iterator():
+        for submission, block in identity.chunked_blocks(
+            submissions.iterator(), lambda item: item.student, lambda item: item, course_id=task.course_id
+        ):
             student = submission.student
+            who = identity.identity_cells(block)
             folder = safe_component(
                 f"{student.full_name or student.email} ({student.pk})", fallback=f"student-{student.pk}"
             )
@@ -194,7 +208,7 @@ def iter_task_zip(task):
                     label = "BLOCKED BY VIRUS SCANNER" if item.scan_status == SCAN_INFECTED else "NOT SCANNED YET"
                     manifest.append(
                         [
-                            student.full_name,
+                            *who,
                             student.email,
                             submission.status,
                             version.number,
@@ -222,7 +236,7 @@ def iter_task_zip(task):
                 except OSError:
                     manifest.append(
                         [
-                            student.full_name,
+                            *who,
                             student.email,
                             submission.status,
                             version.number,
@@ -243,7 +257,7 @@ def iter_task_zip(task):
                         yield sink.drain()
                 manifest.append(
                     [
-                        student.full_name or "",
+                        *who,
                         student.email,
                         submission.get_status_display(),
                         version.number,

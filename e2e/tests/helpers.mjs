@@ -114,6 +114,45 @@ export async function signInWithForm(page, manifest, who, { path = "/login" } = 
   return user;
 }
 
+/**
+ * Sign in to the Django back office ("Al Syed Admin") through its own login
+ * form (the back office uses the Django session, not the API's JWT cookie).
+ */
+export async function signInToBackOffice(page, manifest, who = "admin", { next = "/admin/" } = {}) {
+  const user = manifest.users[who];
+  await page.goto(`/admin/login/?next=${encodeURIComponent(next)}`);
+  await page.locator("#id_username").fill(user.email);
+  await page.locator("#id_password").fill(manifest.password);
+  await page.locator('form#login-form [type="submit"], form [type="submit"]').first().click();
+  await expect(page).not.toHaveURL(/\/admin\/login\//);
+  return user;
+}
+
+/** Turn feature switches on/off through the audited service: `{ teaching: true }`. */
+export function setFeatures(control, switches) {
+  return control.fixture("features", { set: switches });
+}
+
+/**
+ * UI overhaul transition: open the page at its new workspace URL; while the
+ * owning workstream has not landed it yet (the WS-0 placeholder renders),
+ * open the old URL instead and note it on the report. Returns the URL used.
+ * Once every page is real this always uses `newUrl` (and old URLs redirect).
+ */
+export async function openWorkspacePage(page, newUrl, legacyUrl) {
+  await page.goto(newUrl);
+  const placeholder = page.locator("[data-placeholder-owner]");
+  // The route module is lazy: give it a moment to render either the page or the placeholder.
+  await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
+  if (legacyUrl && (await placeholder.count())) {
+    const owner = await placeholder.first().getAttribute("data-placeholder-owner");
+    test.info().annotations.push({ type: "transition", description: `${newUrl} is still a placeholder (${owner}); used ${legacyUrl}` });
+    await page.goto(legacyUrl);
+    return legacyUrl;
+  }
+  return newUrl;
+}
+
 export const test = base.extend({
   control: async ({}, use) => {
     const api = await playwrightRequest.newContext();

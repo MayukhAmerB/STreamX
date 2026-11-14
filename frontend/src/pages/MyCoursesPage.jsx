@@ -5,9 +5,10 @@ import { Button, Search } from "@carbon/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getMyCourses } from "../api/courses";
+import useCapabilities from "../features/capabilities/useCapabilities";
+import { MembershipIncludedSection, useMembershipLibrary } from "../features/my-courses/MembershipIncluded";
 import CourseProgressTile from "../features/my-courses/CourseProgressTile";
-import { EmptyState, PageHeader, PageNotification, PageSkeleton, StatChips } from "../features/app-shell/ui";
-import { getAverageProgress } from "../features/users-corner/cornerModel";
+import { EmptyState, PageHeader, PageNotification, PageSkeleton } from "../features/app-shell/ui";
 import { apiData, apiMessage } from "../utils/api";
 import { isOsintCourse } from "../utils/courseAccess";
 
@@ -27,6 +28,18 @@ export function getStudentLibraryStats(courses = []) {
   return { total: normalizedCourses.length, inProgress, completed };
 }
 
+/**
+ * The one course whose button is the screen's champagne action (plan §3.4):
+ * the first in progress, else the first not finished, else none.
+ */
+export function pickAccentCourseId(courses = []) {
+  const list = Array.isArray(courses) ? courses : [];
+  const percent = (course) => Number(course?.progress_percent || 0);
+  const inProgress = list.find((course) => percent(course) > 0 && percent(course) < 100);
+  const notStarted = list.find((course) => percent(course) < 100);
+  return (inProgress || notStarted)?.id ?? null;
+}
+
 export function filterCourses(courses = [], query = "") {
   const needle = String(query || "").trim().toLowerCase();
   if (!needle) return courses;
@@ -40,10 +53,9 @@ const BrowseButton = ({ kind = "primary" }) => (
 );
 
 /** Presentational view, also used by tests and the visual harness. */
-export function MyCoursesView({ courses = [], loading = false, error = "", onRetry }) {
+export function MyCoursesView({ courses = [], loading = false, error = "", onRetry, membership = null }) {
   const [query, setQuery] = useState("");
-  const stats = useMemo(() => getStudentLibraryStats(courses), [courses]);
-  const averageProgress = useMemo(() => getAverageProgress(courses), [courses]);
+  const accentId = useMemo(() => pickAccentCourseId(courses), [courses]);
   const hasOsintAccess = useMemo(() => courses.some(isOsintCourse), [courses]);
   const visibleCourses = useMemo(() => filterCourses(courses, query), [courses, query]);
 
@@ -77,16 +89,6 @@ export function MyCoursesView({ courses = [], loading = false, error = "", onRet
 
       {!loading && !error && courses.length > 0 ? (
         <>
-          <StatChips
-            className="cds-library-stats"
-            items={[
-              { id: "courses", label: stats.total === 1 ? "Course" : "Courses", value: stats.total },
-              { id: "progress", label: "In progress", value: stats.inProgress },
-              { id: "completed", label: "Completed", value: stats.completed },
-              { id: "average", label: "Avg. progress", value: averageProgress, suffix: "%", accent: true },
-            ]}
-          />
-
           {hasOsintAccess ? (
             <div className="cds-library-callout">
               <span className="cds-library-callout__icon" aria-hidden="true">
@@ -117,7 +119,7 @@ export function MyCoursesView({ courses = [], loading = false, error = "", onRet
           {visibleCourses.length > 0 ? (
             <section className="cds-tile-grid" aria-label="Courses">
               {visibleCourses.map((course) => (
-                <CourseProgressTile key={course.id} course={course} />
+                <CourseProgressTile key={course.id} course={course} accent={course.id === accentId} />
               ))}
             </section>
           ) : (
@@ -133,6 +135,8 @@ export function MyCoursesView({ courses = [], loading = false, error = "", onRet
           )}
         </>
       ) : null}
+
+      {!loading ? <MembershipIncludedSection library={membership} /> : null}
     </>
   );
 }
@@ -164,6 +168,11 @@ export default function MyCoursesPage() {
   }, [attempt]);
 
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
+  // OSINT plans (switch `memberships`, off by default): recordings included
+  // without an enrollment. No request at all while the switch is off.
+  const { caps } = useCapabilities();
+  const ownedIds = useMemo(() => courses.map((course) => course?.id), [courses]);
+  const membership = useMembershipLibrary(Boolean(caps?.features?.memberships?.enabled), ownedIds);
 
-  return <MyCoursesView courses={courses} loading={loading} error={error} onRetry={retry} />;
+  return <MyCoursesView courses={courses} loading={loading} error={error} onRetry={retry} membership={membership} />;
 }

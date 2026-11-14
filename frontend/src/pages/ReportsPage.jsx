@@ -1,15 +1,17 @@
 import "../features/reports/Reports.scss";
 
-import { ArrowRight, ChartLine, ChevronRight, Report, Time } from "@carbon/icons-react";
+import { ArrowRight, ChevronRight, Report, Time } from "@carbon/icons-react";
 import { Button, Select, SelectItem } from "@carbon/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { EmptyState, FeatureBoundary, PageHeader, PageNotification, PageSkeleton, useToast } from "../features/app-shell/ui";
+import { EmptyState, FeatureBoundary, PageNotification, PageSkeleton, useToast } from "../features/app-shell/ui";
+import CourseworkHeader from "../features/coursework/CourseworkHeader";
 import { getMyWeek, listReportTasks } from "../features/reports/reportsApi";
 import WeeklyReportCard, { WeeklyReportView } from "../features/reports/WeeklyReportCard";
 import { formatIst, getCountdown, splitTasks } from "../features/reports/reportModel";
 import StatusChip from "../features/reports/StatusChip";
 import useNow from "../features/reports/useNow";
+import MyIdentityHeader from "../features/identity/StudentIdentityHeader";
 import { apiData, apiMessage } from "../utils/api";
 
 export function taskPath(task) {
@@ -60,22 +62,12 @@ function TaskRow({ task }) {
   );
 }
 
-/** Presentational view (also used by tests and the screenshot harness). */
+/** Coursework hub header with the "This week" tab (plan §3.4). */
 export function ReportsHeader() {
-  return (
-    <PageHeader
-      title="Reports"
-      description="One report per target you investigate. Upload your files before the weekly deadline and see your marks here."
-      actions={
-        <Button as={Link} to="/reports/marks" kind="tertiary" renderIcon={ChartLine}>
-          My marks
-        </Button>
-      }
-    />
-  );
+  return <CourseworkHeader active="week" />;
 }
 
-export function ReportsListView({ tasks = [], loading = false, error = "", onRetry, now = Date.now(), header = true, emptyText }) {
+export function ReportsListView({ tasks = [], loading = false, error = "", onRetry, now = Date.now(), header = true, emptyText, emptyAction }) {
   const [courseId, setCourseId] = useState("all");
   const courses = useMemo(() => {
     const map = new Map();
@@ -87,23 +79,13 @@ export function ReportsListView({ tasks = [], loading = false, error = "", onRet
 
   return (
     <>
-      {header ? (
-        <PageHeader
-          title="Reports"
-          description="One OSINT target a week. Upload your report before the deadline and see your marks here."
-          actions={
-            <Button as={Link} to="/reports/marks" kind="tertiary" renderIcon={ChartLine}>
-              My marks
-            </Button>
-          }
-        />
-      ) : null}
+      {header ? <ReportsHeader /> : null}
       {loading ? <PageSkeleton label="Loading reports" count={2} /> : null}
       {!loading && error ? (
         <PageNotification kind="error" title="Couldn't load your reports." subtitle={error} actionLabel={onRetry ? "Try again" : undefined} onAction={onRetry} />
       ) : null}
       {!loading && !error && tasks.length === 0 ? (
-        <EmptyState icon={Report} text={emptyText || "No weekly reports yet. When your instructor publishes this week's target, it appears here."} />
+        <EmptyState icon={Report} text={emptyText || "No weekly reports yet. When your instructor publishes this week's target, it appears here."} action={emptyAction} />
       ) : null}
       {!loading && !error && tasks.length > 0 ? (
         <div className="rpt-list-page">
@@ -228,6 +210,10 @@ export default function ReportsPage() {
   return (
     <>
       <ReportsHeader />
+      {/* Owner rule: roll number, real name, handle, stats lead the submission screen. */}
+      <div className="rpt-identity">
+        <MyIdentityHeader />
+      </div>
       <WeeklySection
         courses={week.courses}
         loading={week.loading}
@@ -245,7 +231,14 @@ export default function ReportsPage() {
           error={state.error}
           onRetry={load}
           now={now}
-          emptyText={week.courses.length ? "No instructor-set weekly tasks right now." : undefined}
+          emptyText={week.courses.length || week.loading ? "No instructor-set weekly tasks right now." : "Weekly reports start once you join a course."}
+          emptyAction={
+            week.courses.length || week.loading ? undefined : (
+              <Button as={Link} to="/courses" kind="tertiary" renderIcon={ArrowRight}>
+                Browse courses
+              </Button>
+            )
+          }
         />
       ) : null}
     </>

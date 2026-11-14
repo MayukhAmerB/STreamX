@@ -4,6 +4,7 @@ import IndiaMap from "../components/IndiaMap";
 import { SupremeCourtHero } from "../components/NationalDeskArt";
 import { getNationalDesk } from "../api/nationalDesk";
 import { apiData } from "../utils/api";
+import "./NationalDeskPage.css";
 import heroFir from "../assets/nd-hero-fir.jpg";
 import heroLaws from "../assets/nd-hero-laws.jpg";
 
@@ -1104,7 +1105,7 @@ export default function NationalDeskPage() {
   };
 
   return (
-    <section ref={topRef} className="mx-auto max-w-5xl px-3 py-6 text-white sm:px-5 sm:py-10 lg:px-6">
+    <section ref={topRef} className="nd-page mx-auto max-w-5xl px-3 py-6 text-white sm:px-5 sm:py-10 lg:px-6">
       {/* Heading */}
       <div className="mb-6">
         <div className="mb-3 h-1 w-10 rounded-full bg-white/70" aria-hidden="true" />

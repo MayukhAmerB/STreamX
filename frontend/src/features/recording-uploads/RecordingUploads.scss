@@ -1,138 +1,442 @@
-// Console -> Upload class recording (Carbon, Console palette).
-// Token-only imports: emits no Carbon component CSS; every rule is scoped
-// under `.cds-app`. Phone first.
-@use '../app-shell/styles/tokens' as *;
+// Console -> Upload class recording (UI overhaul WS-D1): Syed Carbon tokens
+// (--sc-*), square surfaces, one champagne action. Motion is transform /
+// opacity only (M7 chunk track, M7b drop zone) and stops under reduced
+// motion. Every rule is scoped under `.cds-app`. Phone first.
+
+@mixin rup-reduced-motion {
+  @media (prefers-reduced-motion: reduce) {
+    @content;
+  }
+
+  :root[data-motion='reduce'] & {
+    @content;
+  }
+}
+
+@keyframes rup-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes rup-indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(250%);
+  }
+}
+
+@keyframes rup-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+@keyframes rup-fade-out {
+  to {
+    opacity: 0;
+  }
+}
 
 .cds-app {
   .rup-section {
-    margin-block: $spacing-06;
+    display: grid;
+    margin-block: 0;
+    gap: 1rem;
   }
 
-  .rup-card {
+  .rup-task {
+    padding: 1rem;
+    background: var(--sc-surface-01, #262626);
+    gap: 1.25rem;
+
+    @media (min-width: 42rem) {
+      padding: 1.5rem;
+    }
+  }
+
+  .rup-step {
     display: grid;
-    padding: $spacing-05;
-    border: 1px solid var(--uc-border);
-    border-radius: var(--uc-radius-card);
-    background: var(--uc-surface);
-    gap: $spacing-05;
+    gap: 0.5rem;
   }
 
   .rup-subtitle {
-    @include type-style('heading-compact-02');
-
-    color: var(--uc-text);
+    margin: 0;
+    color: var(--sc-text-primary, #f4f4f4);
+    font-size: var(--sc-type-heading-03-size, 1.25rem);
+    font-weight: 400;
+    line-height: 1.75rem;
   }
 
   .rup-muted {
-    @include type-style('body-compact-01');
-
-    color: var(--uc-text-muted);
+    margin: 0;
+    color: var(--sc-text-secondary, #c6c6c6);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
   }
 
   .rup-error {
-    @include type-style('body-compact-01');
-
-    color: var(--cds-text-error, #da1e28);
+    color: var(--sc-status-error, #fafafa);
+    font-size: 0.875rem;
   }
 
   .rup-check-label {
-    @include type-style('heading-compact-01');
-
-    color: var(--uc-text);
+    margin: 0;
+    color: var(--sc-text-primary, #f4f4f4);
+    font-size: 0.875rem;
+    font-weight: 600;
   }
 
-  .rup-outcome {
-    margin-block-start: calc(-1 * #{$spacing-03});
-  }
-
-  .rup-row {
+  .rup-row,
+  .rup-actions {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
-    gap: $spacing-04;
+    gap: 0.5rem;
   }
 
-  .rup-drop {
-    position: relative;
+  .rup-row > :first-child {
+    flex: 1 1 12rem;
+  }
+
+  .rup-actions {
+    align-items: center;
+
+    .cds--btn {
+      flex: 1 1 100%;
+      max-inline-size: none;
+
+      @media (min-width: 42rem) {
+        flex: 0 0 auto;
+      }
+    }
+
+    // Why the Upload button is disabled (plan §2.7: every disabled control explains itself).
+    .rup-reason {
+      margin: 0;
+      padding-inline-start: 0.5rem;
+
+      @media (max-width: 41.98rem) {
+        padding-inline-start: 0;
+      }
+    }
+  }
+
+  .rup-accent.cds--btn--primary:not(:disabled) {
+    background-color: var(--sc-accent, #f3e2b3);
+    color: var(--sc-accent-on, #161616);
+
+    svg {
+      fill: currentColor;
+    }
+
+    &:hover {
+      background-color: var(--sc-accent-hover, #f8edcf);
+    }
+
+    &:active {
+      background-color: var(--sc-accent-active, #e6d29c);
+    }
+  }
+
+  // M7b: the shared DropZone (WS-A), on the raised layer of the task card.
+  .rup-dropzone {
     display: grid;
-    min-block-size: 9rem;
-    padding: $spacing-06 $spacing-05;
-    border: 2px dashed var(--uc-border-strong, var(--uc-border));
-    border-radius: var(--uc-radius-card);
-    background: var(--uc-surface-2, var(--uc-surface));
-    color: var(--uc-text);
-    cursor: pointer;
-    gap: $spacing-02;
-    justify-items: center;
-    text-align: center;
+    gap: 0.5rem;
 
-    &:focus-within {
-      outline: 2px solid var(--cds-focus, #0f62fe);
-      outline-offset: 2px;
-    }
-
-    &--over {
-      border-color: var(--cds-interactive, #0f62fe);
-    }
-
-    &--disabled {
-      cursor: not-allowed;
-      opacity: 0.6;
+    .sc-drop-zone {
+      background-color: var(--sc-surface-02, #393939);
     }
   }
 
-  .rup-drop__title {
-    @include type-style('heading-compact-01');
+  .rup-file {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    margin: 0;
+    padding: 0.75rem 1rem;
+    border-inline-start: 2px solid var(--sc-text-primary, #f4f4f4);
+    background-color: var(--sc-surface-02, #393939);
+    gap: 0.25rem 1rem;
+  }
 
+  .rup-file__name {
+    min-inline-size: 0;
+    color: var(--sc-text-primary, #f4f4f4);
+    font-size: 0.875rem;
     overflow-wrap: anywhere;
   }
 
-  .rup-drop__input {
-    position: absolute;
-    inset: 0;
-    opacity: 0;
-    cursor: inherit;
-    inline-size: 100%;
-    block-size: 100%;
+  .rup-file__size {
+    color: var(--sc-text-secondary, #c6c6c6);
+    font-family: var(--sc-font-mono, monospace);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
   }
 
+  .rup-outcome {
+    color: var(--sc-text-helper, #a8a8a8);
+  }
+
+  // M7: chunk track.
   .rup-progress {
     display: grid;
-    gap: $spacing-03;
+    gap: 0.5rem;
+  }
+
+  .rup-progress__label,
+  .rup-progress__helper {
+    margin: 0;
+    color: var(--sc-text-primary, #f4f4f4);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.25rem;
+  }
+
+  .rup-progress__helper {
+    color: var(--sc-text-secondary, #c6c6c6);
+    font-size: 0.75rem;
+  }
+
+  .rup-track {
+    position: relative;
+    display: grid;
+    gap: 0.5rem;
+    padding-block-end: 0.25rem;
+
+    &.is-done .rup-track__cells {
+      animation: rup-fade-out var(--sc-duration-moderate-02, 240ms) var(--sc-ease-exit-productive, ease) forwards;
+    }
+  }
+
+  .rup-track__cells {
+    display: grid;
+    gap: 2px;
+    grid-template-columns: repeat(var(--rup-cells), minmax(0, 1fr));
+  }
+
+  .rup-track__cell {
+    position: relative;
+    overflow: hidden;
+    background-color: var(--sc-surface-02, #393939);
+    block-size: 0.5rem;
+
+    &.is-resumed {
+      animation: rup-pulse 600ms var(--sc-ease-standard-productive, ease) 3;
+    }
+  }
+
+  .rup-track__fill {
+    position: absolute;
+    background-color: var(--sc-text-primary, #f4f4f4);
+    inset: 0;
+    transform-origin: left;
+    transition: transform var(--sc-duration-slow-01, 400ms) var(--sc-ease-standard-productive, ease);
+  }
+
+  // Offline: a static 45° hatch over the track (no motion) + elapsed time.
+  .rup-track.is-offline .rup-track__cells {
+    position: relative;
+
+    &::after {
+      position: absolute;
+      background-image: repeating-linear-gradient(
+        45deg,
+        rgb(243 226 179 / 55%) 0 2px,
+        transparent 2px 6px
+      );
+      content: '';
+      inset: 0;
+    }
+  }
+
+  .rup-track__offline {
+    color: var(--sc-status-warning, #f3e2b3);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  // Verifying on the server: a 2 px indeterminate bar.
+  .rup-track__verify {
+    position: relative;
+    overflow: hidden;
+    block-size: 2px;
+
+    &::after {
+      position: absolute;
+      background-color: var(--sc-text-secondary, #c6c6c6);
+      animation: rup-indeterminate 1.4s var(--sc-ease-standard-productive, ease) infinite;
+      content: '';
+      inset-block: 0;
+      inline-size: 40%;
+    }
+  }
+
+  @include rup-reduced-motion {
+    .rup-track__fill {
+      transition: none;
+    }
+
+    .rup-track__cell.is-resumed,
+    .rup-track.is-done .rup-track__cells {
+      animation: none;
+    }
+
+    .rup-track__verify::after {
+      animation: none;
+      inline-size: 100%;
+      opacity: 0.5;
+    }
   }
 
   .rup-result {
     display: grid;
-    gap: $spacing-03;
+    gap: 0.5rem;
+  }
+
+  .rup-result__head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .rup-check {
+    flex: none;
+    fill: none;
+    stroke: var(--sc-status-success, #fafafa);
+    stroke-linecap: square;
+    stroke-width: 1.5;
+
+    circle,
+    path {
+      animation: rup-draw var(--sc-duration-slow-01, 400ms) var(--sc-ease-entrance-productive, ease-out) backwards;
+      stroke-dasharray: 1;
+      stroke-dashoffset: 0;
+    }
+
+    path {
+      animation-delay: 120ms;
+    }
+
+    @include rup-reduced-motion {
+      circle,
+      path {
+        animation: none;
+      }
+    }
   }
 
   .rup-link {
-    @include type-style('body-compact-01');
-
     display: inline-flex;
     align-items: center;
     min-block-size: 2.75rem;
-    color: var(--cds-link-primary, #0f62fe);
+    color: var(--sc-text-primary, #f4f4f4);
+    font-size: 0.875rem;
+    text-underline-offset: 0.25rem;
+
+    &:focus-visible {
+      outline: 2px solid var(--brand-focus, #fff);
+      outline-offset: 2px;
+    }
+  }
+
+  .rup-link--strong {
+    padding-inline: 1rem;
+    border: 1px solid var(--sc-border-strong, #6f6f6f);
+    text-decoration: none;
+  }
+
+  // Desktop uploader: a secondary disclosure below the task.
+  .rup-disclosure {
+    border-block: 1px solid var(--sc-border-subtle, #393939);
+
+    > summary {
+      display: flex;
+      align-items: center;
+      min-block-size: 4rem;
+      cursor: pointer;
+      gap: 0.75rem;
+      list-style: none;
+
+      &::-webkit-details-marker {
+        display: none;
+      }
+
+      &::after {
+        flex: none;
+        border-block-end: 1.5px solid var(--sc-text-primary, #f4f4f4);
+        border-inline-end: 1.5px solid var(--sc-text-primary, #f4f4f4);
+        margin-inline: auto 0.5rem;
+        block-size: 0.5rem;
+        content: '';
+        inline-size: 0.5rem;
+        transform: rotate(45deg);
+        transition: transform var(--sc-duration-fast-02, 110ms) var(--sc-ease-standard-productive, ease);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--brand-focus, #fff);
+        outline-offset: 2px;
+      }
+    }
+
+    &[open] > summary::after {
+      transform: rotate(-135deg);
+    }
+
+    @include rup-reduced-motion {
+      > summary::after {
+        transition: none;
+      }
+    }
+  }
+
+  .rup-disclosure__text {
+    display: grid;
+    gap: 0.125rem;
+  }
+
+  .rup-disclosure__title {
+    color: var(--sc-text-primary, #f4f4f4);
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+
+  .rup-disclosure__body {
+    padding-block-end: 1.5rem;
+  }
+
+  .rup-tokens {
+    display: grid;
+    gap: 1rem;
   }
 
   .rup-token {
     display: grid;
-    padding: $spacing-04;
-    border: 1px solid var(--uc-border);
-    background: var(--uc-surface-2, var(--uc-surface));
-    gap: $spacing-03;
+    padding: 1rem;
+    border-inline-start: 2px solid var(--sc-status-success, #fafafa);
+    background: var(--sc-surface-02, #393939);
+    gap: 0.5rem;
   }
 
   .rup-token__value {
-    @include type-style('code-02');
-
+    color: var(--sc-text-primary, #f4f4f4);
+    font-family: var(--sc-font-mono, monospace);
+    font-size: 0.875rem;
     overflow-wrap: anywhere;
     user-select: all;
   }
 
   .rup-list {
     display: grid;
-    gap: $spacing-03;
+    margin: 0;
+    padding: 0;
+    gap: 1px;
+    list-style: none;
   }
 
   .rup-list__item {
@@ -140,46 +444,61 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    padding: $spacing-04;
-    border: 1px solid var(--uc-border);
-    background: var(--uc-surface);
-    gap: $spacing-03;
+    padding: 0.75rem 1rem;
+    background: var(--sc-surface-01, #262626);
+    gap: 0.5rem 1rem;
     overflow-wrap: anywhere;
+  }
+
+  .rup-list__text {
+    display: grid;
+    min-inline-size: 0;
+    gap: 0.125rem;
+  }
+
+  .rup-list__name {
+    color: var(--sc-text-primary, #f4f4f4);
+    font-size: 0.875rem;
+    font-weight: 600;
   }
 
   .rup-list__end {
     display: flex;
     align-items: center;
-    gap: $spacing-03;
+    gap: 0.75rem;
+
+    .cds--tag {
+      margin: 0;
+    }
   }
 
   .rup-guide {
-    @include type-style('body-compact-01');
-
-    color: var(--uc-text-2, var(--uc-text));
+    color: var(--sc-text-secondary, #c6c6c6);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
 
     summary {
       min-block-size: 2.75rem;
+      color: var(--sc-text-primary, #f4f4f4);
       cursor: pointer;
-      font-weight: 600;
       line-height: 2.75rem;
     }
 
     ol {
       display: grid;
-      padding-inline-start: $spacing-06;
-      gap: $spacing-03;
+      padding-inline-start: 1.5rem;
+      gap: 0.5rem;
       list-style: decimal;
     }
   }
 
   .rup-code {
-    @include type-style('code-01');
-
     overflow-x: auto;
-    padding: $spacing-03;
-    margin-block-start: $spacing-02;
-    background: var(--uc-surface-2, var(--uc-surface));
+    padding: 0.5rem;
+    margin-block-start: 0.25rem;
+    background: var(--sc-surface-02, #393939);
+    font-family: var(--sc-font-mono, monospace);
+    font-size: 0.75rem;
     white-space: pre;
   }
 }

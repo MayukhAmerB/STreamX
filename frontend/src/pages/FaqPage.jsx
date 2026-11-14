@@ -1,9 +1,12 @@
-import { useState } from "react";
+// /faqs (PHILOSOPHY T-PROSE + accordion, BUILD_PLAN §2.1): grouped questions
+// (category pills jump to each group) in native <details> accordions. The
+// original answers are kept word for word; the Free tier, Pentesting and plans
+// questions are new.
 import { Link } from "react-router-dom";
-import PageShell from "../components/PageShell";
 
-const pageBackgroundImage =
-  "https://i.pinimg.com/736x/7e/4d/a3/7e4da37224c6c189161ed24cd8fc2ab3.jpg";
+import { FREE_TIER } from "../data/freeLabs";
+import { FAQ_PAGE } from "../marketing/marketingContent";
+import { ChevronDownIcon, Hand, Tagline } from "../marketing/primitives";
 
 const faqItems = [
   {
@@ -67,7 +70,7 @@ const faqItems = [
       "Understand concepts better",
       "Stay consistent with your learning",
     ],
-    afterBullets: "You can contact us via WhatsApp, Telegram, or Email.",
+    afterBullets: "You can contact us via WhatsApp or Email.",
   },
   {
     question: "Do you offer refunds?",
@@ -94,163 +97,110 @@ const faqItems = [
   },
 ];
 
+
+export const NEW_FAQ_ITEMS = [
+  {
+    question: "What can I do for free?",
+    paragraphs: [
+      "Start with our curated directory of free OSINT challenges on other platforms, follow our learning path through them and track your own progress. The monthly live OSINT CTF is free to enter.",
+    ],
+    link: { to: FREE_TIER.href, label: "Start free" },
+  },
+  {
+    question: "Is Pentesting open?",
+    paragraphs: [
+      "Pentesting is coming soon. You can browse every tier, course and module outline now; enrolment, payments and applications open at launch.",
+    ],
+    link: { to: "/tracks/pentesting", label: "Browse the Pentesting tiers" },
+  },
+  {
+    question: "What are Starter and the CTF Labs membership?",
+    paragraphs: [
+      "Two monthly plans for the labs. Starter covers the easy and medium labs plus the recorded classes of one batch. The CTF Labs membership covers every lab, new cases each month and that month's recorded course bundle. Both open once their prices are confirmed.",
+    ],
+    link: { to: "/pricing", label: "See the plans" },
+  },
+];
+
+export const FAQ_GROUPS = [
+  { id: "courses", label: "Courses", questions: ["What is this course about?", "Who is this course for?", "What will I learn in this course?", "Is this course legal and safe to learn?", "Will I get a certificate after completing the course?"] },
+  { id: "access", label: "Access", questions: ["How will I get access after approval?", "How does the login system work?", "Can I share my login details with others?", "Do you provide support during the course?"] },
+  { id: "payments", label: "Payments", questions: ["Do you offer refunds?"] },
+  { id: "plans", label: "Free & plans", questions: NEW_FAQ_ITEMS.map((item) => item.question) },
+];
+
 function FaqAnswer({ item }) {
   return (
-    <div className="space-y-4 text-sm leading-7 text-[#C6C6C6]">
+    <div className="hp-faq__answer">
       {item.paragraphs?.map((paragraph) => (
         <p key={paragraph}>{paragraph}</p>
       ))}
       {item.beforeBullets ? <p>{item.beforeBullets}</p> : null}
       {item.bullets?.length ? (
-        <ul className="space-y-2">
+        <ul className="hp-faq__bullets">
           {item.bullets.map((bullet) => (
-            <li
-              key={bullet}
-              className="flex items-start gap-3 rounded-xl border border-black bg-white/[0.03] px-4 py-3"
-            >
-              <span className="mt-2 inline-flex h-2.5 w-2.5 shrink-0 rounded-full bg-[#D4D4D4]" />
-              <span>{bullet}</span>
-            </li>
+            <li key={bullet}>{bullet}</li>
           ))}
         </ul>
       ) : null}
       {item.afterBullets ? <p>{item.afterBullets}</p> : null}
+      {item.link ? (
+        <p>
+          <Link to={item.link.to}>{item.link.label}</Link>
+        </p>
+      ) : null}
     </div>
   );
 }
 
 export default function FaqPage() {
-  const [openIndex, setOpenIndex] = useState(0);
-
+  const all = [...faqItems, ...NEW_FAQ_ITEMS];
+  const byQuestion = new Map(all.map((item) => [item.question, item]));
   return (
-    <PageShell
-      title="FAQs"
-      subtitle="Everything students usually ask before enrolling, paying, and getting access."
-      decryptTitle
-    >
-      <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[28px] border border-black bg-[#080808] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
-        <div className="absolute inset-0">
-          <img
-            src={pageBackgroundImage}
-            alt=""
-            aria-hidden="true"
-            className="h-full w-full object-cover opacity-[0.16]"
-          />
-          <div className="absolute inset-0 bg-gradient-to-br from-black/86 via-black/80 to-[#111111]/94" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_14%_14%,rgba(192,192,192,0.13),transparent_34%)]" />
-        </div>
-
-        <div className="relative p-5 sm:p-7">
-          <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-            <section className="rounded-2xl border border-black panel-gradient p-6 backdrop-blur-sm">
-              <div className="inline-flex items-center rounded-full border border-black bg-white/5 px-3 py-1 text-xs font-semibold tracking-wide text-[#DBDBDB]">
-                COURSE FAQS
-              </div>
-              <h2 className="mt-4 font-reference text-3xl font-semibold leading-tight text-white sm:text-4xl">
-                Clear answers before you enroll
-              </h2>
-              <p className="mt-4 text-sm leading-7 text-[#BBBBBB]">
-                This page covers the most common questions about the course, legal use, payment
-                access, support, login rules, refunds, and certificates.
-              </p>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-                <div className="rounded-xl border border-black panel-gradient p-4">
-                  <div className="font-reference text-lg font-semibold text-[#E0E0E0]">OSINT</div>
-                  <div className="mt-1 text-xs uppercase tracking-wide text-[#969696]">
-                    Research focused
-                  </div>
-                </div>
-                <div className="rounded-xl border border-black panel-gradient p-4">
-                  <div className="font-reference text-lg font-semibold text-[#E0E0E0]">
-                    Ethical
-                  </div>
-                  <div className="mt-1 text-xs uppercase tracking-wide text-[#969696]">
-                    Legal boundaries
-                  </div>
-                </div>
-                <div className="rounded-xl border border-black panel-gradient p-4">
-                  <div className="font-reference text-lg font-semibold text-[#E0E0E0]">
-                    Guided
-                  </div>
-                  <div className="mt-1 text-xs uppercase tracking-wide text-[#969696]">
-                    Support included
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-6 rounded-2xl border border-black bg-gradient-to-r from-[#161616] to-[#121212] p-5">
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#D5D5D5]">
-                  Need More Help?
-                </div>
-                <p className="mt-3 text-sm leading-7 text-[#B8B8B8]">
-                  If your question is not covered here, use the contact page and we will guide you
-                  before enrollment.
-                </p>
-                <Link
-                  to="/contact"
-                  className="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
-                >
-                  Go to Contact
-                </Link>
-              </div>
-            </section>
-
-            <section className="rounded-2xl border border-black panel-gradient p-6 backdrop-blur-sm">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <h2 className="font-reference text-2xl font-semibold text-white">
-                    Frequently Asked Questions
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
-                    Open each item for the full answer.
-                  </p>
-                </div>
-                <div className="text-xs uppercase tracking-[0.18em] text-[#8F8F8F]">
-                  {faqItems.length} questions
-                </div>
-              </div>
-
-              <div className="mt-5 space-y-3">
-                {faqItems.map((item, index) => {
-                  const isOpen = openIndex === index;
-                  const itemNumber = String(index + 1).padStart(2, "0");
-
-                  return (
-                    <article
-                      key={item.question}
-                      className="overflow-hidden rounded-2xl border border-black bg-[#0F0F0F]/80 transition hover:border-[#3B3B3B]"
-                    >
-                      <button
-                        type="button"
-                        className="flex w-full items-start gap-4 px-5 py-4 text-left"
-                        onClick={() => setOpenIndex((current) => (current === index ? -1 : index))}
-                        aria-expanded={isOpen}
-                      >
-                        <span className="mt-1 inline-flex min-w-10 rounded-full border border-black bg-white/5 px-2.5 py-1 text-[11px] font-semibold tracking-[0.16em] text-[#D7D7D7]">
-                          {itemNumber}
-                        </span>
-                        <span className="flex-1 font-reference text-lg font-semibold leading-7 text-white">
-                          {item.question}
-                        </span>
-                        <span className="mt-1 text-xl leading-none text-[#D0D0D0]">
-                          {isOpen ? "-" : "+"}
-                        </span>
-                      </button>
-
-                      {isOpen ? (
-                        <div className="border-t border-black px-5 pb-5 pt-4">
-                          <FaqAnswer item={item} />
-                        </div>
-                      ) : null}
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
-          </div>
-        </div>
+    <div data-page="faqs">
+      <section className="hp-hero hp-hero--page" aria-labelledby="hp-faq-title">
+        <Tagline>{FAQ_PAGE.tagline}</Tagline>
+        <h1 id="hp-faq-title" className="hp-display">
+          <span className="hp-display__line">
+            {FAQ_PAGE.before} <Hand>{FAQ_PAGE.accent}</Hand>
+          </span>
+        </h1>
+        <p className="hp-lead">{FAQ_PAGE.lead}</p>
+        <nav aria-label="Question groups">
+          <ul className="hp-chips" style={{ justifyContent: "center" }}>
+            {FAQ_GROUPS.map((group) => (
+              <li key={group.id}>
+                <a className="hp-chip" href={`#faq-${group.id}`}>
+                  {group.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </section>
+      <div className="hp-frame" style={{ maxWidth: "56rem", paddingBottom: 96 }}>
+        {FAQ_GROUPS.map((group, index) => (
+          <section key={group.id} id={`faq-${group.id}`} aria-labelledby={`faq-${group.id}-title`} style={{ marginTop: index ? 56 : 0, scrollMarginTop: 88 }}>
+            <p className="hp-chapter" id={`faq-${group.id}-title`}>
+              {group.label}
+            </p>
+            <div className="hp-faq">
+              {group.questions
+                .map((question) => byQuestion.get(question))
+                .filter(Boolean)
+                .map((item, itemIndex) => (
+                  <details key={item.question} open={index === 0 && itemIndex === 0}>
+                    <summary>
+                      <span>{item.question}</span>
+                      <ChevronDownIcon />
+                    </summary>
+                    <FaqAnswer item={item} />
+                  </details>
+                ))}
+            </div>
+          </section>
+        ))}
       </div>
-    </PageShell>
+    </div>
   );
 }

@@ -1,6 +1,8 @@
 from django.db.models import Q
 from django.utils import timezone
 
+from apps.users import teaching
+
 from .models import Enrollment, LiveClass, LiveClassEnrollment
 
 
@@ -125,16 +127,26 @@ def lecture_access_context(lecture, user):
     """Single source of truth for who may see/play a lecture."""
     course = lecture.section.course
     is_authenticated = bool(user and getattr(user, "is_authenticated", False))
-    is_instructor_owner = bool(
-        is_authenticated and user.role == "instructor" and getattr(user, "id", None) == course.instructor_id
-    )
+    # While Teaching is off a non-staff instructor is treated as a student here
+    # (plan §5.3); staff keep their access through ``is_staff`` below.
+    is_instructor_owner = bool(teaching.has_instructor_role(user) and teaching.owns_course(user, course))
     is_enrolled = bool(is_authenticated and user_has_course_access(user, course.id))
     is_staff = bool(is_authenticated and (user.is_staff or user.is_superuser))
     # Unpublished lectures (class recordings still transcoding) stay invisible
     # to students; the owning instructor and staff can still preview them.
     is_visible = bool(lecture.is_published) or is_instructor_owner or is_staff
+    # OSINT memberships (Starter / CTF Labs bundle) play published recordings
+    # only; asked only for signed-in viewers without an enrollment.
+    has_membership_recordings = False
+    if is_authenticated and lecture.is_published and not (is_enrolled or is_instructor_owner):
+        from apps.payments.recording_access import user_has_recording_access
+
+        has_membership_recordings = user_has_recording_access(user, course.id)
     can_access = is_visible and (
-        bool(lecture.is_preview and is_authenticated) or is_instructor_owner or is_enrolled
+        bool(lecture.is_preview and is_authenticated)
+        or is_instructor_owner
+        or is_enrolled
+        or has_membership_recordings
     )
     return {
         "course": course,
@@ -144,4 +156,5 @@ def lecture_access_context(lecture, user):
         "is_enrolled": is_enrolled,
         "is_visible": is_visible,
         "can_access": can_access,
+        "has_membership_recordings": has_membership_recordings,
     }

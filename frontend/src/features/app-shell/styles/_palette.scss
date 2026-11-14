@@ -1,0 +1,214 @@
+// Console palette: Syed Carbon (UI overhaul plan §2.1). OWNER: WS-A.
+//
+// One source for every colour, type and shape value: the generated tokens in
+// src/styles/tokens.css (--sc-*, from scripts/build-tokens.mjs). This file
+// emits no CSS on its own. It keeps the old Console names working while
+// pages move over:
+//   - `console-alias-properties` (emitted once on `.cds-app`) points every
+//     --uc-* custom property at its --sc-* token; glows resolve to `none`,
+//     radii to the one surface radius (0) or the pill;
+//   - the $corner-* Sass aliases and corner-* mixins keep their signatures
+//     but now produce the calm Carbon look (Plex 400, sentence case, square,
+//     monochrome focus, transform-only shimmer).
+// New code uses the --sc-* tokens and the sc-* mixins below.
+
+/// Emits the old --uc-* names as aliases of the Syed Carbon tokens. Included once, on `.cds-app`.
+@mixin console-alias-properties {
+  // Surfaces (g100 layers)
+  --uc-page: var(--sc-surface-page);
+  --uc-surface: var(--sc-surface-01);
+  --uc-surface-2: var(--sc-surface-02);
+  --uc-raised: var(--sc-surface-hover-01);
+  --uc-raised-2: var(--sc-surface-selected-01);
+  --uc-border: var(--sc-border-subtle);
+  --uc-border-strong: var(--sc-border-strong);
+  --uc-border-hover: #8d8d8d;
+
+  // Text and icons
+  --uc-text: var(--sc-text-primary);
+  --uc-text-2: var(--sc-text-secondary);
+  --uc-text-muted: var(--sc-text-helper);
+
+  // Champagne: rules, the active-nav bar and the one next-best action only
+  --uc-accent: var(--sc-accent);
+  --uc-accent-hover: var(--sc-accent-hover);
+  --uc-accent-active: var(--sc-accent-active);
+  --uc-on-accent: var(--sc-accent-on);
+  --uc-accent-soft: var(--sc-accent-wash);
+  --uc-accent-soft-strong: rgba(243, 226, 179, 0.14);
+  --uc-accent-line: rgba(243, 226, 179, 0.32);
+  // Glows are retired (Phase 1 §7.1, UI overhaul §2.1).
+  --uc-glow: none;
+  --uc-glow-strong: none;
+  --uc-text-glow: none;
+
+  // Status (always with an icon and a word)
+  --uc-success: var(--sc-status-success);
+  --uc-warning: var(--sc-status-warning);
+  --uc-error: var(--sc-status-error);
+  --uc-live: var(--sc-status-live);
+
+  // Shape and type: one surface radius, a pill, Plex, no wide tracking
+  --uc-radius-card: var(--sc-radius-surface);
+  --uc-radius-lg: var(--sc-radius-surface);
+  --uc-radius-md: var(--sc-radius-surface);
+  --uc-radius-control: var(--sc-radius-surface);
+  --uc-radius-pill: var(--sc-radius-pill);
+  --uc-font: var(--sc-font-sans);
+  --uc-label-tracking: var(--sc-type-label-01-letter-spacing);
+  --uc-card-highlight: none;
+  --uc-shadow: var(--sc-shadow-floating);
+}
+
+// --- Sass aliases for page stylesheets (old names, new values) ------------
+$corner-page: var(--sc-surface-page);
+$corner-surface: var(--sc-surface-01);
+$corner-surface-2: var(--sc-surface-02);
+$corner-raised: var(--sc-surface-hover-01);
+$corner-raised-2: var(--sc-surface-selected-01);
+$corner-border: var(--sc-border-subtle);
+$corner-border-strong: var(--sc-border-strong);
+$corner-border-hover: #8d8d8d;
+$corner-text: var(--sc-text-primary);
+$corner-text-2: var(--sc-text-secondary);
+$corner-text-muted: var(--sc-text-helper);
+$corner-accent: var(--sc-accent);
+$corner-accent-hover: var(--sc-accent-hover);
+$corner-accent-active: var(--sc-accent-active);
+$corner-on-accent: var(--sc-accent-on);
+$corner-accent-soft: var(--sc-accent-wash);
+$corner-accent-soft-strong: rgba(243, 226, 179, 0.14);
+$corner-accent-line: rgba(243, 226, 179, 0.32);
+$corner-glow: none;
+$corner-glow-strong: none;
+$corner-text-glow: none;
+$corner-success: var(--sc-status-success);
+$corner-warning: var(--sc-status-warning);
+$corner-error: var(--sc-status-error);
+$corner-live: var(--sc-status-live);
+$corner-radius-card: var(--sc-radius-surface);
+$corner-radius-lg: var(--sc-radius-surface);
+$corner-radius-md: var(--sc-radius-surface);
+$corner-radius-control: var(--sc-radius-surface);
+$corner-radius-pill: var(--sc-radius-pill);
+$corner-font: var(--sc-font-sans);
+$corner-label-tracking: var(--sc-type-label-01-letter-spacing);
+$corner-card-highlight: none;
+$corner-shadow: var(--sc-shadow-floating);
+
+// --- Syed Carbon mixins -----------------------------------------------------
+
+/// Label-01: 12/16, 0.32px, sentence case (the 12 px floor; no micro-labels).
+@mixin sc-label {
+  font-family: var(--sc-font-sans);
+  font-size: var(--sc-type-label-01-size);
+  font-weight: 400;
+  letter-spacing: var(--sc-type-label-01-letter-spacing);
+  line-height: var(--sc-type-label-01-line-height);
+  text-transform: none;
+}
+
+/// The one eyebrow: a 32 x 2 px champagne rule, 8 px gap, label-01 secondary.
+@mixin sc-eyebrow {
+  @include sc-label;
+
+  display: flex;
+  align-items: center;
+  color: var(--sc-text-secondary);
+  gap: 0.5rem;
+
+  &::before {
+    display: block;
+    flex: none;
+    background-color: var(--sc-accent-rule, var(--sc-accent));
+    block-size: var(--sc-accent-rule-width);
+    content: '';
+    inline-size: 2rem;
+  }
+}
+
+/// Page title: Plex 400 32/40 (phone 28/36).
+@mixin sc-page-title {
+  font-family: var(--sc-font-sans);
+  font-size: var(--sc-type-page-title-size);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: var(--sc-type-page-title-line-height);
+}
+
+/// Section heading-03: 20/28, 400.
+@mixin sc-section-title {
+  font-family: var(--sc-font-sans);
+  font-size: var(--sc-type-heading-03-size);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: var(--sc-type-heading-03-line-height);
+}
+
+/// Monochrome focus ring (white on dark), instant.
+@mixin sc-focus-ring($offset: 2px) {
+  outline: 2px solid var(--brand-focus, #ffffff);
+  outline-offset: $offset;
+}
+
+/// Square layer card: elevation from the layer, never a shadow.
+@mixin sc-card {
+  border: 1px solid var(--sc-surface-01);
+  border-radius: var(--sc-radius-surface);
+  background: var(--sc-surface-01);
+}
+
+/// Skeleton surface: transform shimmer on a pseudo-element, 3 cycles, then static.
+@mixin sc-skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--cds-skeleton-background, var(--sc-surface-02));
+
+  &::after {
+    position: absolute;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+    content: '';
+    inset: 0;
+    transform: translateX(-100%);
+    animation: sc-shimmer var(--sc-shimmer-period, 2000ms) linear 3;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::after {
+      animation: none;
+    }
+  }
+
+  :root[data-motion='reduce'] &::after {
+    animation: none;
+  }
+}
+
+// --- Old mixin names, new look ------------------------------------------------
+
+/// Was a 10-11 px uppercase micro-label; now label-01 sentence case.
+@mixin corner-micro-label($size: 0.75rem) {
+  @include sc-label;
+}
+
+/// Was Inter 800 with tight tracking; now Plex 400, no negative tracking.
+@mixin corner-heading($tracking: 0) {
+  font-family: var(--sc-font-sans);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/// Was a rounded card with a translucent border; now a square layer.
+@mixin corner-card($radius: 0) {
+  @include sc-card;
+}
+
+/// Was a champagne ring; focus is monochrome now.
+@mixin corner-focus-ring($offset: 2px) {
+  @include sc-focus-ring($offset);
+}
+
+/// Was a background-position shimmer (paint every frame); now transform x3.
+@mixin corner-skeleton {
+  @include sc-skeleton;
+}

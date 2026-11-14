@@ -1,10 +1,28 @@
+// Exam detail (UI overhaul plan §3.5, T3). OWNER: WS-D2. Mounted at
+// /console/{teach,admin}/exams/:slug and the old /console/exams/:slug.
+// Actions and readiness sit in the side column (under the title on phones);
+// Publish stays disabled with its reason until the checklist passes; an
+// unknown slug is a not-found page, never "Try again".
 import "../features/exams/Exams.scss";
 
-import { ArrowLeft, CheckmarkFilled, DocumentExport, Launch, MisuseOutline, Renew, Upload } from "@carbon/icons-react";
-import { Button, Checkbox, Tag, TextInput } from "@carbon/react";
+import { CheckmarkFilled, DocumentExport, Launch, MisuseOutline, Renew, Upload } from "@carbon/icons-react";
+import { Button, Checkbox, TextInput } from "@carbon/react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { PageHeader, PageNotification, PageSkeleton, StatChips, useToast } from "../features/app-shell/ui";
+import { ExamStateTag, useExamsBase } from "./ConsoleExamsPage";
+import {
+  ConfirmDialog,
+  ErrorState,
+  NotFoundState,
+  PageHeader,
+  PageNotification,
+  PageSkeleton,
+  StatChips,
+  StatusTag,
+  useToast,
+} from "../features/app-shell/ui";
+import useScrollCue from "../features/grading/useScrollCue";
+import { gradingPaths, useWorkspaceRoot } from "../features/grading/workspaceRoot";
 import {
   canClose,
   canEditSchedule,
@@ -17,7 +35,6 @@ import {
   scheduleFormFrom,
   schedulePayload,
   scheduleProblem,
-  stateMeta,
   WINDOW_LABELS,
 } from "../features/exams/examModel";
 import {
@@ -31,6 +48,7 @@ import {
   updateConsoleExam,
   uploadExamMaterial,
 } from "../features/exams/examsApi";
+import { identityLine } from "../features/identity/identityModel";
 import { apiData, apiMessage } from "../utils/api";
 
 export function ReadinessChecklist({ readiness }) {
@@ -93,7 +111,9 @@ export function ScheduleForm({ exam, batches = [], form, problem = "", saving = 
   const published = exam.state === "published";
   const set = (patch) => onChange?.({ ...form, ...patch });
   const toggleBatch = (id, checked) =>
-    set({ batchIds: checked ? [...new Set([...form.batchIds, id])] : form.batchIds.filter((item) => item !== id) });
+    set({
+      batchIds: checked ? [...new Set([...form.batchIds, id])] : form.batchIds.filter((item) => item !== id),
+    });
   return (
     <section className="exm-section exm-card" aria-labelledby="exm-schedule-title">
       <h2 id="exm-schedule-title" className="exm-subtitle">
@@ -137,7 +157,11 @@ export function ScheduleForm({ exam, batches = [], form, problem = "", saving = 
           />
         ))}
       </fieldset>
-      {problem ? <p className="exm-reason" role="alert">{problem}</p> : null}
+      {problem ? (
+        <p className="exm-reason" role="alert">
+          {problem}
+        </p>
+      ) : null}
       <Button kind="secondary" disabled={saving || Boolean(problem)} onClick={onSave}>
         {saving ? "Saving…" : "Save window and batches"}
       </Button>
@@ -146,8 +170,12 @@ export function ScheduleForm({ exam, batches = [], form, problem = "", saving = 
 }
 
 export function MaterialsPanel({ exam, busyPath = "", onUpload }) {
+  const scrollRef = useScrollCue();
   const items = (exam?.questions || []).flatMap((question) =>
-    (question.materials || []).map((item) => ({ ...item, question: `Q${question.order}` }))
+    (question.materials || []).map((item) => ({
+      ...item,
+      question: `Q${question.order}`,
+    })),
   );
   if (!items.length) return null;
   const missing = missingMaterials(exam).length;
@@ -157,7 +185,7 @@ export function MaterialsPanel({ exam, busyPath = "", onUpload }) {
         Evidence files ({items.length - missing} of {items.length} uploaded)
       </h2>
       <p className="exm-muted">Students get a short-lived private link to each file, only after they start the exam.</p>
-      <div className="exm-table-wrap" tabIndex={0} role="region" aria-label="Evidence files">
+      <div className="exm-table-wrap" tabIndex={0} role="region" aria-label="Evidence files" ref={scrollRef}>
         <table className="exm-table">
           <thead>
             <tr>
@@ -172,17 +200,23 @@ export function MaterialsPanel({ exam, busyPath = "", onUpload }) {
               <tr key={`${item.question}-${item.path}`}>
                 <td>{item.question}</td>
                 <td title={item.path}>{item.label || item.path.split("/").pop()}</td>
-                <td>{item.uploaded ? "Uploaded" : "Missing"}</td>
+                <td>
+                  <StatusTag status={item.uploaded ? "published" : "late"}>{item.uploaded ? "Uploaded" : "Missing"}</StatusTag>
+                </td>
                 {exam.can_manage ? (
                   <td>
-                    <label className="exm-file-input">
+                    <label className={`exm-upload-btn${busyPath === item.path ? " is-busy" : ""}`}>
+                      <Upload size={16} aria-hidden="true" />
+                      <span aria-hidden="true">{busyPath === item.path ? "Uploading…" : item.uploaded ? "Replace" : "Upload"}</span>
                       <input
                         type="file"
+                        className="exm-visually-hidden"
                         aria-label={`Upload ${item.path.split("/").pop()}`}
                         disabled={busyPath === item.path}
                         onChange={(event) => {
                           const file = event.target.files?.[0];
                           if (file) onUpload?.(item.path, file);
+                          event.target.value = "";
                         }}
                       />
                     </label>
@@ -197,18 +231,21 @@ export function MaterialsPanel({ exam, busyPath = "", onUpload }) {
   );
 }
 
-export function ResultsPanel({ results, csvHref }) {
+const LEGACY_STUDENT_HREF = (id) => `/gradebook/students/${id}`;
+
+export function ResultsPanel({ results, csvHref, studentHref = LEGACY_STUDENT_HREF }) {
+  const scrollRef = useScrollCue();
   if (!results) return null;
   const { stats } = results;
   const chips = [
     { id: "participants", label: "Students", value: stats.participants },
     { id: "active", label: "In progress", value: stats.active },
-    { id: "average", label: "Average", value: stats.average_score ?? "–", accent: true },
+    { id: "average", label: "Average", value: stats.average_score ?? "–" },
     { id: "top", label: "Top score", value: stats.top_score ?? "–" },
   ];
   return (
     <section className="exm-section" aria-labelledby="exm-results-title">
-      <div className="exm-row">
+      <div className="exm-row exm-row--head">
         <h2 id="exm-results-title" className="exm-subtitle">
           Results (out of {results.exam.total_points})
         </h2>
@@ -220,14 +257,14 @@ export function ResultsPanel({ results, csvHref }) {
       </div>
       <StatChips items={chips} label="Exam summary" />
       {results.participants.length ? (
-        <div className="exm-table-wrap" tabIndex={0} role="region" aria-label="Results (scrolls sideways)">
+        <div className="exm-table-wrap" tabIndex={0} role="region" aria-label="Results (scrolls sideways)" ref={scrollRef}>
           <table className="exm-table">
             <thead>
               <tr>
+                <th scope="col">Student (roll number · real name · handle)</th>
                 <th scope="col" className="exm-num">
                   #
                 </th>
-                <th scope="col">Student</th>
                 <th scope="col">Batch</th>
                 <th scope="col">Status</th>
                 <th scope="col" className="exm-num">
@@ -244,10 +281,10 @@ export function ResultsPanel({ results, csvHref }) {
             <tbody>
               {results.participants.map((row) => (
                 <tr key={row.student.id}>
-                  <td className="exm-num">{row.rank}</td>
                   <th scope="row">
-                    <Link to={`/gradebook/students/${row.student.id}`}>{row.student.full_name || row.student.email}</Link>
+                    <Link to={studentHref(row.student.id)}>{identityLine(row.identity, row.student)}</Link>
                   </th>
+                  <td className="exm-num">{row.rank}</td>
                   <td>{row.batch?.title || "–"}</td>
                   <td>{PARTICIPATION_LABELS[row.status] || row.status}</td>
                   <td className="exm-num">{row.score}</td>
@@ -259,7 +296,7 @@ export function ResultsPanel({ results, csvHref }) {
           </table>
         </div>
       ) : (
-        <p className="exm-muted">Nobody has started this exam yet.</p>
+        <p className="exm-muted exm-after-chips">Nobody has started this exam yet.</p>
       )}
       {results.questions.length ? (
         <>
@@ -300,10 +337,20 @@ export function ResultsPanel({ results, csvHref }) {
   );
 }
 
+const WINDOW_STATUS = { open: "open", not_open: "scheduled", closed: "off" };
+
 export default function ConsoleExamDetailPage() {
   const { slug } = useParams();
   const { showToast } = useToast();
-  const [state, setState] = useState({ exam: null, loading: true, error: "" });
+  const base = useExamsBase();
+  const paths = gradingPaths(useWorkspaceRoot());
+  const [confirmClose, setConfirmClose] = useState(false);
+  const [state, setState] = useState({
+    exam: null,
+    loading: true,
+    error: "",
+    missing: false,
+  });
   const [results, setResults] = useState(null);
   const [batches, setBatches] = useState([]);
   const [form, setForm] = useState(scheduleFormFrom(null));
@@ -311,7 +358,7 @@ export default function ConsoleExamDetailPage() {
   const [actionError, setActionError] = useState("");
 
   const applyExam = useCallback((exam) => {
-    setState({ exam, loading: false, error: "" });
+    setState({ exam, loading: false, error: "", missing: false });
     setForm(scheduleFormFrom(exam));
   }, []);
 
@@ -327,7 +374,14 @@ export default function ConsoleExamDetailPage() {
             .catch(() => setBatches([]));
         }
       })
-      .catch((error) => setState({ exam: null, loading: false, error: apiMessage(error, "Please try again.") }));
+      .catch((error) =>
+        setState({
+          exam: null,
+          loading: false,
+          error: apiMessage(error, "Please try again."),
+          missing: error?.response?.status === 404,
+        }),
+      );
     getConsoleExamResults(slug)
       .then((response) => setResults(apiData(response, null)))
       .catch(() => setResults(null));
@@ -355,83 +409,121 @@ export default function ConsoleExamDetailPage() {
   };
 
   const exam = state.exam;
-  const meta = stateMeta(exam?.state);
   const problem = scheduleProblem(form);
 
+  if (state.missing) {
+    return (
+      <NotFoundState
+        title="This exam does not exist"
+        body="It may have been removed, or the link has a typo."
+        backHref={base}
+        backLabel="Back to Exams"
+      />
+    );
+  }
+
   return (
-    <>
-      <Link to="/console/exams" className="exm-back">
-        <ArrowLeft size={16} aria-hidden="true" /> Exams
-      </Link>
+    <div className="exm-page">
       {state.loading && !exam ? <PageSkeleton label="Loading exam" count={3} /> : null}
-      {!state.loading && state.error ? (
-        <PageNotification kind="error" title="Couldn't load this exam." subtitle={state.error} actionLabel="Try again" onAction={load} />
-      ) : null}
+      {!state.loading && state.error ? <ErrorState error={`Couldn't load this exam. ${state.error}`} onRetry={load} /> : null}
       {exam ? (
         <>
           <PageHeader
+            eyebrow={null}
+            breadcrumbs={[{ label: "Exams", href: base }]}
             title={exam.title}
             description={`${formatWindow(exam)} · ${exam.question_count} questions · ${exam.total_points} points`}
             actions={
-              <div className="exm-row">
-                <Tag type={meta.tag}>{meta.label}</Tag>
-                <Tag type="outline">{WINDOW_LABELS[exam.window] || exam.window}</Tag>
-                <Button kind="ghost" size="sm" renderIcon={Renew} onClick={load}>
-                  Refresh
-                </Button>
-                <Button kind="ghost" size="sm" renderIcon={Launch} href={exam.labs_url} target="_blank" rel="noopener noreferrer">
-                  Open labs
-                </Button>
+              <div className="exm-row exm-head-actions">
+                <span className="exm-row">
+                  <ExamStateTag state={exam.state} />
+                  <StatusTag status={WINDOW_STATUS[exam.window] || "scheduled"}>{WINDOW_LABELS[exam.window] || exam.window}</StatusTag>
+                </span>
+                <span className="exm-row exm-head-actions__buttons">
+                  <Button
+                    kind="ghost"
+                    size="md"
+                    hasIconOnly
+                    renderIcon={Renew}
+                    iconDescription="Refresh"
+                    tooltipPosition="bottom"
+                    onClick={load}
+                  />
+                  <Button kind="ghost" size="md" renderIcon={Launch} href={exam.labs_url} target="_blank" rel="noopener noreferrer">
+                    Open labs
+                  </Button>
+                </span>
               </div>
             }
           />
           {actionError ? (
             <PageNotification kind="error" title="That didn't work." subtitle={actionError} onClose={() => setActionError("")} />
           ) : null}
-          <PublishBar
-            exam={exam}
-            busy={busy}
-            onPublish={() => act("publish", () => publishConsoleExam(slug), "Published.")}
-            onUnschedule={() => act("unschedule", () => unscheduleConsoleExam(slug), "Back to draft.")}
-            onClose={() => {
-              if (typeof window !== "undefined" && window.confirm && !window.confirm("Close this exam now? Students can no longer answer.")) return;
+          <div className="exm-detail">
+            <aside className="exm-detail__aside" aria-label="Publishing">
+              <PublishBar
+                exam={exam}
+                busy={busy}
+                onPublish={() => act("publish", () => publishConsoleExam(slug), "Published.")}
+                onUnschedule={() => act("unschedule", () => unscheduleConsoleExam(slug), "Back to draft.")}
+                onClose={() => setConfirmClose(true)}
+              />
+              <ReadinessChecklist readiness={exam.readiness} />
+              {exam.published_at || exam.closed_at ? (
+                <p className="exm-muted">
+                  {exam.published_at ? `Published ${formatIstMoment(exam.published_at)}. ` : ""}
+                  {exam.closed_at ? `Closed ${formatIstMoment(exam.closed_at)}.` : ""}
+                </p>
+              ) : null}
+            </aside>
+            <div className="exm-detail__main">
+              <ScheduleForm
+                exam={exam}
+                batches={batches}
+                form={form}
+                problem={problem}
+                saving={busy === "save"}
+                onChange={setForm}
+                onSave={() => act("save", () => updateConsoleExam(slug, schedulePayload(form)), "Saved.")}
+              />
+              <MaterialsPanel
+                exam={exam}
+                busyPath={busy.startsWith("material:") ? busy.slice(9) : ""}
+                onUpload={(path, file) =>
+                  act(
+                    `material:${path}`,
+                    async () => {
+                      await uploadExamMaterial(slug, path, file);
+                      return getConsoleExam(slug);
+                    },
+                    "Evidence file uploaded.",
+                  )
+                }
+              />
+              <ResultsPanel results={results} csvHref={examResultsCsvHref(slug)} studentHref={paths.student} />
+              {exam.can_manage ? (
+                <p className="exm-muted exm-note">
+                  <Upload size={16} aria-hidden="true" /> To change questions, import the exam file again on the{" "}
+                  <Link to={base}>Exams page</Link>; the window and batches set here are kept.
+                </p>
+              ) : null}
+            </div>
+          </div>
+          <ConfirmDialog
+            open={confirmClose}
+            danger
+            title="Close this exam now?"
+            objectName={exam.title}
+            body="Students can no longer answer. Results stay as they are."
+            confirmLabel="Close exam"
+            onConfirm={() => {
+              setConfirmClose(false);
               act("close", () => closeConsoleExam(slug), "Closed.");
             }}
+            onCancel={() => setConfirmClose(false)}
           />
-          <ReadinessChecklist readiness={exam.readiness} />
-          <ScheduleForm
-            exam={exam}
-            batches={batches}
-            form={form}
-            problem={problem}
-            saving={busy === "save"}
-            onChange={setForm}
-            onSave={() => act("save", () => updateConsoleExam(slug, schedulePayload(form)), "Saved.")}
-          />
-          <MaterialsPanel
-            exam={exam}
-            busyPath={busy.startsWith("material:") ? busy.slice(9) : ""}
-            onUpload={(path, file) =>
-              act(`material:${path}`, async () => {
-                await uploadExamMaterial(slug, path, file);
-                return getConsoleExam(slug);
-              }, "Evidence file uploaded.")
-            }
-          />
-          {exam.published_at || exam.closed_at ? (
-            <p className="exm-muted">
-              {exam.published_at ? `Published ${formatIstMoment(exam.published_at)}. ` : ""}
-              {exam.closed_at ? `Closed ${formatIstMoment(exam.closed_at)}.` : ""}
-            </p>
-          ) : null}
-          <ResultsPanel results={results} csvHref={examResultsCsvHref(slug)} />
-          {exam.can_manage ? (
-            <p className="exm-muted">
-              <Upload size={16} aria-hidden="true" /> To change questions, upload the exam file again on the Exams page; the window and batches set here are kept.
-            </p>
-          ) : null}
         </>
       ) : null}
-    </>
+    </div>
   );
 }

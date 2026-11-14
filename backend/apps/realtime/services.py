@@ -1633,6 +1633,12 @@ def build_participant_token(
     )
 
 
+def _participant_name(user) -> str:
+    from apps.profiles.handles import public_display_name
+
+    return public_display_name(user) or "Participant"
+
+
 def build_participant_metadata(*, user, request=None):
     if not user:
         return {}
@@ -1644,7 +1650,8 @@ def build_participant_metadata(*, user, request=None):
             profile_image_url = ""
     return {
         "user_id": getattr(user, "id", None),
-        "full_name": getattr(user, "full_name", "") or getattr(user, "email", "") or "",
+        # Shared with every participant of the room: a student's handle only.
+        "full_name": _participant_name(user),
         "role": getattr(user, "role", ""),
         "is_admin": bool(getattr(user, "is_staff", False) or getattr(user, "is_superuser", False)),
         "profile_image_url": profile_image_url,
@@ -1846,7 +1853,7 @@ def build_host_publisher_token(*, session, user):
     token = build_participant_token(
         identity=identity,
         room_name=session.livekit_room_name or session.room_name,
-        participant_name=user.full_name or user.email,
+        participant_name=_participant_name(user),
         can_publish=True,
         can_subscribe=True,
         room_admin=True,

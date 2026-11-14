@@ -28,6 +28,21 @@
             heading: "OSINT Examination",
             intro: "A timed, graded OSINT examination. Every answer you submit is recorded against your LMS account, and your score is visible to your instructors.",
             scoreLabel: "SCORE:",
+            // Owner rule: the paper opens with the candidate block (roll number,
+            // real name, handle, stats), auto-filled from the LMS and read-only.
+            identityHeading: "CANDIDATE",
+            identityNote: "Auto-filled from your LMS account · read-only",
+            rollLabel: "ROLL NUMBER",
+            nameLabel: "REAL NAME",
+            handleLabel: "HANDLE",
+            handleAtStart: "HANDLE AT START",
+            handleRecent: "Most recent: {handle}",
+            xpLabel: "XP",
+            rankLabel: "RANK",
+            attendanceLabel: "ATTENDANCE",
+            reportsLabel: "REPORTS",
+            reportsNote: "Graded avg {avg}",
+            examScoreLabel: "EXAM SCORE",
             solvedLabel: "SOLVED:",
             timeLabel: "TIME LEFT:",
             loading: "Loading your examinations...",
@@ -127,6 +142,19 @@
             heading: "OSINT امتحان",
             intro: "وقت کی پابندی والا، نمبروں والا OSINT امتحان۔ آپ کا ہر جواب آپ کے LMS اکاؤنٹ کے ساتھ محفوظ ہوتا ہے اور آپ کا اسکور آپ کے اساتذہ دیکھ سکتے ہیں۔",
             scoreLabel: "اسکور:",
+            identityHeading: "امیدوار",
+            identityNote: "آپ کے LMS اکاؤنٹ سے خودکار · صرف پڑھنے کے لیے",
+            rollLabel: "رول نمبر",
+            nameLabel: "اصل نام",
+            handleLabel: "ہینڈل",
+            handleAtStart: "آغاز پر ہینڈل",
+            handleRecent: "تازہ ترین: {handle}",
+            xpLabel: "XP",
+            rankLabel: "درجہ",
+            attendanceLabel: "حاضری",
+            reportsLabel: "رپورٹس",
+            reportsNote: "اوسط نمبر {avg}",
+            examScoreLabel: "امتحان اسکور",
             solvedLabel: "حل شدہ:",
             timeLabel: "باقی وقت:",
             loading: "آپ کے امتحانات لوڈ ہو رہے ہیں...",
@@ -229,6 +257,7 @@
         exams: null,
         eligibility: null,
         detail: null,
+        identity: null,
         slug: "",
         clockOffsetMs: 0,
         timer: null,
@@ -625,6 +654,34 @@
             </div>`;
     };
 
+    // The candidate block (owner order): roll number, real name, handle (with the
+    // most recent handle when it changed), then stats. Values come from the LMS
+    // (/api/ctf/exams/<slug>/identity/: the snapshot taken at start) and are never editable.
+    const percentText = (value) => (value === null || value === undefined || value === "" ? "—" : `${Number(value)}%`);
+    const renderIdentity = () => {
+        const who = state.identity;
+        if (!who) return "";
+        const handle = who.handle ? `@${who.handle}` : "—";
+        const recent = who.handle_changed ? t("handleRecent", { handle: who.handle_most_recent ? `@${who.handle_most_recent}` : "—" }) : "";
+        const cell = (label, value, note = "", extra = "") => `<div class="exam-identity-cell${extra}"><dt class="stat-label">${esc(label)}</dt><dd class="exam-identity-value">${esc(value)}</dd>${note ? `<dd class="exam-identity-note">${esc(note)}</dd>` : ""}</div>`;
+        const stats = who.stats || null;
+        const statCells = [];
+        if (stats) {
+            if (stats.xp !== null && stats.xp !== undefined) {
+                statCells.push(cell(t("xpLabel"), String(stats.xp)));
+                statCells.push(cell(t("rankLabel"), stats.rank || "—"));
+            }
+            statCells.push(cell(t("attendanceLabel"), percentText(stats.attendance_percent)));
+            statCells.push(cell(t("reportsLabel"), String(stats.reports_submitted ?? 0), t("reportsNote", { avg: percentText(stats.reports_graded_average) })));
+            statCells.push(cell(t("examScoreLabel"), percentText(stats.exam_score)));
+        }
+        return `<section class="desc-card exam-identity" aria-label="${esc(t("identityHeading"))}" data-testid="exam-identity">
+                <div class="exam-identity-head"><h3 class="exam-identity-heading">${esc(t("identityHeading"))}</h3><span class="exam-muted">${esc(t("identityNote"))}</span></div>
+                <dl class="exam-identity-grid">${cell(t("rollLabel"), who.roll_number || "—", "", " exam-identity-roll")}${cell(t("nameLabel"), who.real_name || "—")}${cell(who.snapshot ? t("handleAtStart") : t("handleLabel"), handle, recent)}</dl>
+                ${statCells.length ? `<dl class="exam-identity-stats">${statCells.join("")}</dl>` : ""}
+            </section>`;
+    };
+
     const renderExam = () => {
         const view = el("exam-view");
         const list = el("exam-list");
@@ -638,6 +695,8 @@
         view.hidden = false;
         const parts = [`<button type="button" class="btn exam-secondary-btn exam-back" data-action="back">${state.lang === "ur" ? "→" : "←"} ${esc(t("back"))}</button>`];
         parts.push(`<div class="exam-title-row"><h3 class="exam-title">${esc(localized(exam.title))}</h3><span class="q-badge exam-window exam-window-${esc(exam.window)}">${esc(participation ? statusLabel(participation) : windowLabel(exam))}</span></div>`);
+        // The paper opens with the candidate block, then the briefing and the questions.
+        parts.push(renderIdentity());
 
         const briefing = (exam.briefing && (exam.briefing[state.lang] || exam.briefing.en)) || [];
         const rules = (exam.rules && (exam.rules[state.lang] || exam.rules.en)) || [];
@@ -779,7 +838,13 @@
 
     const loadExam = async (slug) => {
         try {
-            const data = await api(`/ctf/exams/${encodeURIComponent(slug)}/`);
+            // The candidate block is informative: an LMS without the identity endpoint
+            // (or any error there) never blocks the exam itself.
+            const [data, identity] = await Promise.all([
+                api(`/ctf/exams/${encodeURIComponent(slug)}/`),
+                api(`/ctf/exams/${encodeURIComponent(slug)}/identity/`).catch(() => null),
+            ]);
+            state.identity = identity;
             const serverTime = Date.parse(data.server_time);
             state.clockOffsetMs = Number.isNaN(serverTime) ? 0 : serverTime - Date.now();
             state.detail = data;

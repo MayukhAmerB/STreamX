@@ -42,7 +42,7 @@ def _image_tag(file_field):
         except ValueError:
             return "—"
         return format_html(
-            '<img src="{}" alt="" style="max-height:160px;border-radius:8px" />', url
+            '<img src="{}" alt="" style="max-height:160px" />', url
         )
     return "—"
 

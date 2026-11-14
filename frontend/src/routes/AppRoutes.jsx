@@ -5,10 +5,20 @@ import ScrollToTop from "../components/ScrollToTop";
 import { siteBrand } from "../config/siteBrand";
 import { CONSOLE_PATH, LEGACY_CONSOLE_PATH } from "../features/app-shell/navConfig";
 import AppLayout from "../layouts/AppLayout";
+import { isLegacyRedirectLive } from "./legacyRedirects";
+import { overhaulShellRoutes } from "./overhaulRoutes";
+// Student profiles (WS-PROFILES): public /u/:handle and the Console editor /profile/public.
+import { profilePublicRoutes, profileShellRoutes } from "../features/profiles/routes";
+// Verifiable certificates (WS-CERTIFICATES): public /certificates and /certificates/:reference.
+import { certificatePublicRoutes } from "../features/certificates/routes";
+// Attendance and the class calendar (WS-ATTENDANCE): /attendance, /calendar and the Teach/Admin pages.
+import { attendanceShellRoutes } from "../features/attendance/routes";
+import { calendarShellRoutes } from "../features/calendar/routes";
 
 // Carbon app shell for functional routes; lazy so Carbon never ships in the public website bundle.
 const AppShellLayout = lazy(() => import("../features/app-shell/AppShellLayout"));
-const AdminControlCenterPage = lazy(() => import("../pages/AdminControlCenterPage"));
+// Old Console URLs → the viewer's workspace URL (plan §3.3, §4.3); lazy for the same reason.
+const WorkspaceRedirect = lazy(() => import("../features/app-shell/WorkspaceRedirect"));
 const AboutPage = lazy(() => import("../pages/AboutPage"));
 const AccountsDirectoryPage = lazy(() => import("../pages/AccountsDirectoryPage"));
 const BroadcastingPage = lazy(() => import("../pages/BroadcastingPage"));
@@ -52,9 +62,21 @@ const GradebookPage = lazy(() => import("../pages/GradebookPage"));
 const ConsoleRecordingUploadPage = lazy(() => import("../pages/ConsoleRecordingUploadPage"));
 const StudentGradebookPage = lazy(() => import("../pages/GradebookPage").then((module) => ({ default: module.StudentGradebookPage })));
 const TermsPage = lazy(() => import("../pages/TermsPage"));
-const UsersCornerPage = lazy(() => import("../pages/UsersCornerPage"));
+// Console Home route module (WS-C rebuilds Home behind it).
+const UsersCornerPage = lazy(() => import("../features/console-home/ConsoleHomePage"));
 const WatchPage = lazy(() => import("../pages/WatchPage"));
+// HackPath-philosophy marketing pages (BUILD_PLAN §2.1): plans, roadmap, tracks, bootcamp, free OSINT tier.
+const PricingPage = lazy(() => import("../pages/PricingPage"));
+const RoadmapPage = lazy(() => import("../pages/RoadmapPage"));
+const TrackPage = lazy(() => import("../pages/TrackPage"));
+const BootcampPage = lazy(() => import("../pages/BootcampPage"));
+const FreeDirectoryPage = lazy(() => import("../marketing/pages/FreeDirectoryPage"));
 const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
+// Monthly OSINT CTF (WS-MONTHLY-CTF): public page, Hall of Fame, certificate check, Console play page.
+const MonthlyCtfPage = lazy(() => import("../features/monthly-ctf/MonthlyCtfPage"));
+const MonthlyCtfHallOfFamePage = lazy(() => import("../features/monthly-ctf/MonthlyCtfHallOfFamePage"));
+const SeasonCertificatePage = lazy(() => import("../features/monthly-ctf/SeasonCertificatePage"));
+const MonthlyCtfPlayPage = lazy(() => import("../features/monthly-ctf/MonthlyCtfPlayPage"));
 
 /**
  * The Console used to live at /users-corner. Shared links keep working: they
@@ -63,6 +85,35 @@ const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
 export function LegacyConsoleRedirect() {
   const { search, hash } = useLocation();
   return <Navigate to={{ pathname: CONSOLE_PATH, search, hash }} replace />;
+}
+
+/**
+ * An old Console URL: the old page until its new home is live, then a
+ * redirect by role (routes/legacyRedirects.js holds the switch per URL).
+ */
+function legacy(path, page) {
+  return isLegacyRedirectLive(path) ? <WorkspaceRedirect /> : page;
+}
+
+/**
+ * Old staff URLs. Live ones redirect by role (students see not found);
+ * the rest keep their page behind the original role check (ProtectedRoute:
+ * not found or "Teaching is switched off", never the website home).
+ */
+function legacyGroup(guard, entries) {
+  const key = Object.keys(guard).join("-");
+  const live = entries.filter(([path]) => isLegacyRedirectLive(path));
+  const kept = entries.filter(([path]) => !isLegacyRedirectLive(path));
+  return [
+    ...live.map(([path]) => <Route key={`live:${path}`} path={path} element={<WorkspaceRedirect />} />),
+    kept.length ? (
+      <Route key={`guard:${key}`} element={<ProtectedRoute {...guard} />}>
+        {kept.map(([path, page]) => (
+          <Route key={path} path={path} element={page} />
+        ))}
+      </Route>
+    ) : null,
+  ];
 }
 
 export default function AppRoutes() {
@@ -88,6 +139,16 @@ export default function AppRoutes() {
           <Route path="/courses/:id/payment" element={<CoursePaymentPage />} />
           <Route path="/terms" element={<TermsPage />} />
           {siteBrand.youtube ? <Route path="/watch" element={<WatchPage />} /> : null}
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/roadmap" element={<RoadmapPage />} />
+          <Route path="/tracks/:track" element={<TrackPage />} />
+          <Route path="/bootcamp" element={<BootcampPage />} />
+          <Route path="/osint/free" element={<FreeDirectoryPage />} />
+          <Route path="/monthly-ctf" element={<MonthlyCtfPage />} />
+          <Route path="/monthly-ctf/hall-of-fame" element={<MonthlyCtfHallOfFamePage />} />
+          <Route path="/monthly-ctf/certificates/:slug" element={<SeasonCertificatePage />} />
+          {profilePublicRoutes()}
+          {certificatePublicRoutes()}
           {/* Unknown website addresses get a real "not found" page (noindex), not a silent redirect home. */}
           <Route path="*" element={<NotFoundPage />} />
         </Route>
@@ -104,37 +165,41 @@ export default function AppRoutes() {
             <Route path="/join-live" element={<JoinLivePage />} />
             <Route path="/guides" element={<GuidesPage />} />
             <Route path="/osint-tools" element={<OsintToolsPage />} />
+            <Route path="/monthly-ctf/play" element={<MonthlyCtfPlayPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            {profileShellRoutes()}
+            {attendanceShellRoutes()}
+            {calendarShellRoutes()}
             <Route path="/id-card" element={<IdCardPage />} />
             <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/reports/marks" element={<ReportsMarksPage />} />
+            <Route path="/reports/marks" element={legacy("/reports/marks", <ReportsMarksPage />)} />
             <Route path="/reports/tasks/:taskId" element={<ReportsTaskPage />} />
             {/* Phase 3: unified gradebook (students: their own; staff and instructors: their batches). */}
             <Route path="/gradebook" element={<GradebookPage />} />
-            {/* Staff tools share the same shell instance; each group keeps its original role check. */}
-            <Route element={<ProtectedRoute requireModerator />}>
-              {/* Phase 3: Console exams and per-student gradebook (staff manage; instructors read only). */}
-              <Route path="/console/exams" element={<ConsoleExamsPage />} />
-              <Route path="/console/exams/:slug" element={<ConsoleExamDetailPage />} />
-              <Route path="/console/recordings/upload" element={<ConsoleRecordingUploadPage />} />
-              <Route path="/gradebook/students/:studentId" element={<StudentGradebookPage />} />
-              <Route path="/report-grading" element={<ReportsGradingPage />} />
-              <Route path="/report-grading/tasks/new" element={<ReportsTaskEditorPage />} />
-              <Route path="/report-grading/tasks/:taskId/edit" element={<ReportsTaskEditorPage />} />
-              <Route path="/report-grading/queue" element={<ReportsQueuePage />} />
-              <Route path="/report-grading/gradebook" element={<ReportsGradebookPage />} />
-              <Route path="/control-center" element={<AdminControlCenterPage />} />
-              <Route path="/meeting" element={<MeetingPage />} />
-              <Route path="/broadcasting" element={<BroadcastingPage />} />
-            </Route>
-            <Route element={<ProtectedRoute requireAdmin />}>
-              <Route path="/lecture-questions" element={<LectureQuestionsPage />} />
-            </Route>
-            <Route element={<ProtectedRoute requireInstructor />}>
-              <Route path="/instructor/dashboard" element={<InstructorDashboardPage />} />
-              <Route path="/instructor/courses/new" element={<CreateCoursePage />} />
-              <Route path="/instructor/courses/:id/edit" element={<EditCoursePage />} />
-            </Route>
+            {/* Control center is gone (owner decision D7): its URL opens the viewer's workspace home. */}
+            <Route path="/control-center" element={<WorkspaceRedirect fallback={<Navigate to={CONSOLE_PATH} replace />} />} />
+            {/* UI overhaul: Teach and Admin workspaces + Coursework exams (routes/overhaulRoutes.jsx). */}
+            {overhaulShellRoutes()}
+            {/* Old staff URLs: the old page behind its original role check until the new home is live. */}
+            {legacyGroup({ requireModerator: true }, [
+              ["/console/exams", <ConsoleExamsPage key="exams" />],
+              ["/console/exams/:slug", <ConsoleExamDetailPage key="exam" />],
+              ["/console/recordings/upload", <ConsoleRecordingUploadPage key="upload" />],
+              ["/gradebook/students/:studentId", <StudentGradebookPage key="student" />],
+              ["/report-grading", <ReportsGradingPage key="grading" />],
+              ["/report-grading/tasks/new", <ReportsTaskEditorPage key="task-new" />],
+              ["/report-grading/tasks/:taskId/edit", <ReportsTaskEditorPage key="task-edit" />],
+              ["/report-grading/queue", <ReportsQueuePage key="queue" />],
+              ["/report-grading/gradebook", <ReportsGradebookPage key="gradebook" />],
+              ["/meeting", <MeetingPage key="meeting" />],
+              ["/broadcasting", <BroadcastingPage key="broadcasting" />],
+            ])}
+            {legacyGroup({ requireAdmin: true }, [["/lecture-questions", <LectureQuestionsPage key="questions" />]])}
+            {legacyGroup({ requireInstructor: true }, [
+              ["/instructor/dashboard", <InstructorDashboardPage key="dashboard" />],
+              ["/instructor/courses/new", <CreateCoursePage key="create" />],
+              ["/instructor/courses/:id/edit", <EditCoursePage key="edit" />],
+            ])}
           </Route>
         </Route>
       </Routes>

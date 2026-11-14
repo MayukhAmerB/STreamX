@@ -1,0 +1,15 @@
+{% load i18n admin_urls enterprise_admin %}
+{% enterprise_active_filter_count cl as active_filters %}
+<div class="enterprise-empty" role="status">
+  {% if active_filters or cl.query %}
+    <p class="enterprise-empty-title">No {{ cl.opts|enterprise_model_title|lower }} match{% if cl.query %} &ldquo;{{ cl.query }}&rdquo;{% endif %}{% if active_filters %} with these filters{% endif %}.</p>
+    <p class="enterprise-empty-body">Try another search, or clear the filters to see everything.</p>
+    <a class="button" href="?">Clear search and filters</a>
+  {% else %}
+    <p class="enterprise-empty-title">Nothing here yet</p>
+    <p class="enterprise-empty-body">{% enterprise_empty_state cl.opts %}</p>
+    {% if has_add_permission and not is_popup %}
+      <a class="button" href="{% url cl.opts|admin_urlname:'add' %}{% if is_popup %}?{{ is_popup_var }}=1{% endif %}">{% blocktranslate with name=cl.opts.verbose_name %}Add {{ name }}{% endblocktranslate %}</a>
+    {% endif %}
+  {% endif %}
+</div>

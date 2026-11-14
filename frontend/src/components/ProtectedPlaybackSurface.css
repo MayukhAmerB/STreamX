@@ -11,12 +11,12 @@
 
 .pps-surface {
   --pps-text: var(--uc-text, #f6f1e7);
-  --pps-text-secondary: var(--uc-text-2, #b8b3a8);
+  --pps-text-secondary: var(--uc-text-2, #b4b4b4);
   --pps-text-disabled: rgba(246, 241, 231, 0.38);
   --pps-accent: var(--uc-accent, #f3e2b3);
   --pps-accent-hover: var(--uc-accent-hover, #fff0c8);
   --pps-on-accent: var(--uc-on-accent, #0a0a0a);
-  --pps-live: var(--uc-live, #fa4d56);
+  --pps-live: var(--uc-live, #f3e2b3);
   --pps-hover: rgba(246, 241, 231, 0.12);
   --pps-active: rgba(246, 241, 231, 0.22);
   --pps-glass: rgba(0, 0, 0, 0.58);
@@ -113,8 +113,8 @@
   }
 
   .pps-btn--primary:hover {
-    background-color: var(--pps-accent-hover);
-    box-shadow: 0 0 32px rgba(243, 226, 179, 0.45);
+    background-color: rgba(250, 250, 250, 0.88);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
   }
 
   .pps-menu__item:hover {
@@ -191,26 +191,27 @@
   background-color: rgba(0, 0, 0, 0.42);
 }
 
-/* The big play / pause button: champagne with the Console glow. */
+/* The big play / pause button: the HackPath solid white primary, no glow
+   (the one golden element on the player page is the "Next lesson" action). */
 .pps-btn--primary {
   border-color: transparent;
-  background-color: var(--pps-accent);
+  background-color: #fafafa;
   block-size: 4rem;
-  box-shadow: 0 0 24px rgba(243, 226, 179, 0.3);
-  color: var(--pps-on-accent);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+  color: #000;
   inline-size: 4rem;
   min-inline-size: 4rem;
 }
 
 .pps-btn--primary:active {
-  background-color: var(--pps-accent);
-  color: var(--pps-on-accent);
+  background-color: #e5e5e5;
+  color: #000;
 }
 
 .pps-btn--primary:disabled {
-  background-color: rgba(243, 226, 179, 0.4);
+  background-color: rgba(250, 250, 250, 0.4);
   box-shadow: none;
-  color: var(--pps-on-accent);
+  color: #000;
 }
 
 .pps-surface[data-controls-layout='desktop'] .pps-btn--primary {
@@ -336,7 +337,7 @@
   border-radius: 50%;
   background-color: var(--pps-live);
   block-size: 0.5rem;
-  box-shadow: 0 0 8px rgba(250, 77, 86, 0.8);
+  box-shadow: 0 0 8px rgba(243, 226, 179, 0.8);
   inline-size: 0.5rem;
 }
 

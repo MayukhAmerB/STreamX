@@ -331,25 +331,65 @@ $stage-text-secondary: var(--uc-text-2);
   gap: $spacing-03;
 }
 
+// Phones (WS-C, plan §3.4): an icon toolbar (Like · Mark complete ·
+// Previous) above a full-width 48 px "Next lesson" button. Nothing scrolls
+// sideways and every target is at least 44 px.
 .cds-app .cp-page[data-layout='mobile'] .cp-actions {
-  // One swipeable row of chips, edge to edge.
-  overflow-x: auto;
-  margin-inline: calc(-1 * var(--cp-gutter));
-  overscroll-behavior-x: contain;
-  padding-block: $spacing-01;
-  padding-inline: var(--cp-gutter);
-  scrollbar-width: none;
-
-  &::-webkit-scrollbar {
-    display: none;
-  }
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: $spacing-03;
 }
 
-// Phones: slightly tighter chips so Like, Comments, Previous and Next fit
-// on a 390px screen (Mark complete is one swipe away).
+.cds-app .cp-page[data-layout='mobile'] .cp-actions__group--social {
+  grid-column: 1;
+  min-inline-size: 0;
+}
+
+.cds-app .cp-page[data-layout='mobile'] .cp-actions__group--lesson {
+  display: contents;
+}
+
 .cds-app .cp-page[data-layout='mobile'] .cp-chip {
   padding-inline: $spacing-04;
   gap: 0.375rem;
+}
+
+.cds-app .cp-page[data-layout='mobile'] .cp-chip--icon-mobile {
+  inline-size: 2.75rem;
+  padding-inline: 0;
+
+  .cp-chip__label {
+    position: absolute;
+    overflow: hidden;
+    inline-size: 1px;
+    block-size: 1px;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+.cds-app .cp-page[data-layout='mobile'] .cp-chip--complete {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.cds-app .cp-page[data-layout='mobile'] .cp-chip--previous {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.cds-app .cp-page[data-layout='mobile'] .cp-chip--next {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-block-size: 3rem;
+  inline-size: 100%;
+}
+
+// Signed out: the sign-in chip may wrap instead of pushing the row wider.
+.cds-app .cp-page[data-layout='mobile'] .cp-actions__group--social .cp-chip {
+  max-inline-size: 100%;
+  white-space: normal;
 }
 
 .cds-app .cp-page[data-layout='desktop'] .cp-actions {
@@ -1086,11 +1126,11 @@ $stage-text-secondary: var(--uc-text-2);
 }
 
 .cds-app .cp-avatar--tone-4 {
-  background-color: #1f1d19;
+  background-color: #1c1c1c;
 }
 
 .cds-app .cp-avatar--tone-5 {
-  background-color: #2b2823;
+  background-color: #282828;
 }
 
 .cds-app .cp-avatar--skeleton {

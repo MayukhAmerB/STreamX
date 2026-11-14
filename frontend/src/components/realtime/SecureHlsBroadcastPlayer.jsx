@@ -1192,7 +1192,7 @@ export default function SecureHlsBroadcastPlayer({
           type="button"
           data-playback-gesture-ignore="true"
           onClick={() => jumpToLiveRef.current?.()}
-          className="absolute bottom-14 right-3 z-30 rounded-full border border-white/25 bg-[#da1e28] px-3 py-1.5 text-xs font-semibold text-white shadow-[0_8px_20px_rgba(0,0,0,0.35)] transition hover:bg-[#b81921]"
+          className="absolute bottom-14 right-3 z-30 rounded-full border border-[#F3E2B3] bg-[#F3E2B3] px-3 py-1.5 text-xs font-semibold text-[#0a0a0a] shadow-[0_8px_20px_rgba(0,0,0,0.35)] transition-colors hover:bg-[#F8EDCF]"
         >
           Jump to live
         </button>
@@ -1203,7 +1203,7 @@ export default function SecureHlsBroadcastPlayer({
         </div>
       ) : null}
       {bootstrapReady && connectionIssue && !streamReconnect && sessionExpectedLive && autoplayState !== "blocked" ? (
-        <div className="absolute inset-x-3 top-3 z-30 rounded-xl border border-amber-300/30 bg-[#18140a]/95 px-3 py-2.5 text-center text-xs leading-5 text-amber-100 shadow-[0_12px_30px_rgba(0,0,0,0.34)] backdrop-blur sm:left-1/2 sm:right-auto sm:w-[min(32rem,calc(100%-1.5rem))] sm:-translate-x-1/2">
+        <div className="absolute inset-x-3 top-3 z-30 rounded-xl border border-[#F3E2B3]/30 bg-[#0a0a0a]/95 px-3 py-2.5 text-center text-xs leading-5 text-[#F3E2B3] shadow-[0_12px_30px_rgba(0,0,0,0.34)] backdrop-blur sm:left-1/2 sm:right-auto sm:w-[min(32rem,calc(100%-1.5rem))] sm:-translate-x-1/2">
           <span>{connectionIssue.message}</span>
           <button
             type="button"

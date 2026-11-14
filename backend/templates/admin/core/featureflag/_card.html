@@ -1,0 +1,103 @@
+{% load tz %}{% with key=card.key feature=card.feature %}
+<article class="ff-card{% if card.enabled %} is-on{% endif %}{% if card.locked %} is-locked{% endif %}" id="ff-card-{{ key }}" data-ff-card="{{ key }}" aria-labelledby="ff-title-{{ key }}">
+  <div class="ff-card__head">
+    <h3 class="ff-card__title" id="ff-title-{{ key }}">{{ feature.label }}</h3>
+    <span class="ff-tag {% if card.enabled %}ff-tag--on{% else %}ff-tag--off{% endif %}" data-ff-tag>{% if card.enabled %}On{% else %}Off{% endif %}</span>
+    {% if card.locked %}<span class="ff-tag ff-tag--locked">Locked</span>{% endif %}
+  </div>
+
+  <p class="ff-card__summary">{{ feature.summary }}</p>
+  {% if card.notices %}
+    <ul class="ff-card__notices" aria-label="Who notices">
+      {% for label, text in card.notices %}
+        <li>{% if label %}<span class="ff-card__notice-label">{{ label }}:</span> {% endif %}{{ text }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  {% if not card.enabled and card.custom_reason %}
+    <p class="ff-card__reason"><span class="ff-card__notice-label">Instructors see:</span> “{{ card.custom_reason }}”</p>
+  {% endif %}
+
+  {% if card.can_change %}
+    <details class="ff-flip" data-ff-flip{% if card.open_confirm %} open{% endif %}>
+      <summary class="ff-switch" role="switch" aria-checked="{{ card.enabled|yesno:'true,false' }}" aria-label="{{ feature.label }}" aria-describedby="ff-state-{{ key }}" data-ff-switch>
+        <span class="ff-switch__text" id="ff-state-{{ key }}" aria-hidden="true">{% if card.enabled %}On{% else %}Off{% endif %}</span>
+        <span class="ff-switch__track" aria-hidden="true"><span class="ff-switch__thumb"></span></span>
+      </summary>
+      <form method="post" class="ff-confirm" data-ff-form aria-labelledby="ff-confirm-title-{{ key }}">
+        {% csrf_token %}
+        <input type="hidden" name="key" value="{{ key }}">
+        <input type="hidden" name="enabled" value="{{ card.target|yesno:'1,0' }}">
+        <input type="hidden" name="expected_version" value="{{ card.version }}">
+        <h4 class="ff-confirm__title" id="ff-confirm-title-{{ key }}">{{ card.confirm_title }}</h4>
+        {% if card.error %}
+          <p class="ff-confirm__error" role="alert">{{ card.error }}</p>
+        {% endif %}
+        <ul class="ff-confirm__list">
+          {% for line in card.confirm_lines %}<li>{{ line }}</li>{% endfor %}
+          {% if card.impact_lines %}<li>Covers {{ card.impact_lines|join:" · " }}.</li>{% endif %}
+        </ul>
+        {% if not card.target and card.live_now %}
+          <p class="ff-confirm__warning">{{ card.live_now }} class{{ card.live_now|pluralize:"es" }} hosted by an instructor {{ card.live_now|pluralize:"is,are" }} live now and will continue until {{ card.live_now|pluralize:"it ends,they end" }}. New classes are refused.</p>
+        {% endif %}
+        {% if not card.target %}
+          <label class="ff-field">
+            <span class="ff-field__label">Message instructors will see <span class="ff-optional">(optional)</span></span>
+            <input type="text" name="reason" maxlength="160" placeholder="{{ feature.disabled_reason }}" class="ff-input">
+          </label>
+        {% endif %}
+        <label class="ff-field">
+          <span class="ff-field__label">Note for the history <span class="ff-optional">(optional)</span></span>
+          <textarea name="note" rows="2" maxlength="500" class="ff-input" placeholder="Why are you changing this?"></textarea>
+        </label>
+        <div class="ff-confirm__actions">
+          <a class="ff-button ff-button--secondary" href="?" data-ff-cancel>Cancel</a>
+          <button type="submit" class="ff-button ff-button--primary">{{ card.confirm_label }}</button>
+        </div>
+      </form>
+    </details>
+  {% else %}
+    <div class="ff-flip ff-flip--static">
+      <span class="ff-switch is-disabled" role="switch" aria-checked="{{ card.enabled|yesno:'true,false' }}" aria-disabled="true" tabindex="0" aria-label="{{ feature.label }}" aria-describedby="ff-locked-{{ key }}">
+        <span class="ff-switch__text" aria-hidden="true">{% if card.enabled %}On{% else %}Off{% endif %}</span>
+        <span class="ff-switch__track" aria-hidden="true"><span class="ff-switch__thumb"></span></span>
+      </span>
+    </div>
+    <p class="ff-card__locked" id="ff-locked-{{ key }}">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12 7h-1V5a3 3 0 0 0-6 0v2H4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1ZM6 5a2 2 0 0 1 4 0v2H6Zm6 9H4V8h8Z"/></svg>
+      {{ card.disabled_reason }}
+    </p>
+  {% endif %}
+
+  <footer class="ff-card__footer">
+    <p class="ff-card__who">
+      {% if card.row %}
+        Turned {% if card.row.enabled %}on{% else %}off{% endif %}{% if card.updated_by_name %} by {{ card.updated_by_name }}{% endif %} · <time datetime="{{ card.row.updated_at|date:'c' }}">{{ card.row.updated_at|localtime|date:"j M, H:i" }}</time>
+      {% else %}
+        Default · {% if card.default %}on{% else %}off{% endif %} for new installs
+      {% endif %}
+    </p>
+    <div class="ff-card__meta">
+      {% if card.impact_lines %}<span>{{ card.impact_lines|join:" · " }}</span>{% endif %}
+      <details class="ff-history" data-ff-history>
+        <summary class="ff-history__toggle">History ({{ card.history_count }})</summary>
+        <div class="ff-history__panel">
+          {% if card.history %}
+            <ol class="ff-history__list">
+              {% for change in card.history %}
+                <li>
+                  <span class="ff-history__change">{% if change.from_enabled is None %}Default{% elif change.from_enabled %}On{% else %}Off{% endif %} → {% if change.to_enabled %}On{% else %}Off{% endif %}</span>
+                  <span class="ff-history__who">{{ change.changed_by_email|default:"System" }} · <time datetime="{{ change.changed_at|date:'c' }}">{{ change.changed_at|localtime|date:"j M, H:i" }}</time></span>
+                  {% if change.note %}<span class="ff-history__note">{{ change.note }}</span>{% endif %}
+                </li>
+              {% endfor %}
+            </ol>
+          {% else %}
+            <p class="ff-history__empty">No changes yet. It has been at its default since it was added.</p>
+          {% endif %}
+        </div>
+      </details>
+    </div>
+  </footer>
+</article>
+{% endwith %}

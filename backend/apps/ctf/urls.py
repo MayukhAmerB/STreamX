@@ -1,4 +1,6 @@
-from django.urls import path
+from django.urls import include, path
+
+from apps.users.identity_views import ExamCandidateIdentityView
 
 from . import views
 
@@ -12,6 +14,8 @@ urlpatterns = [
         name="ctf-question-attempts",
     ),
     path("exams/<slug:slug>/submit/", views.ExamSubmitView.as_view(), name="ctf-exam-submit"),
+    # The candidate block (roll number, real name, handle, stats) that opens the paper.
+    path("exams/<slug:slug>/identity/", ExamCandidateIdentityView.as_view(), name="ctf-exam-identity"),
     path(
         "exams/<slug:slug>/materials/<int:material_id>/",
         views.MaterialUrlView.as_view(),
@@ -19,4 +23,6 @@ urlpatterns = [
     ),
     path("eligibility/", views.EligibilityView.as_view(), name="ctf-eligibility"),
     path("materials/<str:token>/", views.MaterialFileView.as_view(), name="ctf-material-file"),
+    # Monthly OSINT CTF (season_urls.py).
+    path("seasons/", include("apps.ctf.season_urls")),
 ]

@@ -352,3 +352,55 @@ test("exam.js still works when exam-core.js is not loaded (cached page)", async 
   );
   assert.match(elements["exam-list"].innerHTML, /data-slug="week-5"/);
 });
+
+test("the paper opens with the candidate block: roll number, real name, handle, stats, then the questions", async () => {
+  const { elements } = await boot({
+    "GET /ctf/eligibility/": json(200, { data: { enabled: true, reason: "ok", message: "", action: null, exam: null, next_exam: null } }),
+    "GET /ctf/exams/": json(200, { data: { results: [exam({ can_start: false, start_reason: "started" })] } }),
+    "GET /ctf/exams/week-5/identity/": json(200, {
+      data: {
+        roll_number: "AL-SYD-00042",
+        real_name: "Asha <Rao>",
+        handle: "quiet_falcon",
+        handle_most_recent: "amber_lynx",
+        handle_changed: true,
+        stats: { xp: null, rank: null, attendance_percent: 87.5, reports_submitted: 6, reports_graded_average: 78.4, exam_score: null, exams_taken: 0 },
+        snapshot: false,
+        user_id: 42,
+      },
+    }),
+    "GET /ctf/exams/week-5/": json(200, {
+      data: {
+        exam: { ...exam({ can_start: false, start_reason: "started" }), briefing: { en: ["Brief"], ur: [] }, rules: { en: [], ur: [] } },
+        participation: { status: "active", started_at: "2026-11-14T05:10:00Z", deadline_at: "2099-01-01T00:00:00Z", submitted_at: null, score: 0, solved_count: 0, wrong_count: 0 },
+        server_time: "2026-11-14T06:00:00Z",
+        questions: [
+          { key: "q1", order: 1, category: "geoint", difficulty: "hard", points: 50, title: { en: "Harbour" }, prompt: { en: { task: "Find it" } }, materials: [], max_attempts: 3, attempts_used: 0, solved: false, points_awarded: 0 },
+        ],
+      },
+    }),
+  });
+  clickAction(elements, "open", { slug: "week-5" });
+  await settle();
+  const view = elements["exam-view"].innerHTML;
+  const order = ["ROLL NUMBER", "AL-SYD-00042", "REAL NAME", "Asha &lt;Rao&gt;", "HANDLE", "@quiet_falcon", "Most recent: @amber_lynx", "ATTENDANCE", "87.5%", "REPORTS", "EXAM SCORE", "Brief", "Harbour"];
+  const positions = order.map((text) => view.indexOf(text));
+  assert.ok(positions.every((value) => value >= 0), `all present: ${positions}`);
+  assert.deepEqual([...positions].sort((a, b) => a - b), positions);
+  assert.ok(!view.includes(">XP<"), "XP hidden while engagement is off");
+  assert.ok(!/<input[^>]*exam-identity/.test(view), "read-only");
+});
+
+test("an LMS without the identity endpoint still opens the paper", async () => {
+  const { elements } = await boot({
+    "GET /ctf/eligibility/": json(200, { data: { enabled: true, reason: "ok", message: "", action: null, exam: null, next_exam: null } }),
+    "GET /ctf/exams/": json(200, { data: { results: [exam()] } }),
+    "GET /ctf/exams/week-5/": json(200, {
+      data: { exam: { ...exam(), briefing: { en: [], ur: [] }, rules: { en: [], ur: [] } }, participation: null, server_time: "2026-11-14T06:00:00Z", questions: [] },
+    }),
+  });
+  clickAction(elements, "open", { slug: "week-5" });
+  await settle();
+  assert.match(elements["exam-view"].innerHTML, /data-action="start"/);
+  assert.doesNotMatch(elements["exam-view"].innerHTML, /exam-identity/);
+});

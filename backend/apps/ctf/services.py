@@ -99,6 +99,10 @@ def start_participation(*, exam, user, at=None):
         started_at=now,
         deadline_at=exam.deadline_for(now, ignore_closes_at=is_staff),
     )
+    # Owner rule: the student's identity (roll number, real name, handle) is frozen on the record.
+    from apps.users.identity import apply_snapshot
+
+    apply_snapshot(participation, user)
     try:
         with transaction.atomic():
             participation.save()

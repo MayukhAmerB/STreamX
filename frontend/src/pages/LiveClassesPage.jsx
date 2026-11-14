@@ -22,6 +22,9 @@ import {
   reconcileActiveLivePayload,
 } from "../utils/realtimeSessionResilience";
 import { useLiveSessions } from "../services/realtime/liveSessionsStore";
+import useLivePresence from "../features/engagement-ui/useLivePresence";
+import useAttendancePresence from "../features/attendance/useAttendancePresence";
+import { liveJoinDisplayName } from "../features/profiles/publicName";
 
 // No fabricated fallback classes (plan §7.2 rule 5): an empty list shows an
 // honest empty state, a failed request an error with Try again.
@@ -89,6 +92,10 @@ export default function LiveClassesPage() {
   const liveSessionsFetchedAt = liveSessions.fetchedAt;
   const absenceCheckedAtRef = useRef(0);
   const [activeLivePayload, setActiveLivePayload] = useState(null);
+  // Live-attendance XP: one presence ping a minute while the class is open and visible.
+  useLivePresence(activeLivePayload?.session?.id || null);
+  // Attendance: once a minute while this live page is visible (live classes only).
+  useAttendancePresence(activeLivePayload?.session?.id || null);
   const [liveJoinState, setLiveJoinState] = useState({ loading: false, error: "" });
   const liveStageRef = useRef(null);
   const [courseAttempt, setCourseAttempt] = useState(0);
@@ -226,7 +233,7 @@ export default function LiveClassesPage() {
         (session) => String(session.id) === String(sessionId),
       );
       const response = await joinRealtimeSession(sessionId, {
-        display_name: user?.full_name || "",
+        display_name: liveJoinDisplayName(user),
         prefer_broadcast: requestedSession?.session_type === "broadcasting",
       });
       const payload = apiData(response, null);

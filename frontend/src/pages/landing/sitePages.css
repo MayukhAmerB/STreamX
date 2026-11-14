@@ -1,0 +1,802 @@
+/*
+ * Syed Carbon for the small public pages (UI overhaul plan §6.8): Login,
+ * Not found, Terms and Contact. Same tokens, type and rules as the landing:
+ * Plex 300 display, sentence case, square surfaces, one champagne rule per
+ * viewport (the eyebrow), white focus ring on dark, only opacity/transform
+ * animate. OWNER: WS-H.
+ */
+
+/* The band fills the window down to the footer: no black gap under short pages. */
+.sp {
+  display: flex;
+  min-height: calc(100vh - 3rem);
+  flex-direction: column;
+}
+
+.sp > .sk-band {
+  flex: 1 0 auto;
+}
+
+.sp .sk-band {
+  --sc-band-padding: 3rem;
+}
+
+@media (min-width: 1056px) {
+  .sp .sk-band {
+    --sc-band-padding: 6rem;
+  }
+}
+
+/* --------------------------------------------------------------- type */
+
+.sp-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--sc-spacing-03);
+  margin: 0 0 var(--sc-spacing-05);
+  color: var(--cds-text-secondary);
+  font-size: var(--sc-type-label-01-size);
+  line-height: var(--sc-type-label-01-line-height, 1.33333);
+  letter-spacing: 0.32px;
+}
+
+/* The one champagne rule of the viewport (gray on light bands). */
+.sp-eyebrow::before {
+  width: 2rem;
+  height: var(--sc-accent-rule-width, 2px);
+  flex: none;
+  background-color: var(--brand-accent-rule, #f3e2b3);
+  content: "";
+  transform-origin: left center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion="reduce"]) .sp-eyebrow--draw::before {
+    animation: sp-rule-draw var(--sc-duration-slow-01, 400ms) var(--sc-ease-entrance-expressive, cubic-bezier(0, 0, 0.3, 1)) 120ms both;
+  }
+}
+
+@keyframes sp-rule-draw {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.sp-title {
+  margin: 0;
+  color: var(--cds-text-primary);
+  font-size: var(--sc-type-greeting-size, 2.625rem);
+  font-weight: 300;
+  line-height: 1.19;
+  letter-spacing: 0;
+}
+
+@media (max-width: 671px) {
+  .sp-title {
+    font-size: 2rem;
+    line-height: 1.25;
+  }
+}
+
+.sp-lead {
+  max-width: 34rem;
+  margin: var(--sc-spacing-05) 0 0;
+  color: var(--cds-text-secondary);
+  font-size: var(--sc-type-body-02-size);
+  line-height: var(--sc-type-body-02-line-height, 1.5);
+}
+
+.sp-h2 {
+  margin: 0;
+  color: var(--cds-text-primary);
+  font-size: var(--sc-type-heading-03-size);
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.sp-label {
+  margin: 0;
+  font-weight: 400;
+  color: var(--cds-text-secondary);
+  font-size: var(--sc-type-label-01-size);
+  line-height: 1.33333;
+  letter-spacing: 0.32px;
+}
+
+/* ------------------------------------------------------------- lists */
+
+.sp-checks {
+  display: grid;
+  gap: var(--sc-spacing-04);
+  margin: var(--sc-spacing-07) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--cds-text-secondary);
+  font-size: var(--sc-type-body-01-size);
+  line-height: 1.43;
+}
+
+.sp-checks li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sc-spacing-04);
+}
+
+.sp-checks svg {
+  flex: none;
+  margin-top: 0.125rem;
+  color: var(--cds-icon-primary, #f4f4f4);
+}
+
+/* ------------------------------------------------------------ panel */
+
+/* A square layer-01 surface: elevation from layers, never from shadows. */
+.sp-panel {
+  padding: var(--sc-spacing-07) var(--sc-spacing-06);
+  background-color: var(--cds-layer-01);
+  color: var(--cds-text-primary);
+}
+
+@media (min-width: 672px) {
+  .sp-panel {
+    padding: var(--sc-spacing-08) var(--sc-spacing-07);
+  }
+}
+
+.sp-panel__head {
+  margin-bottom: var(--sc-spacing-07);
+}
+
+.sp-panel__head .sp-lead {
+  margin-top: var(--sc-spacing-03);
+  font-size: var(--sc-type-body-01-size);
+  line-height: 1.43;
+}
+
+.sp-panel__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sc-spacing-04) var(--sc-spacing-06);
+  margin-top: var(--sc-spacing-07);
+  padding-top: var(--sc-spacing-06);
+  border-top: 1px solid var(--cds-border-subtle-01);
+}
+
+.sp-panel__foot p {
+  max-width: 26rem;
+  margin: 0;
+  color: var(--cds-text-secondary);
+  font-size: var(--sc-type-body-01-size);
+  line-height: 1.43;
+}
+
+/* ------------------------------------------------------------ fields */
+
+.sp-form {
+  display: grid;
+  gap: var(--sc-spacing-06);
+}
+
+.sp-field {
+  display: grid;
+  gap: var(--sc-spacing-03);
+}
+
+.sp-field__label {
+  color: var(--cds-text-secondary);
+  font-size: var(--sc-type-label-01-size);
+  line-height: 1.33333;
+  letter-spacing: 0.32px;
+}
+
+.sp-field__input {
+  width: 100%;
+  min-height: 3rem;
+  box-sizing: border-box;
+  padding: 0 var(--sc-spacing-05);
+  border: 0;
+  border-bottom: 1px solid var(--cds-border-strong-01, #6f6f6f);
+  border-radius: 0;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  background-color: var(--cds-field-02, #393939);
+  color: var(--cds-text-primary);
+  font: inherit;
+  font-size: var(--sc-type-body-01-size);
+  letter-spacing: 0.16px;
+  transition: background-color var(--sc-duration-fast-01, 70ms) var(--sc-ease-standard-productive, ease);
+}
+
+/* 16 px on phones so iOS never zooms the page on focus. */
+@media (max-width: 671px) {
+  .sp-field__input {
+    font-size: 1rem;
+  }
+}
+
+.sp-field__input::placeholder {
+  color: var(--cds-text-placeholder, #a8a8a8);
+  opacity: 1;
+}
+
+.sp-field__input:hover {
+  background-color: var(--cds-field-hover-02, #4c4c4c);
+}
+
+.sp-field__input:focus,
+.sp-field__input:focus-visible {
+  outline: 2px solid var(--brand-focus, #ffffff);
+  outline-offset: -2px;
+}
+
+.sp-field__input[aria-invalid="true"] {
+  outline: 2px solid var(--cds-support-error, #fa4d56);
+  outline-offset: -2px;
+}
+
+textarea.sp-field__input {
+  min-height: 8rem;
+  padding-top: var(--sc-spacing-04);
+  padding-bottom: var(--sc-spacing-04);
+  resize: vertical;
+  line-height: 1.43;
+}
+
+.sp-field__hint {
+  color: var(--cds-text-helper);
+  font-size: var(--sc-type-label-01-size);
+  line-height: 1.33333;
+  letter-spacing: 0.32px;
+}
+
+.sp-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sc-spacing-03);
+}
+
+/* Text-style action (Forgot password?): 24 px target, underline on hover. */
+.sp-text-btn {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--cds-link-primary, #f4f4f4);
+  font: inherit;
+  font-size: var(--sc-type-body-01-size);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 0.25rem;
+  cursor: pointer;
+  transition: text-decoration-color var(--sc-duration-fast-01, 70ms) var(--sc-ease-standard-productive, ease);
+}
+
+.sp-text-btn:hover {
+  text-decoration-color: currentColor;
+}
+
+.sp-text-btn:focus-visible {
+  outline: 2px solid var(--brand-focus, #ffffff);
+  outline-offset: 2px;
+}
+
+/* Messages: square, a 3 px status edge, icon-free text (status by word). */
+.sp-message {
+  margin: 0;
+  padding: var(--sc-spacing-04) var(--sc-spacing-05);
+  border-left: 3px solid var(--cds-border-strong-01, #6f6f6f);
+  background-color: var(--cds-layer-02, #393939);
+  color: var(--cds-text-primary);
+  font-size: var(--sc-type-body-01-size);
+  line-height: 1.43;
+}
+
+.sp-message--error {
+  border-left-color: var(--cds-support-error, #fa4d56);
+}
+
+.sp-message--warning {
+  border-left-color: var(--cds-support-warning, #f1c21b);
+}
+
+.sp-message--info {
+  border-left-color: var(--cds-support-info, #4589ff);
+}
+
+.sp-message--success {
+  border-left-color: var(--cds-support-success, #42be65);
+}
+
+/* Messages and the panel content arrive with a calm fade (no shift under RM). */
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion="reduce"]) .sp-message {
+    animation: sp-fade-in var(--sc-duration-fast-02, 110ms) var(--sc-ease-entrance-productive, ease-out);
+  }
+}
+
+@keyframes sp-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------ actions */
+
+.sp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sc-spacing-05);
+  margin-top: var(--sc-spacing-08);
+}
+
+@media (max-width: 671px) {
+  .sp-actions > .sk-button {
+    width: 100%;
+  }
+}
+
+/* ------------------------------------------------------------- layout */
+
+/* Login: copy cols 1-7 and the form cols 9-15 at lg; on phones the title, then the form. */
+.sp-login__aside {
+  display: none;
+}
+
+@media (min-width: 1056px) {
+  .sp-login__aside {
+    display: grid;
+  }
+
+  /* The eyebrow lines up with the top of the form panel. */
+  .sp-login__copy {
+    align-self: start;
+  }
+}
+
+/* Terms: a 66ch reading column and the consent panel beside it (below on phones). */
+.sp-terms__body {
+  min-width: 0;
+}
+
+.sp-terms__text {
+  max-width: 66ch;
+  margin: 0;
+  color: var(--cds-text-primary);
+  font-size: var(--sc-type-body-02-size);
+  line-height: 1.625;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sp-terms__aside .sp-panel {
+  display: grid;
+  gap: var(--sc-spacing-05);
+}
+
+@media (min-width: 1056px) {
+  .sp-terms__aside {
+    position: sticky;
+    top: calc(3rem + var(--sc-spacing-06));
+    align-self: start;
+  }
+}
+
+.sp-terms__meta {
+  margin: 0;
+  color: var(--cds-text-secondary);
+  font-size: var(--sc-type-body-01-size);
+  line-height: 1.43;
+  overflow-wrap: anywhere;
+}
+
+.sp-terms__meta strong {
+  color: var(--cds-text-primary);
+  font-weight: 400;
+}
+
+.sp-terms__note {
+  margin: 0;
+}
+
+.sp-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sc-spacing-04);
+  color: var(--cds-text-primary);
+  font-size: var(--sc-type-body-01-size);
+  line-height: 1.43;
+  cursor: pointer;
+}
+
+.sp-check input {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+  margin: 0;
+  accent-color: var(--cds-text-primary, #f4f4f4);
+}
+
+.sp-check input:focus-visible {
+  outline: 2px solid var(--brand-focus, #ffffff);
+  outline-offset: 2px;
+}
+
+/* Contact: channel rows (monochrome, 56 px) and a two-up name/email pair from md. */
+.sp-contact__channels-title {
+  margin-top: var(--sc-spacing-09);
+  margin-bottom: var(--sc-spacing-04);
+}
+
+.sp-channels {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--cds-border-subtle-00, #393939);
+}
+
+.sp-channels li {
+  border-bottom: 1px solid var(--cds-border-subtle-00, #393939);
+}
+
+.sp-channel {
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  gap: var(--sc-spacing-05);
+  padding: var(--sc-spacing-03) var(--sc-spacing-03) var(--sc-spacing-03) 0;
+  color: var(--cds-text-primary);
+  text-decoration: none;
+  transition: background-color var(--sc-duration-fast-01, 70ms) var(--sc-ease-standard-productive, ease);
+}
+
+.sp-channel:hover {
+  background-color: var(--cds-layer-hover-01, #333333);
+}
+
+.sp-channel:focus-visible {
+  outline: 2px solid var(--brand-focus, #ffffff);
+  outline-offset: -2px;
+}
+
+.sp-channel__icon {
+  display: inline-flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--cds-icon-primary, #f4f4f4);
+}
+
+.sp-channel__text {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+
+.sp-channel__name {
+  font-size: var(--sc-type-body-01-size);
+  line-height: 1.43;
+}
+
+.sp-channel__handle {
+  overflow: hidden;
+  color: var(--cds-text-secondary);
+  font-size: var(--sc-type-label-01-size);
+  line-height: 1.33333;
+  letter-spacing: 0.32px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sp-channel .sp-channel__arrow {
+  flex: none;
+  align-self: center;
+  color: var(--cds-icon-secondary, #c6c6c6);
+}
+
+.sp-channel:hover .sp-channel__arrow {
+  transform: translateX(var(--sc-motion-distance-01, 4px));
+}
+
+.sp-form__pair {
+  display: grid;
+  gap: var(--sc-spacing-06);
+}
+
+@media (min-width: 672px) {
+  .sp-form__pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1055px) {
+  .sp-contact .sp-panel {
+    margin-top: var(--sc-spacing-05);
+  }
+}
+
+/* Watch: the channel mark in the eyebrow, the showcase on the band's grid. */
+.sp-watch__eyebrow {
+  flex-wrap: wrap;
+}
+
+.sp-watch__glyph {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+  color: var(--cds-icon-secondary, #c6c6c6);
+}
+
+.sp-watch__body {
+  margin-top: var(--sc-spacing-07);
+}
+
+/* Not found: one calm block, the code as a quiet mono label. */
+.sp-code {
+  color: var(--cds-text-helper);
+  font-family: var(--sc-font-mono);
+  font-size: var(--sc-type-code-01-size);
+  letter-spacing: 0.32px;
+}
+
+.sp-links {
+  display: grid;
+  margin: var(--sc-spacing-09) 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--cds-border-subtle-00, #393939);
+}
+
+.sp-links li {
+  border-bottom: 1px solid var(--cds-border-subtle-00, #393939);
+}
+
+@media (min-width: 672px) {
+  .sp-links {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    border-top: 0;
+  }
+
+  .sp-links li {
+    border-bottom: 0;
+    background-color: var(--cds-layer-01, #262626);
+  }
+
+  .sp-links .sp-link-tile {
+    min-height: 8rem;
+  }
+}
+
+/*
+ * A quiet link row / tile: colour change on hover, a 2 px top rule that
+ * grows from the left (M4) and a 4 px arrow nudge. No lift, no zoom.
+ */
+.sp-link-tile {
+  position: relative;
+  display: flex;
+  min-height: 5rem;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--sc-spacing-03);
+  padding: var(--sc-spacing-05);
+  color: var(--cds-text-primary);
+  text-decoration: none;
+  transition: background-color var(--sc-duration-fast-01, 70ms) var(--sc-ease-standard-productive, ease);
+}
+
+.sp-link-tile::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background-color: var(--cds-text-primary);
+  content: "";
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--sc-duration-moderate-02, 240ms) var(--sc-ease-standard-productive, ease);
+}
+
+.sp-link-tile:hover {
+  background-color: var(--cds-layer-hover-01, #333333);
+}
+
+.sp-link-tile:hover::before,
+.sp-link-tile:focus-visible::before {
+  transform: scaleX(1);
+}
+
+.sp-link-tile:focus-visible {
+  outline: 2px solid var(--brand-focus, #ffffff);
+  outline-offset: -2px;
+}
+
+.sp-link-tile__title {
+  font-size: var(--sc-type-heading-02-size, 1rem);
+  line-height: 1.5;
+}
+
+.sp-link-tile__body {
+  color: var(--cds-text-secondary);
+  font-size: var(--sc-type-body-01-size);
+  line-height: 1.43;
+}
+
+.sp-link-tile__arrow {
+  align-self: flex-end;
+  transition: transform var(--sc-duration-fast-02, 110ms) var(--sc-ease-standard-productive, ease);
+}
+
+.sp-link-tile:hover .sp-link-tile__arrow {
+  transform: translateX(var(--sc-motion-distance-01, 4px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sp *,
+  .sp *::before,
+  .sp *::after {
+    animation: none !important;
+    transition-duration: 0ms !important;
+  }
+
+  .sp-link-tile:hover .sp-link-tile__arrow,
+  .sp-channel:hover .sp-channel__arrow {
+    transform: none;
+  }
+}
+
+:root[data-motion="reduce"] .sp *,
+:root[data-motion="reduce"] .sp *::before,
+:root[data-motion="reduce"] .sp *::after {
+  animation: none !important;
+  transition-duration: 0ms !important;
+}
+
+/* Printing: the finished page. */
+@media print {
+  .sp *,
+  .sp *::before,
+  .sp *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ===================================================================
+ * HackPath-philosophy layer (PHILOSOPHY T6/T8, palette law) for the small
+ * public pages that keep their site-kit structure (Contact, Terms, National
+ * Desk, AS-Accounts, Watch). Black canvas, Geist 600 headlines, hairline
+ * cards with a 10 px radius, underline fields with a golden-white focus.
+ * =================================================================== */
+
+.site-public .sp .sk-band {
+  background: transparent;
+}
+
+.site-public .sp-eyebrow {
+  font-size: 10px;
+  line-height: 15px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hp-subtle, #8a8a8a);
+}
+
+.site-public .sp-eyebrow::before {
+  width: 32px;
+  height: 1px;
+  background-color: rgb(255 255 255 / 0.2);
+}
+
+.site-public .sp-title {
+  font-family: var(--hp-font-sans, inherit);
+  font-size: 2.75rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  color: var(--hp-fg, #fafafa);
+}
+
+@media (min-width: 640px) {
+  .site-public .sp-title {
+    font-size: 3.75rem;
+  }
+}
+
+.site-public .sp-lead {
+  max-width: 42rem;
+  color: var(--hp-muted, #a1a1a1);
+  font-size: 1rem;
+  line-height: 1.75rem;
+}
+
+@media (min-width: 640px) {
+  .site-public .sp-lead {
+    font-size: 1.125rem;
+  }
+}
+
+.site-public .sp-h2 {
+  font-weight: 600;
+  color: var(--hp-fg, #fafafa);
+}
+
+.site-public .sp-panel {
+  border: 1px solid var(--hp-border, rgb(255 255 255 / 0.1));
+  border-radius: 10px;
+  background-color: var(--hp-card, #0a0a0a);
+}
+
+.site-public .sp-field__input {
+  padding: 0;
+  border-bottom: 1px solid var(--hp-border-input, rgb(255 255 255 / 0.35));
+  background-color: transparent;
+  color: var(--hp-fg, #fafafa);
+}
+
+.site-public .sp-field__input::placeholder {
+  color: var(--hp-placeholder, #737373);
+}
+
+.site-public .sp-field__input:focus,
+.site-public .sp-field__input:focus-visible {
+  outline: none;
+  border-bottom-color: var(--hp-accent, #f3e2b3);
+  box-shadow: 0 1px 0 0 var(--hp-accent, #f3e2b3);
+}
+
+.site-public .sp-field__label {
+  font-size: 11px;
+  color: var(--hp-muted, #a1a1a1);
+}
+
+.site-public .sp-channel,
+.site-public .sp-link-tile {
+  border: 1px solid var(--hp-border, rgb(255 255 255 / 0.1));
+  border-radius: 10px;
+  background-color: var(--hp-surface-1, #070707);
+  transition:
+    background-color 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.site-public .sp-channel:hover,
+.site-public .sp-channel:focus-visible,
+.site-public .sp-link-tile:hover,
+.site-public .sp-link-tile:focus-visible {
+  background-color: #fff;
+  color: #000;
+}
+
+.site-public .sp-channel:hover *,
+.site-public .sp-channel:focus-visible *,
+.site-public .sp-link-tile:hover *,
+.site-public .sp-link-tile:focus-visible * {
+  color: #000;
+}
+
+.site-public .sp-terms__text {
+  color: var(--hp-muted, #a1a1a1);
+  font-size: 1rem;
+  line-height: 1.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-public .sp-channel,
+  .site-public .sp-link-tile {
+    transition: none;
+  }
+}

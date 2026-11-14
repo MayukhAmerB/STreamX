@@ -185,6 +185,23 @@ def _exam(course, now):
     return exam
 
 
+def _pentesting_catalog() -> dict:
+    """WS catalog-plans: the 20 browsable, not-for-sale Pentesting courses, the
+    disabled platform plans and the free OSINT directory (switches stay off)."""
+    from apps.courses.management.commands.seed_pentesting_catalog import apply_actions, plan_actions
+    from apps.osint_labs.management.commands.import_osint_directory import DEFAULT_FILE, import_rows, load_rows
+    from apps.payments.platform_plans import seed_platform_plans
+
+    apply_actions(plan_actions())
+    seed_platform_plans(apply=True)
+    paths, rows = load_rows(DEFAULT_FILE)
+    import_rows(paths, rows, apply=True)
+    from apps.courses.models import Course
+
+    courses = dict(Course.objects.filter(slug__startswith="pt-").values_list("slug", "id"))
+    return {"courseId": courses.get("pt-command-line"), "courses": courses}
+
+
 @transaction.atomic
 def seed() -> dict:
     from apps.courses.models import Enrollment, LiveClassEnrollment
@@ -214,6 +231,7 @@ def seed() -> dict:
     channel.section_enabled = True
     channel.channel_title = "Al Syed (E2E)"
     channel.save()
+    pentesting = _pentesting_catalog()
 
     return {
         "password": PASSWORD,
@@ -232,4 +250,5 @@ def seed() -> dict:
         "exam": {"id": exam.pk, "slug": exam.slug, "title": exam.title},
         "console_exam_slug": CONSOLE_EXAM_SLUG,
         "exam_answers": {question["key"]: question["answers"][0] for question in EXAM_QUESTIONS},
+        "pentesting": pentesting,
     }

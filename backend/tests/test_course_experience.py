@@ -7,6 +7,7 @@ from apps.courses.admin import CourseReviewAdmin
 from apps.courses.models import Course, CourseReview, Enrollment, Lecture, PentestingApplication, Section
 from apps.payments.models import Payment
 from apps.payments.provisioning import provision_paid_payment
+from apps.profiles.handles import public_handle
 from apps.users.models import User
 from django.apps import apps
 from django.contrib import admin
@@ -185,7 +186,7 @@ class CourseExperienceTests(APITestCase):
         self.assertEqual(data["average_rating"], 5)
         self.assertEqual(data["review_count"], 1)
         self.assertNotIn(self.student.email, str(data))
-        self.assertEqual(data["reviews"][0]["author"], f"AL-SYD-{self.student.pk:05d}")
+        self.assertEqual(data["reviews"][0]["author"], public_handle(self.student))
         self.assertNotIn(self.student.full_name, str(data))
         self.assertEqual(set(data["reviews"][0]), {"rating", "text", "author", "verified", "date"})
         review.edit_allowed = True
@@ -264,12 +265,12 @@ class CourseExperienceTests(APITestCase):
         for data in (current_osint_data, future_osint_data):
             self.assertEqual(data["average_rating"], 5)
             self.assertEqual(data["review_count"], 1)
-            self.assertEqual(data["reviews"][0]["author"], f"AL-SYD-{self.student.pk:05d}")
+            self.assertEqual(data["reviews"][0]["author"], public_handle(self.student))
             self.assertEqual(data["reviews"][0]["text"], "A verified OSINT review shared with future batches.")
         for data in (current_pentesting_data, future_pentesting_data):
             self.assertEqual(data["average_rating"], 4)
             self.assertEqual(data["review_count"], 1)
-            self.assertEqual(data["reviews"][0]["author"], f"AL-SYD-{pentesting_student.pk:05d}")
+            self.assertEqual(data["reviews"][0]["author"], public_handle(pentesting_student))
             self.assertEqual(
                 data["reviews"][0]["text"],
                 "A verified Pentesting review shared with future batches.",

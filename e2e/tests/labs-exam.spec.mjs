@@ -45,8 +45,15 @@ test("labs: sign-in round trip, exam attempts recorded, staff see results", asyn
     // The exam card opens the exam page; its Start button starts the timer.
     await page.locator(`button[data-action="open"][data-slug="${manifest.exam.slug}"]`).click();
     await expect(page.getByText("Ready when you are")).toBeVisible();
+    // The paper opens with the candidate block: roll number, real name, handle, stats (read-only).
+    const candidate = page.getByTestId("exam-identity");
+    await expect(candidate).toBeVisible();
+    await expect(candidate).toContainText(`AL-SYD-${String(manifest.users.student1.id).padStart(5, "0")}`);
+    await expect(candidate).toContainText(manifest.users.student1.name);
+    await expect(candidate.locator("input, textarea")).toHaveCount(0);
     await page.locator('button[data-action="start"]').click();
     await expect(page.locator("#exam-q-first-handle")).toBeVisible();
+    await expect(page.getByTestId("exam-identity")).toContainText("HANDLE AT START");
 
     const first = await answer(page, "first-handle", "wrong_handle_99");
     await expect(first.locator(".feedback-text")).toContainText("[-] Incorrect.");
@@ -64,10 +71,11 @@ test("labs: sign-in round trip, exam attempts recorded, staff see results", asyn
     const staff = await newUserContext(browser, test.info(), pageErrors, "staff");
     await signIn(staff, manifest, "admin");
     const console_ = await staff.newPage();
-    await console_.goto(`/console/exams/${manifest.exam.slug}`);
+    await console_.goto(`/console/admin/exams/${manifest.exam.slug}`);
     await expect(console_.getByText("Results (out of 30)")).toBeVisible();
     await expect(console_.getByText(manifest.users.student1.name).first()).toBeVisible();
-    await expect(console_.getByRole("row", { name: /Sana Student OSINT Foundations Submitted 30 2 1/ })).toBeVisible();
+    // Owner rule: the student block (roll number · real name · handle) leads the row, then rank and the record.
+    await expect(console_.getByRole("row", { name: /AL-SYD-\d{5} · Sana Student · \S+ 1 OSINT Foundations Submitted 30 2 1/ })).toBeVisible();
     // Wrong-answer clusters (normalised) per question.
     await expect(console_.getByRole("row", { name: /Q1\. Find the handle 100% \(1\/1\) wronghandle99 ×1/ })).toBeVisible();
 

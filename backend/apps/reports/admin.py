@@ -13,6 +13,7 @@ from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
 
 from apps.core.errors import DomainError
+from apps.users.identity_admin import IDENTITY_LIST_DISPLAY, StudentIdentityAdminMixin
 
 from . import services
 from .models import (
@@ -258,8 +259,12 @@ def _file_links(files):
 
 
 @admin.register(ReportSubmission)
-class ReportSubmissionAdmin(_ReadOnlyAdmin):
+class ReportSubmissionAdmin(StudentIdentityAdminMixin, _ReadOnlyAdmin):
+    # Owner rule: roll number, real name, handle, stats first; then the record.
+    identity_user_attr = "student"
+    identity_user_id_field = "student_id"
     list_display = (
+        *IDENTITY_LIST_DISPLAY,
         "student",
         "task",
         "target_name",
@@ -274,6 +279,9 @@ class ReportSubmissionAdmin(_ReadOnlyAdmin):
     search_fields = ("student__email", "student__full_name", "task__title", "target_name", "target_key")
     date_hierarchy = "submitted_at"
     readonly_fields = (
+        "student_roll_number",
+        "student_name_snapshot",
+        "student_handle_snapshot",
         "task",
         "student",
         "status",

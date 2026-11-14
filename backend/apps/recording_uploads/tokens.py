@@ -32,12 +32,23 @@ def hash_token(raw):
 
 
 def can_upload_recordings(user):
-    """Staff (admins) and instructors."""
+    """Staff (admins) and instructors.
+
+    While the Teachers section is off (``apps.users.teaching``) an instructor
+    account gets 403 ``feature_disabled`` with the calm reason instead of a
+    plain refusal: this raises ``FeatureDisabled`` for them, so the Console
+    and the desktop uploader can say why (personal tokens included).
+    """
+    from apps.users import teaching
+
     if not user or not getattr(user, "is_authenticated", False) or not getattr(user, "is_active", False):
         return False
     if getattr(user, "is_staff", False) or getattr(user, "is_superuser", False):
         return True
-    return str(getattr(user, "role", "") or "") == "instructor"
+    if not teaching.has_instructor_role(user):
+        return False
+    teaching.require_teaching(user)
+    return True
 
 
 def create_token(owner, name, *, expires_in_days=None):

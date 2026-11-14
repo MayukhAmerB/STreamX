@@ -16,7 +16,14 @@ export default defineConfig({
   fullyParallel: false,
   retries: 0,
   timeout: 120_000,
-  expect: { timeout: 15_000 },
+  expect: {
+    timeout: 15_000,
+    // Visual regression (tests/visual.spec.mjs, UI overhaul plan §7.5 WS-I):
+    // viewport shots, animations frozen, 1% pixel budget.
+    toHaveScreenshot: { maxDiffPixelRatio: 0.01, animations: "disabled", caret: "hide", scale: "css" },
+  },
+  // Accepted baselines live next to the page list: tests/visual/baselines/<project>/<page>.png
+  snapshotPathTemplate: "{testDir}/visual/baselines/{projectName}/{arg}{ext}",
   outputDir: path.join(resultsDir, "artifacts"),
   reporter: [
     ["list"],

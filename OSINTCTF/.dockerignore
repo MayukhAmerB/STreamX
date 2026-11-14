@@ -1,5 +1,6 @@
 *
 !server.js
+!labs-access.js
 !index.html
 !app.js
 !exam.js
@@ -9,3 +10,5 @@
 !favicon.ico
 !materials/
 !materials/**
+!fonts/
+!fonts/**

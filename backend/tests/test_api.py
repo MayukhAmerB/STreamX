@@ -45,6 +45,7 @@ from apps.courses.serializers import LectureSerializer
 from apps.courses.services import transcode_lecture_to_hls
 from apps.payments.models import Payment, PaymentWebhookEvent
 from apps.payments.provisioning import provision_paid_payment
+from apps.profiles.handles import public_handle
 from apps.payments.services import RazorpayServiceError
 from apps.realtime import domain as realtime_domain
 from apps.realtime import services as realtime_services
@@ -5502,7 +5503,7 @@ class RealtimeSessionTests(APITestCase):
         self.assertEqual(identity.access_token_hash, OwncastChatIdentity.hash_access_token("bridge-access-token-123"))
         self.assertNotIn("bridge-access-token-123", identity.access_token_secret)
         self.assertEqual(identity.reveal_access_token(), "bridge-access-token-123")
-        mock_register_chat_user.assert_called_once_with(display_name="")
+        mock_register_chat_user.assert_called_once_with(display_name=public_handle(self.viewer))
 
     @override_settings(OWNCAST_CHAT_BRIDGE_ENABLED=True)
     @patch("apps.realtime.views.register_owncast_chat_user")
@@ -5573,7 +5574,7 @@ class RealtimeSessionTests(APITestCase):
         )
         self.assertEqual(signed_payload["display_name"], "")
         self.assertEqual(signed_payload["platform_display_name"], "Viewer User")
-        mock_register_chat_user.assert_called_once_with(display_name="")
+        mock_register_chat_user.assert_called_once_with(display_name=public_handle(self.viewer))
 
     @override_settings(OWNCAST_CHAT_BRIDGE_ENABLED=True)
     @patch("apps.realtime.views.register_owncast_chat_user")
@@ -5626,7 +5627,7 @@ class RealtimeSessionTests(APITestCase):
         )
         self.assertEqual(second_response.status_code, 200)
 
-        mock_register_chat_user.assert_called_once_with(display_name="")
+        mock_register_chat_user.assert_called_once_with(display_name=public_handle(self.viewer))
         self.assertEqual(OwncastChatIdentity.objects.count(), 1)
         identity = OwncastChatIdentity.objects.get()
         self.assertEqual(identity.session, second_session)

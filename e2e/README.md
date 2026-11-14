@@ -45,3 +45,18 @@ changed.
 Determinism: one worker, a fresh seed per journey, a server clock set by the
 journey (and `page.clock` in the browser), background work run by explicit
 `tick` calls, and waits on responses or UI state instead of sleeps.
+
+## Quality specs (UI overhaul, WS-I)
+
+| Spec | What it checks |
+|---|---|
+| `tests/visual.spec.mjs` | every page in `tests/visual/pages.mjs` (plan Appendix A.4) at 1440x900 and 390x844: viewport screenshots, reduced motion, frozen clocks, fresh seed, `maxDiffPixelRatio 0.01`; on every page also ≤1 champagne-filled element in the viewport, no sideways scroll, Console/back-office radii 0 or pill |
+| `tests/motion.spec.mjs` | `/`, `/console`, `/console/admin`, `/admin/`: no layout/paint-property motion, bounded loops, reduced motion still, one champagne action per viewport, radii 0/pill, IBM Plex Sans |
+| `tests/a11y.spec.mjs` | every listed page: axe-core 0 serious/critical, 24 px targets (WCAG 2.5.8), no sideways scroll |
+
+Baselines live in `tests/visual/baselines/<project>/<page>.png` and are accepted
+only after design review: `node run.mjs tests/visual.spec.mjs --update-snapshots`.
+A page without a baseline runs only the language checks (annotated `no-baseline`); a page still showing a WS-0 placeholder is skipped. Live media and embeds are masked in `#262626`.
+`E2E_SHOTS_DIR=<dir>` makes the visual spec also write review copies
+`<page>-<width>.png`. Fixtures for these pages: `features`, `attention`,
+`admin-queues` (`backend/apps/e2e_support/ui_fixtures.py`).

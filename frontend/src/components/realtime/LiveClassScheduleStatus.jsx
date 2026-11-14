@@ -6,23 +6,23 @@ export default function LiveClassScheduleStatus({ schedule, liveSession, compact
 
   if (liveSession) {
     return (
-      <section className={`rounded-2xl border border-red-500/55 bg-red-950/25 ${compact ? "p-4" : "p-5 sm:p-6"}`}>
+      <section className={`rounded-2xl border border-[#F3E2B3]/40 bg-[#F3E2B3]/[0.04] ${compact ? "p-4" : "p-5 sm:p-6"}`}>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-red-300">
-              <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-500 shadow-[0_0_16px_rgba(239,68,68,0.85)]" />
+            <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[#F3E2B3]">
+              <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#F3E2B3] shadow-[0_0_14px_rgba(243,226,179,0.6)] motion-reduce:animate-none" />
               Live now
             </div>
             <h3 className={`${compact ? "mt-2 text-lg" : "mt-3 text-2xl sm:text-3xl"} font-reference font-semibold text-white`}>
               Your live class is in progress
             </h3>
-            <p className="mt-2 text-sm leading-6 text-red-100/75">
+            <p className="mt-2 text-sm leading-6 text-[#a1a1a1]">
               {liveSession.title || "Your approved live class"} is live. Join the classroom now.
             </p>
           </div>
           <Link
             to={`/join-live?session=${liveSession.id}`}
-            className="inline-flex min-h-14 w-full items-center justify-center rounded-xl bg-red-600 px-8 py-4 text-base font-extrabold uppercase tracking-[0.1em] text-white shadow-[0_18px_38px_rgba(220,38,38,0.28)] transition hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 sm:w-auto"
+            className="inline-flex min-h-14 w-full items-center justify-center rounded-md bg-[#F3E2B3] px-8 py-4 text-base font-semibold text-[#0a0a0a] shadow-[0_6px_18px_rgba(243,226,179,0.15)] transition-colors hover:bg-[#F8EDCF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F3E2B3] motion-reduce:transition-none sm:w-auto"
           >
             Join Live
             <span aria-hidden="true" className="ml-3">→</span>

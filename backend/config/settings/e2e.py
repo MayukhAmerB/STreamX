@@ -186,3 +186,19 @@ FFPROBE_BINARY = "e2e-fake-ffprobe"
 from apps.e2e_support import clock as _e2e_clock  # noqa: E402
 
 _e2e_clock.install(initial=E2E_FROZEN_NOW)
+
+# Engagement (apps.engagement) is ON by default in production; E2E pins it on explicitly.
+FEATURE_DEFAULT_OVERRIDES = {**FEATURE_DEFAULT_OVERRIDES, "engagement": FEATURE_DEFAULT_OVERRIDES.get("engagement", True)}
+
+# Student profiles (apps.profiles) are ON by default in production; E2E pins them on explicitly.
+FEATURE_DEFAULT_OVERRIDES = {
+    **FEATURE_DEFAULT_OVERRIDES,
+    "public_profiles": FEATURE_DEFAULT_OVERRIDES.get("public_profiles", True),
+}
+
+# The Monthly CTF is ON by default in production; E2E pins it OFF so each spec
+# opts in (monthly-ctf.spec.mjs sets it through the features fixture).
+FEATURE_DEFAULT_OVERRIDES = {
+    **FEATURE_DEFAULT_OVERRIDES,
+    "monthly_ctf": FEATURE_DEFAULT_OVERRIDES.get("monthly_ctf", False),
+}

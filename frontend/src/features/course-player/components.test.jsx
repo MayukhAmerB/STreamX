@@ -103,12 +103,9 @@ describe("Like button", () => {
     expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({ title: "You're going a bit fast" }));
   });
 
-  it("jumps to comments from the Comments chip", async () => {
-    const onOpenComments = vi.fn();
-    const view = await renderEngagement({ api: createMockEngagementApi(), onOpenComments });
-    const chip = view.getByLabel("button", "Comments, 2 comments");
-    await fire(chip, "onClick");
-    expect(onOpenComments).toHaveBeenCalled();
+  it("keeps Comments in its tab only (no second Comments button in the action row)", async () => {
+    const view = await renderEngagement({ api: createMockEngagementApi() });
+    expect(view.all((node) => node.type === "button" && /^Comments/.test(node.props?.["aria-label"] || ""))).toHaveLength(0);
   });
 });
 

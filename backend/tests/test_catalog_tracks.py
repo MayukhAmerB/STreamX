@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from apps.core import features
 from apps.courses.catalog_tracks import compute_catalog_tracks, get_catalog_tracks
 from apps.courses.models import Course
 from apps.users.models import User
@@ -31,6 +32,12 @@ def track(tracks, key):
 class CatalogTracksComputationTests(TestCase):
     def setUp(self):
         cache.clear()
+        # A switch written by an earlier TestCase never commits, so its
+        # "pending write" marker (apps.core.features) would otherwise send
+        # every feature read of this thread to the database.
+        features._pending.dirty = False
+        features.invalidate_cache()
+        features.snapshot()  # prime the per-process memo outside the counted blocks
 
     def test_empty_catalog_lists_both_tracks_as_coming_soon(self):
         self.assertEqual(
@@ -45,7 +52,7 @@ class CatalogTracksComputationTests(TestCase):
                 },
                 {
                     "key": "web_pentesting",
-                    "title": "Web Application & API Security",
+                    "title": "Pentesting",  # D7: display label only; the key stays web_pentesting
                     "state": "coming_soon",
                     "course_count": 0,
                     "open_course_count": 0,

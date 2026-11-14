@@ -382,13 +382,18 @@ a.sk-tile--clickable:hover {
   inset: 0;
   border-radius: 50%;
   background-color: var(--brand-live);
-  animation: sk-live-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+  /* M8: the one live ping, 2 s x 3, then rests (WCAG 2.2.2). */
+  animation: sk-live-ping var(--sc-live-period) var(--sc-ease-entrance-productive) 3;
 }
 
 @keyframes sk-live-ping {
-  75%,
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  80%,
   100% {
-    transform: scale(2.2);
+    transform: scale(2.4);
     opacity: 0;
   }
 }
@@ -818,7 +823,8 @@ a.sk-tile--clickable:hover {
   position: absolute;
   inset: 0;
   background-color: var(--cds-skeleton-element);
-  animation: sk-shimmer 3s ease-in-out infinite;
+  /* M3: transform shimmer, 3 cycles, then static. */
+  animation: sk-shimmer var(--sc-shimmer-period) linear 3;
   opacity: 0.6;
   transform: translateX(-100%);
 }
@@ -881,6 +887,17 @@ a.sk-tile--clickable:hover {
   transition:
     opacity var(--sc-duration-expressive) var(--sc-easing-entrance),
     transform var(--sc-duration-expressive) var(--sc-easing-entrance);
+}
+
+:root[data-motion="reduce"] .sk-tag__live-dot::after,
+:root[data-motion="reduce"] .sk-skeleton__bar::after {
+  animation: none;
+}
+
+:root[data-motion="reduce"] .sk-reveal[data-reveal] {
+  opacity: 1;
+  transform: none;
+  transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

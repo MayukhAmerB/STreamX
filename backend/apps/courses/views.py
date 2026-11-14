@@ -7,6 +7,7 @@ from django.db.models import Count, Prefetch, Q
 from django.http import FileResponse, HttpResponse, HttpResponseNotFound
 from django.shortcuts import redirect
 from drf_spectacular.utils import extend_schema
+from rest_framework import exceptions as drf_exceptions
 from rest_framework import generics, permissions, status
 from rest_framework.views import APIView
 
@@ -18,6 +19,7 @@ from config.throttling import ClientIpScopedRateThrottle
 from config.turnstile import enforce_turnstile
 
 from apps.payments.models import Payment
+from apps.users import teaching
 
 from .access import (
     active_enrollment_q,
@@ -27,6 +29,14 @@ from .access import (
     user_has_course_access,
 )
 from .cache_utils import get_course_list_cache_version, get_live_class_list_cache_version
+from .features import course_acquisition_blocked, pentesting_gate_error
+
+
+def _features_fingerprint():
+    """Feature-switch state in public cache keys: a switch flip shows within ~2 s."""
+    from apps.core import features
+
+    return features.fingerprint()
 from .catalog_tracks import get_catalog_tracks
 from .engagement.views_tracking import record_lecture_view
 from .models import (
@@ -272,6 +282,7 @@ class CourseListCreateView(APIView):
                 "course-list:"
                 f"v={cache_version}:"
                 f"direct_pay={int(bool(getattr(settings, 'DIRECT_COURSE_PAYMENTS_ENABLED', False)))}:"
+                f"features={_features_fingerprint()}:"
                 f"search={search.lower()}:"
                 f"catalog={catalog}:"
                 f"paginate={request.query_params.get('paginate','')}:"
@@ -330,7 +341,8 @@ class CourseListCreateView(APIView):
                 errors={"detail": "Authentication credentials were not provided."},
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
-        if request.user.role != "instructor":
+        teaching.require_teaching(request.user)
+        if not teaching.teaching_allowed(request.user):
             return api_response(
                 success=False,
                 message="Instructor role required.",
@@ -367,7 +379,7 @@ class CourseThumbnailView(APIView):
             return False
         if getattr(user, "is_staff", False) or getattr(user, "is_superuser", False):
             return True
-        return bool(getattr(user, "id", None) and user.id == course.instructor_id)
+        return teaching.owns_course(user, course)
 
     def get(self, request, pk):
         course = generics.get_object_or_404(Course.objects.select_related("instructor"), pk=pk)
@@ -394,7 +406,7 @@ class CourseDetailView(APIView):
     def _build_public_cache_key(course_id, updated_at):
         updated_ts = int(updated_at.timestamp() * 1_000_000) if updated_at else 0
         direct_pay = int(bool(getattr(settings, "DIRECT_COURSE_PAYMENTS_ENABLED", False)))
-        return f"course-detail:{course_id}:v={updated_ts}:direct_pay={direct_pay}"
+        return f"course-detail:{course_id}:v={updated_ts}:direct_pay={direct_pay}:features={_features_fingerprint()}"
 
     def get_object(self, request, pk):
         queryset = _course_prefetch_queryset()
@@ -402,10 +414,12 @@ class CourseDetailView(APIView):
         if course.is_published:
             return course
         if not request.user.is_authenticated:
-            raise permissions.PermissionDenied("Course is not published.")
-        if request.user.role == "instructor" and request.user.id == course.instructor_id:
+            raise drf_exceptions.PermissionDenied("Course is not published.")
+        # The owning instructor previews an unpublished course, unless Teaching is
+        # switched off for them (then it is hidden like for any student).
+        if teaching.has_instructor_role(request.user) and teaching.owns_course(request.user, course):
             return course
-        raise permissions.PermissionDenied("Course is not published.")
+        raise drf_exceptions.PermissionDenied("Course is not published.")
 
     @extend_schema(responses={200: CourseDetailResponseSerializer})
     def get(self, request, pk):
@@ -427,7 +441,7 @@ class CourseDetailView(APIView):
 
         try:
             course = self.get_object(request, pk)
-        except permissions.PermissionDenied as exc:
+        except drf_exceptions.PermissionDenied as exc:
             return api_response(
                 success=False,
                 message="Access denied.",
@@ -451,7 +465,7 @@ class CourseDetailView(APIView):
             serializer_context["live_class_enrollment_statuses"] = live_statuses
             serializer_context["live_class_access_sources"] = live_sources
             can_view_progress = bool(
-                request.user.id == course.instructor_id
+                teaching.owns_course(request.user, course)
                 or user_has_course_access(request.user, course.id)
             )
             if can_view_progress:
@@ -485,7 +499,8 @@ class CourseDetailView(APIView):
                 errors={"detail": "Authentication credentials were not provided."},
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
-        if request.user.role != "instructor" or course.instructor_id != request.user.id:
+        teaching.require_teaching(request.user)
+        if not (teaching.has_instructor_role(request.user) and teaching.owns_course(request.user, course)):
             return api_response(
                 success=False,
                 message="Access denied.",
@@ -513,7 +528,8 @@ class CourseDetailView(APIView):
                 errors={"detail": "Authentication credentials were not provided."},
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
-        if request.user.role != "instructor" or course.instructor_id != request.user.id:
+        teaching.require_teaching(request.user)
+        if not (teaching.has_instructor_role(request.user) and teaching.owns_course(request.user, course)):
             return api_response(
                 success=False,
                 message="Access denied.",
@@ -1308,7 +1324,7 @@ class InstructorCoursesView(APIView):
 
     def get(self, request):
         queryset = _with_course_catalog_metrics(
-            Course.objects.filter(instructor=request.user)
+            teaching.taught_courses(request.user)
             .select_related("instructor")
         )
         serializer = CourseListSerializer(
@@ -1347,6 +1363,11 @@ class CourseEnrollView(APIView):
                 errors={"detail": "Course not found or not published."},
                 status_code=status.HTTP_404_NOT_FOUND,
             )
+
+        if course_acquisition_blocked(course):
+            # Pentesting "coming soon" switch (apps.courses.features).
+            log_security_event("course.enroll_feature_disabled", request=request, course_id=course.id)
+            raise pentesting_gate_error()
 
         if request.user.id == course.instructor_id:
             log_security_event("course.enroll_instructor_self_blocked", request=request, course_id=course.id)
@@ -1512,6 +1533,10 @@ class LiveClassEnrollView(APIView):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
+        if live_class.linked_course_id and course_acquisition_blocked(live_class.linked_course):
+            log_security_event("live_class.enroll_feature_disabled", request=request, live_class_id=live_class.id)
+            raise pentesting_gate_error()
+
         enrollment, created = LiveClassEnrollment.objects.get_or_create(
             user=request.user,
             live_class=live_class,
@@ -1575,6 +1600,14 @@ class PublicEnrollmentLeadCreateView(APIView):
                 errors=serializer.errors,
                 status_code=status.HTTP_400_BAD_REQUEST,
         )
+
+        lead_course = serializer.validated_data.get("course")
+        lead_live_class = serializer.validated_data.get("live_class")
+        if lead_course is None and lead_live_class is not None:
+            lead_course = getattr(lead_live_class, "linked_course", None)
+        if lead_course is not None and course_acquisition_blocked(lead_course):
+            log_security_event("public_enrollment_lead.feature_disabled", request=request, course_id=lead_course.id)
+            raise pentesting_gate_error()
 
         lead = serializer.save()
         target_id = lead.course_id or lead.live_class_id

@@ -7,10 +7,12 @@ class Notification(models.Model):
     KIND_COURSE_VIDEO_UPLOADED = "course_video_uploaded"
     KIND_LIVE_CLASS_STARTED = "live_class_started"
     KIND_ANNOUNCEMENT = "announcement"
+    KIND_LEVEL_UP = "level_up"  # apps.engagement: a student reached a new rank
     KIND_CHOICES = [
         (KIND_COURSE_VIDEO_UPLOADED, "Course video uploaded"),
         (KIND_LIVE_CLASS_STARTED, "Live class started"),
         (KIND_ANNOUNCEMENT, "Announcement"),
+        (KIND_LEVEL_UP, "Rank reached"),
     ]
 
     kind = models.CharField(max_length=40, choices=KIND_CHOICES)

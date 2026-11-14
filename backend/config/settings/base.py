@@ -67,6 +67,8 @@ INSTALLED_APPS = [
     "apps.ctf.apps.CtfConfig",
     # Resumable (chunked) class recording uploads + personal upload tokens.
     "apps.recording_uploads.apps.RecordingUploadsConfig",
+    # UI overhaul: Console workspace + admin API (/api/console/, /api/admin/).
+    "apps.console_api.apps.ConsoleApiConfig",
 ]
 
 MIDDLEWARE = [
@@ -286,6 +288,8 @@ REST_FRAMEWORK = {
         # Public website YouTube section (GET /api/site/youtube/), per client IP. Generous:
         # classrooms share one NAT address and every open tab polls once a minute.
         "site_youtube": env("SITE_YOUTUBE_RATE", "300/minute"),
+        # Public website figures (GET /api/site/stats/): one cached payload for everyone.
+        "site_stats": env("SITE_STATS_RATE", "120/minute"),
         # OSINT CTF exams (apps.ctf). Per student; the per-question attempt cap
         # is the real brute-force limit.
         "ctf_attempt": env("CTF_ATTEMPT_RATE", "30/minute"),
@@ -993,3 +997,201 @@ REPORTS_UNDO_SECONDS = max(0, env_int("REPORTS_UNDO_SECONDS", 15))
 # One OpenAPI name for the "this week / last week" choice used by two serializers.
 SPECTACULAR_SETTINGS["ENUM_NAME_OVERRIDES"]["ReportWeekWhichEnum"] = "apps.reports.serializers.WEEK_WHICH_CHOICES"
 # --- end Phase 3 self-service weekly reports ---
+
+# --- UI overhaul (plan §5.1, §4.4, §4.5; frozen after WS-0) ---
+# Feature switches (apps.core.features). Both are JSON objects of
+# {"<key>": true|false} read from the environment:
+#   FEATURE_FORCE              emergency lock; the admin switch shows "Locked by
+#                              server configuration" and cannot change it.
+#                              Rollback without a deploy: FEATURE_FORCE='{"teaching": true}'.
+#   FEATURE_DEFAULT_OVERRIDES  replaces registry defaults (no admin override stored).
+# Production default: {} so "teaching" (Teachers section) starts OFF. Under
+# `manage.py test` the default is {"teaching": true} so suites that act as
+# instructors keep passing; tests that need production behaviour use
+# override_settings(FEATURE_DEFAULT_OVERRIDES={}).
+import json as _ui_json  # noqa: E402
+
+
+def _ui_json_flags(name, default):
+    raw = env(name, "")
+    if raw is None or not str(raw).strip():
+        return dict(default)
+    try:
+        value = _ui_json.loads(raw)
+    except ValueError:
+        logging.getLogger("config.settings").warning("%s is not valid JSON; ignoring it.", name)
+        return dict(default)
+    if not isinstance(value, dict):
+        logging.getLogger("config.settings").warning("%s must be a JSON object; ignoring it.", name)
+        return dict(default)
+    return {str(key): bool(flag) for key, flag in value.items()}
+
+
+FEATURE_FORCE = _ui_json_flags("FEATURE_FORCE", {})
+FEATURE_DEFAULT_OVERRIDES = _ui_json_flags(
+    "FEATURE_DEFAULT_OVERRIDES", {"teaching": True} if _PHASE2_RUNNING_TESTS else {}
+)
+# Shared snapshot cache (Redis) and the per-process memo in front of it: a flip
+# reaches every worker within ~FEATURE_PROCESS_MEMO_SECONDS.
+FEATURE_SNAPSHOT_CACHE_KEY = "features:snapshot:v1"
+FEATURE_SNAPSHOT_CACHE_SECONDS = max(1, env_int("FEATURE_SNAPSHOT_CACHE_SECONDS", 300))
+FEATURE_PROCESS_MEMO_SECONDS = max(0, env_int("FEATURE_PROCESS_MEMO_SECONDS", 2))
+# Admin "needs attention" queues (GET /api/admin/attention/ and the Django index).
+ADMIN_ATTENTION_CACHE_SECONDS = max(0, env_int("ADMIN_ATTENTION_CACHE_SECONDS", 30))
+# Command palette record search (GET /api/admin/search/?q=).
+ADMIN_SEARCH_MIN_CHARS = max(1, env_int("ADMIN_SEARCH_MIN_CHARS", 2))
+ADMIN_SEARCH_GROUP_LIMIT = max(1, env_int("ADMIN_SEARCH_GROUP_LIMIT", 5))
+# Where staff land after sign-in (owner decision D3).
+CONSOLE_STAFF_HOME = (env("CONSOLE_STAFF_HOME", "/console/admin") or "").strip() or "/console/admin"
+# Back-office product name (owner decision D9).
+ADMIN_SITE_NAME = (env("ADMIN_SITE_NAME", "Al Syed Admin") or "").strip() or "Al Syed Admin"
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"].update(
+    {
+        # Console Home / Admin home / capabilities: polled about once a minute per tab.
+        "console_read": env("CONSOLE_READ_RATE", "600/minute"),
+        "admin_search": env("ADMIN_SEARCH_RATE", "240/minute"),
+        "admin_action": env("ADMIN_ACTION_RATE", "1200/hour"),
+        "feature_write": env("FEATURE_WRITE_RATE", "60/hour"),
+    }
+)
+# --- end UI overhaul ---
+
+# --- Engagement (apps.engagement: XP, streaks, badges, leaderboards) ---
+INSTALLED_APPS += ["apps.engagement.apps.EngagementConfig"]
+# Adds X-Engagement ({xp, level, streak, pending_xp}) to responses of requests
+# that queued an XP-earning event; every other request pays one contextvar set.
+MIDDLEWARE += ["apps.engagement.middleware.EngagementSnapshotMiddleware"]
+CORS_EXPOSE_HEADERS = [*CORS_EXPOSE_HEADERS, "X-Engagement"]
+ENGAGEMENT_READ_RATE = env("ENGAGEMENT_READ_RATE", "240/minute")
+ENGAGEMENT_WRITE_RATE = env("ENGAGEMENT_WRITE_RATE", "30/minute")
+ENGAGEMENT_PRESENCE_RATE = env("ENGAGEMENT_PRESENCE_RATE", "12/minute")
+ENGAGEMENT_PUBLIC_RATE = env("ENGAGEMENT_PUBLIC_RATE", "60/minute")
+ENGAGEMENT_STAFF_RATE = env("ENGAGEMENT_STAFF_RATE", "600/hour")
+# XP economy v2 (owner rules A/B; defaults and meaning in apps/engagement/rules.py).
+# Empty = the rules.py default. Read at call time, so a restart applies a change.
+ENGAGEMENT_LIVE_PRESENT_XP = env("ENGAGEMENT_LIVE_PRESENT_XP", "")  # 150
+ENGAGEMENT_LIVE_PARTIAL_XP = env("ENGAGEMENT_LIVE_PARTIAL_XP", "")  # 30
+ENGAGEMENT_FIRST_LIVE_BONUS_XP = env("ENGAGEMENT_FIRST_LIVE_BONUS_XP", "")  # 100
+ENGAGEMENT_PURCHASE_XP_PER_RUPEE = env("ENGAGEMENT_PURCHASE_XP_PER_RUPEE", "")  # 0.5
+ENGAGEMENT_ONE_TIME_PURCHASE_XP_CAP = env("ENGAGEMENT_ONE_TIME_PURCHASE_XP_CAP", "")  # 1000 per payment
+ENGAGEMENT_SUBSCRIPTION_XP_CAP = env("ENGAGEMENT_SUBSCRIPTION_XP_CAP", "")  # 0 = no cap
+ENGAGEMENT_WEEKLY_FIRST_XP = env("ENGAGEMENT_WEEKLY_FIRST_XP", "")  # 200
+ENGAGEMENT_WEEKLY_PODIUM_XP = env("ENGAGEMENT_WEEKLY_PODIUM_XP", "")  # 120 (#2-3)
+ENGAGEMENT_WEEKLY_TOP10_XP = env("ENGAGEMENT_WEEKLY_TOP10_XP", "")  # 60 (#4-10)
+ENGAGEMENT_MONTHLY_TOP10_XP = env("ENGAGEMENT_MONTHLY_TOP10_XP", "")  # 100
+ENGAGEMENT_STANDING_AWARDS = env_bool("ENGAGEMENT_STANDING_AWARDS", True)
+ENGAGEMENT_LEADERBOARD_COUNT_PURCHASE_XP = env_bool("ENGAGEMENT_LEADERBOARD_COUNT_PURCHASE_XP", True)
+# JSON list of 8 ascending integers from 0 (rank thresholds); empty = the documented curve.
+ENGAGEMENT_LEVEL_THRESHOLDS = env("ENGAGEMENT_LEVEL_THRESHOLDS", "")
+# Release day (owner's legacy plan, apps.engagement.legacy). ENGAGEMENT_RELEASE_AT is
+# the launch moment (ISO with offset, e.g. 2026-12-01T00:00:00+05:30): streaks and the
+# weekly leaderboard start from it, legacy students are those enrolled before it.
+# Empty = no epoch (dev, tests).
+ENGAGEMENT_RELEASE_AT = (env("ENGAGEMENT_RELEASE_AT", "") or "").strip()
+ENGAGEMENT_LEGACY_ACTIVE_DAYS = max(1, env_int("ENGAGEMENT_LEGACY_ACTIVE_DAYS", 30))
+ENGAGEMENT_FOUNDING_GLOW_DAYS = max(1, env_int("ENGAGEMENT_FOUNDING_GLOW_DAYS", 30))
+# --- end Engagement ---
+# Engagement and the Monthly CTF ship ON in production (registry defaults,
+# owner decision: rewards from release day). Test runs pin both explicitly
+# unless FEATURE_DEFAULT_OVERRIDES names them: engagement on, monthly_ctf off
+# (the Monthly CTF suites turn it on per test), so a registry change never
+# silently changes what the other suites exercise.
+if _PHASE2_RUNNING_TESTS:
+    FEATURE_DEFAULT_OVERRIDES.setdefault("engagement", True)
+    FEATURE_DEFAULT_OVERRIDES.setdefault("monthly_ctf", False)
+    # No release epoch under tests unless a test sets one (override_settings).
+    ENGAGEMENT_RELEASE_AT = ""
+
+# --- Catalogue, platform plans, memberships and labs access (WS catalog-plans) ---
+INSTALLED_APPS += ["apps.osint_labs.apps.OsintLabsConfig"]
+# Membership access continues this many days past a subscription's paid
+# period (covers Razorpay's charge retries and late webhooks).
+SUBSCRIPTION_GRACE_DAYS = max(0, env_int("SUBSCRIPTION_GRACE_DAYS", 3))
+# Razorpay requires a total_count for every subscription.
+MEMBERSHIP_TOTAL_COUNT_MONTHLY = max(1, env_int("MEMBERSHIP_TOTAL_COUNT_MONTHLY", 120))
+MEMBERSHIP_TOTAL_COUNT_YEARLY = max(1, env_int("MEMBERSHIP_TOTAL_COUNT_YEARLY", 10))
+# Labs site <-> LMS: HMAC secret shared with OSINTCTF/server.js (LABS_PASS_SECRET)
+# for the short-lived labs pass. Empty = no pass can be issued (labs gating then
+# refuses members-only content while "labs_membership_required" is on).
+LABS_PASS_SECRET = env("LABS_PASS_SECRET", "")
+LABS_PASS_TTL_SECONDS = max(60, env_int("LABS_PASS_TTL_SECONDS", 1800))
+LABS_PUBLIC_URL = (env("LABS_PUBLIC_URL", "https://labs.alsyedinitiative.com") or "").strip().rstrip("/")
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"].update(
+    {
+        "catalog_read": env("CATALOG_READ_RATE", "600/minute"),
+        "plan_checkout": env("PLAN_CHECKOUT_RATE", "20/hour"),
+        "labs_pass": env("LABS_PASS_RATE", "120/hour"),
+        "directory_write": env("DIRECTORY_WRITE_RATE", "120/hour"),
+    }
+)
+# Purchase-gate tests turn "pentesting" off explicitly; every other suite keeps
+# testing the purchase mechanics with it on (production default: off).
+if _PHASE2_RUNNING_TESTS:
+    FEATURE_DEFAULT_OVERRIDES.setdefault("pentesting", True)
+# --- end catalog-plans ---
+
+# --- Student profiles (apps.profiles: /u/<handle>, PII guard, moderation) ---
+INSTALLED_APPS += ["apps.profiles.apps.ProfilesConfig"]
+# Profile images live outside MEDIA_ROOT (default <REPORTS_PRIVATE_ROOT>/profiles)
+# and leave only through /api/profiles/media/<id>/ after a permission check.
+PROFILES_PRIVATE_ROOT = env("PROFILES_PRIVATE_ROOT", "")
+PROFILES_IMAGE_MAX_BYTES = max(256 * 1024, env_int("PROFILES_IMAGE_MAX_BYTES", 8 * 1024 * 1024))
+PROFILES_READ_RATE = env("PROFILES_READ_RATE", "240/minute")
+PROFILES_WRITE_RATE = env("PROFILES_WRITE_RATE", "60/minute")
+PROFILES_PUBLISH_RATE = env("PROFILES_PUBLISH_RATE", "30/hour")
+PROFILES_UPLOAD_RATE = env("PROFILES_UPLOAD_RATE", "40/hour")
+PROFILES_REPORT_RATE = env("PROFILES_REPORT_RATE", "10/hour")
+PROFILES_PUBLIC_RATE = env("PROFILES_PUBLIC_RATE", "120/minute")
+PROFILES_STAFF_RATE = env("PROFILES_STAFF_RATE", "600/hour")
+# "public_profiles" ships ON in production (registry default, owner decision);
+# test runs pin it on explicitly.
+if _PHASE2_RUNNING_TESTS:
+    FEATURE_DEFAULT_OVERRIDES.setdefault("public_profiles", True)
+# --- end Student profiles ---
+
+# --- Attendance & class calendar (apps.attendance) ---
+INSTALLED_APPS += ["apps.attendance.apps.AttendanceConfig"]
+# Present = at least this many minutes in the LIVE class (recordings never count).
+# Admin-editable afterwards in Admin > Attendance rule; these seed that row.
+ATTENDANCE_PRESENT_MIN_MINUTES = max(1, env_int("ATTENDANCE_PRESENT_MIN_MINUTES", 40))
+# A class on air for less than the minutes above is a "short session": present =
+# this share of its on-air time (flagged for staff).
+ATTENDANCE_SHORT_SESSION_RATIO = float(env("ATTENDANCE_SHORT_SESSION_RATIO", "0.80") or 0.80)
+ATTENDANCE_LOW_PERCENT = max(1, env_int("ATTENDANCE_LOW_PERCENT", 75))
+ATTENDANCE_FLUSH_INTERVAL_SECONDS = max(15, env_int("ATTENDANCE_FLUSH_INTERVAL_SECONDS", 120))
+ATTENDANCE_FINALIZE_DELAY_SECONDS = max(0, env_int("ATTENDANCE_FINALIZE_DELAY_SECONDS", 90))
+ATTENDANCE_PRESENCE_RATE = env("ATTENDANCE_PRESENCE_RATE", "12/minute")
+ATTENDANCE_READ_RATE = env("ATTENDANCE_READ_RATE", "240/minute")
+ATTENDANCE_STAFF_RATE = env("ATTENDANCE_STAFF_RATE", "1200/hour")
+ATTENDANCE_WRITE_RATE = env("ATTENDANCE_WRITE_RATE", "120/hour")
+# Calendar: occurrences 30 days ahead; a RealtimeSession is created for a class
+# starting within the lead time (kept short so the Live classes list stays tidy).
+CALENDAR_HORIZON_DAYS = max(1, env_int("CALENDAR_HORIZON_DAYS", 30))
+CALENDAR_SESSION_LEAD_HOURS = max(1, env_int("CALENDAR_SESSION_LEAD_HOURS", 24))
+CALENDAR_MATERIALIZE_INTERVAL_SECONDS = max(60, env_int("CALENDAR_MATERIALIZE_INTERVAL_SECONDS", 600))
+CALENDAR_FEED_RATE = env("CALENDAR_FEED_RATE", "120/hour")
+CALENDAR_PUBLIC_RATE = env("CALENDAR_PUBLIC_RATE", "60/minute")
+# "attendance" ships ON (registry default); nothing to override for tests.
+# --- end Attendance & class calendar ---
+
+# --- Certification, delivery and Hall of Fame (apps.certification) ---
+INSTALLED_APPS += ["apps.certification.apps.CertificationConfig"]
+CERTIFICATION_ENABLED = env_bool("CERTIFICATION_ENABLED", True)
+# Default pass mark for a new certification exam policy (admin can change it per exam).
+CERTIFICATION_DEFAULT_PASS_MARK = env("CERTIFICATION_DEFAULT_PASS_MARK", "70") or "70"
+CERTIFICATION_SWEEP_INTERVAL_SECONDS = max(15, env_int("CERTIFICATION_SWEEP_INTERVAL_SECONDS", 60))
+CERTIFICATION_DELIVERY_MAX_ATTEMPTS = max(1, env_int("CERTIFICATION_DELIVERY_MAX_ATTEMPTS", 8))
+# Sender of the certificate e-mail (empty: DEFAULT_FROM_EMAIL). SMTP itself is EMAIL_*.
+CERTIFICATION_EMAIL_FROM = env("CERTIFICATION_EMAIL_FROM", "").strip()
+# WhatsApp Business Cloud API (Meta). DISABLED until token, phone number id and the
+# certificate template are all set; nothing is ever reported as sent while disabled.
+WHATSAPP_CLOUD_API_TOKEN = env("WHATSAPP_CLOUD_API_TOKEN", "").strip()
+WHATSAPP_PHONE_NUMBER_ID = env("WHATSAPP_PHONE_NUMBER_ID", "").strip()
+WHATSAPP_API_VERSION = env("WHATSAPP_API_VERSION", "v21.0").strip() or "v21.0"
+WHATSAPP_GRAPH_BASE_URL = env("WHATSAPP_GRAPH_BASE_URL", "https://graph.facebook.com").strip()
+WHATSAPP_TEMPLATE_CERTIFICATE = env("WHATSAPP_TEMPLATE_CERTIFICATE", "").strip()
+WHATSAPP_TEMPLATE_LETTER = env("WHATSAPP_TEMPLATE_LETTER", "").strip()
+WHATSAPP_TEMPLATE_LANGUAGE = env("WHATSAPP_TEMPLATE_LANGUAGE", "en").strip() or "en"
+WHATSAPP_DEFAULT_COUNTRY_CODE = env("WHATSAPP_DEFAULT_COUNTRY_CODE", "91").strip()
+WHATSAPP_HTTP_TIMEOUT_SECONDS = max(1, env_int("WHATSAPP_HTTP_TIMEOUT_SECONDS", 15))
+# --- end Certification ---

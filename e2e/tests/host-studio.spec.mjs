@@ -78,6 +78,18 @@ test("host studio: 202 Go Live -> heartbeat -> host gone -> auto-end -> room del
     await expect(page.getByText("Class recordings").first()).toBeVisible();
   });
 
+  await test.step("the host's studio link (Admin workspace) opens the ended class", async () => {
+    // UI overhaul §4.3: /console/admin/classes/:id/studio (old: /broadcasting?session=:id).
+    const hostPage = await hostContext.newPage();
+    await hostPage.clock.setFixedTime(new Date(CLASS_START));
+    await hostPage.goto(`/console/admin/classes/${session.id}/studio`);
+    await expect(hostPage).toHaveURL(new RegExp(`/console/admin/classes/${session.id}/studio`));
+    await expect(hostPage.getByText(session.title).first()).toBeVisible();
+    // An ended class can never be started again from its studio (absent, or disabled with a reason).
+    const goLive = hostPage.getByRole("button", { name: /^(Go live|Start live)$/i });
+    if (await goLive.count()) await expect(goLive.first()).toBeDisabled();
+  });
+
   await hostContext.close();
 });
 

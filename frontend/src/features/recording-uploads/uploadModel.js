@@ -118,3 +118,39 @@ function safeStorage() {
     return null;
   }
 }
+
+// ---- chunk track (M7) and status tags (UI overhaul WS-D1) ------------------
+
+/**
+ * How full each 32 MB cell of the chunk track is (0..1), from the bytes sent
+ * so far. Cells fill left to right; the last cell may be shorter.
+ */
+export function chunkFractions({ totalBytes = 0, chunkCount = 0, chunkBytes = 0, sentBytes = 0 } = {}) {
+  const count = Math.max(0, Math.floor(Number(chunkCount) || 0));
+  if (!count) return [];
+  const total = Math.max(0, Number(totalBytes) || 0);
+  const size = Number(chunkBytes) > 0 ? Number(chunkBytes) : total / count;
+  const sent = Math.min(total || Infinity, Math.max(0, Number(sentBytes) || 0));
+  return Array.from({ length: count }, (_, index) => {
+    const start = index * size;
+    const cellSize = Math.max(1, Math.min(size, total - start));
+    return Math.max(0, Math.min(1, (sent - start) / cellSize));
+  });
+}
+
+/** 0:07, 1:05, 12:00 */
+export function formatClock(seconds) {
+  const total = Math.max(0, Math.floor(Number(seconds) || 0));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+/** The one StatusTag vocabulary (plan §2.5) for an upload in the recent list. */
+export function uploadStatusTag(item) {
+  const status = item?.status;
+  if (status === "completed") {
+    return { status: "published", label: item?.result?.action === "replaced" ? "Replaced auto-recording" : "Published" };
+  }
+  if (status === "failed") return { status: "failed", label: item?.status_label || "Failed" };
+  if (status === "aborted" || status === "expired") return { status: "off", label: item?.status_label || "Cancelled" };
+  return { status: "processing", label: item?.status_label || "Processing" };
+}

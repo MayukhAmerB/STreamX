@@ -2,10 +2,11 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY server.js ./
+COPY server.js labs-access.js ./
 COPY index.html app.js exam-core.js exam.js styles.css ./public/
 COPY *.png ./public/
 COPY favicon.ico ./public/
+COPY fonts ./public/fonts
 COPY materials ./public/materials
 
 ENV NODE_ENV=production

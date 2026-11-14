@@ -9,7 +9,7 @@ export default function LiveEvictionBanner({ signingOut = false, onUseThisDevice
       role="status"
       aria-live="polite"
       data-testid="live-eviction-banner"
-      className="fixed inset-x-0 top-0 z-[1100] border-b border-amber-300/40 bg-[#2b1d00]/95 px-4 py-3 text-[#FCEFC7] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-sm"
+      className="fixed inset-x-0 top-0 z-[1100] border-b border-[#F3E2B3]/40 bg-[#0a0a0a]/95 px-4 py-3 text-[#F3E2B3] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-sm"
     >
       <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm leading-6">

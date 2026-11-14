@@ -1,19 +1,17 @@
 import { lazy, Suspense } from "react";
 
-import LandingPageV2 from "./landing/LandingPageV2";
-import { isLandingV2Enabled } from "./landing/landingFlag";
+import LandingPageHP from "./landing/LandingPageHP";
+import { landingVariant } from "./landing/landingFlag";
 
-// Rollback path (plan Phase 1A): VITE_LANDING_V2=off serves the previous
-// design. It is a separate chunk, so the default page never downloads it.
+// Rollback paths: VITE_LANDING_V2=v2 serves the previous Syed Carbon page and
+// VITE_LANDING_V2=off the original one. Both are separate chunks, so the
+// default page never downloads them.
+const LandingPageV2 = lazy(() => import("./landing/LandingPageV2"));
 const LandingPageV1 = lazy(() => import("./landing/LandingPageV1"));
 
-const LANDING_V2 = isLandingV2Enabled(import.meta.env.VITE_LANDING_V2);
+const VARIANT = landingVariant(import.meta.env.VITE_LANDING_V2);
 
 export default function LandingPage() {
-  if (LANDING_V2) return <LandingPageV2 />;
-  return (
-    <Suspense fallback={null}>
-      <LandingPageV1 />
-    </Suspense>
-  );
+  if (VARIANT === "hp") return <LandingPageHP />;
+  return <Suspense fallback={null}>{VARIANT === "v2" ? <LandingPageV2 /> : <LandingPageV1 />}</Suspense>;
 }

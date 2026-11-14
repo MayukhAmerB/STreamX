@@ -153,10 +153,13 @@ class LectureCommentListCreateView(_LectureEngagementView):
         total = queryset.count()
         offset = (page - 1) * page_size
         items = list(queryset[offset : offset + page_size])
+        from apps.profiles.handles import public_handles
+
         context = {
             "request": request,
             "course_instructor_id": lecture.section.course.instructor_id,
             "can_moderate": services.can_moderate(lecture, request.user),
+            "author_handles": public_handles({item.user_id for item in items}),
         }
         return api_response(
             message="Lecture comments fetched.",

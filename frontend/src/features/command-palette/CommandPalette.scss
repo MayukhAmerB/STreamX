@@ -1,0 +1,290 @@
+// Ctrl/Cmd+K palette (plan §4.5, motion M11). OWNER: WS-G.
+// Syed Carbon tokens with today's values as fallbacks. Only opacity and
+// transform animate; reduced motion drops the movement.
+
+.scp-layer {
+  --scp-text: var(--sc-text-primary, #f4f4f4);
+  --scp-text-2: var(--sc-text-secondary, #c6c6c6);
+  --scp-text-3: var(--sc-text-helper, #8d8d8d);
+  --scp-layer: var(--sc-surface-01, #262626);
+  --scp-hover: var(--sc-surface-hover-01, #333333);
+  --scp-selected: var(--sc-accent-wash, rgba(243, 226, 179, 0.08));
+  --scp-border: var(--sc-border-subtle, #393939);
+  --scp-accent: var(--sc-accent, #f3e2b3);
+  --scp-focus: var(--brand-focus, #ffffff);
+  --scp-shadow: var(--sc-shadow-floating, 0 2px 6px rgba(0, 0, 0, 0.3));
+  --scp-ease-in: var(--sc-ease-entrance-productive, cubic-bezier(0, 0, 0.38, 0.9));
+  --scp-fast-02: var(--sc-duration-fast-02, 110ms);
+
+  position: fixed;
+  z-index: 9000;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 1rem 1rem;
+  font-family: var(--sc-font-sans, "IBM Plex Sans", system-ui, sans-serif);
+}
+
+.scp-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--sc-overlay, rgba(0, 0, 0, 0.6));
+  animation: scp-fade var(--scp-fast-02) linear both;
+}
+
+.scp-dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  inline-size: min(40rem, 100%);
+  max-block-size: min(34rem, 76vh);
+  background: var(--scp-layer);
+  border: 1px solid var(--scp-border);
+  border-radius: var(--sc-radius-surface, 0);
+  box-shadow: var(--scp-shadow);
+  color: var(--scp-text);
+  animation: scp-enter var(--scp-fast-02) var(--scp-ease-in) both;
+}
+
+.scp-field {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-inline: 1rem 0.5rem;
+  border-block-end: 1px solid var(--scp-border);
+}
+
+.scp-field__icon {
+  flex: none;
+  fill: var(--scp-text-2);
+}
+
+.scp-input {
+  flex: 1;
+  min-inline-size: 0;
+  block-size: 3.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--scp-text);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  outline: none;
+
+  &::placeholder {
+    color: var(--scp-text-3);
+  }
+}
+
+.scp-field:focus-within {
+  outline: 2px solid var(--scp-focus);
+  outline-offset: -2px;
+}
+
+// One ring only: the wrapper carries it (:focus-within), so the input drops
+// the shell-wide `.cds-app :focus-visible` outline (PHILOSOPHY §5).
+.scp-field .scp-input:focus,
+.scp-field .scp-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.scp-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 2.75rem;
+  min-inline-size: 2.75rem;
+  padding: 0 0.5rem;
+  border: 0;
+  background: transparent;
+  color: var(--scp-text-2);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--scp-hover);
+    color: var(--scp-text);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--scp-focus);
+    outline-offset: -2px;
+  }
+}
+
+.scp-close__icon {
+  display: none;
+  fill: currentColor;
+}
+
+.scp-kbd {
+  display: inline-block;
+  min-inline-size: 1.25rem;
+  padding: 0 0.25rem;
+  border: 1px solid var(--scp-border);
+  border-radius: 2px;
+  color: var(--scp-text-2);
+  font-family: var(--sc-font-mono, "IBM Plex Mono", monospace);
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+  text-align: center;
+}
+
+.scp-list {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-block: 0.5rem;
+}
+
+.scp-group + .scp-group {
+  margin-block-start: 0.25rem;
+}
+
+.scp-group__label {
+  padding: 0.5rem 1rem 0.25rem;
+  color: var(--scp-text-3);
+  font-size: 0.75rem;
+  letter-spacing: 0.32px;
+  line-height: 1rem;
+}
+
+.scp-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-block-size: 3rem;
+  padding: 0.375rem 1rem;
+  cursor: pointer;
+  transition: background-color var(--sc-duration-fast-01, 70ms) linear;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset-block: 0.5rem;
+    inset-inline-start: 0;
+    inline-size: 2px;
+    background: var(--scp-accent);
+    opacity: 0;
+    transition: opacity var(--sc-duration-fast-01, 70ms) linear;
+  }
+}
+
+.scp-option--active {
+  background: var(--scp-selected);
+
+  &::before {
+    opacity: 1;
+  }
+}
+
+.scp-option__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.scp-option__title,
+.scp-option__subtitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scp-option__title {
+  color: var(--scp-text);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.scp-option__subtitle {
+  color: var(--scp-text-3);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.scp-option__kind {
+  flex: none;
+  color: var(--scp-text-3);
+  font-size: 0.75rem;
+}
+
+.scp-match {
+  color: var(--scp-text);
+  font-weight: 600;
+}
+
+.scp-empty {
+  margin: 0;
+  padding: 1rem;
+  color: var(--scp-text-2);
+  font-size: 0.875rem;
+}
+
+.scp-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  border-block-start: 1px solid var(--scp-border);
+  color: var(--scp-text-3);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.scp-footer__keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 41.98rem) {
+  .scp-layer {
+    padding: 0.5rem;
+  }
+
+  .scp-dialog {
+    max-block-size: calc(100dvh - 1rem);
+  }
+
+  .scp-kbd,
+  .scp-footer__keys {
+    display: none;
+  }
+
+  .scp-close__icon {
+    display: block;
+  }
+}
+
+@keyframes scp-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes scp-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scp-dialog,
+  .scp-scrim {
+    animation: scp-fade 100ms linear both;
+  }
+}
+
+:root[data-motion="reduce"] {
+  .scp-dialog,
+  .scp-scrim {
+    animation: scp-fade 100ms linear both;
+  }
+}

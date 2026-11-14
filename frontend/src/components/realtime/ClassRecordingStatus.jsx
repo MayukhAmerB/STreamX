@@ -67,10 +67,10 @@ export function canRerunFinalize(recording) {
 }
 
 const TONE_CLASSES = {
-  live: "text-red-200",
-  busy: "text-amber-200",
-  done: "text-emerald-200",
-  failed: "text-red-300",
+  live: "text-[#F3E2B3]",
+  busy: "text-[#d4d4d4]",
+  done: "text-[#fafafa]",
+  failed: "text-[#fafafa] underline decoration-dotted underline-offset-4",
 };
 
 function ModulePicker({ recording, moduleOptions, onChangeModule, changing }) {
@@ -165,7 +165,7 @@ export default function ClassRecordingStatus({
                     {lectureTitle ? ` · Lecture: ${lectureTitle}` : ""}
                   </p>
                   {recording.needs_review ? (
-                    <p className="mt-0.5 text-[11px] text-amber-200" title={recording.review_reason || undefined}>
+                    <p className="mt-0.5 text-[11px] text-[#F3E2B3]" title={recording.review_reason || undefined}>
                       Needs review{recording.review_reason ? `: ${recording.review_reason}` : ""}
                     </p>
                   ) : null}
@@ -211,7 +211,7 @@ export default function ClassRecordingStatus({
           {loading ? "Checking recordings..." : "No recording yet. It starts by itself when the class goes live."}
         </p>
       )}
-      {error ? <p className="mt-2 text-xs text-red-300">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs text-[#fafafa]">{error}</p> : null}
     </div>
   );
 }

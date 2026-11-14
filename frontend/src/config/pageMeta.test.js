@@ -5,7 +5,7 @@ import { resolvePageMeta } from "./pageMeta";
 describe("page meta", () => {
   it("gives the home page the brand title and description", () => {
     const meta = resolvePageMeta("/");
-    expect(meta.title).toBe("Al syed Initiative | Cybersecurity Training");
+    expect(meta.title).toBe("Al syed Initiative | Live OSINT Training, Labs & CTF");
     expect(meta.description).toMatch(/OSINT/);
     expect(meta).toMatchObject({ noindex: false, notFound: false, canonicalPath: "/" });
   });

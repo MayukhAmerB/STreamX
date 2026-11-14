@@ -131,7 +131,12 @@ class LectureCommentTests(EngagementFixtureMixin, APITestCase):
         response = self._post(self.student, "<b>Great</b> <i>class</i>!")
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["data"]["body"], "Great class!")
-        self.assertEqual(response.data["data"]["author"], {"id": self.student.id, "display_name": "Enrolled Student", "is_instructor": False})
+        # Owner privacy rule: other students see the author's handle, never the name.
+        from apps.profiles.handles import public_handle
+
+        self.assertEqual(
+            response.data["data"]["author"], {"id": self.student.id, "display_name": public_handle(self.student), "is_instructor": False}
+        )
         self.client.force_authenticate(self.other_student)
         listing = self.client.get(self.url)
         self.assertEqual(listing.status_code, 200)

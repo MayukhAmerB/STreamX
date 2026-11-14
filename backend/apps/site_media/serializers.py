@@ -45,3 +45,29 @@ class YouTubeChannelResponseSerializer(serializers.Serializer):
     message = serializers.CharField()
     data = YouTubeChannelPayloadSerializer()
     errors = serializers.JSONField(allow_null=True)
+
+
+# --- GET /api/site/stats/ (documentation only: built in apps.site_media.stats) ---
+class SiteStatsValuesSerializer(serializers.Serializer):
+    """``null`` = below the display minimum (the website hides that figure)."""
+
+    students_enrolled = serializers.IntegerField(allow_null=True)
+    live_classes_delivered = serializers.IntegerField(allow_null=True)
+    recorded_hours = serializers.IntegerField(allow_null=True)
+    certificates_issued = serializers.IntegerField(allow_null=True)
+    ctf_cases = serializers.IntegerField(allow_null=True)
+    average_rating = serializers.FloatField(allow_null=True)
+    rating_count = serializers.IntegerField(allow_null=True)
+
+
+class SiteStatsPayloadSerializer(serializers.Serializer):
+    stats = SiteStatsValuesSerializer()
+    available = serializers.BooleanField()
+    generated_at = serializers.DateTimeField(allow_null=True)
+
+
+class SiteStatsResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    data = SiteStatsPayloadSerializer()
+    errors = serializers.JSONField(allow_null=True)

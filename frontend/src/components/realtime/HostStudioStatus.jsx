@@ -1,16 +1,16 @@
 import { HOST_LINK } from "../../services/realtime/hostStudioController";
 
 const TONE_CLASSES = {
-  good: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
-  warn: "border-amber-400/30 bg-amber-400/10 text-amber-200",
-  bad: "border-red-400/40 bg-red-500/10 text-red-200",
+  good: "border-white/30 bg-white/[0.06] text-[#fafafa]",
+  warn: "border-[#F3E2B3]/40 bg-[#F3E2B3]/10 text-[#F3E2B3]",
+  bad: "border-white bg-[#fafafa] text-black",
   idle: "border-black bg-[#171717] text-[#CDCDCD]",
 };
 
 const DOT_CLASSES = {
-  good: "bg-emerald-400",
-  warn: "bg-amber-400 animate-pulse",
-  bad: "bg-red-400",
+  good: "bg-white",
+  warn: "bg-[#F3E2B3] animate-pulse motion-reduce:animate-none",
+  bad: "bg-black ring-1 ring-black",
   idle: "bg-[#6B6B6B]",
 };
 

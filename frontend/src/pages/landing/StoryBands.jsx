@@ -3,6 +3,9 @@ import storyIllustration from "../../assets/story-mission.webp";
 import { journeyBlocks, owlCognitoJourneyBlocks } from "../../components/StoryJourneySection";
 import { siteBrand } from "../../config/siteBrand";
 import { Band, Button, Column, DataStat, ProgressIndicator, Reveal, Tag, Tile } from "../../site-kit";
+import { siteStatValues } from "../../marketing/SiteStatStrip";
+import { useSiteStats } from "../../marketing/siteStats";
+import { CountUp } from "../../site-kit/motion";
 import { ArrowRight, BandHeading, WhyIcon } from "./LandingParts";
 import {
   ABOUT_SUBTITLE,
@@ -13,7 +16,6 @@ import {
   JOURNEY_STEPS,
   JOURNEY_SUBTITLE,
   JOURNEY_TITLE,
-  LANDING_STATS,
   WHY_CHOOSE,
   WHY_SUBTITLE,
   WHY_TITLE,
@@ -66,8 +68,31 @@ export function CertificateBand({ theme = "g100" }) {
   );
 }
 
-/** Band 6 (`id="about"`): three columns and the four stats as a description list. */
-export function AboutBand({ theme = "white" }) {
+const COUNTABLE = /^(\d+)([+%x]?)$/;
+
+/**
+ * The key figures with a count-up (M5, first view per session, from 50 %
+ * visible; the shared CountUp shows the final value under reduced motion and
+ * to assistive tech). Values that are not a plain count ("1:1") stay text.
+ */
+export function countUpStats(items = []) {
+  return items.map((item) => {
+    const match = COUNTABLE.exec(String(item.value ?? "").trim());
+    if (!match) return item;
+    const [, digits, suffix] = match;
+    const total = Number(digits);
+    return { ...item, value: <CountUp value={total} format={(current) => `${Math.round(current)}${suffix}`} /> };
+  });
+}
+
+/**
+ * Band 6 (`id="about"`): three columns and the live key figures as a
+ * description list (hidden while loading, on failure, or when none is shown).
+ * `stats` overrides the fetched figures (tests, previews).
+ */
+export function AboutBand({ theme = "white", stats }) {
+  const live = useSiteStats();
+  const figures = siteStatValues(Array.isArray(stats) ? stats : live.items);
   return (
     <Band theme={theme} id="about" className="lp-band lp-about" labelledBy="lp-about-title">
       <Column sm={4} md={4} lg={10}>
@@ -84,9 +109,11 @@ export function AboutBand({ theme = "white" }) {
           ))}
         </Reveal>
       </Column>
-      <Column sm={4} md={8} lg={16}>
-        <DataStat items={LANDING_STATS} className="lp-stats" aria-label="Key figures" />
-      </Column>
+      {figures.length ? (
+        <Column sm={4} md={8} lg={16}>
+          <DataStat items={figures} className="lp-stats" aria-label="Key figures" />
+        </Column>
+      ) : null}
     </Band>
   );
 }
@@ -108,7 +135,7 @@ export function StoryBand({ theme = "g100" }) {
         <h2 id="lp-story-title" className="sk-visually-hidden">
           {blocks.map((block) => block.title).join(" and ")}
         </h2>
-        <p className="lp-eyebrow lp-eyebrow--rule">{isOwlCognito ? "Private intelligence learning" : "Founded in 2026"}</p>
+        <p className="lp-eyebrow lp-eyebrow--rule">{isOwlCognito ? "Private intelligence learning" : "Founded in 2025"}</p>
         {blocks.map((block) => (
           <Reveal key={block.title} className="lp-story__block">
             <h3 className="lp-h2 lp-story__title">{block.title}</h3>

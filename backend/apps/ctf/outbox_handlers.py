@@ -5,3 +5,4 @@ the module here registers them in every process.
 """
 
 from . import scheduler  # noqa: F401  (registers the ctf.* outbox handlers)
+from . import season_scheduler  # noqa: F401  (ctf.season.* handlers: Monthly CTF)

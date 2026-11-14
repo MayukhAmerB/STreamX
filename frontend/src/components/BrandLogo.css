@@ -64,3 +64,31 @@
   outline: 2px solid var(--brand-focus, currentColor);
   outline-offset: -2px;
 }
+
+/* HackPath philosophy (PHILOSOPHY §2.7 nav): mark h-8 + a 14 px 600 wordmark
+   in white; the platform label is a quiet 10 px eyebrow under it. */
+.snav .brand-shell,
+.sf .brand-shell,
+.snav-sheet .brand-shell {
+  gap: 0.625rem;
+  color: #fafafa;
+}
+
+.snav .brand-shell__label,
+.snav-sheet .brand-shell__label {
+  display: none;
+}
+
+.sf .brand-shell__label {
+  color: #8a8a8a;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.snav .brand-shell:focus-visible,
+.sf .brand-shell:focus-visible {
+  outline: 2px solid #f3e2b3;
+  outline-offset: 2px;
+  border-radius: 6px;
+}

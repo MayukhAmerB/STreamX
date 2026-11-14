@@ -156,14 +156,19 @@ function CourseSkeletons() {
 }
 
 /**
- * Band 2: Bestsellers. A carousel (4-up lg, 2-up md, swipe on phones) of the
- * open and upcoming programmes, oldest first. Empty: the kept copy plus the
- * existing enquiry form (owner decision D2). Failure: real cached data with
- * "Last updated", or an error with Retry; never an invented course.
+ * The Bestsellers body, shared by the v2 band and the v3 "Open now" band: a
+ * carousel (4-up lg, 2-up md, swipe on phones) of the open and upcoming
+ * programmes, oldest first. Empty: the kept copy plus the existing enquiry
+ * form (owner decision D2). Failure: real cached data with "Last updated",
+ * or an error with Retry; never an invented course.
+ *
+ * `browsableTracks`: v3 (owner rule) keeps coming-soon tracks browsable, so
+ * their cards link to the course page instead of rendering disabled.
  */
-export default function BestsellersBand({ theme = "white", catalog }) {
+export function BestsellersContent({ catalog, browsableTracks = false, limit = 0 }) {
   const [enquiryOpen, setEnquiryOpen] = useState(false);
-  const courses = selectLandingCourses(catalog.courses);
+  const all = selectLandingCourses(catalog.courses);
+  const courses = limit > 0 ? all.slice(0, limit) : all;
   const loading = catalog.status === "loading";
   const failed = catalog.status === "error";
 
@@ -180,7 +185,7 @@ export default function BestsellersBand({ theme = "white", catalog }) {
       >
         {courses.map((course) => {
           const { closed, reason } = describeTrackAvailability(catalog.tracks, course?.category);
-          return <LandingCourseCard key={course.id} course={course} closedReason={closed ? reason : ""} />;
+          return <LandingCourseCard key={course.id} course={course} closedReason={closed && !browsableTracks ? reason : ""} />;
         })}
       </Carousel>
     );
@@ -199,6 +204,31 @@ export default function BestsellersBand({ theme = "white", catalog }) {
   }
 
   return (
+    <>
+      {failed ? (
+        <InlineNotification
+          kind={courses.length ? "warning" : "error"}
+          lowContrast
+          title={courses.length ? "Showing the last saved course list." : "Courses could not be loaded."}
+          subtitle={courses.length ? "The live catalogue did not respond." : "Check your connection and try again."}
+          lastUpdated={courses.length ? catalog.updatedAt : undefined}
+          onRetry={catalog.retry}
+          className="lp-notice"
+        />
+      ) : null}
+      {content}
+      {enquiryOpen ? (
+        <Suspense fallback={null}>
+          <PublicEnrollmentRequestModal isOpen={enquiryOpen} onClose={() => setEnquiryOpen(false)} sourcePath="/" />
+        </Suspense>
+      ) : null}
+    </>
+  );
+}
+
+/** Band 2 (v2 page): Bestsellers heading + the shared body. */
+export default function BestsellersBand({ theme = "white", catalog }) {
+  return (
     <Band theme={theme} className="lp-band lp-bestsellers" labelledBy="lp-bestsellers-title">
       <Column sm={4} md={8} lg={8}>
         <BandHeading
@@ -209,24 +239,8 @@ export default function BestsellersBand({ theme = "white", catalog }) {
         />
       </Column>
       <Column sm={4} md={8} lg={16} className="lp-bestsellers__content">
-        {failed ? (
-          <InlineNotification
-            kind={courses.length ? "warning" : "error"}
-            lowContrast
-            title={courses.length ? "Showing the last saved course list." : "Courses could not be loaded."}
-            subtitle={courses.length ? "The live catalogue did not respond." : "Check your connection and try again."}
-            lastUpdated={courses.length ? catalog.updatedAt : undefined}
-            onRetry={catalog.retry}
-            className="lp-notice"
-          />
-        ) : null}
-        {content}
+        <BestsellersContent catalog={catalog} />
       </Column>
-      {enquiryOpen ? (
-        <Suspense fallback={null}>
-          <PublicEnrollmentRequestModal isOpen={enquiryOpen} onClose={() => setEnquiryOpen(false)} sourcePath="/" />
-        </Suspense>
-      ) : null}
     </Band>
   );
 }

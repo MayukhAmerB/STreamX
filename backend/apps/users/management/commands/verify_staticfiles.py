@@ -10,8 +10,11 @@ REQUIRED_ASSETS = (
     "admin/css/login.css",
     "admin/css/enterprise.css",
     "admin/js/enterprise-shell.js",
-    "admin/fonts/inter-latin-400-normal.woff2",
-    "admin/fonts/inter-latin-600-normal.woff2",
+    # Preloaded by templates/admin/base_site.html and declared in enterprise.css.
+    "admin/fonts/geist/geist-latin-wght-normal.woff2",
+    "admin/fonts/geist/geist-latin-ext-wght-normal.woff2",
+    "admin/fonts/geist-mono/geist-mono-latin-wght-normal.woff2",
+    "admin/fonts/handlee/handlee-latin-400-normal.woff2",
 )
 
 

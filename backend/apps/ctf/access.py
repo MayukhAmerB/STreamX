@@ -58,11 +58,12 @@ def batch_course_for(user, exam):
 # Console (staff manage; instructors read their own batches' results)
 # ---------------------------------------------------------------------------
 def taught_course_ids(user):
-    from apps.courses.models import Course
+    """Batches ``user`` teaches; ``[]`` while the Teachers section is off for them."""
+    from apps.users import teaching
 
     if not user or not user.is_authenticated:
         return []
-    return list(Course.objects.filter(instructor_id=user.pk).values_list("pk", flat=True))
+    return teaching.taught_course_ids(user)
 
 
 def is_console_reader(user):
@@ -76,6 +77,10 @@ def require_console_reader(user):
     from apps.core.errors import PermissionDenied
 
     if not is_console_reader(user):
+        from apps.users import teaching
+
+        # An instructor while the Teachers section is off: 403 feature_disabled with the reason.
+        teaching.require_teaching(user)
         raise PermissionDenied("Only staff and instructors can open exam results.", code="ctf_console_forbidden")
 
 

@@ -8,9 +8,9 @@
  *    interactive accent are black on light bands and white on dark bands
  *    instead of Carbon blue. Scoped to .site-public, so the Console
  *    (@carbon/react) keeps its own theme.
- * 2. IBM Plex Sans for the whole public document, including portals rendered
- *    into <body> (enquiry modal, toasts), so Inter is never fetched there.
- * 3. Only Plex 300/400/600 ship: no faux bold for legacy 700/800 headings.
+ * 2. Geist (variable, src/styles/fonts.css) for the whole public document,
+ *    including portals rendered into <body> (enquiry modal, toasts).
+ * 3. Geist is variable (100-900), so every weight is real; synthesis stays off.
  * 4. A 12 px floor for the legacy inner pages' tiny Tailwind text until they
  *    are rebuilt (§7.4).
  */
@@ -31,7 +31,7 @@
 }
 
 .site-public [data-theme="g100"] {
-  --cds-button-primary: #ffffff;
+  --cds-button-primary: #fafafa;
   --cds-button-primary-hover: #e0e0e0;
   --cds-button-primary-active: #c6c6c6;
   --cds-button-tertiary: #ffffff;
@@ -40,8 +40,8 @@
   --cds-link-primary: #f4f4f4;
   --cds-link-primary-hover: #ffffff;
   --cds-interactive: #f4f4f4;
-  --cds-focus: #ffffff;
-  --sk-button-primary-text: #161616;
+  --cds-focus: #f3e2b3;
+  --sk-button-primary-text: #000000;
 }
 
 html[data-surface="public"],

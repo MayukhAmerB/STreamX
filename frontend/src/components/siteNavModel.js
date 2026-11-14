@@ -1,6 +1,9 @@
 // Pure model for the website navbar (no React): which links show in the
 // centred pill, which go under "More", and what the account menu and the
 // phone sheet contain. Kept separate so it can be unit tested per brand.
+// Direct file imports (not the capabilities index): the public bundle must
+// not pull in the Console's Carbon components.
+import applyCapabilities, { resolveCapability } from "../features/capabilities/applyCapabilities";
 
 export const SITE_CONSOLE_PATH = "/console";
 /** The OSINT labs (CTF) site: external, Al Syed brand only (plan §7.3 additions). */
@@ -17,12 +20,20 @@ const LINKS = {
   contact: { id: "contact", label: "Contact", to: "/contact" },
   faqs: { id: "faqs", label: "FAQs", to: "/faqs" },
   labs: { id: "labs", label: "Labs", href: LABS_URL, external: true, brandOnly: "alsyed" },
+  // HackPath-philosophy nav (BUILD_PLAN §1.4): the Pentesting track is browsable
+  // while purchases are switched off, so it carries a calm "Soon" chip.
+  pentesting: { id: "pentesting", label: "Pentesting", to: "/tracks/pentesting", chip: "Soon", brandOnly: "alsyed" },
+  roadmap: { id: "roadmap", label: "Roadmap", to: "/roadmap", brandOnly: "alsyed" },
+  pricing: { id: "pricing", label: "Pricing", to: "/pricing", brandOnly: "alsyed" },
 };
 
-/** Centred pill (desktop), in order. "Watch" (YouTube) only where the brand has the channel. */
-const PRIMARY = ["courses", "watch", "about", "nationalDesk", "contact"];
-/** "More" menu (desktop), in order. */
-const MORE = ["accounts", "join", "hallOfFame", "faqs", "labs"];
+/**
+ * Centred links (desktop), in order. OwlCognito has no Al Syed programmes,
+ * plans or labs: its brand filter leaves Courses, About, Contact and FAQs.
+ */
+const PRIMARY = ["courses", "pentesting", "roadmap", "labs", "pricing"];
+/** "More" menu (desktop), in order: every other website link ("Watch" only where the brand has the channel). */
+const MORE = ["watch", "about", "nationalDesk", "accounts", "join", "hallOfFame", "contact", "faqs"];
 
 const visibleFor = (brandId, { youtube = false } = {}) => (link) =>
   (!link.brandOnly || link.brandOnly === brandId) && (!link.needsYouTube || youtube);
@@ -45,13 +56,14 @@ export function getSiteNavLinks(brandId = "alsyed", options = {}) {
 /** Phone sheet groups: every website link, grouped. */
 export function getSiteNavGroups(brandId = "alsyed", options = {}) {
   const visible = visibleFor(brandId, options);
+  const pick = (keys) => keys.map((key) => LINKS[key]).filter(visible);
+  const learn = pick(["courses", "pentesting", "roadmap", "pricing", "labs"]);
+  // A brand with only "Courses" to learn from keeps one Explore group.
+  const learnGroup = learn.length > 1 ? learn : [];
   return [
-    { id: "explore", label: "Explore", links: ["courses", "watch", "about", "contact", "faqs"].map((key) => LINKS[key]).filter(visible) },
-    {
-      id: "community",
-      label: "Al Syed",
-      links: ["nationalDesk", "accounts", "join", "hallOfFame", "labs"].map((key) => LINKS[key]).filter(visible),
-    },
+    { id: "learn", label: "Learn", links: learnGroup },
+    { id: "explore", label: "Explore", links: [...(learnGroup.length ? [] : learn), ...pick(["watch", "about", "contact", "faqs"])] },
+    { id: "community", label: "Al Syed", links: pick(["nationalDesk", "accounts", "join", "hallOfFame"]) },
   ].filter((group) => group.links.length > 0);
 }
 
@@ -78,36 +90,68 @@ export function isSiteLinkActive(link, pathname = "") {
   return path === link.to || path.startsWith(`${link.to}/`);
 }
 
+/** Staff land here (plan D3); "Admin" in the account menu opens it. */
+export const SITE_ADMIN_PATH = "/console/admin";
+
 /**
- * Account menu (avatar dropdown / phone sheet) for a signed-in user,
- * gated exactly like the previous navbar: instructors get the instructor
- * dashboard, instructors and admins the staff controls, admins lecture
- * questions and the Django admin.
+ * Teaching shortcuts for instructors. Their state comes from the server's
+ * capabilities (`caps.items`), never from a role check here (plan §6.7).
  */
-export function getAccountMenuGroups({ isInstructor = false, isAdmin = false, djangoAdminUrl = "" } = {}) {
-  const canAccessControls = Boolean(isAdmin || isInstructor);
-  const staff = [
-    isInstructor ? { id: "instructor", label: "Instructor", to: "/instructor/dashboard" } : null,
-    canAccessControls ? { id: "control-center", label: "Admin Control Center", to: "/control-center" } : null,
-    canAccessControls ? { id: "meeting", label: "Meeting Control", to: "/meeting" } : null,
-    canAccessControls ? { id: "broadcasting", label: "Broadcast Control", to: "/broadcasting" } : null,
-    isAdmin ? { id: "lecture-questions", label: "Lecture Questions", to: "/lecture-questions" } : null,
-    isAdmin && djangoAdminUrl ? { id: "django-admin", label: "Django Admin", href: djangoAdminUrl, external: true } : null,
-  ].filter(Boolean);
-  return [
+export const TEACH_MENU_LINKS = Object.freeze([
+  { id: "teach-today", label: "Teach", to: "/console/teach", capability: "teach-today" },
+  { id: "teach-classes", label: "Classes", to: "/console/teach/classes", capability: "teach-classes" },
+  { id: "teach-grading", label: "Grading", to: "/console/teach/grading", capability: "teach-grading" },
+]);
+
+/**
+ * Account menu (avatar dropdown / phone sheet) for a signed-in user. Every
+ * gated row comes from the capabilities contract (Appendix A.1), so the site
+ * and the Console can never disagree about who sees what:
+ * - Teaching (instructors): the shortcuts when the Teach workspace is on, one
+ *   disabled "Teach" row with the server's reason when it is switched off,
+ *   nothing when it is hidden (students, staff);
+ * - Admin (staff): the Console Admin home and the back office (Django admin).
+ * Until the capabilities arrive (`caps` null) only the ungated rows show, so
+ * nothing flashes in and out.
+ */
+export function getAccountMenuGroups({ caps = null, djangoAdminUrl = "" } = {}) {
+  const groups = [
     {
       id: "account",
       label: "Your account",
       links: [
-        { id: "console", label: "Console", to: SITE_CONSOLE_PATH },
+        { id: "console", label: "Open Console", to: SITE_CONSOLE_PATH },
         { id: "my-courses", label: "My courses", to: "/my-courses" },
-        { id: "guides", label: "Guides", to: "/guides" },
         { id: "profile", label: "Profile", to: "/profile" },
-        { id: "id-card", label: "ID Card", to: "/id-card" },
+        { id: "id-card", label: "ID card", to: "/id-card" },
       ],
     },
-    { id: "staff", label: "Staff tools", links: staff },
-  ].filter((group) => group.links.length > 0);
+  ];
+  if (!caps) return groups;
+
+  const teach = resolveCapability({ workspace: "teach" }, caps);
+  if (teach.state === "enabled") {
+    const links = applyCapabilities(TEACH_MENU_LINKS, caps).filter((link) => link.state !== "hidden");
+    if (links.length) groups.push({ id: "teaching", label: "Teaching", links });
+  } else if (teach.state === "disabled") {
+    groups.push({
+      id: "teaching",
+      label: "Teaching",
+      links: [{ id: "teach", label: "Teach", to: "/console/teach", state: "disabled", reason: teach.reason }],
+    });
+  }
+
+  if (resolveCapability({ workspace: "admin" }, caps).state === "enabled") {
+    groups.push({
+      id: "admin",
+      label: "Admin",
+      links: [
+        { id: "admin", label: "Admin", to: SITE_ADMIN_PATH },
+        djangoAdminUrl ? { id: "back-office", label: "Back office", href: djangoAdminUrl, external: true } : null,
+      ].filter(Boolean),
+    });
+  }
+  return groups;
 }
 
 /** "AR" from "Asha Rao", else the first letter of the e-mail, else "?". */

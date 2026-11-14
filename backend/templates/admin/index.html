@@ -1,205 +1,199 @@
 {% extends "admin/base_site.html" %}
 {% load i18n log realtime_admin enterprise_admin %}
+{# Overview (UI plan §4.4): what needs attention, from the same service as the Console admin home. #}
 
+{% block title %}Overview | {% enterprise_site_name %}{% endblock %}
+{% block bodyclass %}{{ block.super }} enterprise-home{% endblock %}
 {% block pretitle %}{% endblock %}
 
 {% block content_title %}
-  {% url 'insights-dashboard' as dashboard_url %}
-  <div class="enterprise-page-header">
-    <div>
-      <h1>Overview</h1>
-      <p class="enterprise-page-description">What needs you today, and every part of the admin in one place.</p>
-    </div>
-    {% if dashboard_url and request.user.is_superuser %}
-      <a class="button default enterprise-button-icon" href="{{ dashboard_url }}">
-        Open dashboard
-        <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-dashboard"></use></svg>
-      </a>
+  {% enterprise_attention as attention %}
+  {% url 'admin:enterprise_search' as palette_search_url %}
+  <header class="enterprise-home-header">
+    <p class="enterprise-eyebrow">Overview</p>
+    {% enterprise_greeting_parts as greeting %}
+    <h1>{{ greeting.lead }}{% if greeting.name %} <span class="enterprise-hand">{{ greeting.name }}</span>{% endif %}</h1>
+    <p class="enterprise-page-description" data-attention-summary>
+      {% if attention.error %}
+        The attention queues could not be loaded. Every section is still in the sidebar.
+      {% elif attention.total %}
+        {{ attention.total }} thing{{ attention.total|pluralize:" needs,s need" }} you.
+      {% else %}
+        All clear. Nothing needs you right now.
+      {% endif %}
+    </p>
+    <a class="enterprise-command-field" href="{{ palette_search_url }}" data-palette-open aria-haspopup="dialog">
+      <svg class="enterprise-icon enterprise-icon-lg" aria-hidden="true"><use href="#icon-search"></use></svg>
+      <span>Search people, courses, payments, or type an action</span>
+      <kbd class="enterprise-kbd" data-palette-kbd>Ctrl K</kbd>
+    </a>
+    {% if not attention.error %}
+      {% enterprise_home_stats attention as stats %}
+      <ul class="enterprise-stat-strip" role="list" data-cols="{{ stats|length }}" aria-label="At a glance">
+        {% for cell in stats %}<li><span class="enterprise-stat-value">{{ cell.value }}</span><span class="enterprise-stat-label">{{ cell.label }}</span></li>{% endfor %}
+      </ul>
     {% endif %}
-  </div>
+  </header>
 {% endblock %}
 
 {% block content %}
-  {% enterprise_queue_counts as queue %}
-  <section class="enterprise-section" aria-labelledby="queue-title">
-    <header class="enterprise-section-header">
-      <h2 class="enterprise-section-title" id="queue-title"><svg class="enterprise-icon" aria-hidden="true"><use href="#icon-warning"></use></svg>Needs attention</h2>
-      <p class="enterprise-admin-muted">Requests waiting for a decision.</p>
-    </header>
-    <div class="enterprise-queue-grid">
-      <article class="enterprise-queue-card">
-        <div class="enterprise-queue-head">
-          <svg class="enterprise-icon enterprise-icon-lg" aria-hidden="true"><use href="#icon-education"></use></svg>
-          <h3>Course buy requests</h3>
-        </div>
-        <p class="enterprise-queue-count">{% if queue.courses is not None %}{{ queue.courses }}{% else %}&mdash;{% endif %}<span>pending</span></p>
-        <div class="enterprise-queue-actions">
-          <a class="button default" href="{% url 'admin:courses_enrollment_changelist' %}?payment_status__exact=pending">Review pending</a>
-          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_enrollment_changelist' %}">All requests</a>
-        </div>
-      </article>
-      <article class="enterprise-queue-card">
-        <div class="enterprise-queue-head">
-          <svg class="enterprise-icon enterprise-icon-lg" aria-hidden="true"><use href="#icon-video"></use></svg>
-          <h3>Live class enrollments</h3>
-        </div>
-        <p class="enterprise-queue-count">{% if queue.live_classes is not None %}{{ queue.live_classes }}{% else %}&mdash;{% endif %}<span>pending</span></p>
-        <div class="enterprise-queue-actions">
-          <a class="button default" href="{% url 'admin:courses_liveclassenrollment_changelist' %}?status__exact=pending">Review pending</a>
-          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_liveclassenrollment_changelist' %}">All requests</a>
-        </div>
-      </article>
-      <article class="enterprise-queue-card">
-        <div class="enterprise-queue-head">
-          <svg class="enterprise-icon enterprise-icon-lg" aria-hidden="true"><use href="#icon-user-follow"></use></svg>
-          <h3>Join Al Syed forms</h3>
-        </div>
-        <p class="enterprise-queue-count">{% if queue.join_forms is not None %}{{ queue.join_forms }}{% else %}&mdash;{% endif %}<span>new</span></p>
-        <div class="enterprise-queue-actions">
-          <a class="button default" href="{% url 'admin:join_requests_joinapplication_changelist' %}?status__exact=new">Review new</a>
-          <a class="enterprise-admin-action-link" href="{% url 'admin:join_requests_joinapplication_changelist' %}">All forms</a>
-          <a class="enterprise-admin-action-link" href="{% url 'admin:join_requests_joinformsettings_changelist' %}">Form settings</a>
-        </div>
-      </article>
-    </div>
-  </section>
+  {% enterprise_attention as attention %}
 
-  {% server_resource_profile_bar %}
-
-  <section class="enterprise-section" aria-labelledby="sections-title">
-    <header class="enterprise-section-header">
-      <h2 class="enterprise-section-title" id="sections-title"><svg class="enterprise-icon" aria-hidden="true"><use href="#icon-catalog"></use></svg>All sections</h2>
-      <p class="enterprise-admin-muted">Every area of the admin, grouped by what it manages.</p>
-    </header>
-    {% if app_list %}
-      {% enterprise_nav_groups app_list as areas %}
-      <div class="enterprise-area-grid">
-        {% for area in areas %}
-          <article class="enterprise-area" aria-labelledby="area-{{ forloop.counter }}">
-            <h3 class="enterprise-area-title" id="area-{{ forloop.counter }}">{{ area.title }}</h3>
-            {% for app in area.apps %}
-              <div class="enterprise-area-app">
-                <p class="enterprise-area-app-name">
-                  <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-{{ app.icon }}"></use></svg>
-                  {{ app.name }}
-                </p>
-                <ul class="enterprise-area-models">
-                  {% for model in app.models %}
-                    <li>
-                      {% if model.admin_url %}<a href="{{ model.admin_url }}">{{ model.name }}</a>{% else %}<span>{{ model.name }}</span>{% endif %}
-                      {% if model.add_url %}
-                        <a class="enterprise-icon-button" href="{{ model.add_url }}" title="Add {{ model.name }}" aria-label="Add {{ model.name }}">
-                          <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-add"></use></svg>
-                        </a>
-                      {% endif %}
-                    </li>
-                  {% endfor %}
-                </ul>
-              </div>
-            {% endfor %}
-          </article>
+  <section class="enterprise-section" aria-labelledby="attention-title" data-attention>
+    <h2 class="enterprise-eyebrow enterprise-section-title" id="attention-title">Needs attention</h2>
+    {% if attention.busy %}
+      <ul class="enterprise-queue-grid" role="list">
+        {% for queue in attention.busy %}
+          <li class="enterprise-queue-card{% if forloop.first %} is-busiest{% endif %}" data-queue="{{ queue.key }}">
+            <h3 class="enterprise-queue-label">{{ queue.label }}</h3>
+            <p class="enterprise-queue-count"><span data-count-up="{{ queue.count }}">{{ queue.count }}</span>{% if queue.severity == "high" %}<span class="enterprise-tag enterprise-tag--warning"><svg class="enterprise-icon" aria-hidden="true"><use href="#icon-warning"></use></svg>Urgent</span>{% endif %}</p>
+            {% if queue.age %}<p class="enterprise-queue-age">Oldest {{ queue.age }}</p>{% endif %}
+            <div class="enterprise-queue-actions">
+              <a class="button{% if forloop.first %} default{% endif %}" href="{{ queue.href }}">{{ queue.action_label }} {{ queue.count }}</a>
+              {% if queue.back_office_href %}<a class="enterprise-admin-action-link" href="{{ queue.back_office_href }}">In back office</a>{% endif %}
+            </div>
+          </li>
         {% endfor %}
-      </div>
-    {% else %}
-      <p class="enterprise-admin-muted">You do not have permission to view or edit admin models.</p>
+      </ul>
+    {% endif %}
+    {% if attention.clear %}
+      <p class="enterprise-all-clear" data-all-clear>
+        <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-checkmark"></use></svg>
+        <span><strong>All clear:</strong> {{ attention.clear|join:", "|lower|capfirst }}.</span>
+      </p>
     {% endif %}
   </section>
 
-  <section class="enterprise-section enterprise-admin-activity" aria-labelledby="activity-title">
-    <header class="enterprise-section-header">
-      <h2 class="enterprise-section-title" id="activity-title"><svg class="enterprise-icon" aria-hidden="true"><use href="#icon-time"></use></svg>Recent activity</h2>
-    </header>
-    {% get_admin_log 30 as admin_log for_user user %}
-    <div class="enterprise-admin-tablist" role="tablist" aria-label="Activity tabs">
-      <button
-        class="enterprise-admin-tab is-active"
-        type="button"
-        role="tab"
-        aria-selected="true"
-        aria-controls="tab-recent-actions"
-        id="tab-trigger-recent-actions"
-        data-tab-target="tab-recent-actions"
-      >
-        Recent Actions
-      </button>
-      <button
-        class="enterprise-admin-tab"
-        type="button"
-        role="tab"
-        aria-selected="false"
-        aria-controls="tab-enrollment-inbox"
-        id="tab-trigger-enrollment-inbox"
-        data-tab-target="tab-enrollment-inbox"
-      >
-        Enrollment Inbox
-      </button>
-    </div>
-
-    <div class="enterprise-admin-tab-panel is-active" id="tab-recent-actions" role="tabpanel" aria-labelledby="tab-trigger-recent-actions">
-      {% if admin_log %}
-        <ul class="enterprise-admin-activity-list">
-          {% for entry in admin_log|slice:":12" %}
-            <li>
-              <span class="enterprise-admin-activity-object">{{ entry.object_repr }}</span>
-              <span class="enterprise-admin-activity-model">{{ entry.content_type.name|capfirst }}</span>
+  <div class="enterprise-home-columns">
+    <section class="enterprise-section" aria-labelledby="classes-title">
+      <h2 class="enterprise-eyebrow enterprise-section-title" id="classes-title">Today's classes</h2>
+      {% if attention.live_today %}
+        <ul class="enterprise-rows enterprise-rows--inline" role="list">
+          {% for item in attention.live_today %}
+            <li class="enterprise-row">
+              <span class="enterprise-row-time">{% if item.starts_at_dt %}{{ item.starts_at_dt|time:"g:i a" }}{% else %}&mdash;{% endif %}</span>
+              <span class="enterprise-row-title">{{ item.title }}</span>
+              {% if item.state == "live" %}
+                <span class="enterprise-tag enterprise-tag--live"><span class="enterprise-live-dot" aria-hidden="true"></span>Live</span>
+              {% else %}
+                <span class="enterprise-tag enterprise-tag--scheduled">Scheduled</span>
+              {% endif %}
+              <a class="enterprise-admin-action-link" href="{{ item.href }}">Open studio</a>
             </li>
           {% endfor %}
         </ul>
       {% else %}
-        <p class="enterprise-admin-muted">No recent actions.</p>
+        <p class="enterprise-admin-muted">No classes today.</p>
       {% endif %}
-    </div>
+    </section>
 
-    <div class="enterprise-admin-tab-panel" id="tab-enrollment-inbox" role="tabpanel" aria-labelledby="tab-trigger-enrollment-inbox">
-      {% if admin_log %}
-        <ul class="enterprise-admin-activity-list">
-          {% for entry in admin_log %}
-            <li
-              class="{% if entry.content_type.model != 'publicenrollmentlead' and entry.content_type.model != 'enrollment' and entry.content_type.model != 'liveclassenrollment' %}is-hidden{% endif %}"
-            >
-              <span class="enterprise-admin-activity-object">
-                {{ entry.object_repr }}
-              </span>
-              <span class="enterprise-admin-activity-model">
-                {{ entry.content_type.name|capfirst }}
-              </span>
+    <section class="enterprise-section" aria-labelledby="switches-title">
+      <h2 class="enterprise-eyebrow enterprise-section-title" id="switches-title">Platform switches</h2>
+      {% url 'admin-settings-features' as features_url %}
+      {% if attention.switches %}
+        <ul class="enterprise-rows enterprise-rows--inline" role="list">
+          {% for switch in attention.switches %}
+            <li class="enterprise-row">
+              <span class="enterprise-row-title">{{ switch.label }}</span>
+              <span class="enterprise-tag {% if switch.enabled %}enterprise-tag--on{% else %}enterprise-tag--off{% endif %}">{% if switch.enabled %}On{% else %}Off{% endif %}</span>
+              <a class="enterprise-admin-action-link" href="{% firstof features_url switch.href %}" aria-label="Change {{ switch.label }}">Change</a>
             </li>
           {% endfor %}
         </ul>
-        <div class="enterprise-admin-tab-footer">
-          <a class="enterprise-admin-action-link" href="{% url 'admin:courses_publicenrollmentlead_changelist' %}">
-            Open Full Enrollment Sheet
-          </a>
-        </div>
       {% else %}
-        <p class="enterprise-admin-muted">No enrollment activity yet.</p>
+        <p class="enterprise-admin-muted">No switches yet.</p>
       {% endif %}
-    </div>
+    </section>
+  </div>
+
+  {% enterprise_quick_actions as actions %}
+  {% if actions %}
+    <section class="enterprise-section" aria-labelledby="actions-title">
+      <h2 class="enterprise-eyebrow enterprise-section-title" id="actions-title">Quick actions</h2>
+      <ul class="enterprise-quick-actions" role="list">
+        {% for action in actions %}
+          <li><a class="enterprise-quick-action" href="{{ action.href }}"><span>{{ action.label }}</span><svg class="enterprise-icon" aria-hidden="true"><use href="#icon-arrow-right"></use></svg></a></li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+
+  {% enterprise_server_profile_needs_attention as profile_needs_attention %}
+  {% if profile_needs_attention and perms.realtime.change_serverresourceprofile %}
+    {# Only while the host agent is offline; it lives in Live classes > Server profile otherwise. #}
+    <details class="enterprise-browse enterprise-profile-disclosure">
+      <summary>
+        <span class="enterprise-profile-summary"><svg class="enterprise-icon" aria-hidden="true"><use href="#icon-warning"></use></svg>Server profile: the host agent is offline</span>
+        <svg class="enterprise-icon enterprise-sidenav-chevron" aria-hidden="true"><use href="#icon-chevron-down"></use></svg>
+      </summary>
+      <div class="enterprise-browse-body">{% server_resource_profile_bar %}</div>
+    </details>
+  {% endif %}
+
+  <section class="enterprise-section" aria-labelledby="activity-title">
+    <h2 class="enterprise-eyebrow enterprise-section-title" id="activity-title">Recent activity</h2>
+    {% get_admin_log 10 as admin_log %}
+    {% if admin_log %}
+      <div class="enterprise-table-scroll">
+        <table class="enterprise-activity">
+          <caption class="enterprise-visually-hidden">The last 10 changes made in the back office</caption>
+          <thead><tr><th scope="col">When</th><th scope="col">Who</th><th scope="col">What</th><th scope="col">Type</th></tr></thead>
+          <tbody>
+            {% for entry in admin_log %}
+              <tr>
+                <td class="enterprise-activity-when"><time datetime="{{ entry.action_time|date:'c' }}">{{ entry.action_time|timesince }} ago</time></td>
+                <td>{% firstof entry.user.full_name entry.user.get_username %}</td>
+                <td class="enterprise-activity-what">
+                  {% if entry.is_addition %}Added{% elif entry.is_change %}Changed{% elif entry.is_deletion %}Deleted{% endif %}
+                  {% if entry.is_deletion or not entry.get_admin_url %}<span>{{ entry.object_repr }}</span>{% else %}<a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>{% endif %}
+                </td>
+                <td class="enterprise-activity-type">{% if entry.content_type %}{{ entry.content_type.name|capfirst }}{% endif %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="enterprise-admin-muted">No changes yet. Edits made in the back office appear here.</p>
+    {% endif %}
   </section>
 
-  <script>
-    (function () {
-      var tabs = Array.prototype.slice.call(document.querySelectorAll(".enterprise-admin-tab"));
-      var panels = Array.prototype.slice.call(document.querySelectorAll(".enterprise-admin-tab-panel"));
-      if (!tabs.length || !panels.length) return;
-
-      function activateTab(targetId) {
-        tabs.forEach(function (tab) {
-          var isActive = tab.getAttribute("data-tab-target") === targetId;
-          tab.classList.toggle("is-active", isActive);
-          tab.setAttribute("aria-selected", isActive ? "true" : "false");
-        });
-        panels.forEach(function (panel) {
-          var isActive = panel.id === targetId;
-          panel.classList.toggle("is-active", isActive);
-        });
-      }
-
-      tabs.forEach(function (tab) {
-        tab.addEventListener("click", function () {
-          activateTab(tab.getAttribute("data-tab-target"));
-        });
-      });
-    })();
-  </script>
+  {% if app_list %}
+    {% enterprise_nav_groups app_list as areas %}
+    {% enterprise_section_count areas as section_count %}
+    <details class="enterprise-browse" data-browse>
+      <summary>
+        <span>Browse every section <span class="enterprise-browse-count">({{ section_count }})</span></span>
+        <svg class="enterprise-icon enterprise-sidenav-chevron" aria-hidden="true"><use href="#icon-chevron-down"></use></svg>
+      </summary>
+      <div class="enterprise-browse-body">
+        <label class="enterprise-visually-hidden" for="browse-filter">Filter sections</label>
+        <input type="search" id="browse-filter" class="enterprise-browse-filter" placeholder="Filter sections" autocomplete="off" data-browse-filter>
+        <div class="enterprise-area-grid">
+          {% for area in areas %}
+            <section class="enterprise-area" aria-labelledby="area-{{ area.key }}" data-browse-area>
+              <h3 class="enterprise-area-title" id="area-{{ area.key }}"><svg class="enterprise-icon" aria-hidden="true"><use href="#icon-{{ area.icon }}"></use></svg>{{ area.title }}</h3>
+              <ul class="enterprise-area-models">
+                {% for model in area.models %}
+                  <li data-browse-item>
+                    {% if model.admin_url %}<a href="{{ model.admin_url }}">{{ model.name }}</a>{% else %}<span>{{ model.name }}</span>{% endif %}
+                    {% if model.add_url %}
+                      <a class="enterprise-icon-button" href="{{ model.add_url }}" title="Add to {{ model.name }}" aria-label="Add to {{ model.name }}">
+                        <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-add"></use></svg>
+                      </a>
+                    {% endif %}
+                  </li>
+                {% endfor %}
+              </ul>
+            </section>
+          {% endfor %}
+        </div>
+        <p class="enterprise-admin-muted" data-browse-empty hidden>No section matches.</p>
+      </div>
+    </details>
+  {% else %}
+    <p class="enterprise-admin-muted">You do not have permission to view or edit anything in the back office yet.</p>
+  {% endif %}
 {% endblock %}
+
+{% block sidebar %}{% endblock %}

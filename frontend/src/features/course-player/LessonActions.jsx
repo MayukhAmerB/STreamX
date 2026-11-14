@@ -1,5 +1,4 @@
 import {
-  Chat,
   CheckmarkFilled,
   CheckmarkOutline,
   Login,
@@ -11,11 +10,11 @@ import {
 import { Link } from "react-router-dom";
 import { formatCount } from "./formatters";
 
-function Chip({ icon: Icon, label, kind = "default", pressed, disabled, onClick, ariaLabel, shortcut, busy }) {
+function Chip({ icon: Icon, label, kind = "default", pressed, disabled, onClick, ariaLabel, shortcut, busy, className = "" }) {
   return (
     <button
       type="button"
-      className={`cp-chip cp-chip--${kind}${pressed ? " is-pressed" : ""}`}
+      className={`cp-chip cp-chip--${kind}${pressed ? " is-pressed" : ""}${className ? ` ${className}` : ""}`}
       aria-pressed={pressed === undefined ? undefined : pressed ? "true" : "false"}
       aria-label={ariaLabel}
       aria-keyshortcuts={shortcut}
@@ -30,10 +29,10 @@ function Chip({ icon: Icon, label, kind = "default", pressed, disabled, onClick,
 }
 
 /**
- * The action row under the lesson title — the same icons and words as
- * YouTube / Udemy so nothing needs explaining: Like (with count), Comments
- * (with count), Previous, Next, Mark complete. On phones it is a single
- * horizontally scrollable row of chips.
+ * The action row under the lesson title: Like (with count), Previous, Next,
+ * Mark complete. Comments live once, in their tab (plan §3.4). On phones the
+ * row becomes an icon toolbar (Like, Mark complete, Previous) above a full
+ * width 48 px "Next lesson" button, so nothing scrolls sideways.
  */
 export default function LessonActions({
   engagement,
@@ -44,7 +43,6 @@ export default function LessonActions({
   nextLecture,
   onPrevious,
   onNext,
-  onOpenComments,
   completed,
   completing,
   onToggleComplete,
@@ -55,7 +53,6 @@ export default function LessonActions({
   // Signed out: the sign-in chip. Locked: no social actions at all.
   const hasSocial = !isAuthenticated || !locked;
   const likeCount = engagement?.likeCount || 0;
-  const commentCount = engagement?.commentCount || 0;
 
   return (
     <div className="cp-actions" role="group" aria-label="Lesson actions">
@@ -77,16 +74,6 @@ export default function LessonActions({
               onClick={() => void engagement.toggleLike()}
             />
           ) : null}
-          {isAuthenticated && !locked ? (
-            <Chip
-              icon={Chat}
-              label={engagementReady && commentCount > 0 ? formatCount(commentCount) : "Comments"}
-              ariaLabel={
-                engagementReady ? `Comments, ${commentCount} ${commentCount === 1 ? "comment" : "comments"}` : "Comments"
-              }
-              onClick={onOpenComments}
-            />
-          ) : null}
         </div>
       ) : null}
       <div className="cp-actions__group cp-actions__group--lesson">
@@ -95,15 +82,17 @@ export default function LessonActions({
           label="Previous"
           ariaLabel={previousLecture ? `Previous lesson: ${previousLecture.title}` : "Previous lesson"}
           shortcut="Shift+P"
+          className="cp-chip--icon-mobile cp-chip--previous"
           disabled={!previousLecture}
           onClick={onPrevious}
         />
         <Chip
           icon={SkipForward}
-          label="Next"
+          label="Next lesson"
           kind="primary"
           ariaLabel={nextLecture ? `Next lesson: ${nextLecture.title}` : "Next lesson"}
           shortcut="Shift+N"
+          className="cp-chip--next"
           disabled={!nextLecture}
           onClick={onNext}
         />
@@ -113,6 +102,7 @@ export default function LessonActions({
             label={completed ? "Completed" : "Mark complete"}
             kind={completed ? "success" : "default"}
             pressed={Boolean(completed)}
+            className="cp-chip--icon-mobile cp-chip--complete"
             busy={completing}
             disabled={completing}
             onClick={onToggleComplete}

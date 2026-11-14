@@ -1,15 +1,35 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { requestPasswordReset } from "../api/auth";
-import Button from "../components/Button";
-import BrandLogo from "../components/BrandLogo";
-import FormInput from "../components/FormInput";
-import PageShell from "../components/PageShell";
 import TurnstileWidget from "../components/TurnstileWidget";
 import { useTurnstileChallenge } from "../hooks/useTurnstileChallenge";
 import { useAuth } from "../hooks/useAuth";
+import { AuthField, AuthMessage, AuthSubmit } from "../marketing/auth/AuthControls";
+import AuthSplit from "../marketing/auth/AuthSplit";
 import { apiMessage } from "../utils/api";
 import { returnTargetFromSearch } from "../utils/safeReturnUrl";
+
+/** Where a sign-in lands without a return address (plan D3): staff in Admin, everyone else in the Console. */
+export const STAFF_HOME = "/console/admin";
+export const LEARNER_HOME = "/console";
+
+export function homeAfterLogin(user) {
+  return user?.is_admin ? STAFF_HOME : LEARNER_HOME;
+}
+
+/** Headline and sub-line for each step of the sign-in (our words). */
+export function loginCopy({ needs2FA = false, returningToLabs = false } = {}) {
+  if (needs2FA) {
+    return {
+      title: "One more step",
+      sub: "Your password was accepted. Enter the 6-digit code from your authenticator app.",
+    };
+  }
+  return {
+    title: "Sign in",
+    sub: returningToLabs ? "Sign in to continue to Al Syed Labs." : "Pick up where you paused.",
+  };
+}
 
 function normalizeEmailInput(value) {
   return String(value || "").replace(/\s+/g, "").trim().toLowerCase();
@@ -31,7 +51,8 @@ export default function LoginPage() {
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const redirectTo = location.state?.from || "/";
+  // A protected page that sent the visitor here wins; otherwise the role's home.
+  const redirectFrom = location.state?.from || "";
   // ?next= (e.g. from labs.alsyedinitiative.com): only in-app paths or the trusted labs site.
   const returnTarget = returnTargetFromSearch(location.search);
   // The labs site can only use the account once the current Terms are
@@ -45,7 +66,7 @@ export default function LoginPage() {
       window.location.assign(returnTarget.href);
       return;
     }
-    navigate(returnTarget?.path || redirectTo, { replace: true });
+    navigate(returnTarget?.path || redirectFrom || homeAfterLogin(signedInUser), { replace: true });
   };
 
   // Already signed in and sent here with a return address: go straight back.
@@ -146,210 +167,122 @@ export default function LoginPage() {
     }
   };
 
+  const returningToLabs = returnTarget?.type === "external";
+  const copy = loginCopy({ needs2FA, returningToLabs });
+  const securityPending = Boolean(turnstileEnabled && !turnstile.token);
+
   return (
-    <PageShell title="" subtitle="">
-      <section className="relative mx-auto max-w-6xl overflow-hidden rounded-[28px] border border-black bg-[#080808] shadow-[0_28px_70px_rgba(0,0,0,0.45)]">
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-black" />
-          <div className="absolute inset-0 bg-[radial-gradient(88%_78%_at_100%_0%,rgba(255,255,255,0.24)_0%,rgba(255,255,255,0.11)_24%,rgba(255,255,255,0.045)_42%,rgba(255,255,255,0)_68%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(0,0,0,0)_58%,rgba(255,255,255,0.025)_76%,rgba(255,255,255,0.08)_100%)]" />
-        </div>
+    <AuthSplit
+      labelledBy="au-login-title"
+      corner={
+        <Link to="/courses" className="au-corner">
+          Browse courses
+        </Link>
+      }
+      foot={<p>Accounts are created by the Al Syed team after verification.</p>}
+    >
+      <h1 id="au-login-title" className="au-title">
+        {copy.title}
+      </h1>
+      <p className="au-sub">{copy.sub}</p>
 
-        <div className="relative grid gap-6 p-4 sm:p-6 lg:grid-cols-[1.03fr_0.97fr] lg:gap-8">
-          <div className="hidden rounded-[26px] border border-black panel-gradient p-6 backdrop-blur-sm lg:block">
-            <div className="rounded-[22px] border border-black panel-gradient p-4 shadow-[0_16px_44px_rgba(0,0,0,0.24)]">
-              <div className="flex items-start justify-between gap-4">
-                <BrandLogo className="max-w-[260px]" />
-                <div className="rounded-2xl border border-black panel-gradient px-4 py-3 text-right">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#949494]">
-                    AUTH STATE
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-[#E0E0E0]">SECURE GATEWAY</div>
-                </div>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {["EMAIL", "PASSWORD", "2FA", "ENROLLED ACCESS"].map((item) => (
-                  <span
-                    key={item}
-                    className="rounded-full border border-black bg-[#151515] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#DBDBDB]"
-                  >
-                    {item}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-black bg-white/5 px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#DBDBDB]">
-              SECURE LOGIN
-            </div>
-
-            <h2 className="mt-4 font-reference text-4xl font-semibold leading-tight text-white">
-              Access the training platform through a controlled login path
-            </h2>
-            <p className="mt-3 max-w-md text-sm leading-7 text-[#BBBBBB]">
-              Continue your OSINT and web application pentesting workflow with protected course access,
-              instructor-led live sessions, and optional authenticator-based verification.
-            </p>
-
-            <div className="mt-6 grid gap-3">
-              {[
-                "Course access is issued to enrolled students only",
-                "Live class permissions stay linked to your account",
-                "Authenticator-based 2FA can harden the session",
-              ].map((item) => (
-                <div
-                  key={item}
-                  className="flex items-start gap-3 rounded-xl border border-black panel-gradient px-3 py-3 text-sm text-[#C9C9C9]"
-                >
-                  <span className="mt-1 h-2.5 w-2.5 rounded-full bg-[#C0C0C0]" />
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-6 rounded-2xl border border-black bg-[#121212]/95 p-4">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
-                Authentication Flow
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {["Email", "Password", "2FA (Optional)"].map((step, idx) => (
-                  <div key={step} className="rounded-xl border border-black panel-gradient p-3">
-                    <div className="text-xs font-semibold text-[#E0E0E0]">{`0${idx + 1}`}</div>
-                    <div className="mt-1 text-xs text-[#AFAFAF]">{step}</div>
-                  </div>
-                ))}
-              </div>
+      <form onSubmit={handleSubmit} className="au-form" noValidate={false}>
+        <div className="au-grid au-grid--2">
+          <div>
+            <AuthField
+              label="Email"
+              type="email"
+              name="email"
+              autoComplete="username"
+              placeholder="you@example.com"
+              value={form.email}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              onChange={(e) => setNormalizedEmail(e.target.value)}
+              onBlur={(e) => setNormalizedEmail(e.target.value)}
+              onPaste={(e) => {
+                const pastedText = e.clipboardData?.getData("text");
+                if (!pastedText) return;
+                e.preventDefault();
+                setNormalizedEmail(pastedText, { fromPaste: true });
+              }}
+              required
+            />
+          </div>
+          <div>
+            <AuthField
+              label="Password"
+              name="password"
+              reveal
+              autoComplete="current-password"
+              placeholder="Your password"
+              value={form.password}
+              onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+              required
+            />
+            <div className="au-row">
+              <button type="button" onClick={handleResetRequest} className="au-textbtn">
+                Forgot password?
+              </button>
             </div>
           </div>
-
-          <div className="rounded-2xl border border-black panel-gradient p-5 shadow-[0_16px_44px_rgba(0,0,0,0.32)] backdrop-blur-sm sm:p-6">
-            <div className="mb-5">
-              <div className="inline-flex items-center gap-2 rounded-full border border-black bg-[#141414] px-3 py-1 text-xs font-semibold tracking-[0.14em] text-[#DCDCDC]">
-                {needs2FA ? "2FA REQUIRED" : "LOGIN"}
-              </div>
-              {/* The page h1 at every width (the side panel is hidden on phones). */}
-              <h1 className="mt-3 font-reference text-2xl font-semibold text-white sm:text-3xl">
-                {needs2FA ? "Enter your authenticator code" : "Welcome back"}
-              </h1>
-              <p className="mt-2 text-sm leading-6 text-[#BBBBBB]">
-                {needs2FA
-                  ? "Your password was accepted. Complete login using the 6-digit code from your authenticator app."
-                  : "Access your student or instructor dashboard securely."}
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <FormInput
-                label="Email"
-                type="email"
-                placeholder="you@example.com"
-                value={form.email}
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                onChange={(e) => setNormalizedEmail(e.target.value)}
-                onBlur={(e) => setNormalizedEmail(e.target.value)}
-                onPaste={(e) => {
-                  const pastedText = e.clipboardData?.getData("text");
-                  if (!pastedText) return;
-                  e.preventDefault();
-                  setNormalizedEmail(pastedText, { fromPaste: true });
-                }}
+          {needs2FA ? (
+            <div className="au-span-2">
+              <AuthField
+                label="Authenticator code (2FA)"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="123456"
+                value={form.otp_code}
+                onChange={(e) => setForm((prev) => ({ ...prev, otp_code: e.target.value.replace(/\s+/g, "") }))}
                 required
+                autoFocus
               />
-              <FormInput
-                label="Password"
-                type="password"
-                placeholder="Enter your password"
-                value={form.password}
-                onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-                required
-              />
-              {needs2FA ? (
-                <FormInput
-                  label="Authenticator Code (2FA)"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  placeholder="123456"
-                  value={form.otp_code}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, otp_code: e.target.value.replace(/\s+/g, "") }))
-                  }
-                  required
-                />
-              ) : null}
-
-              {error ? (
-                <div className="rounded-xl border border-red-300/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-                  {error}
-                </div>
-              ) : null}
-              {info ? (
-                <div className="rounded-xl border border-zinc-400/20 bg-zinc-500/10 px-3 py-2 text-sm text-zinc-200">
-                  {info}
-                </div>
-              ) : null}
-              {hasWhitespaceWarning ? (
-                <div className="rounded-xl border border-amber-300/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-                  {emailWhitespaceWarning ? <div>{emailWhitespaceWarning}</div> : null}
-                  {passwordWhitespaceWarning ? <div>{passwordWhitespaceWarning}</div> : null}
-                </div>
-              ) : null}
-
-              {turnstileEnabled ? (
-                <TurnstileWidget
-                  siteKey={turnstileSiteKey}
-                  action="auth"
-                  onToken={turnstile.setToken}
-                  onExpire={turnstile.expire}
-                  onError={() => {
-                    turnstile.expire();
-                    setError("Security check failed to load. Refresh the page and try again.");
-                  }}
-                  resetSignal={turnstile.resetSignal}
-                  className="rounded-xl border border-black bg-[#101010] p-3"
-                />
-              ) : null}
-
-              <div className="flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={handleResetRequest}
-                  className="-my-2 inline-flex min-h-8 items-center py-2 text-xs font-medium text-[#BBBBBB] transition hover:text-white"
-                >
-                  Forgot password?
-                </button>
-                <span className="text-[11px] uppercase tracking-[0.12em] text-[#8D8D8D]">
-                  Secure session
-                </span>
+              <div className="au-row">
+                <Link to="/contact" className="au-link">
+                  Lost access to your authenticator?
+                </Link>
               </div>
-
-              <Button
-                className="w-full rounded-xl py-2.5"
-                type="submit"
-                loading={loading}
-                disabled={turnstileEnabled && !turnstile.token}
-              >
-                {needs2FA ? "Verify & Login" : "Login"}
-              </Button>
-            </form>
-
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-black bg-[#131313] px-4 py-3">
-              <p className="text-sm text-[#BBBBBB]">
-                Account creation is managed by admin. Use the credentials issued after verification.
-              </p>
-              <Link
-                to="/courses"
-                className="-my-2 inline-flex min-h-8 items-center py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#DBDBDB] hover:text-white"
-              >
-                Browse Courses
-              </Link>
             </div>
-          </div>
+          ) : null}
         </div>
-      </section>
-    </PageShell>
+
+        {error ? <AuthMessage tone="error">{error}</AuthMessage> : null}
+        {info ? <AuthMessage tone="info">{info}</AuthMessage> : null}
+        {hasWhitespaceWarning ? (
+          <AuthMessage tone="warning">
+            {emailWhitespaceWarning ? <div>{emailWhitespaceWarning}</div> : null}
+            {passwordWhitespaceWarning ? <div>{passwordWhitespaceWarning}</div> : null}
+          </AuthMessage>
+        ) : null}
+
+        {turnstileEnabled ? (
+          <div className="au-turnstile">
+            <TurnstileWidget
+              siteKey={turnstileSiteKey}
+              action="auth"
+              onToken={turnstile.setToken}
+              onExpire={turnstile.expire}
+              onError={() => {
+                turnstile.expire();
+                setError("Security check failed to load. Refresh the page and try again.");
+              }}
+              resetSignal={turnstile.resetSignal}
+            />
+          </div>
+        ) : null}
+
+        <div className="au-submit-wrap">
+          <AuthSubmit
+            loading={loading}
+            disabled={securityPending}
+            disabledReason={securityPending ? "Complete the security check first." : ""}
+          >
+            {needs2FA ? "Verify & Login" : "Login"}
+          </AuthSubmit>
+        </div>
+      </form>
+    </AuthSplit>
   );
 }
-
-

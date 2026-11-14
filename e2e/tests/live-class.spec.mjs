@@ -20,16 +20,19 @@ test("live class: OBS live -> host drops -> reconnecting -> auto-end -> recordin
   await signIn(staff, manifest, "admin");
   const host = await staff.newPage();
 
-  const sessionCard = () =>
-    // The nearest ancestor of the session title that holds its action buttons.
-    host
-      .getByText(session.title, { exact: true })
-      .first()
-      .locator("xpath=ancestor::*[.//button[normalize-space()='Open Host Studio']][1]");
+  // One row per class (named by its title) with ONE primary action (UI overhaul §3.5).
+  const sessionRow = () => host.getByRole("listitem", { name: session.title });
+
+  await test.step("the old Broadcasting URL lands on Classes in the Admin workspace", async () => {
+    await host.goto("/broadcasting");
+    await expect(host).toHaveURL(/\/console\/admin\/classes\?mode=broadcast$/);
+    await expect(sessionRow()).toBeVisible();
+  });
 
   await test.step("staff open the OBS class in the Host Studio and start it", async () => {
-    await host.goto("/broadcasting");
-    await sessionCard().getByRole("button", { name: "Open Host Studio" }).click();
+    await host.goto("/console/admin/classes?mode=broadcast");
+    await sessionRow().getByRole("button", { name: "Open Host Studio" }).click();
+    await expect(host).toHaveURL(new RegExp(`/console/admin/classes/${session.id}/studio$`));
     const start = host.getByRole("button", { name: /^(Start Live|Resume OBS)$/ });
     await expect(start).toBeVisible();
     // The Start/Stop Recording buttons are gone: recording is automatic.

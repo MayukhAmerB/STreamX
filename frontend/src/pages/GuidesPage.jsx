@@ -3,6 +3,7 @@ import "./GuidesPage.scss";
 import { ArrowRight, Book, PlayFilledAlt } from "@carbon/icons-react";
 import { Button, InlineLoading, Tag } from "@carbon/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { getGuideVideoUrl, listGuides } from "../api/guides";
 import ProtectedPlaybackSurface from "../components/ProtectedPlaybackSurface";
 import { EmptyState, PageHeader, PageNotification, PageSkeleton, useBreakpoint, useMediaQuery } from "../features/app-shell/ui";
@@ -58,7 +59,15 @@ export function GuidesPageContent({
         onAction={onRetry}
       />
     ) : (
-      <EmptyState icon={Book} text="No guides yet. New how-to videos will appear here." />
+      <EmptyState
+        icon={Book}
+        text="No guides yet. New how-to videos will appear here."
+        action={
+          <Button as={Link} to="/console" kind="tertiary">
+            Back to Home
+          </Button>
+        }
+      />
     );
   }
 
