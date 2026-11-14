@@ -18,7 +18,7 @@ import {
 import { Button, InlineNotification, Modal, Select, SelectItem } from "@carbon/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { EmptyState, PageHeader, PageNotification, PageSkeleton, useToast } from "../features/app-shell/ui";
+import { EmptyState, FeatureBoundary, PageHeader, PageNotification, PageSkeleton, useToast } from "../features/app-shell/ui";
 import {
   closeTask,
   duplicateTask,
@@ -30,6 +30,7 @@ import {
   reopenTask,
   taskZipHref,
 } from "../features/reports/reportsApi";
+import ReportPolicyPanel from "../features/reports/ReportPolicyPanel";
 import { formatIst, formatMarks } from "../features/reports/reportModel";
 import { apiData, apiMessage } from "../utils/api";
 
@@ -270,6 +271,11 @@ export default function ReportsGradingPage() {
           ))}
         </Select>
       </div>
+      {activeCourse ? (
+        <FeatureBoundary key={activeCourse.id} label="Report settings">
+          <ReportPolicyPanel courseId={activeCourse.id} notify={showToast} />
+        </FeatureBoundary>
+      ) : null}
       {actionError ? (
         <InlineNotification kind="error" lowContrast className="rpt-banner" title="Not saved." subtitle={actionError} onClose={() => setActionError("")} />
       ) : null}

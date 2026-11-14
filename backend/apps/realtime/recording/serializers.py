@@ -34,6 +34,7 @@ class ClassRecordingSerializer(serializers.ModelSerializer):
     lecture = serializers.SerializerMethodField()
     can_retry = serializers.SerializerMethodField()
     can_replace = serializers.SerializerMethodField()
+    can_choose_module = serializers.SerializerMethodField()
 
     class Meta:
         model = ClassRecording
@@ -44,6 +45,8 @@ class ClassRecordingSerializer(serializers.ModelSerializer):
             "state",
             "module",
             "lecture",
+            "needs_review",
+            "review_reason",
             "error",
             "part_count",
             "captured_bytes",
@@ -59,6 +62,7 @@ class ClassRecordingSerializer(serializers.ModelSerializer):
             "updated_at",
             "can_retry",
             "can_replace",
+            "can_choose_module",
         )
         read_only_fields = fields
 
@@ -80,6 +84,9 @@ class ClassRecordingSerializer(serializers.ModelSerializer):
 
     def get_can_retry(self, obj) -> bool:
         return services.can_retry(obj)
+
+    def get_can_choose_module(self, obj) -> bool:
+        return services.can_choose_module(obj)
 
     def get_can_replace(self, obj) -> bool:
         return obj.state in {ClassRecording.STATE_PROCESSING, ClassRecording.STATE_PUBLISHED} and bool(
@@ -110,6 +117,20 @@ class SessionModuleUpdateSerializer(serializers.Serializer):
         queryset=Section.objects.select_related("course"),
         allow_null=True,
     )
+
+
+class ClassRecordingModuleSerializer(serializers.Serializer):
+    module_id = serializers.PrimaryKeyRelatedField(
+        source="module",
+        queryset=Section.objects.select_related("course"),
+        help_text="Module (of the class's course) that receives this recording's lecture.",
+    )
+
+
+class ClassRecordingActionResultSerializer(serializers.Serializer):
+    done = serializers.BooleanField()
+    detail = serializers.CharField()
+    recording = ClassRecordingSerializer()
 
 
 class ModuleOptionSerializer(serializers.Serializer):
@@ -148,3 +169,6 @@ ClassRecordingListResponseSerializer = _envelope(
     "ClassRecordingListResponse", ClassRecordingSerializer(many=True, allow_null=True)
 )
 ModuleOptionsResponseSerializer = _envelope("ModuleOptionsResponse", ModuleOptionsSerializer(allow_null=True))
+ClassRecordingActionResponseSerializer = _envelope(
+    "ClassRecordingActionResponse", ClassRecordingActionResultSerializer(allow_null=True)
+)

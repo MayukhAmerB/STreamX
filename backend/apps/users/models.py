@@ -167,6 +167,11 @@ class SessionSlot(models.Model):
     slot_id = models.CharField(max_length=64, unique=True)
     created_at = models.DateTimeField(default=timezone.now)
     last_seen_at = models.DateTimeField(default=timezone.now)
+    # The live class (RealtimeSession id) this device last joined. If the slot
+    # is evicted while that class is still live, the device keeps it until
+    # the class ends (SessionSlotLiveGrace). A plain id: users must not
+    # depend on the realtime app's migrations.
+    live_session_id = models.PositiveBigIntegerField(null=True, blank=True)
 
     class Meta:
         indexes = [
@@ -175,3 +180,27 @@ class SessionSlot(models.Model):
 
     def __str__(self):
         return f"{self.user_id}:{self.slot_id}"
+
+
+class SessionSlotLiveGrace(models.Model):
+    """An evicted device that may finish the live class it was watching.
+
+    Created instead of simply forgetting a SessionSlot that a newer sign-in
+    evicts while its device is in a live class. Its tokens then authenticate
+    only that class's player, chat and rejoin requests, and only while the
+    class is live (see apps.users.live_grace); once the class ends its next
+    refresh signs it out. It never counts against the device cap.
+    """
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="session_live_graces")
+    slot_id = models.CharField(max_length=64, unique=True)
+    session_id = models.PositiveBigIntegerField()
+    evicted_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "evicted_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id}:{self.slot_id}->{self.session_id}"

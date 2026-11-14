@@ -5,6 +5,11 @@ error sink (retryable). Recordings found on disk by the "scan for existing
 recordings" import start as imported (no module yet) and join the same path at
 finalizing once an admin picks the module. Transitions live in
 recording/state.py.
+
+Phase 2 (no-click recordings): the module is always derived at finalize
+(recording/modules.py), so a missing module never fails a recording; the
+lecture is published as soon as its MP4 exists ("processing" then means "HD
+stream still building") unless RECORDING_INSTANT_PUBLISH is off.
 """
 
 from django.conf import settings
@@ -17,11 +22,13 @@ class ClassRecording(models.Model):
     SOURCE_OBS_UPLOAD = "obs_upload"
     SOURCE_LIVEKIT_EGRESS = "livekit_egress"
     SOURCE_IMPORTED = "imported"
+    SOURCE_BROWSER_FALLBACK = "browser_fallback"
     SOURCE_CHOICES = [
-        (SOURCE_SERVER, "Server recording (OBS stream)"),
+        (SOURCE_SERVER, "Server recording (Owncast feed: OBS or Host Studio)"),
         (SOURCE_OBS_UPLOAD, "OBS file upload (replacement)"),
-        (SOURCE_LIVEKIT_EGRESS, "LiveKit egress (Host Studio)"),
+        (SOURCE_LIVEKIT_EGRESS, "LiveKit egress (meeting / Host Studio)"),
         (SOURCE_IMPORTED, "Imported (found on the server)"),
+        (SOURCE_BROWSER_FALLBACK, "Browser fallback upload"),
     ]
 
     STATE_RECORDING = "recording"
@@ -102,6 +109,19 @@ class ClassRecording(models.Model):
     duration_seconds = models.PositiveIntegerField(null=True, blank=True)
     attempts = models.PositiveIntegerField(default=0)
     recorder_heartbeat_at = models.DateTimeField(null=True, blank=True)
+    # Phase 2 (no-click recordings), all expand-only columns.
+    # The module was derived automatically (e.g. the auto-created "Class
+    # recordings" section): the lecture is published, but an admin should look.
+    needs_review = models.BooleanField(default=False)
+    review_reason = models.CharField(max_length=255, blank=True, default="")
+    # Last time the live feed was seen online for this take (idle finalize).
+    last_media_at = models.DateTimeField(null=True, blank=True)
+    # Automatic retry of a failed recording (recording.reconcile), and when the
+    # current failure was last alerted to admins.
+    next_retry_at = models.DateTimeField(null=True, blank=True)
+    alerted_at = models.DateTimeField(null=True, blank=True)
+    # An admin unpublished the lecture: automatic publishing must not undo it.
+    hold_unpublished = models.BooleanField(default=False)
     started_at = models.DateTimeField(null=True, blank=True)
     stop_requested_at = models.DateTimeField(null=True, blank=True)
     finalized_at = models.DateTimeField(null=True, blank=True)
@@ -126,6 +146,7 @@ class ClassRecording(models.Model):
         indexes = [
             models.Index(fields=["state", "source"]),
             models.Index(fields=["session", "-created_at"]),
+            models.Index(fields=["needs_review", "state"], name="class_rec_review_state_idx"),
         ]
 
     @property

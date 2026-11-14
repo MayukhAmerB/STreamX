@@ -9,8 +9,17 @@
 
     const DEFAULT_API_BASE = "https://alsyedinitiative.com/api";
     const MAX_ANSWER_LENGTH = 512;
-    const MATERIAL_PATH = /^\/materials\/[A-Za-z0-9_\-./]+$/;
     const WARNING_SECONDS = 5 * 60;
+    // Pure rules (exam-core.js, loaded first). The fallback keeps the tab
+    // working with a cached page that does not load exam-core.js yet.
+    const LEGACY_MATERIAL_PATH = /^\/materials\/[A-Za-z0-9_\-./]+$/;
+    const Core = window.LabsExamCore || {
+        materialUrlAllowed: (url) => LEGACY_MATERIAL_PATH.test(String(url || "")) && !String(url).includes(".."),
+        signInUrl: (where, lms) => `${lms}/login?next=${encodeURIComponent(`${where.origin}${where.pathname}#exam`)}`,
+        termsUrl: (where, lms) => `${lms}/login?next=${encodeURIComponent(`${where.origin}${where.pathname}#exam`)}`,
+        eligibilityView: () => ({ locked: false, reason: "ok", action: null, nextExam: null }),
+        startView: (exam) => ({ enabled: Boolean(exam && exam.can_start), reason: exam && exam.can_start ? "ok" : "not_open" }),
+    };
 
     const STRINGS = {
         en: {
@@ -26,8 +35,23 @@
             signedOut: "Sign in to the LMS to take the examination.",
             signInLink: "Sign in at alsyedinitiative.com",
             termsRequired: "Accept the current Terms and Conditions on the LMS before taking the examination.",
-            termsLink: "Open alsyedinitiative.com",
+            termsLink: "Accept the terms on alsyedinitiative.com",
             retry: "Try again",
+            locked: "Examination locked",
+            eligibility: {
+                no_batch: "You are not in a batch yet. Enrol in a course to take its examinations.",
+                access_expired: "Your course access has ended. Renew it to take your batch's examinations.",
+                not_assigned: "No examination is assigned to your batch yet. Your instructor will announce it.",
+            },
+            nextExam: "Your next examination, {title}, opens {when}.",
+            startReasons: {
+                not_open: "This examination has not opened yet.",
+                closed: "This examination has closed.",
+                no_questions: "This examination is not ready yet.",
+                not_configured: "Answer checking is not available right now. Tell your instructor.",
+                started: "You have already started this examination.",
+                completed: "You have already finished this examination.",
+            },
             open: "Open",
             startExam: "Start examination",
             resume: "Continue",
@@ -110,8 +134,23 @@
             signedOut: "امتحان دینے کے لیے LMS میں سائن ان کریں۔",
             signInLink: "alsyedinitiative.com پر سائن ان کریں",
             termsRequired: "امتحان سے پہلے LMS پر موجودہ شرائط و ضوابط قبول کریں۔",
-            termsLink: "alsyedinitiative.com کھولیں",
+            termsLink: "alsyedinitiative.com پر شرائط قبول کریں",
             retry: "دوبارہ کوشش کریں",
+            locked: "امتحان بند ہے",
+            eligibility: {
+                no_batch: "آپ ابھی کسی بیچ میں شامل نہیں ہیں۔ امتحان دینے کے لیے کسی کورس میں داخلہ لیں۔",
+                access_expired: "آپ کے کورس تک رسائی ختم ہو چکی ہے۔ اپنے بیچ کے امتحانات کے لیے اسے دوبارہ فعال کریں۔",
+                not_assigned: "ابھی آپ کے بیچ کے لیے کوئی امتحان مقرر نہیں ہوا۔ آپ کے استاد اس کا اعلان کریں گے۔",
+            },
+            nextExam: "آپ کا اگلا امتحان، {title}، {when} کو شروع ہوگا۔",
+            startReasons: {
+                not_open: "یہ امتحان ابھی شروع نہیں ہوا۔",
+                closed: "یہ امتحان بند ہو چکا ہے۔",
+                no_questions: "یہ امتحان ابھی تیار نہیں ہے۔",
+                not_configured: "جوابات کی جانچ ابھی دستیاب نہیں۔ اپنے استاد کو بتائیں۔",
+                started: "آپ یہ امتحان پہلے ہی شروع کر چکے ہیں۔",
+                completed: "آپ یہ امتحان پہلے ہی مکمل کر چکے ہیں۔",
+            },
             open: "کھولیں",
             startExam: "امتحان شروع کریں",
             resume: "جاری رکھیں",
@@ -188,6 +227,7 @@
         apiBase: "",
         csrf: "",
         exams: null,
+        eligibility: null,
         detail: null,
         slug: "",
         clockOffsetMs: 0,
@@ -278,9 +318,14 @@
 
     // The LMS login page sends the student straight back here (?next= is
     // validated on the LMS side: only this labs site is accepted).
-    const signInUrl = () => {
-        const back = `${window.location.origin}${window.location.pathname}#exam`;
-        return `${lmsOrigin()}/login?next=${encodeURIComponent(back)}`;
+    const signInUrl = () => Core.signInUrl(window.location, lmsOrigin());
+
+    // Terms are accepted on the LMS login page, which then returns here.
+    const termsUrl = () => Core.termsUrl(window.location, lmsOrigin());
+
+    const reasonText = (group, reason) => {
+        const table = dict()[group] || {};
+        return table[reason] || (STRINGS.en[group] || {})[reason] || "";
     };
 
     const csrfToken = async (force = false) => {
@@ -394,7 +439,7 @@
             action = `<a class="btn btn-primary exam-link-btn" href="${esc(signInUrl())}">${esc(t("signInLink"))}</a>
                 <button type="button" class="btn exam-secondary-btn" data-action="reload">${esc(t("retry"))}</button>`;
         } else if (kind === "terms") {
-            action = `<a class="btn btn-primary exam-link-btn" href="${esc(lmsOrigin())}" target="_blank" rel="noopener">${esc(t("termsLink"))}</a>
+            action = `<a class="btn btn-primary exam-link-btn" href="${esc(termsUrl())}">${esc(t("termsLink"))}</a>
                 <button type="button" class="btn exam-secondary-btn" data-action="reload">${esc(t("retry"))}</button>`;
         } else if (kind === "error") {
             action = `<button type="button" class="btn exam-secondary-btn" data-action="reload">${esc(t("retry"))}</button>`;
@@ -416,6 +461,21 @@
         expired: t("statusExpired"),
     })[participation && participation.status] || "";
 
+    // The tab stays clickable (so the reason can be read) but shows locked.
+    const renderNavLock = (access) => {
+        const navButton = el("nav-exam-btn");
+        if (!navButton) return;
+        const locked = Boolean(access && access.locked);
+        navButton.classList.toggle("exam-nav-locked", locked);
+        if (locked) {
+            navButton.setAttribute("aria-disabled", "true");
+            navButton.title = reasonText("eligibility", access.reason) || t("locked");
+        } else {
+            navButton.removeAttribute("aria-disabled");
+            navButton.removeAttribute("title");
+        }
+    };
+
     const renderList = () => {
         const list = el("exam-list");
         const view = el("exam-view");
@@ -425,6 +485,24 @@
         el("exam-stats").hidden = true;
         if (state.exams === null) {
             list.innerHTML = state.loading ? `<p class="exam-muted">${esc(t("loading"))}</p>` : "";
+            return;
+        }
+        const access = Core.eligibilityView(state.eligibility);
+        renderNavLock(access);
+        if (access.locked) {
+            const next = access.nextExam;
+            const nextLine = next && next.opens_at
+                ? `<p>${esc(t("nextExam", { title: localized(next.title), when: formatMoment(next.opens_at) }))}</p>`
+                : "";
+            const button = access.action
+                ? `<div class="answer-row"><a class="btn btn-primary exam-link-btn" href="${esc(access.action.url)}" target="_blank" rel="noopener">${esc(access.action.label)}</a></div>`
+                : "";
+            list.innerHTML = `<div class="certification-lock-panel exam-empty exam-locked-panel" data-reason="${esc(access.reason)}">
+                <h3>${esc(t("locked"))}</h3>
+                <p>${esc(reasonText("eligibility", access.reason) || access.message)}</p>
+                ${nextLine}
+                ${button}
+            </div>`;
             return;
         }
         if (!state.exams.length) {
@@ -494,7 +572,7 @@
     };
 
     const renderMaterials = (question) => {
-        const items = (question.materials || []).filter((item) => MATERIAL_PATH.test(String(item.url || "")) && !String(item.url).includes(".."));
+        const items = (question.materials || []).filter((item) => Core.materialUrlAllowed(item.url, lmsOrigin()));
         const images = items
             .filter((item) => item.kind === "image")
             .map((item) => `<figure class="question-evidence"><img src="${esc(item.url)}" alt="${esc(localized(item.alt) || localized(item.label))}" loading="lazy"><figcaption>${esc(localized(item.label))}</figcaption></figure>`)
@@ -571,10 +649,11 @@
         }
 
         if (!participation) {
-            const canStart = exam.can_start;
+            const start = Core.startView(exam);
+            const canStart = start.enabled;
             parts.push(`<div class="certification-lock-panel exam-start-panel">
                 <h3>${esc(t("startTitle"))}</h3>
-                <p>${esc(canStart ? t("startText") : (exam.window === "not_open" ? t("notOpenText") : errorText("ctf_exam_closed")))}</p>
+                <p>${esc(canStart ? t("startText") : (reasonText("startReasons", start.reason) || t("notOpenText")))}</p>
                 <p class="exam-muted">${esc(exam.question_count)} ${esc(t("questions"))} · ${esc(exam.total_points)} ${esc(t("points"))} · ${esc(exam.time_limit_minutes ? `${exam.time_limit_minutes} ${t("minutes")}` : t("noTimeLimit"))}</p>
                 ${canStart ? `<div class="certification-unlock-row"><button type="button" class="btn btn-primary" data-action="start">${esc(t("startExam"))}</button></div>` : ""}
             </div>`);
@@ -676,7 +755,17 @@
         stopClock();
         renderList();
         try {
-            const data = await api("/ctf/exams/");
+            // Eligibility tells the student WHY nothing is available (no
+            // batch, access ended...). An older LMS without the endpoint
+            // simply leaves the tab unlocked.
+            const [eligibility, data] = await Promise.all([
+                api("/ctf/eligibility/").catch((error) => {
+                    if (error.status === 404) return null;
+                    throw error;
+                }),
+                api("/ctf/exams/"),
+            ]);
+            state.eligibility = eligibility;
             state.exams = Array.isArray(data) ? data : (data && data.results) || [];
             showBanner(null);
         } catch (error) {

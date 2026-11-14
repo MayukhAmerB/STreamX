@@ -65,6 +65,8 @@ INSTALLED_APPS = [
     "apps.reports.apps.ReportsConfig",
     "apps.site_media.apps.SiteMediaConfig",
     "apps.ctf.apps.CtfConfig",
+    # Resumable (chunked) class recording uploads + personal upload tokens.
+    "apps.recording_uploads.apps.RecordingUploadsConfig",
 ]
 
 MIDDLEWARE = [
@@ -86,6 +88,8 @@ MIDDLEWARE += [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # X-Session-State: live-grace for a device evicted mid-class (apps/users/live_grace.py).
+    "apps.users.live_grace.LiveGraceHeaderMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -286,6 +290,12 @@ REST_FRAMEWORK = {
         # is the real brute-force limit.
         "ctf_attempt": env("CTF_ATTEMPT_RATE", "30/minute"),
         "ctf_read": env("CTF_READ_RATE", "240/minute"),
+        # Resumable class recording uploads (apps.recording_uploads). A 3 GB
+        # file is ~96 chunks of 32 MiB; retries and 3 parallel streams fit.
+        "recording_upload_create": env("RECORDING_UPLOAD_CREATE_RATE", "60/hour"),
+        "recording_upload_chunk": env("RECORDING_UPLOAD_CHUNK_RATE", "1200/hour"),
+        "recording_upload_read": env("RECORDING_UPLOAD_READ_RATE", "600/hour"),
+        "recording_upload_token": env("RECORDING_UPLOAD_TOKEN_RATE", "20/hour"),
     },
 }
 
@@ -324,6 +334,9 @@ SPECTACULAR_SETTINGS = {
         "CtfQuestionCategoryEnum": "apps.ctf.models.CATEGORY_CHOICES",
         "CtfQuestionDifficultyEnum": "apps.ctf.models.DIFFICULTY_CHOICES",
         "CtfMaterialKindEnum": "apps.ctf.serializers.MATERIAL_KIND_CHOICES",
+        # Phase 3: Console exams and the unified gradebook.
+        "CtfConsoleExamStateEnum": "apps.ctf.console.STATE_CHOICES",
+        "UnifiedGradebookItemKindEnum": "apps.ctf.gradebook_serializers.KIND_CHOICES",
     },
 }
 
@@ -360,7 +373,8 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False
 # If-None-Match/ETag: conditional polling of the realtime session list (304).
 CORS_ALLOW_HEADERS = (*default_headers, "idempotency-key", "if-none-match")
-CORS_EXPOSE_HEADERS = ["ETag"]
+# X-Session-State: a device evicted mid-class finishes it with a banner.
+CORS_EXPOSE_HEADERS = ["ETag", "X-Session-State"]
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", ["http://localhost:5173"])
 
 if DEBUG:
@@ -388,6 +402,18 @@ CSRF_TRUSTED_ORIGINS = _dedupe_preserve_order([*CSRF_TRUSTED_ORIGINS, *CTF_LABS_
 # HMAC key for exam answer hashes. A separate secret (not SECRET_KEY), at
 # least 32 characters; rotating it requires reloading every exam file.
 CTF_ANSWER_PEPPER = env("CTF_ANSWER_PEPPER", "").strip()
+# >>> Phase 3: exams lifecycle, materials and gradebook (apps.ctf) >>>
+# ctf.scheduler (apps/ctf/scheduler.py): auto-publish at opens_at, auto-close,
+# expire participations, write results to the gradebook, notify students.
+CTF_SCHEDULER_ENABLED = env_bool("CTF_SCHEDULER_ENABLED", True)
+CTF_SCHEDULER_INTERVAL_SECONDS = max(15, env_int("CTF_SCHEDULER_INTERVAL_SECONDS", 60))
+CTF_OPENING_SOON_MINUTES = max(5, env_int("CTF_OPENING_SOON_MINUTES", 60))
+# Where exam notifications and the Console card send students.
+CTF_LABS_EXAM_URL = env("CTF_LABS_EXAM_URL", "https://labs.alsyedinitiative.com/#exam").strip()
+# Exam evidence uploaded from the Console: signed URL lifetime and size cap.
+CTF_MATERIAL_URL_TTL_SECONDS = max(60, env_int("CTF_MATERIAL_URL_TTL_SECONDS", 7200))
+CTF_MATERIAL_MAX_UPLOAD_MB = max(1, env_int("CTF_MATERIAL_MAX_UPLOAD_MB", 25))
+# <<< Phase 3: exams lifecycle, materials and gradebook <<<
 
 SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", False)
 USE_X_FORWARDED_HOST = env_bool("USE_X_FORWARDED_HOST", True)
@@ -673,6 +699,20 @@ REPORTS_PRIVATE_ROOT = env("REPORTS_PRIVATE_ROOT", str(BASE_DIR / "private_media
 REPORTS_QUARANTINE_ROOT = env("REPORTS_QUARANTINE_ROOT", str(BASE_DIR / "private_quarantine")).strip() or str(
     BASE_DIR / "private_quarantine"
 )
+# --- Resumable class recording uploads (apps.recording_uploads) ---
+# Chunks are staged in a private directory, by default inside the noexec
+# report volume (/app/private_media/.recording-uploads on the VPS), never
+# under MEDIA_ROOT. See apps/recording_uploads/config.py for every knob.
+RECORDING_UPLOAD_STAGING_ROOT = env("RECORDING_UPLOAD_STAGING_ROOT", "").strip() or str(
+    Path(REPORTS_PRIVATE_ROOT) / ".recording-uploads"
+)
+RECORDING_UPLOAD_CHUNK_BYTES = env_int("RECORDING_UPLOAD_CHUNK_BYTES", 32 * 1024 * 1024)
+RECORDING_UPLOAD_MAX_BYTES = env_int("RECORDING_UPLOAD_MAX_BYTES", 8 * 1024 * 1024 * 1024)
+RECORDING_UPLOAD_EXPIRY_HOURS = env_int("RECORDING_UPLOAD_EXPIRY_HOURS", 48)
+RECORDING_UPLOAD_MAX_ACTIVE_PER_USER = env_int("RECORDING_UPLOAD_MAX_ACTIVE_PER_USER", 3)
+RECORDING_UPLOAD_MIN_FREE_BYTES = env_int("RECORDING_UPLOAD_MIN_FREE_BYTES", 2 * 1024 * 1024 * 1024)
+RECORDING_UPLOAD_REVERT_RETENTION_DAYS = env_int("RECORDING_UPLOAD_REVERT_RETENTION_DAYS", 14)
+RECORDING_UPLOAD_MEDIA_RUNNER = env("RECORDING_UPLOAD_MEDIA_RUNNER", "").strip()
 # Hard ceilings an instructor cannot exceed when configuring a task.
 REPORTS_MAX_FILE_SIZE_MB_CAP = max(1, env_int("REPORTS_MAX_FILE_SIZE_MB_CAP", 200))
 REPORTS_MAX_FILES_CAP = max(1, env_int("REPORTS_MAX_FILES_CAP", 20))
@@ -840,3 +880,116 @@ LOGGING = {
     },
 }
 
+
+# --- Phase 2: live-class lifecycle (apps/realtime/lifecycle.py, reconciler.py) ---
+# LIVE_RECONCILER_MODE: off | shadow | enforce. "shadow" only logs the
+# transitions the reconciler would make; "enforce" applies them. Production
+# starts in shadow (backend/.env.example); the test suite runs in enforce.
+import sys as _phase2_sys  # noqa: E402
+
+_PHASE2_RUNNING_TESTS = len(_phase2_sys.argv) > 1 and _phase2_sys.argv[1] == "test"
+LIVE_RECONCILER_MODE = env("LIVE_RECONCILER_MODE", "enforce" if _PHASE2_RUNNING_TESTS else "shadow").strip().lower()
+LIVE_RECONCILER_INTERVAL_SECONDS = max(2, env_int("LIVE_RECONCILER_INTERVAL_SECONDS", 5))
+# Host Studio heartbeat freshness (Redis TTL) and the reconnect grace period
+# before an interrupted stream is declared stopped.
+REALTIME_HOST_HEARTBEAT_TTL_SECONDS = max(10, env_int("REALTIME_HOST_HEARTBEAT_TTL_SECONDS", 30))
+REALTIME_HOST_GRACE_SECONDS = max(10, env_int("REALTIME_HOST_GRACE_SECONDS", 60))
+# A live class whose feed has been gone (and whose host has been silent) this
+# long is ended automatically. Classes that never went live end after the
+# attendee bound (REALTIME_ATTENDEE_JOIN_MAX_LIVE_HOURS, default 6 h).
+REALTIME_ABANDONED_END_MINUTES = max(1, env_int("REALTIME_ABANDONED_END_MINUTES", 20))
+REALTIME_STREAM_STARTING_TIMEOUT_SECONDS = max(30, env_int("REALTIME_STREAM_STARTING_TIMEOUT_SECONDS", 180))
+REALTIME_EGRESS_RESTART_BACKOFF_SECONDS = max(1, env_int("REALTIME_EGRESS_RESTART_BACKOFF_SECONDS", 5))
+# Go Live returns 202 and a worker starts the egress (POST .../go-live/).
+REALTIME_ASYNC_GO_LIVE = env_bool("REALTIME_ASYNC_GO_LIVE", True)
+# Calendar-aware server resource profile (broadcast before/while a class,
+# content 10 min after). Off by default: the owner turns it on after the
+# shadow weekends.
+REALTIME_AUTO_RESOURCE_PROFILE = env_bool("REALTIME_AUTO_RESOURCE_PROFILE", False)
+# Off under `manage.py test` so suites never probe real services in the T-10 window.
+REALTIME_PRECLASS_PROBE_ENABLED = env_bool("REALTIME_PRECLASS_PROBE_ENABLED", not _PHASE2_RUNNING_TESTS)
+# Egress health port (egress.yaml health_port; shares LiveKit's network namespace).
+LIVEKIT_EGRESS_HEALTH_URL = env("LIVEKIT_EGRESS_HEALTH_URL", "").strip()
+# Process liveness file for the async worker healthcheck (written every ~10 s).
+WORKER_HEARTBEAT_FILE = env("WORKER_HEARTBEAT_FILE", "").strip()
+# --- end Phase 2 live-class lifecycle ---
+
+
+# --- Phase 2: no-click automatic class recordings (apps/realtime/recording) ---
+# Record every broadcast (OBS and Host Studio both reach Owncast) with the
+# server recorder; no Start/Stop Recording button exists any more.
+RECORDING_AUTO_ALL_BROADCASTS = env_bool("RECORDING_AUTO_ALL_BROADCASTS", True)
+# STREAM_RECORDER_ENABLED (above) follows RECORDING_AUTO_ALL_BROADCASTS unless
+# it is set explicitly in the environment.
+import os as _phase2_rec_os  # noqa: E402
+
+if "STREAM_RECORDER_ENABLED" not in _phase2_rec_os.environ:
+    STREAM_RECORDER_ENABLED = RECORDING_AUTO_ALL_BROADCASTS
+# Meetings: a LiveKit room-composite egress starts when the meeting goes live
+# and is stopped and published when it ends (recording.reconcile, 30 s).
+# OFF by default and in every shipped env example: a meeting records students'
+# cameras and microphones, and the owner decision is that meetings are never
+# auto-recorded (broadcasts only). If a deployment ever turns it on, the meeting
+# room shows "This meeting is being recorded" to its hosts and every meeting
+# recording is held unpublished and flagged "needs review" for an admin.
+RECORDING_AUTO_MEETINGS = env_bool("RECORDING_AUTO_MEETINGS", False)
+RECORDING_RECONCILE_INTERVAL_SECONDS = max(10, env_int("RECORDING_RECONCILE_INTERVAL_SECONDS", 30))
+# Only egress/browser recordings that completed this recently are picked up
+# automatically (older ones stay for the admin "Scan" review).
+RECORDING_RECONCILE_LOOKBACK_HOURS = max(1, env_int("RECORDING_RECONCILE_LOOKBACK_HOURS", 24))
+# Publish the faststart MP4 as soon as finalize completes; HLS follows.
+RECORDING_INSTANT_PUBLISH = env_bool("RECORDING_INSTANT_PUBLISH", True)
+# Section auto-created in the class's course when no module can be derived.
+RECORDING_AUTO_MODULE_TITLE = env("RECORDING_AUTO_MODULE_TITLE", "Class recordings").strip() or "Class recordings"
+# Feed offline this long -> the take is finalized (one take per class).
+STREAM_RECORDER_IDLE_FINALIZE_SECONDS = max(60, env_int("STREAM_RECORDER_IDLE_FINALIZE_SECONDS", 900))
+# "Stop Live" without "End": wait this long for a restart (same take) before
+# finalizing. 0 = finalize on Stop immediately (pre-Phase-2 behaviour).
+STREAM_RECORDER_STOP_GRACE_SECONDS = max(0, env_int("STREAM_RECORDER_STOP_GRACE_SECONDS", 600))
+# Failed recordings retry automatically (attempt n waits RETRY_BACKOFF[n]).
+RECORDING_AUTO_RETRY_MAX = max(0, env_int("RECORDING_AUTO_RETRY_MAX", 3))
+RECORDING_AUTO_RETRY_BACKOFF_SECONDS = env("RECORDING_AUTO_RETRY_BACKOFF_SECONDS", "300,1800,7200").strip()
+# Periodic import scan in the stream recorder (0 disables); unclaimed egress
+# files of classes that never got a recording are published automatically.
+RECORDING_IMPORT_SCAN_INTERVAL_SECONDS = max(0, env_int("RECORDING_IMPORT_SCAN_INTERVAL_SECONDS", 3600))
+RECORDING_IMPORT_AUTO_PUBLISH = env_bool("RECORDING_IMPORT_AUTO_PUBLISH", True)
+# Admin alerts (in-app notification + ERROR log line) for failed/stuck recordings.
+RECORDING_ALERTS_ENABLED = env_bool("RECORDING_ALERTS_ENABLED", True)
+RECORDING_PROCESSING_ALERT_SECONDS = max(600, env_int("RECORDING_PROCESSING_ALERT_SECONDS", 6 * 3600))
+RECORDING_FINALIZING_ALERT_SECONDS = max(300, env_int("RECORDING_FINALIZING_ALERT_SECONDS", 3600))
+RECORDING_HEARTBEAT_ALERT_SECONDS = max(60, env_int("RECORDING_HEARTBEAT_ALERT_SECONDS", 180))
+# Nightly canary: the stream recorder runs `verify_recording_pipeline` in a
+# subprocess at this local hour when no class is being recorded.
+RECORDING_CANARY_ENABLED = env_bool("RECORDING_CANARY_ENABLED", True)
+RECORDING_CANARY_HOUR = min(23, max(0, env_int("RECORDING_CANARY_HOUR", 3)))
+# Liveness file the stream recorder touches every loop (compose healthcheck).
+STREAM_RECORDER_HEARTBEAT_FILE = env("STREAM_RECORDER_HEARTBEAT_FILE", "").strip()
+# Transcoder (transcode_lecture_streams --pending): one ffmpeg pass for every
+# rendition, faster preset, hard timeout, retries with backoff, blue/green HLS.
+COURSE_HLS_SINGLE_PASS = env_bool("COURSE_HLS_SINGLE_PASS", True)
+COURSE_HLS_SINGLE_PASS_PRESET = env("COURSE_HLS_SINGLE_PASS_PRESET", "veryfast").strip().lower() or "veryfast"
+COURSE_HLS_SINGLE_PASS_CRF = min(30, max(16, env_int("COURSE_HLS_SINGLE_PASS_CRF", 23)))
+# Top rendition by stream copy when the source is already H.264 at that size.
+COURSE_HLS_TOP_RUNG_COPY = env_bool("COURSE_HLS_TOP_RUNG_COPY", False)
+COURSE_HLS_TRANSCODE_TIMEOUT_BASE_SECONDS = max(60, env_int("COURSE_HLS_TRANSCODE_TIMEOUT_BASE_SECONDS", 600))
+COURSE_HLS_TRANSCODE_TIMEOUT_FACTOR = float(env("COURSE_HLS_TRANSCODE_TIMEOUT_FACTOR", "3") or 3)
+COURSE_HLS_TRANSCODE_MAX_TIMEOUT_SECONDS = max(600, env_int("COURSE_HLS_TRANSCODE_MAX_TIMEOUT_SECONDS", 6 * 3600))
+COURSE_HLS_MAX_ATTEMPTS = max(1, env_int("COURSE_HLS_MAX_ATTEMPTS", 5))
+COURSE_HLS_RETRY_BACKOFF_SECONDS = env("COURSE_HLS_RETRY_BACKOFF_SECONDS", "60,300,1800,7200").strip()
+# Old HLS revisions are kept this long after a swap (viewers mid-playback).
+COURSE_HLS_REVISION_GRACE_SECONDS = max(0, env_int("COURSE_HLS_REVISION_GRACE_SECONDS", 86400))
+TRANSCODER_HEARTBEAT_FILE = env("TRANSCODER_HEARTBEAT_FILE", "").strip()
+# --- end Phase 2 no-click recordings ---
+# --- Phase 3 self-service weekly reports (apps.reports) ---
+# Weeks, deadlines and late windows are computed in this zone (IST).
+REPORTS_TIME_ZONE = env("REPORTS_TIME_ZONE", "Asia/Kolkata").strip() or "Asia/Kolkata"
+# reports.scheduler: reminders, grader digest, SLA alert, automatic marks release.
+REPORTS_SCHEDULER_ENABLED = env_bool("REPORTS_SCHEDULER_ENABLED", True)
+REPORTS_SCHEDULER_INTERVAL_SECONDS = max(60, env_int("REPORTS_SCHEDULER_INTERVAL_SECONDS", 300))
+REPORTS_GRADER_DIGEST_HOUR = min(23, max(0, env_int("REPORTS_GRADER_DIGEST_HOUR", 9)))
+REPORTS_GRADING_SLA_HOURS = max(1, env_int("REPORTS_GRADING_SLA_HOURS", 72))
+# Seconds a student can take back a first submission (the UI shows a 10 s Undo).
+REPORTS_UNDO_SECONDS = max(0, env_int("REPORTS_UNDO_SECONDS", 15))
+# One OpenAPI name for the "this week / last week" choice used by two serializers.
+SPECTACULAR_SETTINGS["ENUM_NAME_OVERRIDES"]["ReportWeekWhichEnum"] = "apps.reports.serializers.WEEK_WHICH_CHOICES"
+# --- end Phase 3 self-service weekly reports ---

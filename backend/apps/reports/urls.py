@@ -14,6 +14,26 @@ urlpatterns = [
     ),
     path("tasks/<int:task_id>/submit/", views.StudentSubmitView.as_view(), name="reports-task-submit"),
     path("marks/", views.MyMarksView.as_view(), name="reports-my-marks"),
+    # Students, self-service weekly reports (Phase 3)
+    path("me/week/", views.MyWeekView.as_view(), name="reports-me-week"),
+    path("me/targets/", views.MyTargetListView.as_view(), name="reports-me-targets"),
+    path("me/targets/<int:submission_id>/", views.MyTargetDetailView.as_view(), name="reports-me-target-detail"),
+    path(
+        "me/targets/<int:submission_id>/files/",
+        views.MyTargetUploadView.as_view(),
+        name="reports-me-target-files",
+    ),
+    path(
+        "me/targets/<int:submission_id>/files/<int:file_id>/",
+        views.MyTargetFileDeleteView.as_view(),
+        name="reports-me-target-file-delete",
+    ),
+    path(
+        "me/targets/<int:submission_id>/submit/",
+        views.MyTargetSubmitView.as_view(),
+        name="reports-me-target-submit",
+    ),
+    path("me/targets/<int:submission_id>/undo/", views.MyTargetUndoView.as_view(), name="reports-me-target-undo"),
     # Private file downloads (owner, course instructor, staff)
     path("files/<int:file_id>/download/", views.SubmissionFileDownloadView.as_view(), name="reports-file-download"),
     path(
@@ -28,6 +48,11 @@ urlpatterns = [
     ),
     # Graders (course instructor or admin)
     path("manage/courses/", views.GradableCoursesView.as_view(), name="reports-manage-courses"),
+    path(
+        "manage/courses/<int:course_id>/policy/",
+        views.CoursePolicyView.as_view(),
+        name="reports-manage-course-policy",
+    ),
     path("manage/tasks/", views.ManageTaskListView.as_view(), name="reports-manage-tasks"),
     path("manage/tasks/<int:task_id>/", views.ManageTaskDetailView.as_view(), name="reports-manage-task-detail"),
     path("manage/tasks/<int:task_id>/publish/", views.PublishTaskView.as_view(), name="reports-manage-task-publish"),

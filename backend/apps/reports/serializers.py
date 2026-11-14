@@ -174,6 +174,7 @@ class UploadRequestSerializer(serializers.Serializer):
 
 class GradebookCellSerializer(serializers.Serializer):
     task_id = serializers.IntegerField()
+    target_count = serializers.IntegerField(required=False, default=0)
     status = serializers.ChoiceField(choices=CELL_STATUS_CHOICES)
     submission_id = serializers.IntegerField(allow_null=True)
     final_marks = serializers.DecimalField(max_digits=6, decimal_places=2, allow_null=True)
@@ -354,6 +355,13 @@ class SubmissionQueueItemSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     task = GradebookTaskSerializer()
     student = PersonSerializer()
+    target_name = serializers.CharField(allow_blank=True)
+    target_key = serializers.CharField(allow_blank=True)
+    week_start = serializers.DateField(allow_null=True)
+    week_label = serializers.CharField(allow_blank=True)
+    same_target_count = serializers.IntegerField()
+    sha256_match_count = serializers.IntegerField()
+    different_target_confirmed = serializers.BooleanField()
     status = serializers.ChoiceField(choices=STUDENT_STATUS_CHOICES)
     submitted_at = serializers.DateTimeField(allow_null=True)
     is_late = serializers.BooleanField()
@@ -397,6 +405,8 @@ class AuditEntrySerializer(serializers.Serializer):
 class GradingTaskSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     title = serializers.CharField()
+    origin = serializers.CharField()
+    week_start = serializers.DateField(allow_null=True)
     course = RefSerializer()
     week_number = serializers.IntegerField(allow_null=True)
     due_at = serializers.DateTimeField()
@@ -415,10 +425,31 @@ class SubmissionNeighboursSerializer(serializers.Serializer):
     total = serializers.IntegerField()
 
 
+class SameTargetSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    student = PersonSerializer()
+    status = serializers.ChoiceField(choices=STUDENT_STATUS_CHOICES)
+
+
+class Sha256MatchSerializer(serializers.Serializer):
+    file_id = serializers.IntegerField()
+    file_name = serializers.CharField()
+    sha256 = serializers.CharField()
+    submission_id = serializers.IntegerField()
+    student = PersonSerializer()
+    target_name = serializers.CharField(allow_blank=True)
+
+
 class SubmissionDetailSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     task = GradingTaskSerializer()
     student = PersonSerializer()
+    target_name = serializers.CharField(allow_blank=True)
+    different_target_confirmed = serializers.BooleanField()
+    similar_targets = serializers.ListField(child=serializers.CharField())
+    revision_deadline = serializers.DateTimeField(allow_null=True)
+    same_target = SameTargetSerializer(many=True)
+    sha256_matches = Sha256MatchSerializer(many=True)
     status = serializers.ChoiceField(choices=STUDENT_STATUS_CHOICES)
     revision = serializers.IntegerField()
     submitted_at = serializers.DateTimeField(allow_null=True)
@@ -468,3 +499,170 @@ class GradebookSerializer(serializers.Serializer):
 
 class AttachmentUploadResponseSerializer(serializers.Serializer):
     attachment = StoredFileSerializer()
+
+
+# ---------------------------------------------------------------------------
+# Self-service weekly reports (Phase 3)
+# ---------------------------------------------------------------------------
+WEEK_WHICH_CHOICES = [("current", "This week"), ("previous", "Last week (late window)")]
+WEEK_STATUS_CHOICES = [("open", "Open"), ("late", "Late window"), ("closed", "Closed"), ("future", "Not open yet")]
+
+
+class DraftFileSerializer(StoredFileSerializer):
+    scan_pending = serializers.BooleanField()
+    blocked_reason = serializers.CharField(allow_blank=True)
+
+
+class ReportRulesSerializer(serializers.Serializer):
+    allowed_extensions = serializers.ListField(child=serializers.CharField())
+    max_files = serializers.IntegerField()
+    max_file_size_mb = serializers.IntegerField()
+    max_total_size_mb = serializers.IntegerField()
+    max_marks = serializers.DecimalField(max_digits=6, decimal_places=2)
+    late_penalty_percent_per_day = serializers.DecimalField(max_digits=5, decimal_places=2)
+    grace_hours = serializers.IntegerField()
+    max_targets_per_week = serializers.IntegerField(allow_null=True)
+    marks_visibility = serializers.CharField()
+    brief = serializers.CharField(allow_blank=True)
+
+
+class WeekTargetSummarySerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    target_name = serializers.CharField()
+    status = serializers.ChoiceField(choices=STUDENT_STATUS_CHOICES)
+    submitted_at = serializers.DateTimeField(allow_null=True)
+    is_late = serializers.BooleanField()
+    minutes_late = serializers.IntegerField()
+    version_count = serializers.IntegerField()
+    file_count = serializers.IntegerField()
+    draft_file_count = serializers.IntegerField()
+    marks_visible = serializers.BooleanField()
+    final_marks = serializers.DecimalField(max_digits=6, decimal_places=2, allow_null=True)
+    max_marks = serializers.DecimalField(max_digits=6, decimal_places=2)
+    can_change = serializers.BooleanField()
+
+
+class ReportWeekSerializer(serializers.Serializer):
+    which = serializers.ChoiceField(choices=WEEK_WHICH_CHOICES)
+    week_start = serializers.DateField()
+    week_end = serializers.DateField()
+    week_number = serializers.IntegerField(allow_null=True)
+    label = serializers.CharField()
+    due_at = serializers.DateTimeField()
+    late_until = serializers.DateTimeField()
+    status = serializers.ChoiceField(choices=WEEK_STATUS_CHOICES)
+    penalty_percent = serializers.DecimalField(max_digits=6, decimal_places=2)
+    task_id = serializers.IntegerField(allow_null=True)
+    slots_left = serializers.IntegerField(allow_null=True)
+    targets = WeekTargetSummarySerializer(many=True)
+
+
+class CourseWeekSerializer(serializers.Serializer):
+    course = RefSerializer()
+    enabled = serializers.BooleanField()
+    reason = serializers.CharField(allow_blank=True)
+    legacy_task_count = serializers.IntegerField()
+    weeks = ReportWeekSerializer(many=True)
+    rules = ReportRulesSerializer(allow_null=True)
+
+
+class MyWeekSerializer(serializers.Serializer):
+    courses = CourseWeekSerializer(many=True)
+    server_time = serializers.DateTimeField()
+
+
+class CreateTargetRequestSerializer(serializers.Serializer):
+    course = serializers.IntegerField(min_value=1)
+    target_name = serializers.CharField(max_length=400, allow_blank=True)
+    week = serializers.ChoiceField(choices=WEEK_WHICH_CHOICES, default="current")
+    confirm_different = serializers.BooleanField(default=False)
+
+
+class SubmitTargetRequestSerializer(serializers.Serializer):
+    file_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), required=False, allow_empty=False, max_length=50
+    )
+    note = serializers.CharField(required=False, allow_blank=True, max_length=2000, default="")
+
+
+class TargetDetailSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    course = RefSerializer()
+    task_id = serializers.IntegerField()
+    week_start = serializers.DateField()
+    week_label = serializers.CharField()
+    due_at = serializers.DateTimeField()
+    late_until = serializers.DateTimeField(allow_null=True)
+    window = serializers.ChoiceField(choices=WINDOW_CHOICES)
+    target_name = serializers.CharField()
+    status = serializers.ChoiceField(choices=STUDENT_STATUS_CHOICES)
+    can_change = serializers.BooleanField()
+    lock_reason = serializers.CharField(allow_blank=True)
+    is_late = serializers.BooleanField()
+    minutes_late = serializers.IntegerField()
+    submitted_at = serializers.DateTimeField(allow_null=True)
+    version_count = serializers.IntegerField()
+    revision = serializers.IntegerField()
+    revision_deadline = serializers.DateTimeField(allow_null=True)
+    undo_until = serializers.DateTimeField(allow_null=True)
+    different_target_confirmed = serializers.BooleanField()
+    draft_files = DraftFileSerializer(many=True)
+    current_version = VersionSerializer(allow_null=True)
+    marks_visible = serializers.BooleanField()
+    grade = StudentGradeSerializer(allow_null=True)
+    revision_feedback = serializers.CharField(allow_blank=True)
+    marks_hidden_until_release = serializers.BooleanField()
+    rules = ReportRulesSerializer()
+
+
+class SubmitTargetResponseSerializer(serializers.Serializer):
+    created = serializers.BooleanField()
+    target = TargetDetailSerializer()
+
+
+POLICY_MARKS_VISIBILITY_CHOICES = [
+    ("on_grade", "Show marks as soon as they are graded"),
+    ("on_release", "Release all marks together (by hand)"),
+    ("auto_release", "Release automatically after the late window"),
+]
+
+
+class ReportPolicySerializer(serializers.Serializer):
+    """Grader view and update of a course's weekly report policy."""
+
+    course = serializers.IntegerField(read_only=True)
+    self_service = serializers.BooleanField(default=False)
+    due_weekday = serializers.IntegerField(min_value=0, max_value=6, default=6)
+    due_time = serializers.TimeField(default="23:59")
+    grace_hours = serializers.IntegerField(min_value=0, max_value=144, default=48)
+    late_penalty_percent_per_day = serializers.DecimalField(
+        max_digits=5, decimal_places=2, min_value=Decimal("0"), max_value=Decimal("100"), default=Decimal("10")
+    )
+    max_marks = serializers.DecimalField(
+        max_digits=6, decimal_places=2, min_value=Decimal("0.01"), max_value=Decimal("1000"), default=Decimal("10")
+    )
+    max_targets_per_week = serializers.IntegerField(min_value=1, max_value=50, allow_null=True, default=None)
+    marks_visibility = serializers.ChoiceField(choices=POLICY_MARKS_VISIBILITY_CHOICES, default="on_grade")
+    auto_release_delay_hours = serializers.IntegerField(min_value=0, max_value=24 * 14, default=24)
+    revision_window_hours = serializers.IntegerField(min_value=1, max_value=24 * 30, default=72)
+    brief = serializers.CharField(required=False, allow_blank=True, max_length=20000, default="")
+    allowed_file_types = serializers.ListField(
+        child=serializers.ChoiceField(choices=FILE_TYPE_CHOICES), required=False, default=list
+    )
+    max_files = serializers.IntegerField(min_value=1, default=5)
+    max_file_size_mb = serializers.IntegerField(min_value=1, default=50)
+    max_total_size_mb = serializers.IntegerField(min_value=1, default=200)
+    updated_at = serializers.DateTimeField(read_only=True, allow_null=True)
+
+    def validate(self, attrs):
+        files_cap = int(getattr(settings, "REPORTS_MAX_FILES_CAP", 20))
+        size_cap = int(getattr(settings, "REPORTS_MAX_FILE_SIZE_MB_CAP", 200))
+        if attrs.get("max_files", 5) > files_cap:
+            raise serializers.ValidationError({"max_files": [f"At most {files_cap} files per report."]})
+        if attrs.get("max_file_size_mb", 50) > size_cap:
+            raise serializers.ValidationError({"max_file_size_mb": [f"At most {size_cap} MB per file."]})
+        if attrs.get("max_total_size_mb", 200) < attrs.get("max_file_size_mb", 50):
+            raise serializers.ValidationError(
+                {"max_total_size_mb": ["The total limit must be at least the per-file limit."]}
+            )
+        return attrs

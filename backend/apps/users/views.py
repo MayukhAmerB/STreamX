@@ -52,6 +52,7 @@ from .refresh_rotation import (
     rotate_refresh_token,
 )
 from .security import clear_failed_login, get_lockout_state, register_failed_login
+from .live_grace import mark_live_grace
 from .session_policy import (
     SESSION_SLOT_CLAIM,
     SESSION_VERSION_CLAIM,
@@ -144,11 +145,14 @@ def _attach_csrf_token(response, request):
     return response
 
 
-def _refresh_token_error_response(request, *, message, detail, code=REJECT_INVALID, clear_cookies=True):
+def _refresh_token_error_response(request, *, message, detail, code=REJECT_INVALID, clear_cookies=True, reason=""):
+    errors = {"detail": detail, "code": code}
+    if reason:
+        errors["reason"] = reason
     response = api_response(
         success=False,
         message=message,
-        errors={"detail": detail, "code": code},
+        errors=errors,
         status_code=status.HTTP_401_UNAUTHORIZED,
     )
     if clear_cookies:
@@ -336,12 +340,17 @@ class MobileRefreshTokenView(APIView):
         try:
             rotated = rotate_refresh_token(refresh_token, request=request)
         except RefreshRejected as exc:
+            errors = {"detail": exc.detail, "code": exc.code}
+            if exc.reason:
+                errors["reason"] = exc.reason
             return api_response(
                 success=False,
                 message=_REFRESH_REJECTION_MESSAGES.get(exc.code, "Invalid refresh token."),
-                errors={"detail": exc.detail, "code": exc.code},
+                errors=errors,
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
+        if rotated.live_grace:
+            mark_live_grace(request)
 
         return api_response(
             success=True,
@@ -396,7 +405,12 @@ class RefreshTokenView(APIView):
                 detail=exc.detail,
                 code=exc.code,
                 clear_cookies=exc.clear_cookies,
+                reason=exc.reason,
             )
+        if rotated.live_grace:
+            # Evicted, finishing a live class: the client keeps the class and
+            # shows the "signed in on another device" banner.
+            mark_live_grace(request)
         response = api_response(success=True, message="Token refreshed.", data=None)
         set_auth_cookies(response, rotated.access, rotated.refresh)
         return _attach_csrf_token(response, request)

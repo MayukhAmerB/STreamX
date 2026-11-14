@@ -4,6 +4,7 @@ from unittest import mock
 
 from apps.ctf import answers
 from apps.ctf.checks import check_answer_pepper
+from django.core.checks import WARNING
 from django.test import SimpleTestCase, override_settings
 
 PEPPER = "test-pepper-0123456789abcdefghijklmnopqrstuvwxyz"
@@ -102,13 +103,40 @@ class PepperConfigurationTests(SimpleTestCase):
         self.assertEqual([item.id for item in check_answer_pepper()], ["ctf.I001"])
 
     @override_settings(CTF_ANSWER_PEPPER="too-short", APP_ENV="production")
-    def test_short_pepper_fails_the_check(self):
-        self.assertEqual([item.id for item in check_answer_pepper()], ["ctf.E001"])
+    def test_short_pepper_disables_exams_without_blocking_startup(self):
+        messages = check_answer_pepper()
+        self.assertEqual([item.id for item in messages], ["ctf.I003"])
+        self.assertIn("shorter than 32 characters", messages[0].msg)
+        self.assertTrue(all(item.level < WARNING for item in messages))
+        self.assertEqual(answers.pepper_problem(), answers.PEPPER_TOO_SHORT)
+        self.assertIn("shorter than 32", answers.exams_disabled_reason())
+        # The weak pepper is never used: exams answer 503 instead.
+        with self.assertRaises(answers.CtfNotConfigured):
+            answers.answer_key_id()
 
     @override_settings(CTF_ANSWER_PEPPER="x" * 40, SECRET_KEY="x" * 40, APP_ENV="production")
-    def test_pepper_equal_to_secret_key_fails_the_check(self):
-        self.assertIn("ctf.E001", [item.id for item in check_answer_pepper()])
+    def test_pepper_equal_to_secret_key_disables_exams_without_blocking_startup(self):
+        messages = check_answer_pepper()
+        self.assertEqual([item.id for item in messages], ["ctf.I003"])
+        self.assertIn("DJANGO_SECRET_KEY", messages[0].msg)
+        self.assertTrue(all(item.level < WARNING for item in messages))
+        with self.assertRaises(answers.CtfNotConfigured):
+            answers.answer_digest("e", "q", "a")
+
+    @override_settings(CTF_ANSWER_PEPPER="too-short", APP_ENV="development")
+    def test_short_pepper_in_development_is_advisory_and_still_used(self):
+        self.assertEqual([item.id for item in check_answer_pepper()], ["ctf.I003"])
+        self.assertEqual(answers.exams_disabled_reason(), "")
+        self.assertEqual(answers.answer_pepper(), b"too-short")
+
+    @override_settings(CTF_ANSWER_PEPPER="", APP_ENV="production")
+    def test_missing_pepper_never_blocks_startup(self):
+        self.assertTrue(all(item.level < WARNING for item in check_answer_pepper()))
+        self.assertIn("not set", answers.exams_disabled_reason())
 
     @override_settings(CTF_ANSWER_PEPPER=PEPPER, APP_ENV="production")
     def test_strong_pepper_passes(self):
         self.assertEqual(check_answer_pepper(), [])
+        self.assertEqual(answers.pepper_problem(), "")
+        self.assertEqual(answers.exams_disabled_reason(), "")
+        self.assertEqual(answers.answer_pepper(), PEPPER.encode("utf-8"))

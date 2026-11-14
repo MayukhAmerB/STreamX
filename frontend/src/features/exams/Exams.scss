@@ -1,0 +1,287 @@
+// Console -> Exams and the unified gradebook (Carbon, Console palette).
+// Token-only imports: emits no Carbon component CSS; every rule is scoped
+// under `.cds-app`. Phone first.
+@use '../app-shell/styles/tokens' as *;
+
+.cds-app {
+  .exm-section {
+    margin-block: $spacing-06;
+  }
+
+  .exm-subtitle {
+    @include type-style('heading-compact-02');
+
+    margin-block-end: $spacing-04;
+    color: var(--uc-text);
+  }
+
+  .exm-muted {
+    @include type-style('body-compact-01');
+
+    color: var(--uc-text-muted);
+  }
+
+  .exm-card {
+    padding: $spacing-05;
+    border: 1px solid var(--uc-border);
+    border-radius: var(--uc-radius-card);
+    background: var(--uc-surface);
+  }
+
+  .exm-back {
+    @include type-style('body-compact-01');
+
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 2.75rem;
+    color: var(--uc-text-2);
+    gap: $spacing-02;
+    text-decoration: none;
+
+    svg {
+      fill: currentColor;
+    }
+
+    &:hover {
+      color: var(--uc-accent);
+    }
+
+    &:focus-visible {
+      @include corner-focus-ring;
+    }
+  }
+
+  .exm-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $spacing-03;
+  }
+
+  .exm-row--spaced {
+    margin-block: $spacing-05 $spacing-03;
+  }
+
+  .exm-file-input {
+    @include type-style('body-compact-01');
+
+    max-inline-size: 100%;
+    color: var(--uc-text-2);
+  }
+
+  .exm-preview {
+    margin-block-start: $spacing-04;
+
+    li {
+      @include type-style('body-compact-01');
+
+      margin-block-end: $spacing-02;
+      color: var(--uc-text);
+    }
+  }
+
+  .exm-problems li {
+    @include type-style('code-01');
+
+    color: var(--uc-error);
+    overflow-wrap: anywhere;
+  }
+
+  .exm-checklist {
+    display: grid;
+    padding: 0;
+    margin: 0;
+    gap: $spacing-03;
+    list-style: none;
+
+    li {
+      display: flex;
+      align-items: flex-start;
+      gap: $spacing-03;
+    }
+
+    svg {
+      flex: none;
+      margin-block-start: 2px;
+    }
+  }
+
+  .exm-ok {
+    fill: var(--uc-success);
+  }
+
+  .exm-bad {
+    fill: var(--uc-error);
+  }
+
+  .exm-check-label {
+    @include type-style('body-compact-01');
+
+    color: var(--uc-text);
+  }
+
+  .exm-check-detail {
+    @include type-style('helper-text-01');
+
+    display: block;
+    color: var(--uc-text-muted);
+  }
+
+  .exm-publish {
+    display: grid;
+    gap: $spacing-03;
+  }
+
+  .exm-reason {
+    @include type-style('helper-text-01');
+
+    color: var(--uc-text-muted);
+  }
+
+  .exm-form {
+    display: grid;
+    gap: $spacing-05;
+
+    @include breakpoint(md) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .exm-batches {
+    display: grid;
+    gap: $spacing-02;
+    margin-block: $spacing-04;
+
+    @include breakpoint(md) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .exm-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--uc-border);
+    border-radius: var(--uc-radius-control);
+
+    &:focus-visible {
+      @include corner-focus-ring;
+    }
+  }
+
+  .exm-table {
+    @include type-style('body-compact-01');
+
+    border-collapse: collapse;
+    color: var(--uc-text);
+    inline-size: 100%;
+
+    th,
+    td {
+      padding: $spacing-03 $spacing-04;
+      border-block-end: 1px solid var(--uc-border);
+      text-align: start;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    thead th {
+      @include corner-micro-label(0.625rem);
+
+      background: var(--uc-surface-2);
+      color: var(--uc-text-2);
+    }
+
+    a {
+      color: var(--uc-accent);
+    }
+  }
+
+  .exm-num {
+    font-variant-numeric: tabular-nums;
+    text-align: end !important;
+  }
+
+  .exm-wrong {
+    @include type-style('code-01');
+
+    color: var(--uc-text-2);
+    white-space: normal;
+  }
+
+  .exm-card-tile {
+    display: flex;
+    align-items: center;
+    padding: $spacing-05;
+    border: 1px solid var(--uc-border);
+    border-radius: var(--uc-radius-card);
+    margin-block: $spacing-05;
+    background: var(--uc-surface);
+    color: var(--uc-text);
+    gap: $spacing-04;
+    text-decoration: none;
+
+    &:hover {
+      border-color: var(--uc-border-hover);
+    }
+
+    &:focus-visible {
+      @include corner-focus-ring;
+    }
+
+    &--open {
+      border-color: var(--uc-accent-line);
+    }
+  }
+
+  .exm-card-tile__icon {
+    display: inline-flex;
+    padding: $spacing-03;
+    border-radius: var(--uc-radius-pill);
+    background: var(--uc-accent-soft);
+
+    svg {
+      fill: var(--uc-accent);
+    }
+  }
+
+  .exm-card-tile__text {
+    display: grid;
+    flex: 1;
+    gap: $spacing-01;
+    min-inline-size: 0;
+  }
+
+  .exm-card-tile__label {
+    @include corner-micro-label(0.625rem);
+
+    color: var(--uc-accent);
+  }
+
+  .exm-card-tile__title {
+    @include type-style('heading-compact-01');
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .exm-card-tile__meta {
+    @include type-style('helper-text-01');
+
+    color: var(--uc-text-muted);
+  }
+
+  .gbk-cell--missing {
+    color: var(--uc-error);
+  }
+
+  .gbk-cell--pending {
+    color: var(--uc-text-muted);
+  }
+
+  .gbk-kind {
+    @include corner-micro-label(0.5625rem);
+
+    display: block;
+    color: var(--uc-text-muted);
+  }
+}

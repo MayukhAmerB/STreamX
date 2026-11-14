@@ -29,12 +29,15 @@ from .models import (
     GRADE_ACTION_DRAFT,
     GRADE_ACTION_GRADE,
     GRADE_ACTION_RETURN,
+    SCAN_CLEAN,
+    SCAN_INFECTED,
     SCAN_UNSCANNED,
     ReportAttachment,
     ReportCriterion,
     ReportFile,
     ReportGrade,
     ReportGradeAudit,
+    ReportPolicy,
     ReportSubmission,
     ReportSubmissionVersion,
     ReportTask,
@@ -80,7 +83,14 @@ def submission_window(task, at=None):
 
 
 def student_can_change(task, submission, at=None):
-    """May the student upload/submit now? Returns (allowed, reason)."""
+    """May the student upload/submit now? Returns (allowed, reason).
+
+    Deadline-aware lock: a grader's *draft* (under review) does not lock the
+    student before the deadline (a change bumps the revision, so the grader's
+    stale draft is refused with a conflict); after the deadline it does. A
+    returned report can be resubmitted until its revision deadline.
+    """
+    at = at or timezone.now()
     window = submission_window(task, at)
     status = submission.status if submission else ReportSubmission.STATUS_NOT_SUBMITTED
     if window == WINDOW_NOT_OPEN:
@@ -88,8 +98,13 @@ def student_can_change(task, submission, at=None):
     if task.status == ReportTask.STATUS_CLOSED:
         return False, "This report is closed."
     if status == ReportSubmission.STATUS_RETURNED:
+        deadline = getattr(submission, "revision_deadline", None)
+        if deadline is not None and at > deadline:
+            return False, "The time to resubmit this returned report has passed."
         return True, ""
-    if status in (ReportSubmission.STATUS_UNDER_REVIEW, ReportSubmission.STATUS_GRADED):
+    if status == ReportSubmission.STATUS_GRADED:
+        return False, "Your report has been marked, so it can't be changed any more."
+    if status == ReportSubmission.STATUS_UNDER_REVIEW and at > task.due_at:
         return False, "Your report is being marked, so it can't be changed any more."
     if window == WINDOW_CLOSED:
         return False, "The deadline has passed, so submissions are closed."
@@ -106,10 +121,18 @@ def _require_student_can_change(task, submission, at=None):
 # Files (validated, virus-scanned and stored by intake.ingest_upload)
 # ---------------------------------------------------------------------------
 def prune_staged_files(*, owner=None, older_than_hours=None, now=None):
-    """Delete staged files (uploaded, never submitted) older than the TTL."""
+    """Delete legacy staged files (uploaded, never submitted) older than the TTL.
+
+    Self-service draft evidence (``draft`` set) is never pruned here: a student
+    may upload on Monday and submit on Thursday, and Undo returns files to the
+    draft with their old ``created_at``. ``scheduler.housekeeping`` removes
+    drafts once their week's late window has closed.
+    """
     now = now or timezone.now()
     hours = older_than_hours or int(getattr(settings, "REPORTS_STAGED_UPLOAD_TTL_HOURS", 48))
-    queryset = ReportFile.objects.filter(submitted=False, created_at__lt=now - timedelta(hours=hours))
+    queryset = ReportFile.objects.filter(
+        submitted=False, draft__isnull=True, created_at__lt=now - timedelta(hours=hours)
+    )
     if owner is not None:
         queryset = queryset.filter(owner=owner)
     removed = 0
@@ -133,12 +156,31 @@ def _delete_stored_file(field_file):
 
 
 def staged_files(task, student):
-    return ReportFile.objects.filter(task=task, owner=student, submitted=False).order_by("created_at", "id")
+    """Legacy (one report per task) staged files; self-service drafts keep theirs on ``draft``."""
+    return ReportFile.objects.filter(task=task, owner=student, submitted=False, draft__isnull=True).order_by(
+        "created_at", "id"
+    )
+
+
+def require_legacy_task(task):
+    if task.origin == ReportTask.ORIGIN_AUTO:
+        raise Conflict(
+            "This week's reports are submitted per target. Open Reports to add or open a target.",
+            code="use_weekly_flow",
+        )
+
+
+def legacy_submission(task, student, *, for_update=False):
+    queryset = ReportSubmission.objects.filter(task=task, student=student).order_by("id")
+    if for_update:
+        queryset = queryset.select_for_update()
+    return queryset.first()
 
 
 def stage_upload(*, task, student, uploaded):
     """Store one uploaded file for the student's next submission."""
-    submission = ReportSubmission.objects.filter(task=task, student=student).first()
+    require_legacy_task(task)
+    submission = legacy_submission(task, student)
     _require_student_can_change(task, submission)
     prune_staged_files(owner=student)
     if staged_files(task, student).count() >= task.max_files:
@@ -189,12 +231,15 @@ def _late_digest_bucket(at):
     return int(at.timestamp()) // window, window
 
 
-def submit_report(*, task, student, file_ids, note="", now=None):
-    now = now or timezone.now()
+def clean_note(note):
     note = str(note or "").strip()
     if len(note) > NOTE_MAX_LENGTH:
         message = f"Keep the note under {NOTE_MAX_LENGTH} characters."
         raise ValidationFailed(message, details={"note": [message]})
+    return note
+
+
+def parse_file_ids(file_ids):
     try:
         wanted_ids = []
         for value in file_ids or []:
@@ -206,92 +251,139 @@ def submit_report(*, task, student, file_ids, note="", now=None):
     if not wanted_ids:
         message = "Add at least one file before submitting."
         raise ValidationFailed(message, details={"file_ids": [message]})
+    return wanted_ids
+
+
+def submit_report(*, task, student, file_ids, note="", now=None):
+    """Legacy flow: the student's one report for an instructor-created task."""
+    from apps.core.textnorm import clean_display, target_key
+
+    now = now or timezone.now()
+    require_legacy_task(task)
+    note = clean_note(note)
+    wanted_ids = parse_file_ids(file_ids)
 
     with transaction.atomic():
-        submission, _created = ReportSubmission.objects.select_for_update().get_or_create(
-            task=task, student=student, defaults={"status": ReportSubmission.STATUS_NOT_SUBMITTED}
-        )
-        _require_student_can_change(task, submission, now)
-
-        current_files = (
-            set(submission.current_version.files.values_list("pk", flat=True))
-            if submission.current_version_id
-            else set()
-        )
-        files = {
-            item.pk: item
-            for item in ReportFile.objects.filter(pk__in=wanted_ids, task=task, owner=student).select_for_update()
-        }
-        usable = [files[pk] for pk in wanted_ids if pk in files and (not files[pk].submitted or pk in current_files)]
-        if len(usable) != len(wanted_ids):
-            message = "Some files are no longer available. Upload them again."
-            raise ValidationFailed(message, details={"file_ids": [message]}, code="validation_files_missing")
-        if len(usable) > task.max_files:
-            message = f"You can submit up to {task.max_files} file{'s' if task.max_files != 1 else ''}."
-            raise ValidationFailed(message, details={"file_ids": [message]})
-        allowed = set(task.allowed_extensions)
-        not_allowed = [item.original_name for item in usable if item.extension not in allowed]
-        if not_allowed:
-            message = f"{not_allowed[0]} is not an allowed file type for this report any more. Remove it."
-            raise ValidationFailed(message, details={"file_ids": [message]})
-        if sum(item.size for item in usable) > task.max_total_bytes:
-            limit_mb = task.max_total_bytes // (1024 * 1024)
-            message = f"Together your files are larger than the {limit_mb} MB limit for this report."
-            raise ValidationFailed(message, details={"file_ids": [message]})
-
-        # A double tap (or a retry with a new key) that changes nothing never
-        # creates a second version.
-        is_revision = submission.status == ReportSubmission.STATUS_RETURNED
-        if (
-            submission.current_version_id
-            and not is_revision
-            and set(wanted_ids) == current_files
-            and submission.current_version.note == note
-        ):
-            return SubmitResult(submission, submission.current_version, False)
-
-        previous = submission.current_version
-        if is_revision and previous is not None:
-            is_late, minutes_late = previous.is_late, previous.minutes_late
-        else:
-            minutes_late = task.minutes_late(now)
-            is_late = minutes_late > 0
-        version = ReportSubmissionVersion.objects.create(
-            submission=submission,
-            number=submission.version_count + 1,
-            note=note,
-            submitted_at=now,
-            is_late=is_late,
-            minutes_late=minutes_late,
-            is_revision=is_revision,
-            submitted_by=student,
-        )
-        version.files.set(usable)
-        ReportFile.objects.filter(pk__in=[item.pk for item in usable if not item.submitted]).update(submitted=True)
-
-        old_status = submission.status
-        if is_revision:
-            submission.status = ReportSubmission.STATUS_RESUBMITTED
-        elif old_status == ReportSubmission.STATUS_NOT_SUBMITTED:
-            submission.status = ReportSubmission.STATUS_SUBMITTED
-        submission.current_version = version
-        submission.version_count = version.number
-        submission.first_submitted_at = submission.first_submitted_at or now
-        submission.submitted_at = now
-        submission.is_late = is_late
-        submission.minutes_late = minutes_late
-        submission.revision += 1
-        submission.save()
-
-        if is_late and not is_revision and submission.late_digest_sent_at is None:
-            bucket, window = _late_digest_bucket(now)
-            delay = max(0, (bucket + 1) * window - int(now.timestamp()))
-            publish(
-                EVENT_LATE_DIGEST,
-                {"task_id": task.pk, "bucket": bucket},
-                dedupe_key=f"report-late-digest:{task.pk}:{bucket}",
-                delay_seconds=delay,
+        submission = legacy_submission(task, student, for_update=True)
+        if submission is None:
+            name = clean_display(task.title) or f"Task {task.pk}"
+            submission, _created = ReportSubmission.objects.select_for_update().get_or_create(
+                task=task,
+                student=student,
+                target_key=target_key(name) or f"task-{task.pk}",
+                defaults={"status": ReportSubmission.STATUS_NOT_SUBMITTED, "target_name": name},
             )
+        return submit_locked(
+            task=task, submission=submission, student=student, wanted_ids=wanted_ids, note=note, now=now
+        )
+
+
+def submit_locked(*, task, submission, student, wanted_ids, note, now, draft_files_only=False):
+    """Create the next version of a locked ``submission`` (call inside a transaction).
+
+    ``draft_files_only``: staged files must belong to this submission's draft
+    (self-service, several targets per week task) and carry a clean scan.
+    """
+    _require_student_can_change(task, submission, now)
+
+    current_files = (
+        set(submission.current_version.files.values_list("pk", flat=True)) if submission.current_version_id else set()
+    )
+    files = {
+        item.pk: item
+        for item in ReportFile.objects.filter(pk__in=wanted_ids, task=task, owner=student).select_for_update()
+    }
+
+    def usable_file(pk):
+        item = files.get(pk)
+        if item is None:
+            return False
+        if pk in current_files:
+            return True
+        if item.submitted:
+            return False
+        return item.draft_id == submission.pk if draft_files_only else item.draft_id is None
+
+    usable = [files[pk] for pk in wanted_ids if usable_file(pk)]
+    if len(usable) != len(wanted_ids):
+        message = "Some files are no longer available. Upload them again."
+        raise ValidationFailed(message, details={"file_ids": [message]}, code="validation_files_missing")
+    if draft_files_only:
+        blocked = [item.original_name for item in usable if item.scan_status == SCAN_INFECTED]
+        if blocked:
+            message = f"{blocked[0]} was blocked by the virus scanner. Remove it before submitting."
+            raise ValidationFailed(message, details={"file_ids": [message]}, code="validation_file_blocked")
+        if any(item.scan_status != SCAN_CLEAN for item in usable):
+            raise Conflict(
+                "Your files are still being checked for viruses. Submit again in a moment.", code="files_scanning"
+            )
+    if len(usable) > task.max_files:
+        message = f"You can submit up to {task.max_files} file{'s' if task.max_files != 1 else ''}."
+        raise ValidationFailed(message, details={"file_ids": [message]})
+    allowed = set(task.allowed_extensions)
+    not_allowed = [item.original_name for item in usable if item.extension not in allowed]
+    if not_allowed:
+        message = f"{not_allowed[0]} is not an allowed file type for this report any more. Remove it."
+        raise ValidationFailed(message, details={"file_ids": [message]})
+    if sum(item.size for item in usable) > task.max_total_bytes:
+        limit_mb = task.max_total_bytes // (1024 * 1024)
+        message = f"Together your files are larger than the {limit_mb} MB limit for this report."
+        raise ValidationFailed(message, details={"file_ids": [message]})
+
+    # A double tap (or a retry with a new key) that changes nothing never
+    # creates a second version.
+    is_revision = submission.status == ReportSubmission.STATUS_RETURNED
+    if (
+        submission.current_version_id
+        and not is_revision
+        and set(wanted_ids) == current_files
+        and submission.current_version.note == note
+    ):
+        return SubmitResult(submission, submission.current_version, False)
+
+    previous = submission.current_version
+    if is_revision and previous is not None:
+        is_late, minutes_late = previous.is_late, previous.minutes_late
+    else:
+        minutes_late = task.minutes_late(now)
+        is_late = minutes_late > 0
+    version = ReportSubmissionVersion.objects.create(
+        submission=submission,
+        number=submission.version_count + 1,
+        note=note,
+        submitted_at=now,
+        is_late=is_late,
+        minutes_late=minutes_late,
+        is_revision=is_revision,
+        submitted_by=student,
+    )
+    version.files.set(usable)
+    ReportFile.objects.filter(pk__in=[item.pk for item in usable if not item.submitted]).update(submitted=True)
+
+    old_status = submission.status
+    if is_revision:
+        submission.status = ReportSubmission.STATUS_RESUBMITTED
+    elif old_status in (ReportSubmission.STATUS_NOT_SUBMITTED, ReportSubmission.STATUS_UNDER_REVIEW):
+        # A change before the deadline puts a draft-marked report back in the queue.
+        submission.status = ReportSubmission.STATUS_SUBMITTED
+    submission.current_version = version
+    submission.version_count = version.number
+    submission.first_submitted_at = submission.first_submitted_at or now
+    submission.submitted_at = now
+    submission.is_late = is_late
+    submission.minutes_late = minutes_late
+    submission.revision += 1
+    submission.save()
+
+    if is_late and not is_revision and submission.late_digest_sent_at is None:
+        bucket, window = _late_digest_bucket(now)
+        delay = max(0, (bucket + 1) * window - int(now.timestamp()))
+        publish(
+            EVENT_LATE_DIGEST,
+            {"task_id": task.pk, "bucket": bucket},
+            dedupe_key=f"report-late-digest:{task.pk}:{bucket}",
+            delay_seconds=delay,
+        )
     return SubmitResult(submission, version, True)
 
 
@@ -441,6 +533,9 @@ def _save_grade_locked(
             grade.revision_feedback = feedback
             grade.returned_at = now
             submission.status = ReportSubmission.STATUS_RETURNED
+            submission.revision_deadline = revision_deadline_for(task, now)
+            if submission.revision_deadline:
+                details["revision_deadline"] = submission.revision_deadline.isoformat()
             audit_action = ReportGradeAudit.ACTION_RETURNED
         else:
             required = action == GRADE_ACTION_GRADE
@@ -516,7 +611,7 @@ def _save_grade_locked(
         grade.save()
 
         submission.revision += 1
-        submission.save(update_fields=["status", "revision", "updated_at"])
+        submission.save(update_fields=["status", "revision", "revision_deadline", "updated_at"])
         details["version"] = version.number
         ReportGradeAudit.objects.create(
             submission=submission,
@@ -542,6 +637,15 @@ def _save_grade_locked(
 
 def _delete_name(name):
     delete_stored_name(name)
+
+
+def revision_deadline_for(task, now):
+    """Courses with a report policy give a returned report a revision window
+    (default 72 h); legacy courses without a policy keep "no limit"."""
+    policy = ReportPolicy.objects.filter(course_id=task.course_id).only("revision_window_hours").first()
+    if policy is None:
+        return None
+    return now + timedelta(hours=int(policy.revision_window_hours or 72))
 
 
 def release_marks(*, task, actor, now=None):
@@ -780,6 +884,40 @@ def _cell(task, submission, *, now, visible_only):
     }
 
 
+def _cell_for(task, submissions, *, now, visible_only):
+    """One gradebook cell for a task; a self-service week can hold several
+    targets per student: marks add up and so does the maximum (graded only)."""
+    real = [item for item in submissions if item.status != ReportSubmission.STATUS_NOT_SUBMITTED]
+    if len(real) <= 1:
+        cell = _cell(task, real[0] if real else None, now=now, visible_only=visible_only)
+        cell["target_count"] = len(real)
+        return cell
+    cells = [_cell(task, item, now=now, visible_only=visible_only) for item in real]
+    graded = [cell for cell in cells if cell["final_marks"] is not None]
+    statuses = {item.status for item in real}
+    if statuses == {ReportSubmission.STATUS_GRADED}:
+        status = ReportSubmission.STATUS_GRADED
+    elif ReportSubmission.STATUS_RETURNED in statuses:
+        status = ReportSubmission.STATUS_RETURNED
+    elif statuses & {ReportSubmission.STATUS_SUBMITTED, ReportSubmission.STATUS_RESUBMITTED}:
+        status = ReportSubmission.STATUS_SUBMITTED
+    else:
+        status = ReportSubmission.STATUS_UNDER_REVIEW
+    return {
+        "task_id": task.pk,
+        "status": status,
+        "submission_id": real[0].pk,
+        "final_marks": quantize_marks(sum((Decimal(cell["final_marks"]) for cell in graded), Decimal("0")))
+        if graded
+        else None,
+        "max_marks": quantize_marks(Decimal(task.max_marks) * max(1, len(graded))),
+        "is_late": any(cell["is_late"] for cell in cells),
+        "minutes_late": max(cell["minutes_late"] for cell in cells),
+        "is_missing": False,
+        "target_count": len(real),
+    }
+
+
 def _totals(cells):
     graded = [cell for cell in cells if cell["final_marks"] is not None]
     total = quantize_marks(sum((Decimal(cell["final_marks"]) for cell in graded), Decimal("0")))
@@ -812,7 +950,7 @@ def course_gradebook(course, *, now=None):
     )
     by_student = {}
     for submission in submissions:
-        by_student.setdefault(submission.student_id, {})[submission.task_id] = submission
+        by_student.setdefault(submission.student_id, {}).setdefault(submission.task_id, []).append(submission)
     from django.contrib.auth import get_user_model
 
     student_ids = set(active_student_ids(course)) | set(by_student)
@@ -820,7 +958,8 @@ def course_gradebook(course, *, now=None):
     rows = []
     for student in students:
         cells = [
-            _cell(task, by_student.get(student.pk, {}).get(task.pk), now=now, visible_only=False) for task in tasks
+            _cell_for(task, by_student.get(student.pk, {}).get(task.pk, []), now=now, visible_only=False)
+            for task in tasks
         ]
         rows.append({"student": student, "cells": cells, "totals": _totals(cells)})
     return {"course": course, "tasks": tasks, "rows": rows}
@@ -831,15 +970,18 @@ def student_marks(user, *, now=None):
     from .access import student_visible_tasks
 
     now = now or timezone.now()
-    tasks = list(student_visible_tasks(user, now).select_related("course").order_by("course_id", "due_at", "id"))
-    submissions = {
-        item.task_id: item
-        for item in ReportSubmission.objects.filter(student=user, task__in=tasks).select_related("grade", "task")
-    }
+    tasks = list(
+        student_visible_tasks(user, now, include_auto=True)
+        .select_related("course")
+        .order_by("course_id", "due_at", "id")
+    )
+    submissions = {}
+    for item in ReportSubmission.objects.filter(student=user, task__in=tasks).select_related("grade", "task"):
+        submissions.setdefault(item.task_id, []).append(item)
     courses = {}
     for task in tasks:
         entry = courses.setdefault(task.course_id, {"course": task.course, "tasks": [], "cells": []})
-        cell = _cell(task, submissions.get(task.pk), now=now, visible_only=True)
+        cell = _cell_for(task, submissions.get(task.pk, []), now=now, visible_only=True)
         entry["tasks"].append(task)
         entry["cells"].append(cell)
     result = []
@@ -863,13 +1005,18 @@ def unsubmitted_student_ids(task):
 
 
 def due_reminder_targets(now=None):
-    """Published tasks due within 24h that still need their reminder."""
+    """Published instructor-set tasks due within 24h that still need their
+    reminder (self-service weeks are reminded by reports.scheduler)."""
     now = now or timezone.now()
-    return ReportTask.objects.filter(
-        status=ReportTask.STATUS_PUBLISHED,
-        due_at__gt=now,
-        due_at__lte=now + timedelta(hours=24),
-    ).select_related("course")
+    return (
+        ReportTask.objects.filter(
+            status=ReportTask.STATUS_PUBLISHED,
+            due_at__gt=now,
+            due_at__lte=now + timedelta(hours=24),
+        )
+        .exclude(origin=ReportTask.ORIGIN_AUTO)
+        .select_related("course")
+    )
 
 
 def ceil_hours(delta):

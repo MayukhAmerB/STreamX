@@ -12,29 +12,35 @@ import {
   createRealtimeSession,
   deleteRealtimeRecording,
   endRealtimeSession,
+  getRealtimeGoLiveStatus,
   getRealtimeOwncastChatModeration,
+  getRealtimePreflight,
   getRealtimeSession,
   getRealtimeHostToken,
+  goLiveRealtimeStream,
   joinRealtimeSession,
   listRealtimeRecordings,
   listRealtimeSessions,
-  startRealtimeRecording,
   startRealtimeStream,
-  stopRealtimeRecording,
   stopRealtimeStream,
-  uploadRealtimeBrowserRecording,
 } from "../api/realtime";
 import {
   getRealtimeModuleOptions,
   listSessionClassRecordings,
+  rerunClassRecordingFinalize,
   retryClassRecording,
   sendRealtimeStreamHeartbeat,
+  setClassRecordingModule,
 } from "../api/realtimeLive";
 import { useAuth } from "../hooks/useAuth";
 import useAdaptiveRealtimeSessionPolling from "../hooks/useAdaptiveRealtimeSessionPolling";
 import useOwncastStreamLaunch from "../hooks/useOwncastStreamLaunch";
-import { ScreenityFallbackRecorder } from "../services/recording/ScreenityFallbackRecorder";
-import { HOST_LINK, HOST_SOURCE, getHostStudioController } from "../services/realtime/hostStudioController";
+import {
+  GO_LIVE_CANCELLED,
+  HOST_LINK,
+  HOST_SOURCE,
+  getHostStudioController,
+} from "../services/realtime/hostStudioController";
 import { resolveBroadcastEmbedUrls } from "../utils/broadcastUrls";
 import { apiData, apiMessage } from "../utils/api";
 import { copyTextToClipboard } from "../utils/clipboard";
@@ -276,6 +282,10 @@ export default function BroadcastingPage() {
     retryingId: null,
   });
   const [classRecordingRefreshKey, setClassRecordingRefreshKey] = useState(0);
+  // Phase 2 recordings: modules of the studio session's course for the
+  // optional module override, and the in-flight override / admin re-run.
+  const [sessionModuleOptions, setSessionModuleOptions] = useState([]);
+  const [classRecordingActionId, setClassRecordingActionId] = useState({ module: null, rerun: null });
   const [studioRecordingState, setStudioRecordingState] = useState({
     loading: false,
     error: "",
@@ -286,6 +296,8 @@ export default function BroadcastingPage() {
   });
 
   const fallbackRecorderRef = useRef(null);
+  // Phase 2: latest pre-class readiness probe (instructors and admins).
+  const [preflightState, setPreflightState] = useState(null);
   const attachStudioPreview = useCallback(
     (element) => {
       studioController.attachPreview(element);
@@ -466,6 +478,11 @@ export default function BroadcastingPage() {
       },
       sendHeartbeat: (sessionId, payload) => sendRealtimeStreamHeartbeat(sessionId, payload),
       startStream: async (sessionId) => apiData(await startRealtimeStream(sessionId), null),
+      // Cancel while Go Live is still starting.
+      stopStream: async (sessionId) => apiData(await stopRealtimeStream(sessionId), null),
+      // Phase 2: Go Live answers 202 and the studio polls until live.
+      goLive: (sessionId) => goLiveRealtimeStream(sessionId),
+      getGoLiveStatus: (sessionId) => getRealtimeGoLiveStatus(sessionId),
     });
     const unsubscribe = studioController.subscribe(setStudioLink);
 
@@ -483,6 +500,29 @@ export default function BroadcastingPage() {
         .catch(() => {
           // the studio panel stays closed; the badge still links back here
         });
+    } else {
+      // Phase 2: the page reloaded while this tab was live. Reopen the studio
+      // and resume the broadcast (camera; a screen share needs a click).
+      const candidate = studioController.readResumeCandidate();
+      if (candidate) {
+        getRealtimeSession(candidate.sessionId)
+          .then(async (response) => {
+            const session = apiData(response, null);
+            if (cancelled || !session) return;
+            setStudioSession((current) => current || session);
+            try {
+              await studioController.resumeAfterReload(session);
+            } catch (err) {
+              setStudioState((prev) => ({
+                ...prev,
+                error: apiMessage(err, "The broadcast could not resume on its own. Connect your camera and Go Live."),
+              }));
+            }
+          })
+          .catch(() => {
+            studioController.clearResume();
+          });
+      }
     }
 
     return () => {
@@ -496,6 +536,21 @@ export default function BroadcastingPage() {
       }
     };
   }, [studioController]);
+
+  useEffect(() => {
+    if (!studioSession?.id) return undefined;
+    let cancelled = false;
+    getRealtimePreflight()
+      .then((result) => {
+        if (!cancelled) setPreflightState(result);
+      })
+      .catch(() => {
+        // Optional notice only; never blocks going live.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [studioSession?.id]);
 
   useEffect(() => {
     // Heartbeats carry the latest session row (stream status, egress errors).
@@ -577,6 +632,54 @@ export default function BroadcastingPage() {
     };
   }, [studioSession?.id, classRecordingRefreshKey]);
 
+  // --- Phase 2 recordings: optional module override + admin re-run finalize ---
+  const studioLiveClassId = studioSession?.linked_live_class?.id || null;
+  useEffect(() => {
+    if (!studioLiveClassId || !canManageSession(studioSession, user)) {
+      setSessionModuleOptions([]);
+      return undefined;
+    }
+    let cancelled = false;
+    getRealtimeModuleOptions({ live_class_id: Number(studioLiveClassId) })
+      .then((options) => {
+        if (!cancelled) setSessionModuleOptions(Array.isArray(options?.modules) ? options.modules : []);
+      })
+      .catch(() => {
+        if (!cancelled) setSessionModuleOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload only when the class changes
+  }, [studioLiveClassId]);
+
+  const handleChangeClassRecordingModule = async (recording, moduleId) => {
+    setClassRecordingActionId((prev) => ({ ...prev, module: recording.id }));
+    setClassRecordingState((prev) => ({ ...prev, error: "" }));
+    try {
+      await setClassRecordingModule(recording.id, moduleId);
+      setClassRecordingRefreshKey((previous) => previous + 1);
+    } catch (err) {
+      setClassRecordingState((prev) => ({ ...prev, error: apiMessage(err, "Unable to change the module.") }));
+    } finally {
+      setClassRecordingActionId((prev) => ({ ...prev, module: null }));
+    }
+  };
+
+  const handleRerunClassRecording = async (recording) => {
+    setClassRecordingActionId((prev) => ({ ...prev, rerun: recording.id }));
+    setClassRecordingState((prev) => ({ ...prev, error: "" }));
+    try {
+      await rerunClassRecordingFinalize(recording.id);
+      setClassRecordingRefreshKey((previous) => previous + 1);
+    } catch (err) {
+      setClassRecordingState((prev) => ({ ...prev, error: apiMessage(err, "Unable to re-run the recording.") }));
+    } finally {
+      setClassRecordingActionId((prev) => ({ ...prev, rerun: null }));
+    }
+  };
+  // --- end Phase 2 recordings ---
+
   const handleRetryClassRecording = async (recording) => {
     setClassRecordingState((prev) => ({ ...prev, retryingId: recording.id, error: "" }));
     try {
@@ -600,14 +703,6 @@ export default function BroadcastingPage() {
     }
     if (moduleOptionsState.loading) {
       setCreateState({ loading: false, error: "Course modules are still loading. Try again in a moment.", success: "" });
-      return;
-    }
-    if (moduleOptionsState.modules.length > 0 && !form.target_module_id) {
-      setCreateState({
-        loading: false,
-        error: "Select the module that will receive this class recording.",
-        success: "",
-      });
       return;
     }
     setCreateState({ loading: true, error: "", success: "" });
@@ -1084,13 +1179,17 @@ export default function BroadcastingPage() {
       info: wasLive ? "Checking live delivery..." : "Starting live stream...",
     }));
     try {
-      const response = await startRealtimeStream(studioSession.id);
-      const updated = apiData(response, null);
+      let response = null;
+      let updated = null;
+      if (obsMode) {
+        response = await startRealtimeStream(studioSession.id);
+        updated = apiData(response, null);
+      } else {
+        // Phase 2: asynchronous Go Live (202 + polling) inside the controller.
+        updated = await studioController.startLive(studioSession.id);
+      }
       if (updated) {
         syncSessionRow(updated);
-      }
-      if (!obsMode) {
-        studioController.setLive(studioSession.id, true);
       }
       const serverMessage = String(response?.data?.message || "").trim();
       setStudioState((prev) => ({
@@ -1109,11 +1208,49 @@ export default function BroadcastingPage() {
         await handleJoin(studioSession.id);
       }
     } catch (err) {
+      if (err?.code === GO_LIVE_CANCELLED) {
+        setStudioState((prev) => ({
+          ...prev,
+          actionLoading: false,
+          error: "",
+          info: "Go Live cancelled. Press Go Live when you are ready.",
+        }));
+        return;
+      }
       setStudioState((prev) => ({
         ...prev,
         actionLoading: false,
         error: apiMessage(err, "Unable to start live stream."),
         info: "",
+      }));
+    }
+  };
+
+  // Stop a Go Live that is still starting (the server stops the queued start).
+  const handleCancelGoLive = async () => {
+    try {
+      const stopped = await studioController.cancelGoLive();
+      if (stopped) syncSessionRow(stopped);
+    } catch (err) {
+      setStudioState((prev) => ({ ...prev, error: apiMessage(err, "Unable to cancel Go Live. Press Stop Live.") }));
+    }
+  };
+
+  const handleResumeDelivery = async () => {
+    setStudioState((prev) => ({ ...prev, error: "", info: "Resuming the broadcast..." }));
+    try {
+      const updated = await studioController.resumeDelivery();
+      if (updated) syncSessionRow(updated);
+      setStudioState((prev) => ({ ...prev, info: "The broadcast resumed. Viewers are reconnecting." }));
+    } catch (err) {
+      if (err?.code === GO_LIVE_CANCELLED) {
+        setStudioState((prev) => ({ ...prev, error: "", info: "Resume cancelled." }));
+        return;
+      }
+      setStudioState((prev) => ({
+        ...prev,
+        info: "",
+        error: apiMessage(err, "The broadcast could not resume. Check your connection and try again."),
       }));
     }
   };
@@ -1141,130 +1278,6 @@ export default function BroadcastingPage() {
         ...prev,
         actionLoading: false,
         error: apiMessage(err, "Unable to stop live stream."),
-        info: "",
-      }));
-    }
-  };
-
-  const handleStartRecording = async () => {
-    if (!studioSession?.id) return;
-    setStudioRecordingState((prev) => ({ ...prev, loading: true, error: "", info: "" }));
-    try {
-      const response = await startRealtimeRecording(studioSession.id);
-      const recording = apiData(response, null);
-      setStudioRecordingState((prev) => ({
-        ...prev,
-        loading: false,
-        error: "",
-        info: "Broadcast recording started.",
-        active: recording,
-        mode: resolveRecordingMode(recording) || "livekit-egress",
-      }));
-    } catch (livekitErr) {
-      try {
-        const fallbackRecorder =
-          fallbackRecorderRef.current || new ScreenityFallbackRecorder({ withMicrophone: true });
-        fallbackRecorderRef.current = fallbackRecorder;
-        if (!fallbackRecorder.isRecording) {
-          await fallbackRecorder.start();
-        }
-        setStudioRecordingState((prev) => ({
-          ...prev,
-          loading: false,
-          error: "",
-          info: "LiveKit recorder unavailable. Browser fallback recording started.",
-          active: {
-            id: "browser-fallback",
-            status: "recording",
-            is_active: true,
-            source: "browser_fallback",
-          },
-          mode: "screenity-fallback",
-        }));
-      } catch (fallbackErr) {
-        fallbackRecorderRef.current = null;
-        setStudioRecordingState((prev) => ({
-          ...prev,
-          loading: false,
-          error: `${apiMessage(livekitErr, "Unable to start broadcast recording.")} ${apiMessage(
-            fallbackErr,
-            "Fallback recording failed."
-          )}`,
-          info: "",
-          mode: "",
-        }));
-      }
-    }
-  };
-
-  const handleStopRecording = async () => {
-    if (!studioSession?.id) return;
-    setStudioRecordingState((prev) => ({ ...prev, loading: true, error: "", info: "" }));
-    if (studioRecordingState.mode === "screenity-fallback") {
-      const fallbackRecorder = fallbackRecorderRef.current;
-      if (!fallbackRecorder || !fallbackRecorder.isRecording) {
-        setStudioRecordingState((prev) => ({
-          ...prev,
-          loading: false,
-          error: "No active fallback recording found.",
-          info: "",
-          active: null,
-          mode: "",
-        }));
-        return;
-      }
-      try {
-        const localRecording = await fallbackRecorder.stop();
-        fallbackRecorderRef.current = null;
-
-        const formData = new FormData();
-        formData.append("video_file", localRecording.file, localRecording.file_name);
-        if (localRecording.started_at) {
-          formData.append("started_at", localRecording.started_at);
-        }
-        if (localRecording.ended_at) {
-          formData.append("ended_at", localRecording.ended_at);
-        }
-
-        const uploadResponse = await uploadRealtimeBrowserRecording(studioSession.id, formData);
-        const storedRecording = apiData(uploadResponse, null);
-        setStudioRecordingState((prev) => ({
-          ...prev,
-          loading: false,
-          error: "",
-          info: "Fallback recording uploaded and stored.",
-          active: null,
-          latestCompleted: storedRecording || prev.latestCompleted,
-          mode: "",
-        }));
-      } catch (err) {
-        setStudioRecordingState((prev) => ({
-          ...prev,
-          loading: false,
-          error: apiMessage(err, "Unable to stop/upload fallback broadcast recording."),
-          info: "",
-        }));
-      }
-      return;
-    }
-
-    try {
-      const response = await stopRealtimeRecording(studioSession.id);
-      const recording = apiData(response, null);
-      setStudioRecordingState((prev) => ({
-        ...prev,
-        loading: false,
-        error: "",
-        info: "Broadcast recording stopped and stored.",
-        active: recording?.is_active ? recording : null,
-        latestCompleted: recording?.status === "completed" ? recording : prev.latestCompleted,
-        mode: recording?.is_active ? resolveRecordingMode(recording) : "",
-      }));
-    } catch (err) {
-      setStudioRecordingState((prev) => ({
-        ...prev,
-        loading: false,
-        error: apiMessage(err, "Unable to stop broadcast recording."),
         info: "",
       }));
     }
@@ -1311,15 +1324,26 @@ export default function BroadcastingPage() {
     handleJoin(sessionId);
   }, [activeBroadcast?.session?.id, highlightedSessionId, isAuthenticated]);
 
+  const studioObsPresence = Boolean(
+    studioSession?.id && isObsStreamMode(studioSession) && studioSession?.status !== "ended"
+  );
+
   useEffect(() => {
     if (!studioSession?.id) {
       return undefined;
     }
 
     let cancelled = false;
+    const sessionId = studioSession.id;
     const refreshStudioSession = async () => {
+      if (studioObsPresence) {
+        // OBS classes: the open Host Studio tells the server the host is
+        // present, so a paused class (OBS stopped for a break) is never
+        // auto-ended as abandoned.
+        sendRealtimeStreamHeartbeat(sessionId, { state: "connected", publishing: false }).catch(() => {});
+      }
       try {
-        const response = await getRealtimeSession(studioSession.id);
+        const response = await getRealtimeSession(sessionId);
         const latestSession = apiData(response, null);
         if (!latestSession || cancelled) {
           return;
@@ -1336,7 +1360,7 @@ export default function BroadcastingPage() {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [studioSession?.id]);
+  }, [studioSession?.id, studioObsPresence]);
 
   const applyActiveBroadcastSessionUpdate = useCallback((latestSession) => {
     if (!latestSession) {
@@ -1358,11 +1382,14 @@ export default function BroadcastingPage() {
     });
   }, [syncSessionRow]);
 
+  // null while the player plays; otherwise its stall reason (see SecureHlsBroadcastPlayer).
+  const [activeBroadcastPlaybackStalled, setActiveBroadcastPlaybackStalled] = useState(null);
   const handleRefreshActiveBroadcast = useAdaptiveRealtimeSessionPolling({
     enabled: Boolean(activeBroadcast?.session?.id),
     sessionId: activeBroadcast?.session?.id,
     sessionStatus: activeBroadcast?.session?.status,
     streamStatus: activeBroadcast?.broadcast?.stream_status,
+    playbackStalled: activeBroadcastPlaybackStalled,
     onSessionData: applyActiveBroadcastSessionUpdate,
   });
 
@@ -1619,7 +1646,6 @@ export default function BroadcastingPage() {
                       className="w-full rounded-xl border border-black bg-[#101010] px-3 py-2 text-sm text-white outline-none focus:border-[#999999] disabled:opacity-60"
                       value={form.target_module_id}
                       onChange={(e) => setForm((prev) => ({ ...prev, target_module_id: e.target.value }))}
-                      required={moduleOptionsState.modules.length > 0}
                       disabled={!form.linked_live_class_id || moduleOptionsState.loading}
                     >
                       <option value="">
@@ -1628,8 +1654,8 @@ export default function BroadcastingPage() {
                           : moduleOptionsState.loading
                             ? "Loading modules..."
                             : moduleOptionsState.modules.length
-                              ? "Select module..."
-                              : "No modules in this course"}
+                              ? "Choose automatically (optional)"
+                              : "No modules yet: \"Class recordings\" is created"}
                       </option>
                       {moduleOptionsState.modules.map((module) => (
                         <option key={module.id} value={module.id}>
@@ -1639,7 +1665,9 @@ export default function BroadcastingPage() {
                     </select>
                     {moduleOptionsState.course ? (
                       <p className="mt-1 text-[11px] text-[#9A9A9A]">
-                        The class recording is published as a lecture in this module of {moduleOptionsState.course.title}.
+                        Optional. The class recording is published as a lecture in this module of{" "}
+                        {moduleOptionsState.course.title}; left empty, it goes to the live class&apos;s default module or
+                        &quot;Class recordings&quot;.
                       </p>
                     ) : null}
                     {moduleOptionsState.error ? (
@@ -1986,7 +2014,7 @@ export default function BroadcastingPage() {
                       disabled={studioState.actionLoading}
                       loading={studioState.actionLoading}
                     >
-                      {studioSession.stream_status === "live" ? "Verify Delivery" : "Start Live"}
+                      {studioSession.stream_status === "live" ? "Verify Delivery" : "Go Live"}
                     </Button>
                     <Button
                       variant="danger"
@@ -1996,24 +2024,10 @@ export default function BroadcastingPage() {
                       Stop Live
                     </Button>
                   </div>
-                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                    <Button
-                      variant="secondary"
-                      onClick={handleStartRecording}
-                      loading={studioRecordingState.loading}
-                      disabled={Boolean(studioRecordingState.active)}
-                    >
-                      Start Recording
-                    </Button>
-                    <Button
-                      variant="danger"
-                      onClick={handleStopRecording}
-                      loading={studioRecordingState.loading}
-                      disabled={!studioRecordingState.active}
-                    >
-                      Stop Recording
-                    </Button>
-                  </div>
+                  <p className="mt-2 text-[11px] text-[#A4A4A4]">
+                    Recording is automatic: every broadcast is recorded and published to the course when the class
+                    ends.
+                  </p>
                 </>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -2048,6 +2062,31 @@ export default function BroadcastingPage() {
                 </div>
               )}
 
+              {!isObsStudioMode && isStudioLinkedToSession && studioLink.deliveryFailed ? (
+                <div
+                  role="alert"
+                  className="mt-3 flex flex-col gap-2 rounded-xl border border-red-400/50 bg-[#2d0709] p-3 text-sm text-red-100 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <span>Viewers are not receiving your broadcast. Your camera is still connected.</span>
+                  <Button variant="danger" onClick={handleResumeDelivery} loading={studioLink.goingLive}>
+                    Resume broadcast
+                  </Button>
+                </div>
+              ) : null}
+              {!isObsStudioMode && studioLink.goingLive ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-zinc-300">
+                  <span role="status">Going live... the stream starts in a few seconds.</span>
+                  <Button variant="secondary" onClick={handleCancelGoLive}>
+                    Cancel Go Live
+                  </Button>
+                </div>
+              ) : null}
+              {preflightState?.ok === false ? (
+                <p role="alert" className="mt-3 text-xs text-amber-300">
+                  Pre-class check found a problem ({(preflightState.failed || []).join(", ")}). Ops has been alerted;
+                  you can still try to go live.
+                </p>
+              ) : null}
               {studioState.error ? <p className="mt-3 text-xs text-red-300">{studioState.error}</p> : null}
               {studioState.info ? <p className="mt-3 text-xs text-zinc-300">{studioState.info}</p> : null}
               {!isObsStudioMode && isStudioLinkedToSession && studioLink.error ? (
@@ -2076,11 +2115,8 @@ export default function BroadcastingPage() {
                     {studioProfile.fps}fps, max {studioProfile.max_video_bitrate_kbps} kbps.
                   </p>
                   <p className="mt-1 text-[11px] text-[#A4A4A4]">
-                    Recording status: {studioRecordingState.active?.status || "idle"}
-                    {studioRecordingState.active
-                      ? ` (${studioRecordingState.mode === "screenity-fallback" ? "browser fallback" : "livekit"})`
-                      : ""}
-                    .
+                    Recording: automatic. Every broadcast is recorded on the server and published when the class
+                    ends.
                   </p>
                   {resolveRecordingPlaybackUrl(studioRecordingState.latestCompleted) ? (
                     <a
@@ -2125,6 +2161,12 @@ export default function BroadcastingPage() {
               error={classRecordingState.error}
               retryingId={classRecordingState.retryingId}
               onRetry={handleRetryClassRecording}
+              moduleOptions={sessionModuleOptions}
+              onChangeModule={canManageSession(studioSession, user) ? handleChangeClassRecordingModule : undefined}
+              changingModuleId={classRecordingActionId.module}
+              isAdmin={user?.is_admin === true}
+              onRerunFinalize={handleRerunClassRecording}
+              rerunningId={classRecordingActionId.rerun}
             />
           </div>
 
@@ -2568,6 +2610,7 @@ export default function BroadcastingPage() {
             withContainer={false}
             statusMessage={activeBroadcastStatusMessage}
             onRefreshStream={handleRefreshActiveBroadcast}
+            onPlaybackStalledChange={setActiveBroadcastPlaybackStalled}
             onRefreshChat={() => setActiveBroadcastChatRefreshKey((previous) => previous + 1)}
           />
         </section>

@@ -60,7 +60,7 @@ backup_report_files() {
       -v "${REPORTS_HOST_DIR}:/source:ro" \
       -v "${BACKUP_DIR}:/backup" \
       alpine:3.20 \
-      sh -lc "tar czf \"/backup/${archive_name}\" -C /source --exclude=./.incoming ."
+      sh -lc "tar czf \"/backup/${archive_name}\" -C /source --exclude=./.incoming --exclude=./.recording-uploads ."
   elif docker volume inspect "$LEGACY_REPORTS_VOLUME" >/dev/null 2>&1; then
     log "Archiving report files from the $LEGACY_REPORTS_VOLUME volume (not migrated yet)."
     backup_volume "$LEGACY_REPORTS_VOLUME" "$archive_name"

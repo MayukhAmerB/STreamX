@@ -27,15 +27,21 @@ export default function LoginPage() {
     sessionEndedMessage,
     isAuthenticated,
     loading: authLoading,
+    user,
   } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTo = location.state?.from || "/";
   // ?next= (e.g. from labs.alsyedinitiative.com): only in-app paths or the trusted labs site.
   const returnTarget = returnTargetFromSearch(location.search);
+  // The labs site can only use the account once the current Terms are
+  // accepted here (its API calls answer 403 "terms" until then). The Terms
+  // gate shows on this page; the effect below returns to labs after "I Agree".
+  const termsPending = Boolean(user?.terms_acceptance_required);
 
-  const goAfterLogin = () => {
+  const goAfterLogin = (signedInUser) => {
     if (returnTarget?.type === "external") {
+      if (signedInUser?.terms_acceptance_required) return;
       window.location.assign(returnTarget.href);
       return;
     }
@@ -45,11 +51,12 @@ export default function LoginPage() {
   // Already signed in and sent here with a return address: go straight back.
   useEffect(() => {
     if (!authLoading && isAuthenticated && returnTarget) {
-      if (returnTarget.type === "external") window.location.replace(returnTarget.href);
-      else navigate(returnTarget.path, { replace: true });
+      if (returnTarget.type === "external") {
+        if (!termsPending) window.location.replace(returnTarget.href);
+      } else navigate(returnTarget.path, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isAuthenticated]);
+  }, [authLoading, isAuthenticated, termsPending]);
   const turnstile = useTurnstileChallenge(turnstileEnabled);
   const [form, setForm] = useState({ email: "", password: "", otp_code: "" });
   const [loading, setLoading] = useState(false);
@@ -91,13 +98,13 @@ export default function LoginPage() {
       if (normalizedEmail !== form.email) {
         setNormalizedEmail(normalizedEmail);
       }
-      await login({
+      const signedInUser = await login({
         email: normalizedEmail,
         password: form.password,
         ...(needs2FA ? { otp_code: form.otp_code } : {}),
         ...turnstile.payload,
       });
-      goAfterLogin();
+      goAfterLogin(signedInUser);
     } catch (err) {
       const requires2FA = Boolean(err?.response?.data?.errors?.requires_2fa);
       const detail = err?.response?.data?.errors?.detail;

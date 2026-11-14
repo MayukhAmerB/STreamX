@@ -12,8 +12,11 @@ import {
   PlayOutline,
   QuestionAnswering,
   Report,
+  Security,
   TaskApproved,
+  Table,
   ToolKit,
+  Upload,
   UserAvatar,
   Video,
 } from "@carbon/icons-react";
@@ -37,6 +40,10 @@ export const NAV_ICONS = {
   labs: Flag,
   reports: Report,
   grading: TaskApproved,
+  // Phase 3
+  exams: Security,
+  gradebook: Table,
+  recordingUpload: Upload,
 };
 
 export function getNavIcon(key) {

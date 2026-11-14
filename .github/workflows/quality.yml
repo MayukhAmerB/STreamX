@@ -118,3 +118,28 @@ jobs:
         run: bash infra/hostinger/tests/test-report-storage-config.sh
       - name: Test report storage preparation and legacy volume migration
         run: bash infra/hostinger/tests/test-prepare-report-storage.sh
+      - name: Test the live-class deploy guard
+        run: bash infra/hostinger/tests/test-deploy-guard.sh
+      - name: Test container autoheal
+        run: bash infra/hostinger/tests/test-autoheal.sh
+
+  labs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # The shell expands the glob: `node --test <dir>` is not accepted by Node 22+.
+      - run: node --test OSINTCTF/tests/*.test.js
+
+  obs-uploader:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: tools/obs-uploader
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets --locked -- -D warnings
+      - run: cargo test --locked

@@ -247,6 +247,9 @@ class ObsStreamHealthWriterTests(RealtimeFixtureMixin, TestCase):
     def setUp(self):
         self.make_fixture()
 
+    # The legacy OBS writer runs until LIVE_RECONCILER_MODE=enforce, where the
+    # live reconciler takes over (tests/test_live_lifecycle.py).
+    @override_settings(LIVE_RECONCILER_MODE="shadow")
     @patch("apps.realtime.services.get_owncast_public_status", return_value={"online": True})
     def test_periodic_hook_persists_obs_stream_status(self, _status):
         obs = self.make_session(

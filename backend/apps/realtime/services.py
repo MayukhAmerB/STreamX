@@ -536,6 +536,10 @@ def refresh_obs_session_stream_health(session, *, force_refresh=False, persist=T
         next_status = session.STREAM_STARTING
     elif current_status == session.STREAM_FAILED:
         next_status = session.STREAM_FAILED
+    elif current_status == getattr(session, "STREAM_INTERRUPTED", "interrupted"):
+        # The live reconciler owns interrupted -> stopped (after its grace period).
+        next_status = current_status
+        grace_active = True
     elif current_status == session.STREAM_LIVE and offline_grace_seconds > 0 and cache.get(last_online_cache_key):
         next_status = session.STREAM_LIVE
         grace_active = True
@@ -1401,6 +1405,29 @@ def _list_room_participants(room_name):
     )
     participants = response.get("participants") or []
     return participants if isinstance(participants, list) else []
+
+
+def delete_livekit_room(room_name, *, timeout=None):
+    """RoomService.DeleteRoom: disconnects everyone and frees the room (End).
+
+    Raises LiveKitRoomServiceError (a 404 means the room is already gone; the
+    caller treats that as success) or LiveKitConfigError.
+    """
+    room_name = str(room_name or "").strip()
+    if not room_name:
+        return {}
+    room_timeout = timeout or max(1, int(getattr(settings, "LIVEKIT_EGRESS_STATUS_TIMEOUT_SECONDS", 5) or 5))
+    return _twirp_room_service_post(
+        room_name=room_name,
+        method_name="DeleteRoom",
+        payload={"room": room_name},
+        timeout=room_timeout,
+    )
+
+
+def list_room_participant_count(room_name):
+    """Participants currently in the LiveKit room (raises when LiveKit cannot be asked)."""
+    return len(_list_room_participants(room_name))
 
 
 def resolve_host_publisher_identity(*, room_name, session_id, preferred_identity=""):

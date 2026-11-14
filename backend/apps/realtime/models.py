@@ -74,10 +74,15 @@ class RealtimeSession(models.Model):
     STREAM_LIVE = "live"
     STREAM_STOPPED = "stopped"
     STREAM_FAILED = "failed"
+    # Phase 2: the feed dropped while the class is live and the host is
+    # expected back (grace period). Viewers see "Host reconnecting...".
+    # Written only by the live reconciler (apps/realtime/reconciler.py).
+    STREAM_INTERRUPTED = "interrupted"
     STREAM_STATUS_CHOICES = [
         (STREAM_IDLE, "Idle"),
         (STREAM_STARTING, "Starting"),
         (STREAM_LIVE, "Live"),
+        (STREAM_INTERRUPTED, "Interrupted (host reconnecting)"),
         (STREAM_STOPPED, "Stopped"),
         (STREAM_FAILED, "Failed"),
     ]
@@ -140,6 +145,18 @@ class RealtimeSession(models.Model):
     )
     livekit_egress_id = models.CharField(max_length=255, blank=True, default="")
     livekit_egress_error = models.TextField(blank=True, default="")
+    # Phase 2 live lifecycle (expand-only, nullable/defaulted columns).
+    stream_interrupted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the feed dropped into the 'interrupted' (host reconnecting) state.",
+    )
+    end_reason = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        help_text="Why the session ended: host, admin, abandoned, never_started.",
+    )
 
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True)

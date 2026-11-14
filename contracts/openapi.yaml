@@ -1093,6 +1093,317 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /ctf-admin/batches/:
+    get:
+      operationId: ctf_admin_batches_list
+      tags:
+      - ctf-admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchList'
+          description: ''
+  /ctf-admin/exams/:
+    get:
+      operationId: ctf_admin_exams_list
+      tags:
+      - ctf-admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsoleExamList'
+          description: ''
+  /ctf-admin/exams/{slug}/:
+    get:
+      operationId: ctf_admin_exams_retrieve
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf-admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsoleExamDetail'
+          description: ''
+    patch:
+      operationId: ctf_admin_exams_partial_update
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf-admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedExamUpdateRequest'
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsoleExamDetail'
+          description: ''
+  /ctf-admin/exams/{slug}/close/:
+    post:
+      operationId: ctf_admin_exams_close_create
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf-admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsoleExamDetail'
+          description: ''
+  /ctf-admin/exams/{slug}/materials/:
+    post:
+      operationId: ctf_admin_exams_materials_create
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf-admin
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MaterialUploadRequest'
+        required: true
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialUploaded'
+          description: ''
+  /ctf-admin/exams/{slug}/materials/{material_id}/:
+    delete:
+      operationId: ctf_admin_exams_materials_destroy
+      parameters:
+      - in: path
+        name: material_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf-admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '204':
+          description: No response body
+  /ctf-admin/exams/{slug}/publish/:
+    post:
+      operationId: ctf_admin_exams_publish_create
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf-admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsoleExamDetail'
+          description: ''
+  /ctf-admin/exams/{slug}/results/:
+    get:
+      operationId: ctf_admin_exams_results_retrieve
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf-admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Results'
+          description: ''
+  /ctf-admin/exams/{slug}/results.csv:
+    get:
+      operationId: ctf_admin_exams_results_csv_retrieve
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf-admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            text/csv:
+              schema:
+                type: string
+          description: ''
+  /ctf-admin/exams/{slug}/unschedule/:
+    post:
+      operationId: ctf_admin_exams_unschedule_create
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf-admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsoleExamDetail'
+          description: ''
+  /ctf-admin/exams/preview/:
+    post:
+      operationId: ctf_admin_exams_preview_create
+      description: Validate and diff an exam file without saving anything (counts
+        only).
+      tags:
+      - ctf-admin
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExamUploadRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExamUploadRequest'
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+          description: ''
+  /ctf-admin/exams/upload/:
+    post:
+      operationId: ctf_admin_exams_upload_create
+      tags:
+      - ctf-admin
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExamUploadRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExamUploadRequest'
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+          description: ''
+  /ctf-admin/summary/:
+    get:
+      operationId: ctf_admin_summary_retrieve
+      description: 'The staff Console card: exams open now and scheduled.'
+      tags:
+      - ctf-admin
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsoleSummary'
+          description: ''
+  /ctf/eligibility/:
+    get:
+      operationId: ctf_eligibility_retrieve
+      description: '``{enabled, reason}`` for the labs Examination tab and the Console
+        card.'
+      tags:
+      - ctf
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Eligibility'
+          description: ''
   /ctf/exams/:
     get:
       operationId: ctf_exams_list
@@ -1128,6 +1439,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExamDetail'
+          description: ''
+  /ctf/exams/{slug}/materials/{material_id}/:
+    get:
+      operationId: ctf_exams_materials_retrieve
+      description: A fresh signed URL for one evidence file (the student must have
+        started).
+      parameters:
+      - in: path
+        name: material_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialUrl'
           description: ''
   /ctf/exams/{slug}/questions/{key}/attempts/:
     post:
@@ -1219,6 +1558,31 @@ paths:
               schema:
                 $ref: '#/components/schemas/ParticipationResponse'
           description: ''
+  /ctf/materials/{token}/:
+    get:
+      operationId: ctf_materials_file_retrieve
+      description: |-
+        The evidence bytes behind a signed URL. The token is the credential
+        (an ``<img>`` on the labs page cannot send headers), so no session is
+        read here; the participation is re-checked on every request.
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - ctf
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
   /enrollment-leads/:
     post:
       operationId: enrollment_leads_create
@@ -1249,6 +1613,99 @@ paths:
               schema:
                 type: object
                 additionalProperties: {}
+          description: ''
+  /gradebook/courses/:
+    get:
+      operationId: gradebook_courses_list
+      tags:
+      - gradebook
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedGradebookCourseList'
+          description: ''
+  /gradebook/courses/{course_id}/:
+    get:
+      operationId: gradebook_courses_retrieve
+      parameters:
+      - in: path
+        name: course_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - gradebook
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedBatchGradebook'
+          description: ''
+  /gradebook/courses/{course_id}/export.csv:
+    get:
+      operationId: gradebook_courses_export_retrieve
+      parameters:
+      - in: path
+        name: course_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - gradebook
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            text/csv:
+              schema:
+                type: string
+          description: ''
+  /gradebook/me/:
+    get:
+      operationId: gradebook_me_retrieve
+      tags:
+      - gradebook
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedStudentGradebook'
+          description: ''
+  /gradebook/students/{student_id}/:
+    get:
+      operationId: gradebook_students_retrieve
+      parameters:
+      - in: path
+        name: student_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - gradebook
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedStudentGradebook'
           description: ''
   /guides/:
     get:
@@ -2355,6 +2812,55 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /realtime/class-recordings/{recording_id}/module/:
+    post:
+      operationId: realtime_class_recording_set_module
+      description: 'Choose the module that receives this recording. Optional: without
+        a choice the server derives one (session module, the live class''s default
+        module, or an auto-created ''Class recordings'' section). Moves an existing
+        lecture, clears the review flag and retries a failed recording.'
+      parameters:
+      - in: path
+        name: recording_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Class recordings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassRecordingModuleRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ClassRecordingModuleRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ClassRecordingModuleRequest'
+        required: true
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassRecordingResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassRecordingResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassRecordingResponse'
+          description: ''
   /realtime/class-recordings/{recording_id}/obs-upload/:
     post:
       operationId: realtime_class_recording_obs_upload
@@ -2395,6 +2901,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ClassRecordingResponse'
+          description: ''
+  /realtime/class-recordings/{recording_id}/rerun-finalize/:
+    post:
+      operationId: realtime_class_recording_rerun_finalize
+      description: 'Admin only: push a recording forward from where it is (never needed
+        normally).'
+      parameters:
+      - in: path
+        name: recording_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Class recordings
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassRecordingActionResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassRecordingActionResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClassRecordingActionResponse'
           description: ''
   /realtime/class-recordings/{recording_id}/retry/:
     post:
@@ -2533,6 +3074,23 @@ paths:
       - realtime
       security:
       - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /realtime/preflight/:
+    get:
+      operationId: realtime_preflight
+      description: Latest pre-class readiness probe; managers may run a fresh one.
+      tags:
+      - realtime
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
       responses:
         '200':
           content:
@@ -2990,6 +3548,75 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /realtime/sessions/{id}/go-live/:
+    get:
+      operationId: realtime_session_go_live_status
+      description: |-
+        Host Studio Go Live without holding a request thread on LiveKit (D7).
+
+        POST moves the stream to "starting" (compare-and-set) and queues the
+        egress start for the worker: **202** with the state to poll. GET is the
+        poll: ``state`` is starting | live | failed | stopped | ended.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - realtime
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: realtime_session_go_live
+      description: |-
+        Host Studio Go Live without holding a request thread on LiveKit (D7).
+
+        POST moves the stream to "starting" (compare-and-set) and queues the
+        egress start for the worker: **202** with the state to poll. GET is the
+        poll: ``state`` is starting | live | failed | stopped | ended.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - realtime
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '202':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /realtime/sessions/{id}/host-token/:
     post:
       operationId: realtime_sessions_host_token_create_by_id
@@ -3430,6 +4057,301 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /recording-uploads/:
+    get:
+      operationId: recording_uploads_list
+      description: The caller's recent uploads (newest first), unfinished ones included
+        for resuming.
+      tags:
+      - Recording uploads
+      security:
+      - recordingUploadToken: []
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingUploadListResponse'
+          description: ''
+    post:
+      operationId: recording_uploads_create
+      description: 'Start a resumable upload (or resume the unfinished upload of the
+        same file: same class, name, size and, when both give one, SHA-256). Then
+        PUT every chunk and POST complete.'
+      tags:
+      - Recording uploads
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UploadCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadCreateRequest'
+        required: true
+      security:
+      - recordingUploadToken: []
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingUploadResponse'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingUploadResponse'
+          description: ''
+  /recording-uploads/{upload_id}/:
+    get:
+      operationId: recording_uploads_retrieve
+      parameters:
+      - in: path
+        name: upload_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Recording uploads
+      security:
+      - recordingUploadToken: []
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingUploadResponse'
+          description: ''
+    delete:
+      operationId: recording_uploads_abort
+      description: Cancel an unfinished upload and delete its chunks.
+      parameters:
+      - in: path
+        name: upload_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Recording uploads
+      security:
+      - recordingUploadToken: []
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingUploadResponse'
+          description: ''
+  /recording-uploads/{upload_id}/chunks/{index}/:
+    put:
+      operationId: recording_uploads_put_chunk
+      description: |-
+        PUT one chunk as the raw request body (application/octet-stream).
+
+        The body is streamed to the private staging directory in 1 MiB blocks
+        (never request.body / request.data). Headers: ``Content-Length`` (must be
+        the chunk's exact size) and optionally ``X-Chunk-Sha256``.
+      parameters:
+      - in: header
+        name: X-Chunk-Sha256
+        schema:
+          type: string
+      - in: path
+        name: index
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: upload_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Recording uploads
+      requestBody:
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      security:
+      - recordingUploadToken: []
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingUploadChunkResponse'
+          description: ''
+  /recording-uploads/{upload_id}/complete/:
+    post:
+      operationId: recording_uploads_complete
+      description: 'All chunks are in: queue the server to assemble, verify and publish
+        the recording. Answers at once (202); poll the upload until it is completed
+        or failed. Calling it again is harmless.'
+      parameters:
+      - in: path
+        name: upload_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Recording uploads
+      security:
+      - recordingUploadToken: []
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingUploadResponse'
+          description: ''
+  /recording-uploads/{upload_id}/switch-video/:
+    post:
+      operationId: recording_uploads_switch_video
+      description: 'Admin: put the auto-recording (replaced video) back into the lecture,
+        or switch to the uploaded video again. The lecture, its progress and comments
+        are kept; the stream is rebuilt.'
+      parameters:
+      - in: path
+        name: upload_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Recording uploads
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevertRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RevertRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RevertRequest'
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingUploadResponse'
+          description: ''
+  /recording-uploads/targets/:
+    get:
+      operationId: recording_upload_targets
+      description: 'Classes the caller may upload a recording to (live first, then
+        recent), with what an upload would do: replace the class''s recording lecture
+        video or create the lecture. latest=1 returns only the class a desktop upload
+        without session_id is attached to.'
+      parameters:
+      - in: query
+        name: latest
+        schema:
+          type: boolean
+      tags:
+      - Recording uploads
+      security:
+      - recordingUploadToken: []
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingUploadTargetListResponse'
+          description: ''
+  /recording-uploads/tokens/:
+    get:
+      operationId: recording_upload_tokens_list
+      tags:
+      - Recording uploads
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingUploadTokenListResponse'
+          description: ''
+    post:
+      operationId: recording_upload_tokens_create
+      description: Create a personal upload token for the desktop uploader. The token
+        is shown once.
+      tags:
+      - Recording uploads
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenCreateRequest'
+        required: true
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingUploadTokenCreatedResponse'
+          description: ''
+  /recording-uploads/tokens/{token_id}/:
+    delete:
+      operationId: recording_upload_tokens_revoke
+      parameters:
+      - in: path
+        name: token_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Recording uploads
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingUploadTokenResponse'
+          description: ''
   /reports/attachments/{attachment_id}/download/:
     get:
       operationId: reports_attachments_download
@@ -3543,6 +4465,52 @@ paths:
               schema:
                 $ref: '#/components/schemas/GradableCourseList'
           description: ''
+  /reports/manage/courses/{course_id}/policy/:
+    get:
+      operationId: reports_manage_courses_policy_retrieve
+      parameters:
+      - in: path
+        name: course_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportPolicy'
+          description: ''
+    put:
+      operationId: reports_manage_courses_policy_update
+      parameters:
+      - in: path
+        name: course_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportPolicyRequest'
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportPolicy'
+          description: ''
   /reports/manage/export.csv:
     get:
       operationId: reports_manage_export_csv
@@ -3597,6 +4565,11 @@ paths:
         schema:
           type: integer
       - in: query
+        name: group
+        schema:
+          type: string
+        description: '''week'': order by week, then target, then oldest'
+      - in: query
         name: late
         schema:
           type: boolean
@@ -3604,7 +4577,7 @@ paths:
         name: q
         schema:
           type: string
-        description: Student name or email
+        description: Student name or email, or target name
       - in: query
         name: status
         schema:
@@ -3615,6 +4588,11 @@ paths:
         name: task
         schema:
           type: integer
+      - in: query
+        name: week
+        schema:
+          type: string
+        description: Week start date (YYYY-MM-DD), self-service weeks
       tags:
       - reports
       security:
@@ -3636,6 +4614,11 @@ paths:
         schema:
           type: integer
       - in: query
+        name: group
+        schema:
+          type: string
+        description: '''week'': order by week, then target, then oldest'
+      - in: query
         name: late
         schema:
           type: boolean
@@ -3643,7 +4626,7 @@ paths:
         name: q
         schema:
           type: string
-        description: Student name or email
+        description: Student name or email, or target name
       - in: query
         name: status
         schema:
@@ -3659,6 +4642,11 @@ paths:
         name: task
         schema:
           type: integer
+      - in: query
+        name: week
+        schema:
+          type: string
+        description: Week start date (YYYY-MM-DD), self-service weeks
       tags:
       - reports
       security:
@@ -3680,6 +4668,11 @@ paths:
         schema:
           type: integer
       - in: query
+        name: group
+        schema:
+          type: string
+        description: '''week'': order by week, then target, then oldest'
+      - in: query
         name: late
         schema:
           type: boolean
@@ -3687,7 +4680,7 @@ paths:
         name: q
         schema:
           type: string
-        description: Student name or email
+        description: Student name or email, or target name
       - in: query
         name: status
         schema:
@@ -3703,6 +4696,11 @@ paths:
         name: task
         schema:
           type: integer
+      - in: query
+        name: week
+        schema:
+          type: string
+        description: Week start date (YYYY-MM-DD), self-service weeks
       tags:
       - reports
       requestBody:
@@ -3998,6 +4996,209 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MyMarks'
+          description: ''
+  /reports/me/targets/:
+    post:
+      operationId: reports_me_targets_create
+      description: |-
+        DRF APIView/ViewSet mixin. Put it FIRST in the bases.
+
+        Runs after authentication/permissions/throttling (inside ``initial``) so
+        the owner is the authenticated user and rejected requests never claim keys.
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+      tags:
+      - reports
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTargetRequestRequest'
+        required: true
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetDetail'
+          description: ''
+  /reports/me/targets/{submission_id}/:
+    get:
+      operationId: reports_me_targets_retrieve
+      parameters:
+      - in: path
+        name: submission_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetDetail'
+          description: ''
+    delete:
+      operationId: reports_me_targets_destroy
+      parameters:
+      - in: path
+        name: submission_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          description: No response body
+  /reports/me/targets/{submission_id}/files/:
+    post:
+      operationId: reports_me_targets_files_create
+      parameters:
+      - in: path
+        name: submission_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadRequestRequest'
+        required: true
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftFile'
+          description: ''
+  /reports/me/targets/{submission_id}/files/{file_id}/:
+    delete:
+      operationId: reports_me_targets_files_destroy
+      parameters:
+      - in: path
+        name: file_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: submission_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          description: No response body
+  /reports/me/targets/{submission_id}/submit/:
+    post:
+      operationId: reports_me_targets_submit_create
+      description: |-
+        DRF APIView/ViewSet mixin. Put it FIRST in the bases.
+
+        Runs after authentication/permissions/throttling (inside ``initial``) so
+        the owner is the authenticated user and rejected requests never claim keys.
+      parameters:
+      - in: header
+        name: Idempotency-Key
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: submission_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitTargetRequestRequest'
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitTargetResponse'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitTargetResponse'
+          description: ''
+  /reports/me/targets/{submission_id}/undo/:
+    post:
+      operationId: reports_me_targets_undo_create
+      parameters:
+      - in: path
+        name: submission_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetDetail'
+          description: ''
+  /reports/me/week/:
+    get:
+      operationId: reports_me_week_retrieve
+      description: |-
+        Per course: is self-service on (else why not), this week (and last week
+        during its late window), the student's targets and slots left.
+      parameters:
+      - in: query
+        name: course
+        schema:
+          type: integer
+      tags:
+      - reports
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyWeek'
           description: ''
   /reports/tasks/:
     get:
@@ -4330,6 +5531,50 @@ components:
       - new_final_marks
       - old_final_marks
       - to_status
+    Batch:
+      type: object
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        title:
+          type: string
+        batch:
+          type: string
+      required:
+      - batch
+      - id
+      - slug
+      - title
+    BatchList:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchOption'
+      required:
+      - results
+    BatchOption:
+      type: object
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        title:
+          type: string
+        batch:
+          type: string
+        student_count:
+          type: integer
+      required:
+      - batch
+      - id
+      - slug
+      - student_count
+      - title
     BroadcastEgressStatus:
       type: object
       properties:
@@ -4355,6 +5600,29 @@ components:
       description: |-
         * `osint` - OSINT
         * `web_pentesting` - Web Application Pentesting
+    ChunkAck:
+      type: object
+      properties:
+        index:
+          type: integer
+        duplicate:
+          type: boolean
+        received_count:
+          type: integer
+        received_bytes:
+          type: integer
+        chunk_count:
+          type: integer
+        complete:
+          type: boolean
+          description: Every chunk is on the server; call complete.
+      required:
+      - chunk_count
+      - complete
+      - duplicate
+      - index
+      - received_bytes
+      - received_count
     ClassRecording:
       type: object
       properties:
@@ -4382,6 +5650,12 @@ components:
           allOf:
           - $ref: '#/components/schemas/LectureRef'
           nullable: true
+          readOnly: true
+        needs_review:
+          type: boolean
+          readOnly: true
+        review_reason:
+          type: string
           readOnly: true
         error:
           type: string
@@ -4444,8 +5718,12 @@ components:
         can_replace:
           type: boolean
           readOnly: true
+        can_choose_module:
+          type: boolean
+          readOnly: true
       required:
       - attempts
+      - can_choose_module
       - can_replace
       - can_retry
       - captured_bytes
@@ -4457,15 +5735,48 @@ components:
       - id
       - lecture
       - module
+      - needs_review
       - part_count
       - published_at
       - recorder_heartbeat_at
+      - review_reason
       - session_id
       - source
       - started_at
       - state
       - stop_requested_at
       - updated_at
+    ClassRecordingActionResponse:
+      type: object
+      properties:
+        data:
+          allOf:
+          - $ref: '#/components/schemas/ClassRecordingActionResult'
+          nullable: true
+        success:
+          type: boolean
+        message:
+          type: string
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    ClassRecordingActionResult:
+      type: object
+      properties:
+        done:
+          type: boolean
+        detail:
+          type: string
+        recording:
+          $ref: '#/components/schemas/ClassRecording'
+      required:
+      - detail
+      - done
+      - recording
     ClassRecordingListResponse:
       type: object
       properties:
@@ -4485,6 +5796,15 @@ components:
       - errors
       - message
       - success
+    ClassRecordingModuleRequest:
+      type: object
+      properties:
+        module_id:
+          type: integer
+          description: Module (of the class's course) that receives this recording's
+            lecture.
+      required:
+      - module_id
     ClassRecordingResponse:
       type: object
       properties:
@@ -4509,12 +5829,14 @@ components:
       - obs_upload
       - livekit_egress
       - imported
+      - browser_fallback
       type: string
       description: |-
-        * `server` - Server recording (OBS stream)
+        * `server` - Server recording (Owncast feed: OBS or Host Studio)
         * `obs_upload` - OBS file upload (replacement)
-        * `livekit_egress` - LiveKit egress (Host Studio)
+        * `livekit_egress` - LiveKit egress (meeting / Host Studio)
         * `imported` - Imported (found on the server)
+        * `browser_fallback` - Browser fallback upload
     ClassRecordingStateEnum:
       enum:
       - recording
@@ -4544,6 +5866,257 @@ components:
       - display_name
       - id
       - is_instructor
+    ConsoleExamDetail:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        state:
+          $ref: '#/components/schemas/CtfConsoleExamStateEnum'
+        status:
+          $ref: '#/components/schemas/ReportTaskStatusEnum'
+        window:
+          $ref: '#/components/schemas/CtfExamWindowEnum'
+        opens_at:
+          type: string
+          format: date-time
+          nullable: true
+        closes_at:
+          type: string
+          format: date-time
+          nullable: true
+        time_limit_minutes:
+          type: integer
+          nullable: true
+        question_count:
+          type: integer
+        total_points:
+          type: integer
+        batches:
+          type: array
+          items:
+            $ref: '#/components/schemas/Batch'
+        ready:
+          type: boolean
+          nullable: true
+          description: Readiness (staff only; null for instructors).
+        stats:
+          $ref: '#/components/schemas/ExamStats'
+        results_finalized_at:
+          type: string
+          format: date-time
+          nullable: true
+        title_ur:
+          type: string
+        default_max_attempts:
+          type: integer
+        auto_publish:
+          type: boolean
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
+        content_loaded_at:
+          type: string
+          format: date-time
+          nullable: true
+        content_fingerprint:
+          type: string
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConsoleQuestion'
+        materials:
+          $ref: '#/components/schemas/MaterialCounts'
+        readiness:
+          allOf:
+          - $ref: '#/components/schemas/Readiness'
+          nullable: true
+        can_manage:
+          type: boolean
+        labs_url:
+          type: string
+      required:
+      - auto_publish
+      - batches
+      - can_manage
+      - closed_at
+      - closes_at
+      - content_fingerprint
+      - content_loaded_at
+      - default_max_attempts
+      - labs_url
+      - materials
+      - opens_at
+      - published_at
+      - question_count
+      - questions
+      - readiness
+      - ready
+      - results_finalized_at
+      - slug
+      - state
+      - stats
+      - status
+      - time_limit_minutes
+      - title
+      - title_ur
+      - total_points
+      - window
+    ConsoleExamList:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConsoleExamRow'
+        can_manage:
+          type: boolean
+        server_time:
+          type: string
+          format: date-time
+      required:
+      - can_manage
+      - results
+      - server_time
+    ConsoleExamRow:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        state:
+          $ref: '#/components/schemas/CtfConsoleExamStateEnum'
+        status:
+          $ref: '#/components/schemas/ReportTaskStatusEnum'
+        window:
+          $ref: '#/components/schemas/CtfExamWindowEnum'
+        opens_at:
+          type: string
+          format: date-time
+          nullable: true
+        closes_at:
+          type: string
+          format: date-time
+          nullable: true
+        time_limit_minutes:
+          type: integer
+          nullable: true
+        question_count:
+          type: integer
+        total_points:
+          type: integer
+        batches:
+          type: array
+          items:
+            $ref: '#/components/schemas/Batch'
+        ready:
+          type: boolean
+          nullable: true
+          description: Readiness (staff only; null for instructors).
+        stats:
+          $ref: '#/components/schemas/ExamStats'
+        results_finalized_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - batches
+      - closes_at
+      - opens_at
+      - question_count
+      - ready
+      - results_finalized_at
+      - slug
+      - state
+      - stats
+      - status
+      - time_limit_minutes
+      - title
+      - total_points
+      - window
+    ConsoleMaterial:
+      type: object
+      properties:
+        path:
+          type: string
+        label:
+          type: string
+        kind:
+          $ref: '#/components/schemas/CtfMaterialKindEnum'
+        uploaded:
+          type: boolean
+        material_id:
+          type: integer
+          nullable: true
+        size:
+          type: integer
+          nullable: true
+      required:
+      - kind
+      - label
+      - material_id
+      - path
+      - size
+      - uploaded
+    ConsoleQuestion:
+      type: object
+      properties:
+        key:
+          type: string
+        order:
+          type: integer
+        title:
+          type: string
+        category:
+          $ref: '#/components/schemas/CtfQuestionCategoryEnum'
+        difficulty:
+          $ref: '#/components/schemas/CtfQuestionDifficultyEnum'
+        points:
+          type: integer
+        max_attempts:
+          type: integer
+        materials:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConsoleMaterial'
+      required:
+      - category
+      - difficulty
+      - key
+      - materials
+      - max_attempts
+      - order
+      - points
+      - title
+    ConsoleSummary:
+      type: object
+      properties:
+        open:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpenExam'
+        scheduled:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScheduledExam'
+        labs_url:
+          type: string
+        server_time:
+          type: string
+          format: date-time
+      required:
+      - labs_url
+      - open
+      - scheduled
+      - server_time
     CourseDetailContract:
       type: object
       description: |-
@@ -4677,6 +6250,90 @@ components:
       required:
       - id
       - title
+    CourseWeek:
+      type: object
+      properties:
+        course:
+          $ref: '#/components/schemas/Ref'
+        enabled:
+          type: boolean
+        reason:
+          type: string
+        legacy_task_count:
+          type: integer
+        weeks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportWeek'
+        rules:
+          allOf:
+          - $ref: '#/components/schemas/ReportRules'
+          nullable: true
+      required:
+      - course
+      - enabled
+      - legacy_task_count
+      - reason
+      - rules
+      - weeks
+    CreateTargetRequestRequest:
+      type: object
+      properties:
+        course:
+          type: integer
+          minimum: 1
+        target_name:
+          type: string
+          maxLength: 400
+        week:
+          allOf:
+          - $ref: '#/components/schemas/ReportWeekWhichEnum'
+          default: current
+        confirm_different:
+          type: boolean
+          default: false
+      required:
+      - course
+      - target_name
+    CreatedUploadToken:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        prefix:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+        active:
+          type: boolean
+        token:
+          type: string
+          description: Shown once. Only its hash is stored.
+      required:
+      - active
+      - created_at
+      - expires_at
+      - id
+      - last_used_at
+      - name
+      - prefix
+      - revoked_at
+      - token
     Criterion:
       type: object
       properties:
@@ -4770,6 +6427,18 @@ components:
       - id
       - max_marks
       - name
+    CtfConsoleExamStateEnum:
+      enum:
+      - draft
+      - scheduled
+      - published
+      - closed
+      type: string
+      description: |-
+        * `draft` - Draft
+        * `scheduled` - Scheduled
+        * `published` - Published
+        * `closed` - Closed
     CtfExamWindowEnum:
       enum:
       - not_open
@@ -4838,6 +6507,121 @@ components:
         * `hard` - Hard
         * `expert` - Expert
         * `insane` - Insane
+    DraftFile:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        extension:
+          type: string
+        content_type:
+          type: string
+        size:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        preview:
+          $ref: '#/components/schemas/ReportFilePreviewEnum'
+        scan_status:
+          $ref: '#/components/schemas/ScanStatusEnum'
+        download_url:
+          type: string
+        scan_pending:
+          type: boolean
+        blocked_reason:
+          type: string
+      required:
+      - blocked_reason
+      - content_type
+      - created_at
+      - download_url
+      - extension
+      - id
+      - name
+      - preview
+      - scan_pending
+      - scan_status
+      - size
+    Eligibility:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        reason:
+          $ref: '#/components/schemas/EligibilityReasonEnum'
+        message:
+          type: string
+        action:
+          allOf:
+          - $ref: '#/components/schemas/EligibilityAction'
+          nullable: true
+        exam:
+          allOf:
+          - $ref: '#/components/schemas/EligibilityExam'
+          nullable: true
+        next_exam:
+          allOf:
+          - $ref: '#/components/schemas/EligibilityExam'
+          nullable: true
+        server_time:
+          type: string
+          format: date-time
+      required:
+      - action
+      - enabled
+      - exam
+      - message
+      - next_exam
+      - reason
+      - server_time
+    EligibilityAction:
+      type: object
+      properties:
+        label:
+          type: string
+        url:
+          type: string
+      required:
+      - label
+      - url
+    EligibilityExam:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          $ref: '#/components/schemas/LocalizedText'
+        window:
+          $ref: '#/components/schemas/CtfExamWindowEnum'
+        opens_at:
+          type: string
+          format: date-time
+          nullable: true
+        closes_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - closes_at
+      - opens_at
+      - slug
+      - title
+      - window
+    EligibilityReasonEnum:
+      enum:
+      - ok
+      - no_batch
+      - access_expired
+      - not_assigned
+      type: string
+      description: |-
+        * `ok` - Eligible
+        * `no_batch` - Not in a batch
+        * `access_expired` - Course access expired
+        * `not_assigned` - No exam assigned
     EventEnum:
       enum:
       - connecting
@@ -4911,6 +6695,8 @@ components:
           type: integer
         can_start:
           type: boolean
+        start_reason:
+          $ref: '#/components/schemas/StartReasonEnum'
       required:
       - briefing
       - can_start
@@ -4919,6 +6705,7 @@ components:
       - question_count
       - rules
       - slug
+      - start_reason
       - status
       - time_limit_minutes
       - title
@@ -4937,6 +6724,31 @@ components:
       required:
       - results
       - server_time
+    ExamStats:
+      type: object
+      properties:
+        participants:
+          type: integer
+        active:
+          type: integer
+        submitted:
+          type: integer
+        expired:
+          type: integer
+        average_score:
+          type: number
+          format: double
+          nullable: true
+        top_score:
+          type: integer
+          nullable: true
+      required:
+      - active
+      - average_score
+      - expired
+      - participants
+      - submitted
+      - top_score
     ExamSummary:
       type: object
       properties:
@@ -4965,6 +6777,8 @@ components:
           type: integer
         can_start:
           type: boolean
+        start_reason:
+          $ref: '#/components/schemas/StartReasonEnum'
         participation:
           allOf:
           - $ref: '#/components/schemas/Participation'
@@ -4976,11 +6790,26 @@ components:
       - participation
       - question_count
       - slug
+      - start_reason
       - status
       - time_limit_minutes
       - title
       - total_points
       - window
+    ExamUploadRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+          description: The exam JSON file (multipart).
+        content:
+          type: string
+          minLength: 1
+          description: Or the JSON text itself.
+        allow_content_change:
+          type: boolean
+          default: false
     FeedbackFile:
       type: object
       properties:
@@ -5116,6 +6945,9 @@ components:
       properties:
         task_id:
           type: integer
+        target_count:
+          type: integer
+          default: 0
         status:
           $ref: '#/components/schemas/ReportGradebookCellStatusEnum'
         submission_id:
@@ -5274,6 +7106,12 @@ components:
           type: integer
         title:
           type: string
+        origin:
+          type: string
+        week_start:
+          type: string
+          format: date
+          nullable: true
         course:
           $ref: '#/components/schemas/Ref'
         week_number:
@@ -5309,8 +7147,10 @@ components:
       - marks_released_at
       - marks_visibility
       - max_marks
+      - origin
       - title
       - week_number
+      - week_start
     JoinApplicationCreateRequest:
       type: object
       properties:
@@ -6003,19 +7843,80 @@ components:
     Material:
       type: object
       properties:
+        id:
+          type: integer
+          nullable: true
+          description: Set when the file is served by the LMS (refresh its URL by
+            this id).
         label:
           $ref: '#/components/schemas/LocalizedText'
         url:
           type: string
-          description: Path on the labs site, e.g. /materials/exams/<folder>/photo.jpg
+          description: Either a short-lived signed LMS URL (/api/ctf/materials/<token>/)
+            or, for evidence still in the labs image, a path on the labs site such
+            as /materials/exams/<folder>/photo.jpg
         kind:
           $ref: '#/components/schemas/CtfMaterialKindEnum'
         alt:
           $ref: '#/components/schemas/LocalizedText'
       required:
       - alt
+      - id
       - kind
       - label
+      - url
+    MaterialCounts:
+      type: object
+      properties:
+        referenced:
+          type: integer
+        uploaded:
+          type: integer
+      required:
+      - referenced
+      - uploaded
+    MaterialUploadRequest:
+      type: object
+      properties:
+        path:
+          type: string
+          minLength: 1
+          maxLength: 300
+        file:
+          type: string
+          format: binary
+      required:
+      - file
+      - path
+    MaterialUploaded:
+      type: object
+      properties:
+        material_id:
+          type: integer
+        path:
+          type: string
+        size:
+          type: integer
+        sha256:
+          type: string
+      required:
+      - material_id
+      - path
+      - sha256
+      - size
+    MaterialUrl:
+      type: object
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+      required:
+      - expires_at
+      - id
       - url
     ModuleOption:
       type: object
@@ -6108,6 +8009,19 @@ components:
       - course
       - tasks
       - totals
+    MyWeek:
+      type: object
+      properties:
+        courses:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseWeek'
+        server_time:
+          type: string
+          format: date-time
+      required:
+      - courses
+      - server_time
     NationalDeskData:
       type: object
       properties:
@@ -6173,6 +8087,9 @@ components:
         * `wifi` - wifi
         * `ethernet` - ethernet
         * `unknown` - unknown
+    NullEnum:
+      enum:
+      - null
     ObsUploadRequest:
       type: object
       properties:
@@ -6184,6 +8101,24 @@ components:
             MAX_VIDEO_UPLOAD_BYTES (5 GB).'
       required:
       - video_file
+    OpenExam:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        closes_at:
+          type: string
+          format: date-time
+          nullable: true
+        active:
+          type: integer
+      required:
+      - active
+      - closes_at
+      - slug
+      - title
     PaginationMeta:
       type: object
       properties:
@@ -6243,6 +8178,39 @@ components:
           $ref: '#/components/schemas/Participation'
       required:
       - participation
+    PatchedExamUpdateRequest:
+      type: object
+      properties:
+        opens_at:
+          type: string
+          format: date-time
+          nullable: true
+        closes_at:
+          type: string
+          format: date-time
+          nullable: true
+        time_limit_minutes:
+          type: integer
+          maximum: 1440
+          minimum: 1
+          nullable: true
+        default_max_attempts:
+          type: integer
+          maximum: 100
+          minimum: 1
+        batch_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          maxItems: 200
+        batch_slugs:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            pattern: ^[-a-zA-Z0-9_]+$
+          maxItems: 200
     PatchedLectureCommentWriteRequest:
       type: object
       properties:
@@ -6525,6 +8493,71 @@ components:
       - prompt
       - solved
       - title
+    QuestionStat:
+      type: object
+      properties:
+        key:
+          type: string
+        order:
+          type: integer
+        title:
+          type: string
+        points:
+          type: integer
+        attempted:
+          type: integer
+        solved:
+          type: integer
+        solve_rate:
+          type: number
+          format: double
+          nullable: true
+        wrong_answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/WrongAnswer'
+      required:
+      - attempted
+      - key
+      - order
+      - points
+      - solve_rate
+      - solved
+      - title
+      - wrong_answers
+    Readiness:
+      type: object
+      properties:
+        ready:
+          type: boolean
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReadinessItem'
+        reasons:
+          type: array
+          items:
+            type: string
+      required:
+      - items
+      - ready
+      - reasons
+    ReadinessItem:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        ok:
+          type: boolean
+        detail:
+          type: string
+      required:
+      - detail
+      - id
+      - label
+      - ok
     RealtimeBroadcastPlaybackIssueReasonEnum:
       enum:
       - network
@@ -6634,6 +8667,124 @@ components:
           default: 0
       required:
       - event
+    RecordingUploadChunkResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/ChunkAck'
+        success:
+          type: boolean
+        message:
+          type: string
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    RecordingUploadListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Upload'
+        success:
+          type: boolean
+        message:
+          type: string
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    RecordingUploadResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Upload'
+        success:
+          type: boolean
+        message:
+          type: string
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    RecordingUploadTargetListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/UploadTarget'
+        success:
+          type: boolean
+        message:
+          type: string
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    RecordingUploadTokenCreatedResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/CreatedUploadToken'
+        success:
+          type: boolean
+        message:
+          type: string
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    RecordingUploadTokenListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/UploadToken'
+        success:
+          type: boolean
+        message:
+          type: string
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
+    RecordingUploadTokenResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/UploadToken'
+        success:
+          type: boolean
+        message:
+          type: string
+        errors:
+          nullable: true
+      required:
+      - data
+      - errors
+      - message
+      - success
     Ref:
       type: object
       properties:
@@ -6736,6 +8887,208 @@ components:
       description: |-
         * `on_grade` - Show each student's marks as soon as they are graded
         * `on_release` - Release all marks together
+    ReportPolicy:
+      type: object
+      description: Grader view and update of a course's weekly report policy.
+      properties:
+        course:
+          type: integer
+          readOnly: true
+        self_service:
+          type: boolean
+          default: false
+        due_weekday:
+          type: integer
+          maximum: 6
+          minimum: 0
+          default: 6
+        due_time:
+          type: string
+          format: time
+          default: '23:59'
+        grace_hours:
+          type: integer
+          maximum: 144
+          minimum: 0
+          default: 48
+        late_penalty_percent_per_day:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          default: '10.00'
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          default: '10.00'
+        max_targets_per_week:
+          type: integer
+          maximum: 50
+          minimum: 1
+          nullable: true
+        marks_visibility:
+          allOf:
+          - $ref: '#/components/schemas/ReportPolicyMarksVisibilityEnum'
+          default: on_grade
+        auto_release_delay_hours:
+          type: integer
+          maximum: 336
+          minimum: 0
+          default: 24
+        revision_window_hours:
+          type: integer
+          maximum: 720
+          minimum: 1
+          default: 72
+        brief:
+          type: string
+          default: ''
+          maxLength: 20000
+        allowed_file_types:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportFileTypeEnum'
+        max_files:
+          type: integer
+          minimum: 1
+          default: 5
+        max_file_size_mb:
+          type: integer
+          minimum: 1
+          default: 50
+        max_total_size_mb:
+          type: integer
+          minimum: 1
+          default: 200
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - course
+      - updated_at
+    ReportPolicyMarksVisibilityEnum:
+      enum:
+      - on_grade
+      - on_release
+      - auto_release
+      type: string
+      description: |-
+        * `on_grade` - Show marks as soon as they are graded
+        * `on_release` - Release all marks together (by hand)
+        * `auto_release` - Release automatically after the late window
+    ReportPolicyRequest:
+      type: object
+      description: Grader view and update of a course's weekly report policy.
+      properties:
+        self_service:
+          type: boolean
+          default: false
+        due_weekday:
+          type: integer
+          maximum: 6
+          minimum: 0
+          default: 6
+        due_time:
+          type: string
+          format: time
+          default: '23:59'
+        grace_hours:
+          type: integer
+          maximum: 144
+          minimum: 0
+          default: 48
+        late_penalty_percent_per_day:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          default: '10.00'
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          default: '10.00'
+        max_targets_per_week:
+          type: integer
+          maximum: 50
+          minimum: 1
+          nullable: true
+        marks_visibility:
+          allOf:
+          - $ref: '#/components/schemas/ReportPolicyMarksVisibilityEnum'
+          default: on_grade
+        auto_release_delay_hours:
+          type: integer
+          maximum: 336
+          minimum: 0
+          default: 24
+        revision_window_hours:
+          type: integer
+          maximum: 720
+          minimum: 1
+          default: 72
+        brief:
+          type: string
+          default: ''
+          maxLength: 20000
+        allowed_file_types:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportFileTypeEnum'
+        max_files:
+          type: integer
+          minimum: 1
+          default: 5
+        max_file_size_mb:
+          type: integer
+          minimum: 1
+          default: 50
+        max_total_size_mb:
+          type: integer
+          minimum: 1
+          default: 200
+    ReportRules:
+      type: object
+      properties:
+        allowed_extensions:
+          type: array
+          items:
+            type: string
+        max_files:
+          type: integer
+        max_file_size_mb:
+          type: integer
+        max_total_size_mb:
+          type: integer
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        late_penalty_percent_per_day:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        grace_hours:
+          type: integer
+        max_targets_per_week:
+          type: integer
+          nullable: true
+        marks_visibility:
+          type: string
+        brief:
+          type: string
+      required:
+      - allowed_extensions
+      - brief
+      - grace_hours
+      - late_penalty_percent_per_day
+      - marks_visibility
+      - max_file_size_mb
+      - max_files
+      - max_marks
+      - max_targets_per_week
+      - max_total_size_mb
     ReportSubmissionStatusEnum:
       enum:
       - not_submitted
@@ -6762,6 +9115,77 @@ components:
         * `draft` - Draft
         * `published` - Published
         * `closed` - Closed
+    ReportWeek:
+      type: object
+      properties:
+        which:
+          $ref: '#/components/schemas/ReportWeekWhichEnum'
+        week_start:
+          type: string
+          format: date
+        week_end:
+          type: string
+          format: date
+        week_number:
+          type: integer
+          nullable: true
+        label:
+          type: string
+        due_at:
+          type: string
+          format: date-time
+        late_until:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/ReportWeekStatusEnum'
+        penalty_percent:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        task_id:
+          type: integer
+          nullable: true
+        slots_left:
+          type: integer
+          nullable: true
+        targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/WeekTargetSummary'
+      required:
+      - due_at
+      - label
+      - late_until
+      - penalty_percent
+      - slots_left
+      - status
+      - targets
+      - task_id
+      - week_end
+      - week_number
+      - week_start
+      - which
+    ReportWeekStatusEnum:
+      enum:
+      - open
+      - late
+      - closed
+      - future
+      type: string
+      description: |-
+        * `open` - Open
+        * `late` - Late window
+        * `closed` - Closed
+        * `future` - Not open yet
+    ReportWeekWhichEnum:
+      enum:
+      - current
+      - previous
+      type: string
+      description: |-
+        * `current` - This week
+        * `previous` - Last week (late window)
     ReportWindowEnum:
       enum:
       - not_open
@@ -6774,6 +9198,97 @@ components:
         * `open` - Open
         * `late` - Late window
         * `closed` - Closed
+    ResultRow:
+      type: object
+      properties:
+        rank:
+          type: integer
+        student:
+          $ref: '#/components/schemas/StudentRef'
+        batch:
+          allOf:
+          - $ref: '#/components/schemas/Batch'
+          nullable: true
+        status:
+          $ref: '#/components/schemas/CtfParticipationStatusEnum'
+        score:
+          type: integer
+        solved_count:
+          type: integer
+        wrong_count:
+          type: integer
+        attempt_count:
+          type: integer
+        started_at:
+          type: string
+          format: date-time
+        deadline_at:
+          type: string
+          format: date-time
+          nullable: true
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - attempt_count
+      - batch
+      - deadline_at
+      - rank
+      - score
+      - solved_count
+      - started_at
+      - status
+      - student
+      - submitted_at
+      - wrong_count
+    Results:
+      type: object
+      properties:
+        exam:
+          $ref: '#/components/schemas/ResultsExam'
+        stats:
+          $ref: '#/components/schemas/ExamStats'
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResultRow'
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuestionStat'
+      required:
+      - exam
+      - participants
+      - questions
+      - stats
+    ResultsExam:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        state:
+          $ref: '#/components/schemas/CtfConsoleExamStateEnum'
+        question_count:
+          type: integer
+        total_points:
+          type: integer
+      required:
+      - question_count
+      - slug
+      - state
+      - title
+      - total_points
+    RevertRequest:
+      type: object
+      properties:
+        restore_upload:
+          type: boolean
+          default: false
+          description: 'false: put the replaced video back. true: switch to the uploaded
+            video again.'
     RoleEnum:
       enum:
       - citizen
@@ -6782,6 +9297,19 @@ components:
       description: |-
         * `citizen` - Citizen / Volunteer
         * `lawyer` - Lawyer
+    SameTarget:
+      type: object
+      properties:
+        id:
+          type: integer
+        student:
+          $ref: '#/components/schemas/Person'
+        status:
+          $ref: '#/components/schemas/ReportSubmissionStatusEnum'
+      required:
+      - id
+      - status
+      - student
     ScanStatusEnum:
       enum:
       - unscanned
@@ -6792,6 +9320,21 @@ components:
         * `unscanned` - Not scanned yet
         * `clean` - Clean
         * `infected` - Infected (quarantined)
+    ScheduledExam:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        opens_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - opens_at
+      - slug
+      - title
     SectionOption:
       type: object
       properties:
@@ -6805,6 +9348,28 @@ components:
       - id
       - order
       - title
+    Sha256Match:
+      type: object
+      properties:
+        file_id:
+          type: integer
+        file_name:
+          type: string
+        sha256:
+          type: string
+        submission_id:
+          type: integer
+        student:
+          $ref: '#/components/schemas/Person'
+        target_name:
+          type: string
+      required:
+      - file_id
+      - file_name
+      - sha256
+      - student
+      - submission_id
+      - target_name
     SocialAccount:
       type: object
       properties:
@@ -6900,6 +9465,24 @@ components:
       - errors
       - message
       - success
+    StartReasonEnum:
+      enum:
+      - ok
+      - started
+      - completed
+      - not_open
+      - closed
+      - no_questions
+      - not_configured
+      type: string
+      description: |-
+        * `ok` - Can start
+        * `started` - Already started
+        * `completed` - Already finished
+        * `not_open` - Not open yet
+        * `closed` - Closed
+        * `no_questions` - No questions yet
+        * `not_configured` - Answer checking not ready
     StateEnum:
       enum:
       - Andaman and Nicobar Islands
@@ -7070,6 +9653,11 @@ components:
         restarted:
           type: boolean
           description: True when this heartbeat replaced a dead egress.
+        grace:
+          type: boolean
+          description: True while the server is holding the class through a host reconnect.
+        host_grace_seconds:
+          type: integer
       required:
       - egress
       - restarted
@@ -7082,6 +9670,15 @@ components:
           default: false
           description: True while the Host Studio has a connected room and a published
             video track.
+        state:
+          allOf:
+          - $ref: '#/components/schemas/StreamHeartbeatStateEnum'
+          description: |-
+            Host link state. 'reconnecting' while LiveKit rejoins: the server keeps the class live for the grace period instead of marking delivery failed. Defaults from 'publishing'.
+
+            * `publishing` - publishing
+            * `reconnecting` - reconnecting
+            * `connected` - connected
     StreamHeartbeatResponse:
       type: object
       properties:
@@ -7100,6 +9697,16 @@ components:
       - errors
       - message
       - success
+    StreamHeartbeatStateEnum:
+      enum:
+      - publishing
+      - reconnecting
+      - connected
+      type: string
+      description: |-
+        * `publishing` - publishing
+        * `reconnecting` - reconnecting
+        * `connected` - connected
     StudentGrade:
       type: object
       properties:
@@ -7144,6 +9751,19 @@ components:
       - late_penalty
       - max_marks
       - raw_marks
+    StudentRef:
+      type: object
+      properties:
+        id:
+          type: integer
+        full_name:
+          type: string
+        email:
+          type: string
+      required:
+      - email
+      - full_name
+      - id
     StudentSubmission:
       type: object
       properties:
@@ -7441,6 +10061,26 @@ components:
           $ref: '#/components/schemas/GradingTask'
         student:
           $ref: '#/components/schemas/Person'
+        target_name:
+          type: string
+        different_target_confirmed:
+          type: boolean
+        similar_targets:
+          type: array
+          items:
+            type: string
+        revision_deadline:
+          type: string
+          format: date-time
+          nullable: true
+        same_target:
+          type: array
+          items:
+            $ref: '#/components/schemas/SameTarget'
+        sha256_matches:
+          type: array
+          items:
+            $ref: '#/components/schemas/Sha256Match'
         status:
           $ref: '#/components/schemas/ReportSubmissionStatusEnum'
         revision:
@@ -7478,6 +10118,7 @@ components:
       required:
       - audit
       - current_version
+      - different_target_confirmed
       - first_submitted_at
       - grade
       - id
@@ -7485,9 +10126,14 @@ components:
       - minutes_late
       - neighbours
       - revision
+      - revision_deadline
+      - same_target
+      - sha256_matches
+      - similar_targets
       - status
       - student
       - submitted_at
+      - target_name
       - task
       - versions
     SubmissionNeighbours:
@@ -7534,6 +10180,22 @@ components:
           $ref: '#/components/schemas/GradebookTask'
         student:
           $ref: '#/components/schemas/Person'
+        target_name:
+          type: string
+        target_key:
+          type: string
+        week_start:
+          type: string
+          format: date
+          nullable: true
+        week_label:
+          type: string
+        same_target_count:
+          type: integer
+        sha256_match_count:
+          type: integer
+        different_target_confirmed:
+          type: boolean
         status:
           $ref: '#/components/schemas/ReportSubmissionStatusEnum'
         submitted_at:
@@ -7558,17 +10220,24 @@ components:
         revision:
           type: integer
       required:
+      - different_target_confirmed
       - final_marks
       - id
       - is_late
       - max_marks
       - minutes_late
       - revision
+      - same_target_count
+      - sha256_match_count
       - status
       - student
       - submitted_at
+      - target_key
+      - target_name
       - task
       - version_count
+      - week_label
+      - week_start
     SubmitReportRequestRequest:
       type: object
       properties:
@@ -7594,6 +10263,130 @@ components:
       required:
       - created
       - task
+    SubmitTargetRequestRequest:
+      type: object
+      properties:
+        file_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          maxItems: 50
+        note:
+          type: string
+          default: ''
+          maxLength: 2000
+    SubmitTargetResponse:
+      type: object
+      properties:
+        created:
+          type: boolean
+        target:
+          $ref: '#/components/schemas/TargetDetail'
+      required:
+      - created
+      - target
+    TargetDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        course:
+          $ref: '#/components/schemas/Ref'
+        task_id:
+          type: integer
+        week_start:
+          type: string
+          format: date
+        week_label:
+          type: string
+        due_at:
+          type: string
+          format: date-time
+        late_until:
+          type: string
+          format: date-time
+          nullable: true
+        window:
+          $ref: '#/components/schemas/ReportWindowEnum'
+        target_name:
+          type: string
+        status:
+          $ref: '#/components/schemas/ReportSubmissionStatusEnum'
+        can_change:
+          type: boolean
+        lock_reason:
+          type: string
+        is_late:
+          type: boolean
+        minutes_late:
+          type: integer
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        version_count:
+          type: integer
+        revision:
+          type: integer
+        revision_deadline:
+          type: string
+          format: date-time
+          nullable: true
+        undo_until:
+          type: string
+          format: date-time
+          nullable: true
+        different_target_confirmed:
+          type: boolean
+        draft_files:
+          type: array
+          items:
+            $ref: '#/components/schemas/DraftFile'
+        current_version:
+          allOf:
+          - $ref: '#/components/schemas/Version'
+          nullable: true
+        marks_visible:
+          type: boolean
+        grade:
+          allOf:
+          - $ref: '#/components/schemas/StudentGrade'
+          nullable: true
+        revision_feedback:
+          type: string
+        marks_hidden_until_release:
+          type: boolean
+        rules:
+          $ref: '#/components/schemas/ReportRules'
+      required:
+      - can_change
+      - course
+      - current_version
+      - different_target_confirmed
+      - draft_files
+      - due_at
+      - grade
+      - id
+      - is_late
+      - late_until
+      - lock_reason
+      - marks_hidden_until_release
+      - marks_visible
+      - minutes_late
+      - revision
+      - revision_deadline
+      - revision_feedback
+      - rules
+      - status
+      - submitted_at
+      - target_name
+      - task_id
+      - undo_until
+      - version_count
+      - week_label
+      - week_start
+      - window
     TaskCounts:
       type: object
       properties:
@@ -7638,6 +10431,20 @@ components:
       - returned
       - students
       - submitted
+    TokenCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        expires_in_days:
+          type: integer
+          maximum: 730
+          minimum: 1
+          nullable: true
+      required:
+      - name
     TrackerOverview:
       type: object
       properties:
@@ -7732,6 +10539,399 @@ components:
         * `auto` - auto
         * `relay` - relay
         * `unknown` - unknown
+    UnifiedBatchGradebook:
+      type: object
+      properties:
+        course:
+          $ref: '#/components/schemas/UnifiedGradebookCourse'
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnifiedGradebookColumn'
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnifiedGradebookRow'
+        generated_at:
+          type: string
+          format: date-time
+      required:
+      - columns
+      - course
+      - generated_at
+      - rows
+    UnifiedGradebookCell:
+      type: object
+      properties:
+        key:
+          type: string
+        kind:
+          $ref: '#/components/schemas/UnifiedGradebookItemKindEnum'
+        status:
+          type: string
+          description: graded | missing | not_submitted | submitted | ... (reports);
+            result | absent | pending | in_progress (exams)
+        value:
+          type: number
+          format: double
+          nullable: true
+        max:
+          type: number
+          format: double
+          nullable: true
+        is_late:
+          type: boolean
+        rank:
+          type: integer
+          nullable: true
+      required:
+      - is_late
+      - key
+      - kind
+      - max
+      - rank
+      - status
+      - value
+    UnifiedGradebookColumn:
+      type: object
+      properties:
+        key:
+          type: string
+        kind:
+          $ref: '#/components/schemas/UnifiedGradebookItemKindEnum'
+        id:
+          type: integer
+        title:
+          type: string
+        short_title:
+          type: string
+        date:
+          type: string
+          format: date-time
+          nullable: true
+        max:
+          type: number
+          format: double
+          nullable: true
+      required:
+      - date
+      - id
+      - key
+      - kind
+      - max
+      - short_title
+      - title
+    UnifiedGradebookCourse:
+      type: object
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        title:
+          type: string
+        batch:
+          type: string
+      required:
+      - batch
+      - id
+      - slug
+      - title
+    UnifiedGradebookCourseList:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnifiedGradebookCourse'
+      required:
+      - results
+    UnifiedGradebookItemKindEnum:
+      enum:
+      - report
+      - exam
+      type: string
+      description: |-
+        * `report` - Weekly report
+        * `exam` - CTF exam
+    UnifiedGradebookPart:
+      type: object
+      properties:
+        total:
+          type: number
+          format: double
+        max:
+          type: number
+          format: double
+        percentage:
+          type: number
+          format: double
+          nullable: true
+        count:
+          type: integer
+      required:
+      - count
+      - max
+      - percentage
+      - total
+    UnifiedGradebookRow:
+      type: object
+      properties:
+        student:
+          $ref: '#/components/schemas/UnifiedGradebookStudent'
+        cells:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnifiedGradebookCell'
+        totals:
+          $ref: '#/components/schemas/UnifiedGradebookTotals'
+      required:
+      - cells
+      - student
+      - totals
+    UnifiedGradebookStudent:
+      type: object
+      properties:
+        id:
+          type: integer
+        full_name:
+          type: string
+        email:
+          type: string
+      required:
+      - email
+      - full_name
+      - id
+    UnifiedGradebookTotals:
+      type: object
+      properties:
+        reports:
+          $ref: '#/components/schemas/UnifiedGradebookPart'
+        exams:
+          $ref: '#/components/schemas/UnifiedGradebookPart'
+        overall_percentage:
+          type: number
+          format: double
+          nullable: true
+        missing_count:
+          type: integer
+        late_count:
+          type: integer
+      required:
+      - exams
+      - late_count
+      - missing_count
+      - overall_percentage
+      - reports
+    UnifiedStudentCourseSection:
+      type: object
+      properties:
+        course:
+          $ref: '#/components/schemas/UnifiedGradebookCourse'
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnifiedGradebookColumn'
+        cells:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnifiedGradebookCell'
+        totals:
+          $ref: '#/components/schemas/UnifiedGradebookTotals'
+      required:
+      - cells
+      - columns
+      - course
+      - totals
+    UnifiedStudentGradebook:
+      type: object
+      properties:
+        student:
+          $ref: '#/components/schemas/UnifiedGradebookStudent'
+        courses:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnifiedStudentCourseSection'
+        generated_at:
+          type: string
+          format: date-time
+      required:
+      - courses
+      - generated_at
+      - student
+    Upload:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/UploadStatusEnum'
+        status_label:
+          type: string
+        session_id:
+          type: integer
+          nullable: true
+        session_title:
+          type: string
+        filename:
+          type: string
+        total_bytes:
+          type: integer
+        chunk_bytes:
+          type: integer
+        chunk_count:
+          type: integer
+        received_count:
+          type: integer
+        received_bytes:
+          type: integer
+        received_chunks:
+          type: array
+          items:
+            type: integer
+        sha256:
+          type: string
+        error:
+          type: string
+        waiting_for_auto_recording:
+          type: boolean
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        via_token:
+          type: boolean
+        result:
+          allOf:
+          - $ref: '#/components/schemas/UploadResult'
+          nullable: true
+      required:
+      - chunk_bytes
+      - chunk_count
+      - completed_at
+      - created_at
+      - error
+      - expires_at
+      - filename
+      - id
+      - received_bytes
+      - received_chunks
+      - received_count
+      - result
+      - session_id
+      - session_title
+      - sha256
+      - status
+      - status_label
+      - total_bytes
+      - via_token
+      - waiting_for_auto_recording
+    UploadCreateRequest:
+      type: object
+      properties:
+        session_id:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: 'The class. Omitted: the uploader''s live class, else the one
+            that ended last.'
+        filename:
+          type: string
+          minLength: 1
+          maxLength: 255
+        size:
+          type: integer
+          minimum: 1
+          description: File size in bytes.
+        sha256:
+          type: string
+          description: Optional whole-file SHA-256 (hex).
+          maxLength: 64
+        content_type:
+          type: string
+          maxLength: 100
+      required:
+      - filename
+      - size
+    UploadReport:
+      type: object
+      properties:
+        slug:
+          type: string
+        title:
+          type: string
+        exam_created:
+          type: boolean
+        dry_run:
+          type: boolean
+        created:
+          type: integer
+        updated:
+          type: integer
+        unchanged:
+          type: integer
+        deactivated:
+          type: integer
+        removed:
+          type: integer
+        question_count:
+          type: integer
+        total_points:
+          type: integer
+        materials_referenced:
+          type: integer
+        eligible_courses:
+          type: integer
+          nullable: true
+        changed_with_attempts:
+          type: array
+          items:
+            type: string
+        opens_at:
+          type: string
+          format: date-time
+          nullable: true
+        closes_at:
+          type: string
+          format: date-time
+          nullable: true
+        time_limit_minutes:
+          type: integer
+          nullable: true
+        content_fingerprint:
+          type: string
+        current_state:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/CtfConsoleExamStateEnum'
+          - $ref: '#/components/schemas/NullEnum'
+      required:
+      - changed_with_attempts
+      - closes_at
+      - content_fingerprint
+      - created
+      - current_state
+      - deactivated
+      - dry_run
+      - eligible_courses
+      - exam_created
+      - materials_referenced
+      - opens_at
+      - question_count
+      - removed
+      - slug
+      - time_limit_minutes
+      - title
+      - total_points
+      - unchanged
+      - updated
     UploadRequestRequest:
       type: object
       properties:
@@ -7740,6 +10940,156 @@ components:
           format: binary
       required:
       - file
+    UploadResponse:
+      type: object
+      properties:
+        report:
+          $ref: '#/components/schemas/UploadReport'
+        exam:
+          allOf:
+          - $ref: '#/components/schemas/ConsoleExamDetail'
+          nullable: true
+      required:
+      - exam
+      - report
+    UploadResult:
+      type: object
+      properties:
+        action:
+          type: string
+          description: '"replaced" (the class recording lecture video) or "created".'
+        lecture_id:
+          type: integer
+          nullable: true
+        lecture_title:
+          type: string
+        course_id:
+          type: integer
+          nullable: true
+        recording_id:
+          type: integer
+          nullable: true
+        learn_url:
+          type: string
+        reverted:
+          type: boolean
+        can_switch_back:
+          type: boolean
+      required:
+      - action
+      - can_switch_back
+      - course_id
+      - learn_url
+      - lecture_id
+      - lecture_title
+      - recording_id
+      - reverted
+    UploadStatusEnum:
+      enum:
+      - uploading
+      - queued
+      - assembling
+      - completed
+      - failed
+      - aborted
+      - expired
+      type: string
+      description: |-
+        * `uploading` - uploading
+        * `queued` - queued
+        * `assembling` - assembling
+        * `completed` - completed
+        * `failed` - failed
+        * `aborted` - aborted
+        * `expired` - expired
+    UploadTarget:
+      type: object
+      properties:
+        session_id:
+          type: integer
+        title:
+          type: string
+        session_type:
+          type: string
+        status:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        ended_at:
+          type: string
+          format: date-time
+          nullable: true
+        course_id:
+          type: integer
+          nullable: true
+        course_title:
+          type: string
+        has_course:
+          type: boolean
+        auto_recording_pending:
+          type: boolean
+        action:
+          type: string
+          description: 'What an upload would do: "replaced" or "created".'
+        lecture_id:
+          type: integer
+          nullable: true
+        lecture_title:
+          type: string
+        module_title:
+          type: string
+      required:
+      - action
+      - auto_recording_pending
+      - course_id
+      - course_title
+      - ended_at
+      - has_course
+      - lecture_id
+      - lecture_title
+      - module_title
+      - session_id
+      - session_type
+      - started_at
+      - status
+      - title
+    UploadToken:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        prefix:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+        active:
+          type: boolean
+      required:
+      - active
+      - created_at
+      - expires_at
+      - id
+      - last_used_at
+      - name
+      - prefix
+      - revoked_at
     Version:
       type: object
       properties:
@@ -7771,6 +11121,66 @@ components:
       - note
       - number
       - submitted_at
+    WeekTargetSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        target_name:
+          type: string
+        status:
+          $ref: '#/components/schemas/ReportSubmissionStatusEnum'
+        submitted_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_late:
+          type: boolean
+        minutes_late:
+          type: integer
+        version_count:
+          type: integer
+        file_count:
+          type: integer
+        draft_file_count:
+          type: integer
+        marks_visible:
+          type: boolean
+        final_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          nullable: true
+        max_marks:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        can_change:
+          type: boolean
+      required:
+      - can_change
+      - draft_file_count
+      - file_count
+      - final_marks
+      - id
+      - is_late
+      - marks_visible
+      - max_marks
+      - minutes_late
+      - status
+      - submitted_at
+      - target_name
+      - version_count
+    WrongAnswer:
+      type: object
+      properties:
+        answer:
+          type: string
+        count:
+          type: integer
+      required:
+      - answer
+      - count
     YouTubeChannelInfo:
       type: object
       properties:
@@ -7897,6 +11307,12 @@ components:
       type: apiKey
       in: cookie
       name: access_token
+    recordingUploadToken:
+      type: apiKey
+      in: header
+      name: X-Upload-Token
+      description: Personal upload token (Console -> Upload recording). Upload endpoints
+        only.
 servers:
 - url: /api
   description: Current origin API

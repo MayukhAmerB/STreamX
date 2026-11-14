@@ -100,6 +100,7 @@ const rootPublicFiles = new Set([
   "/index.html",
   "/app.js",
   "/exam.js",
+  "/exam-core.js",
   "/styles.css",
   "/favicon.ico",
   "/favicon-16x16.png",
@@ -131,7 +132,8 @@ function contentSecurityPolicy() {
     "script-src-attr 'none'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data:",
+    // Exam evidence uploaded to the LMS is shown from short-lived signed URLs.
+    `img-src 'self' data: ${LMS_API_ORIGIN}`,
     `connect-src 'self' https://cloudflareinsights.com ${LMS_API_ORIGIN}`,
     "form-action 'self'",
     "frame-src 'none'",

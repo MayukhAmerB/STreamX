@@ -9,7 +9,9 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
+from .eligibility import REASON_CHOICES as ELIGIBILITY_REASON_CHOICES
 from .models import CATEGORY_CHOICES, DIFFICULTY_CHOICES, MAX_ANSWER_LENGTH, CtfExam, CtfParticipation
+from .presenters import START_REASON_CHOICES
 
 MATERIAL_KIND_CHOICES = [("image", "Image"), ("file", "File")]
 
@@ -39,8 +41,16 @@ class PromptSerializer(serializers.Serializer):
 
 
 class MaterialSerializer(serializers.Serializer):
+    id = serializers.IntegerField(
+        allow_null=True, help_text="Set when the file is served by the LMS (refresh its URL by this id)."
+    )
     label = LocalizedTextSerializer()
-    url = serializers.CharField(help_text="Path on the labs site, e.g. /materials/exams/<folder>/photo.jpg")
+    url = serializers.CharField(
+        help_text=(
+            "Either a short-lived signed LMS URL (/api/ctf/materials/<token>/) or, for evidence still "
+            "in the labs image, a path on the labs site such as /materials/exams/<folder>/photo.jpg"
+        )
+    )
     kind = serializers.ChoiceField(choices=MATERIAL_KIND_CHOICES)
     alt = LocalizedTextSerializer()
 
@@ -81,6 +91,7 @@ class ExamSummarySerializer(serializers.Serializer):
     question_count = serializers.IntegerField()
     total_points = serializers.IntegerField()
     can_start = serializers.BooleanField()
+    start_reason = serializers.ChoiceField(choices=START_REASON_CHOICES)
     participation = ParticipationSerializer(allow_null=True)
 
 
@@ -102,6 +113,7 @@ class ExamInfoSerializer(serializers.Serializer):
     question_count = serializers.IntegerField()
     total_points = serializers.IntegerField()
     can_start = serializers.BooleanField()
+    start_reason = serializers.ChoiceField(choices=START_REASON_CHOICES)
 
 
 class ExamDetailSerializer(serializers.Serializer):
@@ -134,3 +146,32 @@ class AttemptResultSerializer(serializers.Serializer):
 class AttemptResponseSerializer(serializers.Serializer):
     attempt = AttemptResultSerializer()
     participation = ParticipationSerializer()
+
+
+class EligibilityActionSerializer(serializers.Serializer):
+    label = serializers.CharField()
+    url = serializers.CharField()
+
+
+class EligibilityExamSerializer(serializers.Serializer):
+    slug = serializers.CharField()
+    title = LocalizedTextSerializer()
+    window = serializers.ChoiceField(choices=CtfExam.WINDOW_CHOICES)
+    opens_at = serializers.DateTimeField(allow_null=True)
+    closes_at = serializers.DateTimeField(allow_null=True)
+
+
+class EligibilitySerializer(serializers.Serializer):
+    enabled = serializers.BooleanField()
+    reason = serializers.ChoiceField(choices=ELIGIBILITY_REASON_CHOICES)
+    message = serializers.CharField()
+    action = EligibilityActionSerializer(allow_null=True)
+    exam = EligibilityExamSerializer(allow_null=True)
+    next_exam = EligibilityExamSerializer(allow_null=True)
+    server_time = serializers.DateTimeField()
+
+
+class MaterialUrlSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    url = serializers.CharField()
+    expires_at = serializers.DateTimeField()

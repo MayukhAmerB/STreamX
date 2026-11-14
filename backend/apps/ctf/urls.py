@@ -12,4 +12,11 @@ urlpatterns = [
         name="ctf-question-attempts",
     ),
     path("exams/<slug:slug>/submit/", views.ExamSubmitView.as_view(), name="ctf-exam-submit"),
+    path(
+        "exams/<slug:slug>/materials/<int:material_id>/",
+        views.MaterialUrlView.as_view(),
+        name="ctf-exam-material-url",
+    ),
+    path("eligibility/", views.EligibilityView.as_view(), name="ctf-eligibility"),
+    path("materials/<str:token>/", views.MaterialFileView.as_view(), name="ctf-material-file"),
 ]

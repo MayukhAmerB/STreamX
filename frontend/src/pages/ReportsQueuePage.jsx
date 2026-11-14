@@ -4,7 +4,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, List, NextFilled, Report } from "
 import { Button, InlineLoading, Search, Select, SelectItem } from "@carbon/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { EmptyState, PageHeader, PageNotification, PageSkeleton, useToast } from "../features/app-shell/ui";
+import { EmptyState, FeatureBoundary, PageHeader, PageNotification, PageSkeleton, useToast } from "../features/app-shell/ui";
 import FilePreview, { FileList } from "../features/reports/FilePreview";
 import GradingForm from "../features/reports/GradingForm";
 import { getSubmission, gradeSubmission, listManageTasks, listSubmissions } from "../features/reports/reportsApi";
@@ -25,11 +25,64 @@ export const QUEUE_STATUS_OPTIONS = [
 /** Query params that define the queue (sent with every detail/grade call for neighbours). */
 export function queueFilters(params) {
   const filters = {};
-  ["task", "course", "status", "late", "q"].forEach((key) => {
+  ["task", "course", "status", "late", "q", "week"].forEach((key) => {
     const value = params.get(key);
     if (value) filters[key] = value;
   });
+  // Grouped marking (week -> target -> oldest) is the default; group=off lists by age.
+  if (params.get("group") !== "off") filters.group = "week";
   return filters;
+}
+
+/**
+ * Groups queue items (already ordered week -> target -> oldest by the server)
+ * into [{ key, label, targets: [{ key, name, items }] }].
+ */
+export function groupQueue(items = []) {
+  const weeks = [];
+  items.forEach((item) => {
+    const weekKey = item.week_start || `task-${item.task.id}`;
+    let week = weeks[weeks.length - 1];
+    if (!week || week.key !== weekKey) {
+      week = { key: weekKey, label: item.week_label || item.task.title, targets: [] };
+      weeks.push(week);
+    }
+    const targetKey = item.target_key || item.target_name || item.task.title;
+    let target = week.targets.find((entry) => entry.key === targetKey);
+    if (!target) {
+      target = { key: targetKey, name: item.target_name || item.task.title, items: [] };
+      week.targets.push(target);
+    }
+    target.items.push(item);
+  });
+  return weeks;
+}
+
+/** Badges for duplicate signals: same target this week, identical file bytes. */
+export function SignalBadges({ item }) {
+  const badges = [];
+  if (item.same_target_count) {
+    badges.push(
+      <span key="same" className="rpt-chip rpt-chip--info rpt-chip--sm" data-status="same-target">
+        <span className="rpt-chip__label">Same target ×{item.same_target_count + 1}</span>
+      </span>
+    );
+  }
+  if (item.sha256_match_count) {
+    badges.push(
+      <span key="sha" className="rpt-chip rpt-chip--warning rpt-chip--sm" data-status="sha256" title="A submitted file has exactly the same bytes (SHA-256) as another student's file.">
+        <span className="rpt-chip__label">Identical file ×{item.sha256_match_count}</span>
+      </span>
+    );
+  }
+  if (item.different_target_confirmed) {
+    badges.push(
+      <span key="confirmed" className="rpt-chip rpt-chip--neutral rpt-chip--sm" data-status="confirmed-different">
+        <span className="rpt-chip__label">Student confirmed distinct target</span>
+      </span>
+    );
+  }
+  return badges.length ? <span className="rpt-task__chips">{badges}</span> : null;
 }
 
 const graderChipItem = (item) => ({
@@ -45,7 +98,7 @@ function isTyping(target) {
   return tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable;
 }
 
-function QueueList({ items, onOpen }) {
+function QueueRows({ items, onOpen, showTarget = true }) {
   return (
     <ul className="rpt-rows" aria-label="Submissions">
       {items.map((item) => (
@@ -54,9 +107,11 @@ function QueueList({ items, onOpen }) {
             <span className="rpt-row__text">
               <span className="rpt-row__title">{item.student.full_name || item.student.email}</span>
               <span className="rpt-row__meta">
-                {item.task.title} · {formatIst(item.submitted_at)} · v{item.version_count}
+                {showTarget ? `${item.target_name || item.task.title} · ` : ""}
+                {formatIst(item.submitted_at)} · v{item.version_count}
                 {item.is_late ? ` · ${formatMinutesLate(item.minutes_late)}` : ""}
               </span>
+              <SignalBadges item={item} />
             </span>
             <StatusChip item={graderChipItem(item)} size="sm" />
             <ChevronRight size={20} aria-hidden="true" className="rpt-row__chevron" />
@@ -64,6 +119,69 @@ function QueueList({ items, onOpen }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+export function QueueList({ items, onOpen, grouped = false }) {
+  if (!grouped) return <QueueRows items={items} onOpen={onOpen} />;
+  return (
+    <div className="rpt-queue__groups">
+      {groupQueue(items).map((week) => (
+        <section key={week.key} className="rpt-section" aria-label={week.label}>
+          <h2 className="cds-section-title">{week.label}</h2>
+          {week.targets.map((target) => (
+            <div key={target.key} className="rpt-queue__target">
+              <h3 className="rpt-queue__target-title">
+                {target.name} <span className="rpt-muted">({target.items.length})</span>
+              </h3>
+              <QueueRows items={target.items} onOpen={onOpen} showTarget={false} />
+            </div>
+          ))}
+        </section>
+      ))}
+    </div>
+  );
+}
+
+/** Grader-only context: same target this week and identical files elsewhere. */
+export function DuplicateSignals({ detail, onNavigate }) {
+  const same = detail.same_target || [];
+  const matches = detail.sha256_matches || [];
+  if (!same.length && !matches.length && !detail.different_target_confirmed) return null;
+  return (
+    <details className="rpt-history" open={matches.length > 0}>
+      <summary>Similar work ({same.length + matches.length})</summary>
+      {detail.different_target_confirmed ? (
+        <p className="rpt-muted">The student confirmed this is a different target from: {(detail.similar_targets || []).join(", ")}.</p>
+      ) : null}
+      {same.length ? (
+        <>
+          <p className="rpt-muted">Same target this week:</p>
+          <ul className="rpt-history__list">
+            {same.map((item) => (
+              <li key={item.id}>
+                <Button kind="ghost" size="sm" onClick={() => onNavigate(item.id)}>
+                  {item.student.full_name || item.student.email}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {matches.length ? (
+        <>
+          <p className="rpt-muted">Identical files (same SHA-256):</p>
+          <ul className="rpt-history__list">
+            {matches.map((item) => (
+              <li key={`${item.sha256}-${item.submission_id}`}>
+                {item.file_name} = {item.student.full_name || item.student.email}
+                {item.target_name ? ` (${item.target_name})` : ""} <code title={item.sha256}>{item.sha256.slice(0, 12)}</code>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+    </details>
   );
 }
 
@@ -89,7 +207,8 @@ export function GradingSplitView({ detail, saving, error, conflict, onSubmit, on
         <div className="rpt-split__who">
           <h2 className="rpt-split__name">{detail.student.full_name || detail.student.email}</h2>
           <p className="rpt-muted">
-            {detail.student.email} · {detail.task.title}
+            {detail.student.email} · {detail.target_name || detail.task.title}
+            {detail.target_name && detail.target_name !== detail.task.title ? ` · ${detail.task.title}` : ""}
           </p>
           <div className="rpt-task__chips">
             <StatusChip item={graderChipItem({ ...detail, final_marks: detail.grade?.final_marks, max_marks: detail.task.max_marks })} size="sm" />
@@ -130,16 +249,18 @@ export function GradingSplitView({ detail, saving, error, conflict, onSubmit, on
           {selected ? <FilePreview file={selected} /> : <p className="rpt-preview__message">No preview for these files. Download them to review.</p>}
         </section>
         <section className="rpt-split__form" aria-label="Marks and feedback">
-          <GradingForm
-            key={`${detail.id}-${detail.revision}`}
-            detail={detail}
-            saving={saving}
-            error={error}
-            conflict={conflict}
-            hasNext={Boolean(neighbours.next_ungraded_id)}
-            onSubmit={onSubmit}
-            onReload={onReload}
-          />
+          <FeatureBoundary key={`${detail.id}-${detail.revision}`} label="The marking form">
+            <GradingForm
+              detail={detail}
+              saving={saving}
+              error={error}
+              conflict={conflict}
+              hasNext={Boolean(neighbours.next_ungraded_id)}
+              onSubmit={onSubmit}
+              onReload={onReload}
+            />
+          </FeatureBoundary>
+          <DuplicateSignals detail={detail} onNavigate={onNavigate} />
           {detail.audit?.length ? (
             <details className="rpt-history">
               <summary>Marking history ({detail.audit.length})</summary>
@@ -281,6 +402,10 @@ export default function ReportsQueuePage() {
             <SelectItem key={option.value || "all"} value={option.value} text={option.label} />
           ))}
         </Select>
+        <Select id="rpt-queue-group" labelText="Order" value={filters.group === "week" ? "week" : "off"} onChange={(event) => updateParams({ group: event.target.value === "off" ? "off" : "" })}>
+          <SelectItem value="week" text="By week, then target" />
+          <SelectItem value="off" text="Oldest first" />
+        </Select>
         <Select id="rpt-queue-late" labelText="Timing" value={filters.late || ""} onChange={(event) => updateParams({ late: event.target.value })}>
           <SelectItem value="" text="On time and late" />
           <SelectItem value="1" text="Late only" />
@@ -289,7 +414,7 @@ export default function ReportsQueuePage() {
         <Search
           id="rpt-queue-search"
           labelText="Student"
-          placeholder="Search students"
+          placeholder="Search students or targets"
           size="lg"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
@@ -337,7 +462,7 @@ export default function ReportsQueuePage() {
                 </Button>
                 <span className="rpt-muted">Shortcuts while marking: J next · K previous · U next ungraded · Ctrl + Enter save</span>
               </div>
-              <QueueList items={queue.items} onOpen={open} />
+              <QueueList items={queue.items} onOpen={open} grouped={filters.group === "week"} />
             </>
           ) : null}
         </>

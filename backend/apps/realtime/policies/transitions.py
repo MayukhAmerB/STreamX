@@ -13,10 +13,15 @@ SESSION_TRANSITIONS = {
     "ended": frozenset(),
 }
 
+# "interrupted" (Phase 2): the feed dropped while the class is live and the
+# host is inside the reconnect grace period. Only the live reconciler moves a
+# stream into it; it leaves to "live" (feed back), "stopped" (grace expired),
+# "failed" (restart budget exhausted) or "starting" (host pressed Go Live).
 STREAM_TRANSITIONS = {
     "idle": frozenset({"starting", "live", "stopped", "failed"}),
     "starting": frozenset({"live", "stopped", "failed"}),
-    "live": frozenset({"stopped", "failed"}),
+    "live": frozenset({"interrupted", "stopped", "failed"}),
+    "interrupted": frozenset({"starting", "live", "stopped", "failed"}),
     "stopped": frozenset({"starting", "live", "failed"}),
     "failed": frozenset({"starting", "live", "stopped"}),
 }

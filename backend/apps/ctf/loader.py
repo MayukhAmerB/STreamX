@@ -126,6 +126,12 @@ class LoadReport:
     eligible_courses: int | None = None
     content_sha256: str = ""
     changed_with_attempts: list = field(default_factory=list)
+    # Preview details for the Console dry run (never answers or hashes).
+    title: str = ""
+    materials_referenced: int = 0
+    opens_at: object = None
+    closes_at: object = None
+    time_limit_minutes: int | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -483,8 +489,12 @@ def _question_values(exam_slug, spec):
     }
 
 
-def load_exam(raw_bytes, *, dry_run=False, allow_content_change=False, materials_root=None):
-    """Validate and load one exam file. Returns a ``LoadReport`` (counts only)."""
+def load_exam(raw_bytes, *, dry_run=False, allow_content_change=False, materials_root=None, preserve_schedule=False):
+    """Validate and load one exam file. Returns a ``LoadReport`` (counts only).
+
+    ``preserve_schedule`` (Console uploads): opening/closing times, the time
+    limit and the batches are only taken from the file when it sets them, so
+    re-uploading questions never clears a schedule chosen in the Console."""
     document = parse_exam_bytes(raw_bytes)
     validated = validate_document(document)
     if materials_root:
@@ -503,9 +513,9 @@ def load_exam(raw_bytes, *, dry_run=False, allow_content_change=False, materials
         exam.title_ur = exam_spec["title"]["ur"]
         exam.briefing = exam_spec["briefing"]
         exam.rules = exam_spec["rules"]
-        exam.opens_at = exam_spec["opens_at"]
-        exam.closes_at = exam_spec["closes_at"]
-        exam.time_limit_minutes = exam_spec["time_limit_minutes"]
+        for name in ("opens_at", "closes_at", "time_limit_minutes"):
+            if not preserve_schedule or exam_spec[name] is not None:
+                setattr(exam, name, exam_spec[name])
         exam.default_max_attempts = exam_spec["default_max_attempts"]
         exam.content_sha256 = content_sha256
         exam.answer_key_id = key_id
@@ -578,6 +588,13 @@ def load_exam(raw_bytes, *, dry_run=False, allow_content_change=False, materials
 
         report.question_count = len(planned)
         report.total_points = sum(spec["points"] for spec, _values in planned.values())
+        report.title = exam.title
+        report.materials_referenced = len(
+            {material["path"] for spec, _values in planned.values() for material in spec["materials"]}
+        )
+        report.opens_at = exam.opens_at
+        report.closes_at = exam.closes_at
+        report.time_limit_minutes = exam.time_limit_minutes
         if dry_run:
             transaction.set_rollback(True)
     return report

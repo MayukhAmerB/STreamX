@@ -71,9 +71,17 @@ def handle_release_chat_timeouts(event):
 
 
 def persist_obs_stream_health():
-    """Refresh and persist stream_status for every running OBS session."""
+    """Refresh and persist stream_status for every running OBS session.
+
+    With ``LIVE_RECONCILER_MODE=enforce`` the live reconciler is the single
+    writer of stream_status (OBS included), so this legacy hook stands down.
+    """
+    from .lifecycle import enforcing
     from .models import RealtimeSession
     from .services import refresh_obs_session_stream_health
+
+    if enforcing():
+        return 0
 
     sessions = list(
         RealtimeSession.objects.filter(
@@ -90,3 +98,10 @@ def persist_obs_stream_health():
         if result.get("changed"):
             changed += 1
     return changed
+
+
+def live_reconcile():
+    """``live.reconcile`` (5 s): see apps/realtime/reconciler.py."""
+    from .reconciler import reconcile_live_sessions
+
+    return reconcile_live_sessions()

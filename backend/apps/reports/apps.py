@@ -24,3 +24,12 @@ class ReportsConfig(AppConfig):
             interval_seconds=HOUSEKEEPING_INTERVAL_SECONDS,
             func=schedule_housekeeping,
         )
+        # Self-service weekly reports: reminders, digests, SLA alert, automatic
+        # marks release, stuck-scan requeue (Phase 3). Publishes one deduplicated
+        # outbox tick per interval; the worker does the work.
+        from django.conf import settings
+
+        from .scheduler import interval_seconds, schedule_tick
+
+        if getattr(settings, "REPORTS_SCHEDULER_ENABLED", True):
+            register_periodic("reports.scheduler", interval_seconds=interval_seconds(), func=schedule_tick)

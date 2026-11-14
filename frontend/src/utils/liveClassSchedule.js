@@ -13,7 +13,8 @@ export const DEFAULT_LIVE_CLASS_SCHEDULE = {
 export function isJoinableLiveSession(session) {
   if (session?.status !== "live" || session?.viewer_can_join_now !== true) return false;
   if (session?.session_type === "broadcasting") {
-    return session?.stream_status === "live";
+    // "interrupted": live class, host reconnecting (Phase 2) -- still joinable.
+    return session?.stream_status === "live" || session?.stream_status === "interrupted";
   }
   return true;
 }

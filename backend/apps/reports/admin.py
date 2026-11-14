@@ -21,6 +21,8 @@ from .models import (
     ReportFile,
     ReportGrade,
     ReportGradeAudit,
+    ReportNoticeLog,
+    ReportPolicy,
     ReportQuarantineRecord,
     ReportSubmission,
     ReportSubmissionVersion,
@@ -260,6 +262,7 @@ class ReportSubmissionAdmin(_ReadOnlyAdmin):
     list_display = (
         "student",
         "task",
+        "target_name",
         "status",
         "submitted_at",
         "is_late",
@@ -268,7 +271,7 @@ class ReportSubmissionAdmin(_ReadOnlyAdmin):
         "final_marks",
     )
     list_filter = ("status", "is_late", "task__course", "task")
-    search_fields = ("student__email", "student__full_name", "task__title")
+    search_fields = ("student__email", "student__full_name", "task__title", "target_name", "target_key")
     date_hierarchy = "submitted_at"
     readonly_fields = (
         "task",
@@ -480,3 +483,35 @@ class ReportQuarantineRecordAdmin(_ReadOnlyAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(ReportPolicy)
+class ReportPolicyAdmin(admin.ModelAdmin):
+    """Per-course weekly report settings (also editable in the Console)."""
+
+    list_display = (
+        "course",
+        "self_service",
+        "due_weekday",
+        "due_time",
+        "grace_hours",
+        "late_penalty_percent_per_day",
+        "max_targets_per_week",
+        "marks_visibility",
+        "updated_at",
+    )
+    list_filter = ("self_service", "marks_visibility")
+    search_fields = ("course__title",)
+    autocomplete_fields = ("course",)
+    readonly_fields = ("updated_by", "created_at", "updated_at")
+
+    def save_model(self, request, obj, form, change):
+        obj.updated_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(ReportNoticeLog)
+class ReportNoticeLogAdmin(_ReadOnlyAdmin):
+    list_display = ("key", "created_at")
+    search_fields = ("key",)
+    date_hierarchy = "created_at"

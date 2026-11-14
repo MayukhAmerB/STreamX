@@ -993,3 +993,16 @@ body.ur-mode .exam-timer {
     direction: ltr;
     unicode-bidi: plaintext;
 }
+
+/* Examination tab locked (eligibility API: no batch, access ended, not assigned). */
+.nav-btn.exam-nav-locked {
+    opacity: 0.6;
+}
+
+.exam-locked-panel p + p {
+    margin-top: 8px;
+}
+
+.exam-locked-panel .answer-row {
+    margin-top: 16px;
+}

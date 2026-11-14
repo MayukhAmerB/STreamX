@@ -4,7 +4,7 @@ import { ArrowLeft, CheckmarkFilled, Renew, Report, Send } from "@carbon/icons-r
 import { Button, InlineLoading, InlineNotification, Modal, TextArea } from "@carbon/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { EmptyState, PageNotification, PageSkeleton, useToast } from "../features/app-shell/ui";
+import { EmptyState, FeatureBoundary, PageNotification, PageSkeleton, useToast } from "../features/app-shell/ui";
 import FilePreview, { FileList } from "../features/reports/FilePreview";
 import Markdown from "../features/reports/markdown";
 import { ReportUploaderView, useReportUploads } from "../features/reports/ReportUploader";
@@ -278,16 +278,18 @@ function SubmitPanel({ task, now, onSubmitted, onCancel, replacing }) {
           ? "Keep the files you still want, remove the rest and add new ones."
           : "Add your report files, then submit. You can replace them until the deadline."}
       </p>
-      <ReportUploaderView
-        items={uploads.items}
-        rules={rules}
-        rejections={uploads.rejections}
-        onPick={(files) => uploads.addFiles(files, rules)}
-        onRetry={uploads.retry}
-        onRemove={uploads.remove}
-        onDismissRejections={uploads.dismissRejections}
-        disabled={submitting}
-      />
+      <FeatureBoundary label="The file uploader">
+        <ReportUploaderView
+          items={uploads.items}
+          rules={rules}
+          rejections={uploads.rejections}
+          onPick={(files) => uploads.addFiles(files, rules)}
+          onRetry={uploads.retry}
+          onRemove={uploads.remove}
+          onDismissRejections={uploads.dismissRejections}
+          disabled={submitting}
+        />
+      </FeatureBoundary>
       <TextArea
         id="rpt-note"
         labelText="Short note or summary (optional)"

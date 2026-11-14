@@ -56,3 +56,12 @@ test("invalid LMS bases fall back to the production default", () => {
   assert.equal(resolveLmsApiBase("https://user:pw@evil.example/api"), "https://alsyedinitiative.com/api");
   assert.equal(resolveLmsApiBase("http://127.0.0.1:8000/api"), "http://127.0.0.1:8000/api");
 });
+
+test("exam-core.js is served and LMS evidence images are allowed by the CSP", async () => {
+  const core = await fetch(`${base}/exam-core.js`);
+  assert.equal(core.status, 200);
+  assert.match(core.headers.get("content-type"), /javascript/);
+  const csp = contentSecurityPolicy();
+  assert.match(csp, /img-src 'self' data: https:\/\/lms\.example\.test;/);
+  assert.doesNotMatch(csp, /img-src[^;]*\*/);
+});

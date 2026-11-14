@@ -24,7 +24,7 @@ from apps.core.errors import Conflict, NotFound, ValidationFailed
 from apps.core.idempotency import IdempotencyMixin
 from apps.courses.models import Section
 
-from . import access, presenters, services
+from . import access, presenters, services, weekly
 from .exports import course_marks_csv, iter_task_zip, safe_component, task_marks_csv
 from .models import (
     SCAN_CLEAN,
@@ -33,17 +33,22 @@ from .models import (
     ReportCriterion,
     ReportFile,
     ReportGrade,
+    ReportPolicy,
     ReportSubmission,
     ReportTask,
 )
 from .serializers import (
     AttachmentUploadResponseSerializer,
+    CreateTargetRequestSerializer,
+    DraftFileSerializer,
     GradableCourseListSerializer,
     GradebookSerializer,
     GradeRequestSerializer,
     ManageTaskListSerializer,
     ManageTaskSerializer,
     MyMarksSerializer,
+    MyWeekSerializer,
+    ReportPolicySerializer,
     StoredFileSerializer,
     StudentTaskDetailSerializer,
     StudentTaskListSerializer,
@@ -51,6 +56,9 @@ from .serializers import (
     SubmissionQueueSerializer,
     SubmitReportRequestSerializer,
     SubmitReportResponseSerializer,
+    SubmitTargetRequestSerializer,
+    SubmitTargetResponseSerializer,
+    TargetDetailSerializer,
     UploadRequestSerializer,
 )
 
@@ -96,9 +104,7 @@ def require_clean_scan(scan_status):
     if scan_status == SCAN_CLEAN:
         return
     if scan_status == SCAN_INFECTED:
-        raise Conflict(
-            "This file was blocked by the virus scanner and can't be downloaded.", code="file_infected"
-        )
+        raise Conflict("This file was blocked by the virus scanner and can't be downloaded.", code="file_infected")
     raise Conflict(
         "This file hasn't been checked by the virus scanner yet, so it can't be downloaded. Try again later.",
         code="file_not_scanned",
@@ -159,10 +165,13 @@ class StudentTaskListView(_ReportsView):
         if course_id:
             tasks = tasks.filter(course_id=course_id)
         tasks = list(tasks.order_by("-due_at", "-id"))
-        submissions = {
-            item.task_id: item
-            for item in ReportSubmission.objects.filter(student=request.user, task__in=tasks).select_related("grade")
-        }
+        submissions = {}
+        for item in (
+            ReportSubmission.objects.filter(student=request.user, task__in=tasks)
+            .select_related("grade")
+            .order_by("-id")
+        ):
+            submissions[item.task_id] = item  # legacy tasks: one per student (lowest id wins)
         results = [presenters.student_summary(task, submissions.get(task.pk), now) for task in tasks]
         upcoming = [
             item
@@ -178,6 +187,7 @@ def _student_detail_payload(request, task):
     submission = (
         ReportSubmission.objects.filter(task=task, student=request.user)
         .select_related("grade", "current_version")
+        .order_by("id")
         .first()
     )
     task = services.tasks_with_prefetch(ReportTask.objects.select_related("course", "section")).get(pk=task.pk)
@@ -624,6 +634,8 @@ class DuplicateTaskView(_TaskActionView):
     @extend_schema(request=None, responses={201: ManageTaskSerializer})
     def post(self, request, task_id):
         task = access.manageable_task_or_404(request.user, task_id)
+        if task.origin == ReportTask.ORIGIN_AUTO:
+            raise Conflict("Weekly self-service tasks are created automatically.", code="auto_task")
         copy = services.duplicate_task(task=task, actor=request.user)
         return api_response(
             message=self.message, data=_data(ManageTaskSerializer, _manage_task_payload(copy)), status_code=201
@@ -679,7 +691,7 @@ QUEUE_STATUS_FILTERS = {
 def _queue_queryset(request):
     queryset = ReportSubmission.objects.filter(
         task__course__in=access.gradable_courses(request.user), current_version__isnull=False
-    ).select_related("task", "task__course", "student", "grade")
+    ).select_related("task", "task__course", "task__course__report_policy", "student", "grade")
     task_id = _int_param(request, "task")
     if task_id:
         queryset = queryset.filter(task_id=task_id)
@@ -696,9 +708,29 @@ def _queue_queryset(request):
         queryset = queryset.filter(is_late=False)
     search = str(request.query_params.get("q", "") or "").strip()[:80]
     if search:
-        queryset = queryset.filter(Q(student__full_name__icontains=search) | Q(student__email__icontains=search))
+        queryset = queryset.filter(
+            Q(student__full_name__icontains=search)
+            | Q(student__email__icontains=search)
+            | Q(target_name__icontains=search)
+        )
+    week = str(request.query_params.get("week", "") or "").strip()
+    if week:
+        queryset = queryset.filter(task__week_start=week) if _is_iso_date(week) else queryset.none()
+    if _bool_param(request, "group") or str(request.query_params.get("group", "")).strip() == "week":
+        # Grouped marking: oldest week first, then each target together, oldest first.
+        return queryset.order_by("task__due_at", "task_id", "target_key", "submitted_at", "id")
     # Oldest submissions first: fair marking order.
     return queryset.order_by("submitted_at", "id")
+
+
+def _is_iso_date(value):
+    from datetime import date
+
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
 
 
 QUEUE_PARAMETERS = [
@@ -711,7 +743,9 @@ QUEUE_PARAMETERS = [
         description="awaiting, submitted, under_review, graded, returned_for_revision, resubmitted",
     ),
     OpenApiParameter("late", bool, required=False),
-    OpenApiParameter("q", str, required=False, description="Student name or email"),
+    OpenApiParameter("q", str, required=False, description="Student name or email, or target name"),
+    OpenApiParameter("week", str, required=False, description="Week start date (YYYY-MM-DD), self-service weeks"),
+    OpenApiParameter("group", str, required=False, description="'week': order by week, then target, then oldest"),
 ]
 
 
@@ -736,7 +770,10 @@ class SubmissionQueueView(_GraderView):
             task = access.manageable_tasks(request.user).select_related("course").filter(pk=task_id).first()
             students = len(services.active_student_ids(task.course)) if task else 0
         counts = {"students": students, **{key: int(value or 0) for key, value in stats.items()}}
-        results = [presenters.queue_item(item) for item in queryset[:500]]
+        page = list(queryset[:500])
+        signals = presenters.queue_signals(page)
+        labels = {item.task_id: presenters.week_label_for(item.task) for item in page if item.task.week_start}
+        results = [presenters.queue_item(item, signals, labels) for item in page]
         return _ok(SubmissionQueueSerializer, {"results": results, "counts": counts})
 
 
@@ -890,3 +927,223 @@ class TaskZipDownloadView(_GraderView):
         # nginx must not buffer the whole archive before sending it.
         response["X-Accel-Buffering"] = "no"
         return response
+
+
+# ---------------------------------------------------------------------------
+# Self-service weekly reports (Phase 3): /api/reports/me/...
+# ---------------------------------------------------------------------------
+def _target_payload(submission_id, user, now=None):
+    submission = weekly.student_target_or_404(user, submission_id)
+    submission = (
+        ReportSubmission.objects.select_related("task", "task__course", "current_version", "grade")
+        .prefetch_related("task__criteria")
+        .get(pk=submission.pk)
+    )
+    return presenters.target_detail(submission, now)
+
+
+class MyWeekView(_ReportsView):
+    """Per course: is self-service on (else why not), this week (and last week
+    during its late window), the student's targets and slots left."""
+
+    @extend_schema(
+        operation_id="reports_me_week_retrieve",
+        parameters=[OpenApiParameter("course", int, required=False)],
+        responses={200: MyWeekSerializer},
+    )
+    def get(self, request):
+        now = timezone.now()
+        courses = weekly.student_courses(request.user)
+        course_id = _int_param(request, "course")
+        if course_id:
+            courses = [course for course in courses if course.pk == course_id]
+        states = [
+            presenters.course_week_dict(weekly.course_week_state(course, request.user, now=now), now)
+            for course in courses
+        ]
+        # Self-service courses first, then the rest (with their reason).
+        states.sort(key=lambda state: (not state["enabled"], state["course"]["title"].lower()))
+        return _ok(MyWeekSerializer, {"courses": states, "server_time": now})
+
+
+class MyTargetListView(IdempotencyMixin, _ReportsView):
+    idempotency_scope = "reports.target_create"
+    idempotency_required = False
+    throttle_scope = "report_submit"
+    parser_classes = [JSONParser]
+
+    @extend_schema(
+        operation_id="reports_me_targets_create",
+        request=CreateTargetRequestSerializer,
+        responses={201: TargetDetailSerializer},
+        parameters=[OpenApiParameter("Idempotency-Key", str, OpenApiParameter.HEADER, required=False)],
+    )
+    def post(self, request):
+        serializer = CreateTargetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        course = weekly.student_course_or_404(request.user, data["course"])
+        submission = weekly.create_target(
+            course=course,
+            student=request.user,
+            target_name=data["target_name"],
+            week=data["week"],
+            confirm_different=data["confirm_different"],
+        )
+        return api_response(
+            message="Target added. Upload your files.",
+            data=_data(TargetDetailSerializer, _target_payload(submission.pk, request.user)),
+            status_code=201,
+        )
+
+
+class MyTargetDetailView(_ReportsView):
+    @extend_schema(operation_id="reports_me_targets_retrieve", responses={200: TargetDetailSerializer})
+    def get(self, request, submission_id):
+        return _ok(TargetDetailSerializer, _target_payload(submission_id, request.user))
+
+    @extend_schema(operation_id="reports_me_targets_destroy", responses={200: None})
+    def delete(self, request, submission_id):
+        weekly.discard_draft(submission_id=submission_id, student=request.user)
+        return api_response(message="Draft removed.", data=None)
+
+
+class MyTargetUploadView(_ReportsView):
+    parser_classes = [MultiPartParser, FormParser]
+    throttle_scope = "report_upload"
+
+    @extend_schema(
+        operation_id="reports_me_targets_files_create",
+        request={"multipart/form-data": UploadRequestSerializer},
+        responses={202: DraftFileSerializer},
+    )
+    def post(self, request, submission_id):
+        uploaded = request.FILES.get("file")
+        if uploaded is None:
+            raise ValidationFailed("Choose a file to upload.", details={"file": ["Choose a file to upload."]})
+        item = weekly.upload_file(submission_id=submission_id, student=request.user, uploaded=uploaded)
+        # 202: stored, virus scan still running (scan_pending=true until clean).
+        return api_response(
+            message="File uploaded. Checking it for viruses…",
+            data=_data(DraftFileSerializer, presenters.draft_file_dict(item)),
+            status_code=202,
+        )
+
+
+class MyTargetFileDeleteView(_ReportsView):
+    @extend_schema(operation_id="reports_me_targets_files_destroy", responses={200: None})
+    def delete(self, request, submission_id, file_id):
+        weekly.remove_file(submission_id=submission_id, student=request.user, file_id=file_id)
+        return api_response(message="File removed.", data=None)
+
+
+class MyTargetSubmitView(IdempotencyMixin, _ReportsView):
+    idempotency_scope = "reports.target_submit"
+    idempotency_required = True
+    throttle_scope = "report_submit"
+    parser_classes = [JSONParser]
+
+    @extend_schema(
+        operation_id="reports_me_targets_submit_create",
+        request=SubmitTargetRequestSerializer,
+        responses={200: SubmitTargetResponseSerializer, 201: SubmitTargetResponseSerializer},
+        parameters=[OpenApiParameter("Idempotency-Key", str, OpenApiParameter.HEADER, required=True)],
+    )
+    def post(self, request, submission_id):
+        serializer = SubmitTargetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        result = weekly.submit_target(
+            submission_id=submission_id,
+            student=request.user,
+            file_ids=data.get("file_ids"),
+            note=data.get("note", ""),
+        )
+        payload = {"created": result.created, "target": _target_payload(submission_id, request.user)}
+        return api_response(
+            message="Report submitted." if result.created else "Your report was already submitted.",
+            data=_data(SubmitTargetResponseSerializer, payload),
+            status_code=201 if result.created else 200,
+        )
+
+
+class MyTargetUndoView(_ReportsView):
+    throttle_scope = "report_submit"
+
+    @extend_schema(operation_id="reports_me_targets_undo_create", request=None, responses={200: TargetDetailSerializer})
+    def post(self, request, submission_id):
+        weekly.undo_submit(submission_id=submission_id, student=request.user)
+        return _ok(
+            TargetDetailSerializer,
+            _target_payload(submission_id, request.user),
+            message="Submission undone. It is a draft again.",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Graders: a course's weekly report policy
+# ---------------------------------------------------------------------------
+POLICY_FIELDS = (
+    "self_service",
+    "due_weekday",
+    "due_time",
+    "grace_hours",
+    "late_penalty_percent_per_day",
+    "max_marks",
+    "max_targets_per_week",
+    "marks_visibility",
+    "auto_release_delay_hours",
+    "revision_window_hours",
+    "brief",
+    "allowed_file_types",
+    "max_files",
+    "max_file_size_mb",
+    "max_total_size_mb",
+)
+
+
+def _policy_payload(course, policy):
+    if policy is None:
+        defaults = ReportPolicy(course=course)
+        data = {field: getattr(defaults, field) for field in POLICY_FIELDS}
+        return {"course": course.pk, **data, "updated_at": None}
+    return {
+        "course": course.pk,
+        **{field: getattr(policy, field) for field in POLICY_FIELDS},
+        "updated_at": policy.updated_at,
+    }
+
+
+class CoursePolicyView(_GraderView):
+    parser_classes = [JSONParser]
+
+    def _course(self, request, course_id):
+        course = access.gradable_courses(request.user).filter(pk=course_id).first()
+        if course is None:
+            raise NotFound("Course not found.", code="course_not_found")
+        return course
+
+    @extend_schema(operation_id="reports_manage_courses_policy_retrieve", responses={200: ReportPolicySerializer})
+    def get(self, request, course_id):
+        course = self._course(request, course_id)
+        policy = ReportPolicy.objects.filter(course=course).first()
+        return _ok(ReportPolicySerializer, _policy_payload(course, policy))
+
+    @extend_schema(
+        operation_id="reports_manage_courses_policy_update",
+        request=ReportPolicySerializer,
+        responses={200: ReportPolicySerializer},
+    )
+    def put(self, request, course_id):
+        course = self._course(request, course_id)
+        serializer = ReportPolicySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            policy, _created = ReportPolicy.objects.select_for_update().get_or_create(course=course)
+            for field in POLICY_FIELDS:
+                if field in serializer.validated_data:
+                    setattr(policy, field, serializer.validated_data[field])
+            policy.updated_by = request.user
+            policy.save()
+        message = "Weekly reports are self-service now." if policy.self_service else "Report settings saved."
+        return _ok(ReportPolicySerializer, _policy_payload(course, policy), message=message)

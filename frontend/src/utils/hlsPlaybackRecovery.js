@@ -8,7 +8,8 @@ export const HLS_MEDIA_ERROR = "mediaError";
 export const RETRY_BASE_MS = 1_000;
 export const RETRY_MAX_MS = 12_000;
 export const MAX_IN_PLACE_NETWORK_ATTEMPTS = 3;
-export const PLAYBACK_FREEZE_THRESHOLD_MS = 30_000;
+// Phase 2: a frozen picture is reloaded in place after 13 s (was 30 s).
+export const PLAYBACK_FREEZE_THRESHOLD_MS = 13_000;
 export const PLAYBACK_STARTUP_GRACE_MS = 45_000;
 export const LIVE_RESUME_JITTER_MS = 5_000;
 // Probing for a broadcast that went offline mid-class (encoder blip).
@@ -427,4 +428,34 @@ export function buildStreamOutageReport({ kind = "offline", outageMs = 0, attemp
     httpStatus: 0,
     retryAttempt: Math.max(0, Math.min(100, Math.floor(Number(attempt) || 0))),
   };
+}
+
+// --- Phase 2: live latency and "Host reconnecting" ---------------------------
+
+// hls.js live tuning: 3 target durations behind the live edge (was 5, which put
+// the video 20-30 s behind chat), and catch up past 10.
+export const LIVE_SYNC_DURATION_COUNT = 3;
+export const LIVE_MAX_LATENCY_DURATION_COUNT = 10;
+// Offer "Jump to live" once the viewer is this many target durations behind.
+export const JUMP_TO_LIVE_TARGET_DURATIONS = 4;
+export const JUMP_TO_LIVE_MIN_SECONDS = 8;
+
+/** Seconds behind the live sync point, or null when it is unknown. */
+export function liveBehindSeconds({ liveSyncPosition, currentTime } = {}) {
+  const edge = Number(liveSyncPosition);
+  const position = Number(currentTime);
+  if (!Number.isFinite(edge) || edge <= 0 || !Number.isFinite(position)) return null;
+  return Math.max(0, edge - position);
+}
+
+export function shouldOfferJumpToLive({ behindSeconds = null, targetDuration = 2, paused = false } = {}) {
+  if (paused || behindSeconds === null || behindSeconds === undefined) return false;
+  const target = Number(targetDuration) > 0 ? Number(targetDuration) : 2;
+  return behindSeconds >= Math.max(JUMP_TO_LIVE_MIN_SECONDS, target * JUMP_TO_LIVE_TARGET_DURATIONS);
+}
+
+// The server's live reconciler marks a dropped feed "interrupted" while the
+// host is inside the reconnect grace period.
+export function isHostReconnecting(streamStatus) {
+  return normalizeStreamStatus(streamStatus) === "interrupted";
 }

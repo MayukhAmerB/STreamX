@@ -106,3 +106,101 @@ def ffprobe_binary():
 def hls_filter_enabled():
     """Capture through the local playlist filter (hls_proxy.py). Default on."""
     return bool(getattr(settings, "STREAM_RECORDER_HLS_FILTER", True))
+
+
+# --------------------------------------------------------------------------
+# Phase 2: no-click recordings
+# --------------------------------------------------------------------------
+
+
+def _bool(name, default):
+    return bool(getattr(settings, name, default))
+
+
+def _seconds_list(name, default):
+    raw = str(getattr(settings, name, "") or default)
+    values = []
+    for item in raw.split(","):
+        try:
+            values.append(max(1, int(item.strip())))
+        except (TypeError, ValueError):
+            continue
+    return values or [int(item) for item in default.split(",")]
+
+
+def auto_all_broadcasts():
+    """Record every broadcast (OBS and Host Studio), not only OBS sessions."""
+    return _bool("RECORDING_AUTO_ALL_BROADCASTS", True)
+
+
+def auto_meetings():
+    """Auto-record meetings (students' cameras/mics). Off unless enabled."""
+    return _bool("RECORDING_AUTO_MEETINGS", False)
+
+
+def instant_publish():
+    return _bool("RECORDING_INSTANT_PUBLISH", True)
+
+
+def auto_module_title():
+    return str(getattr(settings, "RECORDING_AUTO_MODULE_TITLE", "") or "Class recordings").strip()[:255]
+
+
+def idle_finalize_seconds():
+    return _int("STREAM_RECORDER_IDLE_FINALIZE_SECONDS", 900, minimum=60)
+
+
+def stop_grace_seconds():
+    return _int("STREAM_RECORDER_STOP_GRACE_SECONDS", 600)
+
+
+def reconcile_interval_seconds():
+    return _int("RECORDING_RECONCILE_INTERVAL_SECONDS", 30, minimum=10)
+
+
+def reconcile_lookback_seconds():
+    return _int("RECORDING_RECONCILE_LOOKBACK_HOURS", 24, minimum=1) * 3600
+
+
+def auto_retry_max():
+    return _int("RECORDING_AUTO_RETRY_MAX", 3)
+
+
+def auto_retry_backoff_seconds():
+    return _seconds_list("RECORDING_AUTO_RETRY_BACKOFF_SECONDS", "300,1800,7200")
+
+
+def import_scan_interval_seconds():
+    return _int("RECORDING_IMPORT_SCAN_INTERVAL_SECONDS", 3600)
+
+
+def import_auto_publish():
+    return _bool("RECORDING_IMPORT_AUTO_PUBLISH", True)
+
+
+def alerts_enabled():
+    return _bool("RECORDING_ALERTS_ENABLED", True)
+
+
+def processing_alert_seconds():
+    return _int("RECORDING_PROCESSING_ALERT_SECONDS", 6 * 3600, minimum=600)
+
+
+def finalizing_alert_seconds():
+    return _int("RECORDING_FINALIZING_ALERT_SECONDS", 3600, minimum=300)
+
+
+def heartbeat_alert_seconds():
+    return _int("RECORDING_HEARTBEAT_ALERT_SECONDS", 180, minimum=60)
+
+
+def canary_enabled():
+    return _bool("RECORDING_CANARY_ENABLED", True)
+
+
+def canary_hour():
+    return min(23, _int("RECORDING_CANARY_HOUR", 3))
+
+
+def recorder_heartbeat_file():
+    return str(getattr(settings, "STREAM_RECORDER_HEARTBEAT_FILE", "") or "").strip()

@@ -193,6 +193,7 @@ $side-by-side: 75rem; // video + chat columns from 1200px wide screens
 }
 
 .bvt__tag--starting,
+.bvt__tag--reconnecting,
 .bvt__tag--offline,
 .bvt__tag--ended {
   background-color: var(--bvt-neutral-bg);

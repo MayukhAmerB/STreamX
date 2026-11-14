@@ -44,6 +44,13 @@ const ReportsPage = lazy(() => import("../pages/ReportsPage"));
 const ReportsQueuePage = lazy(() => import("../pages/ReportsQueuePage"));
 const ReportsTaskEditorPage = lazy(() => import("../pages/ReportsTaskEditorPage"));
 const ReportsTaskPage = lazy(() => import("../pages/ReportsTaskPage"));
+// Phase 3: Console exams (staff manage, instructors read) and the unified gradebook.
+const ConsoleExamsPage = lazy(() => import("../pages/ConsoleExamsPage"));
+const ConsoleExamDetailPage = lazy(() => import("../pages/ConsoleExamDetailPage"));
+const GradebookPage = lazy(() => import("../pages/GradebookPage"));
+// Console -> Upload class recording (resumable chunked upload + desktop uploader tokens).
+const ConsoleRecordingUploadPage = lazy(() => import("../pages/ConsoleRecordingUploadPage"));
+const StudentGradebookPage = lazy(() => import("../pages/GradebookPage").then((module) => ({ default: module.StudentGradebookPage })));
 const TermsPage = lazy(() => import("../pages/TermsPage"));
 const UsersCornerPage = lazy(() => import("../pages/UsersCornerPage"));
 const WatchPage = lazy(() => import("../pages/WatchPage"));
@@ -102,8 +109,15 @@ export default function AppRoutes() {
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/reports/marks" element={<ReportsMarksPage />} />
             <Route path="/reports/tasks/:taskId" element={<ReportsTaskPage />} />
+            {/* Phase 3: unified gradebook (students: their own; staff and instructors: their batches). */}
+            <Route path="/gradebook" element={<GradebookPage />} />
             {/* Staff tools share the same shell instance; each group keeps its original role check. */}
             <Route element={<ProtectedRoute requireModerator />}>
+              {/* Phase 3: Console exams and per-student gradebook (staff manage; instructors read only). */}
+              <Route path="/console/exams" element={<ConsoleExamsPage />} />
+              <Route path="/console/exams/:slug" element={<ConsoleExamDetailPage />} />
+              <Route path="/console/recordings/upload" element={<ConsoleRecordingUploadPage />} />
+              <Route path="/gradebook/students/:studentId" element={<StudentGradebookPage />} />
               <Route path="/report-grading" element={<ReportsGradingPage />} />
               <Route path="/report-grading/tasks/new" element={<ReportsTaskEditorPage />} />
               <Route path="/report-grading/tasks/:taskId/edit" element={<ReportsTaskEditorPage />} />

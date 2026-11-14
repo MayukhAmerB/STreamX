@@ -1,0 +1,22 @@
+[package]
+name = "obs-uploader"
+version = "0.1.0"
+edition = "2021"
+description = "Uploads the recording OBS saved to the class it belongs to (resumable, 32 MiB chunks)."
+license = "UNLICENSED"
+publish = false
+
+[dependencies]
+base64 = "0.22"
+hex = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+toml = "0.8"
+tungstenite = { version = "0.24", default-features = false, features = ["handshake"] }
+ureq = { version = "2.12", features = ["json"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

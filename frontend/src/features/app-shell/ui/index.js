@@ -1,5 +1,6 @@
 // Shared Carbon building blocks for functional pages (phases 2-5).
 export { default as EmptyState } from "./EmptyState";
+export { default as FeatureBoundary } from "./FeatureBoundary";
 export { default as PageHeader } from "./PageHeader";
 export { default as PageNotification } from "./PageNotification";
 export { default as PageSkeleton } from "./PageSkeleton";

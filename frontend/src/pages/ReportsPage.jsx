@@ -4,8 +4,9 @@ import { ArrowRight, ChartLine, ChevronRight, Report, Time } from "@carbon/icons
 import { Button, Select, SelectItem } from "@carbon/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { EmptyState, PageHeader, PageNotification, PageSkeleton } from "../features/app-shell/ui";
-import { listReportTasks } from "../features/reports/reportsApi";
+import { EmptyState, FeatureBoundary, PageHeader, PageNotification, PageSkeleton, useToast } from "../features/app-shell/ui";
+import { getMyWeek, listReportTasks } from "../features/reports/reportsApi";
+import WeeklyReportCard, { WeeklyReportView } from "../features/reports/WeeklyReportCard";
 import { formatIst, getCountdown, splitTasks } from "../features/reports/reportModel";
 import StatusChip from "../features/reports/StatusChip";
 import useNow from "../features/reports/useNow";
@@ -60,7 +61,21 @@ function TaskRow({ task }) {
 }
 
 /** Presentational view (also used by tests and the screenshot harness). */
-export function ReportsListView({ tasks = [], loading = false, error = "", onRetry, now = Date.now() }) {
+export function ReportsHeader() {
+  return (
+    <PageHeader
+      title="Reports"
+      description="One report per target you investigate. Upload your files before the weekly deadline and see your marks here."
+      actions={
+        <Button as={Link} to="/reports/marks" kind="tertiary" renderIcon={ChartLine}>
+          My marks
+        </Button>
+      }
+    />
+  );
+}
+
+export function ReportsListView({ tasks = [], loading = false, error = "", onRetry, now = Date.now(), header = true, emptyText }) {
   const [courseId, setCourseId] = useState("all");
   const courses = useMemo(() => {
     const map = new Map();
@@ -72,21 +87,23 @@ export function ReportsListView({ tasks = [], loading = false, error = "", onRet
 
   return (
     <>
-      <PageHeader
-        title="Reports"
-        description="One OSINT target a week. Upload your report before the deadline and see your marks here."
-        actions={
-          <Button as={Link} to="/reports/marks" kind="tertiary" renderIcon={ChartLine}>
-            My marks
-          </Button>
-        }
-      />
+      {header ? (
+        <PageHeader
+          title="Reports"
+          description="One OSINT target a week. Upload your report before the deadline and see your marks here."
+          actions={
+            <Button as={Link} to="/reports/marks" kind="tertiary" renderIcon={ChartLine}>
+              My marks
+            </Button>
+          }
+        />
+      ) : null}
       {loading ? <PageSkeleton label="Loading reports" count={2} /> : null}
       {!loading && error ? (
         <PageNotification kind="error" title="Couldn't load your reports." subtitle={error} actionLabel={onRetry ? "Try again" : undefined} onAction={onRetry} />
       ) : null}
       {!loading && !error && tasks.length === 0 ? (
-        <EmptyState icon={Report} text="No weekly reports yet. When your instructor publishes this week's target, it appears here." />
+        <EmptyState icon={Report} text={emptyText || "No weekly reports yet. When your instructor publishes this week's target, it appears here."} />
       ) : null}
       {!loading && !error && tasks.length > 0 ? (
         <div className="rpt-list-page">
@@ -155,8 +172,35 @@ export function ReportsListView({ tasks = [], loading = false, error = "", onRet
   );
 }
 
+/**
+ * Self-service courses first (one "Submit this week's report" card each), then
+ * instructor-set weekly tasks (legacy flow). A course with reports off says so.
+ */
+export function WeeklySection({ courses = [], loading = false, error = "", onRetry, now, onChanged, notify }) {
+  if (loading) return <PageSkeleton label="Loading this week" count={1} />;
+  if (error) {
+    return <PageNotification kind="error" title="Couldn't load this week's reports." subtitle={error} actionLabel={onRetry ? "Try again" : undefined} onAction={onRetry} />;
+  }
+  const enabled = courses.filter((course) => course.enabled);
+  const off = courses.filter((course) => !course.enabled && !course.legacy_task_count);
+  return (
+    <div className="rpt-weekly-list">
+      {enabled.map((course) => (
+        <FeatureBoundary key={course.course.id} label={`The weekly report for ${course.course.title || "this course"}`}>
+          <WeeklyReportCard state={course} now={now} onChanged={onChanged} notify={notify} />
+        </FeatureBoundary>
+      ))}
+      {!enabled.length && off.length ? (
+        <WeeklyReportView state={off[0]} now={now} />
+      ) : null}
+    </div>
+  );
+}
+
 export default function ReportsPage() {
   const [state, setState] = useState({ tasks: [], loading: true, error: "" });
+  const [week, setWeek] = useState({ courses: [], loading: true, error: "" });
+  const { showToast } = useToast();
   const now = useNow();
 
   const load = useCallback(() => {
@@ -166,9 +210,44 @@ export default function ReportsPage() {
       .catch((error) => setState({ tasks: [], loading: false, error: apiMessage(error, "Please try again.") }));
   }, []);
 
+  const loadWeek = useCallback(({ quiet = false } = {}) => {
+    if (!quiet) setWeek((current) => ({ ...current, loading: true, error: "" }));
+    getMyWeek()
+      .then((response) => setWeek({ courses: apiData(response, {})?.courses || [], loading: false, error: "" }))
+      .catch((error) => setWeek({ courses: [], loading: false, error: apiMessage(error, "Please try again.") }));
+  }, []);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadWeek();
+  }, [load, loadWeek]);
 
-  return <ReportsListView tasks={state.tasks} loading={state.loading} error={state.error} onRetry={load} now={now} />;
+  const hasSelfService = week.courses.some((course) => course.enabled);
+  const hasLegacy = state.tasks.length > 0;
+
+  return (
+    <>
+      <ReportsHeader />
+      <WeeklySection
+        courses={week.courses}
+        loading={week.loading}
+        error={week.error}
+        onRetry={() => loadWeek()}
+        now={now}
+        onChanged={() => loadWeek({ quiet: true })}
+        notify={showToast}
+      />
+      {state.loading || state.error || hasLegacy || (!hasSelfService && !week.courses.length) ? (
+        <ReportsListView
+          header={false}
+          tasks={state.tasks}
+          loading={state.loading}
+          error={state.error}
+          onRetry={load}
+          now={now}
+          emptyText={week.courses.length ? "No instructor-set weekly tasks right now." : undefined}
+        />
+      ) : null}
+    </>
+  );
 }

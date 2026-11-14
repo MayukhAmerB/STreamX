@@ -86,6 +86,18 @@ export const NAV_ITEMS = [
     hint: "Weekly targets and your marks",
     match: [/^\/reports(\/.*)?$/],
   },
+  // >>> Phase 3: unified gradebook >>>
+  {
+    id: "gradebook",
+    section: "learn",
+    label: "Gradebook",
+    shortLabel: "Grades",
+    to: "/gradebook",
+    icon: "gradebook",
+    hint: "Report marks and exam results",
+    match: [/^\/gradebook(\/.*)?$/],
+  },
+  // <<< Phase 3 <<<
   {
     id: "guides",
     section: "learn",
@@ -170,6 +182,31 @@ export const NAV_ITEMS = [
     match: [/^\/report-grading(\/.*)?$/],
     roles: [ROLE_MODERATOR],
   },
+  // >>> Phase 3: Console exams >>>
+  {
+    id: "exams",
+    section: "teach",
+    label: "Exams",
+    shortLabel: "Exams",
+    to: "/console/exams",
+    icon: "exams",
+    hint: "Schedule CTF exams and see results",
+    match: [/^\/console\/exams(\/.*)?$/],
+    roles: [ROLE_MODERATOR],
+    brands: [BRAND_ALSYED],
+  },
+  // <<< Phase 3 <<<
+  {
+    id: "recording-upload",
+    section: "teach",
+    label: "Upload recording",
+    shortLabel: "Upload",
+    to: "/console/recordings/upload",
+    icon: "recordingUpload",
+    hint: "Upload the OBS file of a class",
+    match: [/^\/console\/recordings\/upload\/?$/],
+    roles: [ROLE_MODERATOR],
+  },
   {
     id: "control-center",
     section: "teach",
@@ -240,6 +277,10 @@ export const CARBON_NATIVE_PATHS = [
   // Weekly reports (students) and report grading (instructors, admins).
   /^\/reports(\/.*)?$/,
   /^\/report-grading(\/.*)?$/,
+  // Phase 3: Console exams and the unified gradebook.
+  /^\/console\/exams(\/.*)?$/,
+  /^\/gradebook(\/.*)?$/,
+  /^\/console\/recordings\/upload\/?$/,
 ];
 
 /**

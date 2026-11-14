@@ -1,0 +1,12 @@
+#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-TARGETDURATION:2
+#EXT-X-MEDIA-SEQUENCE:1
+#EXTINF:2.0,
+stream-a-001.ts
+#EXTINF:2.0,
+stream-a-002.ts
+#EXTINF:2.0,
+stream-a-003.ts
+#EXTINF:2.0,
+stream-a-004.ts

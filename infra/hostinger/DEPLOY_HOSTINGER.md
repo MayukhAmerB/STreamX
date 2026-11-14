@@ -145,9 +145,14 @@ The labs Examination tab records every answer in Postgres through `/api/ctf/`.
 
 1. Add a pepper to `backend/.env.hostinger.production` (once; keep it secret and backed up):
    `CTF_ANSWER_PEPPER=<python -c "import secrets; print(secrets.token_urlsafe(48))">`
-   Without it the LMS still starts, but the exam API answers 503 `ctf_not_configured`
-   (`check` reports `ctf.I001`). A pepper shorter than 32 characters or equal to
-   `DJANGO_SECRET_KEY` fails the deploy check (`ctf.E001`).
+   Without it the LMS still starts and deploys, but exams are switched off: the exam API
+   answers 503 `ctf_not_configured`, labs shows "Answer checking is not available" in
+   place of Start, and the Console readiness checklist keeps Publish disabled with the
+   reason. A pepper shorter than 32 characters or equal to `DJANGO_SECRET_KEY` is
+   refused the same way (exams off, nothing else). `check --deploy` (container start and
+   `deploy-safe.sh`) prints the reason as INFO, never as an error: `ctf.I001` no pepper,
+   `ctf.I003` weak pepper, `ctf.I002` an exam is already published but cannot be taken.
+   Look for these lines in the deploy log.
 2. `CTF_LABS_ORIGINS` defaults to `https://labs.alsyedinitiative.com`; only set it if the labs host changes.
 3. Rebuild/restart `backend` (migration `ctf.0001_initial` creates the new tables only) and `osint-labs`.
 4. Load an exam from the private file (it never enters an image or git):

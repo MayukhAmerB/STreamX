@@ -10,7 +10,8 @@ import { siteBrand } from "../config/siteBrand";
 import { CONSOLE_TITLE, getCornerTileGroups, isExternalNavItem } from "../features/app-shell/navConfig";
 import { getNavIcon } from "../features/app-shell/navIcons";
 import ReportsDueTile from "../features/reports/ReportsDueTile";
-import { PageNotification, ProgressMeter, StatChips, StatChipsSkeleton } from "../features/app-shell/ui";
+import ExamConsoleCard from "../features/exams/ExamConsoleCard";
+import { FeatureBoundary, PageNotification, ProgressMeter, StatChips, StatChipsSkeleton } from "../features/app-shell/ui";
 import { useLastCourseId } from "../features/app-shell/useLastCourseId";
 import { sessionTypeLabel } from "../features/live-classes/liveSessions";
 import { formatNextClass, formatScheduleSummary, getNextClassStart } from "../features/live-classes/schedule";
@@ -452,7 +453,14 @@ export function UsersCornerView({
       <ContinueCard course={continueCourse} loading={coursesLoading} error={coursesError} />
 
       {/* Weekly reports: "Next report due …" (renders nothing when nothing is due). */}
-      <ReportsDueTile />
+      <FeatureBoundary label="The reports tile">
+        <ReportsDueTile />
+      </FeatureBoundary>
+
+      {/* Phase 3: "Exam open now" (students: links to labs#exam; staff: to Console -> Exams). */}
+      <FeatureBoundary label="The exam tile">
+        <ExamConsoleCard />
+      </FeatureBoundary>
 
       <CoursesSection
         courses={list}

@@ -1,0 +1,185 @@
+// Console -> Upload class recording (Carbon, Console palette).
+// Token-only imports: emits no Carbon component CSS; every rule is scoped
+// under `.cds-app`. Phone first.
+@use '../app-shell/styles/tokens' as *;
+
+.cds-app {
+  .rup-section {
+    margin-block: $spacing-06;
+  }
+
+  .rup-card {
+    display: grid;
+    padding: $spacing-05;
+    border: 1px solid var(--uc-border);
+    border-radius: var(--uc-radius-card);
+    background: var(--uc-surface);
+    gap: $spacing-05;
+  }
+
+  .rup-subtitle {
+    @include type-style('heading-compact-02');
+
+    color: var(--uc-text);
+  }
+
+  .rup-muted {
+    @include type-style('body-compact-01');
+
+    color: var(--uc-text-muted);
+  }
+
+  .rup-error {
+    @include type-style('body-compact-01');
+
+    color: var(--cds-text-error, #da1e28);
+  }
+
+  .rup-check-label {
+    @include type-style('heading-compact-01');
+
+    color: var(--uc-text);
+  }
+
+  .rup-outcome {
+    margin-block-start: calc(-1 * #{$spacing-03});
+  }
+
+  .rup-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: $spacing-04;
+  }
+
+  .rup-drop {
+    position: relative;
+    display: grid;
+    min-block-size: 9rem;
+    padding: $spacing-06 $spacing-05;
+    border: 2px dashed var(--uc-border-strong, var(--uc-border));
+    border-radius: var(--uc-radius-card);
+    background: var(--uc-surface-2, var(--uc-surface));
+    color: var(--uc-text);
+    cursor: pointer;
+    gap: $spacing-02;
+    justify-items: center;
+    text-align: center;
+
+    &:focus-within {
+      outline: 2px solid var(--cds-focus, #0f62fe);
+      outline-offset: 2px;
+    }
+
+    &--over {
+      border-color: var(--cds-interactive, #0f62fe);
+    }
+
+    &--disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+  }
+
+  .rup-drop__title {
+    @include type-style('heading-compact-01');
+
+    overflow-wrap: anywhere;
+  }
+
+  .rup-drop__input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: inherit;
+    inline-size: 100%;
+    block-size: 100%;
+  }
+
+  .rup-progress {
+    display: grid;
+    gap: $spacing-03;
+  }
+
+  .rup-result {
+    display: grid;
+    gap: $spacing-03;
+  }
+
+  .rup-link {
+    @include type-style('body-compact-01');
+
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 2.75rem;
+    color: var(--cds-link-primary, #0f62fe);
+  }
+
+  .rup-token {
+    display: grid;
+    padding: $spacing-04;
+    border: 1px solid var(--uc-border);
+    background: var(--uc-surface-2, var(--uc-surface));
+    gap: $spacing-03;
+  }
+
+  .rup-token__value {
+    @include type-style('code-02');
+
+    overflow-wrap: anywhere;
+    user-select: all;
+  }
+
+  .rup-list {
+    display: grid;
+    gap: $spacing-03;
+  }
+
+  .rup-list__item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    padding: $spacing-04;
+    border: 1px solid var(--uc-border);
+    background: var(--uc-surface);
+    gap: $spacing-03;
+    overflow-wrap: anywhere;
+  }
+
+  .rup-list__end {
+    display: flex;
+    align-items: center;
+    gap: $spacing-03;
+  }
+
+  .rup-guide {
+    @include type-style('body-compact-01');
+
+    color: var(--uc-text-2, var(--uc-text));
+
+    summary {
+      min-block-size: 2.75rem;
+      cursor: pointer;
+      font-weight: 600;
+      line-height: 2.75rem;
+    }
+
+    ol {
+      display: grid;
+      padding-inline-start: $spacing-06;
+      gap: $spacing-03;
+      list-style: decimal;
+    }
+  }
+
+  .rup-code {
+    @include type-style('code-01');
+
+    overflow-x: auto;
+    padding: $spacing-03;
+    margin-block-start: $spacing-02;
+    background: var(--uc-surface-2, var(--uc-surface));
+    white-space: pre;
+  }
+}

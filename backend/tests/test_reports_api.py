@@ -470,6 +470,14 @@ class VersioningTests(ReportsTestCase):
         submission = self.submit_pdf()
         self.assertEqual(self.grade(submission, action="draft", marks="5").status_code, 200)
         self.as_user(self.student)
+        # Deadline-aware lock (Phase 3): a grader's draft does not lock the
+        # student before the deadline; after it, it does.
+        self.assertEqual(self.upload().status_code, 201)
+        ReportTask.objects.filter(pk=self.task.pk).update(
+            due_at=timezone.now() - timedelta(minutes=1),
+            late_policy=ReportTask.LATE_ALLOWED,
+            late_until=timezone.now() + timedelta(days=1),
+        )
         self.assertEqual(self.upload().status_code, 409)
         submission.refresh_from_db()
         self.assertEqual(self.grade(submission, marks="5").status_code, 200)

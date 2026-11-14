@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { resolveReturnTarget, returnTargetFromSearch } from "./safeReturnUrl";
 
 const prod = { hostname: "alsyedinitiative.com" };
@@ -21,6 +21,23 @@ describe("resolveReturnTarget", () => {
   it("accepts the local labs dev server only from localhost", () => {
     expect(resolveReturnTarget("http://localhost:8092/#exam", local)?.type).toBe("external");
     expect(resolveReturnTarget("http://localhost:8092/#exam", prod)).toBeNull();
+    expect(resolveReturnTarget("http://localhost:23003/#exam", local)).toBeNull();
+  });
+
+  it("accepts extra local labs ports from VITE_DEV_LABS_PORTS, still only from localhost", async () => {
+    vi.stubEnv("VITE_DEV_LABS_PORTS", "23003, not-a-port");
+    vi.resetModules();
+    try {
+      const fresh = await import("./safeReturnUrl");
+      expect(fresh.resolveReturnTarget("http://localhost:23003/#exam", local)?.type).toBe("external");
+      expect(fresh.resolveReturnTarget("http://localhost:8092/#exam", local)?.type).toBe("external");
+      expect(fresh.resolveReturnTarget("http://localhost:23003/#exam", prod)).toBeNull();
+      expect(fresh.resolveReturnTarget("https://evil.com:23003/", local)).toBeNull();
+      expect(fresh.resolveReturnTarget("http://localhost:23004/#exam", local)).toBeNull();
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
   });
 
   it.each([

@@ -57,6 +57,7 @@ describe("nav config", () => {
       "continue-learning",
       "live-classes",
       "reports",
+      "gradebook",
       "guides",
       "osint-tools",
       "labs",
@@ -199,6 +200,7 @@ describe("nav config", () => {
       "my-courses",
       "live-classes",
       "reports",
+      "gradebook",
       "guides",
       "osint-tools",
       "labs",
@@ -211,12 +213,22 @@ describe("nav config", () => {
       "instructor-dashboard",
       "new-course",
       "report-grading",
+      "exams",
+      "recording-upload",
       "control-center",
       "meeting",
       "broadcasting",
     ]);
     const adminTeaching = getCornerTileGroups(admin).find((group) => group.id === "teach");
-    expect(ids(adminTeaching.items)).toEqual(["report-grading", "control-center", "meeting", "broadcasting", "lecture-questions"]);
+    expect(ids(adminTeaching.items)).toEqual([
+      "report-grading",
+      "exams",
+      "recording-upload",
+      "control-center",
+      "meeting",
+      "broadcasting",
+      "lecture-questions",
+    ]);
     for (const group of [...studentGroups, ...instructorGroups]) {
       expect(ids(group.items)).not.toContain("overview");
       expect(ids(group.items)).not.toContain("continue-learning");

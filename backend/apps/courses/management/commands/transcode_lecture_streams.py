@@ -1,14 +1,20 @@
 import time
 
 from django.core.management.base import BaseCommand
-from django.db.models import Q
 
+from apps.courses import transcode_queue
 from apps.courses.models import Lecture
 from apps.courses.services import VideoTranscodeError, transcode_lecture_to_hls
 
+GC_INTERVAL_SECONDS = 3600
+
 
 class Command(BaseCommand):
-    help = "Transcode uploaded lecture videos into local HLS streams (Phase 2)."
+    help = (
+        "Transcode uploaded lecture videos into local HLS streams. --pending works the queue: class recordings "
+        "first, claims with SELECT ... SKIP LOCKED (several transcoders may run), retries failures with backoff "
+        "and swaps each finished stream in blue/green."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument("--lecture-id", type=int, help="Transcode a single lecture by ID")
@@ -22,7 +28,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--pending",
             action="store_true",
-            help="Process lectures with uploaded files that still need HLS generation",
+            help="Work the transcode queue (new uploads, class recordings, due retries)",
         )
         parser.add_argument(
             "--force",
@@ -56,6 +62,9 @@ class Command(BaseCommand):
 
         watch = bool(options.get("watch"))
         poll_seconds = max(5, int(options.get("poll_seconds") or 30))
+        if options.get("pending"):
+            self._work_queue(watch=watch, poll_seconds=poll_seconds)
+            return
 
         while True:
             processed, skipped, failed = self._run_batch(options)
@@ -71,12 +80,47 @@ class Command(BaseCommand):
             self.stdout.write(f"Watching for pending uploads. Sleeping {poll_seconds}s...")
             time.sleep(poll_seconds)
 
+    # ------------------------------------------------------------- queue
+    def _work_queue(self, *, watch, poll_seconds):
+        worker = transcode_queue.worker_identity()
+        transcode_queue.release_own_stale_claims()
+        next_gc = 0.0
+        while True:
+            transcode_queue.touch_heartbeat()
+            counts = {"ready": 0, "failed": 0, "superseded": 0}
+            while True:
+                result = transcode_queue.process_next(worker=worker)
+                transcode_queue.touch_heartbeat()
+                if result is None:
+                    break
+                outcome, lecture_id = result
+                counts[outcome] = counts.get(outcome, 0) + 1
+                line = f"{outcome.upper()} lecture {lecture_id}"
+                if outcome == "failed":
+                    self.stderr.write(self.style.ERROR(line))
+                else:
+                    self.stdout.write(self.style.SUCCESS(line))
+            if time.monotonic() >= next_gc:
+                next_gc = time.monotonic() + GC_INTERVAL_SECONDS
+                transcode_queue.gc_stale_stream_revisions()
+            summary = (
+                f"Transcode queue drained. ready={counts['ready']}, failed={counts['failed']}, "
+                f"superseded={counts['superseded']}"
+            )
+            if counts["failed"]:
+                self.stderr.write(self.style.ERROR(summary))
+            else:
+                self.stdout.write(self.style.SUCCESS(summary))
+            if not watch:
+                return
+            time.sleep(poll_seconds)
+
+    # ---------------------------------------------------- manual selectors
     def _select_queryset(self, options):
         lecture_id = options.get("lecture_id")
         module_id = options.get("module_id")
         course_id = options.get("course_id")
         all_uploaded = options.get("all_uploaded")
-        pending = options.get("pending")
 
         queryset = Lecture.objects.select_related("section__course").all()
         if lecture_id:
@@ -87,15 +131,6 @@ class Command(BaseCommand):
             return queryset.filter(section__course_id=course_id)
         if all_uploaded:
             return queryset.filter(video_file__isnull=False).exclude(video_file="")
-        if pending:
-            return (
-                queryset.filter(video_file__isnull=False)
-                .exclude(video_file="")
-                .filter(
-                    Q(stream_status__in=[Lecture.STREAM_PENDING, Lecture.STREAM_UPLOADED, Lecture.STREAM_PROCESSING, Lecture.STREAM_FAILED])
-                    | Q(stream_manifest_key="")
-                )
-            )
         return queryset.none()
 
     def _run_batch(self, options):

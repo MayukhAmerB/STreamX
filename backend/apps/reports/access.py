@@ -83,12 +83,18 @@ def manageable_submission_or_404(user, submission_id):
     return submission
 
 
-def student_visible_tasks(user, at=None):
+def student_visible_tasks(user, at=None, *, include_auto=False):
+    """Instructor-created tasks a student can open (legacy flow). Automatic
+    week tasks of self-service courses are reached through /api/reports/me/
+    instead; ``include_auto`` adds them (marks)."""
     at = at or timezone.now()
-    return ReportTask.objects.filter(
+    queryset = ReportTask.objects.filter(
         course_id__in=accessible_course_ids_for_user(user),
         status__in=[ReportTask.STATUS_PUBLISHED, ReportTask.STATUS_CLOSED],
     ).filter(Q(opens_at__isnull=True) | Q(opens_at__lte=at))
+    if not include_auto:
+        queryset = queryset.exclude(origin=ReportTask.ORIGIN_AUTO)
+    return queryset
 
 
 def student_task_or_404(user, task_id):

@@ -8,7 +8,15 @@
 // Anything else returns null and the caller falls back to its default.
 
 const TRUSTED_SUBDOMAINS = ["labs"];
-const DEV_LABS_PORTS = new Set(["8092"]);
+// VITE_DEV_LABS_PORTS (comma-separated, build time) adds local labs ports, so
+// parallel E2E stacks can run labs on their own port. Localhost/http only.
+const DEV_LABS_PORTS = new Set([
+  "8092",
+  ...String(import.meta.env?.VITE_DEV_LABS_PORTS || "")
+    .split(",")
+    .map((port) => port.trim())
+    .filter((port) => /^\d{2,5}$/.test(port)),
+]);
 
 function baseDomain(hostname) {
   const host = String(hostname || "").toLowerCase();

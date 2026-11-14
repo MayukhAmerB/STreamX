@@ -13,20 +13,28 @@ import { apiData, apiMessage } from "../utils/api";
 import { markKnownRegisteredVisitor } from "../utils/knownRegisteredVisitor";
 import {
   SESSION_EVICTED_LOGIN_MESSAGE,
+  isLiveClassEndedEviction,
+  isLiveGraceEviction,
   isSessionEviction,
   loginReturnState,
 } from "../utils/sessionEviction";
 import SessionEvictedDialog from "../components/SessionEvictedDialog";
+// Phase 2: an evicted device finishes a playing live class with a banner.
+import LiveEvictionBanner from "../components/realtime/LiveEvictionBanner";
+import { useLiveClassActive } from "../services/realtime/liveClassGuard";
 
 export const AuthContext = createContext(null);
 
 const buildTimeTurnstileSiteKey = String(import.meta.env.VITE_TURNSTILE_SITE_KEY || "").trim();
 
 // Mounted only while the dialog is open, beside (never around) the routed page.
-function SessionEvictionPrompt({ onUseThisDevice, onSignOut }) {
+// mode "live": the server lets this device finish its live class; "final":
+// this device is signed out (classEnded: because that class just ended).
+export function SessionEvictionPrompt({ mode = "final", classEnded = false, onUseThisDevice, onSignOut }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [signingOut, setSigningOut] = useState(false);
+  const liveClassActive = useLiveClassActive();
 
   const continueOnThisDevice = () => {
     navigate("/login", { state: loginReturnState(location) });
@@ -43,9 +51,17 @@ function SessionEvictionPrompt({ onUseThisDevice, onSignOut }) {
     navigate("/login");
   };
 
+  // While a class plays here the student finishes it with a banner (no modal,
+  // no logout); once it has ended the device is signed out with the reason.
+  if (liveClassActive && !classEnded) {
+    return (
+      <LiveEvictionBanner signingOut={signingOut} onUseThisDevice={continueOnThisDevice} onSignOut={signOut} />
+    );
+  }
   return (
     <SessionEvictedDialog
       open
+      variant={classEnded ? "class-ended" : mode === "live" ? "live" : "signed-out"}
       signingOut={signingOut}
       onUseThisDevice={continueOnThisDevice}
       onSignOut={signOut}
@@ -61,14 +77,19 @@ export function AuthProvider({ children }) {
   const [turnstileEnabled, setTurnstileEnabled] = useState(Boolean(buildTimeTurnstileSiteKey));
   const [turnstileSiteKey, setTurnstileSiteKey] = useState(buildTimeTurnstileSiteKey);
   const [sessionEndedMessage, setSessionEndedMessage] = useState("");
-  const [sessionEvicted, setSessionEvicted] = useState(false);
+  // null, or { mode: "live" | "final", classEnded } (see SessionEvictionPrompt).
+  const [sessionEviction, setSessionEviction] = useState(null);
   const hasBootstrappedRef = useRef(false);
 
-  function setAuthenticatedUser(data) {
+  function setAuthenticatedUser(data, { newSession = false } = {}) {
     if (data) {
       markKnownRegisteredVisitor();
       setSessionEndedMessage("");
-      setSessionEvicted(false);
+    }
+    if (data && newSession) {
+      // Only a fresh sign-in ends an eviction: reloading the user on a device
+      // that is finishing its live class must keep the banner.
+      setSessionEviction(null);
     }
     setUser(data);
   }
@@ -124,8 +145,12 @@ export function AuthProvider({ children }) {
     const handleSessionExpired = (event) => {
       if (isSessionEviction(event?.detail)) {
         // Keep the user and the page mounted (a class may be playing); the
-        // dialog lets the student decide when to leave it.
-        setSessionEvicted(true);
+        // banner or dialog lets the student decide when to leave it.
+        const next = {
+          mode: isLiveGraceEviction(event.detail) ? "live" : "final",
+          classEnded: isLiveClassEndedEviction(event.detail),
+        };
+        setSessionEviction((current) => (current?.mode === "final" && next.mode === "live" ? current : next));
         return;
       }
       setUser(null);
@@ -141,7 +166,7 @@ export function AuthProvider({ children }) {
   const login = async (payload) => {
     const response = await loginUser(payload);
     const data = apiData(response);
-    setAuthenticatedUser(data);
+    setAuthenticatedUser(data, { newSession: true });
     return data;
   };
 
@@ -150,14 +175,14 @@ export function AuthProvider({ children }) {
       await logoutUser();
     } finally {
       resetSessionEviction();
-      setSessionEvicted(false);
+      setSessionEviction(null);
       setUser(null);
     }
   };
 
   const signInOnThisDevice = () => {
     setSessionEndedMessage(SESSION_EVICTED_LOGIN_MESSAGE);
-    setSessionEvicted(false);
+    setSessionEviction(null);
     setUser(null);
   };
 
@@ -203,8 +228,13 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={value}>
       {children}
-      {sessionEvicted ? (
-        <SessionEvictionPrompt onUseThisDevice={signInOnThisDevice} onSignOut={logout} />
+      {sessionEviction ? (
+        <SessionEvictionPrompt
+          mode={sessionEviction.mode}
+          classEnded={sessionEviction.classEnded}
+          onUseThisDevice={signInOnThisDevice}
+          onSignOut={logout}
+        />
       ) : null}
     </AuthContext.Provider>
   );

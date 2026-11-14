@@ -44,6 +44,12 @@ urlpatterns = [
     path("api/reports/", include("apps.reports.urls")),
     path("api/site/", include("apps.site_media.urls")),
     path("api/ctf/", include("apps.ctf.urls")),
+    # >>> Phase 3: Console exams (staff) and the unified gradebook >>>
+    path("api/ctf-admin/", include("apps.ctf.console_urls")),
+    path("api/gradebook/", include("apps.ctf.gradebook_urls")),
+    # <<< Phase 3 <<<
+    # Resumable class recording uploads (Console + desktop OBS uploader).
+    path("api/recording-uploads/", include("apps.recording_uploads.urls")),
     path("api/", include("apps.courses.urls")),
     path("api/payment/", include("apps.payments.urls")),
 ]

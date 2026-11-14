@@ -88,36 +88,40 @@ def task_marks_csv(task):
     ]
     header += [f"{item.name} (/{format_marks(item.max_marks)})" for item in criteria]
     header += ["Graded by", "Graded at", "Feedback"]
+    auto = task.origin == "auto"
+    if auto:  # self-service week: one row per target
+        header.insert(2, "Target")
     rows = [header]
     submissions = (
         ReportSubmission.objects.filter(task=task)
         .exclude(status=ReportSubmission.STATUS_NOT_SUBMITTED)
         .select_related("student", "grade", "grade__graded_by")
-        .order_by("student__full_name", "student__email")
+        .order_by("student__full_name", "student__email", "target_key", "id")
     )
     for submission in submissions:
         grade = getattr(submission, "grade", None)
         stored = (grade.criteria_marks or {}) if grade else {}
         graded_by = grade.graded_by if grade else None
-        rows.append(
-            [
-                submission.student.full_name or "",
-                submission.student.email,
-                submission.get_status_display(),
-                _local(submission.submitted_at),
-                "yes" if submission.is_late else "no",
-                submission.minutes_late,
-                submission.version_count,
-                format_marks(grade.raw_marks) if grade else "",
-                format_marks(grade.late_penalty) if grade and grade.raw_marks is not None else "",
-                format_marks(grade.final_marks) if grade else "",
-                format_marks(task.max_marks),
-                *[stored.get(str(item.pk), "") for item in criteria],
-                (graded_by.full_name or graded_by.email) if graded_by else "",
-                _local(grade.graded_at) if grade else "",
-                grade.feedback if grade else "",
-            ]
-        )
+        row = [
+            submission.student.full_name or "",
+            submission.student.email,
+            submission.get_status_display(),
+            _local(submission.submitted_at),
+            "yes" if submission.is_late else "no",
+            submission.minutes_late,
+            submission.version_count,
+            format_marks(grade.raw_marks) if grade else "",
+            format_marks(grade.late_penalty) if grade and grade.raw_marks is not None else "",
+            format_marks(grade.final_marks) if grade else "",
+            format_marks(task.max_marks),
+            *[stored.get(str(item.pk), "") for item in criteria],
+            (graded_by.full_name or graded_by.email) if graded_by else "",
+            _local(grade.graded_at) if grade else "",
+            grade.feedback if grade else "",
+        ]
+        if auto:
+            row.insert(2, submission.target_name)
+        rows.append(row)
     return _write_rows(rows)
 
 
@@ -178,6 +182,11 @@ def iter_task_zip(task):
             folder = safe_component(
                 f"{student.full_name or student.email} ({student.pk})", fallback=f"student-{student.pk}"
             )
+            if task.origin == "auto" and submission.target_name:
+                # Self-service week: one sub-folder per target.
+                folder = (
+                    f"{folder}/{safe_component(submission.target_name, fallback=f'target-{submission.pk}', limit=60)}"
+                )
             version = submission.current_version
             for item in version.files.all().order_by("created_at", "id"):
                 if item.scan_status != SCAN_CLEAN:

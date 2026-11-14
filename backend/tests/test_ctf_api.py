@@ -226,6 +226,20 @@ class StartAndDetailTests(CtfApiTestCase):
             self.assertNotIn(digest, body)
         self.assertNotIn("Zz Harbour", body)
 
+    def test_weak_pepper_in_production_disables_the_exam_only(self):
+        """A weak pepper is never used: labs shows "answer checking is not
+        available" instead of Start, starting answers 503, nothing is stored,
+        and the rest of the API keeps serving."""
+        with override_settings(CTF_ANSWER_PEPPER="too-short", APP_ENV="production"):
+            data = self.detail()
+            self.assertFalse(data["exam"]["can_start"])
+            self.assertEqual(data["exam"]["start_reason"], "not_configured")
+            response = self.start()
+            self.assertEqual(response.status_code, 503, response.content)
+            self.assertEqual(self.code(response), "ctf_not_configured")
+            self.assertFalse(CtfParticipation.objects.exists())
+            self.assertEqual(self.client.get(reverse("auth-user")).status_code, 200)
+
 
 class AttemptTests(CtfApiTestCase):
     def setUp(self):

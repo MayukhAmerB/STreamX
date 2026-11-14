@@ -1773,6 +1773,16 @@ class LiveClassAdmin(admin.ModelAdmin):
             },
         ),
         ("Schedule", {"fields": ("schedule_days", "class_duration_minutes", "is_active")}),
+        (
+            "Class recordings",
+            {
+                "description": (
+                    "Recordings of this class are published automatically after each class. Without a module "
+                    "here (or on the session) they go to the course's \"Class recordings\" section."
+                ),
+                "fields": ("default_module",),
+            },
+        ),
         ("Enrollments", {"fields": ("enrollment_count_display",)}),
         ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
     )

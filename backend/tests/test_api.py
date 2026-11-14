@@ -4015,6 +4015,7 @@ class AdaptiveHLSTranscodeTests(BaseAPITestCase):
             COURSE_HLS_KEYFRAME_INTERVAL_SECONDS=4,
             COURSE_HLS_X264_PRESET="slow",
             COURSE_HLS_CRF=18,
+            COURSE_HLS_SINGLE_PASS=False,  # the per-rendition (rollback) path
         ):
             lecture = Lecture.objects.create(
                 section=self.section,
@@ -4025,7 +4026,7 @@ class AdaptiveHLSTranscodeTests(BaseAPITestCase):
             )
             ffmpeg_commands = []
 
-            def fake_run(cmd, check=False, capture_output=False, text=False):
+            def fake_run(cmd, check=False, capture_output=False, text=False, timeout=None):
                 executable = os.path.basename(str(cmd[0]))
                 if executable == "ffprobe":
                     return SimpleNamespace(
@@ -4095,6 +4096,7 @@ class AdaptiveHLSTranscodeTests(BaseAPITestCase):
             COURSE_HLS_KEYFRAME_INTERVAL_SECONDS=4,
             COURSE_HLS_X264_PRESET="slow",
             COURSE_HLS_CRF=18,
+            COURSE_HLS_SINGLE_PASS=False,  # the per-rendition (rollback) path
         ):
             lecture = Lecture.objects.create(
                 section=self.section,
@@ -4105,7 +4107,7 @@ class AdaptiveHLSTranscodeTests(BaseAPITestCase):
             )
             ffmpeg_commands = []
 
-            def fake_run(cmd, check=False, capture_output=False, text=False):
+            def fake_run(cmd, check=False, capture_output=False, text=False, timeout=None):
                 executable = os.path.basename(str(cmd[0]))
                 if executable == "ffprobe":
                     return SimpleNamespace(
@@ -4164,6 +4166,7 @@ class AdaptiveHLSTranscodeTests(BaseAPITestCase):
             COURSE_HLS_KEYFRAME_INTERVAL_SECONDS=4,
             COURSE_HLS_X264_PRESET="slow",
             COURSE_HLS_CRF=18,
+            COURSE_HLS_SINGLE_PASS=False,  # the per-rendition (rollback) path
         ):
             lecture = Lecture.objects.create(
                 section=self.section,
@@ -4174,7 +4177,7 @@ class AdaptiveHLSTranscodeTests(BaseAPITestCase):
             )
             ffmpeg_commands = []
 
-            def fake_run(cmd, check=False, capture_output=False, text=False):
+            def fake_run(cmd, check=False, capture_output=False, text=False, timeout=None):
                 executable = os.path.basename(str(cmd[0]))
                 if executable == "ffprobe":
                     return SimpleNamespace(

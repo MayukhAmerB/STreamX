@@ -613,6 +613,233 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ctf-admin/batches/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ctf_admin_batches_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ctf-admin/exams/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ctf_admin_exams_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ctf-admin/exams/{slug}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ctf_admin_exams_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["ctf_admin_exams_partial_update"];
+        trace?: never;
+    };
+    "/ctf-admin/exams/{slug}/close/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ctf_admin_exams_close_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ctf-admin/exams/{slug}/materials/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ctf_admin_exams_materials_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ctf-admin/exams/{slug}/materials/{material_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["ctf_admin_exams_materials_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ctf-admin/exams/{slug}/publish/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ctf_admin_exams_publish_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ctf-admin/exams/{slug}/results/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ctf_admin_exams_results_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ctf-admin/exams/{slug}/results.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ctf_admin_exams_results_csv_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ctf-admin/exams/{slug}/unschedule/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ctf_admin_exams_unschedule_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ctf-admin/exams/preview/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Validate and diff an exam file without saving anything (counts only). */
+        post: operations["ctf_admin_exams_preview_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ctf-admin/exams/upload/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ctf_admin_exams_upload_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ctf-admin/summary/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The staff Console card: exams open now and scheduled. */
+        get: operations["ctf_admin_summary_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ctf/eligibility/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description ``{enabled, reason}`` for the labs Examination tab and the Console card. */
+        get: operations["ctf_eligibility_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ctf/exams/": {
         parameters: {
             query?: never;
@@ -637,6 +864,23 @@ export interface paths {
             cookie?: never;
         };
         get: operations["ctf_exams_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ctf/exams/{slug}/materials/{material_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description A fresh signed URL for one evidence file (the student must have started). */
+        get: operations["ctf_exams_materials_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -699,6 +943,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ctf/materials/{token}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The evidence bytes behind a signed URL. The token is the credential
+         *     (an ``<img>`` on the labs page cannot send headers), so no session is
+         *     read here; the participation is re-checked on every request.
+         */
+        get: operations["ctf_materials_file_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/enrollment-leads/": {
         parameters: {
             query?: never;
@@ -709,6 +974,86 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["enrollment_leads_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gradebook/courses/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["gradebook_courses_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gradebook/courses/{course_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["gradebook_courses_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gradebook/courses/{course_id}/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["gradebook_courses_export_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gradebook/me/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["gradebook_me_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gradebook/students/{student_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["gradebook_students_retrieve"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1218,6 +1563,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/realtime/class-recordings/{recording_id}/module/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Choose the module that receives this recording. Optional: without a choice the server derives one (session module, the live class's default module, or an auto-created 'Class recordings' section). Moves an existing lecture, clears the review flag and retries a failed recording. */
+        post: operations["realtime_class_recording_set_module"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/realtime/class-recordings/{recording_id}/obs-upload/": {
         parameters: {
             query?: never;
@@ -1229,6 +1591,23 @@ export interface paths {
         put?: never;
         /** @description Replace this recording's lecture video with the OBS file (lecture identity is kept). */
         post: operations["realtime_class_recording_obs_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/realtime/class-recordings/{recording_id}/rerun-finalize/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Admin only: push a recording forward from where it is (never needed normally). */
+        post: operations["realtime_class_recording_rerun_finalize"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1308,6 +1687,23 @@ export interface paths {
             cookie?: never;
         };
         get: operations["realtime_owncast_stream_bridge_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/realtime/preflight/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Latest pre-class readiness probe; managers may run a fresh one. */
+        get: operations["realtime_preflight"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1512,6 +1908,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/realtime/sessions/{id}/go-live/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Host Studio Go Live without holding a request thread on LiveKit (D7).
+         *
+         *     POST moves the stream to "starting" (compare-and-set) and queues the
+         *     egress start for the worker: **202** with the state to poll. GET is the
+         *     poll: ``state`` is starting | live | failed | stopped | ended.
+         */
+        get: operations["realtime_session_go_live_status"];
+        put?: never;
+        /**
+         * @description Host Studio Go Live without holding a request thread on LiveKit (D7).
+         *
+         *     POST moves the stream to "starting" (compare-and-set) and queues the
+         *     egress start for the worker: **202** with the state to poll. GET is the
+         *     poll: ``state`` is starting | live | failed | stopped | ended.
+         */
+        post: operations["realtime_session_go_live"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/realtime/sessions/{id}/host-token/": {
         parameters: {
             query?: never;
@@ -1705,6 +2131,148 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/recording-uploads/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The caller's recent uploads (newest first), unfinished ones included for resuming. */
+        get: operations["recording_uploads_list"];
+        put?: never;
+        /** @description Start a resumable upload (or resume the unfinished upload of the same file: same class, name, size and, when both give one, SHA-256). Then PUT every chunk and POST complete. */
+        post: operations["recording_uploads_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recording-uploads/{upload_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["recording_uploads_retrieve"];
+        put?: never;
+        post?: never;
+        /** @description Cancel an unfinished upload and delete its chunks. */
+        delete: operations["recording_uploads_abort"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recording-uploads/{upload_id}/chunks/{index}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * @description PUT one chunk as the raw request body (application/octet-stream).
+         *
+         *     The body is streamed to the private staging directory in 1 MiB blocks
+         *     (never request.body / request.data). Headers: ``Content-Length`` (must be
+         *     the chunk's exact size) and optionally ``X-Chunk-Sha256``.
+         */
+        put: operations["recording_uploads_put_chunk"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recording-uploads/{upload_id}/complete/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description All chunks are in: queue the server to assemble, verify and publish the recording. Answers at once (202); poll the upload until it is completed or failed. Calling it again is harmless. */
+        post: operations["recording_uploads_complete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recording-uploads/{upload_id}/switch-video/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Admin: put the auto-recording (replaced video) back into the lecture, or switch to the uploaded video again. The lecture, its progress and comments are kept; the stream is rebuilt. */
+        post: operations["recording_uploads_switch_video"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recording-uploads/targets/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Classes the caller may upload a recording to (live first, then recent), with what an upload would do: replace the class's recording lecture video or create the lecture. latest=1 returns only the class a desktop upload without session_id is attached to. */
+        get: operations["recording_upload_targets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recording-uploads/tokens/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["recording_upload_tokens_list"];
+        put?: never;
+        /** @description Create a personal upload token for the desktop uploader. The token is shown once. */
+        post: operations["recording_upload_tokens_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recording-uploads/tokens/{token_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["recording_upload_tokens_revoke"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/attachments/{attachment_id}/download/": {
         parameters: {
             query?: never;
@@ -1781,6 +2349,22 @@ export interface paths {
         };
         get: operations["reports_manage_courses_list"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/manage/courses/{course_id}/policy/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reports_manage_courses_policy_retrieve"];
+        put: operations["reports_manage_courses_policy_update"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2028,6 +2612,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/me/targets/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description DRF APIView/ViewSet mixin. Put it FIRST in the bases.
+         *
+         *     Runs after authentication/permissions/throttling (inside ``initial``) so
+         *     the owner is the authenticated user and rejected requests never claim keys.
+         */
+        post: operations["reports_me_targets_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/me/targets/{submission_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reports_me_targets_retrieve"];
+        put?: never;
+        post?: never;
+        delete: operations["reports_me_targets_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/me/targets/{submission_id}/files/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reports_me_targets_files_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/me/targets/{submission_id}/files/{file_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["reports_me_targets_files_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/me/targets/{submission_id}/submit/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description DRF APIView/ViewSet mixin. Put it FIRST in the bases.
+         *
+         *     Runs after authentication/permissions/throttling (inside ``initial``) so
+         *     the owner is the authenticated user and rejected requests never claim keys.
+         */
+        post: operations["reports_me_targets_submit_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/me/targets/{submission_id}/undo/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reports_me_targets_undo_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/me/week/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Per course: is self-service on (else why not), this week (and last week
+         *     during its late window), the student's targets and slots left.
+         */
+        get: operations["reports_me_week_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/tasks/": {
         parameters: {
             query?: never;
@@ -2210,6 +2922,22 @@ export interface components {
             /** Format: date-time */
             created_at: string;
         };
+        Batch: {
+            id: number;
+            slug: string;
+            title: string;
+            batch: string;
+        };
+        BatchList: {
+            results: components["schemas"]["BatchOption"][];
+        };
+        BatchOption: {
+            id: number;
+            slug: string;
+            title: string;
+            batch: string;
+            student_count: number;
+        };
         BroadcastEgressStatus: {
             /** @description True while LiveKit reports the egress starting/active; null when it could not be verified. */
             running: boolean | null;
@@ -2223,6 +2951,15 @@ export interface components {
          * @enum {string}
          */
         CategoryEnum: "osint" | "web_pentesting";
+        ChunkAck: {
+            index: number;
+            duplicate: boolean;
+            received_count: number;
+            received_bytes: number;
+            chunk_count: number;
+            /** @description Every chunk is on the server; call complete. */
+            complete: boolean;
+        };
         ClassRecording: {
             readonly id: number;
             readonly session_id: number | null;
@@ -2230,6 +2967,8 @@ export interface components {
             readonly state: components["schemas"]["ClassRecordingStateEnum"];
             readonly module: components["schemas"]["ModuleRef"] | null;
             readonly lecture: components["schemas"]["LectureRef"] | null;
+            readonly needs_review: boolean;
+            readonly review_reason: string;
             readonly error: string;
             readonly part_count: number;
             /** @description Bytes captured into parts (server recordings). */
@@ -2254,12 +2993,28 @@ export interface components {
             readonly updated_at: string;
             readonly can_retry: boolean;
             readonly can_replace: boolean;
+            readonly can_choose_module: boolean;
+        };
+        ClassRecordingActionResponse: {
+            data: components["schemas"]["ClassRecordingActionResult"] | null;
+            success: boolean;
+            message: string;
+            errors: unknown;
+        };
+        ClassRecordingActionResult: {
+            done: boolean;
+            detail: string;
+            recording: components["schemas"]["ClassRecording"];
         };
         ClassRecordingListResponse: {
             data: components["schemas"]["ClassRecording"][] | null;
             success: boolean;
             message: string;
             errors: unknown;
+        };
+        ClassRecordingModuleRequest: {
+            /** @description Module (of the class's course) that receives this recording's lecture. */
+            module_id: number;
         };
         ClassRecordingResponse: {
             data: components["schemas"]["ClassRecording"] | null;
@@ -2268,13 +3023,14 @@ export interface components {
             errors: unknown;
         };
         /**
-         * @description * `server` - Server recording (OBS stream)
+         * @description * `server` - Server recording (Owncast feed: OBS or Host Studio)
          *     * `obs_upload` - OBS file upload (replacement)
-         *     * `livekit_egress` - LiveKit egress (Host Studio)
+         *     * `livekit_egress` - LiveKit egress (meeting / Host Studio)
          *     * `imported` - Imported (found on the server)
+         *     * `browser_fallback` - Browser fallback upload
          * @enum {string}
          */
-        ClassRecordingSourceEnum: "server" | "obs_upload" | "livekit_egress" | "imported";
+        ClassRecordingSourceEnum: "server" | "obs_upload" | "livekit_egress" | "imported" | "browser_fallback";
         /**
          * @description * `recording` - Recording
          *     * `finalizing` - Finalizing
@@ -2289,6 +3045,92 @@ export interface components {
             id: number;
             display_name: string;
             is_instructor: boolean;
+        };
+        ConsoleExamDetail: {
+            slug: string;
+            title: string;
+            state: components["schemas"]["CtfConsoleExamStateEnum"];
+            status: components["schemas"]["ReportTaskStatusEnum"];
+            window: components["schemas"]["CtfExamWindowEnum"];
+            /** Format: date-time */
+            opens_at: string | null;
+            /** Format: date-time */
+            closes_at: string | null;
+            time_limit_minutes: number | null;
+            question_count: number;
+            total_points: number;
+            batches: components["schemas"]["Batch"][];
+            /** @description Readiness (staff only; null for instructors). */
+            ready: boolean | null;
+            stats: components["schemas"]["ExamStats"];
+            /** Format: date-time */
+            results_finalized_at: string | null;
+            title_ur: string;
+            default_max_attempts: number;
+            auto_publish: boolean;
+            /** Format: date-time */
+            published_at: string | null;
+            /** Format: date-time */
+            closed_at: string | null;
+            /** Format: date-time */
+            content_loaded_at: string | null;
+            content_fingerprint: string;
+            questions: components["schemas"]["ConsoleQuestion"][];
+            materials: components["schemas"]["MaterialCounts"];
+            readiness: components["schemas"]["Readiness"] | null;
+            can_manage: boolean;
+            labs_url: string;
+        };
+        ConsoleExamList: {
+            results: components["schemas"]["ConsoleExamRow"][];
+            can_manage: boolean;
+            /** Format: date-time */
+            server_time: string;
+        };
+        ConsoleExamRow: {
+            slug: string;
+            title: string;
+            state: components["schemas"]["CtfConsoleExamStateEnum"];
+            status: components["schemas"]["ReportTaskStatusEnum"];
+            window: components["schemas"]["CtfExamWindowEnum"];
+            /** Format: date-time */
+            opens_at: string | null;
+            /** Format: date-time */
+            closes_at: string | null;
+            time_limit_minutes: number | null;
+            question_count: number;
+            total_points: number;
+            batches: components["schemas"]["Batch"][];
+            /** @description Readiness (staff only; null for instructors). */
+            ready: boolean | null;
+            stats: components["schemas"]["ExamStats"];
+            /** Format: date-time */
+            results_finalized_at: string | null;
+        };
+        ConsoleMaterial: {
+            path: string;
+            label: string;
+            kind: components["schemas"]["CtfMaterialKindEnum"];
+            uploaded: boolean;
+            material_id: number | null;
+            size: number | null;
+        };
+        ConsoleQuestion: {
+            key: string;
+            order: number;
+            title: string;
+            category: components["schemas"]["CtfQuestionCategoryEnum"];
+            difficulty: components["schemas"]["CtfQuestionDifficultyEnum"];
+            points: number;
+            max_attempts: number;
+            materials: components["schemas"]["ConsoleMaterial"][];
+        };
+        ConsoleSummary: {
+            open: components["schemas"]["OpenExam"][];
+            scheduled: components["schemas"]["ScheduledExam"][];
+            labs_url: string;
+            /** Format: date-time */
+            server_time: string;
         };
         /**
          * @description OpenAPI contract for GET /api/courses/{id}/ (documentation only).
@@ -2347,6 +3189,38 @@ export interface components {
             id: number;
             title: string;
         };
+        CourseWeek: {
+            course: components["schemas"]["Ref"];
+            enabled: boolean;
+            reason: string;
+            legacy_task_count: number;
+            weeks: components["schemas"]["ReportWeek"][];
+            rules: components["schemas"]["ReportRules"] | null;
+        };
+        CreateTargetRequestRequest: {
+            course: number;
+            target_name: string;
+            /** @default current */
+            week: components["schemas"]["ReportWeekWhichEnum"];
+            /** @default false */
+            confirm_different: boolean;
+        };
+        CreatedUploadToken: {
+            id: number;
+            name: string;
+            prefix: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            last_used_at: string | null;
+            /** Format: date-time */
+            expires_at: string | null;
+            /** Format: date-time */
+            revoked_at: string | null;
+            active: boolean;
+            /** @description Shown once. Only its hash is stored. */
+            token: string;
+        };
         Criterion: {
             id: number;
             name: string;
@@ -2383,6 +3257,14 @@ export interface components {
             /** Format: decimal */
             max_marks: string;
         };
+        /**
+         * @description * `draft` - Draft
+         *     * `scheduled` - Scheduled
+         *     * `published` - Published
+         *     * `closed` - Closed
+         * @enum {string}
+         */
+        CtfConsoleExamStateEnum: "draft" | "scheduled" | "published" | "closed";
         /**
          * @description * `not_open` - Not open yet
          *     * `open` - Open
@@ -2427,6 +3309,51 @@ export interface components {
          * @enum {string}
          */
         CtfQuestionDifficultyEnum: "medium" | "hard" | "expert" | "insane";
+        DraftFile: {
+            id: number;
+            name: string;
+            extension: string;
+            content_type: string;
+            size: number;
+            /** Format: date-time */
+            created_at: string;
+            preview: components["schemas"]["ReportFilePreviewEnum"];
+            scan_status: components["schemas"]["ScanStatusEnum"];
+            download_url: string;
+            scan_pending: boolean;
+            blocked_reason: string;
+        };
+        Eligibility: {
+            enabled: boolean;
+            reason: components["schemas"]["EligibilityReasonEnum"];
+            message: string;
+            action: components["schemas"]["EligibilityAction"] | null;
+            exam: components["schemas"]["EligibilityExam"] | null;
+            next_exam: components["schemas"]["EligibilityExam"] | null;
+            /** Format: date-time */
+            server_time: string;
+        };
+        EligibilityAction: {
+            label: string;
+            url: string;
+        };
+        EligibilityExam: {
+            slug: string;
+            title: components["schemas"]["LocalizedText"];
+            window: components["schemas"]["CtfExamWindowEnum"];
+            /** Format: date-time */
+            opens_at: string | null;
+            /** Format: date-time */
+            closes_at: string | null;
+        };
+        /**
+         * @description * `ok` - Eligible
+         *     * `no_batch` - Not in a batch
+         *     * `access_expired` - Course access expired
+         *     * `not_assigned` - No exam assigned
+         * @enum {string}
+         */
+        EligibilityReasonEnum: "ok" | "no_batch" | "access_expired" | "not_assigned";
         /**
          * @description * `connecting` - connecting
          *     * `connected` - connected
@@ -2461,11 +3388,21 @@ export interface components {
             question_count: number;
             total_points: number;
             can_start: boolean;
+            start_reason: components["schemas"]["StartReasonEnum"];
         };
         ExamList: {
             results: components["schemas"]["ExamSummary"][];
             /** Format: date-time */
             server_time: string;
+        };
+        ExamStats: {
+            participants: number;
+            active: number;
+            submitted: number;
+            expired: number;
+            /** Format: double */
+            average_score: number | null;
+            top_score: number | null;
         };
         ExamSummary: {
             slug: string;
@@ -2480,7 +3417,19 @@ export interface components {
             question_count: number;
             total_points: number;
             can_start: boolean;
+            start_reason: components["schemas"]["StartReasonEnum"];
             participation: components["schemas"]["Participation"] | null;
+        };
+        ExamUploadRequest: {
+            /**
+             * Format: binary
+             * @description The exam JSON file (multipart).
+             */
+            file?: string;
+            /** @description Or the JSON text itself. */
+            content?: string;
+            /** @default false */
+            allow_content_change: boolean;
         };
         FeedbackFile: {
             name: string;
@@ -2532,6 +3481,8 @@ export interface components {
         };
         GradebookCell: {
             task_id: number;
+            /** @default 0 */
+            target_count: number;
             status: components["schemas"]["ReportGradebookCellStatusEnum"];
             submission_id: number | null;
             /** Format: decimal */
@@ -2588,6 +3539,9 @@ export interface components {
         GradingTask: {
             id: number;
             title: string;
+            origin: string;
+            /** Format: date */
+            week_start: string | null;
             course: components["schemas"]["Ref"];
             week_number: number | null;
             /** Format: date-time */
@@ -2869,11 +3823,34 @@ export interface components {
             criteria?: components["schemas"]["CriterionInputRequest"][];
         };
         Material: {
+            /** @description Set when the file is served by the LMS (refresh its URL by this id). */
+            id: number | null;
             label: components["schemas"]["LocalizedText"];
-            /** @description Path on the labs site, e.g. /materials/exams/<folder>/photo.jpg */
+            /** @description Either a short-lived signed LMS URL (/api/ctf/materials/<token>/) or, for evidence still in the labs image, a path on the labs site such as /materials/exams/<folder>/photo.jpg */
             url: string;
             kind: components["schemas"]["CtfMaterialKindEnum"];
             alt: components["schemas"]["LocalizedText"];
+        };
+        MaterialCounts: {
+            referenced: number;
+            uploaded: number;
+        };
+        MaterialUploadRequest: {
+            path: string;
+            /** Format: binary */
+            file: string;
+        };
+        MaterialUploaded: {
+            material_id: number;
+            path: string;
+            size: number;
+            sha256: string;
+        };
+        MaterialUrl: {
+            id: number;
+            url: string;
+            /** Format: date-time */
+            expires_at: string;
         };
         ModuleOption: {
             id: number;
@@ -2906,6 +3883,11 @@ export interface components {
             cells: components["schemas"]["GradebookCell"][];
             totals: components["schemas"]["GradebookTotals"];
         };
+        MyWeek: {
+            courses: components["schemas"]["CourseWeek"][];
+            /** Format: date-time */
+            server_time: string;
+        };
         NationalDeskData: {
             is_published: boolean;
             instagram: components["schemas"]["NationalDeskInstagram"];
@@ -2934,12 +3916,21 @@ export interface components {
          * @enum {string}
          */
         NetworkEnum: "slow_2g" | "2g" | "3g" | "4g" | "wifi" | "ethernet" | "unknown";
+        /** @enum {unknown} */
+        NullEnum: null;
         ObsUploadRequest: {
             /**
              * Format: binary
              * @description The recording OBS saved: MP4/MOV/M4V/WEBM, or OBS's MKV/FLV/TS, which the server remuxes to MP4 (stream copy) before swapping it in. Max MAX_VIDEO_UPLOAD_BYTES (5 GB).
              */
             video_file: string;
+        };
+        OpenExam: {
+            slug: string;
+            title: string;
+            /** Format: date-time */
+            closes_at: string | null;
+            active: number;
         };
         PaginationMeta: {
             page: number;
@@ -2963,6 +3954,16 @@ export interface components {
         };
         ParticipationResponse: {
             participation: components["schemas"]["Participation"];
+        };
+        PatchedExamUpdateRequest: {
+            /** Format: date-time */
+            opens_at?: string | null;
+            /** Format: date-time */
+            closes_at?: string | null;
+            time_limit_minutes?: number | null;
+            default_max_attempts?: number;
+            batch_ids?: number[];
+            batch_slugs?: string[];
         };
         PatchedLectureCommentWriteRequest: {
             body?: string;
@@ -3090,6 +4091,28 @@ export interface components {
             solved: boolean;
             points_awarded: number;
         };
+        QuestionStat: {
+            key: string;
+            order: number;
+            title: string;
+            points: number;
+            attempted: number;
+            solved: number;
+            /** Format: double */
+            solve_rate: number | null;
+            wrong_answers: components["schemas"]["WrongAnswer"][];
+        };
+        Readiness: {
+            ready: boolean;
+            items: components["schemas"]["ReadinessItem"][];
+            reasons: string[];
+        };
+        ReadinessItem: {
+            id: string;
+            label: string;
+            ok: boolean;
+            detail: string;
+        };
         /**
          * @description * `network` - network
          *     * `authorization` - authorization
@@ -3143,6 +4166,48 @@ export interface components {
             retry_attempt: number;
             /** @default 0 */
             elapsed_ms: number;
+        };
+        RecordingUploadChunkResponse: {
+            data: components["schemas"]["ChunkAck"];
+            success: boolean;
+            message: string;
+            errors: unknown;
+        };
+        RecordingUploadListResponse: {
+            data: components["schemas"]["Upload"][];
+            success: boolean;
+            message: string;
+            errors: unknown;
+        };
+        RecordingUploadResponse: {
+            data: components["schemas"]["Upload"];
+            success: boolean;
+            message: string;
+            errors: unknown;
+        };
+        RecordingUploadTargetListResponse: {
+            data: components["schemas"]["UploadTarget"][];
+            success: boolean;
+            message: string;
+            errors: unknown;
+        };
+        RecordingUploadTokenCreatedResponse: {
+            data: components["schemas"]["CreatedUploadToken"];
+            success: boolean;
+            message: string;
+            errors: unknown;
+        };
+        RecordingUploadTokenListResponse: {
+            data: components["schemas"]["UploadToken"][];
+            success: boolean;
+            message: string;
+            errors: unknown;
+        };
+        RecordingUploadTokenResponse: {
+            data: components["schemas"]["UploadToken"];
+            success: boolean;
+            message: string;
+            errors: unknown;
         };
         Ref: {
             id: number;
@@ -3206,6 +4271,110 @@ export interface components {
          * @enum {string}
          */
         ReportMarksVisibilityEnum: "on_grade" | "on_release";
+        /** @description Grader view and update of a course's weekly report policy. */
+        ReportPolicy: {
+            readonly course: number;
+            /** @default false */
+            self_service: boolean;
+            /** @default 6 */
+            due_weekday: number;
+            /**
+             * Format: time
+             * @default 23:59
+             */
+            due_time: string;
+            /** @default 48 */
+            grace_hours: number;
+            /**
+             * Format: decimal
+             * @default 10.00
+             */
+            late_penalty_percent_per_day: string;
+            /**
+             * Format: decimal
+             * @default 10.00
+             */
+            max_marks: string;
+            max_targets_per_week?: number | null;
+            /** @default on_grade */
+            marks_visibility: components["schemas"]["ReportPolicyMarksVisibilityEnum"];
+            /** @default 24 */
+            auto_release_delay_hours: number;
+            /** @default 72 */
+            revision_window_hours: number;
+            /** @default  */
+            brief: string;
+            allowed_file_types?: components["schemas"]["ReportFileTypeEnum"][];
+            /** @default 5 */
+            max_files: number;
+            /** @default 50 */
+            max_file_size_mb: number;
+            /** @default 200 */
+            max_total_size_mb: number;
+            /** Format: date-time */
+            readonly updated_at: string | null;
+        };
+        /**
+         * @description * `on_grade` - Show marks as soon as they are graded
+         *     * `on_release` - Release all marks together (by hand)
+         *     * `auto_release` - Release automatically after the late window
+         * @enum {string}
+         */
+        ReportPolicyMarksVisibilityEnum: "on_grade" | "on_release" | "auto_release";
+        /** @description Grader view and update of a course's weekly report policy. */
+        ReportPolicyRequest: {
+            /** @default false */
+            self_service: boolean;
+            /** @default 6 */
+            due_weekday: number;
+            /**
+             * Format: time
+             * @default 23:59
+             */
+            due_time: string;
+            /** @default 48 */
+            grace_hours: number;
+            /**
+             * Format: decimal
+             * @default 10.00
+             */
+            late_penalty_percent_per_day: string;
+            /**
+             * Format: decimal
+             * @default 10.00
+             */
+            max_marks: string;
+            max_targets_per_week?: number | null;
+            /** @default on_grade */
+            marks_visibility: components["schemas"]["ReportPolicyMarksVisibilityEnum"];
+            /** @default 24 */
+            auto_release_delay_hours: number;
+            /** @default 72 */
+            revision_window_hours: number;
+            /** @default  */
+            brief: string;
+            allowed_file_types?: components["schemas"]["ReportFileTypeEnum"][];
+            /** @default 5 */
+            max_files: number;
+            /** @default 50 */
+            max_file_size_mb: number;
+            /** @default 200 */
+            max_total_size_mb: number;
+        };
+        ReportRules: {
+            allowed_extensions: string[];
+            max_files: number;
+            max_file_size_mb: number;
+            max_total_size_mb: number;
+            /** Format: decimal */
+            max_marks: string;
+            /** Format: decimal */
+            late_penalty_percent_per_day: string;
+            grace_hours: number;
+            max_targets_per_week: number | null;
+            marks_visibility: string;
+            brief: string;
+        };
         /**
          * @description * `not_submitted` - Not submitted
          *     * `submitted` - Submitted
@@ -3223,6 +4392,39 @@ export interface components {
          * @enum {string}
          */
         ReportTaskStatusEnum: "draft" | "published" | "closed";
+        ReportWeek: {
+            which: components["schemas"]["ReportWeekWhichEnum"];
+            /** Format: date */
+            week_start: string;
+            /** Format: date */
+            week_end: string;
+            week_number: number | null;
+            label: string;
+            /** Format: date-time */
+            due_at: string;
+            /** Format: date-time */
+            late_until: string;
+            status: components["schemas"]["ReportWeekStatusEnum"];
+            /** Format: decimal */
+            penalty_percent: string;
+            task_id: number | null;
+            slots_left: number | null;
+            targets: components["schemas"]["WeekTargetSummary"][];
+        };
+        /**
+         * @description * `open` - Open
+         *     * `late` - Late window
+         *     * `closed` - Closed
+         *     * `future` - Not open yet
+         * @enum {string}
+         */
+        ReportWeekStatusEnum: "open" | "late" | "closed" | "future";
+        /**
+         * @description * `current` - This week
+         *     * `previous` - Last week (late window)
+         * @enum {string}
+         */
+        ReportWeekWhichEnum: "current" | "previous";
         /**
          * @description * `not_open` - Not open
          *     * `open` - Open
@@ -3231,12 +4433,53 @@ export interface components {
          * @enum {string}
          */
         ReportWindowEnum: "not_open" | "open" | "late" | "closed";
+        ResultRow: {
+            rank: number;
+            student: components["schemas"]["StudentRef"];
+            batch: components["schemas"]["Batch"] | null;
+            status: components["schemas"]["CtfParticipationStatusEnum"];
+            score: number;
+            solved_count: number;
+            wrong_count: number;
+            attempt_count: number;
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            deadline_at: string | null;
+            /** Format: date-time */
+            submitted_at: string | null;
+        };
+        Results: {
+            exam: components["schemas"]["ResultsExam"];
+            stats: components["schemas"]["ExamStats"];
+            participants: components["schemas"]["ResultRow"][];
+            questions: components["schemas"]["QuestionStat"][];
+        };
+        ResultsExam: {
+            slug: string;
+            title: string;
+            state: components["schemas"]["CtfConsoleExamStateEnum"];
+            question_count: number;
+            total_points: number;
+        };
+        RevertRequest: {
+            /**
+             * @description false: put the replaced video back. true: switch to the uploaded video again.
+             * @default false
+             */
+            restore_upload: boolean;
+        };
         /**
          * @description * `citizen` - Citizen / Volunteer
          *     * `lawyer` - Lawyer
          * @enum {string}
          */
         RoleEnum: "citizen" | "lawyer";
+        SameTarget: {
+            id: number;
+            student: components["schemas"]["Person"];
+            status: components["schemas"]["ReportSubmissionStatusEnum"];
+        };
         /**
          * @description * `unscanned` - Not scanned yet
          *     * `clean` - Clean
@@ -3244,10 +4487,24 @@ export interface components {
          * @enum {string}
          */
         ScanStatusEnum: "unscanned" | "clean" | "infected";
+        ScheduledExam: {
+            slug: string;
+            title: string;
+            /** Format: date-time */
+            opens_at: string | null;
+        };
         SectionOption: {
             id: number;
             title: string;
             order: number;
+        };
+        Sha256Match: {
+            file_id: number;
+            file_name: string;
+            sha256: string;
+            submission_id: number;
+            student: components["schemas"]["Person"];
+            target_name: string;
         };
         SocialAccount: {
             readonly id: number;
@@ -3283,6 +4540,17 @@ export interface components {
             data: components["schemas"]["SocialAccountCategory"][];
             errors: unknown;
         };
+        /**
+         * @description * `ok` - Can start
+         *     * `started` - Already started
+         *     * `completed` - Already finished
+         *     * `not_open` - Not open yet
+         *     * `closed` - Closed
+         *     * `no_questions` - No questions yet
+         *     * `not_configured` - Answer checking not ready
+         * @enum {string}
+         */
+        StartReasonEnum: "ok" | "started" | "completed" | "not_open" | "closed" | "no_questions" | "not_configured";
         /**
          * @description * `Andaman and Nicobar Islands` - Andaman and Nicobar Islands
          *     * `Andhra Pradesh` - Andhra Pradesh
@@ -3363,6 +4631,9 @@ export interface components {
             egress: components["schemas"]["BroadcastEgressStatus"] | null;
             /** @description True when this heartbeat replaced a dead egress. */
             restarted: boolean;
+            /** @description True while the server is holding the class through a host reconnect. */
+            grace?: boolean;
+            host_grace_seconds?: number;
         };
         StreamHeartbeatRequest: {
             /**
@@ -3370,6 +4641,14 @@ export interface components {
              * @default false
              */
             publishing: boolean;
+            /**
+             * @description Host link state. 'reconnecting' while LiveKit rejoins: the server keeps the class live for the grace period instead of marking delivery failed. Defaults from 'publishing'.
+             *
+             *     * `publishing` - publishing
+             *     * `reconnecting` - reconnecting
+             *     * `connected` - connected
+             */
+            state?: components["schemas"]["StreamHeartbeatStateEnum"];
         };
         StreamHeartbeatResponse: {
             success: boolean;
@@ -3377,6 +4656,13 @@ export interface components {
             data: components["schemas"]["StreamHeartbeatData"] | null;
             errors: unknown;
         };
+        /**
+         * @description * `publishing` - publishing
+         *     * `reconnecting` - reconnecting
+         *     * `connected` - connected
+         * @enum {string}
+         */
+        StreamHeartbeatStateEnum: "publishing" | "reconnecting" | "connected";
         StudentGrade: {
             /** Format: decimal */
             raw_marks: string | null;
@@ -3391,6 +4677,11 @@ export interface components {
             /** Format: date-time */
             graded_at: string | null;
             annotated_file: components["schemas"]["FeedbackFile"] | null;
+        };
+        StudentRef: {
+            id: number;
+            full_name: string;
+            email: string;
         };
         StudentSubmission: {
             id: number;
@@ -3493,6 +4784,13 @@ export interface components {
             id: number;
             task: components["schemas"]["GradingTask"];
             student: components["schemas"]["Person"];
+            target_name: string;
+            different_target_confirmed: boolean;
+            similar_targets: string[];
+            /** Format: date-time */
+            revision_deadline: string | null;
+            same_target: components["schemas"]["SameTarget"][];
+            sha256_matches: components["schemas"]["Sha256Match"][];
             status: components["schemas"]["ReportSubmissionStatusEnum"];
             revision: number;
             /** Format: date-time */
@@ -3522,6 +4820,14 @@ export interface components {
             id: number;
             task: components["schemas"]["GradebookTask"];
             student: components["schemas"]["Person"];
+            target_name: string;
+            target_key: string;
+            /** Format: date */
+            week_start: string | null;
+            week_label: string;
+            same_target_count: number;
+            sha256_match_count: number;
+            different_target_confirmed: boolean;
             status: components["schemas"]["ReportSubmissionStatusEnum"];
             /** Format: date-time */
             submitted_at: string | null;
@@ -3543,6 +4849,50 @@ export interface components {
             created: boolean;
             task: components["schemas"]["StudentTaskDetail"];
         };
+        SubmitTargetRequestRequest: {
+            file_ids?: number[];
+            /** @default  */
+            note: string;
+        };
+        SubmitTargetResponse: {
+            created: boolean;
+            target: components["schemas"]["TargetDetail"];
+        };
+        TargetDetail: {
+            id: number;
+            course: components["schemas"]["Ref"];
+            task_id: number;
+            /** Format: date */
+            week_start: string;
+            week_label: string;
+            /** Format: date-time */
+            due_at: string;
+            /** Format: date-time */
+            late_until: string | null;
+            window: components["schemas"]["ReportWindowEnum"];
+            target_name: string;
+            status: components["schemas"]["ReportSubmissionStatusEnum"];
+            can_change: boolean;
+            lock_reason: string;
+            is_late: boolean;
+            minutes_late: number;
+            /** Format: date-time */
+            submitted_at: string | null;
+            version_count: number;
+            revision: number;
+            /** Format: date-time */
+            revision_deadline: string | null;
+            /** Format: date-time */
+            undo_until: string | null;
+            different_target_confirmed: boolean;
+            draft_files: components["schemas"]["DraftFile"][];
+            current_version: components["schemas"]["Version"] | null;
+            marks_visible: boolean;
+            grade: components["schemas"]["StudentGrade"] | null;
+            revision_feedback: string;
+            marks_hidden_until_release: boolean;
+            rules: components["schemas"]["ReportRules"];
+        };
         TaskCounts: {
             students: number;
             submitted: number;
@@ -3558,6 +4908,10 @@ export interface components {
             graded: number;
             returned: number;
             late: number;
+        };
+        TokenCreateRequest: {
+            name: string;
+            expires_in_days?: number | null;
         };
         TrackerOverview: {
             section_label?: string;
@@ -3595,9 +4949,211 @@ export interface components {
          * @enum {string}
          */
         TransportEnum: "auto" | "relay" | "unknown";
+        UnifiedBatchGradebook: {
+            course: components["schemas"]["UnifiedGradebookCourse"];
+            columns: components["schemas"]["UnifiedGradebookColumn"][];
+            rows: components["schemas"]["UnifiedGradebookRow"][];
+            /** Format: date-time */
+            generated_at: string;
+        };
+        UnifiedGradebookCell: {
+            key: string;
+            kind: components["schemas"]["UnifiedGradebookItemKindEnum"];
+            /** @description graded | missing | not_submitted | submitted | ... (reports); result | absent | pending | in_progress (exams) */
+            status: string;
+            /** Format: double */
+            value: number | null;
+            /** Format: double */
+            max: number | null;
+            is_late: boolean;
+            rank: number | null;
+        };
+        UnifiedGradebookColumn: {
+            key: string;
+            kind: components["schemas"]["UnifiedGradebookItemKindEnum"];
+            id: number;
+            title: string;
+            short_title: string;
+            /** Format: date-time */
+            date: string | null;
+            /** Format: double */
+            max: number | null;
+        };
+        UnifiedGradebookCourse: {
+            id: number;
+            slug: string;
+            title: string;
+            batch: string;
+        };
+        UnifiedGradebookCourseList: {
+            results: components["schemas"]["UnifiedGradebookCourse"][];
+        };
+        /**
+         * @description * `report` - Weekly report
+         *     * `exam` - CTF exam
+         * @enum {string}
+         */
+        UnifiedGradebookItemKindEnum: "report" | "exam";
+        UnifiedGradebookPart: {
+            /** Format: double */
+            total: number;
+            /** Format: double */
+            max: number;
+            /** Format: double */
+            percentage: number | null;
+            count: number;
+        };
+        UnifiedGradebookRow: {
+            student: components["schemas"]["UnifiedGradebookStudent"];
+            cells: components["schemas"]["UnifiedGradebookCell"][];
+            totals: components["schemas"]["UnifiedGradebookTotals"];
+        };
+        UnifiedGradebookStudent: {
+            id: number;
+            full_name: string;
+            email: string;
+        };
+        UnifiedGradebookTotals: {
+            reports: components["schemas"]["UnifiedGradebookPart"];
+            exams: components["schemas"]["UnifiedGradebookPart"];
+            /** Format: double */
+            overall_percentage: number | null;
+            missing_count: number;
+            late_count: number;
+        };
+        UnifiedStudentCourseSection: {
+            course: components["schemas"]["UnifiedGradebookCourse"];
+            columns: components["schemas"]["UnifiedGradebookColumn"][];
+            cells: components["schemas"]["UnifiedGradebookCell"][];
+            totals: components["schemas"]["UnifiedGradebookTotals"];
+        };
+        UnifiedStudentGradebook: {
+            student: components["schemas"]["UnifiedGradebookStudent"];
+            courses: components["schemas"]["UnifiedStudentCourseSection"][];
+            /** Format: date-time */
+            generated_at: string;
+        };
+        Upload: {
+            /** Format: uuid */
+            id: string;
+            status: components["schemas"]["UploadStatusEnum"];
+            status_label: string;
+            session_id: number | null;
+            session_title: string;
+            filename: string;
+            total_bytes: number;
+            chunk_bytes: number;
+            chunk_count: number;
+            received_count: number;
+            received_bytes: number;
+            received_chunks: number[];
+            sha256: string;
+            error: string;
+            waiting_for_auto_recording: boolean;
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            completed_at: string | null;
+            via_token: boolean;
+            result: components["schemas"]["UploadResult"] | null;
+        };
+        UploadCreateRequest: {
+            /** @description The class. Omitted: the uploader's live class, else the one that ended last. */
+            session_id?: number | null;
+            filename: string;
+            /** @description File size in bytes. */
+            size: number;
+            /** @description Optional whole-file SHA-256 (hex). */
+            sha256?: string;
+            content_type?: string;
+        };
+        UploadReport: {
+            slug: string;
+            title: string;
+            exam_created: boolean;
+            dry_run: boolean;
+            created: number;
+            updated: number;
+            unchanged: number;
+            deactivated: number;
+            removed: number;
+            question_count: number;
+            total_points: number;
+            materials_referenced: number;
+            eligible_courses: number | null;
+            changed_with_attempts: string[];
+            /** Format: date-time */
+            opens_at: string | null;
+            /** Format: date-time */
+            closes_at: string | null;
+            time_limit_minutes: number | null;
+            content_fingerprint: string;
+            current_state: (components["schemas"]["CtfConsoleExamStateEnum"] | components["schemas"]["NullEnum"]) | null;
+        };
         UploadRequestRequest: {
             /** Format: binary */
             file: string;
+        };
+        UploadResponse: {
+            report: components["schemas"]["UploadReport"];
+            exam: components["schemas"]["ConsoleExamDetail"] | null;
+        };
+        UploadResult: {
+            /** @description "replaced" (the class recording lecture video) or "created". */
+            action: string;
+            lecture_id: number | null;
+            lecture_title: string;
+            course_id: number | null;
+            recording_id: number | null;
+            learn_url: string;
+            reverted: boolean;
+            can_switch_back: boolean;
+        };
+        /**
+         * @description * `uploading` - uploading
+         *     * `queued` - queued
+         *     * `assembling` - assembling
+         *     * `completed` - completed
+         *     * `failed` - failed
+         *     * `aborted` - aborted
+         *     * `expired` - expired
+         * @enum {string}
+         */
+        UploadStatusEnum: "uploading" | "queued" | "assembling" | "completed" | "failed" | "aborted" | "expired";
+        UploadTarget: {
+            session_id: number;
+            title: string;
+            session_type: string;
+            status: string;
+            /** Format: date-time */
+            started_at: string | null;
+            /** Format: date-time */
+            ended_at: string | null;
+            course_id: number | null;
+            course_title: string;
+            has_course: boolean;
+            auto_recording_pending: boolean;
+            /** @description What an upload would do: "replaced" or "created". */
+            action: string;
+            lecture_id: number | null;
+            lecture_title: string;
+            module_title: string;
+        };
+        UploadToken: {
+            id: number;
+            name: string;
+            prefix: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            last_used_at: string | null;
+            /** Format: date-time */
+            expires_at: string | null;
+            /** Format: date-time */
+            revoked_at: string | null;
+            active: boolean;
         };
         Version: {
             id: number;
@@ -3609,6 +5165,28 @@ export interface components {
             minutes_late: number;
             is_revision: boolean;
             files: components["schemas"]["StoredFile"][];
+        };
+        WeekTargetSummary: {
+            id: number;
+            target_name: string;
+            status: components["schemas"]["ReportSubmissionStatusEnum"];
+            /** Format: date-time */
+            submitted_at: string | null;
+            is_late: boolean;
+            minutes_late: number;
+            version_count: number;
+            file_count: number;
+            draft_file_count: number;
+            marks_visible: boolean;
+            /** Format: decimal */
+            final_marks: string | null;
+            /** Format: decimal */
+            max_marks: string;
+            can_change: boolean;
+        };
+        WrongAnswer: {
+            answer: string;
+            count: number;
         };
         YouTubeChannelInfo: {
             title: string;
@@ -4917,6 +6495,327 @@ export interface operations {
             };
         };
     };
+    ctf_admin_batches_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchList"];
+                };
+            };
+        };
+    };
+    ctf_admin_exams_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsoleExamList"];
+                };
+            };
+        };
+    };
+    ctf_admin_exams_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsoleExamDetail"];
+                };
+            };
+        };
+    };
+    ctf_admin_exams_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedExamUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsoleExamDetail"];
+                };
+            };
+        };
+    };
+    ctf_admin_exams_close_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsoleExamDetail"];
+                };
+            };
+        };
+    };
+    ctf_admin_exams_materials_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["MaterialUploadRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialUploaded"];
+                };
+            };
+        };
+    };
+    ctf_admin_exams_materials_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                material_id: number;
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ctf_admin_exams_publish_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsoleExamDetail"];
+                };
+            };
+        };
+    };
+    ctf_admin_exams_results_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Results"];
+                };
+            };
+        };
+    };
+    ctf_admin_exams_results_csv_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+        };
+    };
+    ctf_admin_exams_unschedule_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsoleExamDetail"];
+                };
+            };
+        };
+    };
+    ctf_admin_exams_preview_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": components["schemas"]["ExamUploadRequest"];
+                "application/json": components["schemas"]["ExamUploadRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadResponse"];
+                };
+            };
+        };
+    };
+    ctf_admin_exams_upload_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": components["schemas"]["ExamUploadRequest"];
+                "application/json": components["schemas"]["ExamUploadRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadResponse"];
+                };
+            };
+        };
+    };
+    ctf_admin_summary_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsoleSummary"];
+                };
+            };
+        };
+    };
+    ctf_eligibility_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Eligibility"];
+                };
+            };
+        };
+    };
     ctf_exams_list: {
         parameters: {
             query?: never;
@@ -4953,6 +6852,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExamDetail"];
+                };
+            };
+        };
+    };
+    ctf_exams_materials_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                material_id: number;
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialUrl"];
                 };
             };
         };
@@ -5035,6 +6956,27 @@ export interface operations {
             };
         };
     };
+    ctf_materials_file_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+        };
+    };
     enrollment_leads_create: {
         parameters: {
             query?: never;
@@ -5064,6 +7006,107 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    gradebook_courses_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnifiedGradebookCourseList"];
+                };
+            };
+        };
+    };
+    gradebook_courses_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                course_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnifiedBatchGradebook"];
+                };
+            };
+        };
+    };
+    gradebook_courses_export_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                course_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+        };
+    };
+    gradebook_me_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnifiedStudentGradebook"];
+                };
+            };
+        };
+    };
+    gradebook_students_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnifiedStudentGradebook"];
                 };
             };
         };
@@ -6231,6 +8274,49 @@ export interface operations {
             };
         };
     };
+    realtime_class_recording_set_module: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recording_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassRecordingModuleRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ClassRecordingModuleRequest"];
+                "multipart/form-data": components["schemas"]["ClassRecordingModuleRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassRecordingResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassRecordingResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassRecordingResponse"];
+                };
+            };
+        };
+    };
     realtime_class_recording_obs_upload: {
         parameters: {
             query?: never;
@@ -6268,6 +8354,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ClassRecordingResponse"];
+                };
+            };
+        };
+    };
+    realtime_class_recording_rerun_finalize: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recording_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassRecordingActionResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassRecordingActionResponse"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassRecordingActionResponse"];
                 };
             };
         };
@@ -6424,6 +8547,27 @@ export interface operations {
         };
     };
     realtime_owncast_stream_bridge_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    realtime_preflight: {
         parameters: {
             query?: never;
             header?: never;
@@ -6898,6 +9042,72 @@ export interface operations {
             };
         };
     };
+    realtime_session_go_live_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    realtime_session_go_live: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     realtime_sessions_host_token_create_by_id: {
         parameters: {
             query?: never;
@@ -7316,6 +9526,262 @@ export interface operations {
             };
         };
     };
+    recording_uploads_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordingUploadListResponse"];
+                };
+            };
+        };
+    };
+    recording_uploads_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UploadCreateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["UploadCreateRequest"];
+                "multipart/form-data": components["schemas"]["UploadCreateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordingUploadResponse"];
+                };
+            };
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordingUploadResponse"];
+                };
+            };
+        };
+    };
+    recording_uploads_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                upload_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordingUploadResponse"];
+                };
+            };
+        };
+    };
+    recording_uploads_abort: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                upload_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordingUploadResponse"];
+                };
+            };
+        };
+    };
+    recording_uploads_put_chunk: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Chunk-Sha256"?: string;
+            };
+            path: {
+                index: number;
+                upload_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordingUploadChunkResponse"];
+                };
+            };
+        };
+    };
+    recording_uploads_complete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                upload_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordingUploadResponse"];
+                };
+            };
+        };
+    };
+    recording_uploads_switch_video: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                upload_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RevertRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["RevertRequest"];
+                "multipart/form-data": components["schemas"]["RevertRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordingUploadResponse"];
+                };
+            };
+        };
+    };
+    recording_upload_targets: {
+        parameters: {
+            query?: {
+                latest?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordingUploadTargetListResponse"];
+                };
+            };
+        };
+    };
+    recording_upload_tokens_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordingUploadTokenListResponse"];
+                };
+            };
+        };
+    };
+    recording_upload_tokens_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenCreateRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["TokenCreateRequest"];
+                "multipart/form-data": components["schemas"]["TokenCreateRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordingUploadTokenCreatedResponse"];
+                };
+            };
+        };
+    };
+    recording_upload_tokens_revoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordingUploadTokenResponse"];
+                };
+            };
+        };
+    };
     reports_attachments_download: {
         parameters: {
             query?: {
@@ -7424,6 +9890,52 @@ export interface operations {
             };
         };
     };
+    reports_manage_courses_policy_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                course_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportPolicy"];
+                };
+            };
+        };
+    };
+    reports_manage_courses_policy_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                course_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ReportPolicyRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportPolicy"];
+                };
+            };
+        };
+    };
     reports_manage_export_csv: {
         parameters: {
             query?: {
@@ -7471,12 +9983,16 @@ export interface operations {
         parameters: {
             query?: {
                 course?: number;
+                /** @description 'week': order by week, then target, then oldest */
+                group?: string;
                 late?: boolean;
-                /** @description Student name or email */
+                /** @description Student name or email, or target name */
                 q?: string;
                 /** @description awaiting, submitted, under_review, graded, returned_for_revision, resubmitted */
                 status?: string;
                 task?: number;
+                /** @description Week start date (YYYY-MM-DD), self-service weeks */
+                week?: string;
             };
             header?: never;
             path?: never;
@@ -7498,12 +10014,16 @@ export interface operations {
         parameters: {
             query?: {
                 course?: number;
+                /** @description 'week': order by week, then target, then oldest */
+                group?: string;
                 late?: boolean;
-                /** @description Student name or email */
+                /** @description Student name or email, or target name */
                 q?: string;
                 /** @description awaiting, submitted, under_review, graded, returned_for_revision, resubmitted */
                 status?: string;
                 task?: number;
+                /** @description Week start date (YYYY-MM-DD), self-service weeks */
+                week?: string;
             };
             header?: never;
             path: {
@@ -7527,12 +10047,16 @@ export interface operations {
         parameters: {
             query?: {
                 course?: number;
+                /** @description 'week': order by week, then target, then oldest */
+                group?: string;
                 late?: boolean;
-                /** @description Student name or email */
+                /** @description Student name or email, or target name */
                 q?: string;
                 /** @description awaiting, submitted, under_review, graded, returned_for_revision, resubmitted */
                 status?: string;
                 task?: number;
+                /** @description Week start date (YYYY-MM-DD), self-service weeks */
+                week?: string;
             };
             header?: never;
             path: {
@@ -7834,6 +10358,195 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MyMarks"];
+                };
+            };
+        };
+    };
+    reports_me_targets_create: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTargetRequestRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetDetail"];
+                };
+            };
+        };
+    };
+    reports_me_targets_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                submission_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetDetail"];
+                };
+            };
+        };
+    };
+    reports_me_targets_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                submission_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reports_me_targets_files_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                submission_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["UploadRequestRequest"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftFile"];
+                };
+            };
+        };
+    };
+    reports_me_targets_files_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file_id: number;
+                submission_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reports_me_targets_submit_create: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                submission_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["SubmitTargetRequestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmitTargetResponse"];
+                };
+            };
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmitTargetResponse"];
+                };
+            };
+        };
+    };
+    reports_me_targets_undo_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                submission_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetDetail"];
+                };
+            };
+        };
+    };
+    reports_me_week_retrieve: {
+        parameters: {
+            query?: {
+                course?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyWeek"];
                 };
             };
         };

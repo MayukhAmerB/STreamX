@@ -18,7 +18,13 @@ where ffmpeg is installed). It proves, on the machine it runs on, that:
    the right module with the module's description;
 3. a Host Studio (LiveKit egress) MP4, an OBS MKV upload (remux) and an
    imported file (scan + "publish to module") go through their real
-   finalize paths too.
+   finalize paths too;
+4. Phase 2 auto-publish: the lecture is published as soon as its MP4 exists
+   (RECORDING_INSTANT_PUBLISH), a class without any module lands in the
+   auto-created "Class recordings" section flagged for review, and the real
+   single-pass HLS transcode (one ffmpeg, ``split`` per rendition, a
+   ``v<revision>`` directory swapped in blue/green) builds a playable stream,
+   after which the recording moves to Published.
 
 Only Owncast's status API is replaced (by the simulated feed's state).
 
@@ -66,6 +72,8 @@ OFFLINE_SECONDS = 8
 MKV_SECONDS = 6
 EGRESS_SECONDS = 5
 IMPORT_SECONDS = 4
+HD_SECONDS = 6
+HD_FRAME = "960x540"  # two renditions (360p + 540p): exercises the single-pass split
 DURATION_TOLERANCE = 3.0
 FRAME = "426x240"
 FPS = 25
@@ -187,12 +195,12 @@ def is_faststart(path):
     return "moov" in boxes and "mdat" in boxes and boxes.index("moov") < boxes.index("mdat")
 
 
-def _lavfi_av(seconds, *, video, tone):
+def _lavfi_av(seconds, *, video, tone, size=FRAME):
     return [
         "-f",
         "lavfi",
         "-i",
-        f"{video}=size={FRAME}:rate={FPS}:duration={seconds}",
+        f"{video}=size={size}:rate={FPS}:duration={seconds}",
         "-f",
         "lavfi",
         "-i",
@@ -251,11 +259,11 @@ def generate_hls(directory, prefix, seconds, *, video, tone):
     return segments
 
 
-def generate_file(path, seconds, *, video, tone, container):
+def generate_file(path, seconds, *, video, tone, container, size=FRAME):
     path.parent.mkdir(parents=True, exist_ok=True)
     _run(
         [_binary("FFMPEG_BINARY", "ffmpeg"), "-hide_banner", "-nostdin", "-loglevel", "error", "-y"]
-        + _lavfi_av(seconds, video=video, tone=tone)
+        + _lavfi_av(seconds, video=video, tone=tone, size=size)
         + ["-f", container, str(path)]
     )
     return path
@@ -535,6 +543,8 @@ def run_verification(*, keep_temp=False, write=None):
                                container="mp4")
         old_import = generate_file(livekit_root / "old-class" / "2026-01-15 10-00-00.mp4", IMPORT_SECONDS,
                                    video="testsrc", tone=770, container="mp4")
+        hd_source = generate_file(source_dir / "hd-class.mp4", HD_SECONDS, video="testsrc2", tone=880,
+                                  container="mp4", size=HD_FRAME)
         day_ago = time.time() - 86400
         os.utime(old_import, (day_ago, day_ago))
         report.ok("test media generated with ffmpeg", f"{time.monotonic() - started:.1f}s")
@@ -561,10 +571,12 @@ def run_verification(*, keep_temp=False, write=None):
             stack.enter_context(mock.patch("apps.courses.signals.bump_course_list_cache_version"))
             stack.enter_context(mock.patch("apps.realtime.recording.publisher.bump_course_list_cache_version"))
             stack.enter_context(mock.patch("apps.realtime.recording.services.bump_course_list_cache_version"))
+            stack.enter_context(mock.patch("apps.realtime.recording.modules.bump_course_list_cache_version"))
             try:
                 with transaction.atomic():
+                    _lift_db_timeouts_for_this_transaction()
                     _scenario(report, feed, media_root=media_root, work_root=work_root, mkv=mkv, egress=egress,
-                              old_import=old_import)
+                              old_import=old_import, hd_source=hd_source)
                     raise _Rollback()
             except _Rollback:
                 pass
@@ -587,6 +599,24 @@ def run_verification(*, keep_temp=False, write=None):
     return report
 
 
+def _lift_db_timeouts_for_this_transaction():
+    """The scenario runs real ffmpeg inside one rolled-back transaction for
+    minutes. The application role's ``statement_timeout`` (15 s) and
+    ``idle_in_transaction_session_timeout`` (30 s), see
+    infra/hostinger/apply-db-role-timeouts.sh, would kill it and raise a false
+    nightly "canary failed". ``SET LOCAL`` lasts only for this transaction, so
+    the pooled (PgBouncer, transaction mode) server connection gets the role's
+    values back at COMMIT/ROLLBACK."""
+    from django.db import connection
+
+    if connection.vendor != "postgresql":
+        return
+    with connection.cursor() as cursor:
+        cursor.execute("SET LOCAL statement_timeout = 0")
+        cursor.execute("SET LOCAL idle_in_transaction_session_timeout = 0")
+        cursor.execute("SET LOCAL lock_timeout = '10s'")
+
+
 def _check_no_trace(report):
     from apps.courses.models import Course, Lecture, Section
 
@@ -603,11 +633,11 @@ def _check_no_trace(report):
     report.check(leftovers == 0, "database left unchanged (transaction rolled back)", f"{leftovers} leftover row(s)")
 
 
-def _scenario(report, feed, *, media_root, work_root, mkv, egress, old_import):
+def _scenario(report, feed, *, media_root, work_root, mkv, egress, old_import, hd_source=None):
     from apps.courses.models import Course, Lecture, Section
 
     from ..models import RealtimeSession
-    from . import importer, services
+    from . import config, importer, services
     from .models import ClassRecording as R
     from .recorder import StreamRecorder, list_parts
 
@@ -695,8 +725,11 @@ def _scenario(report, feed, *, media_root, work_root, mkv, egress, old_import):
         report.check(lecture.video_file.name.startswith(f"lecture_videos/") and f"/module_{module.pk}/"
                      in lecture.video_file.name, "MP4 path is lecture_videos/<course>/module_<id>/")
         _check_mp4(report, "final MP4", video, expected_seconds=expected_a + expected_b)
-        report.check(lecture.section_id == module.pk and not lecture.is_published,
-                     "lecture created unpublished in the right module", lecture.title)
+        instant = config.instant_publish()
+        report.check(lecture.section_id == module.pk and lecture.is_published == instant,
+                     "lecture created in the right module, " + ("published at once (MP4)" if instant
+                                                               else "unpublished until HLS (instant publish off)"),
+                     lecture.title)
         report.check(lecture.description == MODULE_DESCRIPTION, "lecture has the module description")
         report.check(recording.duration_seconds and abs(recording.duration_seconds - (expected_a + expected_b)) <= 3,
                      "recording duration recorded", f"{recording.duration_seconds}s")
@@ -750,13 +783,125 @@ def _scenario(report, feed, *, media_root, work_root, mkv, egress, old_import):
                             row.error):
                 imported_lecture = Lecture.objects.get(pk=row.lecture_id)
                 report.check(
-                    imported_lecture.section_id == module.pk and not imported_lecture.is_published
+                    imported_lecture.section_id == module.pk
+                    and imported_lecture.is_published == config.instant_publish()
                     and imported_lecture.description == MODULE_DESCRIPTION,
-                    "imported lecture unpublished in the module with its description", imported_lecture.title,
+                    "imported lecture in the module with its description", imported_lecture.title,
                 )
                 # Imported MP4s are linked/copied as they are (the HLS stream is built from them).
                 _check_mp4(report, "imported MP4", media_root / imported_lecture.video_file.name,
                            expected_seconds=IMPORT_SECONDS, faststart=False)
                 report.check(old_import.is_file(), "the imported original is left in place")
+
+        _auto_publish_checks(report, recorder, course=course, host=host, token=token, egress=egress,
+                             recording=recording, media_root=media_root, module=module, hd_source=hd_source)
     finally:
         recorder.shutdown()
+
+
+def _auto_publish_checks(report, recorder, *, course, host, token, egress, recording, media_root, module, hd_source):
+    """Phase 2: auto module, real single-pass transcode, blue/green swap, Published."""
+    from apps.courses.models import Lecture, Section
+    from apps.courses.services import transcode_lecture_to_hls
+
+    from ..models import RealtimeSession
+    from . import config, publisher
+    from .models import ClassRecording as R
+
+    # A class whose session names no module (and whose live class has no default).
+    loose = RealtimeSession.objects.create(
+        title=f"{MARKER} no-module class {token}",
+        host=host,
+        session_type=RealtimeSession.TYPE_BROADCASTING,
+        stream_service=RealtimeSession.STREAM_SERVICE_ALSYED,
+        status=RealtimeSession.STATUS_SCHEDULED,
+        linked_course=course,
+    )
+    orphan = R.objects.create(
+        session=loose, source=R.SOURCE_LIVEKIT_EGRESS, state=R.STATE_FINALIZING, source_path=str(egress),
+        started_at=timezone.now(), stop_requested_at=timezone.now(),
+    )
+    recorder.finalize_recording(orphan.pk)
+    orphan.refresh_from_db()
+    auto_title = config.auto_module_title()
+    if report.check(orphan.state == R.STATE_PROCESSING and orphan.lecture_id,
+                    "class without a module is never failed", f"{orphan.state} {orphan.error}"):
+        section = Section.objects.get(pk=orphan.lecture.section_id)
+        report.check(section.title == auto_title and section.course_id == course.pk,
+                     f'published into the auto-created "{auto_title}" section', section.title)
+        report.check(orphan.needs_review and orphan.lecture.is_published == config.instant_publish(),
+                     "flagged for review, lecture visible to students", orphan.review_reason)
+
+    # The class recording's HD stream: the real single-pass transcode.
+    lecture = Lecture.objects.select_related("section__course").get(pk=recording.lecture_id)
+    try:
+        transcode_lecture_to_hls(lecture)
+    except Exception as exc:  # reported, not raised: the rest of the report still matters
+        report.fail("HLS transcode of the class recording", f"{type(exc).__name__}: {exc}")
+        return
+    lecture.refresh_from_db()
+    _check_hls(report, "class recording HLS", media_root, lecture, expected_revision=1)
+    published = publisher.publish_if_ready(R.objects.get(pk=recording.pk))
+    report.check(published and R.objects.get(pk=recording.pk).state == R.STATE_PUBLISHED,
+                 "recording Published once its HD stream is ready")
+
+    if hd_source is None:
+        return
+    # 540p source -> 360p + 540p from one ffmpeg (split), then a blue/green rebuild.
+    hd_name = f"lecture_videos/verify/module_{module.pk}/hd-{token}.mp4"
+    (media_root / hd_name).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(hd_source, media_root / hd_name)
+    hd = Lecture(section=module, title=f"{MARKER} hd {token}", is_published=False)
+    hd.video_file.name = hd_name
+    hd.save()
+    hd = Lecture.objects.select_related("section__course").get(pk=hd.pk)
+    try:
+        started = time.monotonic()
+        transcode_lecture_to_hls(hd)
+        elapsed = time.monotonic() - started
+    except Exception as exc:
+        report.fail("single-pass transcode (two renditions)", f"{type(exc).__name__}: {exc}")
+        return
+    hd.refresh_from_db()
+    report.info("single-pass transcode time", f"{elapsed:.1f}s for {HD_SECONDS}s of {HD_FRAME}")
+    master = _check_hls(report, "single-pass HLS", media_root, hd, expected_revision=1)
+    report.check(master is not None and "360p/index.m3u8" in master and "540p/index.m3u8" in master,
+                 "one ffmpeg wrote both renditions (360p + 540p)")
+    first_dir = (media_root / hd.stream_manifest_key).parent
+    try:
+        transcode_lecture_to_hls(hd)
+    except Exception as exc:
+        report.fail("blue/green rebuild", f"{type(exc).__name__}: {exc}")
+        return
+    hd.refresh_from_db()
+    report.check(hd.stream_manifest_key.endswith("/v2/master.m3u8") and first_dir.is_dir(),
+                 "blue/green: v2 swapped in, v1 kept for viewers mid-playback", hd.stream_manifest_key)
+
+
+def _check_hls(report, label, media_root, lecture, *, expected_revision):
+    from apps.courses.models import Lecture
+
+    ok = report.check(
+        lecture.stream_status == Lecture.STREAM_READY
+        and lecture.stream_manifest_key.endswith(f"/v{expected_revision}/master.m3u8"),
+        f"{label}: ready in revision v{expected_revision}", f"{lecture.stream_status} {lecture.stream_manifest_key}",
+    )
+    if not ok:
+        return None
+    master_path = media_root / lecture.stream_manifest_key
+    master = master_path.read_text(encoding="utf-8")
+    variants = [line for line in master.splitlines() if line and not line.startswith("#")]
+    playable = bool(variants)
+    for variant in variants:
+        playlist = master_path.parent / variant
+        text = playlist.read_text(encoding="utf-8") if playlist.is_file() else ""
+        segments = [line for line in text.splitlines() if line and not line.startswith("#")]
+        if "#EXT-X-ENDLIST" not in text or not segments:
+            playable = False
+            continue
+        first = playlist.parent / segments[0]
+        if not first.is_file() or (probe(first)["duration"] or 0) <= 0:
+            playable = False
+    report.check(playable, f"{label}: every rendition is a complete VOD playlist with decodable segments",
+                 ", ".join(variants))
+    return master

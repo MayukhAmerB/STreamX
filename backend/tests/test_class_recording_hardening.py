@@ -216,13 +216,24 @@ class RetentionSweepTests(RecordingFixtureMixin, TestCase):
         self.write_parts(recording, b"part")
         return recording
 
-    def test_failed_parts_are_kept_within_retention_and_swept_after(self):
+    def test_parts_of_a_class_that_never_became_a_lecture_are_never_swept(self):
         fresh = self.failed_with_parts(age_days=6)
         expired = self.failed_with_parts(age_days=8)
 
         self.recorder.sweep_stale_files()
 
         self.assertTrue(Path(fresh.work_dir).exists(), "retryable within retention")
+        self.assertTrue(Path(expired.work_dir).exists(), "the only copy of the class is kept")
+        expired.refresh_from_db()
+        self.assertNotIn("deleted after", expired.error)
+
+    def test_leftover_parts_of_a_failed_recording_with_a_lecture_are_swept_after_retention(self):
+        expired = self.failed_with_parts(age_days=8)
+        lecture = Lecture.objects.create(section=self.module, title="Made", video_key="videos/x.mp4")
+        R.objects.filter(pk=expired.pk).update(lecture=lecture)
+
+        self.recorder.sweep_stale_files()
+
         self.assertFalse(Path(expired.work_dir).exists())
         expired.refresh_from_db()
         self.assertEqual(expired.state, R.STATE_FAILED)
@@ -428,33 +439,34 @@ class EgressWithoutModuleTests(RecordingFixtureMixin, APITestCase):
         )
         self.recorder = offline_recorder()
 
-    def test_missing_module_is_a_visible_failure_that_retries_after_tagging(self, _run):
+    def test_missing_module_publishes_to_class_recordings_and_can_be_moved(self, _run):
         recording = services.enqueue_egress_publish(self.egress)
 
         self.assertIsNotNone(recording)
-        self.assertEqual(recording.state, R.STATE_FAILED)
-        self.assertEqual(recording.error, services.NO_MODULE_SELECTED_ERROR)
+        self.assertEqual(recording.state, R.STATE_FINALIZING, "never FAILED for a missing module")
         self.assertEqual(services.enqueue_egress_publish(self.egress).pk, recording.pk, "idempotent")
-        self.client.force_authenticate(self.instructor)
-        listed = self.client.get(reverse("realtime-session-class-recordings", kwargs={"pk": self.studio.id}))
-        self.assertEqual(listed.data["data"][0]["state"], R.STATE_FAILED)
-        self.assertIn("No module selected", listed.data["data"][0]["error"])
-        self.assertTrue(listed.data["data"][0]["can_retry"])
-
-        patched = self.client.patch(
-            reverse("realtime-session-detail", kwargs={"pk": self.studio.id}),
-            {"target_module_id": self.module2.id},
-            format="json",
-        )
-        self.assertEqual(patched.status_code, 200)
-        retried = self.client.post(reverse("realtime-class-recording-retry", kwargs={"recording_id": recording.id}))
-        self.assertEqual(retried.status_code, 200, retried.data)
         self.recorder.tick()
-
         recording.refresh_from_db()
         self.assertEqual(recording.state, R.STATE_PROCESSING)
+        self.assertEqual(recording.lecture.section.title, "Class recordings")
+        self.assertTrue(recording.needs_review)
+
+        self.client.force_authenticate(self.instructor)
+        listed = self.client.get(reverse("realtime-session-class-recordings", kwargs={"pk": self.studio.id}))
+        row = listed.data["data"][0]
+        self.assertTrue(row["needs_review"])
+        self.assertTrue(row["can_choose_module"])
+
+        moved = self.client.post(
+            reverse("realtime-class-recording-module", kwargs={"recording_id": recording.id}),
+            {"module_id": self.module2.id},
+            format="json",
+        )
+        self.assertEqual(moved.status_code, 200, moved.data)
+        recording.refresh_from_db()
         self.assertEqual(recording.module_id, self.module2.id)
         self.assertEqual(recording.lecture.section_id, self.module2.id)
+        self.assertFalse(recording.needs_review)
 
 
 # --------------------------------------------------------------------------

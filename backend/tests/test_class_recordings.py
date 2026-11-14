@@ -73,6 +73,11 @@ class RecordingFixtureMixin:
             STREAM_RECORDER_FILE_SETTLE_SECONDS=0,
             LIVEKIT_RECORDING_LOCAL_OUTPUT_ROOT=self.work_root,
             OWNCAST_ADMIN_PASSWORD="",
+            # These suites pin the rollback values of the Phase 2 flags (Stop
+            # finalizes at once, the lecture is published when HLS is ready);
+            # tests/test_recording_auto_publish.py covers the new defaults.
+            STREAM_RECORDER_STOP_GRACE_SECONDS=0,
+            RECORDING_INSTANT_PUBLISH=False,
         )
         overrides.enable()
         self.addCleanup(overrides.disable)
@@ -213,14 +218,20 @@ class RecordingStateMachineTests(RecordingFixtureMixin, TestCase):
         second = services.ensure_server_recording(self.session, user=self.instructor)
         self.assertEqual(first.pk, second.pk)
         self.assertEqual(R.objects.count(), 1)
-        self.assertEqual(first.module_id, self.module.id)
+        self.assertIsNone(first.module_id, "derived at finalize, so a module chosen mid-class still applies")
         self.assertTrue(first.work_dir.startswith(self.work_root))
 
-    def test_recording_requires_enabled_recorder_and_obs_session(self):
+    def test_recording_requires_enabled_recorder_and_a_broadcast(self):
         with override_settings(STREAM_RECORDER_ENABLED=False):
             self.assertIsNone(services.ensure_server_recording(self.session))
         studio = self.make_session(title="Studio", stream_service=RealtimeSession.STREAM_SERVICE_ALSYED)
-        self.assertIsNone(services.ensure_server_recording(studio))
+        with override_settings(RECORDING_AUTO_ALL_BROADCASTS=False):
+            self.assertIsNone(services.ensure_server_recording(studio), "rollback flag: OBS sessions only")
+        # Phase 2 default: Host Studio broadcasts reach Owncast too and are recorded.
+        self.assertIsNotNone(services.ensure_server_recording(studio))
+        meeting = self.make_session(title="Meeting", session_type=RealtimeSession.TYPE_MEETING,
+                                    stream_service=RealtimeSession.STREAM_SERVICE_ALSYED)
+        self.assertIsNone(services.ensure_server_recording(meeting), "meetings use LiveKit egress instead")
 
     def test_new_session_supersedes_capture_of_previous_one(self):
         first = services.ensure_server_recording(self.session)
@@ -323,25 +334,24 @@ class FinalizeIntoModuleTests(RecordingFixtureMixin, TestCase):
         publisher.finalize_into_lecture(recording, [], list_path=None)
         self.assertEqual(Lecture.objects.filter(section=self.module).count(), 2)  # existing + one recording
 
-    def test_missing_module_fails_and_retry_publishes_after_tagging(self, _run):
+    def test_missing_module_never_fails_it_publishes_to_class_recordings(self, _run):
         self.session.target_module = None
         self.session.save()
         recording = self._finalizing_recording(b"a" * 10)
         R.objects.filter(pk=recording.pk).update(module=None)
         self.recorder.tick()
         recording.refresh_from_db()
-        self.assertEqual(recording.state, R.STATE_FAILED)
-        self.assertIn("No target module", recording.error)
-        self.assertTrue(Path(recording.work_dir).exists(), "parts are kept for retry")
-
-        self.session.target_module = self.module2
-        self.session.save()
-        self.assertTrue(services.retry(recording))
-        self.recorder.tick()
-        recording.refresh_from_db()
         self.assertEqual(recording.state, R.STATE_PROCESSING)
+        auto = Section.objects.get(course=self.course, title="Class recordings")
+        self.assertEqual(recording.lecture.section_id, auto.pk)
+        self.assertTrue(recording.needs_review)
+        self.assertIn("Class recordings", recording.review_reason)
+
+        # The host/admin override moves it and clears the review flag.
+        services.set_module(recording, self.module2)
+        recording.refresh_from_db()
         self.assertEqual(recording.lecture.section_id, self.module2.id)
-        self.assertEqual(recording.attempts, 1)
+        self.assertFalse(recording.needs_review)
 
     def test_second_take_becomes_part_two(self, _run):
         first = self._finalizing_recording(b"a")
@@ -366,7 +376,15 @@ class FinalizeIntoModuleTests(RecordingFixtureMixin, TestCase):
         recording.refresh_from_db()
         lecture = recording.lecture
 
-        Lecture.objects.filter(pk=lecture.pk).update(stream_status=Lecture.STREAM_FAILED, stream_error="bad codec")
+        # A failed transcode the queue will retry keeps the recording processing.
+        Lecture.objects.filter(pk=lecture.pk).update(
+            stream_status=Lecture.STREAM_FAILED, stream_error="bad codec", stream_attempts=1
+        )
+        self.recorder.tick()
+        recording.refresh_from_db()
+        self.assertEqual(recording.state, R.STATE_PROCESSING)
+        # Out of retries: a visible failure.
+        Lecture.objects.filter(pk=lecture.pk).update(stream_attempts=99)
         self.recorder.tick()
         recording.refresh_from_db()
         self.assertEqual(recording.state, R.STATE_FAILED)

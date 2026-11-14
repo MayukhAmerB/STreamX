@@ -21,6 +21,7 @@ import {
 } from "./navConfig";
 import ShellHeader from "./ShellHeader";
 import ShellSideNav from "./ShellSideNav";
+import FeatureBoundary from "./ui/FeatureBoundary";
 import PageSkeleton from "./ui/PageSkeleton";
 import { ToastProvider } from "./ui/toast";
 import { useBreakpoint } from "./useBreakpoint";
@@ -81,7 +82,13 @@ export default function AppShellLayout() {
   }, [logout, navigate]);
 
   const pageMode = getShellPageMode(pathname);
-  const page = <Outlet />;
+  // A crashing page shows a message inside the shell (navigation keeps
+  // working) instead of unmounting the whole app; navigating away resets it.
+  const page = (
+    <FeatureBoundary label="This page" resetKeys={[pathname]}>
+      <Outlet />
+    </FeatureBoundary>
+  );
 
   return (
     <div

@@ -2,7 +2,7 @@ import hashlib
 import json
 import re
 import uuid
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
@@ -87,7 +87,7 @@ def find_completed_create_order_replay(
 
 
 @contextmanager
-def serialized_checkout(*, user: Any, buyer_email: object, course: Any):
+def serialized_checkout(*, user: Any, buyer_email: object, course: Any) -> Iterator[PaymentCheckoutLock]:
     """Hold a row lock for one canonical buyer/course checkout operation."""
     lookup = {
         "course": course,
@@ -194,4 +194,4 @@ def complete_claim(
         response_payload=response_payload,
         response_status=response_status,
     )
-    return updated == 1
+    return int(updated) == 1

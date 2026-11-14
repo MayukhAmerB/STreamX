@@ -39,6 +39,7 @@ from apps.core.outbox import outbox_handler, publish
 
 from . import antivirus
 from .models import (
+    PENDING_PREFIX,
     SCAN_CLEAN,
     SCAN_INFECTED,
     SCAN_UNSCANNED,
@@ -68,7 +69,13 @@ class Holder:
         return f"{self.prefix}{name}"
 
     def queryset(self):
-        return self.model.objects.exclude(**{self.file_field: ""}).exclude(**{f"{self.file_field}__isnull": True})
+        # Uploads still waiting for their first (async) scan belong to
+        # apps.reports.scanning, not to the periodic re-scan.
+        return (
+            self.model.objects.exclude(**{self.file_field: ""})
+            .exclude(**{f"{self.file_field}__isnull": True})
+            .exclude(**{f"{self.file_field}__startswith": PENDING_PREFIX})
+        )
 
     def candidates(self, cutoff):
         status = self.column("scan_status")
@@ -152,7 +159,9 @@ def _normalise_legacy_name(holder, name):
     storage = private_report_storage()
     old_path, new_path = storage.path(name), storage.path(new_name)
     if os.path.exists(new_path):
-        new_name = f"{directory}/{uuid.uuid4().hex}{STORED_SUFFIX}" if directory else f"{uuid.uuid4().hex}{STORED_SUFFIX}"
+        new_name = (
+            f"{directory}/{uuid.uuid4().hex}{STORED_SUFFIX}" if directory else f"{uuid.uuid4().hex}{STORED_SUFFIX}"
+        )
         new_path = storage.path(new_name)
     os.replace(old_path, new_path)
     try:

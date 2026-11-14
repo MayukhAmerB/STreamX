@@ -35,20 +35,36 @@ def is_obs_broadcast(session):
     )
 
 
+def is_recordable_broadcast(session):
+    """Every broadcast reaches Owncast (OBS directly, Host Studio through its
+    RTMP egress), so the server recorder records all of them by default."""
+    if session.session_type != session.TYPE_BROADCASTING:
+        return False
+    return config.auto_all_broadcasts() or is_obs_broadcast(session)
+
+
 def capturing_server_recording(session):
     return R.objects.filter(session=session, source=R.SOURCE_SERVER, state=R.STATE_RECORDING).first()
 
 
 def ensure_server_recording(session, *, user=None, request=None):
-    """Start (or return the already running) server recording for an OBS session.
+    """Start (or return the already running) server recording for a broadcast.
 
     Owncast carries one feed at a time, so any capture still attached to a
-    different session is asked to finalize first.
+    different session is asked to finalize first. A take whose host pressed
+    Stop is resumed (same take, next part) when the class goes live again.
     """
-    if not config.recorder_enabled() or not is_obs_broadcast(session):
+    if not config.recorder_enabled() or not is_recordable_broadcast(session):
         return None
     existing = capturing_server_recording(session)
     if existing is not None:
+        if existing.stop_requested_at is not None:
+            resumed = R.objects.filter(pk=existing.pk, state=R.STATE_RECORDING).update(
+                stop_requested_at=None, updated_at=timezone.now()
+            )
+            if resumed:
+                existing.stop_requested_at = None
+                logger.info("CLASS_RECORDING_RESUMED recording_id=%s session_id=%s", existing.pk, session.pk)
         return existing
     # A previous take of this session may still be finalizing; this starts a new take.
     for other in R.objects.filter(source=R.SOURCE_SERVER, state=R.STATE_RECORDING).exclude(session=session):
@@ -63,7 +79,10 @@ def ensure_server_recording(session, *, user=None, request=None):
         with transaction.atomic():
             recording = R.objects.create(
                 session=session,
-                module=session.target_module,
+                # No snapshot of the session's module: it is derived at finalize
+                # (recording/modules.py), so a module chosen during the class
+                # still applies. ClassRecording.module is an explicit override.
+                module=None,
                 started_by=user if getattr(user, "is_authenticated", False) else None,
                 source=R.SOURCE_SERVER,
                 state=R.STATE_RECORDING,
@@ -78,62 +97,127 @@ def ensure_server_recording(session, *, user=None, request=None):
     return recording
 
 
+# Reasons that finalize at once; anything else (the host pressing Stop) only
+# pauses the take for STREAM_RECORDER_STOP_GRACE_SECONDS so a restart of the
+# same class continues it instead of producing a "part 2" lecture.
+IMMEDIATE_FINALIZE_REASONS = frozenset({"session_ended", "admin_finalize", "superseded_by_new_session"})
+
+
 def request_finalize(session, *, reason, request=None):
-    """Stop capturing and queue finalization. Idempotent (repeat calls no-op)."""
+    """Stop capturing; finalize now (class ended) or after the stop grace.
+
+    Idempotent (repeat calls no-op). Returns the recording or None.
+    """
     recording = R.objects.filter(session=session, source=R.SOURCE_SERVER, state=R.STATE_RECORDING).first()
     if recording is None:
         return None
-    state.transition(
-        recording,
-        R.STATE_FINALIZING,
-        reason=reason,
-        request=request,
-        stop_requested_at=timezone.now(),
-    )
+    ended = getattr(session, "status", "") == getattr(session, "STATUS_ENDED", "ended")
+    if reason in IMMEDIATE_FINALIZE_REASONS or ended or config.stop_grace_seconds() <= 0:
+        state.transition(
+            recording,
+            R.STATE_FINALIZING,
+            reason=reason,
+            request=request,
+            stop_requested_at=recording.stop_requested_at or timezone.now(),
+        )
+        return recording
+    now = timezone.now()
+    if R.objects.filter(pk=recording.pk, state=R.STATE_RECORDING, stop_requested_at__isnull=True).update(
+        stop_requested_at=now, updated_at=now
+    ):
+        recording.stop_requested_at = now
+        logger.info(
+            "CLASS_RECORDING_STOP_REQUESTED recording_id=%s session_id=%s reason=%s grace_seconds=%s",
+            recording.pk,
+            session.pk,
+            reason,
+            config.stop_grace_seconds(),
+        )
     return recording
 
 
+def on_session_ended(session, *, request=None):
+    """Hook for the live lifecycle (end_session): finalize the take now.
+
+    The recorder also notices an ENDED session on its next tick and
+    recording.reconcile stops a meeting's egress, so calling this is only
+    an accelerator, never required.
+    """
+    return request_finalize(session, reason="session_ended", request=request)
+
+
 NO_MODULE_SELECTED_ERROR = "No module selected for this class — choose a module and retry."
+MEETING_REVIEW_REASON = "Meeting recording (students' cameras and microphones): review it, then publish."
+
+
+def _meeting_hold(session):
+    """A meeting recording shows students' cameras and microphones: it is
+    processed as usual but held back (unpublished, needs review) until an
+    admin reviews it, whichever path produced the file."""
+    if session is not None and session.session_type == session.TYPE_MEETING:
+        return {"hold_unpublished": True, "needs_review": True, "review_reason": MEETING_REVIEW_REASON}
+    return {}
 
 
 def enqueue_egress_publish(livekit_recording, *, request=None):
-    """Publish a completed Host Studio (LiveKit egress) recording into the module.
+    """Publish a completed LiveKit egress recording (meeting / Host Studio).
 
-    Without a target module the recording is still recorded -- as a visible,
-    retryable failure -- so the class video never vanishes silently: set the
-    session's module (PATCH /api/realtime/sessions/<id>/) and retry.
+    Always FINALIZING: the module is derived at finalize (recording/modules.py),
+    so a class without a chosen module is still published (and flagged for
+    review) instead of failing.
     """
     session = livekit_recording.session
     if not livekit_recording.output_file_path:
         return None
-    has_module = bool(session.target_module_id)
-    initial_state = R.STATE_FINALIZING if has_module else R.STATE_FAILED
+    defaults = {
+        "session": session,
+        "module": None,  # derived at finalize
+        "started_by": livekit_recording.started_by,
+        "source": R.SOURCE_LIVEKIT_EGRESS,
+        "state": R.STATE_FINALIZING,
+        "source_path": livekit_recording.output_file_path,
+        "started_at": livekit_recording.started_at,
+        "stop_requested_at": timezone.now(),
+    }
+    defaults.update(_meeting_hold(session))
+    try:
+        with transaction.atomic():
+            recording, created = R.objects.get_or_create(
+                livekit_recording=livekit_recording,
+                defaults=defaults,
+            )
+    except IntegrityError:
+        return R.objects.filter(livekit_recording=livekit_recording).first()
+    if created:
+        state.log_transition(recording, "", R.STATE_FINALIZING, reason="egress_completed", request=request)
+    return recording
+
+
+def enqueue_browser_fallback_publish(livekit_recording, *, request=None):
+    """A browser (MediaRecorder) upload joins the same finalize path."""
+    video_name = str(getattr(livekit_recording.video_file, "name", "") or "")
+    if not video_name:
+        return None
     try:
         with transaction.atomic():
             recording, created = R.objects.get_or_create(
                 livekit_recording=livekit_recording,
                 defaults={
-                    "session": session,
-                    "module": session.target_module if has_module else None,
+                    "session": livekit_recording.session,
+                    "module": None,  # derived at finalize
                     "started_by": livekit_recording.started_by,
-                    "source": R.SOURCE_LIVEKIT_EGRESS,
-                    "state": initial_state,
-                    "error": "" if has_module else NO_MODULE_SELECTED_ERROR,
-                    "source_path": livekit_recording.output_file_path,
+                    "source": R.SOURCE_BROWSER_FALLBACK,
+                    "state": R.STATE_FINALIZING,
+                    "source_path": video_name,
                     "started_at": livekit_recording.started_at,
                     "stop_requested_at": timezone.now(),
+                    **_meeting_hold(livekit_recording.session),
                 },
             )
     except IntegrityError:
         return R.objects.filter(livekit_recording=livekit_recording).first()
     if created:
-        state.log_transition(
-            recording,
-            "",
-            initial_state,
-            reason="egress_completed" if has_module else "egress_completed_without_module",
-            request=request,
-        )
+        state.log_transition(recording, "", R.STATE_FINALIZING, reason="browser_upload_completed", request=request)
     return recording
 
 
@@ -142,8 +226,15 @@ def is_pending_obs_remux(recording):
     return recording.source == R.SOURCE_OBS_UPLOAD and bool(recording.source_path)
 
 
-def retry(recording, *, request=None):
-    """Re-run a failed recording from where it can resume. Returns True if queued."""
+def retry(recording, *, request=None, automatic=False):
+    """Re-run a failed recording from where it can resume. Returns True if queued.
+
+    ``automatic`` (the reconcile's auto-retry): a lecture whose HLS transcode
+    used up its attempts is left alone (its MP4 is already published), and a
+    transcode retry keeps its attempt count, so the automatic retries cannot
+    multiply into dozens of multi-hour ffmpeg runs of a broken file. Only an
+    explicit host/admin retry resets the transcode attempts.
+    """
     if not can_retry(recording):
         return False
     if is_pending_obs_remux(recording):
@@ -151,18 +242,19 @@ def retry(recording, *, request=None):
         return state.transition(
             recording, R.STATE_FINALIZING, reason="retry", request=request, attempts=recording.attempts + 1
         )
+    retry_fields = {"attempts": recording.attempts + 1, "next_retry_at": None, "alerted_at": None}
     if recording.lecture_id:
         lecture = Lecture.objects.filter(pk=recording.lecture_id).first()
         if lecture is None:
             return False
         if lecture.stream_status == Lecture.STREAM_FAILED:
-            lecture.stream_status = Lecture.STREAM_UPLOADED
-            lecture.stream_error = ""
-            lecture.save(update_fields=["stream_status", "stream_error", "updated_at"])
-        return state.transition(
-            recording, R.STATE_PROCESSING, reason="retry", request=request, attempts=recording.attempts + 1
-        )
-    updates = {"attempts": recording.attempts + 1}
+            from apps.courses.transcode_queue import requeue, transcode_exhausted
+
+            if automatic and transcode_exhausted(lecture):
+                return False
+            requeue(lecture, reset_attempts=not automatic)
+        return state.transition(recording, R.STATE_PROCESSING, reason="retry", request=request, **retry_fields)
+    updates = dict(retry_fields)
     if recording.module_id is None and recording.session_id and recording.session.target_module_id:
         updates["module_id"] = recording.session.target_module_id
     return state.transition(recording, R.STATE_FINALIZING, reason="retry", request=request, **updates)
@@ -174,9 +266,90 @@ def can_retry(recording):
     if recording.lecture_id or is_pending_obs_remux(recording):
         return True
     if recording.source == R.SOURCE_IMPORTED:
-        # Without a module there is nothing to retry: "Publish to module" instead.
-        return recording.module_id is not None
+        # Without a module (or a class to derive one from) there is nothing to
+        # retry: "Publish to module" instead.
+        return recording.module_id is not None or recording.session_id is not None
     return recording.source != R.SOURCE_OBS_UPLOAD
+
+
+# --------------------------------------------------------------------------
+# Module picker (host/admin override) and admin "re-run finalize"
+# --------------------------------------------------------------------------
+
+
+def can_choose_module(recording):
+    return recording.state != R.STATE_FINALIZING
+
+
+def set_module(recording, module, *, request=None):
+    """Host/admin override of the module (optional; the server derives one).
+
+    Moves an existing lecture, otherwise remembers the choice for the
+    finalize. Clears the review flag, and retries a failed recording.
+    """
+    if module is None:
+        raise ValidationError("Choose a module.")
+    if not can_choose_module(recording):
+        raise ValidationError("The recording is being finalized right now; try again in a moment.")
+    move_to_module(recording, module, request=request)
+    R.objects.filter(pk=recording.pk).update(needs_review=False, review_reason="")
+    recording.needs_review = False
+    recording.review_reason = ""
+    recording.refresh_from_db()
+    if recording.state == R.STATE_FAILED and can_retry(recording):
+        retry(recording, request=request)
+    elif recording.state == R.STATE_IMPORTED and not recording.lecture_id:
+        publish_to_module(recording, module, request=request)
+    return recording
+
+
+def mark_reviewed(recording, *, request=None):
+    changed = R.objects.filter(pk=recording.pk, needs_review=True).update(needs_review=False)
+    if changed:
+        recording.needs_review = False
+        log_security_event("realtime.class_recording_reviewed", request=request, recording_id=recording.pk)
+    return bool(changed)
+
+
+def rerun_finalize(recording, *, request=None):
+    """Admin "re-run finalize": push the recording forward from where it is.
+
+    Returns (done, message). Never needed in normal operation.
+    """
+    if recording.state == R.STATE_FAILED:
+        if can_retry(recording) and retry(recording, request=request):
+            return True, "Queued again from where it failed."
+        return False, "This failed recording cannot be retried (no captured video or module to use)."
+    if recording.state == R.STATE_RECORDING:
+        if state.transition(
+            recording, R.STATE_FINALIZING, reason="admin_finalize", request=request, stop_requested_at=timezone.now()
+        ):
+            return True, "Capture stopped; the recording is being finalized now."
+        return False, "The recording changed meanwhile; reload and try again."
+    if recording.state == R.STATE_FINALIZING:
+        return True, "Already finalizing; the stream recorder picks it up within seconds."
+    if recording.state == R.STATE_IMPORTED:
+        if recording.module_id or recording.session_id:
+            if state.transition(
+                recording, R.STATE_FINALIZING, reason="admin_finalize", request=request,
+                attempts=recording.attempts + 1,
+            ):
+                return True, "Imported recording queued for publishing."
+        return False, 'Choose a module first ("Publish to module").'
+    lecture = Lecture.objects.filter(pk=recording.lecture_id).first() if recording.lecture_id else None
+    if lecture is None:
+        return False, "This recording has no lecture to process."
+    from apps.courses.transcode_queue import requeue
+
+    if lecture.stream_status == Lecture.STREAM_READY and recording.state == R.STATE_PROCESSING:
+        from .publisher import publish_if_ready
+
+        publish_if_ready(recording)
+        return True, "The HD stream is ready; the recording is published."
+    requeue(lecture)
+    log_security_event("realtime.class_recording_requeued", request=request, recording_id=recording.pk,
+                       lecture_id=lecture.pk)
+    return True, "The lecture's HD stream was queued for processing again."
 
 
 # --------------------------------------------------------------------------
@@ -194,6 +367,24 @@ def recording_course_id(recording):
     if recording.session_id:
         return recording.session.resolve_course_id()
     return None
+
+
+def module_choice_error(user, recording, module):
+    """Why ``user`` may not send ``recording`` to ``module`` ("" when allowed).
+
+    The module must belong to the recording's course. A recording with no
+    course to derive (its class is linked to none) may go only to a course
+    the user teaches, or anywhere for staff: otherwise a host or moderator
+    could publish into someone else's course.
+    """
+    course_id = recording_course_id(recording)
+    if course_id:
+        return "" if module.course_id == course_id else "Pick a module of the class's course."
+    if user is not None and (user.is_staff or user.is_superuser):
+        return ""
+    if user is not None and module.course.instructor_id == user.pk:
+        return ""
+    return "Pick a module of a course you teach."
 
 
 def can_publish_to_module(recording):
@@ -223,16 +414,24 @@ def set_lecture_published(recording, published, *, request=None):
     lecture = Lecture.objects.filter(pk=recording.lecture_id).first() if recording.lecture_id else None
     if lecture is None:
         raise ValidationError("This recording has no lecture yet.")
-    if published and (lecture.stream_status != Lecture.STREAM_READY or not lecture.stream_manifest_key):
+    hls_ready = lecture.stream_status == Lecture.STREAM_READY and bool(lecture.stream_manifest_key)
+    instant = config.instant_publish()
+    # With instant publish the MP4 is playable before the HLS stream exists.
+    if published and not hls_ready and not (instant and lecture.video_file):
         raise ValidationError(
             f"The lecture's video stream is not ready yet ({lecture.get_stream_status_display()}). "
             "It is published automatically as soon as it is."
         )
-    if not published and recording.state in (R.STATE_FINALIZING, R.STATE_PROCESSING):
+    if not published and recording.state == R.STATE_FINALIZING:
+        raise ValidationError("This recording is being finalized right now; try again in a moment.")
+    if not published and not instant and recording.state == R.STATE_PROCESSING:
         raise ValidationError(
             "This recording is still being processed and would be published automatically when it is ready. "
             "Unpublish it once it shows Published."
         )
+    # An admin's choice sticks: automatic publishing never undoes an unpublish.
+    R.objects.filter(pk=recording.pk).update(hold_unpublished=not published)
+    recording.hold_unpublished = not published
     if bool(lecture.is_published) == bool(published):
         return False
     lecture.is_published = bool(published)
@@ -266,9 +465,13 @@ def move_to_module(recording, module, *, request=None):
                 lecture.order = next_lecture_order(module)
                 lecture.save(update_fields=["section", "order", "updated_at"])
             # Every recording of this lecture (OBS replacements included) follows it.
-            R.objects.filter(lecture_id=lecture.pk).update(module=module, updated_at=timezone.now())
+            R.objects.filter(lecture_id=lecture.pk).update(
+                module=module, needs_review=False, review_reason="", updated_at=timezone.now()
+            )
         else:
-            R.objects.filter(pk=recording.pk).update(module=module, updated_at=timezone.now())
+            R.objects.filter(pk=recording.pk).update(
+                module=module, needs_review=False, review_reason="", updated_at=timezone.now()
+            )
     recording.module = module
     bump_course_list_cache_version()
     log_security_event(

@@ -139,6 +139,26 @@ FIREWALL_EXEMPTIONS = (
 )
 
 
+# Routes whose body is raw binary data (never parsed as form/JSON): the body is
+# not inspected (and not read into memory) here; the query string still is.
+# Resumable recording upload chunks: 32 MiB of video per PUT, streamed to disk
+# by the view (apps/recording_uploads/views.py UploadChunkView).
+BINARY_BODY_ROUTES = (
+    (
+        "recording-upload-chunk",
+        re.compile(r"/api/recording-uploads/[0-9a-fA-F-]{36}/chunks/\d{1,6}/"),
+        frozenset({"PUT"}),
+    ),
+)
+
+
+def _query_strings(request):
+    for key, values in request.GET.lists():
+        yield f"query:{key}", key
+        for value in values:
+            yield f"query:{key}", value
+
+
 class SuspiciousInputFirewallMiddleware:
     """
     Lightweight request inspection for obvious SQLi/XSS payload signatures on API endpoints.
@@ -168,6 +188,20 @@ class SuspiciousInputFirewallMiddleware:
             for exemption in FIREWALL_EXEMPTIONS
         )
 
+    @classmethod
+    def _is_binary_body_route(cls, request, cache):
+        content_type = (request.META.get("CONTENT_TYPE") or "").split(";")[0].strip().lower()
+        if content_type != "application/octet-stream":
+            return False
+        candidates = [
+            (name, path) for name, path, methods in BINARY_BODY_ROUTES if request.method in methods and path.fullmatch(request.path)
+        ]
+        if not candidates:
+            return False
+        if "url_name" not in cache:
+            cache["url_name"] = cls._url_name(request)
+        return any(name == cache["url_name"] for name, _path in candidates)
+
     @staticmethod
     def _blocked_response():
         return JsonResponse(
@@ -183,7 +217,11 @@ class SuspiciousInputFirewallMiddleware:
         if getattr(settings, "SECURITY_BLOCK_SUSPICIOUS_INPUT", True) and request.path.startswith("/api/"):
             max_body_bytes = getattr(settings, "SECURITY_MAX_INSPECTION_BODY_BYTES", 16384)
             route_cache = {}
-            for source, value in iter_request_strings(request, max_body_bytes=max_body_bytes):
+            if self._is_binary_body_route(request, route_cache):
+                strings = _query_strings(request)
+            else:
+                strings = iter_request_strings(request, max_body_bytes=max_body_bytes)
+            for source, value in strings:
                 suspicious = contains_suspicious_xss(value) or contains_suspicious_sqli(value)
                 if suspicious and self._is_exempt(request, source, value, route_cache):
                     continue

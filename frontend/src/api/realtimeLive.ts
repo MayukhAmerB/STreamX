@@ -9,7 +9,19 @@ type Schemas = components["schemas"];
 
 export type ModuleOption = Schemas["ModuleOption"];
 export type ModuleOptions = Schemas["ModuleOptions"];
-export type ClassRecording = Schemas["ClassRecording"];
+// Phase 2 fields (needs_review, review_reason, can_choose_module) are listed
+// explicitly until contracts/openapi.yaml and the generated schema are
+// regenerated; the intersection keeps working after that.
+export type ClassRecording = Schemas["ClassRecording"] & {
+  needs_review?: boolean;
+  review_reason?: string;
+  can_choose_module?: boolean;
+};
+export interface ClassRecordingActionResult {
+  done: boolean;
+  detail: string;
+  recording: ClassRecording;
+}
 export type BroadcastEgressStatus = Schemas["BroadcastEgressStatus"];
 export type StreamHeartbeatData = Schemas["StreamHeartbeatData"];
 export type StreamHeartbeatRequest = Schemas["StreamHeartbeatRequest"];
@@ -50,6 +62,19 @@ export function listSessionClassRecordings(sessionId: number): Promise<ClassReco
 export function retryClassRecording(recordingId: number): Promise<ClassRecording | null> {
   const path = fillPath("/realtime/class-recordings/{recording_id}/retry/", { recording_id: recordingId });
   return unwrap<ClassRecording>(apiClient.post(path));
+}
+
+// Optional override: the server always derives a module (session module, the
+// live class's default, or the auto-created "Class recordings" section).
+export function setClassRecordingModule(recordingId: number, moduleId: number): Promise<ClassRecording | null> {
+  const path = `/realtime/class-recordings/${encodeURIComponent(String(recordingId))}/module/`;
+  return unwrap<ClassRecording>(apiClient.post(path, { module_id: moduleId }));
+}
+
+// Admin only: push a recording forward from where it is (never needed normally).
+export function rerunClassRecordingFinalize(recordingId: number): Promise<ClassRecordingActionResult | null> {
+  const path = `/realtime/class-recordings/${encodeURIComponent(String(recordingId))}/rerun-finalize/`;
+  return unwrap<ClassRecordingActionResult>(apiClient.post(path));
 }
 
 export function sendRealtimeStreamHeartbeat(

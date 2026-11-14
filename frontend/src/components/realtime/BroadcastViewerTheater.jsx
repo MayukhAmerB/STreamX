@@ -14,18 +14,21 @@ function EmptyPanel({ className = "", message }) {
   );
 }
 
-/** "live" | "starting" | "offline" | "ended" for the status tag. */
+/** "live" | "starting" | "reconnecting" | "offline" | "ended" for the status tag. */
 export function resolveTheaterState({ streamStatus = "", sessionStatus = "" } = {}) {
   const stream = String(streamStatus || "").trim().toLowerCase();
   const session = String(sessionStatus || "").trim().toLowerCase();
   if (session === "ended") return "ended";
   if (stream === "starting") return "starting";
+  // Phase 2: the server holds the class while the host reconnects.
+  if (stream === "interrupted") return "reconnecting";
   if (stream && stream !== "live") return "offline";
   return "live";
 }
 
 const STATE_LABELS = {
   starting: "Reconnecting",
+  reconnecting: "Host reconnecting",
   offline: "Offline",
   ended: "Ended",
 };
@@ -108,6 +111,7 @@ export default function BroadcastViewerTheater({
   statusMessage = "",
   onRefreshStream = null,
   onRefreshChat = null,
+  onPlaybackStalledChange = null,
   showHeaderMeta = true,
   showChat = true,
   chatEnabled = true,
@@ -160,10 +164,15 @@ export default function BroadcastViewerTheater({
       : secureChat.error
         ? "Secure chat could not be prepared. Refresh chat or sign in again."
     : chatFallbackMessage;
+  const isHostReconnecting = Boolean(
+    resolvedStreamUrl && normalizedSessionStatus !== "ended" && normalizedStreamStatus === "interrupted"
+  );
   const resolvedStatusMessage =
     String(statusMessage || "").trim() ||
     (isSessionEnded
       ? "This broadcast session has ended."
+      : isHostReconnecting
+        ? "Host reconnecting... The class continues here as soon as the host is back."
       : isStreamStarting
         ? "The host is reconnecting OBS. Keep chat open and the video will resume here when the stream is back."
       : isStreamUnavailable
@@ -215,6 +224,7 @@ export default function BroadcastViewerTheater({
                 streamStatus={normalizedStreamStatus}
                 sessionStatus={normalizedSessionStatus}
                 title={streamTitle}
+                onPlaybackStalledChange={onPlaybackStalledChange}
               />
             ) : (
               <EmptyPanel className="bvt__empty--video" message={resolvedStreamFallbackMessage} />

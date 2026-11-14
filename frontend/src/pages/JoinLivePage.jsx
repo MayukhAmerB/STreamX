@@ -339,11 +339,14 @@ export default function JoinLivePage() {
     });
   }, []);
 
+  // null while the player plays; otherwise its stall reason (see SecureHlsBroadcastPlayer).
+  const [broadcastPlaybackStalled, setBroadcastPlaybackStalled] = useState(null);
   const handleRefreshActiveBroadcast = useAdaptiveRealtimeSessionPolling({
     enabled: activeSession?.mode === "broadcast",
     sessionId: activeSession?.mode === "broadcast" ? activeSession?.session?.id : null,
     sessionStatus: activeSession?.session?.status,
     streamStatus: activeSession?.broadcast?.stream_status,
+    playbackStalled: broadcastPlaybackStalled,
     onSessionData: applyActiveBroadcastSessionUpdate,
   });
 
@@ -380,6 +383,8 @@ export default function JoinLivePage() {
     activeSession?.mode === "broadcast"
       ? activeSession?.session?.status === "ended"
         ? "This broadcast session has ended."
+        : String(activeSession?.broadcast?.stream_status || "").trim().toLowerCase() === "interrupted"
+          ? "Host reconnecting... The class continues here as soon as the host is back."
         : String(activeSession?.broadcast?.stream_status || "").trim().toLowerCase() === "starting"
           ? "The host is reconnecting OBS. Keep chat open and the video will resume here when the stream is back."
         : activeSession?.broadcast?.stream_status &&
@@ -557,6 +562,7 @@ export default function JoinLivePage() {
             statusMessage={activeBroadcastStatusMessage}
             onRefreshStream={handleRefreshActiveBroadcast}
             onRefreshChat={() => setBroadcastChatLaunchRefreshKey((previous) => previous + 1)}
+            onPlaybackStalledChange={setBroadcastPlaybackStalled}
             withContainer={false}
             actions={<LeaveClassButton onLeave={leaveBroadcast} />}
           />
