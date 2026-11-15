@@ -360,8 +360,8 @@ describe("link parity: public navbar, landing page and footer", () => {
     const labs = "https://labs.alsyedinitiative.com";
     // HackPath-style redesign (b03f085a): Pricing, Roadmap and the Tracks pages.
     const hackpathNav = ["/pricing", "/roadmap", "/tracks/pentesting"];
-    expect(fixture.allowedHrefAdditions.navbar).toEqual([labs, ...hackpathNav]);
-    expect(fixture.allowedHrefAdditions.navbarSheet).toEqual([labs, ...hackpathNav]);
+    expect(fixture.allowedHrefAdditions.navbar).toEqual([labs, ...hackpathNav, "https://cases.alsyedinitiative.com"]);
+    expect(fixture.allowedHrefAdditions.navbarSheet).toEqual([labs, ...hackpathNav, "https://cases.alsyedinitiative.com"]);
     expect([...fixture.allowedHrefAdditions.footer].sort()).toEqual(
       // v4.0-Thrallback: the version pill opens /changelog.
       [labs, "/as-accounts", "/changelog", "/join-alsyed", "/national-desk", "/pricing", "/rewards", "/roadmap", "/tracks/osint", "/tracks/pentesting"].sort()

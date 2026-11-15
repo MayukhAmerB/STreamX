@@ -20,12 +20,13 @@ const LINKS = {
   hallOfFame: { id: "hall-of-fame", label: "Hall of Fame", to: "/hall-of-fame", brandOnly: "alsyed" },
   contact: { id: "contact", label: "Contact", to: "/contact" },
   faqs: { id: "faqs", label: "FAQs", to: "/faqs" },
+  cases: { id: "cases", label: "Cases", href: "https://cases.alsyedinitiative.com", external: true, brandOnly: "alsyed" },
 };
 
 /** Centred pill (desktop), in order. "Watch" (YouTube) only where the brand has the channel. */
 const PRIMARY = ["courses", "watch", "about", "nationalDesk", "contact"];
 /** "More" menu (desktop), in order. */
-const MORE = ["accounts", "join", "hallOfFame", "faqs"];
+const MORE = ["accounts", "join", "hallOfFame", "cases", "faqs"];
 
 const visibleFor = (brandId, { youtube = false } = {}) => (link) =>
   (!link.brandOnly || link.brandOnly === brandId) && (!link.needsYouTube || youtube);
@@ -51,7 +52,7 @@ export function getSiteNavGroups(brandId = "alsyed", options = {}) {
   const pick = (keys) => keys.map((key) => LINKS[key]).filter(visible);
   return [
     { id: "explore", label: "Explore", links: pick(["courses", "watch", "about", "contact", "faqs"]) },
-    { id: "community", label: "Al Syed", links: pick(["nationalDesk", "accounts", "join", "hallOfFame"]) },
+    { id: "community", label: "Al Syed", links: pick(["nationalDesk", "accounts", "join", "hallOfFame", "cases"]) },
   ].filter((group) => group.links.length > 0);
 }
 

@@ -44,7 +44,7 @@ describe("site nav model", () => {
   it("puts four key links in the pill and the rest under More for Al syed", () => {
     const { primary, more } = getSiteNavLinks("alsyed");
     expect(ids(primary)).toEqual(["courses", "about", "national-desk", "contact"]);
-    expect(ids(more)).toEqual(["accounts", "join", "hall-of-fame", "faqs"]);
+    expect(ids(more)).toEqual(["accounts", "join", "hall-of-fame", "cases", "faqs"]);
   });
 
   it("shows OwlCognito's four links without a More menu or Al Syed programmes", () => {
@@ -58,8 +58,8 @@ describe("site nav model", () => {
   it("keeps every previous website link reachable", () => {
     const previous = ["/courses", "/about", "/as-accounts", "/national-desk", "/join-alsyed", "/hall-of-fame", "/contact", "/faqs"];
     const { primary, more } = getSiteNavLinks("alsyed");
-    expect([...primary, ...more].map((link) => link.to).sort()).toEqual([...previous].sort());
-    const sheet = getSiteNavGroups("alsyed").flatMap((group) => group.links.map((link) => link.to));
+    expect([...primary, ...more].filter((link) => !link.external).map((link) => link.to).sort()).toEqual([...previous].sort());
+    const sheet = getSiteNavGroups("alsyed").flatMap((group) => group.links.filter((link) => !link.external).map((link) => link.to));
     expect([...sheet].sort()).toEqual([...previous].sort());
   });
 
