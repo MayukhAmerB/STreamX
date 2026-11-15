@@ -2,6 +2,7 @@ import "./AppFooter.css";
 
 import { useId } from "react";
 import { Link } from "react-router-dom";
+import { CHANGELOG_PATH, CURRENT_VERSION } from "../config/releaseNotes";
 import { siteBrand } from "../config/siteBrand";
 import { useYouTubeChannel } from "../features/youtube/youTubeStore";
 import Wordmark from "../marketing/Wordmark";
@@ -265,7 +266,12 @@ export default function AppFooter() {
           <span>
             {"©"} {year} {siteBrand.name}. All rights reserved.
           </span>
-          <span>Secure Learning Infrastructure</span>
+          <span className="sf__legal-end">
+            <span>Secure Learning Infrastructure</span>
+            <Link to={CHANGELOG_PATH} className="sf__version" aria-label={`Version ${CURRENT_VERSION}: what's new`}>
+              {CURRENT_VERSION}
+            </Link>
+          </span>
         </div>
       </div>
 

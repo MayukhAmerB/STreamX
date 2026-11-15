@@ -188,34 +188,120 @@ export const HP_STORY = {
   ],
 };
 
-export const HP_PRACTISE = {
-  lines: ["Read the brief", "Work the case"],
-  lead: "Every module ends at a keyboard. Start on free public challenges today, then go deeper in our own labs: The Zenith Footprint, the Real-World OSINT lab, Black Meridian and the ten-question Certification CTF.",
-  terminalTitle: "free challenge · geolocation",
-  terminal: [
-    { kind: "prompt", text: "$ start --challenge street-corner" },
-    { kind: "out", text: "One photo. Find the city, then the corner." },
-    { kind: "prompt", text: "$ note shadows=west signage=bilingual" },
-    { kind: "out", text: "Narrowed to 3 districts · checking street view" },
-    { kind: "hit", text: "Solved. Marked done on your path." },
+// "Batches & live classes": how the live OSINT cohort runs. The open batch's
+// title, start date and fee always come from the course data, never from here.
+export const HP_BATCHES = {
+  eyebrow: "Batches & live classes",
+  lead: "One live cohort,",
+  accent: "start to certificate",
+  body: "Every OSINT batch runs the same proven rhythm: live classes each weekend, recordings the same night, a marked report every week, then the exam and a certificate anyone can verify.",
+  steps: [
+    { title: "Live classes", text: "Fri, Sat and Sun, 7–8 PM IST, with questions answered live." },
+    { title: "Recordings", text: "Every class is recorded, so a missed evening never sets you back." },
+    { title: "Weekly reports", text: "One investigation report a week, marked by an instructor." },
+    { title: "Exam", text: "A proctored, timed exam at the end of the batch." },
+    { title: "Certificate", text: "Pass the mark and your certificate is issued with a reference number and QR." },
   ],
-  columns: {
-    free: {
-      title: "Free path + monthly CTF",
-      body: "Our path through free public challenges, plus one free CTF case on the 1st of every month. The fastest clean solve wears the Golden Aura.",
-      cta: "Start free",
-    },
-    labs: {
-      title: "Members' labs",
-      body: "Expert cases with no investigation path: map identities, infrastructure and DNS residue on your own. New cases every month.",
-      cta: "See membership",
-    },
-    roadmap: {
-      title: "A map of what comes next",
-      body: "What is open today, what opens next and the order we recommend.",
-      cta: "Explore the roadmap",
-    },
+  openLabel: "Open now",
+  openTitleFallback: "OSINT live cohort",
+  startsLabel: "Starts",
+  feeLabel: "Fee",
+  openCta: "See the batch",
+  noOpen: "The next batch opens soon. Browse every course to be ready.",
+  noOpenCta: "Browse courses",
+  pastLabel: "Previous batches",
+  past: [
+    { name: "Batch II", status: "Completed" },
+    { name: "Batch III", status: "Completed" },
+  ],
+};
+
+// "Packages": the stated monthly prices are the fallback; a server price wins.
+export const HP_PACKAGES = {
+  eyebrow: "Packages",
+  lead: "Start free,",
+  accent: "go as deep as you like",
+  body: "Every package works with the same account. Paid plans open on /pricing; each live cohort has its own course page.",
+  free: {
+    title: "Free",
+    price: 0,
+    period: "forever",
+    features: ["Free challenges in the labs", "Curated free external CTFs", "Monthly community CTF", "Earn XP"],
+    cta: "Start free",
   },
+  starter: {
+    title: "Starter",
+    price: 499,
+    period: "/ month",
+    features: ["Easy and medium labs", "Recorded classes of one batch"],
+    cta: "See Starter",
+  },
+  ctf_labs: {
+    title: "CTF Labs Member",
+    price: 1499,
+    period: "/ month",
+    badge: "Most complete",
+    features: ["Every lab, new cases monthly", "Monthly course bundle", "Hints and write-ups", "Certification exam", "Members' leaderboard"],
+    cta: "See membership",
+  },
+  cohort: {
+    title: "Live OSINT cohort",
+    period: "per batch",
+    features: ["Live classes Fri–Sun", "Weekly marked reports", "Exam and verifiable certificate"],
+    cta: "See the batch",
+    noPrice: "Fee on the course page",
+  },
+  pentesting: {
+    title: "Pentesting",
+    status: "Coming soon",
+    features: ["Five tiers, every module outline open to browse", "Enrolment opens at launch"],
+    cta: "Browse Pentesting",
+  },
+  compareTitle: "Compare at a glance",
+  compareColumns: ["Free", "Starter", "CTF Labs", "Live cohort"],
+  compareRows: [
+    { feature: "Free challenges and monthly CTF", values: [true, true, true, true] },
+    { feature: "Easy and medium labs", values: [false, true, true, false] },
+    { feature: "Every lab, new cases monthly", values: [false, false, true, false] },
+    { feature: "Recorded classes", values: [false, "One batch", "Monthly bundle", "Your batch"] },
+    { feature: "Live classes and marked reports", values: [false, false, false, true] },
+    { feature: "Certification exam", values: [false, false, true, true] },
+  ],
+  pricingCta: "Full pricing",
+  roadmapCta: "Roadmap",
+};
+
+// "Rewards": the XP economy (backend apps/engagement/rules.py) in plain words.
+export const HP_REWARDS = {
+  eyebrow: "Rewards",
+  lead: "Steady work,",
+  accent: "visible progress",
+  body: "Every class, lecture and plan earns XP. XP sets your rank, the weekly leaderboard turns it into prizes, and certificates prove it.",
+  xpTitle: "How XP is earned",
+  xp: [
+    { value: "150 XP", label: "Live class, 40+ minutes", note: "+100 for your first" },
+    { value: "30 XP", label: "Partial live class", note: "Under 40 minutes" },
+    { value: "1 XP / 5 min", label: "Recordings", note: "Up to 60 a day, +20 per finished lecture" },
+    { value: "₹ × 0.5 XP", label: "Subscriptions", note: "Half an XP per rupee" },
+  ],
+  prizesTitle: "Weekly leaderboard prizes",
+  prizes: [
+    { place: "#1", xp: "200 XP" },
+    { place: "#2–3", xp: "120 XP" },
+    { place: "#4–10", xp: "60 XP" },
+  ],
+  ranksTitle: "Eight ranks",
+  extras: [
+    { lead: "Badges.", text: "Earned for streaks, reports, labs and exams." },
+    { lead: "Weekly leaderboard.", text: "Handles only, never real names." },
+    { lead: "Monthly CTF glow.", text: "The fastest clean solve wears the Golden Aura for a month." },
+    { lead: "Certificates with QR.", text: "Anyone can verify them by reference number." },
+    { lead: "Hall of Fame.", text: "Every certified graduate, batch by batch." },
+  ],
+  mockRankLabel: "Your rank",
+  mockLeaderboardLabel: "This week",
+  hallCta: "Hall of Fame",
+  verifyCta: "Verify a certificate",
 };
 
 export const HP_COMMUNITY = {

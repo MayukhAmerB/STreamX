@@ -1,6 +1,7 @@
-import { ChevronDown, Launch, Locked, SidePanelClose, SidePanelOpen } from "@carbon/icons-react";
+import { ChevronDown, Earth, Launch, Locked, SidePanelClose, SidePanelOpen } from "@carbon/icons-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { CHANGELOG_PATH, CURRENT_VERSION } from "../../config/releaseNotes";
 import { LiveDot } from "../../site-kit/motion";
 import { WORKSPACE_ADMIN } from "./navConfig";
 import { getNavIcon } from "./navIcons";
@@ -8,6 +9,36 @@ import { DisabledReason } from "./ui";
 import WorkspaceSwitch from "./WorkspaceSwitch";
 
 export const SIDE_NAV_ID = "cds-app-side-nav";
+
+/** "Back to website": the public landing page, at the top of the side nav and the phone sheet. */
+export function WebsiteHomeLink({ rail = false, onNavigate, className = "" }) {
+  return (
+    <Link
+      className={`cds-app-nav-row cds-app-website-link${className ? ` ${className}` : ""}`}
+      to="/"
+      title={rail ? "Back to website" : undefined}
+      data-website-home="true"
+      onClick={onNavigate}
+    >
+      <Earth size={20} className="cds-app-nav-row__icon" aria-hidden="true" />
+      <span className="cds-app-nav-row__label">Back to website</span>
+    </Link>
+  );
+}
+
+/** The release pill: opens the public "What's new" page. */
+export function VersionPill({ onNavigate, className = "" }) {
+  return (
+    <Link
+      className={`cds-app-version${className ? ` ${className}` : ""}`}
+      to={CHANGELOG_PATH}
+      aria-label={`Version ${CURRENT_VERSION}: what's new`}
+      onClick={onNavigate}
+    >
+      {CURRENT_VERSION}
+    </Link>
+  );
+}
 
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
@@ -201,6 +232,9 @@ export default function ShellSideNav({ nav, collapsed = false, forcedRail = fals
       className={`cds-app-sidenav${rail ? " cds-app-sidenav--rail" : ""}`}
       data-workspace={nav.workspace}
     >
+      <div className="cds-app-sidenav__home">
+        <WebsiteHomeLink rail={rail} />
+      </div>
       {!rail && nav.workspaces.length > 1 ? (
         <WorkspaceSwitch className="cds-app-sidenav__workspace" options={nav.workspaces} value={nav.workspace} onChange={onWorkspaceChange} />
       ) : null}
@@ -228,6 +262,11 @@ export default function ShellSideNav({ nav, collapsed = false, forcedRail = fals
           )
         )}
       </div>
+      {!rail ? (
+        <div className="cds-app-sidenav__release">
+          <VersionPill />
+        </div>
+      ) : null}
       {onToggleCollapsed && !forcedRail ? (
         <div className="cds-app-sidenav__footer">
           <button

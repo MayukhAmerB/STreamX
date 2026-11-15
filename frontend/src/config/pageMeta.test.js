@@ -15,6 +15,7 @@ describe("page meta", () => {
     expect(resolvePageMeta("/courses/28/")).toMatchObject({ title: "Course details | Al syed Initiative", canonicalPath: "/courses/28" });
     expect(resolvePageMeta("/watch").title).toBe("Watch | Al syed Initiative");
     expect(resolvePageMeta("/national-desk").title).toBe("National Desk | Al syed Initiative");
+    expect(resolvePageMeta("/changelog")).toMatchObject({ title: "What's new | Al syed Initiative", noindex: false, canonicalPath: "/changelog" });
   });
 
   it("keeps payment steps and unknown addresses out of search results", () => {

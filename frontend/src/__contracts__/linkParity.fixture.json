@@ -14,6 +14,8 @@
       "/tracks/pentesting"
     ],
     "landing": [
+      "/certificates",
+      "/pricing#osint",
       "/about",
       "/hall-of-fame",
       "/osint/free",
@@ -23,6 +25,7 @@
       "/tracks/pentesting"
     ],
     "footer": [
+      "/changelog",
       "https://labs.alsyedinitiative.com",
       "/national-desk",
       "/as-accounts",
@@ -65,6 +68,7 @@
     "footer": []
   },
   "allowedRouteAdditions": [
+    "/changelog",
     "/reset-password",
     "/pricing",
     "/roadmap",

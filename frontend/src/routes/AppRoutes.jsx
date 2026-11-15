@@ -71,6 +71,7 @@ const UsersCornerPage = lazy(() => import("../features/console-home/ConsoleHomeP
 const WatchPage = lazy(() => import("../pages/WatchPage"));
 // HackPath-philosophy marketing pages (BUILD_PLAN §2.1): plans, roadmap, tracks, bootcamp, free OSINT tier.
 const PricingPage = lazy(() => import("../pages/PricingPage"));
+const ChangelogPage = lazy(() => import("../pages/ChangelogPage"));
 const RoadmapPage = lazy(() => import("../pages/RoadmapPage"));
 const TrackPage = lazy(() => import("../pages/TrackPage"));
 const BootcampPage = lazy(() => import("../pages/BootcampPage"));
@@ -154,6 +155,7 @@ export default function AppRoutes() {
           <Route path="/terms" element={<TermsPage />} />
           {siteBrand.youtube ? <Route path="/watch" element={<WatchPage />} /> : null}
           <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/changelog" element={<ChangelogPage />} />
           <Route path="/roadmap" element={<RoadmapPage />} />
           <Route path="/tracks/:track" element={<TrackPage />} />
           <Route path="/bootcamp" element={<BootcampPage />} />

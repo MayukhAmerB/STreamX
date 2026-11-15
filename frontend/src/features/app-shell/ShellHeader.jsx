@@ -59,12 +59,12 @@ function PaletteTrigger({ compact, onOpen }) {
 }
 
 /**
- * Console header, 48 px (plan §3.1). Left: brand (links to this workspace's
- * home) and the breadcrumb on desktop; on phones, deeper pages and focus
+ * Console header, 48 px (plan §3.1). Left: brand (links to the public
+ * website's home page) and the breadcrumb on desktop; on phones, deeper pages and focus
  * mode show a back arrow with the page title instead. Right: Jump to…
  * (command palette), the notifications bell and the avatar menu.
  */
-export default function ShellHeader({ nav, user, isDesktop, homePath, backOfficeUrl, onOpenPalette, onSignOut }) {
+export default function ShellHeader({ nav, user, isDesktop, backOfficeUrl, onOpenPalette, onSignOut }) {
   const showBack = nav.focus || (!isDesktop && !nav.isRoot);
   return (
     <header className="cds-app-header" aria-label={`${siteBrand.name} ${CONSOLE_TITLE}`}>
@@ -81,7 +81,7 @@ export default function ShellHeader({ nav, user, isDesktop, homePath, backOffice
           <span className="cds-app-header__title">{nav.title}</span>
         ) : (
           <>
-            <Link className="cds-app-header__brand" to={homePath} aria-label={`${siteBrand.name}, ${CONSOLE_TITLE} home`}>
+            <Link className="cds-app-header__brand" to="/" aria-label={`${siteBrand.name}: back to the website home page`}>
               <ShellBrand />
             </Link>
             {isDesktop ? <Breadcrumbs items={nav.breadcrumbs} /> : null}

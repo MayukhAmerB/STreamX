@@ -1,4 +1,4 @@
-import { ChevronDown, Close, Earth, Launch } from "@carbon/icons-react";
+import { ChevronDown, Close, Launch } from "@carbon/icons-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { MORE_SHEET_ID } from "./BottomNav";
@@ -7,7 +7,7 @@ import { ACCOUNT_ITEMS, WORKSPACE_ADMIN } from "./navConfig";
 import { getNavIcon } from "./navIcons";
 import { MotionToggleRow } from "./AccountMenu";
 import SignOutButton from "./SignOutButton";
-import { NavRow } from "./ShellSideNav";
+import { NavRow, VersionPill, WebsiteHomeLink } from "./ShellSideNav";
 import UserAvatar from "./UserAvatar";
 import { useDismiss } from "./useDismiss";
 import WorkspaceSwitch from "./WorkspaceSwitch";
@@ -179,6 +179,11 @@ export default function MoreSheet({
           </button>
         </div>
         <div className="cds-app-sheet__body">
+          <ul className="cds-app-sheet__list cds-app-sheet__home">
+            <li>
+              <WebsiteHomeLink onNavigate={() => onClose()} />
+            </li>
+          </ul>
           {nav.workspaces.length > 1 ? (
             <WorkspaceSwitch className="cds-app-sheet__workspace" options={nav.workspaces} value={nav.workspace} onChange={onWorkspaceChange} />
           ) : null}
@@ -224,12 +229,6 @@ export default function MoreSheet({
               <li>
                 <MotionToggleRow />
               </li>
-              <li>
-                <Link className="cds-app-nav-row" to="/" onClick={() => onClose()}>
-                  <Earth size={20} className="cds-app-nav-row__icon" aria-hidden="true" />
-                  <span className="cds-app-nav-row__label">Website</span>
-                </Link>
-              </li>
               {/* In the Admin workspace the back office is already a System row. */}
               {backOfficeUrl && nav.workspace !== WORKSPACE_ADMIN ? (
                 <li>
@@ -244,6 +243,9 @@ export default function MoreSheet({
                 <SignOutButton onSignOut={onSignOut} />
               </li>
             </ul>
+          </div>
+          <div className="cds-app-sheet__release">
+            <VersionPill onNavigate={() => onClose()} />
           </div>
         </div>
       </div>

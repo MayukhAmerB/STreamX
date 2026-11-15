@@ -1017,6 +1017,61 @@ $safe-right: env(safe-area-inset-right, 0px);
   animation: cds-app-fade-in var(--shell-fast-02) linear;
 }
 
+// "Back to website" (top of the side nav and the phone sheet) and the release pill.
+.cds-app .cds-app-sidenav__home {
+  flex: none;
+  padding-block: $spacing-02;
+  border-block-end: 1px solid var(--shell-border);
+}
+
+.cds-app .cds-app-website-link {
+  color: var(--shell-text);
+  font-weight: 500;
+}
+
+.cds-app .cds-app-sidenav__release,
+.cds-app .cds-app-sheet__release {
+  flex: none;
+  padding: $spacing-03 $spacing-05;
+}
+
+.cds-app .cds-app-sidenav__release {
+  border-block-start: 1px solid var(--shell-border);
+}
+
+.cds-app .cds-app-version {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 1.5rem;
+  padding: 0.125rem 0.625rem;
+  border: 1px solid var(--shell-border);
+  border-radius: 999px;
+  color: var(--shell-text-3);
+  font-family: var(--hp-font-mono, ui-monospace, monospace);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  transition:
+    color var(--shell-fast-01) var(--shell-ease-productive),
+    border-color var(--shell-fast-01) var(--shell-ease-productive),
+    background-color var(--shell-fast-01) var(--shell-ease-productive);
+
+  &:focus-visible {
+    @include shell-focus-ring;
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      background-color: var(--shell-hover);
+      color: var(--shell-text);
+    }
+  }
+}
+
+.cds-app .cds-app-sheet__home {
+  border-block-end: 1px solid var(--shell-border);
+}
+
 .cds-app .cds-app-sidenav__footer {
   flex: none;
   padding: $spacing-03 0;

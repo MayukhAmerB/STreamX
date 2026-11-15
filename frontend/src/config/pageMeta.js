@@ -32,6 +32,11 @@ const ROUTES = [
     title: "Pricing",
     description: "Start free on curated OSINT challenges and the monthly CTF, then choose Starter or the CTF Labs membership for every lab and new cases monthly.",
   },
+  {
+    path: "/changelog",
+    title: "What's new",
+    description: "Release notes for every version of the website, the Console, the labs and the exams, starting with v4.0-Thrallback.",
+  },
   { path: "/roadmap", title: "Roadmap", description: "What you can start today in OSINT, what opens next in Pentesting, and the order we recommend." },
   {
     path: "/tracks/osint",

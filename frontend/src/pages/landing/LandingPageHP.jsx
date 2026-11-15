@@ -1,11 +1,13 @@
 // The public landing page in the HackPath philosophy (PHILOSOPHY T1/T2/T5,
 // BUILD_PLAN §2.1 "/"): black canvas, an investigation-console hero (headline,
 // an OSINT pivot chain in a terminal panel, the live site figures), real product UI in a numbered
-// timeline, the open programmes and live classes (same data and states as
-// before), the Watch band, the pricing band and the footer wordmark (layout).
+// timeline, batches & live classes, packages, rewards, the open programmes and
+// live classes (same data and states as before), the Watch band and the footer
+// wordmark (layout).
 import { Link as RouterLink } from "react-router-dom";
 
 import { siteBrand } from "../../config/siteBrand";
+import { LEVELS } from "../../features/engagement-ui/engagementModel";
 import { useYouTubeChannel } from "../../features/youtube/youTubeStore";
 import { useAuth } from "../../hooks/useAuth";
 import { CardShell } from "../../marketing/CatalogCard";
@@ -18,9 +20,10 @@ import {
   TerminalMock,
   TrackPickerMock,
 } from "../../marketing/Mocks";
-import PricingBand from "../../marketing/PricingBand";
+import { mergePlans, OSINT_PLANS, planPriceLabel, rupees } from "../../marketing/plans";
 import {
   ButtonLink,
+  CheckIcon,
   CheckList,
   DisplayHeading,
   Eyebrow,
@@ -36,12 +39,14 @@ import { getCourseCategoryPath } from "../../utils/courseCatalog";
 import { BestsellersContent } from "./BestsellersBand";
 import { HeroCountdownStrip } from "./HeroBand";
 import {
+  HP_BATCHES,
   HP_COMMUNITY,
   HP_HERO_TRACE,
   HP_HERO_TRACKS,
   HP_HERO,
   HP_OPEN_NOW,
-  HP_PRACTISE,
+  HP_PACKAGES,
+  HP_REWARDS,
   HP_STORY,
   HP_TRACKS,
 } from "./landingContent";
@@ -332,48 +337,336 @@ export function StoryBand() {
   );
 }
 
-export function PractiseBand() {
+/* ------------------------------------------------- batches, packages, rewards */
+
+/**
+ * The open OSINT batch from the course list the landing already loads: an
+ * OSINT course still taking registrations, the latest start date first.
+ * Title, start date and fee are read from the course, never hard-coded.
+ */
+export function selectOpenBatch(courses = []) {
+  const open = (Array.isArray(courses) ? courses : []).filter(
+    (course) => course?.category === "osint" && !course.registration_closed && course.launch_status !== "coming_soon"
+  );
+  open.sort((a, b) => String(b.start_date || "").localeCompare(String(a.start_date || "")));
+  return open[0] || null;
+}
+
+function courseFee(course) {
+  const amount = Number(course?.price);
+  return Number.isFinite(amount) && amount > 0 ? rupees(amount) : "";
+}
+
+function formatStart(value) {
+  if (!value) return "";
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function SectionIntro({ id, content }) {
   return (
-    <section className="hp-band hp-band--lg hp-rule-top" aria-labelledby="hp-practise-title">
+    <div className="hp-section-head">
+      <div className="hp-section-head__copy">
+        <Eyebrow>{content.eyebrow}</Eyebrow>
+        <h2 id={id} className="hp-h2">
+          {content.lead} <Hand>{content.accent}</Hand>
+        </h2>
+        <p className="hp-lead">{content.body}</p>
+      </div>
+    </div>
+  );
+}
+
+export function BatchesBand({ courses = [] }) {
+  const batch = selectOpenBatch(courses);
+  const fee = courseFee(batch);
+  const start = formatStart(batch?.start_date);
+  return (
+    <section className="hp-band hp-rule-top" aria-labelledby="hp-batches-title" id="batches">
       <div className="hp-frame">
-        <div className="hp-stack-center">
-          <DisplayHeading id="hp-practise-title" lines={HP_PRACTISE.lines} periods />
-          <p className="hp-lead" style={{ marginTop: 24 }}>
-            {HP_PRACTISE.lead}
-          </p>
+        <SectionIntro id="hp-batches-title" content={HP_BATCHES} />
+        <div className="hp-after-head hp-lp-split">
+          <ol className="hp-lp-steps">
+            {HP_BATCHES.steps.map((step, index) => (
+              <li key={step.title}>
+                <span className="hp-lp-steps__num" aria-hidden="true">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <span className="hp-lp-steps__title">{step.title}</span>
+                <span className="hp-lp-steps__text">{step.text}</span>
+              </li>
+            ))}
+          </ol>
+          <div className="hp-lp-batch">
+            {batch ? (
+              <article className="hp-lp-panel" aria-label={HP_BATCHES.openLabel} data-course-id={batch.id}>
+                <StatusPill kind="open">{HP_BATCHES.openLabel}</StatusPill>
+                <h3 className="hp-lp-panel__title">{batch.card_title || batch.title || HP_BATCHES.openTitleFallback}</h3>
+                <dl className="hp-lp-facts">
+                  {start ? (
+                    <div>
+                      <dt>{HP_BATCHES.startsLabel}</dt>
+                      <dd>{start}</dd>
+                    </div>
+                  ) : null}
+                  {fee ? (
+                    <div>
+                      <dt>{HP_BATCHES.feeLabel}</dt>
+                      <dd>{fee}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+                <ButtonLink to={`/courses/${batch.id}`} variant="primary" size="sm" arrow>
+                  {HP_BATCHES.openCta}
+                </ButtonLink>
+              </article>
+            ) : (
+              <article className="hp-lp-panel">
+                <p className="hp-body">{HP_BATCHES.noOpen}</p>
+                <ButtonLink to="/courses" variant="secondary" size="sm" arrow>
+                  {HP_BATCHES.noOpenCta}
+                </ButtonLink>
+              </article>
+            )}
+            <div className="hp-lp-past">
+              <p className="hp-eyebrow">{HP_BATCHES.pastLabel}</p>
+              <ul>
+                {HP_BATCHES.past.map((item) => (
+                  <li key={item.name}>
+                    <span>{item.name}</span>
+                    <span className="hp-lp-past__status">
+                      <CheckIcon />
+                      {item.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </div>
-        <div className="hp-after-head" style={{ maxWidth: 56 + "rem", marginInline: "auto" }}>
-          <TerminalMock title={HP_PRACTISE.terminalTitle} lines={HP_PRACTISE.terminal} />
+      </div>
+    </section>
+  );
+}
+
+function CompareCell({ value }) {
+  if (value === true) {
+    return (
+      <span className="hp-table__yes">
+        <CheckIcon />
+        <span className="hp-sr">Included</span>
+      </span>
+    );
+  }
+  if (!value) {
+    return (
+      <span className="hp-table__no">
+        <span aria-hidden="true">—</span>
+        <span className="hp-sr">Not included</span>
+      </span>
+    );
+  }
+  return <span>{value}</span>;
+}
+
+function PackageCard({ title, price, period, badge, status, features, cta, to, highlighted = false }) {
+  return (
+    <li className={`hp-lp-pkg${highlighted ? " is-highlighted" : ""}`}>
+      <div className="hp-lp-pkg__top">
+        <h3 className="hp-lp-pkg__title">{title}</h3>
+        {badge ? <span className="hp-lp-pkg__badge">{badge}</span> : null}
+        {status ? <StatusPill kind="soon">{status}</StatusPill> : null}
+      </div>
+      {price ? (
+        <p className="hp-lp-pkg__price">
+          <span>{price}</span> {period ? <span className="hp-lp-pkg__period">{period}</span> : null}
+        </p>
+      ) : null}
+      <ul className="hp-lp-pkg__list">
+        {features.map((feature) => (
+          <li key={feature}>
+            <CheckIcon />
+            <span>{feature}</span>
+          </li>
+        ))}
+      </ul>
+      <ButtonLink to={to} variant={highlighted ? "primary" : "secondary"} size="sm" arrow className="hp-lp-pkg__cta">
+        {cta}
+      </ButtonLink>
+    </li>
+  );
+}
+
+/** A server price wins over the stated monthly price. */
+function packagePrice(plans, key, fallback) {
+  const plan = plans.find((item) => item.key === key);
+  return planPriceLabel(plan) || rupees(fallback);
+}
+
+export function PackagesBand({ courses = [], plans }) {
+  const merged = mergePlans(OSINT_PLANS, plans);
+  const batch = selectOpenBatch(courses);
+  const cohortFee = courseFee(batch);
+  const P = HP_PACKAGES;
+  return (
+    <section className="hp-band hp-rule-top" aria-labelledby="hp-packages-title" id="packages">
+      <div className="hp-frame">
+        <SectionIntro id="hp-packages-title" content={P} />
+        <div className="hp-after-head">
+          <ul className="hp-lp-pkgs" aria-label={P.eyebrow}>
+            <PackageCard {...P.free} price={rupees(0)} to={FREE_TIER.href} />
+            <PackageCard {...P.starter} price={packagePrice(merged, "starter", P.starter.price)} to="/pricing#osint" />
+            <PackageCard {...P.ctf_labs} price={packagePrice(merged, "ctf_labs", P.ctf_labs.price)} to="/pricing#osint" highlighted />
+            <PackageCard
+              {...P.cohort}
+              price={cohortFee || P.cohort.noPrice}
+              period={cohortFee ? P.cohort.period : ""}
+              to={batch ? `/courses/${batch.id}` : getCourseCategoryPath("osint")}
+            />
+            <PackageCard {...P.pentesting} to="/tracks/pentesting" />
+          </ul>
         </div>
-        <ul className="hp-cols">
-          <li>
-            <h3>{HP_PRACTISE.columns.free.title}</h3>
-            <p>{HP_PRACTISE.columns.free.body}</p>
-            <p>
-              <ButtonLink to={FREE_TIER.href} variant="ghost" size="sm" arrow>
-                {HP_PRACTISE.columns.free.cta}
-              </ButtonLink>
-            </p>
+        <div className="hp-table-wrap hp-lp-compare">
+          <table className="hp-table">
+            <caption className="hp-sr">{P.compareTitle}</caption>
+            <thead>
+              <tr>
+                <th scope="col">{P.compareTitle}</th>
+                {P.compareColumns.map((column) => (
+                  <th key={column} scope="col">
+                    {column}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {P.compareRows.map((row) => (
+                <tr key={row.feature}>
+                  <th scope="row">{row.feature}</th>
+                  {row.values.map((value, index) => (
+                    <td key={P.compareColumns[index]}>
+                      <CompareCell value={value} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="hp-actions hp-lp-actions">
+          <ButtonLink to="/pricing" variant="secondary" size="sm" arrow>
+            {P.pricingCta}
+          </ButtonLink>
+          <ButtonLink to="/roadmap" variant="ghost" size="sm" arrow>
+            {P.roadmapCta}
+          </ButtonLink>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const MOCK_BOARD = [
+  { place: 1, handle: "@shadowtrace", xp: 1240 },
+  { place: 2, handle: "@geo_hound", xp: 1105, you: true },
+  { place: 3, handle: "@pivotpoint", xp: 980 },
+];
+
+/** Code-built mocks: a rank chip, a segmented XP meter and a leaderboard row. */
+export function RewardsMock() {
+  const current = LEVELS[2];
+  const next = LEVELS[3];
+  const xp = 4800;
+  const segments = 10;
+  const filled = Math.round(((xp - current.min_xp) / (next.min_xp - current.min_xp)) * segments);
+  return (
+    <figure className="hp-lp-rmock" aria-label="Example: a student's rank, XP and leaderboard row">
+      <p className="hp-eyebrow">{HP_REWARDS.mockRankLabel}</p>
+      <div className="hp-lp-rank">
+        <span className="hp-lp-rank__pip" aria-hidden="true">
+          {current.number}
+        </span>
+        <span className="hp-lp-rank__name">{current.title}</span>
+        <span className="hp-lp-rank__xp">{xp.toLocaleString("en-IN")} XP</span>
+      </div>
+      <div className="hp-lp-meter" role="img" aria-label={`${filled} of ${segments} segments to ${next.title}`}>
+        {Array.from({ length: segments }, (_, index) => (
+          <span key={index} className={index < filled ? "is-on" : undefined} />
+        ))}
+      </div>
+      <p className="hp-lp-meter__caption">
+        {(next.min_xp - xp).toLocaleString("en-IN")} XP to {next.title}
+      </p>
+      <p className="hp-eyebrow hp-lp-rmock__label">{HP_REWARDS.mockLeaderboardLabel}</p>
+      <ol className="hp-lp-board">
+        {MOCK_BOARD.map((row) => (
+          <li key={row.handle} className={row.you ? "is-you" : undefined}>
+            <span className="hp-lp-board__place">#{row.place}</span>
+            <span className="hp-lp-board__handle">{row.handle}</span>
+            <span className="hp-lp-board__xp">{row.xp.toLocaleString("en-IN")} XP</span>
           </li>
-          <li>
-            <h3>{HP_PRACTISE.columns.labs.title}</h3>
-            <p>{HP_PRACTISE.columns.labs.body}</p>
-            <p>
-              <ButtonLink to="/pricing" variant="ghost" size="sm" arrow>
-                {HP_PRACTISE.columns.labs.cta}
-              </ButtonLink>
-            </p>
-          </li>
-          <li>
-            <h3>{HP_PRACTISE.columns.roadmap.title}</h3>
-            <p>{HP_PRACTISE.columns.roadmap.body}</p>
-            <p>
-              <ButtonLink to="/roadmap" variant="ghost" size="sm" arrow>
-                {HP_PRACTISE.columns.roadmap.cta}
-              </ButtonLink>
-            </p>
-          </li>
-        </ul>
+        ))}
+      </ol>
+    </figure>
+  );
+}
+
+export function RewardsBand() {
+  const R = HP_REWARDS;
+  return (
+    <section className="hp-band hp-rule-top" aria-labelledby="hp-rewards-title" id="rewards">
+      <div className="hp-frame">
+        <SectionIntro id="hp-rewards-title" content={R} />
+        <div className="hp-after-head hp-lp-split">
+          <div>
+            <h3 className="hp-lp-subhead">{R.xpTitle}</h3>
+            <dl className="hp-lp-xp">
+              {R.xp.map((item) => (
+                <div key={item.label}>
+                  <dt>{item.label}</dt>
+                  <dd>
+                    <span className="hp-lp-xp__value">{item.value}</span>
+                    <span className="hp-lp-xp__note">{item.note}</span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <h3 className="hp-lp-subhead">{R.prizesTitle}</h3>
+            <ul className="hp-lp-prizes">
+              {R.prizes.map((prize) => (
+                <li key={prize.place}>
+                  <span className="hp-lp-prizes__place">{prize.place}</span>
+                  <span>{prize.xp}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <RewardsMock />
+        </div>
+        <h3 className="hp-lp-subhead">{R.ranksTitle}</h3>
+        <ol className="hp-lp-ranks" aria-label={R.ranksTitle}>
+          {LEVELS.map((level) => (
+            <li key={level.key}>
+              <span className="hp-lp-ranks__num" aria-hidden="true">
+                {level.number}
+              </span>
+              <span className="hp-lp-ranks__name">{level.title}</span>
+              <span className="hp-lp-ranks__xp">{level.min_xp.toLocaleString("en-IN")} XP</span>
+            </li>
+          ))}
+        </ol>
+        <div className="hp-lp-extras">
+          <CheckList items={R.extras} />
+          <div className="hp-actions">
+            <ButtonLink to="/hall-of-fame" variant="secondary" size="sm" arrow>
+              {R.hallCta}
+            </ButtonLink>
+            <ButtonLink to="/certificates" variant="ghost" size="sm" arrow>
+              {R.verifyCta}
+            </ButtonLink>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -414,7 +707,7 @@ export function NeverAloneBand() {
 /** The landing page. Header and footer come from the layout. */
 export default function LandingPageHP() {
   const { isAuthenticated } = useAuth();
-  const { courses: catalog, gate } = useMarketingData();
+  const { courses: catalog, gate, catalog: publicCatalog } = useMarketingData();
   const liveClasses = useLandingLiveClasses(isAuthenticated);
   const liveBroadcast = useHeroLiveBroadcast(isAuthenticated);
   const youtube = useYouTubeChannel();
@@ -425,12 +718,13 @@ export default function LandingPageHP() {
   return (
     <div className="lp lp--hp" data-brand={siteBrand.id}>
       <LandingHero isAuthenticated={isAuthenticated} liveBroadcast={liveBroadcast} gate={gate} />
+      <BatchesBand courses={catalog.courses} />
+      <PackagesBand courses={catalog.courses} plans={publicCatalog.plans} />
+      <RewardsBand />
       <OpenNow catalog={catalog} liveClasses={liveClasses} liveBroadcast={liveBroadcast} />
       <StoryBand />
-      <PractiseBand />
       <NeverAloneBand />
       {showWatch ? <WatchBand theme="g100" youtube={youtube} /> : null}
-      <PricingBand />
     </div>
   );
 }

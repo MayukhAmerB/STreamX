@@ -13,7 +13,9 @@ vi.mock("../hooks/useAuth", () => ({ useAuth: () => state.auth }));
 
 import { EXAM_LAB, FREE_TIER, labAccess, LABS, labUrl } from "../data/freeLabs";
 import { landingVariant } from "../pages/landing/landingFlag";
-import { heroStatItems, LandingHero, TrackPair } from "../pages/landing/LandingPageHP";
+import { BatchesBand, heroStatItems, LandingHero, PackagesBand, RewardsBand, selectOpenBatch, TrackPair } from "../pages/landing/LandingPageHP";
+import ChangelogPage from "../pages/ChangelogPage";
+import { CURRENT_VERSION, RELEASES } from "../config/releaseNotes";
 import { siteStatItems } from "./siteStats";
 import BootcampPage from "../pages/BootcampPage";
 import { resolveCatalogFilter } from "../pages/CourseListPage";
@@ -135,6 +137,65 @@ describe("landing (HackPath philosophy)", () => {
     expect(markup).toContain('href="/tracks/pentesting"');
     expect(markup).toContain("Coming soon");
     expect(html(<TrackPair gate={{ enabled: true, reason: "" }} />)).toContain('data-track="web_pentesting" data-state="open"');
+  });
+});
+
+describe("landing: batches, packages and rewards (v4.0-Thrallback)", () => {
+  const BATCH_IV = { id: 28, title: "OSINT PROFESSIONAL TRAINING PROGRAM (BATCH IV)", category: "osint", launch_status: "live", registration_closed: false, start_date: "2026-10-29", price: "3500.00" };
+  const OLD = { id: 20, title: "Batch III", category: "osint", launch_status: "live", registration_closed: true, start_date: "2026-05-01", price: "3000.00" };
+
+  it("picks the open OSINT batch from the course data (never a closed or Pentesting course)", () => {
+    expect(selectOpenBatch([OLD, PT(41, "foundations"), BATCH_IV])?.id).toBe(28);
+    expect(selectOpenBatch([OLD, PT(41, "foundations")])).toBeNull();
+  });
+
+  it("shows the open batch's title, start date and fee from the course, the weekend rhythm and the completed batches", () => {
+    const markup = html(<BatchesBand courses={[OLD, BATCH_IV]} />);
+    expect(markup).toContain("OSINT PROFESSIONAL TRAINING PROGRAM (BATCH IV)");
+    expect(markup).toContain("29 October 2026");
+    expect(markup).toContain("₹3,500");
+    expect(markup).toContain('href="/courses/28"');
+    expect(markup).toContain("Fri, Sat and Sun, 7–8 PM IST");
+    expect(markup).toContain("Batch II");
+    expect(markup).toContain("Batch III");
+    const changed = html(<BatchesBand courses={[{ ...BATCH_IV, price: "4200.00" }]} />);
+    expect(changed).toContain("₹4,200");
+    expect(changed).not.toContain("₹3,500");
+  });
+
+  it("lists the five packages with the cohort fee from the course data and a comparison table", () => {
+    const markup = html(<PackagesBand courses={[BATCH_IV]} plans={[]} />);
+    for (const label of ["Free", "Starter", "CTF Labs Member", "Live OSINT cohort", "Pentesting", "Coming soon"]) expect(markup).toContain(label);
+    expect(markup).toContain("₹0");
+    expect(markup).toContain("₹499");
+    expect(markup).toContain("₹1,499");
+    expect(markup).toContain("₹3,500");
+    expect(markup).toContain('href="/pricing"');
+    expect(markup).toContain('href="/courses/28"');
+    expect(markup).toContain('href="/tracks/pentesting"');
+    expect(markup).toContain("<table");
+    expect(html(<PackagesBand courses={[]} plans={[]} />)).toContain("Fee on the course page");
+  });
+
+  it("explains XP, the eight ranks from the engagement ladder, prizes and the code-built mocks", () => {
+    const markup = html(<RewardsBand />);
+    for (const text of ["150 XP", "+100 for your first", "30 XP", "1 XP / 5 min", "₹ × 0.5 XP", "200 XP", "120 XP", "60 XP", "Recruit", "Elite Operator", "19,000 XP", "Handles only"]) {
+      expect(markup).toContain(text);
+    }
+    expect(markup.match(/class="hp-lp-ranks__name"/g)).toHaveLength(8);
+    expect(markup).toContain('class="hp-lp-rank"');
+    expect(markup).toContain('class="hp-lp-meter"');
+    expect(markup).toContain('class="hp-lp-board"');
+  });
+});
+
+describe("changelog", () => {
+  it("renders every release, newest first, grouped", () => {
+    const markup = html(<ChangelogPage />, "/changelog");
+    expect(CURRENT_VERSION).toBe("v4.0-Thrallback");
+    expect(markup).toContain("What&#x27;s new in v4.0-Thrallback");
+    for (const group of RELEASES[0].groups) expect(markup).toContain(group.title.replace("&", "&amp;"));
+    expect(markup).toContain("Recruit to Elite Operator");
   });
 });
 

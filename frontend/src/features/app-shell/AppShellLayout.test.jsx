@@ -63,9 +63,9 @@ describe("AppShellLayout", () => {
     expect(html).toContain('<div class="cds-page"><p>Page body</p></div>');
   });
 
-  it("has a 48 px header: brand, breadcrumb, Jump to…, bell and avatar menu (no 'Back to website', no 'Console' eyebrow)", () => {
+  it("has a 48 px header: brand (to the website home), breadcrumb, Jump to…, bell and avatar menu (no 'Console' eyebrow)", () => {
     const html = renderShell({ path: "/reports" });
-    expect(html).toContain('<a class="cds-app-header__brand" aria-label="Al syed Initiative, Console home" href="/console">');
+    expect(html).toContain('<a class="cds-app-header__brand" aria-label="Al syed Initiative: back to the website home page" href="/">');
     expect(html).toContain('<span class="cds-app-brand__name">Al syed Initiative</span>');
     expect(html).toContain('aria-label="Breadcrumb"');
     expect(html).toContain('<span aria-current="page">Coursework</span>');
@@ -73,7 +73,8 @@ describe("AppShellLayout", () => {
     expect(html).toContain('aria-keyshortcuts="Control+K Meta+K"');
     expect(html).toContain('aria-label="Notifications"');
     expect(html).toContain('aria-label="Account and settings"');
-    expect(html).not.toContain("Back to website");
+    const header = html.slice(html.indexOf('class="cds-app-header"'), html.indexOf("</header>"));
+    expect(header).not.toContain("Back to website");
     expect(html).not.toMatch(/>\s*Console\s*</);
     expect(html).not.toContain("uc-header__section");
     expect(html).not.toContain("cds-app-sidenav__title");
@@ -225,7 +226,7 @@ describe("MoreSheet", () => {
     expect(html).toContain('role="dialog"');
     expect(html).toContain('aria-modal="true"');
     expect(html.indexOf("Asha Rao")).toBeLessThan(html.indexOf("OSINT tools"));
-    for (const label of ["Guides", "OSINT tools", "Labs", "Profile", "ID card", "Reduce motion", "Website", "Sign out"]) {
+    for (const label of ["Guides", "OSINT tools", "Labs", "Profile", "ID card", "Reduce motion", "Back to website", "Sign out", "v4.0-Thrallback"]) {
       expect(html).toContain(label);
     }
     expect(html).toContain('role="switch"');
@@ -274,5 +275,31 @@ describe("WorkspaceSwitch", () => {
   it("renders nothing for a single workspace", () => {
     const html = renderToStaticMarkup(<WorkspaceSwitch options={[{ key: "learn", label: "Learn", state: "enabled" }]} value="learn" />);
     expect(html).toBe("");
+  });
+});
+
+describe("Website home link and version pill", () => {
+  it("puts 'Back to website' (to /) at the top of the side nav and the release pill (to /changelog) in its footer", () => {
+    const html = renderShell({ path: "/reports" });
+    const start = html.indexOf('id="cds-app-side-nav"');
+    const nav = html.slice(start, html.indexOf("</nav>", html.lastIndexOf("cds-app-sidenav__release")) + 6);
+    const home = nav.indexOf('data-website-home="true"');
+    expect(home).toBeGreaterThan(-1);
+    expect(home).toBeLessThan(nav.indexOf("cds-app-sidenav__scroll"));
+    expect(nav).toMatch(/<a class="cds-app-nav-row cds-app-website-link"[^>]*href="\/">.*?Back to website/);
+    expect(nav).toContain('<a class="cds-app-version" aria-label="Version v4.0-Thrallback: what&#x27;s new" href="/changelog">v4.0-Thrallback</a>');
+  });
+
+  it("opens the phone sheet with 'Back to website' before every destination", () => {
+    const user = STUDENT;
+    const nav = buildShellNav(authFor(user), { pathname: "/console", caps: user.capabilities });
+    const html = renderToStaticMarkup(
+      <StaticRouter location="/console">
+        <MoreSheet nav={nav} user={user} pathname="/console" onSignOut={() => {}} onClose={() => {}} returnFocusRef={{ current: null }} />
+      </StaticRouter>
+    );
+    expect(html.indexOf("Back to website")).toBeGreaterThan(-1);
+    expect(html.indexOf("Back to website")).toBeLessThan(html.indexOf("OSINT tools"));
+    expect(html).toContain('href="/changelog"');
   });
 });

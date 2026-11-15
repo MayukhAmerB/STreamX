@@ -356,21 +356,24 @@ describe("link parity: public navbar, landing page and footer", () => {
     expect(actual.guest.footer.anchors).toContain("contact");
   });
 
-  it("only allows the planned additions (Labs, National Desk, AS-Accounts, Join Al Syed, the HackPath nav)", () => {
+  it("only allows the planned additions (Labs, National Desk, AS-Accounts, Join Al Syed, the HackPath nav, v4.0 release notes)", () => {
     const labs = "https://labs.alsyedinitiative.com";
     // HackPath-style redesign (b03f085a): Pricing, Roadmap and the Tracks pages.
     const hackpathNav = ["/pricing", "/roadmap", "/tracks/pentesting"];
     expect(fixture.allowedHrefAdditions.navbar).toEqual([labs, ...hackpathNav]);
     expect(fixture.allowedHrefAdditions.navbarSheet).toEqual([labs, ...hackpathNav]);
     expect([...fixture.allowedHrefAdditions.footer].sort()).toEqual(
-      [labs, "/as-accounts", "/join-alsyed", "/national-desk", "/pricing", "/roadmap", "/tracks/osint", "/tracks/pentesting"].sort()
+      // v4.0-Thrallback: the version pill opens /changelog.
+      [labs, "/as-accounts", "/changelog", "/join-alsyed", "/national-desk", "/pricing", "/roadmap", "/tracks/osint", "/tracks/pentesting"].sort()
     );
     expect([...fixture.allowedHrefAdditions.landing].sort()).toEqual(
-      ["/about", "/hall-of-fame", "/osint/free", "/pricing", "/roadmap", "/tracks/osint", "/tracks/pentesting"].sort()
+      // v4.0-Thrallback landing sections: packages link to /pricing#osint, rewards to certificate verification.
+      ["/about", "/certificates", "/hall-of-fame", "/osint/free", "/pricing", "/pricing#osint", "/roadmap", "/tracks/osint", "/tracks/pentesting"].sort()
     );
     expect([...fixture.allowedRouteAdditions].sort()).toEqual(
       [
         "/reset-password",
+        "/changelog",
         "/pricing",
         "/roadmap",
         "/tracks/:track",

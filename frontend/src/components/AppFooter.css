@@ -270,6 +270,34 @@
   color: var(--sf-subtle);
 }
 
+.sf__legal-end {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.sf__version {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 10px;
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: 999px;
+  font-family: var(--hp-font-mono, ui-monospace, monospace);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  color: var(--sf-subtle);
+  text-decoration: none;
+  transition: color 150ms ease, border-color 150ms ease, background-color 150ms ease;
+}
+
+.sf__version:hover {
+  color: #fafafa;
+  border-color: rgb(255 255 255 / 0.35);
+  background: rgb(255 255 255 / 0.04);
+}
+
 .sf :is(a, [tabindex="0"]):focus-visible {
   outline: 2px solid #f3e2b3;
   outline-offset: 2px;
