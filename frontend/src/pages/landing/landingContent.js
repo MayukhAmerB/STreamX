@@ -91,7 +91,8 @@ export const CTA_BODY =
 
 export const HP_HERO = {
   headline: ["Trace it.", "Verify it.", "Prove it."],
-  sub: "Live OSINT investigation training. Start from a photo, a username or a domain, pivot through public sources and finish with evidence that holds up, marked by an instructor every week.",
+  sub: "Live OSINT classes, four investigation labs and a monthly CTF. Start from a photo, a username or a domain, pivot through public sources and finish with evidence that holds up, marked by an instructor every week.",
+  eyebrow: "Cyber-investigation academy",
   badgeLive: "Live",
   badgeSchedule: "Fri · Sat · Sun 7 PM IST",
   primaryCta: "Start free",
@@ -127,14 +128,40 @@ export const HP_HERO_TRACE = {
   title: "case-0419 · osint pivot chain",
   command: "trace --from photo_0419.jpg",
   steps: [
-    { tag: "photo", detail: "Shadow falls at 212°: late afternoon, facing south-west" },
-    { tag: "metadata", detail: "EXIF stripped; embedded thumbnail keeps the capture date" },
-    { tag: "street view", detail: "Shop sign and kerb paint matched to one junction" },
-    { tag: "username", detail: "Same handle reused on 3 public platforms" },
-    { tag: "crt.sh", detail: "Certificate-transparency log names the owner's domain" },
+    { tag: "photo", detail: "Sun at 212°: late afternoon" },
+    { tag: "metadata", detail: "Thumbnail kept capture date" },
+    { tag: "street view", detail: "Shop sign → one junction" },
+    { tag: "username", detail: "Handle reused on 3 sites" },
+    { tag: "crt.sh", detail: "CT log names the domain" },
   ],
-  closed: "Case closed: 5 pivots, public sources only",
+  closed: "Case closed · 5 pivots",
+  progress: "Evidence chain",
   caption: "An example investigation: from a single photo to a closed case in five pivots.",
+};
+
+/**
+ * The hero's investigation board around the case file: a trace map, a located
+ * pin, the CTF leaderboard (handles only, illustrative) and a verifiable
+ * certificate. Ranks come from the real ladder (Recruit → Elite Operator).
+ */
+export const HP_HERO_BOARD = {
+  status: "Trace active",
+  sources: "Public sources only",
+  map: { target: "photo_0419", nodes: ["EXIF", "street view", "@handle", "crt.sh", "WHOIS"] },
+  pin: { label: "Location matched", meta: "1 junction · 3 sources" },
+  leaderboard: {
+    title: "Monthly OSINT CTF",
+    meta: "Hall of Fame",
+    rows: [
+      { handle: "@n0trace", rank: "Elite Operator", xp: "19,420" },
+      { handle: "@pivot_kid", rank: "Lead Investigator", xp: "15,980" },
+      { handle: "@exif_hunter", rank: "Senior Analyst", xp: "12,310" },
+    ],
+    xpLabel: "XP",
+  },
+  certificate: { title: "Certificate", course: "OSINT Investigator", id: "ASI-OSINT-0419", verified: "Verified · scan QR" },
+  caption:
+    "Illustration of the learning experience: a live trace map, the case file, a located pin, the monthly CTF leaderboard by handle and a certificate verifiable by QR code.",
 };
 
 export const HP_TRACKS = {

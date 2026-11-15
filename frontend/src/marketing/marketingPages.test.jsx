@@ -13,7 +13,7 @@ vi.mock("../hooks/useAuth", () => ({ useAuth: () => state.auth }));
 
 import { EXAM_LAB, FREE_TIER, labAccess, LABS, labUrl } from "../data/freeLabs";
 import { landingVariant } from "../pages/landing/landingFlag";
-import { BatchesBand, heroStatItems, LandingHero, PackagesBand, RewardsBand, selectOpenBatch, TrackPair } from "../pages/landing/LandingPageHP";
+import { BatchesBand, heroStatItems, LandingHero, PackagesBand, qrModules, RewardsBand, selectOpenBatch, TrackPair } from "../pages/landing/LandingPageHP";
 import ChangelogPage from "../pages/ChangelogPage";
 import { CURRENT_VERSION, RELEASES } from "../config/releaseNotes";
 import { siteStatItems } from "./siteStats";
@@ -84,7 +84,7 @@ describe("landing (HackPath philosophy)", () => {
     stats: { students_enrolled: 311, live_classes_delivered: 114, recorded_hours: 55, certificates_issued: null, ctf_cases: null, average_rating: 5, rating_count: 19 },
   });
 
-  it("is an investigation console: headline, live badge, actions and the OSINT pivot chain; no verse and no handwritten accent", () => {
+  it("is an investigation hero: headline, live badge, actions and the OSINT pivot chain; no verse and no handwritten accent", () => {
     const markup = html(<LandingHero isAuthenticated={false} liveBroadcast={null} siteStats={SITE_STATS} />);
     const h1 = markup.match(/<h1[^>]*>.*?<\/h1>/)[0];
     expect(h1).toContain("Trace it.");
@@ -100,6 +100,25 @@ describe("landing (HackPath philosophy)", () => {
     expect(markup).toContain('href="/courses"');
     expect(markup).toContain(">Start free<");
     expect(markup).toContain(">Browse courses<");
+  });
+
+  it("frames the hero as a signal-accent investigation board: gradient accent line, trace map, handles-only leaderboard, QR certificate, final figures", () => {
+    const markup = html(<LandingHero isAuthenticated={false} liveBroadcast={null} siteStats={SITE_STATS} />);
+    expect(markup).toContain('class="hp-hero hp-hero--signal"');
+    expect(markup).toMatch(/class="hx-title__line hx-title__line--accent">Prove it\./);
+    expect(markup).toContain('class="hx-map"');
+    for (const handle of ["@n0trace", "@pivot_kid", "@exif_hunter"]) expect(markup).toContain(handle);
+    expect(markup).toContain("Elite Operator");
+    expect(markup).toContain('class="hx-cert__qr"');
+    expect(markup).toContain("<dd>310+</dd>");
+    expect(markup).toContain("<dd>110+</dd>");
+    expect(markup).not.toMatch(/gold|amber|yellow/i);
+  });
+
+  it("draws a QR-like pattern with three finder squares, deterministically", () => {
+    const path = qrModules(17, 419);
+    expect(path).toBe(qrModules(17, 419));
+    for (const corner of ["M0 0h1", "M16 0h1", "M0 16h1"]) expect(path).toContain(corner);
   });
 
   it("highlights the two course categories in the hero: OSINT live (to its courses), Pentesting coming soon (browsable)", () => {

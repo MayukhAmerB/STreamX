@@ -1,6 +1,6 @@
 // The public landing page in the HackPath philosophy (PHILOSOPHY T1/T2/T5,
-// BUILD_PLAN §2.1 "/"): black canvas, an investigation-console hero (headline,
-// an OSINT pivot chain in a terminal panel, the live site figures), real product UI in a numbered
+// BUILD_PLAN §2.1 "/"): black canvas, a signal-accent hero (headline, a tilted
+// investigation board, the two categories and the live site figures), real product UI in a numbered
 // timeline, batches & live classes, packages, rewards, the open programmes and
 // live classes (same data and states as before), the Watch band and the footer
 // wordmark (layout).
@@ -31,7 +31,7 @@ import {
   StatStrip,
   StatusPill,
 } from "../../marketing/primitives";
-import SiteStatStrip, { siteStatValues } from "../../marketing/SiteStatStrip";
+import SiteStatStrip from "../../marketing/SiteStatStrip";
 import { useSiteStats } from "../../marketing/siteStats";
 import { useMarketingData } from "../../marketing/useMarketingData";
 import { FREE_TIER } from "../../data/freeLabs";
@@ -41,6 +41,7 @@ import { HeroCountdownStrip } from "./HeroBand";
 import {
   HP_BATCHES,
   HP_COMMUNITY,
+  HP_HERO_BOARD,
   HP_HERO_TRACE,
   HP_HERO_TRACKS,
   HP_HERO,
@@ -77,7 +78,7 @@ export function heroStatItems(items = []) {
   return rows;
 }
 
-/** The terminal panel: one OSINT case, pivot by pivot, ending in "case closed". */
+/** The case file: one OSINT case, pivot by pivot, ending in "case closed". */
 export function TraceConsole({ steps = HP_HERO_TRACE.steps }) {
   return (
     <figure className="hp-console" aria-labelledby="hp-console-caption">
@@ -107,6 +108,13 @@ export function TraceConsole({ steps = HP_HERO_TRACE.steps }) {
             </li>
           ))}
         </ol>
+        <div className="hp-console__meter" aria-hidden="true">
+          <span>{HP_HERO_TRACE.progress}</span>
+          <span className="hp-console__track">
+            <span className="hp-console__fill" />
+          </span>
+          <span>100%</span>
+        </div>
         <p className="hp-console__done" style={{ "--hp-step": steps.length + 1 }}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
             <path d="M6.5 11.2 3.3 8l-.7.7 3.9 3.9 7-7-.7-.7z" />
@@ -123,6 +131,213 @@ export function TraceConsole({ steps = HP_HERO_TRACE.steps }) {
     </figure>
   );
 }
+
+/* The trace map: a wireframe globe (viewBox 400) with the case photo at the
+   centre and one arc per pivot. Presentation only, so the coordinates live here. */
+const MAP_TARGET = [262, 168];
+const MAP_NODES = [
+  [88, 236],
+  [326, 96],
+  [122, 270],
+  [226, 350],
+  [318, 336],
+];
+
+function arcPath([x1, y1], [x2, y2]) {
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2;
+  const bend = 0.28;
+  return `M${x1} ${y1}Q${Math.round(mx - (y2 - y1) * bend)} ${Math.round(my + (x2 - x1) * bend)} ${x2} ${y2}`;
+}
+
+/** A deterministic QR-like pattern (finder squares in three corners); decoration only. */
+export function qrModules(size = 17, seed = 419) {
+  let state = seed;
+  const next = () => {
+    state = (state * 1103515245 + 12345) % 2147483648;
+    return state / 2147483648;
+  };
+  const finder = (x, y) => {
+    for (const [ox, oy] of [
+      [0, 0],
+      [size - 7, 0],
+      [0, size - 7],
+    ]) {
+      const dx = x - ox;
+      const dy = y - oy;
+      if (dx >= 0 && dx < 7 && dy >= 0 && dy < 7) {
+        const ring = Math.min(dx, dy, 6 - dx, 6 - dy);
+        return ring !== 1;
+      }
+      if (dx >= -1 && dx <= 7 && dy >= -1 && dy <= 7) return false;
+    }
+    return null;
+  };
+  let path = "";
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const fixed = finder(x, y);
+      if (fixed ?? next() > 0.52) path += `M${x} ${y}h1v1h-1z`;
+    }
+  }
+  return path;
+}
+
+const QR_PATH = qrModules();
+
+function TraceMap() {
+  const labels = HP_HERO_BOARD.map.nodes;
+  return (
+    <div className="hx-map" aria-hidden="true">
+      <span className="hx-map__sweep" />
+      <svg className="hx-map__svg" viewBox="0 0 400 400" focusable="false">
+        <defs>
+          <linearGradient id="hx-arc-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" className="hx-stop-a" />
+            <stop offset="1" className="hx-stop-b" />
+          </linearGradient>
+          <radialGradient id="hx-globe-fill" cx="0.38" cy="0.32" r="0.75">
+            <stop offset="0" className="hx-stop-glow" />
+            <stop offset="1" className="hx-stop-none" />
+          </radialGradient>
+        </defs>
+        <circle className="hx-map__ring hx-map__ring--outer" cx="200" cy="200" r="194" />
+        <circle className="hx-map__ring hx-map__ring--mid" cx="200" cy="200" r="172" />
+        <circle className="hx-map__globe" cx="200" cy="200" r="150" />
+        <g className="hx-map__lat">
+          <ellipse cx="200" cy="200" rx="150" ry="22" />
+          <ellipse cx="200" cy="125" rx="130" ry="18" />
+          <ellipse cx="200" cy="275" rx="130" ry="18" />
+          <ellipse cx="200" cy="70" rx="75" ry="10" />
+          <ellipse cx="200" cy="330" rx="75" ry="10" />
+        </g>
+        <g className="hx-map__lon">
+          <ellipse cx="200" cy="200" rx="150" ry="150" />
+          <ellipse cx="200" cy="200" rx="110" ry="150" />
+          <ellipse cx="200" cy="200" rx="56" ry="150" />
+        </g>
+        <g className="hx-map__arcs">
+          {MAP_NODES.map((node, index) => (
+            <path key={labels[index]} d={arcPath(MAP_TARGET, node)} style={{ "--hx-i": index }} />
+          ))}
+        </g>
+        <g className="hx-map__nodes">
+          {MAP_NODES.map(([x, y], index) => (
+            <g key={labels[index]} style={{ "--hx-i": index }}>
+              <circle className="hx-map__ping" cx={x} cy={y} r="9" />
+              <circle className="hx-map__node" cx={x} cy={y} r="3.5" />
+              <text x={x + 9} y={y - 9}>
+                {labels[index]}
+              </text>
+            </g>
+          ))}
+          <circle className="hx-map__ping hx-map__ping--target" cx={MAP_TARGET[0]} cy={MAP_TARGET[1]} r="14" />
+          <circle className="hx-map__target" cx={MAP_TARGET[0]} cy={MAP_TARGET[1]} r="6" />
+          <text className="hx-map__target-label" x={MAP_TARGET[0] + 14} y={MAP_TARGET[1] - 12}>
+            {HP_HERO_BOARD.map.target}
+          </text>
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+/**
+ * The hero's focal visual: a tilted investigation board. The trace map sits at
+ * the back; the case file, a located pin, the CTF leaderboard (handles only)
+ * and a certificate with its QR float in front at different depths.
+ */
+export function InvestigationBoard() {
+  const { pin, leaderboard, certificate } = HP_HERO_BOARD;
+  return (
+    <div className="hx-stage">
+      <p className="hp-sr">{HP_HERO_BOARD.caption}</p>
+      <div className="hx-board">
+        <span className="hx-corners" aria-hidden="true" />
+        <p className="hx-status" aria-hidden="true">
+          <span className="hx-status__dot" />
+          {HP_HERO_BOARD.status}
+          <span className="hx-status__sep">/</span>
+          {HP_HERO_BOARD.sources}
+        </p>
+        <TraceMap />
+        <div className="hx-layer hx-layer--case">
+          <div className="hx-float">
+            <TraceConsole />
+          </div>
+        </div>
+        <div className="hx-layer hx-layer--pin" aria-hidden="true">
+          <div className="hx-float hx-card hx-pin">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" focusable="false">
+              <path d="M8 14.5s4.5-4.2 4.5-8a4.5 4.5 0 1 0-9 0c0 3.8 4.5 8 4.5 8Z" />
+              <circle cx="8" cy="6.5" r="1.6" />
+            </svg>
+            <span>
+              <strong>{pin.label}</strong>
+              <small>{pin.meta}</small>
+            </span>
+          </div>
+        </div>
+        <div className="hx-layer hx-layer--board" aria-hidden="true">
+          <div className="hx-float hx-card hx-lb">
+            <p className="hx-card__head">
+              <span>{leaderboard.title}</span>
+              <span className="hx-card__meta">{leaderboard.meta}</span>
+            </p>
+            <ol className="hx-lb__rows">
+              {leaderboard.rows.map((row, index) => (
+                <li key={row.handle} className={index === 0 ? "is-top" : undefined}>
+                  <span className="hx-lb__pos">{String(index + 1).padStart(2, "0")}</span>
+                  <span className="hx-lb__who">
+                    <span className="hx-lb__handle">{row.handle}</span>
+                    <span className="hx-lb__rank">{row.rank}</span>
+                  </span>
+                  <span className="hx-lb__xp">
+                    {row.xp}
+                    <small> {leaderboard.xpLabel}</small>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+        <div className="hx-layer hx-layer--cert" aria-hidden="true">
+          <div className="hx-float hx-card hx-cert">
+            <svg className="hx-cert__qr" viewBox="-1 -1 19 19" focusable="false">
+              <path d={QR_PATH} />
+            </svg>
+            <span className="hx-cert__text">
+              <span className="hx-card__meta">{certificate.title}</span>
+              <strong>{certificate.course}</strong>
+              <span className="hx-cert__id">{certificate.id}</span>
+              <span className="hx-cert__ok">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" focusable="false">
+                  <path d="M6.5 11.2 3.3 8l-.7.7 3.9 3.9 7-7-.7-.7z" />
+                </svg>
+                {certificate.verified}
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const TRACK_ICONS = {
+  osint: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false">
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m16 16 4.5 4.5M11 7.5v7M7.5 11h7" />
+    </svg>
+  ),
+  web_pentesting: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false">
+      <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
+      <path d="m7 10 3 2.5L7 15M12.5 15H17" />
+    </svg>
+  ),
+};
 
 /**
  * The two course categories, inside the hero: OSINT (live now, to its
@@ -146,7 +361,8 @@ export function HeroTracks({ gate }) {
       {tiles.map((tile) => (
         <li key={tile.key} data-track={tile.key} data-state={tile.live ? "open" : "coming_soon"}>
           <RouterLink to={tile.to} className="hp-htrack">
-            <span className={`hp-htrack__status${tile.live ? " is-live" : ""}`}>
+            <span className="hp-htrack__icon">{TRACK_ICONS[tile.key]}</span>
+            <span className="hp-htrack__status">
               {tile.live ? <span className="hp-htrack__dot" aria-hidden="true" /> : null}
               {tile.status}
             </span>
@@ -165,17 +381,30 @@ export function HeroTracks({ gate }) {
 }
 
 /**
- * Hero: live schedule badge, headline, actions and the real figures, with the
- * trace console beside it (desktop) or below it (phone). `siteStats` overrides
- * the fetched figures (tests, previews).
+ * Hero: live schedule badge, a big headline with one accent-gradient line,
+ * the actions and the investigation board; below them a dock with the two
+ * categories and the real figures. `siteStats` overrides the fetched figures
+ * (tests, previews). The figures render as final values (a count-up above
+ * the fold would sit at "0" until scrolled); while they load, a same-size
+ * placeholder holds their place so nothing below moves.
  */
 export function LandingHero({ isAuthenticated, liveBroadcast, siteStats, gate }) {
   const live = useSiteStats();
-  const rows = heroStatItems(Array.isArray(siteStats) ? siteStats : live.items);
+  const override = Array.isArray(siteStats);
+  const rows = heroStatItems(override ? siteStats : live.items);
+  const loading = !override && live.status === "loading";
+  const last = HP_HERO.headline.length - 1;
   return (
-    <section className="hp-hero hp-hero--console" aria-labelledby="hp-home-title">
-      <div className="hp-hero__grid">
-        <div className="hp-hero__copy">
+    <section className="hp-hero hp-hero--signal" aria-labelledby="hp-home-title">
+      <div className="hx-bg" aria-hidden="true">
+        <span className="hx-bg__glow hx-bg__glow--a" />
+        <span className="hx-bg__glow hx-bg__glow--b" />
+        <span className="hx-bg__glow hx-bg__glow--c" />
+        <span className="hx-bg__grid" />
+        <span className="hx-bg__noise" />
+      </div>
+      <div className="hx-top">
+        <div className="hx-copy">
           <p className="hp-hero__badge">
             <span className="hp-hero__badge-live">
               <span className="hp-hero__badge-dot" aria-hidden="true" />
@@ -183,14 +412,14 @@ export function LandingHero({ isAuthenticated, liveBroadcast, siteStats, gate })
             </span>
             <span>{HP_HERO.badgeSchedule}</span>
           </p>
-          <h1 id="hp-home-title" className="hp-display hp-display--hero hp-hero__title">
+          <h1 id="hp-home-title" className="hp-display hx-title">
             {HP_HERO.headline.map((line, index) => (
-              <span key={line} className={`hp-hero__line${index === HP_HERO.headline.length - 1 ? " hp-hero__line--strong" : ""}`}>
+              <span key={line} className={`hx-title__line${index === last ? " hx-title__line--accent" : ""}`}>
                 {line}{" "}
               </span>
             ))}
           </h1>
-          <p className="hp-lead hp-hero__lead">{HP_HERO.sub}</p>
+          <p className="hp-lead hx-lead">{HP_HERO.sub}</p>
           {liveBroadcast ? (
             <p className="hp-hero__note" role="status">
               <StatusPill kind="live">{HP_HERO.liveLabel}</StatusPill>
@@ -200,19 +429,30 @@ export function LandingHero({ isAuthenticated, liveBroadcast, siteStats, gate })
               </ButtonLink>
             </p>
           ) : null}
-          <div className="hp-actions hp-hero__actions">
-            <ButtonLink to={FREE_TIER.href} variant="primary" size="lg" arrow>
+          <div className="hp-actions hx-actions">
+            <ButtonLink to={FREE_TIER.href} variant="primary" size="lg" arrow className="hx-cta">
               {HP_HERO.primaryCta}
             </ButtonLink>
-            <ButtonLink to="/courses" variant="secondary" size="lg">
+            <ButtonLink to="/courses" variant="secondary" size="lg" className="hx-cta-2">
               {HP_HERO.secondaryCta}
             </ButtonLink>
           </div>
-          <HeroTracks gate={gate} />
-          {rows.length ? <StatStrip items={siteStatValues(rows)} label={HP_HERO.statsLabel} className="hp-hero__stats" /> : null}
         </div>
-        <div className="hp-hero__panel">
-          <TraceConsole />
+        <InvestigationBoard />
+      </div>
+      <div className="hx-dock">
+        <HeroTracks gate={gate} />
+        <div className="hx-dock__stats">
+          {rows.length ? (
+            <StatStrip items={rows.map(({ label, value }) => ({ label, value }))} label={HP_HERO.statsLabel} className="hp-hero__stats" />
+          ) : loading ? (
+            <div className="hx-skel" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
+          ) : null}
         </div>
       </div>
     </section>
