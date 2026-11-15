@@ -3,7 +3,6 @@ import "./Navbar.css";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { siteBrand } from "../config/siteBrand";
-import useCapabilities from "../features/capabilities/useCapabilities";
 import { scrollToWatchSection } from "../features/youtube/watchAnchor";
 import { useYouTubeChannel } from "../features/youtube/youTubeStore";
 import { useAuth } from "../hooks/useAuth";
@@ -565,15 +564,14 @@ function MobileSheet({ id, isAuthenticated, user, siteGroups, accountGroups, onS
 }
 
 /**
- * Website header (Syed Carbon UI shell, plan §7.3 band 0): a 48 px g100 bar,
- * brand at the left, the key links and "More" in the centre, actions at the
- * right (guests: Sign in + Browse courses; signed in: bell, Console, account
- * menu). Under 1024 px the links move into a SideNav sheet. The bar has one
+ * Website header (the previous production navbar in the hero colour system):
+ * brand at the left, a centred pill with the key links and "More", actions at
+ * the right (guests: Log in + Start learning; signed in: bell, Console, account
+ * menu). Under 1024 px the links move into a full-height sheet. The bar has one
  * height in every state, so anchors (scroll-padding-top) never end up under it.
  */
 export default function Navbar() {
-  const { user, isAuthenticated, logout } = useAuth();
-  const { caps } = useCapabilities();
+  const { user, isAuthenticated, isInstructor, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { pathname } = location;
@@ -588,8 +586,10 @@ export default function Navbar() {
   const isLive = watchState === "live";
   const { primary, more } = getSiteNavLinks(siteBrand.id, navOptions);
   const siteGroups = getSiteNavGroups(siteBrand.id, navOptions);
-  // Teaching and Admin rows come from the server's capabilities (plan §6.7).
-  const accountGroups = isAuthenticated ? getAccountMenuGroups({ caps, djangoAdminUrl: resolveDjangoAdminUrl() }) : [];
+  // Staff tools are gated by role, exactly like the previous production navbar.
+  const accountGroups = isAuthenticated
+    ? getAccountMenuGroups({ isInstructor, isAdmin, djangoAdminUrl: isAdmin ? resolveDjangoAdminUrl() : "" })
+    : [];
   // Landing only (M15a): the header hairline fades in over the first 48 px of scroll.
   const hairline = pathname === "/" ? "scroll" : "always";
 

@@ -1,38 +1,96 @@
 /*
- * Website header (PHILOSOPHY N1): 64 px, black canvas, logo left, centred
- * links (14 px, active = 500 white), "Log in" text + solid white "Start
- * learning" on the right. Transparent at the top of the page, black/80 with
- * blur and a hairline once scrolled (palette-safe: no blend modes over the
- * golden calligraphy). Under 1024 px the links move into a full-height sheet.
+ * Website header: the previous production navbar (7a444898) in the landing
+ * hero's colour system (marketing/hp.css, .hp-hero--signal): cyan, emerald
+ * and violet accents on black, red only for "Live", no gold.
+ * - a dark translucent, blurred bar of one height in every state (stronger
+ *   once scrolled, with a cyan-to-violet hairline);
+ * - a centred pill of links; the active one is white with a cyan underline
+ *   and glow; "More" and the account menu open dark cards with an accent
+ *   border;
+ * - "Start learning" / "Console" in the hero's cyan primary style.
+ * Under 1024 px the links move into a full-height sheet.
  */
 
-.snav {
+.snav,
+.snav-sheet-layer {
+  --hx-cyan: #22d3ee; /* palette-law: allow owner decision (Nov 2026): the hero colour system in the site navbar */
+  --hx-emerald: #34d399; /* palette-law: allow owner decision (Nov 2026): the hero colour system in the site navbar */
+  --hx-violet: #a78bfa; /* palette-law: allow owner decision (Nov 2026): the hero colour system in the site navbar */
+  --hx-live: #ff4d5e; /* palette-law: allow owner decision (Nov 2026): red = live only */
   --snav-height: 4rem;
   --snav-fg: #fafafa;
   --snav-text-2: #d1d1d1;
   --snav-muted: #a1a1a1;
   --snav-subtle: #8a8a8a;
   --snav-border: rgb(255 255 255 / 0.1);
-  --snav-accent: #f3e2b3;
+  --snav-accent: var(--hx-cyan);
+  --snav-accent-border: color-mix(in srgb, var(--hx-cyan) 34%, transparent);
+  --snav-accent-wash: color-mix(in srgb, var(--hx-cyan) 9%, transparent);
+  --snav-card: color-mix(in srgb, var(--hx-cyan) 4%, rgb(8 8 8 / 0.96));
+  --snav-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.snav {
   position: sticky;
   top: 0;
   z-index: 50;
   color: var(--snav-fg);
   font-family: var(--hp-font-sans, var(--font-geist, Geist), "Geist Fallback", ui-sans-serif, system-ui, sans-serif);
-  background: transparent;
-  border-bottom: 1px solid transparent;
-  transition:
-    background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  border-bottom: 1px solid var(--snav-border);
+  isolation: isolate;
+  transition: border-color 200ms var(--snav-ease);
 }
 
-.snav[data-scrolled="true"],
-.snav[data-menu-open="true"],
-.snav[data-hairline="always"][data-scrolled="true"] {
-  background: rgb(0 0 0 / 0.8);
-  border-bottom-color: var(--snav-border);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+/*
+ * The translucent, blurred surface lives on a pseudo-element: a backdrop
+ * filter on the header itself would make it the containing block of the
+ * position: fixed phone sheet and clip the sheet to the bar's 64 px.
+ */
+.snav::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: color-mix(in srgb, var(--hx-cyan) 3%, rgb(0 0 0 / 0.55));
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  transition: background-color 200ms var(--snav-ease);
+  pointer-events: none;
+}
+
+/* The landing melts into the hero until the page scrolls. */
+.snav[data-hairline="scroll"][data-scrolled="false"] {
+  border-bottom-color: transparent;
+}
+
+.snav[data-scrolled="true"]::before,
+.snav[data-menu-open="true"]::before {
+  background: color-mix(in srgb, var(--hx-cyan) 4%, rgb(0 0 0 / 0.8));
+}
+
+/* Accent hairline once scrolled: cyan through emerald to violet, faint at the edges. */
+.snav::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--hx-cyan) 55%, transparent) 25%,
+    color-mix(in srgb, var(--hx-emerald) 45%, transparent) 50%,
+    color-mix(in srgb, var(--hx-violet) 55%, transparent) 75%,
+    transparent
+  );
+  opacity: 0;
+  transition: opacity 200ms var(--snav-ease);
+  pointer-events: none;
+}
+
+.snav[data-scrolled="true"]::after {
+  opacity: 1;
 }
 
 .snav__bar {
@@ -44,7 +102,7 @@
   max-width: 80rem;
   height: var(--snav-height);
   margin-inline: auto;
-  padding-inline: 20px;
+  padding-inline: 16px;
 }
 
 @media (min-width: 640px) {
@@ -65,13 +123,15 @@
   min-width: 0;
 }
 
-.snav :is(a, button, [tabindex="0"]):focus-visible {
-  outline: 2px solid var(--snav-accent);
+.snav :is(a, button, [tabindex="0"]):focus-visible,
+.snav .snav__brand.brand-shell:focus-visible,
+.snav-sheet :is(a, button, [tabindex="0"]):focus-visible {
+  outline: 2px solid var(--hx-cyan);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
-/* ------------------------------------------------------------ centred links */
+/* ------------------------------------------------------------ centred pill */
 
 .snav__primary {
   display: none;
@@ -86,9 +146,13 @@
 .snav__pill {
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 2px;
   margin: 0;
-  padding: 0;
+  padding: 4px;
+  border: 1px solid var(--snav-border);
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.03);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
   list-style: none;
 }
 
@@ -97,12 +161,14 @@
 }
 
 .snav__link {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 40px;
-  padding: 0;
+  min-height: 36px;
+  padding: 0 14px;
   border: 0;
+  border-radius: 9999px;
   background: transparent;
   color: var(--snav-text-2);
   font: inherit;
@@ -112,44 +178,63 @@
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  transition: color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    color 150ms var(--snav-ease),
+    background-color 150ms var(--snav-ease);
 }
 
-.snav__link:hover {
+@media (min-width: 1280px) {
+  .snav__link {
+    padding: 0 16px;
+  }
+}
+
+.snav__link:hover,
+.snav__more-trigger[aria-expanded="true"] {
+  background: rgb(255 255 255 / 0.05);
   color: #fff;
 }
 
+/* Active page: white text, a soft cyan wash and a glowing cyan underline. */
 .snav__link.is-active {
+  background: var(--snav-accent-wash);
   color: #fff;
   font-weight: 500;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--hx-cyan) 55%, transparent);
 }
 
-.snav__chip {
-  padding: 1px 7px;
-  border-radius: 9999px;
-  border: 1px dashed rgb(255 255 255 / 0.3);
-  font-size: 10px;
-  line-height: 14px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--snav-muted);
+.snav__link.is-active::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  bottom: 3px;
+  left: 14px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--hx-cyan);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--hx-cyan) 80%, transparent);
+}
+
+.snav__more-trigger.is-active::after {
+  right: 30px;
 }
 
 .snav__link.is-disabled,
 .snav__link.is-disabled:hover {
+  background: transparent;
   color: var(--snav-subtle);
   cursor: not-allowed;
 }
 
 .snav__tooltip {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 8px);
   left: 50%;
   z-index: 2;
   padding: 6px 10px;
-  border: 1px solid var(--snav-border);
+  border: 1px solid var(--snav-accent-border);
   border-radius: 8px;
-  background: #111;
+  background: var(--snav-card);
   color: var(--snav-text-2);
   font-size: 0.75rem;
   white-space: nowrap;
@@ -177,18 +262,36 @@
   transform: rotate(180deg);
 }
 
-/* ------------------------------------------------------------ dropdowns */
+/* ------------------------------------------------------------ dropdowns (dark card, accent border) */
 
 .snav__menu {
   position: absolute;
-  top: calc(100% + 10px);
+  top: calc(100% + 12px);
   z-index: 60;
   min-width: 15rem;
   padding: 6px;
-  border: 1px solid var(--snav-border);
-  border-radius: 10px;
-  background: #111;
-  box-shadow: 0 24px 60px rgb(0 0 0 / 0.6);
+  overflow: hidden;
+  border: 1px solid var(--snav-accent-border);
+  border-radius: 14px;
+  background: var(--snav-card);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  box-shadow:
+    0 24px 60px rgb(0 0 0 / 0.65),
+    0 0 0 1px rgb(0 0 0 / 0.4),
+    0 12px 40px -16px color-mix(in srgb, var(--hx-cyan) 45%, transparent);
+}
+
+/* The hero's gradient as a 2 px rule along the top of the card. */
+.snav__menu::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--hx-cyan), var(--hx-emerald) 50%, var(--hx-violet));
+  opacity: 0.85;
 }
 
 .snav__menu[hidden] {
@@ -230,19 +333,20 @@
   text-decoration: none;
   cursor: pointer;
   transition:
-    background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
-    color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    background-color 150ms var(--snav-ease),
+    color 150ms var(--snav-ease);
 }
 
 .snav__menu-item:hover {
-  background: rgb(255 255 255 / 0.06);
+  background: var(--snav-accent-wash);
   color: #fff;
 }
 
 .snav__menu-item[aria-current="page"] {
-  background: rgb(243 226 179 / 0.08);
+  background: var(--snav-accent-wash);
   color: #fff;
-  box-shadow: inset 2px 0 0 var(--snav-accent);
+  font-weight: 500;
+  box-shadow: inset 2px 0 0 var(--hx-cyan);
 }
 
 .snav__menu-item--danger,
@@ -303,7 +407,7 @@
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--snav-subtle);
+  color: color-mix(in srgb, var(--hx-cyan) 55%, var(--snav-subtle));
 }
 
 /* ------------------------------------------------------------ right cluster */
@@ -318,7 +422,7 @@
 
 @media (min-width: 1024px) {
   .snav__actions {
-    gap: 20px;
+    gap: 14px;
   }
 }
 
@@ -335,17 +439,20 @@
   width: 40px;
   height: 40px;
   padding: 0;
-  border: 0;
-  border-radius: 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
   background: transparent;
   color: var(--snav-fg);
   cursor: pointer;
-  transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    background-color 150ms var(--snav-ease),
+    border-color 150ms var(--snav-ease);
 }
 
 .snav__icon-btn:hover,
 .snav__icon-btn[aria-expanded="true"] {
-  background: rgb(255 255 255 / 0.08);
+  border-color: var(--snav-border);
+  background: rgb(255 255 255 / 0.06);
 }
 
 .snav__icon-btn .snav__icon,
@@ -360,6 +467,7 @@
   }
 }
 
+/* The hero's cyan primary ("Start learning", "Console"). */
 .snav__cta {
   display: inline-flex;
   align-items: center;
@@ -367,23 +475,36 @@
   gap: 8px;
   min-height: 40px;
   padding: 0 20px;
-  border: 1px solid #fff;
-  border-radius: 8px;
-  background: #fff;
+  border: 0;
+  border-radius: 10px;
+  background: var(--hx-cyan);
   color: #000;
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
-  transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--hx-cyan) 60%, transparent),
+    0 10px 32px -10px color-mix(in srgb, var(--hx-cyan) 70%, transparent);
+  transition:
+    transform 160ms var(--snav-ease),
+    background-color 160ms var(--snav-ease);
 }
 
 .snav__cta:hover {
-  background: rgb(255 255 255 / 0.88);
+  background: color-mix(in srgb, var(--hx-cyan) 82%, #fff);
+  transform: translateY(-1px);
+}
+
+.snav .snav__cta:focus-visible,
+.snav-sheet .snav__cta:focus-visible {
+  outline-offset: 3px;
 }
 
 .snav__cta.is-active {
-  box-shadow: 0 0 0 1px rgb(243 226 179 / 0.6);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--hx-cyan) 45%, transparent),
+    0 0 24px color-mix(in srgb, var(--hx-cyan) 55%, transparent);
 }
 
 .snav__ghost {
@@ -391,19 +512,24 @@
   align-items: center;
   justify-content: center;
   min-height: 40px;
-  padding: 0 4px;
+  padding: 0 12px;
+  border-radius: 10px;
   color: var(--snav-text-2);
   font-size: 0.875rem;
+  font-weight: 500;
   text-decoration: none;
   white-space: nowrap;
-  transition: color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    color 150ms var(--snav-ease),
+    background-color 150ms var(--snav-ease);
 }
 
 .snav__ghost:hover {
+  background: rgb(255 255 255 / 0.05);
   color: #fff;
 }
 
-/* 390: logo, the one solid CTA, the menu button (HackPath mobile bar). */
+/* 390: logo, the one cyan CTA, the menu button. */
 .snav__ghost--bar,
 .snav__account {
   display: none;
@@ -429,6 +555,10 @@
   }
 }
 
+.snav__account {
+  position: relative;
+}
+
 .snav__avatar-btn {
   display: inline-flex;
   align-items: center;
@@ -437,17 +567,17 @@
   padding: 0 8px 0 4px;
   border: 1px solid var(--snav-border);
   border-radius: 9999px;
-  background: transparent;
+  background: rgb(255 255 255 / 0.03);
   color: var(--snav-fg);
   font: inherit;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: border-color 150ms var(--snav-ease);
 }
 
 .snav__avatar-btn:hover,
 .snav__avatar-btn[aria-expanded="true"] {
-  border-color: rgb(255 255 255 / 0.24);
+  border-color: var(--snav-accent-border);
 }
 
 .snav__avatar {
@@ -457,10 +587,10 @@
   width: 30px;
   height: 30px;
   border-radius: 9999px;
-  background: #fff;
+  background: linear-gradient(135deg, var(--hx-cyan), var(--hx-violet));
   color: #000;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .snav__avatar--lg {
@@ -488,7 +618,7 @@
   align-items: center;
   gap: 6px;
   font-size: 0.75rem;
-  color: var(--snav-accent);
+  color: var(--hx-live);
 }
 
 .snav__menu-live {
@@ -525,7 +655,7 @@
   color: var(--snav-muted);
 }
 
-/* ------------------------------------------------------------ phone sheet (instant, PHILOSOPHY §2.7) */
+/* ------------------------------------------------------------ phone sheet */
 
 .snav-sheet-layer {
   position: fixed;
@@ -537,6 +667,8 @@
   position: absolute;
   inset: 0;
   background: rgb(0 0 0 / 0.6);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
 }
 
 .snav-sheet {
@@ -544,7 +676,10 @@
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: #000;
+  background:
+    radial-gradient(120% 50% at 100% 0%, color-mix(in srgb, var(--hx-cyan) 9%, transparent), transparent 60%),
+    radial-gradient(90% 40% at 0% 100%, color-mix(in srgb, var(--hx-violet) 8%, transparent), transparent 60%),
+    #000;
   color: var(--snav-fg);
   font-family: var(--hp-font-sans, var(--font-geist, Geist), "Geist Fallback", ui-sans-serif, system-ui, sans-serif);
 }
@@ -553,7 +688,7 @@
   .snav-sheet {
     left: auto;
     width: 26rem;
-    border-left: 1px solid var(--snav-border);
+    border-left: 1px solid var(--snav-accent-border);
   }
 }
 
@@ -566,14 +701,15 @@
   align-items: center;
   justify-content: space-between;
   height: var(--snav-height);
-  padding-inline: 20px;
+  padding-inline: 16px;
   border-bottom: 1px solid var(--snav-border);
 }
 
 .snav-sheet__body {
   flex: 1;
   overflow-y: auto;
-  padding: 8px 20px 24px;
+  overscroll-behavior: contain;
+  padding: 8px 16px 24px;
 }
 
 .snav-sheet__user {
@@ -594,7 +730,7 @@
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--snav-subtle);
+  color: color-mix(in srgb, var(--hx-cyan) 55%, var(--snav-subtle));
 }
 
 .snav-sheet__list {
@@ -614,7 +750,7 @@
   gap: 12px;
   width: 100%;
   min-height: 56px;
-  padding: 0;
+  padding: 0 4px;
   border: 0;
   background: transparent;
   color: var(--snav-fg);
@@ -623,6 +759,7 @@
   text-align: left;
   text-decoration: none;
   cursor: pointer;
+  transition: color 150ms var(--snav-ease);
 }
 
 .snav-sheet__link:hover,
@@ -630,10 +767,20 @@
   color: #fff;
 }
 
+.snav-sheet__link:hover .snav-sheet__arrow {
+  color: var(--hx-cyan);
+}
+
 .snav-sheet__link[aria-current="page"] {
+  padding-left: 14px;
+  background: linear-gradient(90deg, var(--snav-accent-wash), transparent 70%);
+  color: #fff;
   font-weight: 500;
-  box-shadow: inset 2px 0 0 var(--snav-accent);
-  padding-left: 12px;
+  box-shadow: inset 2px 0 0 var(--hx-cyan);
+}
+
+.snav-sheet__link[aria-current="page"] .snav-sheet__arrow {
+  color: var(--hx-cyan);
 }
 
 .snav-sheet__link.is-disabled,
@@ -662,6 +809,7 @@
   height: 16px;
   flex: none;
   color: var(--snav-muted);
+  transition: color 150ms var(--snav-ease);
 }
 
 .snav-sheet__link--danger {
@@ -671,7 +819,7 @@
 .snav-sheet__footer {
   display: grid;
   gap: 12px;
-  padding: 16px 20px max(16px, env(safe-area-inset-bottom));
+  padding: 16px 16px max(16px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--snav-border);
 }
 
@@ -683,16 +831,21 @@
 }
 
 .snav__ghost--block {
-  border: 1px solid rgb(255 255 255 / 0.2);
-  border-radius: 8px;
+  border: 1px solid rgb(255 255 255 / 0.18);
+  background: rgb(255 255 255 / 0.04);
   color: #fff;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .snav,
   .snav *,
+  .snav::after,
   .snav-sheet * {
     transition-duration: 0ms !important;
     animation: none !important;
+  }
+
+  .snav__cta:hover {
+    transform: none;
   }
 }
