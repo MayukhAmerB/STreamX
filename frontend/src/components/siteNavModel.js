@@ -88,7 +88,7 @@ export function getAccountMenuGroups({ isInstructor = false, isAdmin = false, dj
   const canAccessControls = Boolean(isAdmin || isInstructor);
   const staff = [
     isInstructor ? { id: "instructor", label: "Instructor", to: "/instructor/dashboard" } : null,
-    canAccessControls ? { id: "control-center", label: "Admin Control Center", to: "/control-center" } : null,
+    isAdmin ? { id: "control-center", label: "Admin Control Center", to: "/control-center" } : null,
     canAccessControls ? { id: "meeting", label: "Meeting Control", to: "/meeting" } : null,
     canAccessControls ? { id: "broadcasting", label: "Broadcast Control", to: "/broadcasting" } : null,
     isAdmin ? { id: "lecture-questions", label: "Lecture Questions", to: "/lecture-questions" } : null,

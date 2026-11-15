@@ -37,7 +37,7 @@
     ]
   },
   "allowedHrefRemovals": {
-    "_why": "HackPath-style redesign (b03f085a): the account menu keeps Console, My courses, Profile and ID card; staff and teaching shortcuts moved to the Console sidebar and the capability-gated Teaching/Admin groups (Back office included), which these mocked scenarios do not load. The landing page no longer deep-links course reviews or category filters (Tracks, Pricing and Roadmap replace them), and its Console/Login buttons moved to the navbar. Every removed target is still a route.",
+    "_why": "HackPath-style redesign (b03f085a): the account menu keeps Console, My courses, Profile and ID card; staff and teaching shortcuts moved to the Console sidebar and the capability-gated Teaching/Admin groups (Back office included), which these mocked scenarios do not load. The landing page no longer deep-links course reviews or category filters (Tracks, Pricing and Roadmap replace them), and its Console/Login buttons moved to the navbar. Every removed target is still a route. The landing course carousel was replaced by one featured open-batch card (v4.0 landing colour system), so per-course review links and the carousel scroll buttons are gone; every course is still linked from /courses.",
     "navbar": [
       "/guides",
       "/control-center",
@@ -63,7 +63,10 @@
       "/courses/202",
       "/courses/202#reviews",
       "/courses?category=osint#course-category-results",
-      "/courses?category=web_pentesting#course-category-results"
+      "/courses?category=web_pentesting#course-category-results",
+      "/courses/101#reviews",
+      "/courses/102",
+      "/courses/102#reviews"
     ],
     "footer": []
   },
@@ -210,9 +213,7 @@
           "Play Destroying the Propaganda Machine, published last month",
           "Play FREE LIVE Advanced OSINT Class, published 2 months ago",
           "Play video: Destroying the Propaganda Machine",
-          "Request pending",
-          "Scroll courses backward",
-          "Scroll courses forward"
+          "Request pending"
         ],
         "anchors": [
           "about",
@@ -325,8 +326,6 @@
           "Play Destroying the Propaganda Machine, published last month",
           "Play FREE LIVE Advanced OSINT Class, published 2 months ago",
           "Request pending",
-          "Scroll courses backward",
-          "Scroll courses forward",
           "Watch the live stream: Sunday OSINT live"
         ],
         "anchors": [
@@ -447,9 +446,7 @@
           "Play Destroying the Propaganda Machine, published last month",
           "Play FREE LIVE Advanced OSINT Class, published 2 months ago",
           "Play video: Destroying the Propaganda Machine",
-          "Request pending",
-          "Scroll courses backward",
-          "Scroll courses forward"
+          "Request pending"
         ],
         "anchors": [
           "about",
@@ -570,9 +567,7 @@
           "Play Destroying the Propaganda Machine, published last month",
           "Play FREE LIVE Advanced OSINT Class, published 2 months ago",
           "Play video: Destroying the Propaganda Machine",
-          "Request pending",
-          "Scroll courses backward",
-          "Scroll courses forward"
+          "Request pending"
         ],
         "anchors": [
           "about",

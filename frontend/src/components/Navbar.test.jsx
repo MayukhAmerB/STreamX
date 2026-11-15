@@ -102,7 +102,7 @@ describe("site nav model (the previous production navbar, 7a444898)", () => {
     });
 
     it("adds the instructor dashboard and the meeting/broadcast controls for instructors", () => {
-      expect(linksFor({ isInstructor: true })).toEqual([...ACCOUNT, "instructor", "control-center", "meeting", "broadcasting"]);
+      expect(linksFor({ isInstructor: true })).toEqual([...ACCOUNT, "instructor", "meeting", "broadcasting"]);
     });
 
     it("adds the controls, lecture questions and the Django admin (new tab) for admins", () => {
@@ -193,7 +193,7 @@ describe("Navbar", () => {
 
   it("gives instructors the instructor dashboard and the controls, never lecture questions or Django", () => {
     const html = render({ auth: { user: { ...asha, role: "instructor" }, isAuthenticated: true, isInstructor: true } });
-    for (const href of ["/instructor/dashboard", "/control-center", "/meeting", "/broadcasting"]) {
+    for (const href of ["/instructor/dashboard", "/meeting", "/broadcasting"]) {
       expect(html).toContain(`href="${href}"`);
     }
     expect(html).not.toContain('href="/lecture-questions"');
