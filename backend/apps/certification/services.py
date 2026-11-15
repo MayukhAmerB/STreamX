@@ -187,7 +187,7 @@ def decide_participation(participation_id, *, now=None) -> CertificationDecision
     now = now or timezone.now()
     with transaction.atomic():
         participation = (
-            CtfParticipation.objects.select_for_update()
+            CtfParticipation.objects.select_for_update(of=("self",))  # nullable batch_course join
             .select_related("exam", "user", "batch_course")
             .filter(pk=participation_id)
             .first()
@@ -253,7 +253,7 @@ def regrade_decision(decision, *, actor=None, reason="Answer key corrected") -> 
     """Re-evaluate one decision. Returns unchanged | updated | upgraded | flagged | skipped."""
     with transaction.atomic():
         decision = (
-            CertificationDecision.objects.select_for_update()
+            CertificationDecision.objects.select_for_update(of=("self",))
             .select_related("participation__exam", "participation__user", "participation__batch_course", "certificate")
             .get(pk=decision.pk)
         )
@@ -323,7 +323,7 @@ def confirm_revocation(decision, *, actor, reason, request=None) -> Certificatio
     """Staff confirm that a re-graded student no longer passes: revoke the certificate."""
     reason = _reason(reason)
     with transaction.atomic():
-        decision = CertificationDecision.objects.select_for_update().select_related("certificate").get(pk=decision.pk)
+        decision = CertificationDecision.objects.select_for_update(of=("self",)).select_related("certificate").get(pk=decision.pk)
         if decision.review_state != CertificationDecision.REVIEW_REVOCATION_PENDING or not decision.pending:
             raise Conflict("This decision has no revocation waiting for confirmation.", code="certification_no_pending_revocation")
         before = _snapshot(decision)

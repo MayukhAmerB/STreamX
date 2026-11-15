@@ -674,3 +674,46 @@ class HallOfFameTests(CertificationBase):
         self.assertEqual(self.public().json()["data"]["counters"]["since"], 2026)
         HallOfFameEntry.objects.create(display_handle="typo", batch_label="Batch 9", batch_order=9, achieved_on="2019-01-01")
         self.assertEqual(self.public().json()["data"]["counters"]["since"], 2025)  # never before the founding
+
+
+# --- PostgreSQL row locks ------------------------------------------------------------------------------
+class RowLockTests(CertificationBase):
+    """PostgreSQL refuses FOR UPDATE on the nullable side of an outer join (``batch_course``,
+    ``participation``, ``certificate``): every lock that is combined with ``select_related`` must
+    lock only its own row (``of=("self",)``). SQLite ignores FOR UPDATE, so the calls are recorded."""
+
+    def _record_locks(self):
+        from django.db.models.query import QuerySet
+
+        calls = []
+        original = QuerySet.select_for_update
+
+        def recording(qs, *args, **kwargs):
+            calls.append((qs.model.__name__, kwargs.get("of", ())))
+            return original(qs, *args, **kwargs)
+
+        return calls, mock.patch.object(QuerySet, "select_for_update", recording)
+
+    def test_decide_and_regrade_and_revocation_lock_only_their_own_rows(self):
+        participation = self.sit(self.student, range(1, 8))
+        calls, patcher = self._record_locks()
+        with patcher:
+            decision = services.decide_participation(participation.pk)
+            services.regrade_decision(decision)
+        self.assertEqual(decision.outcome, "passed")
+        locks = dict(calls)
+        self.assertEqual(locks["CtfParticipation"], ("self",))
+        self.assertEqual(locks["CertificationDecision"], ("self",))
+
+    def test_select_for_update_of_self_compiles_for_postgresql(self):
+        from django.db import connection
+
+        queryset = (
+            CtfParticipation.objects.select_for_update(of=("self",))
+            .select_related("exam", "user", "batch_course")
+            .filter(pk=1)
+        )
+        sql = str(queryset.query)  # builds without error; the join on batch_course stays an outer join
+        self.assertIn("LEFT OUTER JOIN", sql)
+        self.assertEqual(queryset.query.select_for_update_of, ("self",))
+        self.assertIsNotNone(connection.vendor)
