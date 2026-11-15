@@ -68,7 +68,14 @@ LIVE_FINALIZE_DELAY_SECONDS = 90  # wait for the last presence pings after the c
 
 REPORT_SUBMITTED_XP = 30
 REPORT_ON_TIME_BONUS_XP = 10
-REPORT_GRADED_XP_PER_PERCENT = 0.5  # marks % x 0.5
+# Report-mark bonus (owner, Nov 2026): weekly XP comes from the reports. On top
+# of the submission XP (30, or 40 on time), a graded report pays a tiered BONUS
+# on its final marks normalised to 10 (rounded DOWN: 8.9/10 is tier 8), so a
+# perfect report is worth two live classes. Tunable in ONE place:
+# settings.ENGAGEMENT_REPORT_MARK_BONUS (env JSON, e.g. {"10": 300, "9": 200}).
+# Below the lowest tier pays 0. A regrade settles the difference (sources.py).
+REPORT_MARK_BONUS = {10: 300, 9: 200, 8: 130, 7: 80, 6: 40}
+REPORT_GRADED_XP_PER_PERCENT = 0.5  # retired rule (marks % x 0.5): legacy ledger rows only
 EXAM_XP_PER_PERCENT = 1.0  # score % x 1 (first finished attempt)
 STREAK_DAILY_BONUS_XP = 5  # each study day that continues a streak
 
@@ -151,6 +158,53 @@ def standing_awards_enabled() -> bool:
 def leaderboard_counts_purchase_xp() -> bool:
     return _setting("ENGAGEMENT_LEADERBOARD_COUNT_PURCHASE_XP", LEADERBOARD_COUNT_PURCHASE_XP)
 
+
+# Prize rules (owner, Nov 2026, after the first weekly close paid one student
+# twice and a test account): tunable via ENGAGEMENT_PRIZE_* (settings/base.py).
+#  * one prize per student per period: the batch where they placed best;
+#  * only published, real batch courses compete (never unpublished, test-titled
+#    or listed in ENGAGEMENT_PRIZE_EXCLUDED_COURSE_IDS);
+#  * at least PRIZE_MIN_LEARNING_XP learning XP in the period (purchase and
+#    standing XP never count towards it);
+#  * a batch with fewer than PRIZE_SMALL_BATCH_SIZE active students pays only
+#    its top PRIZE_SMALL_BATCH_TOP_N.
+PRIZE_ONE_PER_STUDENT = True
+PRIZE_MIN_LEARNING_XP = 150
+PRIZE_SMALL_BATCH_SIZE = 30
+PRIZE_SMALL_BATCH_TOP_N = 3
+# A course whose title looks like a test fixture never competes.
+PRIZE_TEST_TITLE_PATTERN = r"(?<![a-z0-9])(e2e|test|tests|hidden|do not publish|sandbox|dummy)(?![a-z0-9])"
+
+
+def prize_one_per_student() -> bool:
+    return _setting("ENGAGEMENT_PRIZE_ONE_PER_STUDENT", PRIZE_ONE_PER_STUDENT)
+
+
+def prize_min_learning_xp() -> int:
+    return _setting("ENGAGEMENT_PRIZE_MIN_LEARNING_XP", PRIZE_MIN_LEARNING_XP)
+
+
+def prize_small_batch_size() -> int:
+    return _setting("ENGAGEMENT_PRIZE_SMALL_BATCH_SIZE", PRIZE_SMALL_BATCH_SIZE)
+
+
+def prize_small_batch_top_n() -> int:
+    return _setting("ENGAGEMENT_PRIZE_SMALL_BATCH_TOP_N", PRIZE_SMALL_BATCH_TOP_N)
+
+
+def prize_excluded_course_ids() -> frozenset[int]:
+    from django.conf import settings
+
+    raw = getattr(settings, "ENGAGEMENT_PRIZE_EXCLUDED_COURSE_IDS", "") or ""
+    values = raw if isinstance(raw, (list, tuple, set, frozenset)) else str(raw).replace(";", ",").split(",")
+    ids = set()
+    for value in values:
+        try:
+            ids.add(int(str(value).strip()))
+        except (TypeError, ValueError):
+            continue
+    return frozenset(ids)
+
 # --- Write-behind ------------------------------------------------------------
 FLUSH_INTERVAL_SECONDS = 300  # Redis counters -> DB every 5 minutes
 LEADERBOARD_REBUILD_INTERVAL_SECONDS = 3600  # membership drift (enrolments) repaired hourly
@@ -217,8 +271,61 @@ def report_submitted_xp(*, on_time: bool) -> int:
     return REPORT_SUBMITTED_XP + (REPORT_ON_TIME_BONUS_XP if on_time else 0)
 
 
+def report_mark_bonus_table() -> dict[int, int]:
+    """``{score out of 10: bonus XP}`` (best first), from settings or the default.
+
+    ``ENGAGEMENT_REPORT_MARK_BONUS`` may be a dict or a JSON object string
+    (env); keys 0-10, values >= 0. An invalid value falls back to the default
+    as a whole (never a half-applied table).
+    """
+    from django.conf import settings
+
+    raw = getattr(settings, "ENGAGEMENT_REPORT_MARK_BONUS", None)
+    if isinstance(raw, str):
+        import json
+
+        try:
+            raw = json.loads(raw) if raw.strip() else None
+        except ValueError:
+            raw = None
+    table = dict(REPORT_MARK_BONUS)
+    if isinstance(raw, dict) and raw:
+        try:
+            parsed = {int(key): int(value) for key, value in raw.items()}
+        except (TypeError, ValueError):
+            parsed = {}
+        if parsed and all(0 <= key <= 10 and value >= 0 for key, value in parsed.items()):
+            table = parsed
+    return dict(sorted(table.items(), reverse=True))
+
+
+def report_score10(final_marks, max_marks) -> int:
+    """The graded score normalised to 10, rounded down (0-10)."""
+    from decimal import ROUND_FLOOR, Decimal, InvalidOperation
+
+    try:
+        final = Decimal(str(final_marks))
+        maximum = Decimal(str(max_marks))
+    except (InvalidOperation, ValueError, TypeError):
+        return 0
+    if maximum <= 0:
+        return 0
+    score = (final * 10 / maximum).quantize(Decimal("1"), rounding=ROUND_FLOOR)
+    return int(min(Decimal(10), max(Decimal(0), score)))
+
+
+def report_mark_bonus(score10: int) -> int:
+    """Bonus XP for a report scored ``score10``/10: the best tier it reaches, else 0."""
+    score10 = int(score10 or 0)
+    for tier, points in report_mark_bonus_table().items():
+        if score10 >= tier:
+            return points
+    return 0
+
+
 def report_graded_xp(percent: float) -> int:
-    return max(0, int(round(_clamp_percent(percent) * REPORT_GRADED_XP_PER_PERCENT)))
+    """The report bonus for a marks percentage (100 % = 10/10)."""
+    return report_mark_bonus(int(_clamp_percent(percent) // 10))
 
 
 def exam_xp(percent: float) -> int:
@@ -431,7 +538,11 @@ def earn_table() -> list[dict]:
             "xp": 1,
         },
         {"key": KIND_REPORT_SUBMITTED, "label": "Submit your weekly report (+10 on time)", "xp": REPORT_SUBMITTED_XP},
-        {"key": KIND_REPORT_GRADED, "label": "Graded report: half your marks %", "xp": report_graded_xp(100)},
+        *(
+            {"key": KIND_REPORT_GRADED, "label": f"Report bonus: {score}/10" + (" (perfect report)" if score == 10 else ""), "xp": points}
+            for score, points in report_mark_bonus_table().items()
+            if points > 0
+        ),
         {"key": KIND_EXAM_FINISHED, "label": "Finish an exam: your score %", "xp": exam_xp(100)},
         {"key": KIND_STREAK_BONUS, "label": "Each study day that continues your streak", "xp": STREAK_DAILY_BONUS_XP},
         {"key": KIND_LEADERBOARD_WEEKLY, "label": "Finish the week #1 in your batch", "xp": weekly_standing_xp(1)},

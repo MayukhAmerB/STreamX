@@ -4,6 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useMotionPreference } from "./motionPreference";
 import { ACCOUNT_ITEMS } from "./navConfig";
 import { getNavIcon } from "./navIcons";
+import RankChip from "./RankChip";
 import SignOutButton from "./SignOutButton";
 import MyCosmeticName from "../monthly-ctf/MyCosmeticName";
 import UserAvatar from "./UserAvatar";
@@ -76,6 +77,7 @@ export default function AccountMenu({ user, backOfficeUrl = "", onSignOut }) {
                 {user?.email ? <span className="cds-app-account__email">{user.email}</span> : null}
               </div>
             </div>
+            <RankChip variant="menu" onNavigate={close} />
             <ul className="cds-app-account__list" aria-label="Account">
               {ACCOUNT_ITEMS.map((item) => {
                 const Icon = getNavIcon(item.icon);

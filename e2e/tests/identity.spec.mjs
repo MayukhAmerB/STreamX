@@ -54,23 +54,28 @@ test("identity: the student block leads reports, exams and staff results", async
     await shot(page, "coursework-exams");
   });
 
-  await test.step("staff results: roll number · real name · handle lead each row", async () => {
+  // Owner rule (Console): staff results show the roll number and @handle only,
+  // never the real name or e-mail (the full identity is in admin -> Examination).
+  await test.step("staff results: roll number · @handle lead each row, no real name", async () => {
     const start = await apiAs(context, "POST", `/api/ctf/exams/${manifest.exam.slug}/start/`, { data: {} });
     expect(start.status()).toBeLessThan(300);
     const staff = await newUserContext(browser, test.info(), pageErrors, "staff");
     await signIn(staff, manifest, "admin");
     const console_ = await staff.newPage();
     await console_.goto(`/console/admin/exams/${manifest.exam.slug}`);
-    await expect(console_.getByRole("columnheader", { name: /Student \(roll number · real name · handle\)/ })).toBeVisible();
-    const row = console_.getByRole("link", { name: new RegExp(`^${roll(student.id)} · ${student.name} · `) });
+    await expect(console_.getByRole("columnheader", { name: /Student \(roll number · handle\)/ })).toBeVisible();
+    const row = console_.getByRole("link", { name: new RegExp(`^${roll(student.id)}( · @\\S+| \\(no handle\\))$`) });
     await expect(row).toBeVisible();
+    await expect(console_.getByText(student.name)).toHaveCount(0);
     await row.scrollIntoViewIfNeeded();
     await console_.evaluate(() => window.scrollBy(0, 200));
     await shot(console_, "staff-exam-results");
     const csv = await apiAs(staff, "GET", `/api/ctf-admin/exams/${manifest.exam.slug}/results.csv`);
     expect(csv.ok()).toBeTruthy();
-    const header = (await csv.text()).replace(/^﻿/, "").split(/\r?\n/)[0];
-    expect(header.startsWith("Roll number,Real name,Handle,Handle (most recent),XP,Rank,Attendance %")).toBeTruthy();
+    const text = (await csv.text()).replace(/^﻿/, "");
+    const header = text.split(/\r?\n/)[0];
+    expect(header.startsWith("Roll number,Handle,Handle (most recent),XP,Rank,Attendance %")).toBeTruthy();
+    expect(text).not.toContain(student.name);
     await staff.close();
   });
 

@@ -118,8 +118,29 @@ def _on_time_reports(n: int):
     return lambda ctx: ctx.count_kind_min_points(rules.KIND_REPORT_SUBMITTED, rules.report_submitted_xp(on_time=True)) >= n
 
 
-def _high_marks_reports(n: int):
-    return lambda ctx: ctx.count_kind_min_points(rules.KIND_REPORT_GRADED, rules.report_graded_xp(90)) >= n
+def _high_marks_reports(n: int, min_score10: int = 9):
+    """``n`` graded reports whose CURRENT score is ``min_score10``/10 or more.
+
+    The report bonus is settled by correction rows (a regrade), so this reads
+    each report's latest score from the ledger (``source_id`` "<id>/<score>");
+    legacy rows (the retired "half the marks %" rule, no score) count by
+    their points (45+ = 90 %+).
+    """
+
+    def check(ctx: BadgeContext) -> bool:
+        from .models import XpEvent
+
+        latest: dict[str, int] = {}
+        rows = XpEvent.objects.filter(user_id=ctx.user_id, kind=rules.KIND_REPORT_GRADED).order_by("id")
+        for source_id, points in rows.values_list("source_id", "points"):
+            head, _sep, tail = str(source_id or "").partition("/")
+            if tail.isdigit():
+                latest[head] = int(tail)
+            elif head not in latest:
+                latest[head] = int(points or 0) * 2 // 10  # legacy: points = marks % / 2
+        return sum(1 for score in latest.values() if score >= min_score10) >= n
+
+    return check
 
 
 def _batch_top_3(ctx: BadgeContext) -> bool:

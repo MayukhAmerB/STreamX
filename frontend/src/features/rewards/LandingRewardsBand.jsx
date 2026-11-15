@@ -9,7 +9,7 @@ import { siteBrand } from "../../config/siteBrand";
 import { useAuth } from "../../hooks/useAuth";
 import LandingRewardsCard from "../landing-rewards/LandingRewardsCard";
 import { RANKS_NOTE, RECORD_POINTS, REWARDS_INTRO } from "./rewardsContent";
-import { PrizePodium, RankLadder, RewardPoints, RewardsMock, XpWays } from "./RewardsVisuals";
+import { PrizePodium, RankLadder, ReportBonusTiers, RewardPoints, RewardsMock, XpWays } from "./RewardsVisuals";
 
 const linkPrimary =
   "inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-5 text-sm font-semibold text-black transition hover:bg-[#E8E8E8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
@@ -58,6 +58,8 @@ export default function LandingRewardsBand() {
           <XpWays />
           <RewardsMock />
         </div>
+
+        <ReportBonusTiers className="mt-6" />
 
         <div className="mt-8 grid gap-6 lg:grid-cols-2">
           <PrizePodium />

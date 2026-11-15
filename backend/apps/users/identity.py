@@ -388,6 +388,94 @@ def identity_cells(block: dict[str, Any]) -> list[Any]:
     ]
 
 
+# --- Console (handles only) ------------------------------------------------------------------
+# Owner rule (Console): wherever the Console shows students' marks or results it
+# identifies a student by @handle only. The roll number stays as the staff
+# reference (it is not personal data); the real name, e-mail and phone never
+# leave the server on a Console payload or a Console CSV. The full identity
+# (real name included) lives in Django admin -> Examination.
+NO_HANDLE = "(no handle)"
+CONSOLE_BLOCK_KEYS = (
+    "roll_number",
+    "handle",
+    "handle_most_recent",
+    "handle_changed",
+    "label",
+    "stats",
+    "snapshot",
+    "user_id",
+)
+CONSOLE_IDENTITY_HEADER = [name for name in IDENTITY_HEADER if name != "Real name"]
+
+
+def handle_label(handle: str | None, roll: str) -> str:
+    """``@handle``, or ``AL-SYD-00042 (no handle)`` when the student has none yet."""
+    handle = str(handle or "").strip().lstrip("@")
+    return f"@{handle}" if handle else f"{roll} {NO_HANDLE}"
+
+
+def console_label(block: dict[str, Any]) -> str:
+    """The label for one block: the record's handle, else the most recent one, else the roll number."""
+    return handle_label(block.get("handle") or block.get("handle_most_recent"), block["roll_number"])
+
+
+def console_block(block: dict[str, Any]) -> dict[str, Any]:
+    """A full block without the real name (keys in ``CONSOLE_BLOCK_KEYS`` order)."""
+    return {
+        "roll_number": block["roll_number"],
+        "handle": block.get("handle"),
+        "handle_most_recent": block.get("handle_most_recent"),
+        "handle_changed": bool(block.get("handle_changed")),
+        "label": console_label(block),
+        "stats": block.get("stats"),
+        "snapshot": bool(block.get("snapshot")),
+        "user_id": block.get("user_id"),
+    }
+
+
+def console_blocks(pairs: Iterable[tuple[Any, Any]], **kwargs) -> list[dict[str, Any]]:
+    """``identity_blocks`` for the Console: the same bulk load, real names dropped."""
+    return [console_block(block) for block in identity_blocks(pairs, **kwargs)]
+
+
+def console_person_from_block(block: dict[str, Any]) -> dict[str, Any]:
+    """The Console ``student`` reference: id, roll number, handle and label (no name, no e-mail)."""
+    handle = block.get("handle") or block.get("handle_most_recent") or None
+    return {
+        "id": block["user_id"],
+        "roll_number": block["roll_number"],
+        "handle": handle,
+        "label": handle_label(handle, block["roll_number"]),
+    }
+
+
+def console_person(user_or_id, *, handle=...) -> dict[str, Any]:
+    """One student's Console reference (one query for the handle unless given)."""
+    user_id = _user_id(user_or_id)
+    if handle is ...:
+        handle = current_handle(user_id)
+    roll = roll_number(user_id)
+    return {"id": user_id, "roll_number": roll, "handle": handle or None, "label": handle_label(handle, roll)}
+
+
+def console_people(users: Iterable[Any]) -> dict[int, dict[str, Any]]:
+    """Console references for many students (one query)."""
+    ids = [user_id for user_id in (_user_id(user) for user in users) if user_id is not None]
+    handles = handles_for(ids)
+    return {user_id: console_person(user_id, handle=handles.get(user_id)) for user_id in ids}
+
+
+def console_identity_cells(block: dict[str, Any]) -> list[Any]:
+    """The ``CONSOLE_IDENTITY_HEADER`` cells (``identity_cells`` without the real name).
+
+    A student without any handle yet shows ``AL-SYD-00042 (no handle)`` in the Handle cell.
+    """
+    cells = identity_cells({**block, "real_name": ""})
+    if not block.get("handle") and not block.get("handle_most_recent"):
+        cells[2] = f"{block['roll_number']} {NO_HANDLE}"
+    return [cells[0], *cells[2:]]
+
+
 def chunked_blocks(items, user_of, record_of=None, *, size: int = 500, **kwargs):
     """Yield ``(item, block)`` for a (streamed) iterable, loading blocks per chunk."""
     chunk: list = []

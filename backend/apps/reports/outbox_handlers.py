@@ -176,7 +176,11 @@ def notify_late_digest(event):
     # Instructor, else the staff "graders" group, else all staff (never dropped).
     recipients = _scheduler.grader_ids(task.course)
     if recipients:
-        names = [item.student.full_name or item.student.email for item in pending]
+        from apps.users import identity
+
+        # Owner rule (Console): graders see students by @handle only.
+        people = identity.console_people(item.student_id for item in pending)
+        names = [people[item.student_id]["label"] for item in pending]
         shown = ", ".join(names[:5]) + (f" and {len(names) - 5} more" if len(names) > 5 else "")
         count = len(pending)
         create_notification(

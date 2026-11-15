@@ -1,4 +1,9 @@
-"""CSV exports of CTF scores and attempts (admin only).
+"""CSV exports of CTF scores and attempts.
+
+* Django admin (Examination): the full identity (roll number, real name,
+  handle, stats) plus the student's e-mail.
+* Console (``console=True``): handles only, by owner rule. No real name and no
+  e-mail; the roll number stays as the staff reference.
 
 Every text cell goes through ``csv_cell`` so a student cannot plant a
 spreadsheet formula (``=HYPERLINK(...)``) in an answer that later runs in
@@ -38,6 +43,12 @@ PARTICIPATION_HEADER = [
     "Submitted at",
     "Last correct answer at",
     "Staff preview",
+]
+
+# Console results CSV: the same record columns, handles only (no real name, no e-mail).
+CONSOLE_PARTICIPATION_HEADER = [
+    *identity.CONSOLE_IDENTITY_HEADER,
+    *[name for name in PARTICIPATION_HEADER[len(identity.IDENTITY_HEADER) :] if name != "Student email"],
 ]
 
 ATTEMPT_HEADER = [
@@ -104,6 +115,14 @@ def participation_row(participation, position, block=None):
     ]
 
 
+def console_participation_row(participation, position, block):
+    """``participation_row`` for the Console: handle-only identity, no e-mail."""
+    full = participation_row(participation, position, block)
+    record = full[len(identity.IDENTITY_HEADER) :]
+    email_at = PARTICIPATION_HEADER.index("Student email") - len(identity.IDENTITY_HEADER)
+    return [*identity.console_identity_cells(block), *record[:email_at], *record[email_at + 1 :]]
+
+
 def attempt_row(attempt, block=None):
     user = attempt.user
     course = attempt.participation.batch_course
@@ -137,9 +156,13 @@ def _iter_rows(header, rows):
         yield writer.writerow([csv_cell(value) for value in row])
 
 
-def iter_participations_csv(queryset):
+def iter_participations_csv(queryset, *, console=False):
+    """Scores CSV. ``console=True``: handles only (the Console export)."""
     queryset = queryset.select_related("exam", "user", "batch_course")
     pairs = identity.chunked_blocks(queryset.iterator(chunk_size=1000), lambda item: item.user, lambda item: item)
+    if console:
+        rows = (console_participation_row(item, position, block) for position, (item, block) in enumerate(pairs, 1))
+        return _iter_rows(CONSOLE_PARTICIPATION_HEADER, rows)
     rows = (participation_row(item, position, block) for position, (item, block) in enumerate(pairs, 1))
     return _iter_rows(PARTICIPATION_HEADER, rows)
 

@@ -475,10 +475,10 @@ class BackfillTests(ApiCase):
         kinds = dict(XpEvent.objects.filter(user=self.student).values_list("kind", "points"))
         self.assertEqual(
             kinds,
-            {"lecture_completed": 20, "report_submitted": 40, "report_graded": 30, "watch_time": 3},
+            {"lecture_completed": 20, "report_submitted": 40, "report_graded": 40, "watch_time": 3},
         )
         total = EngagementSummary.objects.get(user=self.student).total_xp
-        self.assertEqual(total, 93)
+        self.assertEqual(total, 103)  # 6/10 report = the 40 XP bonus tier
         call_command("engagement_backfill", "--apply", "--sleep", "0", stdout=io.StringIO())
         self.assertEqual(EngagementSummary.objects.get(user=self.student).total_xp, total)
         out = io.StringIO()

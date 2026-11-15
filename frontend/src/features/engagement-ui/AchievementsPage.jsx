@@ -17,6 +17,9 @@ import {
   tierInfo,
   verifyHref,
 } from "./engagementModel";
+import RankEmblem from "../landing-rewards/RankEmblem";
+import { rankNumber } from "../landing-rewards/landingRewardsModel";
+import { ReportBonusTiers } from "../rewards/RewardsVisuals";
 import { BadgeMedal, PageIntro, ProgressRing, StatStrip } from "./EngagementParts";
 import { TabBar, TabPanel } from "./Tabs";
 import useEngagement from "./useEngagement";
@@ -65,6 +68,7 @@ export function LevelCard({ summary, data }) {
   const progress = levelProgress(xp, level, next);
   return (
     <section className="eg-level" aria-labelledby="eg-level-title">
+      <RankEmblem number={rankNumber(level)} title={level?.title || "Recruit"} size={112} className="eg-level__emblem" />
       <ProgressRing value={progress.percent} size={88} stroke={5} label={next ? `Progress to ${next.title}` : "Top rank reached"}>
         <span className="eg-level__number">{level?.number ?? 1}</span>
       </ProgressRing>
@@ -159,7 +163,10 @@ export function RanksPanel({ xp, levelNumber }) {
         const state = level.number < levelNumber ? "passed" : level.number === levelNumber ? "current" : "ahead";
         return (
           <li key={level.key} className={`eg-ladder__row is-${state}`} aria-current={state === "current" ? "step" : undefined}>
-            <span className="eg-ladder__number eg-mono">{String(level.number).padStart(2, "0")}</span>
+            <span className="eg-ladder__number eg-mono">
+              <RankEmblem number={level.number} title={level.title} size={44} detail="compact" decorative />
+              <span className="cds--visually-hidden">{String(level.number).padStart(2, "0")}</span>
+            </span>
             <span className="eg-ladder__title">{level.title}</span>
             <span className="eg-ladder__xp eg-mono">{formatXp(level.min_xp)} XP</span>
             <span className="eg-ladder__state">
@@ -305,6 +312,7 @@ export default function AchievementsPage() {
       </TabPanel>
       <TabPanel idPrefix="eg-ach" tabKey="ranks" active={tab === "ranks"}>
         <RanksPanel xp={summary?.xp ?? data?.xp ?? 0} levelNumber={summary?.level?.number ?? data?.level?.number ?? 1} />
+        <ReportBonusTiers className="mt-6" title="Earn more XP: the weekly report bonus" />
       </TabPanel>
       <TabPanel idPrefix="eg-ach" tabKey="certificates" active={tab === "certificates"}>
         <CertificatesPanel achievements={achievements} />

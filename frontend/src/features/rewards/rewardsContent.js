@@ -19,6 +19,23 @@ export const XP_WAYS = [
   { key: "plans", value: "₹ × 0.5 XP", label: "Subscriptions", note: "Half an XP per rupee" },
 ];
 
+/**
+ * Weekly report XP (mirrors backend rules.REPORT_MARK_BONUS, the default of
+ * ENGAGEMENT_REPORT_MARK_BONUS): every submitted report earns the base XP, and
+ * the graded score out of 10 (rounded down) adds a bonus tier.
+ */
+export const REPORT_BASE_XP = { submitted: 30, onTime: 40 };
+
+export const REPORT_MARK_BONUS = [
+  { score: 10, xp: 300, label: "Perfect report" },
+  { score: 9, xp: 200, label: "Excellent" },
+  { score: 8, xp: 130, label: "Strong" },
+  { score: 7, xp: 80, label: "Good" },
+  { score: 6, xp: 40, label: "Pass" },
+];
+
+export const REPORT_BONUS_NOTE = "Below 6/10 earns the submission XP only. A regrade adjusts the bonus up or down.";
+
 export const WEEKLY_PRIZES = [
   { place: "#1", xp: "200 XP", label: "Top of the week" },
   { place: "#2–3", xp: "120 XP", label: "Runners-up" },

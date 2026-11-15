@@ -8,6 +8,7 @@ import { useParams } from "react-router-dom";
 import { ErrorState, NotFoundState, PageHeader, PageSkeleton } from "../app-shell/ui";
 import { getStudentGradebook } from "../gradebook/gradebookApi";
 import { StudentIdentityHeader } from "../identity/StudentIdentityHeader";
+import { studentLabel } from "../identity/identityModel";
 import { StudentSections } from "../../pages/GradebookPage";
 import { apiData, apiMessage } from "../../utils/api";
 import { gradingPaths, useWorkspaceRoot } from "./workspaceRoot";
@@ -46,10 +47,10 @@ export default function GradingStudentPage() {
           { label: "Grading", href: paths.queue() },
           { label: "Marks", href: paths.marks() },
         ]}
-        title={student?.full_name || student?.email || "Student"}
+        title={student || state.data?.identity ? studentLabel(state.data?.identity, student) : "Student"}
         description="Every weekly report and exam for this student, per batch."
       />
-      {!state.loading && state.data?.identity ? <StudentIdentityHeader identity={state.data.identity} eyebrow="Student" /> : null}
+      {!state.loading && state.data?.identity ? <StudentIdentityHeader identity={state.data.identity} eyebrow="Student" handlesOnly /> : null}
       {state.loading ? <PageSkeleton label="Loading marks" count={2} /> : null}
       {!state.loading && state.error ? <ErrorState error={`Couldn't load this student. ${state.error}`} onRetry={load} /> : null}
       {!state.loading && state.data ? <StudentSections data={state.data} /> : null}

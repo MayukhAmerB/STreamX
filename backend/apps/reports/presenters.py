@@ -39,8 +39,17 @@ def ref(obj):
     return {"id": obj.pk, "title": obj.title} if obj is not None else None
 
 
-def person(user):
-    return {"id": user.pk, "full_name": user.full_name or "", "email": user.email}
+def person(user, people=None):
+    """A student on a grader (Console) payload: id, roll number, handle, label.
+
+    Owner rule (Console): handles only, never the real name or the e-mail.
+    ``people`` is a preloaded ``identity.console_people`` map (no query).
+    """
+    from apps.users import identity
+
+    if people is not None and user.pk in people:
+        return people[user.pk]
+    return identity.console_person(user)
 
 
 def file_dict(item):
@@ -291,15 +300,18 @@ def queue_item(submission, signals=None, week_labels=None, identity_block=None):
     grade = getattr(submission, "grade", None)
     signals = signals or {}
     task = submission.task
-    if identity_block is None:
-        from apps.users import identity
+    from apps.users import identity
 
+    if identity_block is None:
         identity_block = identity.block_for_user(submission.student, record=submission)
+    # Owner rule (Console): handles only. A full block is reduced here, so no caller can leak a name.
+    if "label" not in identity_block:
+        identity_block = identity.console_block(identity_block)
     return {
         "identity": identity_block,
         "id": submission.pk,
         "task": gradebook_task_dict(task),
-        "student": person(submission.student),
+        "student": identity.console_person_from_block(identity_block),
         "target_name": submission.target_name or task.title,
         "target_key": submission.target_key,
         "week_start": task.week_start,
@@ -340,9 +352,13 @@ def submission_detail(submission, neighbours):
     )
     from apps.users import identity
 
+    # Owner rule: the student block comes first (snapshot at submission + most recent handle);
+    # on the Console it is handle-only (no real name, no e-mail).
+    block = identity.console_block(
+        identity.block_for_user(submission.student, record=submission, course_id=task.course_id)
+    )
     return {
-        # Owner rule: the student block comes first (snapshot at submission + most recent handle).
-        "identity": identity.block_for_user(submission.student, record=submission, course_id=task.course_id),
+        "identity": block,
         "id": submission.pk,
         "target_name": submission.target_name or task.title,
         "different_target_confirmed": submission.different_target_confirmed,
@@ -364,7 +380,7 @@ def submission_detail(submission, neighbours):
             "marks_released_at": task.marks_released_at,
             "criteria": [criterion_dict(item) for item in criteria],
         },
-        "student": person(submission.student),
+        "student": identity.console_person_from_block(block),
         "status": submission.status,
         "revision": submission.revision,
         "submitted_at": submission.submitted_at,
@@ -470,7 +486,11 @@ def same_target_submissions(submission):
         .select_related("student")
         .order_by("submitted_at", "id")[:20]
     )
-    return [{"id": row.pk, "student": person(row.student), "status": row.status} for row in rows]
+    from apps.users import identity
+
+    rows = list(rows)
+    people = identity.console_people(row.student for row in rows)
+    return [{"id": row.pk, "student": person(row.student, people), "status": row.status} for row in rows]
 
 
 def sha256_matches(submission):
@@ -505,11 +525,17 @@ def sha256_matches(submission):
                     "file_name": mine.original_name,
                     "sha256": other.sha256,
                     "submission_id": sub.pk,
-                    "student": person(sub.student),
+                    "student": sub.student,
                     "target_name": sub.target_name,
                 }
             )
-    return matches[:20]
+    matches = matches[:20]
+    from apps.users import identity
+
+    people = identity.console_people(item["student"] for item in matches)
+    for item in matches:
+        item["student"] = person(item["student"], people)
+    return matches
 
 
 # ---------------------------------------------------------------------------

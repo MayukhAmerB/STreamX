@@ -8,6 +8,10 @@
 
 Correct attempts contain the right answer in plain text, so grant the
 "view CTF attempt" permission to trusted staff only.
+
+These screens form the sidebar section "Examination" (see
+``examination_admin.py``): the full student identity (roll number, REAL NAME,
+most recent handle, stats) lives here. The Console shows handles only.
 """
 
 from __future__ import annotations
@@ -19,9 +23,10 @@ from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 
+from apps.core.errors import DomainError
 from apps.users.identity_admin import IDENTITY_LIST_DISPLAY, StudentIdentityAdminMixin
 
-from . import answers, exports
+from . import answers, console, exports
 from .models import CtfAttempt, CtfExam, CtfExamResult, CtfMaterial, CtfParticipation, CtfQuestion
 
 
@@ -81,19 +86,22 @@ class CtfExamAdmin(admin.ModelAdmin):
     list_display = (
         "title",
         "slug",
+        "state_label",
         "status",
         "opens_at",
         "closes_at",
         "time_limit_minutes",
+        "batches",
         "question_count",
         "participant_count",
+        "results_finalized_at",
         "records",
     )
-    list_filter = ("status",)
+    list_filter = ("status", "auto_publish", ("eligible_courses", admin.RelatedOnlyFieldListFilter))
     search_fields = ("slug", "title", "title_ur")
     autocomplete_fields = ("eligible_courses",)
     inlines = (CtfQuestionInline,)
-    actions = ("publish_selected", "close_selected")
+    actions = ("publish_selected", "unschedule_selected", "close_selected")
     readonly_fields = (
         "slug",
         "title",
@@ -107,12 +115,33 @@ class CtfExamAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
         "records",
+        "state_label",
+        "auto_publish",
+        "published_at",
+        "closed_at",
+        "results_finalized_at",
+        "results_notified_at",
+        "stats_text",
     )
     fieldsets = (
         ("Exam (from the exam file)", {"fields": ("slug", "title", "title_ur", "briefing_text", "rules_text")}),
-        ("Schedule", {"fields": ("status", "opens_at", "closes_at", "time_limit_minutes")}),
+        (
+            "Schedule",
+            {
+                "fields": (
+                    "state_label",
+                    "status",
+                    "opens_at",
+                    "closes_at",
+                    "time_limit_minutes",
+                    "auto_publish",
+                    "published_at",
+                    "closed_at",
+                )
+            },
+        ),
         ("Who may sit it", {"fields": ("eligible_courses",)}),
-        ("Results", {"fields": ("records",)}),
+        ("Results", {"fields": ("stats_text", "results_finalized_at", "results_notified_at", "records")}),
         (
             "Content",
             {
@@ -141,6 +170,30 @@ class CtfExamAdmin(admin.ModelAdmin):
                     "participations", filter=Q(participations__is_staff_preview=False), distinct=True
                 ),
             )
+            .prefetch_related("eligible_courses")
+        )
+
+    @admin.display(description="State")
+    def state_label(self, obj):
+        if not obj or not obj.pk:
+            return "-"
+        return console.exam_state(obj).replace("_", " ").capitalize()
+
+    @admin.display(description="Eligible batches")
+    def batches(self, obj):
+        names = [course.title for course in obj.eligible_courses.all()]
+        return ", ".join(names) if names else "None yet"
+
+    @admin.display(description="Stats (as in the Console)")
+    def stats_text(self, obj):
+        if not obj or not obj.pk:
+            return "-"
+        stats = console._participation_counts(obj)
+        average = "-" if stats["average_score"] is None else f"{stats['average_score']:g}"
+        top = "-" if stats["top_score"] is None else stats["top_score"]
+        return (
+            f"{stats['participants']} students · {stats['active']} active · {stats['submitted']} submitted · "
+            f"{stats['expired']} expired · average {average} · top {top}"
         )
 
     def get_urls(self):
@@ -165,6 +218,7 @@ class CtfExamAdmin(admin.ModelAdmin):
         return exam
 
     def attempts_csv_view(self, request, pk):
+        # Full identity (real name, e-mail): admins only.
         if not CtfAttemptAdmin.has_view_permission_for(request):
             raise Http404
         exam = self._exam_or_404(pk)
@@ -174,6 +228,7 @@ class CtfExamAdmin(admin.ModelAdmin):
         )
 
     def scores_csv_view(self, request, pk):
+        # Full identity (real name, e-mail): admins only.
         if not CtfParticipationAdmin.has_view_permission_for(request):
             raise Http404
         exam = self._exam_or_404(pk)
@@ -194,11 +249,17 @@ class CtfExamAdmin(admin.ModelAdmin):
     def records(self, obj):
         if not obj or not obj.pk:
             return "-"
+        from apps.certification.models import CertificationDecision
+
         return format_html(
-            '<a href="{}">Scores</a> · <a href="{}">Every answer</a> · '
-            '<a href="{}">Scores CSV</a> · <a href="{}">Answers CSV</a>',
+            '<a href="{}">Results</a> · <a href="{}">Every answer</a> · <a href="{}">Questions</a> · '
+            '<a href="{}">Final results</a> · <a href="{}">Certification</a> · '
+            '<a href="{}">Results CSV</a> · <a href="{}">Answers CSV</a>',
             _changelist(CtfParticipation, exam__id__exact=obj.pk),
             _changelist(CtfAttempt, exam__id__exact=obj.pk),
+            _changelist(CtfQuestion, exam__id__exact=obj.pk),
+            _changelist(CtfExamResult, exam__id__exact=obj.pk),
+            _changelist(CertificationDecision, exam__id__exact=obj.pk),
             reverse("admin:ctf_ctfexam_scores_csv", args=[obj.pk]),
             reverse("admin:ctf_ctfexam_attempts_csv", args=[obj.pk]),
         )
@@ -257,6 +318,19 @@ class CtfExamAdmin(admin.ModelAdmin):
             return "its answer key was made with a different pepper. Reload the exam file."
         return ""
 
+    @admin.action(description="Take selected exams off the schedule (back to draft, as in the Console)")
+    def unschedule_selected(self, request, queryset):
+        done = 0
+        for exam in queryset:
+            try:
+                console.unschedule_exam(exam)
+            except DomainError as exc:
+                self.message_user(request, f"{exam.slug}: {getattr(exc, 'message', None) or exc}", messages.WARNING)
+                continue
+            done += 1
+        if done:
+            self.message_user(request, f"Took {done} exam(s) off the schedule.", messages.SUCCESS)
+
     @admin.action(description="Close selected exams (no more answers)")
     def close_selected(self, request, queryset):
         updated = 0
@@ -270,6 +344,23 @@ class CtfExamAdmin(admin.ModelAdmin):
 
 # Leaderboard order: highest score first, earlier last-correct answer wins ties.
 LEADERBOARD_ORDERING = ("exam", "-score", F("last_correct_at").asc(nulls_last=True), "started_at", "id")
+
+
+def leaderboard_ranks(exam_ids):
+    """``{participation id: rank}`` for the exams, exactly as the Console ranks them
+    (staff previews unranked; equal score and last-correct time share a rank)."""
+    from .scheduler import leaderboard
+
+    ranks = {}
+    for exam_id in exam_ids:
+        previous_key, rank = None, 0
+        rows = leaderboard(CtfExam(pk=exam_id)).values_list("pk", "score", "last_correct_at")
+        for position, (pk, score, last_correct_at) in enumerate(rows, 1):
+            key = (score, last_correct_at)
+            if key != previous_key:
+                rank, previous_key = position, key
+            ranks[pk] = rank
+    return ranks
 
 
 class _ReadOnlyAdmin(admin.ModelAdmin):
@@ -323,17 +414,26 @@ class CtfParticipationAdmin(StudentIdentityAdminMixin, _ReadOnlyAdmin):
         "student_email",
         "exam",
         "batch_course",
+        "rank",
         "status",
         "score",
         "solved_count",
         "wrong_count",
         "attempt_count",
         "started_at",
+        "deadline_at",
         "submitted_at",
         "is_staff_preview",
     )
     list_filter = ("exam", ("batch_course", admin.RelatedOnlyFieldListFilter), "status", "is_staff_preview")
-    search_fields = ("user__email", "user__full_name")
+    # Roll numbers (AL-SYD-00042) are matched by StudentIdentityAdminMixin.
+    search_fields = (
+        "user__email",
+        "user__full_name",
+        "user__student_profile__handle",
+        "student_handle_snapshot",
+        "student_name_snapshot",
+    )
     list_select_related = ("exam", "user", "batch_course")
     ordering = LEADERBOARD_ORDERING
     inlines = (CtfAttemptInline,)
@@ -341,6 +441,9 @@ class CtfParticipationAdmin(StudentIdentityAdminMixin, _ReadOnlyAdmin):
     readonly_fields = (
         "exam",
         "user",
+        "student_roll_number",
+        "student_name_snapshot",
+        "student_handle_snapshot",
         "batch_course",
         "is_staff_preview",
         "status",
@@ -354,6 +457,19 @@ class CtfParticipationAdmin(StudentIdentityAdminMixin, _ReadOnlyAdmin):
         "last_correct_at",
         "updated_at",
     )
+
+    def get_changelist_instance(self, request):
+        changelist = super().get_changelist_instance(request)
+        ranks = leaderboard_ranks({row.exam_id for row in changelist.result_list})
+        for row in changelist.result_list:
+            row._rank = ranks.get(row.pk)
+        return changelist
+
+    @admin.display(description="Rank")
+    def rank(self, obj):
+        if not hasattr(obj, "_rank"):
+            obj._rank = leaderboard_ranks({obj.exam_id}).get(obj.pk)
+        return obj._rank if obj._rank is not None else "-"
 
     @admin.display(description="Email", ordering="user__email")
     def student_email(self, obj):
@@ -427,10 +543,18 @@ class CtfAttemptAdmin(StudentIdentityAdminMixin, _ReadOnlyAdmin):
         QuestionListFilter,
         "is_correct",
         ("participation__batch_course", admin.RelatedOnlyFieldListFilter),
+        "participation__status",
         "question__category",
     )
     date_hierarchy = "created_at"
-    search_fields = ("user__email", "user__full_name", "submitted_answer")
+    # Roll numbers (AL-SYD-00042) are matched by StudentIdentityAdminMixin.
+    search_fields = (
+        "user__email",
+        "user__full_name",
+        "user__student_profile__handle",
+        "participation__student_handle_snapshot",
+        "submitted_answer",
+    )
     list_select_related = ("exam", "user", "question", "participation")
     ordering = ("-created_at", "-id")
     actions = ("export_attempts_csv",)
@@ -450,7 +574,7 @@ class CtfAttemptAdmin(StudentIdentityAdminMixin, _ReadOnlyAdmin):
     )
     readonly_fields = fields
 
-    @admin.display(description="Student", ordering="user__email")
+    @admin.display(description="Email", ordering="user__email")
     def student_email(self, obj):
         return obj.user.email
 
@@ -480,9 +604,31 @@ class CtfAttemptAdmin(StudentIdentityAdminMixin, _ReadOnlyAdmin):
 class CtfExamResultAdmin(StudentIdentityAdminMixin, admin.ModelAdmin):
     """Written by ctf.scheduler when an exam closes; never edited by hand."""
 
-    list_display = (*IDENTITY_LIST_DISPLAY, "exam", "user", "batch_course", "score", "total_points", "rank", "status", "finalized_at", "notified_at")
-    list_filter = ("exam", ("batch_course", admin.RelatedOnlyFieldListFilter))
-    search_fields = ("user__email", "user__full_name", "exam__slug")
+    list_display = (
+        *IDENTITY_LIST_DISPLAY,
+        "student_email",
+        "exam",
+        "batch_course",
+        "rank",
+        "score",
+        "total_points",
+        "percent",
+        "solved_count",
+        "question_count",
+        "status",
+        "finalized_at",
+        "notified_at",
+    )
+    list_filter = ("exam", ("batch_course", admin.RelatedOnlyFieldListFilter), "status")
+    # Roll numbers (AL-SYD-00042) are matched by StudentIdentityAdminMixin.
+    search_fields = (
+        "user__email",
+        "user__full_name",
+        "user__student_profile__handle",
+        "student_handle_snapshot",
+        "exam__slug",
+    )
+    ordering = ("exam", F("rank").asc(nulls_last=True), "id")
     list_select_related = ("exam", "user", "batch_course")
 
     def has_add_permission(self, request, obj=None):
@@ -490,6 +636,16 @@ class CtfExamResultAdmin(StudentIdentityAdminMixin, admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+    @admin.display(description="Email", ordering="user__email")
+    def student_email(self, obj):
+        return obj.user.email
+
+    @admin.display(description="%")
+    def percent(self, obj):
+        if not obj.total_points:
+            return "-"
+        return f"{obj.score * 100 / obj.total_points:.1f}"
 
 
 @admin.register(CtfMaterial)
@@ -508,5 +664,6 @@ class CtfMaterialAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         return False
 
-# Monthly OSINT CTF seasons (season_admin.py registers its own admins).
-from . import season_admin  # noqa: E402,F401
+# Monthly OSINT CTF seasons (season_admin.py registers its own admins) and
+# Django admin -> Examination (questions, the combined gradebook).
+from . import examination_admin, season_admin  # noqa: E402,F401

@@ -188,11 +188,18 @@ def report_submission_saved(sender, instance, **kwargs):
     ):
         _note_pending(instance.student_id, rules.REPORT_SUBMITTED_XP)
     if instance.status == "graded":
+        # One event per grading state: a regrade (new marks or a new grading
+        # time) publishes again, and the handler settles the bonus difference.
+        from apps.reports.models import ReportGrade
+
+        state = ReportGrade.objects.filter(submission_id=instance.pk).values_list("graded_at", "final_marks").first()
+        graded_at, final_marks = state or (None, None)
+        stamp = f"{int(graded_at.timestamp()) if graded_at else 0}:{final_marks}"
         _publish_once(
-            f"eng:mk:report-grade:{instance.pk}",
+            f"eng:mk:report-grade:{instance.pk}:{stamp}",
             EVENT_REPORT_GRADED,
             {"submission_id": instance.pk},
-            dedupe_key=f"eng-report-grade:{instance.pk}",
+            dedupe_key=f"eng-report-grade:{instance.pk}:{stamp}",
         )
 
 

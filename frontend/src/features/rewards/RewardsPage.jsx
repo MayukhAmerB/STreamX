@@ -14,7 +14,7 @@ import {
   REWARDS_INTRO,
   TIER_LABELS,
 } from "./rewardsContent";
-import { PrizePodium, RankLadder, RewardPoints, RewardsEyebrow, RewardsMock, XpWays } from "./RewardsVisuals";
+import { PrizePodium, RankLadder, ReportBonusTiers, RewardPoints, RewardsEyebrow, RewardsMock, XpWays } from "./RewardsVisuals";
 
 const TIER_PIPS = { bronze: 1, silver: 2, gold: 3, platinum: 4 };
 
@@ -113,6 +113,7 @@ export default function RewardsPage() {
               <XpWays title="Ways to earn" />
               <RewardsMock />
             </div>
+            <ReportBonusTiers className="mt-6" />
           </Panel>
 
           <Panel id="rewards-ranks" title="Ranks" subtitle={RANKS_NOTE}>

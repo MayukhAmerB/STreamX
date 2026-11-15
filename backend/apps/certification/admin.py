@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.contrib import admin, messages
 
 from apps.core.errors import DomainError
+from apps.users.identity_admin import IDENTITY_LIST_DISPLAY, StudentIdentityAdminMixin
 
 from . import hall_of_fame, services
 from .grading import AnswerKeyMismatch
@@ -75,10 +76,32 @@ class CertificationAuditInline(admin.TabularInline):
 
 
 @admin.register(CertificationDecision)
-class CertificationDecisionAdmin(admin.ModelAdmin):
-    list_display = ("user", "exam", "outcome", "percent", "band", "review_state", "certificate", "decided_at")
+class CertificationDecisionAdmin(StudentIdentityAdminMixin, admin.ModelAdmin):
+    # Admin -> Examination: roll number, real name, handle, stats first (owner rule).
+    identity_record_attr = "participation"
+    list_display = (
+        *IDENTITY_LIST_DISPLAY,
+        "student_email",
+        "exam",
+        "outcome",
+        "score",
+        "total_points",
+        "percent",
+        "band",
+        "review_state",
+        "certificate",
+        "decided_at",
+    )
     list_filter = ("outcome", "review_state", "band", "exam")
-    search_fields = ("user__email", "exam__slug", "certificate__reference")
+    list_select_related = ("user", "exam", "participation", "certificate")
+    # Roll numbers (AL-SYD-00042) are matched by StudentIdentityAdminMixin.
+    search_fields = (
+        "user__email",
+        "user__full_name",
+        "user__student_profile__handle",
+        "exam__slug",
+        "certificate__reference",
+    )
     readonly_fields = [field.name for field in CertificationDecision._meta.fields]
     inlines = [CertificateDeliveryInline, CertificationAuditInline]
     actions = ["confirm_revocation", "dismiss_revocation"]
@@ -88,6 +111,10 @@ class CertificationDecisionAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    @admin.display(description="Email", ordering="user__email")
+    def student_email(self, obj):
+        return obj.user.email
 
     @admin.action(description="Confirm revocation (re-grade fails): revoke the certificate")
     def confirm_revocation(self, request, queryset):
@@ -238,8 +265,8 @@ def _register_nav_groups():
     except Exception:  # noqa: BLE001
         return
     for key, value in (
-        ("certification.examcertificationpolicy", ("assessments", "Certification policies")),
-        ("certification.certificationdecision", ("assessments", "Certification decisions")),
+        ("certification.examcertificationpolicy", ("examination", "Certification policies")),
+        ("certification.certificationdecision", ("examination", "Certification decisions")),
         ("certification.certificatedelivery", ("students", "Certificate deliveries")),
         ("certification.certificationpreferences", ("settings", "Certification preferences")),
         ("certification.halloffameentry", ("community", "Hall of Fame")),

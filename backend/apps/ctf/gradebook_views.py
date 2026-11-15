@@ -15,6 +15,7 @@ from . import exports, gradebook
 from .gradebook_serializers import (
     UnifiedBatchGradebookSerializer,
     UnifiedGradebookCourseListSerializer,
+    UnifiedMyGradebookSerializer,
     UnifiedStudentGradebookSerializer,
 )
 
@@ -29,9 +30,10 @@ class _GradebookView(APIView):
 
 
 class MyGradebookView(_GradebookView):
-    @extend_schema(operation_id="gradebook_me_retrieve", responses={200: UnifiedStudentGradebookSerializer})
+    @extend_schema(operation_id="gradebook_me_retrieve", responses={200: UnifiedMyGradebookSerializer})
     def get(self, request):
-        return _ok(UnifiedStudentGradebookSerializer, gradebook.my_gradebook(request.user))
+        # Always the requesting user's own book: the only payload here that carries a real name.
+        return _ok(UnifiedMyGradebookSerializer, gradebook.my_gradebook(request.user))
 
 
 class GradebookCourseListView(_GradebookView):

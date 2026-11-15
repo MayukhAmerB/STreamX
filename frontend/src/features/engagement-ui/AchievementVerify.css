@@ -218,28 +218,7 @@
   color: #fafafa;
 }
 
-.av-page .eg-medal .eg-medal__frame,
-.av-page .eg-medal .eg-medal__inner,
-.av-page .eg-medal .eg-medal__glyph {
-  fill: none;
-  stroke: #fafafa;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.1;
-}
-
-.av-page .eg-medal .eg-medal__pip {
-  fill: #fafafa;
-}
-
-.av-page .eg-medal.is-locked .eg-medal__frame {
-  stroke: #8a8a8a;
-  stroke-dasharray: 1.6 1.2;
-}
-
-.av-page .eg-medal.is-locked .eg-medal__glyph {
-  stroke: #8a8a8a;
-}
+/* The badge medal carries its own forged colours (EngagementParts.jsx). */
 
 @media (prefers-reduced-motion: reduce) {
   .av-button {

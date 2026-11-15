@@ -1081,6 +1081,16 @@ ENGAGEMENT_WEEKLY_TOP10_XP = env("ENGAGEMENT_WEEKLY_TOP10_XP", "")  # 60 (#4-10)
 ENGAGEMENT_MONTHLY_TOP10_XP = env("ENGAGEMENT_MONTHLY_TOP10_XP", "")  # 100
 ENGAGEMENT_STANDING_AWARDS = env_bool("ENGAGEMENT_STANDING_AWARDS", True)
 ENGAGEMENT_LEADERBOARD_COUNT_PURCHASE_XP = env_bool("ENGAGEMENT_LEADERBOARD_COUNT_PURCHASE_XP", True)
+# Report-mark bonus tiers (score out of 10 -> bonus XP, on top of the submission XP).
+# JSON object, e.g. {"10": 300, "9": 200, "8": 130, "7": 80, "6": 40}; empty = that default.
+ENGAGEMENT_REPORT_MARK_BONUS = env("ENGAGEMENT_REPORT_MARK_BONUS", "")
+# Weekly/monthly prize rules (owner, Nov 2026; apps/engagement/standings.py).
+ENGAGEMENT_PRIZE_ONE_PER_STUDENT = env_bool("ENGAGEMENT_PRIZE_ONE_PER_STUDENT", True)  # best placement only
+ENGAGEMENT_PRIZE_MIN_LEARNING_XP = env("ENGAGEMENT_PRIZE_MIN_LEARNING_XP", "")  # 150 learning XP in the period
+ENGAGEMENT_PRIZE_SMALL_BATCH_SIZE = env("ENGAGEMENT_PRIZE_SMALL_BATCH_SIZE", "")  # 30 active students
+ENGAGEMENT_PRIZE_SMALL_BATCH_TOP_N = env("ENGAGEMENT_PRIZE_SMALL_BATCH_TOP_N", "")  # 3 places paid below that
+# Courses that never compete (comma-separated ids), on top of unpublished and test-titled ones.
+ENGAGEMENT_PRIZE_EXCLUDED_COURSE_IDS = env("ENGAGEMENT_PRIZE_EXCLUDED_COURSE_IDS", "")
 # JSON list of 8 ascending integers from 0 (rank thresholds); empty = the documented curve.
 ENGAGEMENT_LEVEL_THRESHOLDS = env("ENGAGEMENT_LEVEL_THRESHOLDS", "")
 # Release day (owner's legacy plan, apps.engagement.legacy). ENGAGEMENT_RELEASE_AT is

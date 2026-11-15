@@ -25,6 +25,14 @@
 }
 
 // --- Grades ---------------------------------------------------------------
+.cw-own-identity {
+  margin: 0;
+  color: var(--cw-text-2);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
 .cw-course {
   display: flex;
   flex-direction: column;

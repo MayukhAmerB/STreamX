@@ -66,8 +66,8 @@ class LevelTests(SimpleTestCase):
         self.assertEqual(rules.lecture_xp(), 20)
         self.assertEqual(rules.report_submitted_xp(on_time=True), 40)
         self.assertEqual(rules.report_submitted_xp(on_time=False), 30)
-        self.assertEqual(rules.report_graded_xp(80), 40)
-        self.assertEqual(rules.report_graded_xp(100), 50)
+        self.assertEqual(rules.report_graded_xp(80), 130)  # report-mark bonus tier 8/10
+        self.assertEqual(rules.report_graded_xp(100), 300)
         self.assertEqual(rules.exam_xp(73.4), 73)
         self.assertEqual(rules.exam_xp(140), 100)
         self.assertEqual(rules.watch_blocks(299), 0)
@@ -410,11 +410,11 @@ class ReportRuleTests(EngagementTestCase):
         drain()
         self.assertEqual(XpEvent.objects.filter(user=self.student, kind=rules.KIND_REPORT_SUBMITTED).count(), 1)
 
-    def test_graded_marks_half_xp_per_percent(self):
+    def test_graded_marks_pay_the_report_bonus_tier(self):
         submission = self._submit()
         self._grade(submission, Decimal("8.00"))
         drain()
-        self.assertEqual(XpEvent.objects.get(user=self.student, kind=rules.KIND_REPORT_GRADED).points, 40)
+        self.assertEqual(XpEvent.objects.get(user=self.student, kind=rules.KIND_REPORT_GRADED).points, 130)
 
     def test_held_marks_award_on_release(self):
         from apps.reports import services as report_services
@@ -428,7 +428,7 @@ class ReportRuleTests(EngagementTestCase):
         self.assertFalse(XpEvent.objects.filter(user=self.student, kind=rules.KIND_REPORT_GRADED).exists())
         report_services.release_marks(task=self.task, actor=f.make_admin())
         drain()
-        self.assertEqual(XpEvent.objects.get(user=self.student, kind=rules.KIND_REPORT_GRADED).points, 50)
+        self.assertEqual(XpEvent.objects.get(user=self.student, kind=rules.KIND_REPORT_GRADED).points, 300)
         self.assertTrue(BadgeAward.objects.filter(user=self.student, badge_key="perfect_score").exists())
 
 

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#000000" />
+    <title>Insignia gallery</title>
+    <!--
+      Dev-only gallery of rank emblems and badge medals (WS-LEARN). `npm run dev`
+      serves it at /__insignia (vite.config.js kitGalleryPlugin). It is not a Vite
+      build input, so it never ships in production. Query: ?motion=reduce,
+      ?section=<id> (ranks-200, ranks-128, ranks-64, ranks-24, medal-tiers,
+      medal-catalogue, medal-small, in-context, console-header, console-header-recruit,
+      console-header-panel, console-header-level-panel, console-chip, landing-lvl, lvl-badges).
+    -->
+    <link rel="preload" href="/fonts/geist/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/features/landing-rewards/gallery/main.jsx"></script>
+  </body>
+</html>

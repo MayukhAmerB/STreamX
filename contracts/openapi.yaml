@@ -3914,6 +3914,38 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /engagement/me/promotion-seen/:
+    post:
+      operationId: engagement_me_promotion_seen_create
+      description: 'The level-up celebration was shown: acknowledge the promotion
+        (idempotent; it is shown once per rank).'
+      tags:
+      - engagement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /engagement/settings/:
     get:
       operationId: engagement_settings_retrieve
@@ -4305,7 +4337,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UnifiedStudentGradebook'
+                $ref: '#/components/schemas/UnifiedMyGradebook'
           description: ''
   /gradebook/students/{student_id}/:
     get:
@@ -7932,7 +7964,7 @@ paths:
         name: q
         schema:
           type: string
-        description: Student name or email, or target name
+        description: Student @handle or roll number (AL-SYD-00042), or target name
       - in: query
         name: status
         schema:
@@ -7981,7 +8013,7 @@ paths:
         name: q
         schema:
           type: string
-        description: Student name or email, or target name
+        description: Student @handle or roll number (AL-SYD-00042), or target name
       - in: query
         name: status
         schema:
@@ -8035,7 +8067,7 @@ paths:
         name: q
         schema:
           type: string
-        description: Student name or email, or target name
+        description: Student @handle or roll number (AL-SYD-00042), or target name
       - in: query
         name: status
         schema:
@@ -9470,6 +9502,51 @@ components:
       - path
       - size
       - uploaded
+    ConsoleOwnIdentity:
+      type: object
+      description: |-
+        The requesting student's own block on their own Console screens (e.g. ``/api/gradebook/me/``).
+
+        The Console block plus ``real_name``, for the student about themselves only.
+        Never use it on a staff or another student's payload: those stay handle-only.
+      properties:
+        roll_number:
+          type: string
+          description: AL-SYD-<user id, 5 digits>.
+        real_name:
+          type: string
+          description: The requesting student's own full name.
+        handle:
+          type: string
+          nullable: true
+          description: At submission time on a record; null = no handle.
+        handle_most_recent:
+          type: string
+          nullable: true
+        handle_changed:
+          type: boolean
+        label:
+          type: string
+          description: '''@handle'', or ''AL-SYD-00042 (no handle)''.'
+        stats:
+          allOf:
+          - $ref: '#/components/schemas/StudentIdentityStats'
+          nullable: true
+        snapshot:
+          type: boolean
+          description: True when roll/handle come from the record's snapshot.
+        user_id:
+          type: integer
+      required:
+      - handle
+      - handle_changed
+      - handle_most_recent
+      - label
+      - real_name
+      - roll_number
+      - snapshot
+      - stats
+      - user_id
     ConsoleQuestion:
       type: object
       properties:
@@ -9500,6 +9577,67 @@ components:
       - order
       - points
       - title
+    ConsoleStudentIdentity:
+      type: object
+      description: |-
+        The identity block on Console payloads: handles only (owner rule).
+
+        No real name, e-mail or phone: the full identity lives in Django admin ->
+        Examination. The roll number stays as the staff reference.
+      properties:
+        roll_number:
+          type: string
+          description: AL-SYD-<user id, 5 digits>.
+        handle:
+          type: string
+          nullable: true
+          description: At submission time on a record; null = no handle.
+        handle_most_recent:
+          type: string
+          nullable: true
+        handle_changed:
+          type: boolean
+        label:
+          type: string
+          description: '''@handle'', or ''AL-SYD-00042 (no handle)''.'
+        stats:
+          allOf:
+          - $ref: '#/components/schemas/StudentIdentityStats'
+          nullable: true
+        snapshot:
+          type: boolean
+          description: True when roll/handle come from the record's snapshot.
+        user_id:
+          type: integer
+      required:
+      - handle
+      - handle_changed
+      - handle_most_recent
+      - label
+      - roll_number
+      - snapshot
+      - stats
+      - user_id
+    ConsoleStudentRef:
+      type: object
+      description: 'A student reference on Console payloads: no real name, no e-mail.'
+      properties:
+        id:
+          type: integer
+        roll_number:
+          type: string
+          description: AL-SYD-<user id, 5 digits>.
+        handle:
+          type: string
+          nullable: true
+        label:
+          type: string
+          description: '''@handle'', or ''AL-SYD-00042 (no handle)''.'
+      required:
+      - handle
+      - id
+      - label
+      - roll_number
     ConsoleSummary:
       type: object
       properties:
@@ -10439,8 +10577,8 @@ components:
       properties:
         identity:
           allOf:
-          - $ref: '#/components/schemas/StudentIdentity'
-          description: Roll number, real name, handle, stats (first).
+          - $ref: '#/components/schemas/ConsoleStudentIdentity'
+          description: Roll number, handle, stats (first).
         student:
           $ref: '#/components/schemas/Person'
         cells:
@@ -11997,18 +12135,25 @@ components:
       - unavailable_reason
     Person:
       type: object
+      description: 'A student on grader (Console) payloads. Owner rule: handles only,
+        no real name or e-mail.'
       properties:
         id:
           type: integer
-        full_name:
+        roll_number:
           type: string
-        email:
+          description: AL-SYD-<user id, 5 digits>.
+        handle:
           type: string
-          format: email
+          nullable: true
+        label:
+          type: string
+          description: '''@handle'', or ''AL-SYD-00042 (no handle)''.'
       required:
-      - email
-      - full_name
+      - handle
       - id
+      - label
+      - roll_number
     PhaseEnum:
       enum:
       - upcoming
@@ -12845,12 +12990,12 @@ components:
       properties:
         identity:
           allOf:
-          - $ref: '#/components/schemas/StudentIdentity'
-          description: Roll number, real name, handle, stats (first).
+          - $ref: '#/components/schemas/ConsoleStudentIdentity'
+          description: Roll number, handle, stats (first).
         rank:
           type: integer
         student:
-          $ref: '#/components/schemas/StudentRef'
+          $ref: '#/components/schemas/ConsoleStudentRef'
         batch:
           allOf:
           - $ref: '#/components/schemas/Batch'
@@ -13733,19 +13878,6 @@ components:
       - reports_graded_average
       - reports_submitted
       - xp
-    StudentRef:
-      type: object
-      properties:
-        id:
-          type: integer
-        full_name:
-          type: string
-        email:
-          type: string
-      required:
-      - email
-      - full_name
-      - id
     StudentSubmission:
       type: object
       properties:
@@ -14039,8 +14171,8 @@ components:
       properties:
         identity:
           allOf:
-          - $ref: '#/components/schemas/StudentIdentity'
-          description: Roll number, real name, handle, stats (first).
+          - $ref: '#/components/schemas/ConsoleStudentIdentity'
+          description: Roll number, handle, stats (first).
         id:
           type: integer
         task:
@@ -14162,8 +14294,8 @@ components:
       properties:
         identity:
           allOf:
-          - $ref: '#/components/schemas/StudentIdentity'
-          description: Roll number, real name, handle, stats (first).
+          - $ref: '#/components/schemas/ConsoleStudentIdentity'
+          description: Roll number, handle, stats (first).
         id:
           type: integer
         task:
@@ -14725,8 +14857,8 @@ components:
       properties:
         identity:
           allOf:
-          - $ref: '#/components/schemas/StudentIdentity'
-          description: Roll number, real name, handle, stats (first).
+          - $ref: '#/components/schemas/ConsoleStudentIdentity'
+          description: Roll number, handle, stats (first).
         student:
           $ref: '#/components/schemas/UnifiedGradebookStudent'
         cells:
@@ -14741,17 +14873,25 @@ components:
       - totals
     UnifiedGradebookStudent:
       type: object
+      description: 'Owner rule (Console): handles only. Real names are in Django admin
+        -> Examination.'
       properties:
         id:
           type: integer
-        full_name:
+        roll_number:
           type: string
-        email:
+          description: AL-SYD-<user id, 5 digits>.
+        handle:
           type: string
+          nullable: true
+        label:
+          type: string
+          description: '''@handle'', or ''AL-SYD-00042 (no handle)''.'
       required:
-      - email
-      - full_name
+      - handle
       - id
+      - label
+      - roll_number
     UnifiedGradebookTotals:
       type: object
       properties:
@@ -14773,6 +14913,30 @@ components:
       - missing_count
       - overall_percentage
       - reports
+    UnifiedMyGradebook:
+      type: object
+      description: |-
+        ``/api/gradebook/me/``: the student's own gradebook, so their own real name is included.
+
+        Staff and instructor payloads (``UnifiedStudentGradebookSerializer``) stay handle-only.
+      properties:
+        identity:
+          allOf:
+          - $ref: '#/components/schemas/ConsoleOwnIdentity'
+          description: Roll number, the student's own real name, handle, stats (first).
+        student:
+          $ref: '#/components/schemas/UnifiedGradebookStudent'
+        courses:
+          type: array
+          items:
+            $ref: '#/components/schemas/UnifiedStudentCourseSection'
+        generated_at:
+          type: string
+          format: date-time
+      required:
+      - courses
+      - generated_at
+      - student
     UnifiedStudentCourseSection:
       type: object
       properties:
@@ -14798,8 +14962,8 @@ components:
       properties:
         identity:
           allOf:
-          - $ref: '#/components/schemas/StudentIdentity'
-          description: Roll number, real name, handle, stats (first).
+          - $ref: '#/components/schemas/ConsoleStudentIdentity'
+          description: Roll number, handle, stats (first).
         student:
           $ref: '#/components/schemas/UnifiedGradebookStudent'
         courses:

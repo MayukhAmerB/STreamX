@@ -1,0 +1,65 @@
+/*
+ * Compact rank chip (RankChip.jsx): 24 px emblem + LVL tag + rank title.
+ * OWNER: WS-LEARN. Greys only; no motion beyond a background change.
+ */
+
+.rank-chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.375rem;
+  color: #d4d4d4;
+  font-family: "Geist", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.rank-chip:hover {
+  color: #fafafa;
+}
+
+.rank-chip:focus-visible {
+  outline: 2px solid #fafafa;
+  outline-offset: -2px;
+}
+
+.rank-chip__title {
+  overflow: hidden;
+  max-inline-size: 9rem;
+  text-overflow: ellipsis;
+}
+
+/* Header (desktop): a 32 px plate before "Jump to…". */
+.rank-chip--header {
+  block-size: 2rem;
+  margin-inline-end: 0.5rem;
+  padding: 0 0.625rem 0 0.375rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #0a0a0a;
+}
+
+.rank-chip--header:hover {
+  background: #161616;
+}
+
+/* Account menu (every width): a full row under the user. */
+.rank-chip--menu {
+  display: flex;
+  min-block-size: 2.75rem;
+  margin: 0 1rem 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #0a0a0a;
+}
+
+.rank-chip--menu:hover {
+  background: #161616;
+}
+
+.rank-chip--menu .rank-chip__title {
+  max-inline-size: none;
+  flex: 1 1 auto;
+}

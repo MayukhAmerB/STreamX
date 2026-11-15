@@ -118,6 +118,29 @@ def award_many(user_id: int, items: list[AwardedItem], *, force: bool = False, n
     return result
 
 
+def settle_report_bonus(submission, *, extra: list[AwardedItem] | None = None, force: bool = False) -> AwardResult:
+    """Pay (or take back) the report-mark bonus difference for one graded report.
+
+    The ledger is read under the student's summary row lock, so two regrade
+    events delivered at once settle in turn: the second sees the first's row
+    and pays only what is still owed (the unique ledger key also guards it).
+    ``extra`` items (the submission XP) are awarded in the same transaction.
+    """
+    from . import sources
+
+    if not force and not is_enabled():
+        return AwardResult(skipped=True)
+    with transaction.atomic():
+        _lock_summary(submission.student_id)
+        items = [item for item in (extra or []) if item is not None]
+        bonus = sources.report_graded_item(submission)
+        if bonus is not None:
+            items.append(bonus)
+        if not items:
+            return AwardResult()
+        return award_many(submission.student_id, items, force=force)
+
+
 def notify_level_up(user_id: int, old_level: int, new_level: int) -> None:
     """In-app notification for a new rank (after commit; never raises)."""
     try:

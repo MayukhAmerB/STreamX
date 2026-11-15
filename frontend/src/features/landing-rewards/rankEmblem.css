@@ -1,0 +1,98 @@
+/*
+ * Rank emblem motion (RankEmblem.jsx; LevelBadge.jsx reuses the sheen). Transform and opacity only.
+ * - .lr-emblem__shine: the celebratory sweep (`shine`), plays 3 times.
+ * - .lr-emblem__sheen: ambient sheen on ranks VI-VIII (`animated`), slow loop.
+ * - .lr-emblem__aura: breathing glow behind ranks VII-VIII.
+ * - .lr-emblem__rays: the Elite Operator's starburst turns slowly.
+ * Everything is still under prefers-reduced-motion and :root[data-motion="reduce"]:
+ * the shine/sheen hide and the aura/rays rest in place.
+ */
+
+.lr-emblem,
+.lv-badge {
+  display: block;
+  flex: none;
+  overflow: visible;
+}
+
+.lr-emblem__shine,
+.lr-emblem__sheen {
+  opacity: 0;
+  transform: translateX(-40px);
+}
+
+.lr-emblem__aura,
+.lr-emblem__rays {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion="reduce"]) .lr-emblem__shine {
+    animation: lr-emblem-sweep 4.8s cubic-bezier(0.4, 0, 0.2, 1) 0.7s 3;
+  }
+
+  :root:not([data-motion="reduce"]) .lr-emblem__sheen {
+    animation: lr-emblem-sweep 7.5s cubic-bezier(0.4, 0, 0.2, 1) 1.2s infinite;
+  }
+
+  :root:not([data-motion="reduce"]) .lr-emblem--live .lr-emblem__aura {
+    animation: lr-emblem-breathe 4.2s ease-in-out infinite alternate;
+  }
+
+  :root:not([data-motion="reduce"]) .lr-emblem--live .lr-emblem__rays {
+    animation: lr-emblem-turn 80s linear infinite;
+  }
+}
+
+@keyframes lr-emblem-sweep {
+  0% {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  6% {
+    opacity: 1;
+  }
+  30% {
+    opacity: 1;
+    transform: translateX(210px);
+  }
+  34%,
+  100% {
+    opacity: 0;
+    transform: translateX(210px);
+  }
+}
+
+@keyframes lr-emblem-breathe {
+  from {
+    opacity: 0.7;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+}
+
+@keyframes lr-emblem-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lr-emblem__shine,
+  .lr-emblem__sheen,
+  .lr-emblem__aura,
+  .lr-emblem__rays {
+    animation: none;
+  }
+}
+
+:root[data-motion="reduce"] .lr-emblem__shine,
+:root[data-motion="reduce"] .lr-emblem__sheen,
+:root[data-motion="reduce"] .lr-emblem__aura,
+:root[data-motion="reduce"] .lr-emblem__rays {
+  animation: none;
+}

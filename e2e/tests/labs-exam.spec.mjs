@@ -73,9 +73,11 @@ test("labs: sign-in round trip, exam attempts recorded, staff see results", asyn
     const console_ = await staff.newPage();
     await console_.goto(`/console/admin/exams/${manifest.exam.slug}`);
     await expect(console_.getByText("Results (out of 30)")).toBeVisible();
-    await expect(console_.getByText(manifest.users.student1.name).first()).toBeVisible();
-    // Owner rule: the student block (roll number · real name · handle) leads the row, then rank and the record.
-    await expect(console_.getByRole("row", { name: /AL-SYD-\d{5} · Sana Student · \S+ 1 OSINT Foundations Submitted 30 2 1/ })).toBeVisible();
+    // Owner rule (Console): roll number · @handle lead the row (never the real name), then rank and the record.
+    await expect(console_.getByText(manifest.users.student1.name)).toHaveCount(0);
+    await expect(
+      console_.getByRole("row", { name: /AL-SYD-\d{5}( · @\S+| \(no handle\)) 1 OSINT Foundations Submitted 30 2 1/ })
+    ).toBeVisible();
     // Wrong-answer clusters (normalised) per question.
     await expect(console_.getByRole("row", { name: /Q1\. Find the handle 100% \(1\/1\) wronghandle99 ×1/ })).toBeVisible();
 

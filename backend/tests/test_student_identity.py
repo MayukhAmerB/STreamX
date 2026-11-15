@@ -51,6 +51,39 @@ BLOCK_KEYS = [
 ]
 
 
+CONSOLE_BLOCK_KEYS = [
+    "roll_number",
+    "handle",
+    "handle_most_recent",
+    "handle_changed",
+    "label",
+    "stats",
+    "snapshot",
+    "user_id",
+]
+PII_KEYS = {"real_name", "full_name", "email", "phone", "phone_number"}
+
+
+def pii_keys(value):
+    """Every personal-data key anywhere in a JSON payload (recursive)."""
+    found = set()
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key in PII_KEYS:
+                found.add(key)
+            found |= pii_keys(item)
+    elif isinstance(value, list):
+        for item in value:
+            found |= pii_keys(item)
+    return found
+
+
+def assert_console_header(case, header):
+    case.assertEqual(header[: len(identity.CONSOLE_IDENTITY_HEADER)], identity.CONSOLE_IDENTITY_HEADER)
+    case.assertNotIn("Real name", header)
+    case.assertFalse([name for name in header if "mail" in name.lower()], header)
+
+
 def accept_terms(*users):
     for user in users:
         user.terms_accepted_version = TERMS_VERSION
@@ -192,9 +225,10 @@ class ReportIdentityTests(ReportsTestBase):
         self.client.force_authenticate(self.instructor)
         queue = self.client.get(reverse("reports-manage-submissions")).data["data"]["results"]
         self.assertEqual(list(queue[0])[0], "identity")
-        self.assertEqual(list(queue[0]["identity"]), BLOCK_KEYS)
+        self.assertEqual(list(queue[0]["identity"]), CONSOLE_BLOCK_KEYS)
         self.assertEqual(queue[0]["identity"]["handle"], "quiet_falcon")
         self.assertEqual(queue[0]["identity"]["handle_most_recent"], "amber_lynx")
+        self.assertEqual(queue[0]["identity"]["label"], "@quiet_falcon")
         detail = self.client.get(reverse("reports-manage-submission-detail", args=[submission.pk])).data["data"]
         self.assertEqual(list(detail)[0], "identity")
         self.assertEqual(detail["identity"]["roll_number"], identity.roll_number(self.student))
@@ -214,18 +248,75 @@ class ReportIdentityTests(ReportsTestBase):
         for params in ({"course": self.course.pk}, {"task": self.task.pk}):
             text = self.client.get(reverse("reports-manage-export"), params).content.decode("utf-8-sig")
             rows = csv_rows(text)
-            assert_identity_header(self, rows[0])
-            self.assertEqual(rows[0][len(identity.IDENTITY_HEADER)], "Email")
+            # Owner rule (Console): handles only; no real name and no e-mail column.
+            assert_console_header(self, rows[0])
+            self.assertNotIn("Asha Rao", text)
+            self.assertNotIn(self.student.email, text)
             mine = next(row for row in rows[1:] if row[0] == identity.roll_number(self.student))
-            self.assertEqual(mine[1:4], ["Asha Rao", "quiet_falcon", "quiet_falcon"])
-            self.assertEqual(mine[identity.IDENTITY_HEADER.index("Reports graded average %")], "80.0")
+            self.assertEqual(mine[1:3], ["quiet_falcon", "quiet_falcon"])
+            self.assertEqual(mine[identity.CONSOLE_IDENTITY_HEADER.index("Reports graded average %")], "80.0")
 
     def test_zip_manifest_leads_with_identity(self):
         self.submit_pdf(self.student)
         archive = zipfile.ZipFile(io.BytesIO(b"".join(report_exports.iter_task_zip(self.task))))
-        rows = csv_rows(archive.read("manifest.csv").decode("utf-8-sig"))
-        assert_identity_header(self, rows[0])
+        manifest = archive.read("manifest.csv").decode("utf-8-sig")
+        rows = csv_rows(manifest)
+        assert_console_header(self, rows[0])
         self.assertEqual(rows[1][0], identity.roll_number(self.student))
+        self.assertNotIn("Asha Rao", manifest)
+        self.assertNotIn(self.student.email, manifest)
+        names = archive.namelist()
+        self.assertTrue(any(name.startswith(f"@quiet_falcon ({identity.roll_number(self.student)})/") for name in names))
+        self.assertFalse(any("Asha" in name for name in names))
+
+    def test_console_grader_payloads_carry_no_personal_data(self):
+        submission = self.submit_pdf(self.student)
+        other = self.submit_pdf(self.other)  # no handle yet
+        self.client.force_authenticate(self.instructor)
+        queue = self.client.get(reverse("reports-manage-submissions")).data["data"]
+        detail = self.client.get(reverse("reports-manage-submission-detail", args=[submission.pk])).data["data"]
+        book = self.client.get(reverse("reports-manage-gradebook"), {"course": self.course.pk}).data["data"]
+        for payload in (queue, detail, book):
+            self.assertEqual(pii_keys(payload), set())
+            text = str(payload)
+            for secret in ("Asha Rao", "Ravi Kumar", self.student.email, self.other.email):
+                self.assertNotIn(secret, text)
+        labels = {item["student"]["id"]: item["student"]["label"] for item in queue["results"]}
+        self.assertEqual(labels[self.student.pk], "@quiet_falcon")
+        self.assertEqual(labels[self.other.pk], f"{identity.roll_number(self.other)} (no handle)")
+        self.assertEqual(
+            set(queue["results"][0]["student"]), {"id", "roll_number", "handle", "label"}
+        )
+        # Graders find students by handle or roll number, never by name or e-mail.
+        url = reverse("reports-manage-submissions")
+        found = self.client.get(url, {"q": "quiet_fal"}).data["data"]["results"]
+        self.assertEqual([item["id"] for item in found], [submission.pk])
+        found = self.client.get(url, {"q": identity.roll_number(self.other)}).data["data"]["results"]
+        self.assertEqual([item["id"] for item in found], [other.pk])
+        self.assertEqual(self.client.get(url, {"q": "Asha"}).data["data"]["results"], [])
+
+    def test_grading_queue_search_by_handle_with_or_without_at_any_case(self):
+        submission = self.submit_pdf(self.student)
+        other = self.submit_pdf(self.other)
+        give_handle(self.other, "stone_owl")
+        self.client.force_authenticate(self.instructor)
+        url = reverse("reports-manage-submissions")
+
+        def ids(query):
+            response = self.client.get(url, {"q": query})
+            self.assertEqual(response.status_code, 200, response.data)
+            return [item["id"] for item in response.data["data"]["results"]]
+
+        for query in ("@quiet_falcon", "quiet_falcon", "@QUIET_Falcon", "Quiet_Fal", " @quiet_falcon "):
+            self.assertEqual(ids(query), [submission.pk], query)
+        for query in ("@stone_owl", "STONE_OWL"):
+            self.assertEqual(ids(query), [other.pk], query)
+        roll = identity.roll_number(self.student)
+        self.assertEqual(ids(roll.lower()), [submission.pk])
+        self.assertEqual(ids("@nobody_here"), [])
+        # Real names and e-mails are not searchable from the Console.
+        self.assertEqual(ids("asha rao"), [])
+        self.assertEqual(ids(self.student.email), [])
 
     def test_own_header_hides_unreleased_marks(self):
         self.task.marks_visibility = ReportTask.MARKS_ON_RELEASE
@@ -299,6 +390,7 @@ class CtfIdentityTests(APITestCase):
         row = data["participants"][0]
         self.assertEqual(list(row)[0], "identity")
         self.assertEqual(row["identity"]["handle"], "lunar_heron")
+        self.assertEqual(list(row["identity"]), CONSOLE_BLOCK_KEYS)
         book = self.client.get(reverse("gradebook-course", args=[self.course.pk])).data["data"]
         self.assertTrue(book["rows"])
         self.assertEqual(list(book["rows"][0])[0], "identity")
@@ -308,14 +400,96 @@ class CtfIdentityTests(APITestCase):
             if response.streaming
             else response.content.decode("utf-8")
         )
-        assert_identity_header(self, rows[0])
-        self.assertEqual(rows[0][len(identity.IDENTITY_HEADER)], "Student email")
+        assert_console_header(self, rows[0])
         student = self.client.get(reverse("gradebook-student", args=[self.student.pk])).data["data"]
         self.assertEqual(list(student)[0], "identity")
         self.client.force_authenticate(self.student)
         mine = self.client.get(reverse("gradebook-me")).data["data"]
         self.assertEqual(list(mine)[0], "identity")
         self.assertEqual(mine["identity"]["roll_number"], identity.roll_number(self.student))
+
+    def test_console_exam_payloads_and_csvs_carry_no_personal_data(self):
+        self.play()
+        nameless = f.make_user(full_name="Omar Farooq")
+        accept_terms(nameless)
+        f.make_enrollment(user=nameless, course=self.course)
+        start_participation(exam=self.exam, user=nameless)
+        self.client.force_authenticate(self.staff)
+        secrets = ("Zara Khan", "Omar Farooq", self.student.email, nameless.email)
+        payloads = [
+            self.client.get(reverse("ctf-admin-exam-results", args=[self.exam.slug])).data["data"],
+            self.client.get(reverse("gradebook-course", args=[self.course.pk])).data["data"],
+            self.client.get(reverse("gradebook-student", args=[self.student.pk])).data["data"],
+        ]
+        for payload in payloads:
+            self.assertEqual(pii_keys(payload), set())
+            for secret in secrets:
+                self.assertNotIn(secret, str(payload))
+        labels = {row["student"]["id"]: row["student"]["label"] for row in payloads[0]["participants"]}
+        self.assertEqual(labels[self.student.pk], "@lunar_heron")
+        self.assertEqual(labels[nameless.pk], f"{identity.roll_number(nameless)} (no handle)")
+        for name in ("ctf-admin-exam-results-csv", "gradebook-course-csv"):
+            args = [self.exam.slug] if name.startswith("ctf") else [self.course.pk]
+            response = self.client.get(reverse(name, args=args))
+            self.assertEqual(response.status_code, 200)
+            text = b"".join(response.streaming_content).decode("utf-8")
+            rows = csv_rows(text)
+            assert_console_header(self, rows[0])
+            for secret in secrets:
+                self.assertNotIn(secret, text)
+            by_roll = {row[0]: row for row in rows[1:]}
+            self.assertEqual(by_roll[identity.roll_number(self.student)][1], "lunar_heron")
+            self.assertEqual(
+                by_roll[identity.roll_number(nameless)][1], f"{identity.roll_number(nameless)} (no handle)"
+            )
+        # The student's own gradebook adds only their own real name (no e-mail, nobody else's name).
+        self.client.force_authenticate(self.student)
+        mine = self.client.get(reverse("gradebook-me")).data["data"]
+        self.assertEqual(pii_keys(mine), {"real_name"})
+        self.assertNotIn(self.student.email, str(mine))
+        self.assertNotIn("Omar Farooq", str(mine))
+
+    def test_my_gradebook_shows_own_real_name_and_handle(self):
+        self.play()
+        other = f.make_user(full_name="Omar Farooq")
+        accept_terms(other)
+        f.make_enrollment(user=other, course=self.course)
+        give_handle(other, "stone_owl")
+        self.client.force_authenticate(self.student)
+        mine = self.client.get(reverse("gradebook-me")).data["data"]
+        self.assertEqual(list(mine["identity"]), ["roll_number", "real_name", *CONSOLE_BLOCK_KEYS[1:]])
+        self.assertEqual(mine["identity"]["real_name"], "Zara Khan")
+        self.assertEqual(mine["identity"]["handle_most_recent"], "lunar_heron")
+        self.assertEqual(mine["identity"]["roll_number"], identity.roll_number(self.student))
+        # Only the identity block names the owner; the student reference stays handle-only.
+        self.assertEqual(set(mine["student"]), {"id", "roll_number", "handle", "label"})
+        self.assertEqual(pii_keys(mine), {"real_name"})
+        # Another student's /me is about themselves only.
+        self.client.force_authenticate(other)
+        theirs = self.client.get(reverse("gradebook-me")).data["data"]
+        self.assertEqual(theirs["identity"]["real_name"], "Omar Farooq")
+        self.assertNotIn("Zara Khan", str(theirs))
+        # Staff and instructor gradebook payloads never carry a real name, full name or e-mail.
+        self.client.force_authenticate(self.staff)
+        for payload in (
+            self.client.get(reverse("gradebook-course", args=[self.course.pk])).data["data"],
+            self.client.get(reverse("gradebook-student", args=[self.student.pk])).data["data"],
+        ):
+            self.assertEqual(pii_keys(payload), set())
+            for secret in ("Zara Khan", "Omar Farooq", self.student.email, other.email):
+                self.assertNotIn(secret, str(payload))
+
+    def test_admin_results_csv_keeps_the_full_identity(self):
+        self.play()
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse("admin:ctf_ctfexam_scores_csv", args=[self.exam.pk]))
+        self.assertEqual(response.status_code, 200)
+        rows = csv_rows(b"".join(response.streaming_content).decode("utf-8"))
+        self.assertEqual(rows[0], ctf_exports.PARTICIPATION_HEADER)
+        assert_identity_header(self, rows[0])
+        self.assertIn("Student email", rows[0])
+        self.assertEqual(rows[1][:3], [identity.roll_number(self.student), "Zara Khan", "lunar_heron"])
+        self.assertIn(self.student.email, rows[1])
 
     def test_admin_lists_show_identity_and_find_roll_numbers(self):
         self.play()

@@ -122,7 +122,15 @@ describe("Console exams", () => {
       exam: { total_points: 100 },
       stats: { participants: 1, active: 0, average_score: 50, top_score: 50 },
       participants: [
-        { rank: 1, student: { id: 3, full_name: "Asha", email: "a@x" }, batch: { title: "Batch 7" }, status: "expired", score: 50, solved_count: 1, wrong_count: 2 },
+        {
+          rank: 1,
+          student: { id: 3, roll_number: "AL-SYD-00003", handle: null, label: "AL-SYD-00003 (no handle)" },
+          batch: { title: "Batch 7" },
+          status: "expired",
+          score: 50,
+          solved_count: 1,
+          wrong_count: 2,
+        },
       ],
       questions: [{ key: "q1", order: 1, title: "Harbour", solve_rate: 50, solved: 1, attempted: 2, wrong_answers: [{ answer: "port x", count: 2 }] }],
     };
@@ -130,6 +138,7 @@ describe("Console exams", () => {
     expect(markup).toContain("Time over");
     expect(markup).toContain("port x ×2");
     expect(markup).toContain('href="/gradebook/students/3"');
+    expect(markup).toContain("AL-SYD-00003 (no handle)");
   });
 
   it("builds the staff card from open and scheduled exams", () => {
@@ -154,7 +163,8 @@ describe("Unified gradebook", () => {
     ],
     rows: [
       {
-        student: { id: 5, full_name: "Gina", email: "g@x" },
+        identity: { roll_number: "AL-SYD-00005", handle: "gina_g", handle_most_recent: "gina_g", label: "@gina_g" },
+        student: { id: 5, roll_number: "AL-SYD-00005", handle: "gina_g", label: "@gina_g" },
         cells: [
           { key: "report:1", kind: "report", status: "graded", value: 8, max: 10, is_late: false, rank: null },
           { key: "exam:2", kind: "exam", status: "result", value: 40, max: 40, is_late: false, rank: 1 },
@@ -170,6 +180,7 @@ describe("Unified gradebook", () => {
     expect(markup).toContain("40/40 (#1)");
     expect(markup).toContain("90%");
     expect(markup).toContain('href="/gradebook/students/5"');
+    expect(markup).toContain("AL-SYD-00005 · @gina_g");
   });
 
   it("shows a student's sections, or an empty state", () => {

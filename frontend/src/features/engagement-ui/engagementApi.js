@@ -39,7 +39,8 @@ export const fetchBadgeCatalogue = (options) => conditionalGet("/engagement/badg
 export const fetchLevelChart = (options) => conditionalGet("/engagement/levels/", options);
 
 /** The level-up moment was shown: acknowledge it so it is shown once. */
-export const acknowledgeLevelUp = () => apiClient.post("/engagement/me/level-seen/", {});
+// The level-up celebration was shown (idempotent server marker; once per promotion).
+export const acknowledgeLevelUp = () => apiClient.post("/engagement/me/promotion-seen/", {});
 
 export const fetchMyAchievements = (options) => conditionalGet("/engagement/achievements/", options);
 

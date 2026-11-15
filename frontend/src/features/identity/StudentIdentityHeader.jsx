@@ -2,6 +2,8 @@
 // Roll number -> real name -> handle (with the most recent handle when it
 // changed) -> stats, then the screen's own content. Auto-filled and
 // read-only: students never type their identity on a report or an exam.
+// On Console marks screens (`handlesOnly`) there is no real-name cell: the
+// Console identifies students by @handle and roll number only.
 import { Locked } from "@carbon/icons-react";
 import { useCallback, useEffect, useId, useState } from "react";
 import { apiData, apiMessage } from "../../utils/api";
@@ -10,7 +12,15 @@ import { EMPTY, identityFields, identityStats } from "./identityModel";
 import "./identity.css";
 
 /** Presentational: render a block from any API (`identity` field) in the owner's order. */
-export function StudentIdentityHeader({ identity, loading = false, error = "", onRetry, eyebrow = "Your identity", compact = false }) {
+export function StudentIdentityHeader({
+  identity,
+  loading = false,
+  error = "",
+  onRetry,
+  eyebrow = "Your identity",
+  compact = false,
+  handlesOnly = false,
+}) {
   const titleId = `sid-${useId().replace(/:/g, "")}`;
   if (loading) {
     return (
@@ -34,7 +44,7 @@ export function StudentIdentityHeader({ identity, loading = false, error = "", o
     );
   }
   if (!identity) return null;
-  const fields = identityFields(identity);
+  const fields = identityFields(identity, { handlesOnly });
   const stats = identityStats(identity.stats);
   return (
     <section className={`sid${compact ? " sid--compact" : ""}`} aria-labelledby={titleId} data-testid="student-identity">

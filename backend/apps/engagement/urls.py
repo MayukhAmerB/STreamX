@@ -7,6 +7,8 @@ urlpatterns = [
     path("me/history/", views.RewardHistoryView.as_view(), name="engagement-me-history"),
     path("me/highlights/", views.RewardHighlightsView.as_view(), name="engagement-me-highlights"),
     path("me/level-seen/", views.LevelSeenView.as_view(), name="engagement-level-seen"),
+    # The level-up celebration's "seen" marker (same idempotent acknowledgement).
+    path("me/promotion-seen/", views.PromotionSeenView.as_view(), name="engagement-promotion-seen"),
     path("levels/", views.LevelChartView.as_view(), name="engagement-levels"),
     path("journey/", journey.JourneyView.as_view(), name="engagement-journey"),
     path("journey/dismiss/", journey.JourneyDismissView.as_view(), name="engagement-journey-dismiss"),

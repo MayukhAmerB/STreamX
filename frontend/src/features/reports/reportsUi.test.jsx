@@ -347,7 +347,7 @@ describe("GradingForm", () => {
     revision: 5,
     status: "submitted",
     minutes_late: 90,
-    student: { id: 3, full_name: "Asha Rao", email: "asha@example.com" },
+    student: { id: 3, roll_number: "AL-SYD-00003", handle: "quiet_falcon", label: "@quiet_falcon" },
     current_version: { id: 90, number: 1, minutes_late: 90, files: [] },
     task: {
       max_marks: "10.00",
@@ -485,7 +485,7 @@ describe("gradebook", () => {
     ],
     rows: [
       {
-        student: { id: 3, full_name: "Asha Rao", email: "asha@example.com" },
+        student: { id: 3, roll_number: "AL-SYD-00003", handle: "quiet_falcon", label: "@quiet_falcon" },
         cells: [
           { task_id: 1, status: "graded", submission_id: 10, final_marks: "8.50", max_marks: "10.00", is_late: true, minutes_late: 30, is_missing: false },
           { task_id: 2, status: "submitted", submission_id: 11, final_marks: null, max_marks: "10.00", is_late: false, minutes_late: 0, is_missing: false },
@@ -493,7 +493,7 @@ describe("gradebook", () => {
         totals: { total_marks: "8.50", max_marks: "10.00", percentage: "85.00", graded_count: 1, missing_count: 0, late_count: 1, submitted_count: 2 },
       },
       {
-        student: { id: 4, full_name: "", email: "ravi@example.com" },
+        student: { id: 4, roll_number: "AL-SYD-00004", handle: null, label: "AL-SYD-00004 (no handle)" },
         cells: [
           { task_id: 1, status: "missing", submission_id: null, final_marks: null, max_marks: "10.00", is_late: false, minutes_late: 0, is_missing: true },
           { task_id: 2, status: "not_submitted", submission_id: null, final_marks: null, max_marks: "10.00", is_late: false, minutes_late: 0, is_missing: false },
@@ -515,7 +515,10 @@ describe("gradebook", () => {
     expect(html).toContain("Missing");
     expect(html).toContain('href="/console/admin/grading/queue?task=2&amp;status=all&amp;submission=11"');
     expect(html).toContain('href="/console/admin/grading/students/3"');
-    expect(html).toContain("ravi@example.com");
+    // Owner rule (Console): handles only, the roll number as the staff reference.
+    expect(html).toContain("AL-SYD-00003 · @quiet_falcon");
+    expect(html).toContain("AL-SYD-00004 (no handle)");
+    expect(html).not.toContain("@example.com");
   });
 
   it("summarises the class", () => {

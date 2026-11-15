@@ -7,6 +7,8 @@ import { Link } from "react-router-dom";
 import { EngagementOff } from "./AchievementsPage";
 import { fetchLevelChart } from "./engagementApi";
 import { formatXp, levelProgress } from "./engagementModel";
+import RankEmblem from "../landing-rewards/RankEmblem";
+import { rankNumber } from "../landing-rewards/landingRewardsModel";
 import { PageIntro, ProgressRing } from "./EngagementParts";
 import useEngagement from "./useEngagement";
 import useEngagementResource from "./useEngagementResource";
@@ -17,6 +19,7 @@ export function LevelPosition({ me }) {
   const progress = levelProgress(me.xp, me.level, me.next_level);
   return (
     <section className="eg-level" aria-labelledby="eg-levels-me">
+      <RankEmblem number={rankNumber(me.level)} title={me.level?.title || "Recruit"} size={112} className="eg-level__emblem" />
       <ProgressRing value={progress.percent} size={88} stroke={5} label={me.next_level ? `Progress to ${me.next_level.title}` : "Top rank reached"}>
         <span className="eg-mono">{me.level?.number ?? 1}</span>
       </ProgressRing>
@@ -45,7 +48,10 @@ export function LevelLadder({ levels = [] }) {
         const state = level.current ? "current" : level.reached ? "passed" : "ahead";
         return (
           <li key={level.key} className={`eg-ladder__row is-${state}`} aria-current={level.current ? "step" : undefined}>
-            <span className="eg-ladder__number eg-mono">{String(level.number).padStart(2, "0")}</span>
+            <span className="eg-ladder__number eg-mono">
+              <RankEmblem number={rankNumber(level)} title={level.title} size={44} detail="compact" decorative />
+              <span className="cds--visually-hidden">{String(level.number).padStart(2, "0")}</span>
+            </span>
             <span className="eg-ladder__title">
               {level.title}
               {level.unlocks?.length ? (

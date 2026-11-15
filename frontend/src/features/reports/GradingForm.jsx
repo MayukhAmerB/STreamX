@@ -8,6 +8,7 @@ import {
   rubricTotal,
   validateMarksInput,
 } from "./reportModel";
+import { studentLabel } from "../identity/identityModel";
 
 /** Initial form values from the stored grade. */
 export function initialGradingValues(detail) {
@@ -101,7 +102,7 @@ export default function GradingForm({ detail, saving = false, error = "", confli
     <form
       className="rpt-grade-form"
       noValidate
-      aria-label={`Marks for ${detail?.student?.full_name || detail?.student?.email || "this student"}`}
+      aria-label={`Marks for ${detail?.student || detail?.identity ? studentLabel(detail?.identity, detail?.student) : "this student"}`}
       onSubmit={(event) => {
         event.preventDefault();
         submit("grade", { andNext: hasNext });

@@ -17,7 +17,7 @@ import { formatIst, formatMinutesLate } from "../reports/reportModel";
 import StatusChip, { LateChip } from "../reports/StatusChip";
 import { apiData, apiMessage } from "../../utils/api";
 import { StudentIdentityHeader } from "../identity/StudentIdentityHeader";
-import { identityLine } from "../identity/identityModel";
+import { identityLine, studentLabel } from "../identity/identityModel";
 import { describeCounts } from "./GradingTasks";
 
 /** Status chips of the queue. "To grade" is the default view (no `status` param). */
@@ -196,7 +196,7 @@ export function DuplicateSignals({ detail, onNavigate }) {
             {same.map((item) => (
               <li key={item.id}>
                 <Button kind="ghost" size="sm" onClick={() => onNavigate(item.id)}>
-                  {item.student.full_name || item.student.email}
+                  {studentLabel(null, item.student)}
                 </Button>
               </li>
             ))}
@@ -209,7 +209,7 @@ export function DuplicateSignals({ detail, onNavigate }) {
           <ul className="rpt-history__list">
             {matches.map((item) => (
               <li key={`${item.sha256}-${item.submission_id}`}>
-                {item.file_name} = {item.student.full_name || item.student.email}
+                {item.file_name} = {studentLabel(null, item.student)}
                 {item.target_name ? ` (${item.target_name})` : ""} <code title={item.sha256}>{item.sha256.slice(0, 12)}</code>
               </li>
             ))}
@@ -245,7 +245,7 @@ export function GradingSplitView({ detail, saving, error, conflict, onSubmit, on
         <div className="grd-split__who">
           <h2 className="grd-split__name">{identityLine(detail.identity, detail.student)}</h2>
           <p className="grd-muted">
-            {detail.student.email} · {detail.target_name || detail.task.title}
+            {detail.target_name || detail.task.title}
             {detail.target_name && detail.target_name !== detail.task.title ? ` · ${detail.task.title}` : ""}
           </p>
           <div className="rpt-task__chips">
@@ -266,8 +266,8 @@ export function GradingSplitView({ detail, saving, error, conflict, onSubmit, on
           </Button>
         </div>
       </div>
-      {/* Owner rule: roll number, real name, handle (at submission + most recent), stats, then the record. */}
-      {detail.identity ? <StudentIdentityHeader identity={detail.identity} eyebrow="Student" compact /> : null}
+      {/* Owner rule (Console): roll number, handle (at submission + most recent), stats, then the record. No real name. */}
+      {detail.identity ? <StudentIdentityHeader identity={detail.identity} eyebrow="Student" compact handlesOnly /> : null}
       <div className="grd-split__panes">
         <section className="grd-split__files" aria-label="Submitted files">
           {detail.versions.length > 1 ? (
@@ -494,7 +494,7 @@ export default function GradingQueue({ onCount }) {
       <Toolbar
         search={{
           value: search,
-          placeholder: "Search students or targets",
+          placeholder: "Search @handle, roll number or target",
           onChange: setSearch,
         }}
         chips={QUEUE_STATUS_OPTIONS.map((option) => ({

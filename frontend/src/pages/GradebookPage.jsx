@@ -18,7 +18,7 @@ import {
 } from "../features/gradebook/gradebookApi";
 import { batchSummary, cellText, cellTone, columnLabel, formatPercent } from "../features/gradebook/gradebookModel";
 import { useAuth } from "../hooks/useAuth";
-import { identityLine } from "../features/identity/identityModel";
+import { identityLine, ownIdentityLine, studentLabel } from "../features/identity/identityModel";
 import { apiData, apiMessage } from "../utils/api";
 
 function Cell({ cell }) {
@@ -178,6 +178,17 @@ function useLoad(loader, deps) {
   return state;
 }
 
+/** The student's own header line: "Real Name · @handle · AL-SYD-00042" (own book only). */
+export function OwnGradebookIdentity({ identity }) {
+  const line = ownIdentityLine(identity);
+  if (!line) return null;
+  return (
+    <p className="cw-own-identity" data-testid="own-identity">
+      {line}
+    </p>
+  );
+}
+
 function MyGradebook() {
   const [attempt, setAttempt] = useState(0);
   const state = useLoad(getMyGradebook, [attempt]);
@@ -187,6 +198,7 @@ function MyGradebook() {
       <div className="cw-page">
         {state.loading ? <PageSkeleton label="Loading your marks" count={2} /> : null}
         {!state.loading && state.error ? <ErrorState error={state.error} onRetry={() => setAttempt((value) => value + 1)} /> : null}
+        {!state.loading && state.data ? <OwnGradebookIdentity identity={state.data.identity} /> : null}
         {!state.loading && state.data ? (
           <StudentSections
             data={state.data}
@@ -272,7 +284,7 @@ export function StudentGradebookPage() {
         <ArrowLeft size={16} aria-hidden="true" /> Gradebook
       </Link>
       <PageHeader
-        title={state.data?.student?.full_name || state.data?.student?.email || "Student"}
+        title={state.data?.student || state.data?.identity ? studentLabel(state.data?.identity, state.data?.student) : "Student"}
         description="Every weekly report and exam for this student, per batch."
       />
       {state.loading ? <PageSkeleton label="Loading marks" count={2} /> : null}

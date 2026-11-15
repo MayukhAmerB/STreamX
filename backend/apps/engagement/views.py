@@ -324,6 +324,10 @@ class LevelSeenView(APIView):
         )
 
 
+class PromotionSeenView(LevelSeenView):
+    """The level-up celebration was shown: acknowledge the promotion (idempotent; it is shown once per rank)."""
+
+
 class SettingsSerializer(serializers.Serializer):
     # "handle" | "hidden"; the retired "initials" / "name" are accepted and mean "handle".
     leaderboard_display = serializers.ChoiceField(

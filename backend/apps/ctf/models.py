@@ -448,7 +448,10 @@ class CtfExamResult(models.Model):
         return round(self.score * 100.0 / self.total_points, 1)
 
 
-# Monthly OSINT CTF seasons (apps/ctf/season_models.py), registered in this app.
+# Course (for the ExamGradebook proxy below), and the monthly OSINT CTF seasons
+# (apps/ctf/season_models.py), registered in this app.
+from apps.courses.models import Course as _Course  # noqa: E402
+
 from .season_models import (  # noqa: E402,F401
     CtfSeason,
     CtfSeasonAttempt,
@@ -456,3 +459,14 @@ from .season_models import (  # noqa: E402,F401
     CtfSeasonEntry,
     CtfSeasonReward,
 )
+
+
+class ExamGradebook(_Course):
+    """Django admin -> Examination -> Gradebook: one row per batch, opening the
+    combined (reports + exams) gradebook with the full student identity. A proxy:
+    no table, only the admin screen and its view permission."""
+
+    class Meta:
+        proxy = True
+        verbose_name = "batch gradebook"
+        verbose_name_plural = "gradebook"

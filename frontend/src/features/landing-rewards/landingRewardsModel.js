@@ -19,6 +19,22 @@ export function romanRank(number) {
   return ROMAN[Math.max(1, Math.min(ROMAN.length, Number(number) || 1)) - 1];
 }
 
+/**
+ * The rank number (1-8) of a level payload: its `number`, else its `key` or
+ * `title` matched against the ladder (older payloads), else 1.
+ */
+export function rankNumber(level) {
+  if (typeof level === "number" || typeof level === "string") {
+    const direct = Number(level);
+    if (direct >= 1 && direct <= LEVELS.length) return Math.floor(direct);
+  }
+  const number = Number(level?.number);
+  if (number >= 1 && number <= LEVELS.length) return Math.floor(number);
+  const text = String((typeof level === "string" ? level : level?.key || level?.title) || "").trim().toLowerCase();
+  const match = LEVELS.find((item) => item.key === text || item.title.toLowerCase() === text || item.key === text.replace(/\s+/g, "_"));
+  return match ? match.number : 1;
+}
+
 /** The ladder entry for a level payload / number (falls back to the local ladder). */
 export function rankFor(level) {
   const number = Number(level?.number) || 0;

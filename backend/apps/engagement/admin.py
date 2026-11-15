@@ -13,7 +13,7 @@ from django.utils import timezone
 from apps.core.errors import DomainError
 
 from . import badges as badge_catalogue
-from . import certificates, services
+from . import certificates, rules, services
 from .models import (
     Achievement,
     ActivityDay,
@@ -28,6 +28,16 @@ from .models import (
 )
 
 ADMIN_REASON = "Revoked from the Django admin."
+
+
+def report_bonus_summary() -> str:
+    """'Report bonus tiers (on top of 30 XP, 40 on time): 10/10 = 300 XP · 9/10 = 200 XP · ...'."""
+    tiers = " · ".join(f"{score}/10 = {points} XP" for score, points in rules.report_mark_bonus_table().items())
+    return (
+        f"Report bonus tiers (on top of {rules.report_submitted_xp(on_time=False)} XP, "
+        f"{rules.report_submitted_xp(on_time=True)} on time): {tiers}; below that 0. "
+        "Change with ENGAGEMENT_REPORT_MARK_BONUS."
+    )
 
 
 class ReadOnlyAdmin(admin.ModelAdmin):
@@ -58,6 +68,12 @@ class XpEventAdmin(ReadOnlyAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         return [field.name for field in self.model._meta.fields]
+
+    def changelist_view(self, request, extra_context=None):
+        # Read-only listing of the live report-mark bonus tiers (set by ENGAGEMENT_REPORT_MARK_BONUS).
+        if request.method == "GET":
+            self.message_user(request, report_bonus_summary(), level=messages.INFO)
+        return super().changelist_view(request, extra_context)
 
     @admin.action(description="Revoke selected XP events (adds a correcting entry)")
     def revoke_selected(self, request, queryset):

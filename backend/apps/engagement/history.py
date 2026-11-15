@@ -84,6 +84,11 @@ def _xp_page(user_id: int, page: int, page_size: int) -> dict:
     items = []
     for event in rows:
         label = KIND_LABELS.get(event.kind, event.kind.replace("_", " ").capitalize())
+        description = label
+        if event.kind == rules.KIND_REPORT_GRADED:
+            label, description = report_bonus_label(event)
+        elif event.kind in rules.STANDING_KINDS and event.points < 0:
+            description = "Prize voided: rule change"
         items.append(
             {
                 "id": event.pk,
@@ -92,10 +97,23 @@ def _xp_page(user_id: int, page: int, page_size: int) -> dict:
                 "source": event.kind,
                 "source_label": label,
                 "amount": event.points,
-                "description": label,
+                "description": description,
             }
         )
     return {"items": items, "page": page, "page_size": page_size, "total": total, "has_more": start + len(rows) < total}
+
+
+def report_bonus_label(event: XpEvent) -> tuple[str, str]:
+    """``("Report bonus", "Report bonus: 10/10")``; a regrade correction says so."""
+    from .sources import parse_report_bonus_source
+
+    _submission, score10 = parse_report_bonus_source(event.source_id)
+    if score10 is None:
+        return "Report bonus", "Report bonus (graded report)"
+    text = f"Report bonus: {score10}/10"
+    if str(event.idempotency_key or "").count(":") >= 2:  # report-graded:<id>:a<n> = a regrade correction
+        text += " (regraded)"
+    return "Report bonus", text
 
 
 def _enrollment_status(enrollment, now) -> str:

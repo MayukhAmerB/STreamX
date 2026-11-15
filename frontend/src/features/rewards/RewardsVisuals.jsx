@@ -4,7 +4,16 @@
 // the four XP cards, the code-built rank/meter/leaderboard mock and the
 // weekly-prize podium. Shared by the landing band and /rewards.
 import { LEVELS } from "../engagement-ui/engagementModel";
-import { MOCK_BOARD, MOCK_STUDENT, WEEKLY_PRIZES, XP_WAYS } from "./rewardsContent";
+import RankEmblem from "../landing-rewards/RankEmblem";
+import {
+  MOCK_BOARD,
+  MOCK_STUDENT,
+  REPORT_BASE_XP,
+  REPORT_BONUS_NOTE,
+  REPORT_MARK_BONUS,
+  WEEKLY_PRIZES,
+  XP_WAYS,
+} from "./rewardsContent";
 
 const xpFormat = new Intl.NumberFormat("en-IN");
 export const formatRewardXp = (value) => xpFormat.format(Math.max(0, Math.round(Number(value) || 0)));
@@ -30,14 +39,9 @@ export function RankLadder({ title = "Eight ranks", note }) {
         {LEVELS.map((level) => (
           <li
             key={level.key}
-            className="flex min-h-[104px] flex-col border-b border-r border-white/10 p-4"
+            className="flex min-h-[148px] flex-col border-b border-r border-white/10 p-4"
           >
-            <span
-              aria-hidden="true"
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-white/25 bg-white/[0.06] text-xs font-bold text-white"
-            >
-              {level.number}
-            </span>
+            <RankEmblem number={level.number} title={level.title} size={56} decorative />
             <span className="mt-3 text-sm font-semibold leading-tight text-white">{level.title}</span>
             <span className="mt-1 text-xs text-[#9E9E9E]">{formatRewardXp(level.min_xp)} XP</span>
           </li>
@@ -61,6 +65,42 @@ export function XpWays({ title = "How XP is earned", items = XP_WAYS }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/**
+ * Weekly report XP: the submission XP plus the mark-bonus tiers (score out of
+ * 10). Shared by the landing band, /rewards and the Console achievements page.
+ */
+export function ReportBonusTiers({ title = "Weekly report bonus", className = "" }) {
+  const top = REPORT_MARK_BONUS[0];
+  return (
+    <div className={`rounded-2xl border border-white/10 bg-[#0A0A0A] p-4 sm:p-5 ${className}`} data-testid="report-bonus-tiers">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="font-reference text-xl font-semibold text-white">{title}</h3>
+        <span className="text-xs text-[#999999]">
+          Up to {formatRewardXp(REPORT_BASE_XP.onTime + top.xp)} XP a report
+        </span>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-[#BDBDBD]">
+        Every report earns {REPORT_BASE_XP.submitted} XP ({REPORT_BASE_XP.onTime} on time). Your mark out of 10 adds a bonus:
+      </p>
+      <ol className="mt-4 grid grid-cols-5 gap-1.5 sm:gap-2" aria-label="Report mark bonus by score">
+        {REPORT_MARK_BONUS.map((tier, index) => (
+          <li
+            key={tier.score}
+            className={`flex flex-col items-center rounded-xl border px-1 py-3 text-center ${
+              index === 0 ? "border-white/40 bg-white/[0.07]" : "border-white/10 bg-[#090909]"
+            }`}
+          >
+            <span className="font-reference text-base font-semibold text-white sm:text-lg">{tier.score}/10</span>
+            <span className="mt-1 font-mono text-xs font-semibold text-[#E0E0E0] sm:text-sm">+{formatRewardXp(tier.xp)}</span>
+            <span className="mt-1 hidden text-[11px] leading-4 text-[#8E8E8E] sm:block">{tier.label}</span>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-3 text-xs leading-5 text-[#999999]">{REPORT_BONUS_NOTE}</p>
     </div>
   );
 }
@@ -94,12 +134,7 @@ export function RewardsMock() {
     >
       <RewardsEyebrow>Your rank</RewardsEyebrow>
       <div className="mt-3 flex items-center gap-3">
-        <span
-          aria-hidden="true"
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-white/[0.08] text-sm font-bold text-white"
-        >
-          {current.number}
-        </span>
+        <RankEmblem number={current.number} title={current.title} size={44} decorative />
         <span className="font-reference text-lg font-semibold text-white">{current.title}</span>
         <span className="ml-auto text-sm font-semibold text-[#D4D4D4]">{formatRewardXp(xp)} XP</span>
       </div>

@@ -13,6 +13,13 @@ student has a percentage for.
 
 Access: a student sees only their own gradebook; an instructor sees the
 batches (courses) they teach; staff see every batch.
+
+Owner rule (Console): every payload and CSV here identifies students by
+@handle only (roll number as the staff reference; no real name, no e-mail).
+The one exception is ``my_gradebook``: a student's own book also carries
+their own real name.
+Django admin -> Examination calls ``batch_gradebook(..., full_identity=True)``
+and ``batch_csv_rows(..., full_identity=True)`` for the full identity.
 """
 
 from __future__ import annotations
@@ -49,6 +56,14 @@ def _percent(part, whole):
 
 
 def person(user):
+    """The Console student reference: id, roll number, handle, label (no name, no e-mail)."""
+    from apps.users import identity
+
+    return identity.console_person(user)
+
+
+def full_person(user):
+    """Admin only (Django admin -> Examination): the real name and e-mail."""
     return {"id": user.pk, "full_name": getattr(user, "full_name", "") or "", "email": user.email}
 
 
@@ -199,7 +214,8 @@ def _reports_book(course):
     return course_gradebook(course)
 
 
-def batch_gradebook(course, *, now=None):
+def batch_gradebook(course, *, now=None, full_identity=False):
+    """The batch gradebook. ``full_identity`` (admin only) keeps real names and e-mails."""
     now = now or timezone.now()
     book = _reports_book(course)
     report_columns = [report_column(task) for task in book["tasks"]]
@@ -229,6 +245,8 @@ def batch_gradebook(course, *, now=None):
     from apps.users import identity
 
     blocks = identity.identity_blocks([(student, None) for student in students], course_id=course.pk)
+    if not full_identity:
+        blocks = [identity.console_block(block) for block in blocks]
     rows = []
     for student, block in zip(students, blocks, strict=True):
         cells = []
@@ -242,7 +260,8 @@ def batch_gradebook(course, *, now=None):
             cells.append(
                 exam_cell(column, exam, results.get((exam.pk, student.pk)), participations.get((exam.pk, student.pk)))
             )
-        rows.append({"identity": block, "student": person(student), "cells": cells, "totals": totals(cells)})
+        student_ref = full_person(student) if full_identity else identity.console_person_from_block(block)
+        rows.append({"identity": block, "student": student_ref, "cells": cells, "totals": totals(cells)})
     return {
         "course": course_dict(course),
         "columns": report_columns + exam_columns,
@@ -306,9 +325,10 @@ def student_gradebook(student, *, viewer, now=None):
         )
     from apps.users import identity
 
+    block = identity.console_block(identity.block_for_user(student))
     return {
-        "identity": identity.block_for_user(student),
-        "student": person(student),
+        "identity": block,
+        "student": identity.console_person_from_block(block),
         "courses": sections,
         "generated_at": now,
     }
@@ -351,10 +371,15 @@ def my_gradebook(user, *, now=None):
     ordered = sorted(sections.values(), key=lambda item: item["course"].title.lower())
     from apps.users import identity
 
+    # The student's own header: only marks they can already see count. Owner
+    # rule: about themselves, a student sees their real name next to their
+    # handle (``UnifiedMyGradebookSerializer``); every other payload here stays
+    # handle-only.
+    full = identity.block_for_user(user, include_unreleased=False)
+    block = identity.console_block(full)
     return {
-        # The student's own header: only marks they can already see count.
-        "identity": identity.block_for_user(user, include_unreleased=False),
-        "student": person(user),
+        "identity": {**block, "real_name": full.get("real_name") or ""},
+        "student": identity.console_person_from_block(block),
         "courses": [
             {
                 "course": course_dict(item["course"]),
@@ -371,21 +396,32 @@ def my_gradebook(user, *, now=None):
 # ---------------------------------------------------------------------------
 # CSV
 # ---------------------------------------------------------------------------
-def batch_csv_rows(book):
+def batch_csv_rows(book, *, full_identity=False):
+    """CSV rows of a batch gradebook.
+
+    Console (default): handles only (roll number, handle, stats), no e-mail.
+    ``full_identity`` (admin only): roll number, real name, handle, stats, e-mail;
+    ``book`` must then come from ``batch_gradebook(..., full_identity=True)``.
+    """
     from apps.users import identity
 
-    # Owner rule: the student block (roll number, real name, handle, stats) comes first.
-    header = [*identity.IDENTITY_HEADER, "Student email"]
+    # Owner rule: the student block comes first.
+    if full_identity:
+        header = [*identity.IDENTITY_HEADER, "Student email"]
+    else:
+        header = list(identity.CONSOLE_IDENTITY_HEADER)
     for column in book["columns"]:
         label = "Report" if column["kind"] == KIND_REPORT else "Exam"
         maximum = f" /{column['max']:g}" if isinstance(column["max"], (int, float)) else ""
         header.append(f"{label}: {column['title']}{maximum}")
     header += ["Reports %", "Exams %", "Overall %", "Missing", "Late"]
     yield header
-    course_id = (book.get("course") or {}).get("id") if isinstance(book.get("course"), dict) else None
-    blocks = identity.identity_blocks([(row["student"], None) for row in book["rows"]], course_id=course_id)
-    for row, block in zip(book["rows"], blocks, strict=True):
-        values = [*identity.identity_cells(block), row["student"]["email"]]
+    for row in book["rows"]:
+        block = row["identity"]
+        if full_identity:
+            values = [*identity.identity_cells(block), row["student"].get("email", "")]
+        else:
+            values = identity.console_identity_cells(block)
         for cell in row["cells"]:
             if cell["value"] is not None:
                 values.append(f"{cell['value']:g}")

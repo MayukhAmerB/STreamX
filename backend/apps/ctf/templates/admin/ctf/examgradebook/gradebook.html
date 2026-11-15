@@ -1,0 +1,71 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}{{ title }} | {{ site_title|default:_("Django site admin") }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Home</a>
+  &rsaquo; Examination
+  &rsaquo; <a href="{{ changelist_url }}">Gradebook</a>
+  &rsaquo; {{ course.title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main" class="exam-gradebook">
+  <div class="module aligned">
+    <h2>{{ course.title }}{% if course.batch %} · {{ course.batch }}{% endif %}</h2>
+    <p class="help">
+      Weekly reports and CTF exams together, as in Console &rarr; Gradebook, with the full student identity
+      (roll number, real name, handle, stats). The Console shows handles only.
+      Generated {{ generated_at }}.
+    </p>
+    <div class="submit-row">
+      <a class="button" href="{{ csv_url }}">Download CSV (full identity)</a>
+    </div>
+  </div>
+
+  <div class="module" style="overflow-x:auto">
+    {% if rows %}
+    <table id="exam-gradebook-table">
+      <thead>
+        <tr>
+          <th scope="col">Roll number</th>
+          <th scope="col">Real name</th>
+          <th scope="col">Handle</th>
+          <th scope="col">E-mail</th>
+          <th scope="col">Stats</th>
+          {% for column in columns %}
+            <th scope="col" title="{{ column.title }}">{% if column.kind == "exam" %}Exam{% else %}Report{% endif %}: {{ column.short_title }}</th>
+          {% endfor %}
+          <th scope="col">Reports %</th>
+          <th scope="col">Exams %</th>
+          <th scope="col">Overall %</th>
+          <th scope="col">Missing</th>
+          <th scope="col">Late</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td>{{ row.roll_number }}</td>
+          <td>{{ row.real_name }}</td>
+          <td>{{ row.handle }}</td>
+          <td>{{ row.email }}</td>
+          <td>{{ row.stats }}</td>
+          {% for cell in row.cells %}<td>{{ cell }}</td>{% endfor %}
+          <td>{{ row.reports }}</td>
+          <td>{{ row.exams }}</td>
+          <td>{{ row.overall }}</td>
+          <td>{{ row.missing }}</td>
+          <td>{{ row.late }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="help">No students in this batch have marks yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

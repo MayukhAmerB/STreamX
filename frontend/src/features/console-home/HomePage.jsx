@@ -1,13 +1,15 @@
 // Console Home `/console` (T1, plan §3.4). OWNER: WS-LEARN.
 // One request (GET /api/console/today/) answers "what should I do next".
 // The engagement summary (XP, streak) comes from the shared engagement store
-// (no extra polling) and only while the `engagement` switch is on.
+// (no extra polling) and only while the `engagement` switch is on; the rank
+// header at the top reads the same store (no second /me request).
 import { useEffect, useMemo, useState } from "react";
 import { siteBrand } from "../../config/siteBrand";
 import { useAuth } from "../../hooks/useAuth";
 import useCapabilities from "../capabilities/useCapabilities";
 import useEngagement from "../engagement-ui/useEngagement";
 import HomeView from "./HomeView";
+import ConsoleRankHeader from "./RankHeader";
 import useToday from "./useToday";
 
 const CLOCK_TICK_MS = 30_000;
@@ -52,6 +54,7 @@ export default function HomePage() {
       now={now}
       engagement={summary}
       practice={practice}
+      rankHeader={<ConsoleRankHeader engagement={engagement} />}
     />
   );
 }

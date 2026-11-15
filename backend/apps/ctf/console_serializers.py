@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from apps.users.identity_serializers import StudentIdentitySerializer
+from apps.users.identity_serializers import ConsoleStudentIdentitySerializer, ConsoleStudentRefSerializer
 
 from .console import STATE_CHOICES
 from .models import CATEGORY_CHOICES, DIFFICULTY_CHOICES, MAX_ATTEMPTS_CAP, CtfExam, CtfParticipation
@@ -169,16 +169,11 @@ class UploadResponseSerializer(serializers.Serializer):
     exam = ConsoleExamDetailSerializer(allow_null=True)
 
 
-class StudentRefSerializer(serializers.Serializer):
-    id = serializers.IntegerField()
-    full_name = serializers.CharField(allow_blank=True)
-    email = serializers.CharField()
-
-
 class ResultRowSerializer(serializers.Serializer):
-    identity = StudentIdentitySerializer(required=False, help_text="Roll number, real name, handle, stats (first).")
+    # Owner rule (Console): handles only. Real names are in Django admin -> Examination.
+    identity = ConsoleStudentIdentitySerializer(required=False, help_text="Roll number, handle, stats (first).")
     rank = serializers.IntegerField()
-    student = StudentRefSerializer()
+    student = ConsoleStudentRefSerializer()
     batch = BatchSerializer(allow_null=True)
     status = serializers.ChoiceField(choices=CtfParticipation.STATUS_CHOICES)
     score = serializers.IntegerField()

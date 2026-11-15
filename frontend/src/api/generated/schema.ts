@@ -2404,6 +2404,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/engagement/me/promotion-seen/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description The level-up celebration was shown: acknowledge the promotion (idempotent; it is shown once per rank). */
+        post: operations["engagement_me_promotion_seen_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/engagement/settings/": {
         parameters: {
             query?: never;
@@ -5241,6 +5258,28 @@ export interface components {
             material_id: number | null;
             size: number | null;
         };
+        /**
+         * @description The requesting student's own block on their own Console screens (e.g. ``/api/gradebook/me/``).
+         *
+         *     The Console block plus ``real_name``, for the student about themselves only.
+         *     Never use it on a staff or another student's payload: those stay handle-only.
+         */
+        ConsoleOwnIdentity: {
+            /** @description AL-SYD-<user id, 5 digits>. */
+            roll_number: string;
+            /** @description The requesting student's own full name. */
+            real_name: string;
+            /** @description At submission time on a record; null = no handle. */
+            handle: string | null;
+            handle_most_recent: string | null;
+            handle_changed: boolean;
+            /** @description '@handle', or 'AL-SYD-00042 (no handle)'. */
+            label: string;
+            stats: components["schemas"]["StudentIdentityStats"] | null;
+            /** @description True when roll/handle come from the record's snapshot. */
+            snapshot: boolean;
+            user_id: number;
+        };
         ConsoleQuestion: {
             key: string;
             order: number;
@@ -5250,6 +5289,35 @@ export interface components {
             points: number;
             max_attempts: number;
             materials: components["schemas"]["ConsoleMaterial"][];
+        };
+        /**
+         * @description The identity block on Console payloads: handles only (owner rule).
+         *
+         *     No real name, e-mail or phone: the full identity lives in Django admin ->
+         *     Examination. The roll number stays as the staff reference.
+         */
+        ConsoleStudentIdentity: {
+            /** @description AL-SYD-<user id, 5 digits>. */
+            roll_number: string;
+            /** @description At submission time on a record; null = no handle. */
+            handle: string | null;
+            handle_most_recent: string | null;
+            handle_changed: boolean;
+            /** @description '@handle', or 'AL-SYD-00042 (no handle)'. */
+            label: string;
+            stats: components["schemas"]["StudentIdentityStats"] | null;
+            /** @description True when roll/handle come from the record's snapshot. */
+            snapshot: boolean;
+            user_id: number;
+        };
+        /** @description A student reference on Console payloads: no real name, no e-mail. */
+        ConsoleStudentRef: {
+            id: number;
+            /** @description AL-SYD-<user id, 5 digits>. */
+            roll_number: string;
+            handle: string | null;
+            /** @description '@handle', or 'AL-SYD-00042 (no handle)'. */
+            label: string;
         };
         ConsoleSummary: {
             open: components["schemas"]["OpenExam"][];
@@ -5642,8 +5710,8 @@ export interface components {
             is_missing: boolean;
         };
         GradebookRow: {
-            /** @description Roll number, real name, handle, stats (first). */
-            identity?: components["schemas"]["StudentIdentity"];
+            /** @description Roll number, handle, stats (first). */
+            identity?: components["schemas"]["ConsoleStudentIdentity"];
             student: components["schemas"]["Person"];
             cells: components["schemas"]["GradebookCell"][];
             totals: components["schemas"]["GradebookTotals"];
@@ -6241,11 +6309,14 @@ export interface components {
             available: boolean;
             unavailable_reason: string | null;
         };
+        /** @description A student on grader (Console) payloads. Owner rule: handles only, no real name or e-mail. */
         Person: {
             id: number;
-            full_name: string;
-            /** Format: email */
-            email: string;
+            /** @description AL-SYD-<user id, 5 digits>. */
+            roll_number: string;
+            handle: string | null;
+            /** @description '@handle', or 'AL-SYD-00042 (no handle)'. */
+            label: string;
         };
         /**
          * @description * `upcoming` - upcoming
@@ -6648,10 +6719,10 @@ export interface components {
          */
         ReportWindowEnum: "not_open" | "open" | "late" | "closed";
         ResultRow: {
-            /** @description Roll number, real name, handle, stats (first). */
-            identity?: components["schemas"]["StudentIdentity"];
+            /** @description Roll number, handle, stats (first). */
+            identity?: components["schemas"]["ConsoleStudentIdentity"];
             rank: number;
-            student: components["schemas"]["StudentRef"];
+            student: components["schemas"]["ConsoleStudentRef"];
             batch: components["schemas"]["Batch"] | null;
             status: components["schemas"]["CtfParticipationStatusEnum"];
             score: number;
@@ -7017,11 +7088,6 @@ export interface components {
             exam_score: number | null;
             exams_taken: number;
         };
-        StudentRef: {
-            id: number;
-            full_name: string;
-            email: string;
-        };
         StudentSubmission: {
             id: number;
             status: components["schemas"]["ReportSubmissionStatusEnum"];
@@ -7120,8 +7186,8 @@ export interface components {
             can_submit: boolean;
         };
         SubmissionDetail: {
-            /** @description Roll number, real name, handle, stats (first). */
-            identity?: components["schemas"]["StudentIdentity"];
+            /** @description Roll number, handle, stats (first). */
+            identity?: components["schemas"]["ConsoleStudentIdentity"];
             id: number;
             task: components["schemas"]["GradingTask"];
             student: components["schemas"]["Person"];
@@ -7158,8 +7224,8 @@ export interface components {
             counts: components["schemas"]["TaskCounts"];
         };
         SubmissionQueueItem: {
-            /** @description Roll number, real name, handle, stats (first). */
-            identity?: components["schemas"]["StudentIdentity"];
+            /** @description Roll number, handle, stats (first). */
+            identity?: components["schemas"]["ConsoleStudentIdentity"];
             id: number;
             task: components["schemas"]["GradebookTask"];
             student: components["schemas"]["Person"];
@@ -7366,16 +7432,20 @@ export interface components {
             count: number;
         };
         UnifiedGradebookRow: {
-            /** @description Roll number, real name, handle, stats (first). */
-            identity?: components["schemas"]["StudentIdentity"];
+            /** @description Roll number, handle, stats (first). */
+            identity?: components["schemas"]["ConsoleStudentIdentity"];
             student: components["schemas"]["UnifiedGradebookStudent"];
             cells: components["schemas"]["UnifiedGradebookCell"][];
             totals: components["schemas"]["UnifiedGradebookTotals"];
         };
+        /** @description Owner rule (Console): handles only. Real names are in Django admin -> Examination. */
         UnifiedGradebookStudent: {
             id: number;
-            full_name: string;
-            email: string;
+            /** @description AL-SYD-<user id, 5 digits>. */
+            roll_number: string;
+            handle: string | null;
+            /** @description '@handle', or 'AL-SYD-00042 (no handle)'. */
+            label: string;
         };
         UnifiedGradebookTotals: {
             reports: components["schemas"]["UnifiedGradebookPart"];
@@ -7385,6 +7455,19 @@ export interface components {
             missing_count: number;
             late_count: number;
         };
+        /**
+         * @description ``/api/gradebook/me/``: the student's own gradebook, so their own real name is included.
+         *
+         *     Staff and instructor payloads (``UnifiedStudentGradebookSerializer``) stay handle-only.
+         */
+        UnifiedMyGradebook: {
+            /** @description Roll number, the student's own real name, handle, stats (first). */
+            identity?: components["schemas"]["ConsoleOwnIdentity"];
+            student: components["schemas"]["UnifiedGradebookStudent"];
+            courses: components["schemas"]["UnifiedStudentCourseSection"][];
+            /** Format: date-time */
+            generated_at: string;
+        };
         UnifiedStudentCourseSection: {
             course: components["schemas"]["UnifiedGradebookCourse"];
             columns: components["schemas"]["UnifiedGradebookColumn"][];
@@ -7392,8 +7475,8 @@ export interface components {
             totals: components["schemas"]["UnifiedGradebookTotals"];
         };
         UnifiedStudentGradebook: {
-            /** @description Roll number, real name, handle, stats (first). */
-            identity?: components["schemas"]["StudentIdentity"];
+            /** @description Roll number, handle, stats (first). */
+            identity?: components["schemas"]["ConsoleStudentIdentity"];
             student: components["schemas"]["UnifiedGradebookStudent"];
             courses: components["schemas"]["UnifiedStudentCourseSection"][];
             /** Format: date-time */
@@ -11814,6 +11897,39 @@ export interface operations {
             };
         };
     };
+    engagement_me_promotion_seen_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+                "application/x-www-form-urlencoded": {
+                    [key: string]: unknown;
+                };
+                "multipart/form-data": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     engagement_settings_retrieve: {
         parameters: {
             query?: never;
@@ -12226,7 +12342,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UnifiedStudentGradebook"];
+                    "application/json": components["schemas"]["UnifiedMyGradebook"];
                 };
             };
         };
@@ -15926,7 +16042,7 @@ export interface operations {
                 /** @description 'week': order by week, then target, then oldest */
                 group?: string;
                 late?: boolean;
-                /** @description Student name or email, or target name */
+                /** @description Student @handle or roll number (AL-SYD-00042), or target name */
                 q?: string;
                 /** @description awaiting, submitted, under_review, graded, returned_for_revision, resubmitted */
                 status?: string;
@@ -15957,7 +16073,7 @@ export interface operations {
                 /** @description 'week': order by week, then target, then oldest */
                 group?: string;
                 late?: boolean;
-                /** @description Student name or email, or target name */
+                /** @description Student @handle or roll number (AL-SYD-00042), or target name */
                 q?: string;
                 /** @description awaiting, submitted, under_review, graded, returned_for_revision, resubmitted */
                 status?: string;
@@ -15990,7 +16106,7 @@ export interface operations {
                 /** @description 'week': order by week, then target, then oldest */
                 group?: string;
                 late?: boolean;
-                /** @description Student name or email, or target name */
+                /** @description Student @handle or roll number (AL-SYD-00042), or target name */
                 q?: string;
                 /** @description awaiting, submitted, under_review, graded, returned_for_revision, resubmitted */
                 status?: string;

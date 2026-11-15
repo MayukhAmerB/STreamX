@@ -35,7 +35,17 @@ class AdminNavGroupsTests(TestCase):
         titles = [group["title"] for group in groups]
         self.assertEqual(
             titles,
-            ["Live classes", "Content", "Students & sales", "Billing", "Assessments", "Community", "Settings", "System"],
+            [
+                "Live classes",
+                "Content",
+                "Students & sales",
+                "Billing",
+                "Assessments",
+                "Examination",
+                "Community",
+                "Settings",
+                "System",
+            ],
         )
         self.assertNotIn("Not grouped yet", titles)
         for title in titles:
@@ -79,3 +89,24 @@ class AdminNavGroupsTests(TestCase):
         request = RequestFactory().get("/admin/")
         request.user = self.admin
         return admin.site.get_app_list(request)
+
+    def test_examination_section_holds_every_exam_screen(self):
+        groups = {
+            entry["key"]: (group["key"], entry["name"])
+            for group in enterprise_nav_groups(self._apps())
+            for entry in group["models"]
+        }
+        for key in (
+            "ctf.ctfexam",
+            "ctf.ctfquestion",
+            "ctf.ctfparticipation",
+            "ctf.ctfattempt",
+            "ctf.ctfexamresult",
+            "ctf.examgradebook",
+            "certification.certificationdecision",
+            "certification.examcertificationpolicy",
+        ):
+            self.assertEqual(groups[key][0], "examination", key)
+        examination = next(group for group in enterprise_nav_groups(self._apps()) if group["key"] == "examination")
+        self.assertEqual(examination["title"], "Examination")
+        self.assertEqual([entry["name"] for entry in examination["models"]][:3], ["Exams", "Results", "Attempts"])

@@ -14,7 +14,7 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework import serializers
 
-from apps.users.identity_serializers import StudentIdentitySerializer
+from apps.users.identity_serializers import ConsoleStudentIdentitySerializer, ConsoleStudentRefSerializer
 
 from .models import GRADE_ACTION_CHOICES, SCAN_STATUS_CHOICES, ReportSubmission, ReportTask
 
@@ -33,10 +33,8 @@ class RefSerializer(serializers.Serializer):
     title = serializers.CharField()
 
 
-class PersonSerializer(serializers.Serializer):
-    id = serializers.IntegerField()
-    full_name = serializers.CharField(allow_blank=True)
-    email = serializers.EmailField()
+class PersonSerializer(ConsoleStudentRefSerializer):
+    """A student on grader (Console) payloads. Owner rule: handles only, no real name or e-mail."""
 
 
 class StoredFileSerializer(serializers.Serializer):
@@ -354,7 +352,7 @@ class ManageTaskListSerializer(serializers.Serializer):
 
 
 class SubmissionQueueItemSerializer(serializers.Serializer):
-    identity = StudentIdentitySerializer(required=False, help_text="Roll number, real name, handle, stats (first).")
+    identity = ConsoleStudentIdentitySerializer(required=False, help_text="Roll number, handle, stats (first).")
     id = serializers.IntegerField()
     task = GradebookTaskSerializer()
     student = PersonSerializer()
@@ -444,7 +442,7 @@ class Sha256MatchSerializer(serializers.Serializer):
 
 
 class SubmissionDetailSerializer(serializers.Serializer):
-    identity = StudentIdentitySerializer(required=False, help_text="Roll number, real name, handle, stats (first).")
+    identity = ConsoleStudentIdentitySerializer(required=False, help_text="Roll number, handle, stats (first).")
     id = serializers.IntegerField()
     task = GradingTaskSerializer()
     student = PersonSerializer()
@@ -490,7 +488,7 @@ class GradeRequestSerializer(serializers.Serializer):
 
 
 class GradebookRowSerializer(serializers.Serializer):
-    identity = StudentIdentitySerializer(required=False, help_text="Roll number, real name, handle, stats (first).")
+    identity = ConsoleStudentIdentitySerializer(required=False, help_text="Roll number, handle, stats (first).")
     student = PersonSerializer()
     cells = GradebookCellSerializer(many=True)
     totals = GradebookTotalsSerializer()

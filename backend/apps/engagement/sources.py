@@ -52,23 +52,72 @@ def report_submitted_item(submission) -> AwardedItem | None:
     )
 
 
+def report_bonus_key(submission_id) -> str:
+    """The first report-bonus ledger key (also the legacy "half the marks %" key)."""
+    return f"report-graded:{submission_id}"
+
+
+def report_bonus_events(user_id: int, submission_id):
+    """The ledger rows paid for one graded report (the first payment and every
+    regrade correction), oldest first."""
+    from django.db.models import Q
+
+    first = report_bonus_key(submission_id)
+    return XpEvent.objects.filter(user_id=user_id, kind=rules.KIND_REPORT_GRADED).filter(
+        Q(idempotency_key=first) | Q(idempotency_key__startswith=f"{first}:")
+    ).order_by("id")
+
+
+def report_bonus_source_id(submission_id, score10: int) -> str:
+    """``"<submission id>/<score out of 10>"``: the XP history shows "Report bonus: 9/10"."""
+    return f"{submission_id}/{int(score10)}"
+
+
+def parse_report_bonus_source(source_id: str) -> tuple[str, int | None]:
+    """``(submission id, score out of 10 or None)`` from a report-bonus ``source_id``."""
+    head, _sep, tail = str(source_id or "").partition("/")
+    try:
+        return head, int(tail) if tail else None
+    except ValueError:
+        return head, None
+
+
 def report_graded_item(submission) -> AwardedItem | None:
+    """The report-mark bonus still owed (or to take back) for ``submission``.
+
+    Settled against the ledger, so it is idempotent per report: the first
+    grading pays the tier bonus under ``report-graded:<id>``; a regrade pays
+    or takes back only the difference under ``report-graded:<id>:a<n>`` (n =
+    rows already paid for it), never deleting history and never paying twice.
+    Returns None when the ledger already matches (or the marks are not
+    visible to the student yet). Call it under the user's summary lock
+    (``services.settle_report_bonus``) when regrades can race.
+    """
     task = submission.task
     if submission.status != "graded" or not task.marks_released:
         return None
     grade = getattr(submission, "grade", None)
     if grade is None or grade.final_marks is None or not task.max_marks:
         return None
+    score10 = rules.report_score10(grade.final_marks, task.max_marks)
+    target = rules.report_mark_bonus(score10)
     percent = float(Decimal(grade.final_marks) * 100 / Decimal(task.max_marks))
+    paid_rows = list(report_bonus_events(submission.student_id, submission.pk).values_list("points", flat=True))
+    owed = target - sum(paid_rows)
+    if not paid_rows and owed <= 0:
+        return None  # below the lowest tier: nothing to pay, nothing to record
+    if paid_rows and owed == 0:
+        return None
     visible_at = max(value for value in (grade.graded_at, task.marks_released_at, submission.updated_at) if value)
+    first = report_bonus_key(submission.pk)
     return AwardedItem(
         kind=rules.KIND_REPORT_GRADED,
-        points=rules.report_graded_xp(percent),
-        key=f"report-graded:{submission.pk}",
+        points=owed,
+        key=f"{first}:a{len(paid_rows)}" if paid_rows else first,
         source_type=XpEvent.SOURCE_REPORT_SUBMISSION,
-        source_id=str(submission.pk),
+        source_id=report_bonus_source_id(submission.pk, score10),
         occurred_at=visible_at,
-        ctx={"percent": round(percent, 2)},
+        ctx={"percent": round(percent, 2), "score10": score10, "regrade": bool(paid_rows)},
     )
 
 

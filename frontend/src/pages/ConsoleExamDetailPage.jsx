@@ -261,7 +261,7 @@ export function ResultsPanel({ results, csvHref, studentHref = LEGACY_STUDENT_HR
           <table className="exm-table">
             <thead>
               <tr>
-                <th scope="col">Student (roll number · real name · handle)</th>
+                <th scope="col">Student (roll number · handle)</th>
                 <th scope="col" className="exm-num">
                   #
                 </th>

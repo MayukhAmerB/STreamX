@@ -154,7 +154,7 @@ function landingPreloadPlugin() {
 
 /**
  * Dev-only component gallery (WS-KIT): `npm run dev` serves src/kit/gallery/index.html
- * at /__kit. It is not a build input, so it never ships in production.
+ * at /__kit, and the insignia gallery (src/features/landing-rewards/gallery) at /__insignia. It is not a build input, so it never ships in production.
  */
 function kitGalleryPlugin() {
   return {
@@ -164,6 +164,8 @@ function kitGalleryPlugin() {
       server.middlewares.use((req, _res, next) => {
         const [pathname, query = ""] = String(req.url || "").split("?");
         if (pathname === "/__kit" || pathname === "/__kit/") req.url = `/src/kit/gallery/index.html${query ? `?${query}` : ""}`;
+        // Rank emblems and badge medals (WS-LEARN), same rules: dev server only.
+        if (pathname === "/__insignia" || pathname === "/__insignia/") req.url = `/src/features/landing-rewards/gallery/index.html${query ? `?${query}` : ""}`;
         next();
       });
     },

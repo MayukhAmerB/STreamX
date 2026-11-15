@@ -203,6 +203,9 @@ class LiveEconomyTests(EconomyCase):
 
 
 # --- standings --------------------------------------------------------------------------------------------
+# The original ranking/payout contract; the Nov 2026 prize rules (minimum
+# learning XP, small batches) are relaxed here and tested in test_engagement_prizes.
+@override_settings(ENGAGEMENT_PRIZE_MIN_LEARNING_XP="0", ENGAGEMENT_PRIZE_SMALL_BATCH_SIZE="0")
 class StandingsTests(EconomyCase):
     def setUp(self):
         super().setUp()

@@ -12,6 +12,8 @@ import { apiData, apiMessage } from "../../utils/api";
 import { EngagementOff } from "./AchievementsPage";
 import { fetchEngagementSettings, fetchLeaderboard, saveEngagementSettings } from "./engagementApi";
 import { DISPLAY_CHOICES, batchLabel, formatWeekStart, formatXp, normalizeDisplay } from "./engagementModel";
+import RankEmblem from "../landing-rewards/RankEmblem";
+import { rankNumber } from "../landing-rewards/landingRewardsModel";
 import { PageIntro } from "./EngagementParts";
 import { TabBar } from "./Tabs";
 import useEngagement from "./useEngagement";
@@ -131,7 +133,14 @@ export function Board({ data, period }) {
                 <span>{publicName(entry)}</span>
                 {entry.is_me ? <span className="eg-pill eg-pill--accent">You</span> : null}
               </th>
-              <td className="eg-board__level">{entry.level?.title}</td>
+              <td className="eg-board__level">
+                {entry.level?.title ? (
+                  <span className="eg-board__rank-chip">
+                    <RankEmblem number={rankNumber(entry.level)} title={entry.level.title} size={24} decorative />
+                    {entry.level.title}
+                  </span>
+                ) : null}
+              </td>
               <td className="eg-board__xp eg-mono">{formatXp(entry.xp)}</td>
             </tr>
           ))}

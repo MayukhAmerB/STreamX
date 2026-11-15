@@ -1,64 +1,375 @@
-// The level-up moment (LevelUpMoment.jsx) lives in the Console shell, outside
-// .eg-page, so it carries its own tokens. One golden element: the rank word.
-.eg-levelup {
+// The level-up celebration (LevelUpMoment.jsx): a full-screen moment in the
+// Console shell and on the landing page, outside .eg-page, so it carries its
+// own tokens. Greys and white; the only hue is the insignia energy colour
+// (--lu-energy: cyan, emerald from rank VI, set inline from insigniaPalette.js).
+// Motion is transform/opacity only and runs only with no reduced-motion
+// preference; otherwise everything renders in its final, still state.
+.eg-levelup-backdrop {
   position: fixed;
-  inset-inline-end: 16px;
-  inset-block-end: 16px;
-  z-index: 60;
-  inline-size: min(380px, calc(100vw - 32px));
-  padding: 1.25rem 1.25rem 1rem;
-  border: 1px solid var(--hp-accent-line, rgba(243, 226, 179, 0.4));
-  border-radius: 14px;
-  background: var(--hp-card, #0a0a0a);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
-  color: var(--hp-text, #fafafa);
+  inset: 0;
+  z-index: 90;
+  background: rgba(0, 0, 0, 0.86);
+}
+
+.eg-levelup-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 91;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 24px 16px;
+  outline: none;
+}
+
+// Visually hidden (this file must not rely on Carbon's helper: the landing page has none).
+.eg-levelup-sr {
+  position: absolute;
+  overflow: hidden;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.eg-levelup {
+  --lu-text: #fafafa;
+  --lu-text-2: #d4d4d4;
+  --lu-text-3: #a1a1a1;
+  --lu-line: rgba(255, 255, 255, 0.14);
+  --lu-glow: color-mix(in srgb, var(--lu-energy, #ffffff) 34%, transparent);
+
+  position: relative;
+  inline-size: min(520px, 100%);
+  margin: auto;
+  padding: 8px 4px 4px;
+  color: var(--lu-text);
   font-family: var(--hp-sans, "Geist", ui-sans-serif, system-ui, sans-serif);
+  text-align: center;
+}
+
+.eg-levelup__stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  inline-size: 300px;
+  block-size: 260px;
+  margin: 0 auto 8px;
+  max-inline-size: 100%;
+}
+
+.eg-levelup__glow,
+.eg-levelup__ring,
+.eg-levelup__burst {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  pointer-events: none;
+}
+
+.eg-levelup__glow {
+  inline-size: 260px;
+  block-size: 260px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--lu-glow), transparent 72%);
+}
+
+.eg-levelup__ring {
+  inline-size: 210px;
+  block-size: 210px;
+  border: 1px solid color-mix(in srgb, var(--lu-energy, #ffffff) 55%, transparent);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.eg-levelup__burst {
+  inline-size: 0;
+  block-size: 0;
+}
+
+.eg-levelup__ray {
+  position: absolute;
+  inset-block-start: -64px;
+  inset-inline-start: -2px;
+  inline-size: 4px;
+  block-size: 40px;
+  border-radius: 2px;
+  background: linear-gradient(to top, transparent 0%, var(--lu-energy, #ffffff) 70%, #ffffff 100%);
+  opacity: 0;
+  transform-origin: 50% 64px;
+  transform: rotate(var(--lu-angle)) translateY(-70px);
+}
+
+.eg-levelup__emblem {
+  position: relative;
+  display: block;
+  inline-size: 200px;
+  block-size: 200px;
+  filter: drop-shadow(0 0 22px var(--lu-glow));
+}
+
+.eg-levelup__lvl {
+  position: absolute;
+  inset-block-end: 2px;
+  inset-inline-end: 0;
+  display: block;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.6));
 }
 
 .eg-levelup__eyebrow {
   margin: 0;
-  color: var(--hp-muted, #a1a1a1);
+  color: var(--lu-text-3);
   font-family: var(--hp-mono, "Geist Mono", ui-monospace, monospace);
   font-size: 0.75rem;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
 .eg-levelup__title {
-  margin: 0.375rem 0 0;
-  font-size: 1.375rem;
-  font-weight: 500;
-  line-height: 1.25;
-
-  .hp-hand {
-    color: var(--hp-accent, #f3e2b3);
-  }
+  margin: 0.5rem 0 0;
+  font-size: clamp(1.75rem, 6vw, 2.5rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
 }
 
-.eg-levelup__body {
-  margin: 0.5rem 0 0;
-  color: var(--hp-text-2, #d4d4d4);
+.eg-levelup__word {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.eg-levelup__rank {
+  color: var(--lu-text);
+  text-shadow: 0 0 18px var(--lu-glow);
+}
+
+.eg-levelup__xp {
+  margin: 0.75rem auto 0;
+  max-inline-size: 30rem;
+  color: var(--lu-text-2);
   font-size: 0.9375rem;
-  line-height: 1.5;
+  line-height: 1.55;
+}
+
+.eg-levelup__total {
+  color: var(--lu-text);
+  font-family: var(--hp-mono, "Geist Mono", ui-monospace, monospace);
+  font-weight: 600;
+}
+
+.eg-levelup__meter {
+  position: relative;
+  overflow: hidden;
+  inline-size: min(320px, 100%);
+  block-size: 6px;
+  margin: 1rem auto 0;
+  border: 1px solid var(--lu-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.eg-levelup__meter-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #8a8a8a, var(--lu-energy, #ffffff));
+  transform-origin: left center;
 }
 
 .eg-levelup__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-block-start: 1rem;
+  justify-content: center;
+  gap: 0.625rem;
+  margin-block-start: 1.5rem;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  :root:not([data-motion="reduce"]) .eg-levelup {
-    animation: eg-levelup-in 320ms cubic-bezier(0.4, 0, 0.2, 1) both;
+.eg-levelup__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 44px;
+  min-inline-size: 168px;
+  padding: 0 1.25rem;
+  border: 1px solid var(--lu-line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--lu-text);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--lu-text);
+    outline-offset: 3px;
   }
 }
 
-@keyframes eg-levelup-in {
+.eg-levelup__button--primary {
+  border-color: #ffffff;
+  background: #ffffff;
+  color: #0a0a0a;
+
+  &:hover {
+    background: #e8e8e8;
+  }
+}
+
+@media (max-width: 420px) {
+  .eg-levelup__stage {
+    inline-size: 300px;
+    block-size: 250px;
+  }
+
+  .eg-levelup__button {
+    flex: 1 1 100%;
+  }
+}
+
+// --- motion (no reduced-motion preference only) --------------------------------------
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion="reduce"]) {
+    .eg-levelup-backdrop {
+      animation: eg-lu-fade 260ms ease-out both;
+    }
+
+    .eg-levelup:not(.eg-levelup--static) {
+      .eg-levelup__emblem {
+        animation: eg-lu-emblem 900ms cubic-bezier(0.2, 0.9, 0.25, 1.15) both;
+      }
+
+      .eg-levelup__glow {
+        animation: eg-lu-glow 1600ms ease-out 200ms both;
+      }
+
+      .eg-levelup__ring {
+        animation: eg-lu-ring 1100ms ease-out 350ms both;
+      }
+
+      .eg-levelup__ray {
+        animation: eg-lu-ray 900ms cubic-bezier(0.1, 0.7, 0.3, 1) calc(380ms + var(--lu-delay, 0ms)) both;
+      }
+
+      .eg-levelup__lvl {
+        animation: eg-lu-lvl 600ms cubic-bezier(0.2, 0.9, 0.3, 1.2) 700ms both;
+      }
+
+      .eg-levelup__eyebrow,
+      .eg-levelup__title,
+      .eg-levelup__xp,
+      .eg-levelup__meter,
+      .eg-levelup__actions {
+        animation: eg-lu-rise 520ms ease-out both;
+      }
+
+      .eg-levelup__eyebrow {
+        animation-delay: 650ms;
+      }
+
+      .eg-levelup__title {
+        animation-delay: 760ms;
+      }
+
+      .eg-levelup__xp,
+      .eg-levelup__meter {
+        animation-delay: 880ms;
+      }
+
+      .eg-levelup__actions {
+        animation-delay: 1000ms;
+      }
+    }
+  }
+}
+
+@keyframes eg-lu-fade {
   from {
     opacity: 0;
-    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes eg-lu-emblem {
+  0% {
+    opacity: 0;
+    transform: scale(0.45) rotate(-8deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08) rotate(1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes eg-lu-glow {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+}
+
+@keyframes eg-lu-ring {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.45);
+  }
+}
+
+@keyframes eg-lu-ray {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--lu-angle)) translateY(-40px) scaleY(0.2);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--lu-angle)) translateY(-118px) scaleY(1);
+  }
+}
+
+@keyframes eg-lu-lvl {
+  from {
+    opacity: 0;
+    transform: scale(0.4) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes eg-lu-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
   }
   to {
     opacity: 1;

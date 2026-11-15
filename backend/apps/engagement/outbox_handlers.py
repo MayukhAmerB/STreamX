@@ -94,8 +94,8 @@ def handle_report_graded(event):
     submission = _submission((event.payload or {}).get("submission_id"))
     if submission is None:
         return
-    items = [sources.report_submitted_item(submission), sources.report_graded_item(submission)]
-    _award_grouped((submission.student_id, item) for item in items)
+    # Submission XP + the report-mark bonus difference (a regrade settles up or down).
+    services.settle_report_bonus(submission, extra=[sources.report_submitted_item(submission)])
 
 
 @outbox_handler(EVENT_MARKS_RELEASED, max_attempts=8)
@@ -106,7 +106,8 @@ def handle_marks_released(event):
 
     task_id = (event.payload or {}).get("task_id")
     submissions = ReportSubmission.objects.select_related("task", "grade").filter(task_id=task_id, status="graded")
-    _award_grouped((row.student_id, sources.report_graded_item(row)) for row in submissions.iterator(chunk_size=500))
+    for row in submissions.iterator(chunk_size=500):
+        services.settle_report_bonus(row)
 
 
 @outbox_handler(EVENT_EXAM_FINALIZED, max_attempts=8)

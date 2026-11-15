@@ -223,50 +223,13 @@
 }
 
 // ---------------------------------------------------------------------------
-// Medal (our own line art). Earned: solid white strokes. Locked: dashed grey.
+// Medal (forged insignia, EngagementParts.jsx BadgeMedal). Colours are SVG
+// attributes; the stylesheet only lays it out. Locked = dashed grey outline.
 // ---------------------------------------------------------------------------
 .eg-medal {
+  display: block;
   flex: none;
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.eg-medal__frame,
-.eg-medal__inner {
-  stroke-width: 1;
-}
-
-.eg-medal__glyph {
-  stroke-width: 1.1;
-}
-
-.eg-medal.is-earned {
-  stroke: #fafafa;
-
-  .eg-medal__inner {
-    stroke: rgba(255, 255, 255, 0.45);
-  }
-
-  .eg-medal__pip {
-    fill: #fafafa;
-    stroke: none;
-  }
-}
-
-.eg-medal.is-locked {
-  stroke: #8a8a8a;
-
-  .eg-medal__frame,
-  .eg-medal__inner {
-    stroke-dasharray: 1.4 1.2;
-  }
-
-  .eg-medal__pip {
-    fill: none;
-    stroke: #8a8a8a;
-    stroke-width: 0.5;
-  }
+  overflow: visible;
 }
 
 // ---------------------------------------------------------------------------
@@ -477,6 +440,7 @@
 // ---------------------------------------------------------------------------
 .eg-level {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 1.5rem;
   padding: 1.5rem;
@@ -643,7 +607,7 @@
 
 .eg-ladder__row {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  grid-template-columns: 3rem minmax(0, 1fr) auto;
   grid-template-areas:
     "num title xp"
     "num state state";
@@ -672,9 +636,24 @@
 }
 
 .eg-ladder__number {
+  display: flex;
   grid-area: num;
+  align-items: center;
+  justify-content: center;
   color: var(--eg-subtle);
   font-size: 0.75rem;
+}
+
+// Ranks still ahead show their emblem dimmed (not yet earned).
+.eg-ladder__row.is-ahead .eg-ladder__number .lr-emblem {
+  opacity: 0.45;
+}
+
+.eg-level__emblem {
+  @media (max-width: 479.98px) {
+    inline-size: 80px;
+    block-size: 80px;
+  }
 }
 
 .eg-ladder__title {
@@ -1053,6 +1032,13 @@
   span + span {
     margin-inline-start: 0.5rem;
   }
+}
+
+.eg-board__rank-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
 }
 
 .eg-board__level {

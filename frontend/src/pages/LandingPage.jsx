@@ -10,6 +10,7 @@ import HeroCountdown from "../components/HeroCountdown";
 import StoryJourneySection from "../components/StoryJourneySection";
 import YouTubeSection from "../features/youtube/YouTubeSection";
 import LandingRewardsBand from "../features/rewards/LandingRewardsBand";
+import LandingLevelUp from "../features/landing-rewards/LandingLevelUp";
 import LandingRewardsCard from "../features/landing-rewards/LandingRewardsCard";
 import { useAuth } from "../hooks/useAuth";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
@@ -860,6 +861,7 @@ export default function LandingPage() {
       <div className="relative z-10 px-4 pb-20 pt-8">
         <div className="mx-auto max-w-6xl space-y-8">
           {isOwlCognito || !isAuthenticated ? null : <LandingRewardsCard variant="compact" />}
+          {isOwlCognito || !isAuthenticated ? null : <LandingLevelUp />}
           <YouTubeSection />
 
           <SectionCard className="!p-0">

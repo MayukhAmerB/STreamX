@@ -443,6 +443,8 @@ export function HomeSkeleton() {
  * Whole Home body for a /api/console/today/ payload. `engagement` is the
  * /api/engagement/me/ summary (null while the switch is off); `practice` is
  * `{ labsMembersOnly, pentestingOpen, brandId }` from capabilities.
+ * `rankHeader`: the student's rank header (ConsoleRankHeader), the very first
+ * thing on the page (owner item 5); null for everyone else.
  */
 export default function HomeView({
   user,
@@ -455,9 +457,11 @@ export default function HomeView({
   now = new Date(),
   engagement = null,
   practice = null,
+  rankHeader = null,
 }) {
   return (
     <div className="ch-home" data-template="t1">
+      {rankHeader}
       <Greeting user={user} now={now} />
       <HomeStats engagement={engagement} data={data} now={now} />
       {error && !data ? <ErrorState error={error} onRetry={onRetry} /> : null}

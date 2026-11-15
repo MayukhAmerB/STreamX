@@ -774,11 +774,13 @@ class ExportTests(ReportsTestCase):
         self.assertTrue(response["Content-Type"].startswith("text/csv"))
         self.assertIn("attachment;", response["Content-Disposition"])
         text = response.content.decode("utf-8-sig")
-        # Owner rule: roll number, real name, handle, stats first; then Email and the record columns.
-        self.assertTrue(text.splitlines()[0].startswith("Roll number,Real name,Handle,Handle (most recent),"))
-        self.assertIn("Exam score %,Email,Target: Acme Corp (/10)", text)
+        # Owner rule (Console): roll number, handle, stats first (no real name, no e-mail); then the record.
+        self.assertTrue(text.splitlines()[0].startswith("Roll number,Handle,Handle (most recent),"))
+        self.assertIn("Exam score %,Target: Acme Corp (/10)", text)
         self.assertIn(f"AL-SYD-{evil.pk:05d}", text)
-        self.assertIn("'=cmd", text)
+        self.assertIn(f"AL-SYD-{evil.pk:05d} (no handle)", text)
+        self.assertNotIn("cmd|", text)  # the real name never reaches a Console CSV
+        self.assertNotIn(evil.email, text)
         self.assertIn("7.5", text)
         response = self.client.get(reverse("reports-manage-export"), {"task": self.task.pk})
         text = response.content.decode("utf-8-sig")
@@ -799,8 +801,10 @@ class ExportTests(ReportsTestCase):
         self.assertIsNone(archive.testzip())
         names = archive.namelist()
         self.assertIn("manifest.csv", names)
-        self.assertTrue(any(name.startswith(f"Asha Rao ({self.student.pk})/v1/") for name in names))
-        self.assertTrue(any(name.startswith(f"Ravi Kumar ({self.other_student.pk})/v1/") for name in names))
+        # Owner rule (Console): folders are named by handle or roll number, never by real name.
+        self.assertTrue(any(name.startswith(f"AL-SYD-{self.student.pk:05d} (no handle)/v1/") for name in names))
+        self.assertTrue(any(name.startswith(f"AL-SYD-{self.other_student.pk:05d} (no handle)/v1/") for name in names))
+        self.assertFalse(any("Asha" in name or "Ravi" in name for name in names))
         for name in names:
             self.assertFalse(name.startswith("/"))
             self.assertNotIn("..", name.split("/"))

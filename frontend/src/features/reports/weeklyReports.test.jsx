@@ -160,7 +160,7 @@ describe("grader queue grouping", () => {
   const item = (id, overrides = {}) => ({
     id,
     task: { id: 4, title: "Week 3 reports", week_number: 3, due_at: "2026-11-15T18:29:59Z", max_marks: "10.00", status: "published" },
-    student: { id: id + 100, full_name: `Student ${id}`, email: `s${id}@x.test` },
+    student: { id: id + 100, roll_number: `AL-SYD-00${id + 100}`, handle: `student_${id}`, label: `@student_${id}` },
     target_name: "Acme",
     target_key: "acme",
     week_start: "2026-11-09",

@@ -4,7 +4,8 @@ import { StaticRouter } from "react-router-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { LEVELS, levelUpPending } from "./engagementModel";
-import { LevelUpPanel } from "./LevelUpMoment";
+import { LevelUpCard } from "./LevelUpMoment";
+import { celebrationView } from "./levelUpModel";
 import { EarnTable, LevelLadder, LevelPosition } from "./LevelsPage";
 
 const render = (node) => renderToStaticMarkup(<StaticRouter location="/levels">{node}</StaticRouter>);
@@ -57,10 +58,11 @@ describe("level-up moment", () => {
 
   it("celebrates the new rank with a way to the chart and a close button", () => {
     const onClose = vi.fn();
-    const html = render(<LevelUpPanel level={LEVELS[2]} xp={3600} onClose={onClose} />);
-    expect(text(html)).toContain("You reached");
+    const me = { xp: 3600, level: { ...LEVELS[2], number: 3 }, next_level: { ...LEVELS[3], number: 4 }, xp_to_next_level: 2400 };
+    const html = render(<LevelUpCard view={celebrationView(me)} onContinue={onClose} onViewAchievements={onClose} />);
+    expect(text(html)).toContain("Level up");
     expect(text(html)).toContain("Operator");
-    expect(html).toContain('href="/levels"');
-    expect(html).toContain('role="dialog"');
+    expect(html).toContain('href="/achievements"');
+    expect(text(html)).toContain("Continue");
   });
 });

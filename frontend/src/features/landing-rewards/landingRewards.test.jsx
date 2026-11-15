@@ -28,7 +28,7 @@ import { fetchMyProfile } from "../profiles/profilesApi";
 import LandingRewardsBand from "../rewards/LandingRewardsBand";
 import { fetchRewardHistory } from "../rewards/rewardsApi";
 import LandingRewardsCard from "./LandingRewardsCard";
-import { buildRewardsView, cheerLine, formatHandle, meterSegments, romanRank } from "./landingRewardsModel";
+import { buildRewardsView, cheerLine, formatHandle, meterSegments, rankNumber, romanRank } from "./landingRewardsModel";
 import RankEmblem from "./RankEmblem";
 import { resetLandingRewardsCache } from "./useLandingRewards";
 
@@ -239,12 +239,47 @@ describe("landing rewards model", () => {
 describe("rank emblems", () => {
   it("draws eight distinct emblems that grow more ornate with rank", () => {
     const markup = LEVELS.map((level) => renderToStaticMarkup(<RankEmblem number={level.number} title={level.title} />));
-    expect(new Set(markup.map((html) => html.replace(/lr[^"\s)]*-(body|metal|halo|clip|shine)/g, "id"))).size).toBe(8);
+    expect(new Set(markup.map((html) => html.replace(/lr\dx[a-zA-Z0-9]*-/g, "id-"))).size).toBe(8);
     markup.forEach((html, index) => expect(html).toContain(`aria-label="Rank ${romanRank(index + 1)}: ${LEVELS[index].title}"`));
-    const size = (html) => (html.match(/<(path|polygon|ellipse|line|circle)\b/g) || []).length;
-    for (let index = 1; index < markup.length; index += 1) expect(size(markup[index])).toBeGreaterThanOrEqual(size(markup[index - 1]));
-    // No gold: greys and white only.
-    for (const html of markup) expect(html.toLowerCase()).not.toMatch(/f3e2b3|#e6d29c|gold/);
+    markup.forEach((html, index) => expect(html).toContain(`data-rank="${index + 1}"`));
+    const size = (html) => (html.match(/<(path|polygon|ellipse|line|circle|rect)\b/g) || []).length;
+    expect(size(markup[7])).toBeGreaterThan(size(markup[0]) * 3);
+    // Prestige: an aura on VII-VIII, the crowned starburst on VIII only.
+    expect(markup.slice(0, 6).every((html) => !html.includes("lr-emblem__aura"))).toBe(true);
+    expect(markup[6]).toContain("lr-emblem__aura");
+    expect(markup[7]).toContain("lr-emblem__rays");
+    expect(markup.slice(0, 7).every((html) => !html.includes("lr-emblem__rays"))).toBe(true);
+    // No gold, amber or yellow (the owner's rule for the insignia).
+    for (const html of markup) expect(html.toLowerCase()).not.toMatch(/f3e2b3|#e6d29c|gold|amber|yellow|#f4a62a/);
+  });
+
+  it("simplifies small sizes and namespaces its ids per instance", () => {
+    const chip = renderToStaticMarkup(<RankEmblem number={8} title="Elite Operator" size={24} />);
+    const full = renderToStaticMarkup(<RankEmblem number={8} title="Elite Operator" size={200} />);
+    expect(chip).toContain('data-detail="compact"');
+    expect(full).toContain('data-detail="full"');
+    expect(chip).not.toContain("ELITE OPERATOR");
+    expect(full).toContain("ELITE OPERATOR");
+    expect(chip.length).toBeLessThan(full.length / 2);
+    expect(renderToStaticMarkup(<RankEmblem number={4} size={64} />)).toContain('data-detail="standard"');
+    const pair = renderToStaticMarkup(
+      <>
+        <RankEmblem number={3} />
+        <RankEmblem number={3} />
+      </>,
+    );
+    const ids = [...pair.matchAll(/ id="([^"]+)"/g)].map((match) => match[1]);
+    expect(new Set(ids).size).toBe(ids.length);
+    const decorative = renderToStaticMarkup(<RankEmblem number={2} decorative />);
+    expect(decorative).toContain('aria-hidden="true"');
+    expect(decorative).not.toContain('role="img"');
+  });
+
+  it("finds the rank number from a number, key or title", () => {
+    expect(rankNumber({ number: 5, title: "Specialist" })).toBe(5);
+    expect(rankNumber({ title: "Senior Analyst" })).toBe(6);
+    expect(rankNumber({ key: "lead_investigator" })).toBe(7);
+    expect(rankNumber(null)).toBe(1);
   });
 
   it("only renders the shine layer when asked", () => {

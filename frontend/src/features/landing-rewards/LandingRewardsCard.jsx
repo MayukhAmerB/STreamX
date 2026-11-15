@@ -3,13 +3,15 @@
 // the end of the landing. Both read useLandingRewards (one shared request
 // round). Renders nothing for guests, staff, or when engagement is off.
 // Handle only, never a real name. The "Certified" mark is a badge; only the
-// owner's own card links to their profile Certificates tab.
+// owner's own card links to their profile Certificates tab. The LVL badge
+// (LevelBadge: the level is the rank number) sits on the emblem as a medal pair.
 import { useId } from "react";
 import { Link } from "react-router-dom";
 
 import { BadgeMedal } from "../engagement-ui/EngagementParts";
 import { formatXp, tierInfo } from "../engagement-ui/engagementModel";
 import { romanRank, weekRankLabel } from "./landingRewardsModel";
+import LevelBadge from "./LevelBadge";
 import RankEmblem from "./RankEmblem";
 import useLandingRewards from "./useLandingRewards";
 import "./landingRewards.css";
@@ -155,10 +157,25 @@ function MeterLegend({ view }) {
   );
 }
 
+/** Rank emblem with the LVL badge on its lower right (a medal pair). */
+export function MedalPair({ view, size, levelSize = Math.round(size * 0.52), className = "" }) {
+  return (
+    <div className={`relative flex-none ${className}`} style={{ width: size + Math.round(levelSize * 0.42), height: size }} data-testid="landing-medal-pair">
+      <RankEmblem number={view.rank.number} title={view.rank.title} size={size} shine />
+      <LevelBadge
+        number={view.rank.number}
+        title={view.rank.title}
+        size={levelSize}
+        className="absolute bottom-[-4px] right-0 drop-shadow-[0_6px_10px_rgba(0,0,0,0.7)]"
+      />
+    </div>
+  );
+}
+
 function Identity({ view, headingId, headingTag: Heading = "h2", size }) {
   return (
     <div className="flex min-w-0 items-center gap-4">
-      <RankEmblem number={view.rank.number} title={view.rank.title} size={size} shine />
+      <MedalPair view={view} size={size} />
       <div className="min-w-0">
         <p className={eyebrow}>Your progress</p>
         <Heading id={headingId} className="mt-1 truncate font-reference text-xl font-semibold tracking-tight text-white sm:text-2xl">
@@ -166,7 +183,10 @@ function Identity({ view, headingId, headingTag: Heading = "h2", size }) {
         </Heading>
         <p className="mt-0.5 text-sm text-[#BDBDBD]">
           <span className="font-semibold text-white">{view.rank.title}</span>
-          <span className="text-[#8F8F8F]"> · Rank {romanRank(view.rank.number)} of 8</span>
+          <span className="text-[#8F8F8F]">
+            {" "}
+            · Rank {romanRank(view.rank.number)} of 8 · LVL {view.rank.number}
+          </span>
         </p>
         {view.certified ? (
           <div className="mt-2">
@@ -196,7 +216,7 @@ function Skeleton({ variant, className }) {
   );
 }
 
-function CompactCard({ view, className }) {
+export function CompactCard({ view, className = "" }) {
   const headingId = useId();
   return (
     <section
@@ -229,7 +249,7 @@ function CompactCard({ view, className }) {
   );
 }
 
-function FullCard({ view, className }) {
+export function FullCard({ view, className = "" }) {
   const headingId = useId();
   return (
     <section
@@ -240,8 +260,10 @@ function FullCard({ view, className }) {
       <div aria-hidden="true" className="lr-card__glow pointer-events-none absolute inset-0" />
       <div className="relative grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-8">
         <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-[#070707] px-4 py-6 text-center">
-          <RankEmblem number={view.rank.number} title={view.rank.title} size={132} shine />
-          <p className={`${eyebrow} mt-4`}>Rank {romanRank(view.rank.number)} of 8</p>
+          <MedalPair view={view} size={132} levelSize={64} />
+          <p className={`${eyebrow} mt-4`}>
+            Rank {romanRank(view.rank.number)} of 8 · LVL {view.rank.number}
+          </p>
           <h3 id={headingId} className="mt-1 font-reference text-2xl font-semibold tracking-tight text-white">
             {view.rank.title}
           </h3>

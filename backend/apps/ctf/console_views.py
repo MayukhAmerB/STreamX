@@ -235,7 +235,9 @@ class ConsoleExamResultsCsvView(_ConsoleView):
             queryset = queryset.filter(batch_course_id__in=scope)
         _audit(request, "ctf.results_exported", exam.slug)
         return exports.csv_response(
-            exports.iter_participations_csv(queryset), exports.export_filename("ctf-results", exam.slug)
+            # Owner rule (Console): handles only. The full-identity CSV is in admin -> Examination.
+            exports.iter_participations_csv(queryset, console=True),
+            exports.export_filename("ctf-results", exam.slug),
         )
 
 

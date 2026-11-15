@@ -93,10 +93,10 @@ export function GradebookTable({ book, paths = LEGACY_PATHS }) {
             return (
               <tr key={row.student.id}>
                 <th scope="row" className="rpt-gb__student">
+                  {/* Owner rule (Console): handles only; the roll number is the staff reference. */}
                   <Link to={paths.student(row.student.id)} className="rpt-gb__name">
                     {identityLine(row.identity, row.student)}
                   </Link>
-                  <span className="rpt-gb__email">{row.student.email}</span>
                 </th>
                 {row.cells.map((cell) => (
                   <td key={cell.task_id} className="rpt-table__num">

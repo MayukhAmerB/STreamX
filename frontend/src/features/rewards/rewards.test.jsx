@@ -21,7 +21,8 @@ import LandingRewardsBand from "./LandingRewardsBand";
 import { BatchesPanel, CertificatesPanel, groupXpByDay, RewardsPanel, useRewardHistory } from "./RewardRecord";
 import RewardsPage from "./RewardsPage";
 import { certificatePdfUrl, highlightError, MAX_HIGHLIGHTS, toggleHighlight } from "./rewardsApi";
-import { BADGE_GROUPS } from "./rewardsContent";
+import { BADGE_GROUPS, REPORT_BASE_XP, REPORT_MARK_BONUS } from "./rewardsContent";
+import { ReportBonusTiers } from "./RewardsVisuals";
 
 const render = (node, location = "/") => renderToStaticMarkup(<StaticRouter location={location}>{node}</StaticRouter>);
 
@@ -99,6 +100,27 @@ describe("landing reward band (Friday landing, before the footer)", () => {
     expect(html).toContain('href="/hall-of-fame"');
     // No gold (golden white #f3e2b3 / accent) on new pieces.
     expect(html.toLowerCase()).not.toMatch(/f3e2b3|text-accent|bg-accent/);
+  });
+});
+
+describe("report mark bonus tiers (owner, Nov 2026)", () => {
+  const TIERS = ["10/10", "+300", "9/10", "+200", "8/10", "+130", "7/10", "+80", "6/10", "+40"];
+
+  it("lists every tier on the landing band, /rewards and the achievements copy", () => {
+    for (const html of [render(<LandingRewardsBand />), render(<RewardsPage />, "/rewards")]) {
+      expect(html).toContain('data-testid="report-bonus-tiers"');
+      for (const piece of TIERS) expect(html).toContain(piece);
+      expect(html).toContain("Every report earns 30 XP (40 on time)");
+      expect(html).toContain("Up to 340 XP a report");
+    }
+    const tiers = render(<ReportBonusTiers title="Earn more XP: the weekly report bonus" />);
+    expect(tiers).toContain("Earn more XP: the weekly report bonus");
+    expect(tiers).toContain("A regrade adjusts the bonus up or down");
+  });
+
+  it("mirrors the backend default table", () => {
+    expect(REPORT_MARK_BONUS.map((tier) => [tier.score, tier.xp])).toEqual([[10, 300], [9, 200], [8, 130], [7, 80], [6, 40]]);
+    expect(REPORT_BASE_XP).toEqual({ submitted: 30, onTime: 40 });
   });
 });
 

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import NotificationBell from "../../components/NotificationBell";
 import { siteBrand } from "../../config/siteBrand";
 import AccountMenu from "./AccountMenu";
+import RankChip from "./RankChip";
 import { CONSOLE_TITLE } from "./navConfig";
 import ShellBrand from "./ShellBrand";
 
@@ -61,8 +62,9 @@ function PaletteTrigger({ compact, onOpen }) {
 /**
  * Console header, 48 px (plan §3.1). Left: brand (links to the public
  * website's home page) and the breadcrumb on desktop; on phones, deeper pages and focus
- * mode show a back arrow with the page title instead. Right: Jump to…
- * (command palette), the notifications bell and the avatar menu.
+ * mode show a back arrow with the page title instead. Right: the student's
+ * rank chip (desktop), Jump to… (command palette), the notifications bell and
+ * the avatar menu.
  */
 export default function ShellHeader({ nav, user, isDesktop, backOfficeUrl, onOpenPalette, onSignOut }) {
   const showBack = nav.focus || (!isDesktop && !nav.isRoot);
@@ -89,6 +91,7 @@ export default function ShellHeader({ nav, user, isDesktop, backOfficeUrl, onOpe
         )}
       </div>
       <div className="cds-app-header__end">
+        {isDesktop ? <RankChip variant="header" /> : null}
         <PaletteTrigger compact={!isDesktop} onOpen={onOpenPalette} />
         <NotificationBell variant="console" />
         <AccountMenu user={user} backOfficeUrl={backOfficeUrl} onSignOut={onSignOut} />

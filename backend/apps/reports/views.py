@@ -708,11 +708,19 @@ def _queue_queryset(request):
         queryset = queryset.filter(is_late=False)
     search = str(request.query_params.get("q", "") or "").strip()[:80]
     if search:
-        queryset = queryset.filter(
-            Q(student__full_name__icontains=search)
-            | Q(student__email__icontains=search)
-            | Q(target_name__icontains=search)
-        )
+        # Owner rule (Console): students are found by handle or roll number, not by name or e-mail.
+        from apps.users.identity_admin import ROLL_RE
+
+        roll = ROLL_RE.match(search)
+        if roll:
+            queryset = queryset.filter(student_id=int(roll.group(1)))
+        else:
+            # "@handle" and "handle" both work; matching is case-insensitive.
+            handle = search.lstrip("@").strip()
+            match = Q(target_name__icontains=search)
+            if handle:
+                match |= Q(student__student_profile__handle__icontains=handle)
+            queryset = queryset.filter(match)
     week = str(request.query_params.get("week", "") or "").strip()
     if week:
         queryset = queryset.filter(task__week_start=week) if _is_iso_date(week) else queryset.none()
@@ -743,7 +751,7 @@ QUEUE_PARAMETERS = [
         description="awaiting, submitted, under_review, graded, returned_for_revision, resubmitted",
     ),
     OpenApiParameter("late", bool, required=False),
-    OpenApiParameter("q", str, required=False, description="Student name or email, or target name"),
+    OpenApiParameter("q", str, required=False, description="Student @handle or roll number (AL-SYD-00042), or target name"),
     OpenApiParameter("week", str, required=False, description="Week start date (YYYY-MM-DD), self-service weeks"),
     OpenApiParameter("group", str, required=False, description="'week': order by week, then target, then oldest"),
 ]
@@ -775,7 +783,8 @@ class SubmissionQueueView(_GraderView):
         labels = {item.task_id: presenters.week_label_for(item.task) for item in page if item.task.week_start}
         from apps.users import identity
 
-        blocks = identity.identity_blocks([(item.student, item) for item in page])
+        # Owner rule (Console): handles only.
+        blocks = identity.console_blocks([(item.student, item) for item in page])
         results = [
             presenters.queue_item(item, signals, labels, block) for item, block in zip(page, blocks, strict=True)
         ]
@@ -869,14 +878,15 @@ class GradebookView(_GraderView):
         book = services.course_gradebook(course)
         from apps.users import identity
 
-        blocks = identity.identity_blocks([(row["student"], None) for row in book["rows"]], course_id=course.pk)
+        # Owner rule (Console): handles only.
+        blocks = identity.console_blocks([(row["student"], None) for row in book["rows"]], course_id=course.pk)
         payload = {
             "course": presenters.ref(course),
             "tasks": [presenters.gradebook_task_dict(task) for task in book["tasks"]],
             "rows": [
                 {
                     "identity": block,
-                    "student": presenters.person(row["student"]),
+                    "student": identity.console_person_from_block(block),
                     "cells": row["cells"],
                     "totals": row["totals"],
                 }

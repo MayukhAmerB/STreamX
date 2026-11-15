@@ -13,6 +13,7 @@ import { Progress, Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 import { cn } from "../../kit/lib/cn";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../kit/Tabs";
 import { LEVELS, levelProgress, nextLevelFor } from "../engagement-ui/engagementModel";
+import RankEmblem from "../landing-rewards/RankEmblem";
 import { TIER_LABELS } from "./rewardsContent";
 import {
   certificatePageUrl,
@@ -194,9 +195,7 @@ export function RankProgress({ summary }) {
   return (
     <div className="rounded-lg border border-white/10 bg-white/[.02] p-4">
       <div className="flex flex-wrap items-center gap-3">
-        <span aria-hidden="true" className="flex size-8 items-center justify-center rounded-full border border-white/25 text-sm font-semibold text-white">
-          {level.number}
-        </span>
+        <RankEmblem number={level.number} title={level.title} size={56} decorative />
         <span className="text-base font-semibold text-white">{level.title}</span>
         <span className="ml-auto text-sm text-[#d4d4d4]">{fmtXp(xp)} XP</span>
       </div>

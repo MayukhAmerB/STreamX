@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from apps.users.identity_serializers import StudentIdentitySerializer
+from apps.users.identity_serializers import (
+    ConsoleOwnIdentitySerializer,
+    ConsoleStudentIdentitySerializer,
+    ConsoleStudentRefSerializer,
+)
 
 KIND_CHOICES = [("report", "Weekly report"), ("exam", "CTF exam")]
 
@@ -20,10 +24,8 @@ class UnifiedGradebookCourseListSerializer(serializers.Serializer):
     results = UnifiedGradebookCourseSerializer(many=True)
 
 
-class UnifiedGradebookStudentSerializer(serializers.Serializer):
-    id = serializers.IntegerField()
-    full_name = serializers.CharField(allow_blank=True)
-    email = serializers.CharField()
+class UnifiedGradebookStudentSerializer(ConsoleStudentRefSerializer):
+    """Owner rule (Console): handles only. Real names are in Django admin -> Examination."""
 
 
 class UnifiedGradebookColumnSerializer(serializers.Serializer):
@@ -64,7 +66,7 @@ class UnifiedGradebookTotalsSerializer(serializers.Serializer):
 
 
 class UnifiedGradebookRowSerializer(serializers.Serializer):
-    identity = StudentIdentitySerializer(required=False, help_text="Roll number, real name, handle, stats (first).")
+    identity = ConsoleStudentIdentitySerializer(required=False, help_text="Roll number, handle, stats (first).")
     student = UnifiedGradebookStudentSerializer()
     cells = UnifiedGradebookCellSerializer(many=True)
     totals = UnifiedGradebookTotalsSerializer()
@@ -85,7 +87,18 @@ class UnifiedStudentCourseSectionSerializer(serializers.Serializer):
 
 
 class UnifiedStudentGradebookSerializer(serializers.Serializer):
-    identity = StudentIdentitySerializer(required=False, help_text="Roll number, real name, handle, stats (first).")
+    identity = ConsoleStudentIdentitySerializer(required=False, help_text="Roll number, handle, stats (first).")
     student = UnifiedGradebookStudentSerializer()
     courses = UnifiedStudentCourseSectionSerializer(many=True)
     generated_at = serializers.DateTimeField()
+
+
+class UnifiedMyGradebookSerializer(UnifiedStudentGradebookSerializer):
+    """``/api/gradebook/me/``: the student's own gradebook, so their own real name is included.
+
+    Staff and instructor payloads (``UnifiedStudentGradebookSerializer``) stay handle-only.
+    """
+
+    identity = ConsoleOwnIdentitySerializer(
+        required=False, help_text="Roll number, the student's own real name, handle, stats (first)."
+    )

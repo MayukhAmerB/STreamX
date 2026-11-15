@@ -17,6 +17,7 @@ from apps.ctf import checks, readiness, scheduler
 from apps.ctf.models import CtfAttempt, CtfExam, CtfExamResult, CtfMaterial, CtfParticipation
 from apps.ctf.services import start_participation, submit_attempt
 from apps.notifications.models import Notification, NotificationRecipient
+from apps.users import identity
 from apps.users.terms import TERMS_VERSION
 from django.core.cache import cache
 from django.core.checks import WARNING
@@ -316,7 +317,10 @@ class ConsoleApiTests(_MediaMixin, APITestCase):
         self.assertEqual(stats["wrong_answers"][0]["count"], 2)
         csv_response = self.client.get(reverse("ctf-admin-exam-results-csv", args=[exam.slug]))
         self.assertEqual(csv_response.status_code, 200)
-        self.assertIn(self.student.email, b"".join(csv_response.streaming_content).decode("utf-8"))
+        text = b"".join(csv_response.streaming_content).decode("utf-8")
+        # Owner rule (Console): handles only; the roll number is the staff reference.
+        self.assertIn(identity.roll_number(self.student), text)
+        self.assertNotIn(self.student.email, text)
 
     # --- permissions --------------------------------------------------------
     def test_students_cannot_open_the_console(self):
@@ -750,7 +754,10 @@ class GradebookTests(APITestCase):
         self.assertEqual(export.status_code, 200)
         text = b"".join(export.streaming_content).decode("utf-8")
         self.assertIn("Exam: Midterm CTF /40", text)
-        self.assertIn("Gina Student", text)
+        # Owner rule (Console): handles only, never the real name or the e-mail.
+        self.assertIn(identity.roll_number(self.student), text)
+        self.assertNotIn("Gina Student", text)
+        self.assertNotIn(self.student.email, text)
 
     def test_exam_cell_is_pending_until_finalized(self):
         self.client.force_authenticate(self.staff)
