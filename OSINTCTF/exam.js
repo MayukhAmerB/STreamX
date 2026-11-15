@@ -7,7 +7,9 @@
 (() => {
     "use strict";
 
-    const DEFAULT_API_BASE = "https://alsyedinitiative.com/api";
+    // The LMS auth cookies live on the API host (see server.js), the login page on the site.
+    const DEFAULT_API_BASE = "https://api.alsyedinitiative.com/api";
+    const DEFAULT_SITE = "https://alsyedinitiative.com";
     const MAX_ANSWER_LENGTH = 512;
     const WARNING_SECONDS = 5 * 60;
     // Pure rules (exam-core.js, loaded first). The fallback keeps the tab
@@ -253,6 +255,7 @@
     const state = {
         lang: document.body && document.body.classList.contains("ur-mode") ? "ur" : "en",
         apiBase: "",
+        siteUrl: "",
         csrf: "",
         exams: null,
         eligibility: null,
@@ -332,6 +335,8 @@
             const payload = await response.json();
             const base = String(payload.lmsApiBase || "");
             state.apiBase = /^https?:\/\//.test(base) ? base.replace(/\/+$/, "") : DEFAULT_API_BASE;
+            const site = String(payload.siteUrl || "");
+            state.siteUrl = /^https?:\/\//.test(site) ? site.replace(/\/+$/, "") : "";
         } catch {
             state.apiBase = DEFAULT_API_BASE;
         }
@@ -345,12 +350,25 @@
         }
     };
 
+    // The LMS website (login, terms): the server's siteUrl, else the API
+    // origin without "api." (an API host has no login page).
+    const siteOrigin = () => {
+        if (state.siteUrl) return state.siteUrl;
+        try {
+            const url = new URL(lmsOrigin());
+            url.hostname = url.hostname.replace(/^api\./, "");
+            return url.origin;
+        } catch {
+            return DEFAULT_SITE;
+        }
+    };
+
     // The LMS login page sends the student straight back here (?next= is
     // validated on the LMS side: only this labs site is accepted).
-    const signInUrl = () => Core.signInUrl(window.location, lmsOrigin());
+    const signInUrl = () => Core.signInUrl(window.location, siteOrigin());
 
     // Terms are accepted on the LMS login page, which then returns here.
-    const termsUrl = () => Core.termsUrl(window.location, lmsOrigin());
+    const termsUrl = () => Core.termsUrl(window.location, siteOrigin());
 
     const reasonText = (group, reason) => {
         const table = dict()[group] || {};

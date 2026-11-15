@@ -40,7 +40,9 @@ The `05 EXAMINATION` tab (`exam.js`) is different from the practice labs:
   every attempt, right or wrong, in Postgres; scores are in Django admin under
   "OSINT CTF examinations".
 - `GET /api/config` returns `{lmsApiBase}` from `LABS_LMS_API_BASE`
-  (default `https://alsyedinitiative.com/api`); the CSP `connect-src` allows
+  (default `https://api.alsyedinitiative.com/api`, the host that holds the LMS
+  session cookies) and `{siteUrl}` from `LABS_SITE_URL` (default: that origin
+  without `api.`; used for the sign-in link); the CSP `connect-src` allows
   that origin only.
 - Nothing about the exam is stored in the browser, and no answer or hash is in
   any file served here.

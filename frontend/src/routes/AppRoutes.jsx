@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import ProtectedRoute from "../components/ProtectedRoute";
 import ScrollToTop from "../components/ScrollToTop";
 import { siteBrand } from "../config/siteBrand";
@@ -14,6 +14,8 @@ import { certificatePublicRoutes } from "../features/certificates/routes";
 // Attendance and the class calendar (WS-ATTENDANCE): /attendance, /calendar and the Teach/Admin pages.
 import { attendanceShellRoutes } from "../features/attendance/routes";
 import { calendarShellRoutes } from "../features/calendar/routes";
+// XP, levels and badges (WS-ENGAGEMENT): /achievements, /leaderboard, /levels and the public /achievements/:slug.
+import { engagementPublicRoutes, engagementShellRoutes } from "../features/engagement-ui/routes";
 
 // Carbon app shell for functional routes; lazy so Carbon never ships in the public website bundle.
 const AppShellLayout = lazy(() => import("../features/app-shell/AppShellLayout"));
@@ -43,6 +45,8 @@ const PentestingRegistrationPage = lazy(() => import("../pages/PentestingRegistr
 const LectureQuestionsPage = lazy(() => import("../pages/LectureQuestionsPage"));
 const LiveClassesPage = lazy(() => import("../pages/LiveClassesPage"));
 const LoginPage = lazy(() => import("../pages/LoginPage"));
+// The e-mailed password reset link (backend users/views.py builds `/reset-password?uid=…&token=…`).
+const ResetPasswordPage = lazy(() => import("../marketing/auth/ResetPasswordPage"));
 const MeetingPage = lazy(() => import("../pages/MeetingPage"));
 const NationalDeskPage = lazy(() => import("../pages/NationalDeskPage"));
 const OsintToolsPage = lazy(() => import("../pages/OsintToolsPage"));
@@ -75,8 +79,17 @@ const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
 // Monthly OSINT CTF (WS-MONTHLY-CTF): public page, Hall of Fame, certificate check, Console play page.
 const MonthlyCtfPage = lazy(() => import("../features/monthly-ctf/MonthlyCtfPage"));
 const MonthlyCtfHallOfFamePage = lazy(() => import("../features/monthly-ctf/MonthlyCtfHallOfFamePage"));
-const SeasonCertificatePage = lazy(() => import("../features/monthly-ctf/SeasonCertificatePage"));
 const MonthlyCtfPlayPage = lazy(() => import("../features/monthly-ctf/MonthlyCtfPlayPage"));
+
+/**
+ * Monthly CTF finalist certificates joined the certificate system: an old
+ * /monthly-ctf/certificates/<slug> link opens /certificates/<slug>, which the
+ * certificate page replaces with the canonical reference number.
+ */
+export function SeasonCertificateRedirect() {
+  const { slug = "" } = useParams();
+  return <Navigate to={`/certificates/${encodeURIComponent(slug)}`} replace />;
+}
 
 /**
  * The Console used to live at /users-corner. Shared links keep working: they
@@ -135,6 +148,7 @@ export default function AppRoutes() {
           <Route path="/courses" element={new URLSearchParams(location.search).get("view") === "owned" ? <Navigate to="/my-courses" replace /> : <CourseListPage />} />
           <Route path="/courses/:id" element={siteBrand.id === "owlcognito" ? <LegacyCourseDetailPage /> : <CourseDetailPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/courses/:id/register" element={<PentestingRegistrationPage />} />
           <Route path="/courses/:id/payment" element={<CoursePaymentPage />} />
           <Route path="/terms" element={<TermsPage />} />
@@ -146,9 +160,10 @@ export default function AppRoutes() {
           <Route path="/osint/free" element={<FreeDirectoryPage />} />
           <Route path="/monthly-ctf" element={<MonthlyCtfPage />} />
           <Route path="/monthly-ctf/hall-of-fame" element={<MonthlyCtfHallOfFamePage />} />
-          <Route path="/monthly-ctf/certificates/:slug" element={<SeasonCertificatePage />} />
+          <Route path="/monthly-ctf/certificates/:slug" element={<SeasonCertificateRedirect />} />
           {profilePublicRoutes()}
           {certificatePublicRoutes()}
+          {engagementPublicRoutes()}
           {/* Unknown website addresses get a real "not found" page (noindex), not a silent redirect home. */}
           <Route path="*" element={<NotFoundPage />} />
         </Route>
@@ -170,6 +185,7 @@ export default function AppRoutes() {
             {profileShellRoutes()}
             {attendanceShellRoutes()}
             {calendarShellRoutes()}
+            {engagementShellRoutes()}
             <Route path="/id-card" element={<IdCardPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/reports/marks" element={legacy("/reports/marks", <ReportsMarksPage />)} />

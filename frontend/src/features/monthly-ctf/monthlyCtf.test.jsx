@@ -46,6 +46,7 @@ import MonthlyCtfPlayPage from "./MonthlyCtfPlayPage";
 import { SeasonLeaderboard, RewardGrid, DEFAULT_REWARDS } from "./SeasonParts";
 import {
   briefParagraphs,
+  certificatePath,
   countdownFor,
   formatDuration,
   formatIst,
@@ -102,6 +103,10 @@ const BOARD = {
 };
 
 describe("season model", () => {
+  it("links a finalist certificate to the certificate system, not the old Monthly CTF path", () => {
+    expect(certificatePath("k3y 9")).toBe("/certificates/k3y%209");
+  });
+
   it("formats durations, ordinals and IST times", () => {
     expect(formatDuration(0)).toBe("0s");
     expect(formatDuration(75)).toBe("1m 15s");

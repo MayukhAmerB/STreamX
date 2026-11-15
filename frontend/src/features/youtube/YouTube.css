@@ -566,7 +566,8 @@
   align-items: center;
   justify-content: center;
   background-color: var(--cds-layer-01, #262626);
-  color: var(--yt-red);
+  /* Palette law: the channel mark is white like the landing Watch band, never YouTube red. */
+  color: var(--cds-icon-primary, #f4f4f4);
 }
 
 .yt-channel__name {

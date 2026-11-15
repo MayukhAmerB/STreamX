@@ -1252,6 +1252,9 @@ a:focus-visible > .hp-btn__arrow {
 
 .hp-story {
   display: grid;
+  /* One shrinkable column on phones: an implicit `auto` track grows to its
+     widest child (the timeline mocks) and pushed .hp-tl__ui past 390 px. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 48px;
 }
 
@@ -1303,7 +1306,10 @@ a:focus-visible > .hp-btn__arrow {
   font-weight: 600;
 }
 
-.hp-tl {
+/* `.lp .hp-tl` beats the landing list reset (`.lp ol { padding: 0 }`), which
+   otherwise pulled the steps onto the rail and the dots off-screen. */
+.hp-tl,
+.lp .hp-tl {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -1314,7 +1320,8 @@ a:focus-visible > .hp-btn__arrow {
 }
 
 @media (min-width: 640px) {
-  .hp-tl {
+  .hp-tl,
+  .lp .hp-tl {
     padding-left: 40px;
   }
 }

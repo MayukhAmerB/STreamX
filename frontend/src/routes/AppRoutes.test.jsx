@@ -70,6 +70,19 @@ vi.mock("../features/teach-today/TeachTodayPage", () => ({ default: () => "Teach
 vi.mock("../features/teach-courses/CourseEditorPage", () => ({ default: () => "CourseEditor" }));
 vi.mock("../pages/ConsoleRecordingUploadPage", () => ({ default: () => "RecordingUpload" }));
 vi.mock("../pages/ReportsMarksPage", () => ({ default: () => "ReportsMarks" }));
+vi.mock("../marketing/auth/ResetPasswordPage", () => ({ default: () => "ResetPassword" }));
+vi.mock("../features/engagement-ui/AchievementsPage", () => ({ default: () => "Achievements" }));
+vi.mock("../features/engagement-ui/LeaderboardPage", () => ({ default: () => "Leaderboard" }));
+vi.mock("../features/engagement-ui/LevelsPage", () => ({ default: () => "Levels" }));
+vi.mock("../features/engagement-ui/AchievementVerifyPage", () => ({ default: () => "AchievementVerify" }));
+vi.mock("../features/certificates/CertificatePage", async () => {
+  const { useParams } = await import("react-router-dom");
+  return {
+    default: function CertificateStub() {
+      return `Certificate(${useParams().reference ?? ""})`;
+    },
+  };
+});
 
 // Capabilities: Teaching on unless a test says otherwise.
 const capsState = { caps: null, loading: false };
@@ -255,6 +268,30 @@ describe("AppRoutes", { timeout: 30000 }, () => {
 
   it("serves the YouTube Watch page inside the website layout", async () => {
     expect(await renderAt("/watch", authFor("guest"))).toBe("website:Watch @/watch");
+  });
+
+  // Live E2E 2026-11-15: these pages were linked from the Console menu and the
+  // reset e-mail but answered "not found" because their routes were never mounted.
+  it("opens the e-mailed password reset link in the website layout", async () => {
+    expect(await renderAt("/reset-password?uid=MQ&token=abc", authFor("guest"))).toBe(
+      "website:ResetPassword @/reset-password?uid=MQ&token=abc"
+    );
+  });
+
+  it.each([
+    ["/achievements", "Achievements"],
+    ["/leaderboard", "Leaderboard"],
+    ["/levels", "Levels"],
+  ])("serves the engagement page %s inside the shell", async (path, page) => {
+    expect(await renderAt(path, authFor("student"))).toBe(`shell:${page} @${path}`);
+  });
+
+  it("serves the public achievement check in the website layout", async () => {
+    expect(await renderAt("/achievements/abc123", authFor("guest"))).toBe("website:AchievementVerify @/achievements/abc123");
+  });
+
+  it("sends an old Monthly CTF certificate link to the certificate page", async () => {
+    expect(await renderAt("/monthly-ctf/certificates/k3y9", authFor("guest"))).toBe("website:Certificate(k3y9) @/certificates/k3y9");
   });
 
   it.each(["/this-page-does-not-exist", "/courses/12/nope", "/watch/extra"])(

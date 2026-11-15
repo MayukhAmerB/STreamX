@@ -10,13 +10,17 @@ const BODY_LIMIT_BYTES = 8192;
 const ATTEMPT_WINDOW_MS = 60_000;
 const ATTEMPT_LIMIT = 30;
 const CERTIFICATION_ANSWER_SECRET = process.env.CERTIFICATION_ANSWER_SECRET || "";
-const DEFAULT_LMS_API_BASE = "https://alsyedinitiative.com/api";
+// The LMS signs students in through api.alsyedinitiative.com, so its auth
+// cookies are host-only there: calls to alsyedinitiative.com/api carry no
+// session (live E2E 2026-11-15: the Examination tab kept asking to sign in).
+const DEFAULT_LMS_API_BASE = "https://api.alsyedinitiative.com/api";
 // Where the Examination tab sends answers (the LMS API, which records every
 // attempt). Only http(s) URLs are accepted; anything else falls back.
 const LMS_API_BASE = resolveLmsApiBase(process.env.LABS_LMS_API_BASE);
 const LMS_API_ORIGIN = new URL(LMS_API_BASE).origin;
 // Members-only labs (LMS switch "labs_membership_required"; off = open labs).
-const SITE_URL = String(process.env.LABS_SITE_URL || LMS_API_ORIGIN).replace(/\/+$/, "");
+// The LMS website (sign-in, pricing): LABS_SITE_URL, else the API origin without "api.".
+const SITE_URL = resolveSiteUrl(process.env.LABS_SITE_URL, LMS_API_ORIGIN);
 const labsAccess = createAccess({ lmsApiBase: LMS_API_BASE });
 // Always public, even for visitors without a membership.
 const ALWAYS_PUBLIC = new Set(["/styles.css", "/favicon.ico", "/favicon-16x16.png", "/favicon-32x32.png", "/favicon-48x48.png", "/favicon-192x192.png", "/apple-touch-icon.png"]);
@@ -118,6 +122,18 @@ const rootPublicFiles = new Set([
   "/favicon-192x192.png",
   "/apple-touch-icon.png",
 ]);
+
+function resolveSiteUrl(value, apiOrigin) {
+  const raw = String(value || "").trim();
+  if (raw) return raw.replace(/\/+$/, "");
+  try {
+    const url = new URL(apiOrigin);
+    url.hostname = url.hostname.replace(/^api\./, "");
+    return url.origin;
+  } catch {
+    return String(apiOrigin || "").replace(/\/+$/, "");
+  }
+}
 
 function resolveLmsApiBase(value) {
   const raw = String(value || "").trim();
@@ -358,7 +374,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname === "/api/config" && req.method === "GET") {
-    sendJson(res, 200, { lmsApiBase: LMS_API_BASE });
+    sendJson(res, 200, { lmsApiBase: LMS_API_BASE, siteUrl: SITE_URL });
     return;
   }
 
@@ -449,4 +465,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { server, resolveLmsApiBase, resolvePublicFile, contentSecurityPolicy, LMS_API_BASE, labsAccess };
+module.exports = { server, resolveLmsApiBase, resolveSiteUrl, resolvePublicFile, contentSecurityPolicy, LMS_API_BASE, labsAccess };

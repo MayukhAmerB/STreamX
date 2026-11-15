@@ -2,20 +2,80 @@
   "_about": "Link-parity contract for the public site (plan 7.3). Hand-maintained: never regenerate it to make a failing test pass. Nothing listed here may disappear. A new href or route needs an entry in allowedHrefAdditions / allowedRouteAdditions; a renamed button needs an entry in renamedButtons (old label -> new label). Scenario data is mocked in linkParity.test.jsx (both tracks open, one live class per action state).",
   "allowedHrefAdditions": {
     "navbar": [
-      "https://labs.alsyedinitiative.com"
+      "https://labs.alsyedinitiative.com",
+      "/pricing",
+      "/roadmap",
+      "/tracks/pentesting"
     ],
     "navbarSheet": [
-      "https://labs.alsyedinitiative.com"
+      "https://labs.alsyedinitiative.com",
+      "/pricing",
+      "/roadmap",
+      "/tracks/pentesting"
     ],
-    "landing": [],
+    "landing": [
+      "/about",
+      "/hall-of-fame",
+      "/osint/free",
+      "/pricing",
+      "/roadmap",
+      "/tracks/osint",
+      "/tracks/pentesting"
+    ],
     "footer": [
       "https://labs.alsyedinitiative.com",
       "/national-desk",
       "/as-accounts",
-      "/join-alsyed"
+      "/join-alsyed",
+      "/pricing",
+      "/roadmap",
+      "/tracks/osint",
+      "/tracks/pentesting"
     ]
   },
-  "allowedRouteAdditions": [],
+  "allowedHrefRemovals": {
+    "_why": "HackPath-style redesign (b03f085a): the account menu keeps Console, My courses, Profile and ID card; staff and teaching shortcuts moved to the Console sidebar and the capability-gated Teaching/Admin groups (Back office included), which these mocked scenarios do not load. The landing page no longer deep-links course reviews or category filters (Tracks, Pricing and Roadmap replace them), and its Console/Login buttons moved to the navbar. Every removed target is still a route.",
+    "navbar": [
+      "/guides",
+      "/control-center",
+      "/meeting",
+      "/broadcasting",
+      "/lecture-questions",
+      "/instructor/dashboard",
+      "https://api.alsyedinitiative.com/admin/"
+    ],
+    "navbarSheet": [
+      "/guides",
+      "/control-center",
+      "/meeting",
+      "/broadcasting",
+      "/lecture-questions",
+      "/instructor/dashboard",
+      "https://api.alsyedinitiative.com/admin/"
+    ],
+    "landing": [
+      "/console",
+      "/login",
+      "/courses/201#reviews",
+      "/courses/202",
+      "/courses/202#reviews",
+      "/courses?category=osint#course-category-results",
+      "/courses?category=web_pentesting#course-category-results"
+    ],
+    "footer": []
+  },
+  "allowedRouteAdditions": [
+    "/reset-password",
+    "/pricing",
+    "/roadmap",
+    "/tracks/:track",
+    "/bootcamp",
+    "/osint/free",
+    "/monthly-ctf",
+    "/monthly-ctf/hall-of-fame",
+    "/monthly-ctf/certificates/:slug",
+    "/monthly-ctf/play"
+  ],
   "renamedButtons": {},
   "requiredAnchors": {
     "navbar": [],

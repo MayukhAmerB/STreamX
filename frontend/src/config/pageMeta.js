@@ -50,6 +50,7 @@ const ROUTES = [
     description: "A curated path through free OSINT challenges on other platforms, the monthly live CTF and progress you track yourself.",
   },
   { path: "/login", title: "Sign in", description: `Sign in to your ${siteBrand.name} account to open your courses and live classes.` },
+  { path: "/reset-password", title: "Choose a new password", noindex: true },
   {
     path: "/as-accounts",
     title: "Verified accounts",

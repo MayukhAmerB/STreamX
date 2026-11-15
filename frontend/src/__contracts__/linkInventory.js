@@ -60,13 +60,18 @@ export function collectInventory(root, { skip } = {}) {
   return { hrefs: sorted(hrefs), buttons: sorted(buttons), anchors: sorted(anchors) };
 }
 
-/** Every `path=` declared in AppRoutes.jsx (string literal or expression), in source order, unique. */
+/**
+ * Every route declared in AppRoutes.jsx, in source order, unique: each `path=`
+ * (string literal or expression) and each `["/path", <Page />]` entry of a
+ * legacy route group. The group's own `path={path}` (a loop variable) is not a route.
+ */
 export function parseRoutePaths(source) {
   const found = [];
-  const pattern = /\bpath=(?:"([^"]+)"|\{`([^`]+)`\}|\{([^}]+)\})/g;
+  const pattern = /\bpath=(?:"([^"]+)"|\{`([^`]+)`\}|\{([^}]+)\})|\[\s*"(\/[^"]*)"\s*,\s*</g;
   let match;
   while ((match = pattern.exec(String(source || "")))) {
-    const value = (match[1] || match[2] || match[3] || "").trim();
+    const value = (match[1] || match[2] || match[3] || match[4] || "").trim();
+    if (value === "path") continue;
     if (value && !found.includes(value)) found.push(value);
   }
   return found;
@@ -79,11 +84,20 @@ function missing(expected = [], actual = []) {
 
 /**
  * Compares one surface. Returns a list of human-readable problems ([] = parity).
- * `allowedHrefAdditions` / `renamedButtons` / `requiredAnchors` come from the fixture.
+ * `allowedHrefAdditions` / `allowedHrefRemovals` / `renamedButtons` /
+ * `requiredAnchors` come from the fixture (each removal is a reviewed entry).
  */
-export function compareSurface(name, expected, actual, { allowedHrefAdditions = [], renamedButtons = {}, requiredAnchors = [] } = {}) {
+export function compareSurface(
+  name,
+  expected,
+  actual,
+  { allowedHrefAdditions = [], allowedHrefRemovals = [], renamedButtons = {}, requiredAnchors = [] } = {}
+) {
   const problems = [];
-  missing(expected.hrefs, actual.hrefs).forEach((href) => problems.push(`${name}: href removed: ${href}`));
+  const removable = new Set(allowedHrefRemovals);
+  missing(expected.hrefs, actual.hrefs)
+    .filter((href) => !removable.has(href))
+    .forEach((href) => problems.push(`${name}: href removed: ${href}`));
   const known = new Set([...(expected.hrefs || []), ...allowedHrefAdditions]);
   (actual.hrefs || [])
     .filter((href) => !known.has(href))

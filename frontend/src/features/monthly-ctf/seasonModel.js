@@ -4,7 +4,9 @@
 export const PLAY_PATH = "/monthly-ctf/play";
 export const PUBLIC_PATH = "/monthly-ctf";
 export const HALL_OF_FAME_PATH = "/monthly-ctf/hall-of-fame";
-export const certificatePath = (slug) => `/monthly-ctf/certificates/${encodeURIComponent(slug)}`;
+// Finalist certificates live in the certificate system: /certificates/<slug> opens the
+// canonical reference number (the old /monthly-ctf/certificates/<slug> only redirects there).
+export const certificatePath = (slug) => `/certificates/${encodeURIComponent(slug)}`;
 
 export const EMPTY_COSMETICS = Object.freeze({ aura: false, frame: false, frame_tier: "", title: "", until: null });
 

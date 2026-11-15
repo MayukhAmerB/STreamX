@@ -342,6 +342,7 @@ describe("link parity: public navbar, landing page and footer", () => {
       const problems = SURFACES.flatMap((surface) =>
         compareSurface(`${name}.${surface}`, fixture.scenarios[name][surface], actual[name][surface], {
           allowedHrefAdditions: fixture.allowedHrefAdditions[surface] || [],
+          allowedHrefRemovals: fixture.allowedHrefRemovals?.[surface] || [],
           renamedButtons: fixture.renamedButtons || {},
           requiredAnchors: fixture.requiredAnchors[surface] || [],
         })
@@ -355,13 +356,41 @@ describe("link parity: public navbar, landing page and footer", () => {
     expect(actual.guest.footer.anchors).toContain("contact");
   });
 
-  it("only allows the planned additions (Labs, National Desk, AS-Accounts, Join Al Syed)", () => {
+  it("only allows the planned additions (Labs, National Desk, AS-Accounts, Join Al Syed, the HackPath nav)", () => {
     const labs = "https://labs.alsyedinitiative.com";
-    expect(fixture.allowedHrefAdditions.navbar).toEqual([labs]);
-    expect(fixture.allowedHrefAdditions.navbarSheet).toEqual([labs]);
-    expect([...fixture.allowedHrefAdditions.footer].sort()).toEqual([labs, "/as-accounts", "/join-alsyed", "/national-desk"].sort());
-    expect(fixture.allowedHrefAdditions.landing).toEqual([]);
-    expect(fixture.allowedRouteAdditions).toEqual([]);
+    // HackPath-style redesign (b03f085a): Pricing, Roadmap and the Tracks pages.
+    const hackpathNav = ["/pricing", "/roadmap", "/tracks/pentesting"];
+    expect(fixture.allowedHrefAdditions.navbar).toEqual([labs, ...hackpathNav]);
+    expect(fixture.allowedHrefAdditions.navbarSheet).toEqual([labs, ...hackpathNav]);
+    expect([...fixture.allowedHrefAdditions.footer].sort()).toEqual(
+      [labs, "/as-accounts", "/join-alsyed", "/national-desk", "/pricing", "/roadmap", "/tracks/osint", "/tracks/pentesting"].sort()
+    );
+    expect([...fixture.allowedHrefAdditions.landing].sort()).toEqual(
+      ["/about", "/hall-of-fame", "/osint/free", "/pricing", "/roadmap", "/tracks/osint", "/tracks/pentesting"].sort()
+    );
+    expect([...fixture.allowedRouteAdditions].sort()).toEqual(
+      [
+        "/reset-password",
+        "/pricing",
+        "/roadmap",
+        "/tracks/:track",
+        "/bootcamp",
+        "/osint/free",
+        "/monthly-ctf",
+        "/monthly-ctf/hall-of-fame",
+        "/monthly-ctf/certificates/:slug",
+        "/monthly-ctf/play",
+      ].sort()
+    );
+    // A removal never reaches the footer, and every removed in-app target is still a route.
+    expect(fixture.allowedHrefRemovals.footer).toEqual([]);
+    const removed = ["navbar", "navbarSheet", "landing"].flatMap((surface) => fixture.allowedHrefRemovals[surface]);
+    for (const href of removed.filter((item) => item.startsWith("/"))) {
+      const pathname = href.split(/[?#]/)[0];
+      const routes = actual.routes.map((route) => (route === "CONSOLE_PATH" ? "/console" : route));
+      const known = routes.some((route) => route === pathname || (route.includes(":") && new RegExp(`^${route.replace(/:[^/]+/g, "[^/]+")}$`).test(pathname)));
+      expect(known, `${href} is still routed`).toBe(true);
+    }
   });
 });
 
@@ -379,6 +408,17 @@ describe("link parity: comparison rules", () => {
     expect(compareSurface("s", base, { ...renamed, buttons: [] }, { allowedHrefAdditions: ["/labs"], renamedButtons: { More: "Menu" } })).toEqual([
       's: button "More" was renamed to "Menu" in the fixture, but "Menu" is not rendered',
     ]);
+  });
+
+  it("accepts only the reviewed href removals", () => {
+    const current = { hrefs: ["/a"], buttons: ["More"], anchors: ["about"] };
+    expect(compareSurface("s", base, current, { allowedHrefRemovals: ["/b"] })).toEqual([]);
+    expect(compareSurface("s", base, current, { allowedHrefRemovals: ["/c"] })).toEqual(["s: href removed: /b"]);
+  });
+
+  it("reads the routes of a legacy route group but not its loop variable", () => {
+    const source = '{entries.map(([path]) => <Route path={path} />)}[["/old", <Old key="o" />], ["/older/:id", <Older key="p" />]]';
+    expect(parseRoutePaths(source)).toEqual(["/old", "/older/:id"]);
   });
 
   it("parses literal and expression route paths and rejects removed or unlisted routes", () => {

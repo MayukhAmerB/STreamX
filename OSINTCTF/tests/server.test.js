@@ -7,7 +7,7 @@ const { after, before, test } = require("node:test");
 process.env.LABS_LMS_API_BASE = "https://lms.example.test/api/";
 process.env.LABS_PUBLIC_DIR = path.resolve(__dirname, "..");
 
-const { server, resolveLmsApiBase, resolvePublicFile, contentSecurityPolicy } = require("../server.js");
+const { server, resolveLmsApiBase, resolveSiteUrl, resolvePublicFile, contentSecurityPolicy } = require("../server.js");
 
 let base;
 
@@ -22,7 +22,7 @@ test("GET /api/config returns the LMS API base without a trailing slash", async 
   const response = await fetch(`${base}/api/config`);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.deepEqual(await response.json(), { lmsApiBase: "https://lms.example.test/api" });
+  assert.deepEqual(await response.json(), { lmsApiBase: "https://lms.example.test/api", siteUrl: "https://lms.example.test" });
 });
 
 test("the CSP lets the page call the LMS origin and nothing else new", async () => {
@@ -50,11 +50,17 @@ test("documents and scripts are never served from /materials/", () => {
   assert.equal(resolvePublicFile("/materials/../server.js"), null);
 });
 
-test("invalid LMS bases fall back to the production default", () => {
-  assert.equal(resolveLmsApiBase(""), "https://alsyedinitiative.com/api");
-  assert.equal(resolveLmsApiBase("javascript:alert(1)"), "https://alsyedinitiative.com/api");
-  assert.equal(resolveLmsApiBase("https://user:pw@evil.example/api"), "https://alsyedinitiative.com/api");
+test("invalid LMS bases fall back to the production default (the API host that holds the session)", () => {
+  assert.equal(resolveLmsApiBase(""), "https://api.alsyedinitiative.com/api");
+  assert.equal(resolveLmsApiBase("javascript:alert(1)"), "https://api.alsyedinitiative.com/api");
+  assert.equal(resolveLmsApiBase("https://user:pw@evil.example/api"), "https://api.alsyedinitiative.com/api");
   assert.equal(resolveLmsApiBase("http://127.0.0.1:8000/api"), "http://127.0.0.1:8000/api");
+});
+
+test("the LMS website is LABS_SITE_URL, else the API origin without api.", () => {
+  assert.equal(resolveSiteUrl("", "https://api.alsyedinitiative.com"), "https://alsyedinitiative.com");
+  assert.equal(resolveSiteUrl("", "https://alsyedinitiative.com"), "https://alsyedinitiative.com");
+  assert.equal(resolveSiteUrl("https://www.example.test/", "https://api.example.test"), "https://www.example.test");
 });
 
 test("exam-core.js is served and LMS evidence images are allowed by the CSP", async () => {
