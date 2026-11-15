@@ -1,9 +1,9 @@
 // The public landing page in the HackPath philosophy (PHILOSOPHY T1/T2/T5,
 // BUILD_PLAN §2.1 "/"): black canvas, a signal-accent hero (headline, a tilted
 // investigation board, the two categories and the live site figures), real product UI in a numbered
-// timeline, batches & live classes, packages, rewards, the open programmes and
-// live classes (same data and states as before), the Watch band and the footer
-// wordmark (layout).
+// timeline, batches & live classes (the open batch featured, the live classes
+// below it), the method, packages, rewards, community, the Watch band and a
+// closing call to action; the footer wordmark comes from the layout.
 import { Link as RouterLink } from "react-router-dom";
 
 import { siteBrand } from "../../config/siteBrand";
@@ -25,9 +25,6 @@ import {
   ButtonLink,
   CheckIcon,
   CheckList,
-  DisplayHeading,
-  Eyebrow,
-  Hand,
   StatStrip,
   StatusPill,
 } from "../../marketing/primitives";
@@ -36,21 +33,21 @@ import { useSiteStats } from "../../marketing/siteStats";
 import { useMarketingData } from "../../marketing/useMarketingData";
 import { FREE_TIER } from "../../data/freeLabs";
 import { getCourseCategoryPath } from "../../utils/courseCatalog";
-import { BestsellersContent } from "./BestsellersBand";
 import { HeroCountdownStrip } from "./HeroBand";
 import {
   HP_BATCHES,
   HP_COMMUNITY,
+  HP_FINAL_CTA,
   HP_HERO_BOARD,
   HP_HERO_TRACE,
   HP_HERO_TRACKS,
   HP_HERO,
-  HP_OPEN_NOW,
   HP_PACKAGES,
   HP_REWARDS,
   HP_STORY,
   HP_TRACKS,
 } from "./landingContent";
+import { IconTile } from "./LandingIcons";
 import LiveClassesBand from "./LiveClassesBand";
 import { useHashScroll } from "./useHashScroll";
 import { liveBroadcastJoinPath, useLandingLiveClasses, useHeroLiveBroadcast } from "./useLandingData";
@@ -503,81 +500,53 @@ export function TrackPair({ gate }) {
   );
 }
 
-function OpenNow({ catalog: feed, liveClasses, liveBroadcast }) {
-  // "Open now" lists the programmes you can join; Pentesting courses (browsable,
-  // not yet on sale) live on their track page and in the catalogue tiers.
-  const catalog = { ...feed, courses: feed.courses.filter((course) => course?.category !== "web_pentesting") };
+/* ------------------------------------------------ shared section system (lx-) */
+
+/*
+ * Every band below the hero shares one system with it (hp.css "landing
+ * sections"): an accent per section (data-accent: cyan, emerald, violet),
+ * alternating depth (data-depth: raised bands carry soft glows, flat bands a
+ * faint masked grid), an eyebrow chip with an accent dot and a heading with
+ * one gradient phrase.
+ */
+function LxSection({ id, labelledBy, accent, depth = "flat", className = "", children }) {
   return (
-    <section className="hp-band hp-rule-top" aria-labelledby="hp-open-title" id="programs">
-      <div className="hp-frame">
-        <div className="hp-section-head hp-section-head--split">
-          <div className="hp-section-head__copy">
-            <Eyebrow>{HP_OPEN_NOW.eyebrow}</Eyebrow>
-            <h2 id="hp-open-title" className="hp-h2">
-              {HP_OPEN_NOW.lead} <Hand>{HP_OPEN_NOW.accent}</Hand>
-            </h2>
-            <p className="hp-lead">{HP_OPEN_NOW.body}</p>
-          </div>
-          <ButtonLink to="/courses" variant="secondary" size="sm" arrow>
-            {HP_OPEN_NOW.cta}
-          </ButtonLink>
-        </div>
-        <div className="hp-after-head lp-hp-open">
-          <HeroCountdownStrip courses={catalog.courses} />
-          <BestsellersContent catalog={catalog} browsableTracks />
-        </div>
+    <section id={id} className={`hp-band lx-sec${className ? ` ${className}` : ""}`} data-accent={accent} data-depth={depth} aria-labelledby={labelledBy}>
+      <div className="lx-bg" aria-hidden="true">
+        <span className="lx-bg__glow lx-bg__glow--a" />
+        <span className="lx-bg__glow lx-bg__glow--b" />
+        <span className="lx-bg__grid" />
       </div>
-      <LiveClassesBand theme="g100" liveClasses={liveClasses} liveBroadcast={liveBroadcast} />
+      <div className="hp-frame lx-frame">{children}</div>
     </section>
   );
 }
 
-// Copy from landingContent.js (HP_STORY); each step keeps its product mock.
-const STORY_MOCKS = [<TrackPickerMock key="track" />, <PlayerMock key="player" />, <ReportMock key="report" />, <TerminalMock key="lab" />, <ExamMock key="exam" />, <CertificateMock key="cert" />];
-const STORY_STEPS = HP_STORY.steps.map((step, index) => ({ ...step, ui: STORY_MOCKS[index] }));
-
-export const STORY_PRINCIPLES = HP_STORY.principles;
-
-export function StoryBand() {
+export function SectionChip({ children }) {
   return (
-    <section className="hp-band hp-band--lg hp-rule-top" aria-labelledby="hp-story-title">
-      <div className="hp-frame">
-        <div className="hp-stack-center">
-          <DisplayHeading id="hp-story-title" lines={HP_STORY.lines} periods />
-          <p className="hp-lead" style={{ marginTop: 24 }}>
-            {HP_STORY.lead}
-          </p>
-        </div>
-        <div className="hp-story hp-after-head">
-          <div className="hp-story__aside">
-            <Eyebrow>{HP_STORY.asideEyebrow}</Eyebrow>
-            <h3 className="hp-h3">{HP_STORY.asideTitle}</h3>
-            <p className="hp-body">{HP_STORY.asideBody}</p>
-            <CheckList items={STORY_PRINCIPLES} />
-          </div>
-          <ol className="hp-tl">
-            {STORY_STEPS.map((step, index) => (
-              <li key={step.title} className="hp-tl__step">
-                <span className="hp-tl__dot" aria-hidden="true" />
-                <p className="hp-eyebrow">{step.kicker}</p>
-                <h3 className="hp-tl__heading">
-                  <span className="hp-tl__num" aria-hidden="true">
-                    {index + 1}.
-                  </span>
-                  <span className="hp-tl__title">{step.title}</span>
-                </h3>
-                <p className="hp-tl__sub">{step.sub}</p>
-                <div className="hp-tl__ui">{step.ui}</div>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </div>
-    </section>
+    <p className="lx-chip">
+      <span className="lx-chip__dot" aria-hidden="true" />
+      {children}
+    </p>
   );
 }
 
-/* ------------------------------------------------- batches, packages, rewards */
+function SectionIntro({ id, content, action = null, center = false }) {
+  return (
+    <div className={`lx-head${center ? " lx-head--center" : ""}${action ? " lx-head--split" : ""}`}>
+      <div className="lx-head__copy">
+        <SectionChip>{content.eyebrow}</SectionChip>
+        <h2 id={id} className="hp-h2 lx-h2">
+          {content.lead} <span className="lx-grad">{content.accent}</span>
+        </h2>
+        {content.body ? <p className="hp-lead lx-lead">{content.body}</p> : null}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+/* ------------------------------------------------- batches & live classes */
 
 /**
  * The open OSINT batch from the course list the landing already loads: an
@@ -604,91 +573,160 @@ function formatStart(value) {
   return date.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
 }
 
-function SectionIntro({ id, content }) {
+function FeaturedBatch({ batch, courses }) {
+  const B = HP_BATCHES;
+  const fee = courseFee(batch);
+  const start = formatStart(batch?.start_date);
+  if (!batch) {
+    return (
+      <article className="lx-card lx-batch lx-batch--empty">
+        <p className="hp-body">{B.noOpen}</p>
+        <ButtonLink to="/courses" variant="secondary" size="sm" arrow>
+          {B.noOpenCta}
+        </ButtonLink>
+      </article>
+    );
+  }
   return (
-    <div className="hp-section-head">
-      <div className="hp-section-head__copy">
-        <Eyebrow>{content.eyebrow}</Eyebrow>
-        <h2 id={id} className="hp-h2">
-          {content.lead} <Hand>{content.accent}</Hand>
-        </h2>
-        <p className="hp-lead">{content.body}</p>
+    <article className="lx-card lx-batch" aria-label={B.openLabel} data-course-id={batch.id}>
+      <div className="lx-batch__top">
+        <span className="lx-live-chip">
+          <span className="lx-live-chip__dot" aria-hidden="true" />
+          {B.enrollingChip}
+        </span>
+        <span className="lx-batch__kicker">{B.kicker}</span>
       </div>
-    </div>
+      <h3 className="lx-batch__title">{batch.card_title || batch.title || B.openTitleFallback}</h3>
+      {fee ? (
+        <p className="lx-batch__price">
+          <span className="hp-sr">{B.feeLabel}: </span>
+          <span className="lx-batch__amount">{fee}</span>
+          <span className="lx-batch__per">{HP_PACKAGES.cohort.period}</span>
+        </p>
+      ) : null}
+      <dl className="lx-batch__facts">
+        {start ? (
+          <div>
+            <dt>{B.startsLabel}</dt>
+            <dd>{start}</dd>
+          </div>
+        ) : null}
+        <div>
+          <dt>{B.scheduleLabel}</dt>
+          <dd>{B.scheduleValue}</dd>
+        </div>
+        <div>
+          <dt>{B.formatLabel}</dt>
+          <dd>{B.formatValue}</dd>
+        </div>
+      </dl>
+      <HeroCountdownStrip courses={courses} />
+      <div className="hp-actions lx-batch__actions">
+        <ButtonLink to={`/courses/${batch.id}`} variant="primary" size="md" arrow className="hx-cta">
+          {B.openCta}
+        </ButtonLink>
+        <ButtonLink to="/courses" variant="secondary" size="md">
+          {B.allCta}
+        </ButtonLink>
+      </div>
+      <div className="lx-batch__past">
+        <span className="lx-batch__past-label">{B.pastLabel}</span>
+        <ul>
+          {B.past.map((item) => (
+            <li key={item.name}>
+              <CheckIcon />
+              <span>{item.name}</span>
+              <span className="hp-sr"> {item.status}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </article>
   );
 }
 
-export function BatchesBand({ courses = [] }) {
+export function BatchesBand({ courses = [], liveClasses = null, liveBroadcast = null }) {
   const batch = selectOpenBatch(courses);
-  const fee = courseFee(batch);
-  const start = formatStart(batch?.start_date);
   return (
-    <section className="hp-band hp-rule-top" aria-labelledby="hp-batches-title" id="batches">
-      <div className="hp-frame">
-        <SectionIntro id="hp-batches-title" content={HP_BATCHES} />
-        <div className="hp-after-head hp-lp-split">
-          <ol className="hp-lp-steps">
+    <LxSection id="batches" labelledBy="hp-batches-title" accent="cyan" depth="raised" className="lx-batches">
+      <SectionIntro id="hp-batches-title" content={HP_BATCHES} />
+      <div className="lx-after lx-batches__grid">
+        <FeaturedBatch batch={batch} courses={courses} />
+        <div className="lx-card lx-card--quiet lx-timeline">
+          <p className="lx-subhead">{HP_BATCHES.timelineTitle}</p>
+          <ol className="lx-steps">
             {HP_BATCHES.steps.map((step, index) => (
-              <li key={step.title}>
-                <span className="hp-lp-steps__num" aria-hidden="true">
+              <li key={step.title} className="lx-steps__item">
+                <IconTile name={step.icon} />
+                <span className="lx-steps__num" aria-hidden="true">
                   {String(index + 1).padStart(2, "0")}
                 </span>
-                <span className="hp-lp-steps__title">{step.title}</span>
-                <span className="hp-lp-steps__text">{step.text}</span>
+                <span className="lx-steps__title">{step.title}</span>
+                <span className="lx-steps__text">{step.text}</span>
               </li>
             ))}
           </ol>
-          <div className="hp-lp-batch">
-            {batch ? (
-              <article className="hp-lp-panel" aria-label={HP_BATCHES.openLabel} data-course-id={batch.id}>
-                <StatusPill kind="open">{HP_BATCHES.openLabel}</StatusPill>
-                <h3 className="hp-lp-panel__title">{batch.card_title || batch.title || HP_BATCHES.openTitleFallback}</h3>
-                <dl className="hp-lp-facts">
-                  {start ? (
-                    <div>
-                      <dt>{HP_BATCHES.startsLabel}</dt>
-                      <dd>{start}</dd>
-                    </div>
-                  ) : null}
-                  {fee ? (
-                    <div>
-                      <dt>{HP_BATCHES.feeLabel}</dt>
-                      <dd>{fee}</dd>
-                    </div>
-                  ) : null}
-                </dl>
-                <ButtonLink to={`/courses/${batch.id}`} variant="primary" size="sm" arrow>
-                  {HP_BATCHES.openCta}
-                </ButtonLink>
-              </article>
-            ) : (
-              <article className="hp-lp-panel">
-                <p className="hp-body">{HP_BATCHES.noOpen}</p>
-                <ButtonLink to="/courses" variant="secondary" size="sm" arrow>
-                  {HP_BATCHES.noOpenCta}
-                </ButtonLink>
-              </article>
-            )}
-            <div className="hp-lp-past">
-              <p className="hp-eyebrow">{HP_BATCHES.pastLabel}</p>
-              <ul>
-                {HP_BATCHES.past.map((item) => (
-                  <li key={item.name}>
-                    <span>{item.name}</span>
-                    <span className="hp-lp-past__status">
-                      <CheckIcon />
-                      {item.status}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
         </div>
       </div>
-    </section>
+      {liveClasses ? (
+        <div id="programs" className="lx-live">
+          <LiveClassesBand theme="g100" liveClasses={liveClasses} liveBroadcast={liveBroadcast} />
+        </div>
+      ) : null}
+    </LxSection>
   );
 }
+
+/* --------------------------------------------------------------- the method */
+
+// Copy from landingContent.js (HP_STORY); each step keeps its product mock.
+const STORY_MOCKS = [<TrackPickerMock key="track" />, <PlayerMock key="player" />, <ReportMock key="report" />, <TerminalMock key="lab" />, <ExamMock key="exam" />, <CertificateMock key="cert" />];
+const STORY_STEPS = HP_STORY.steps.map((step, index) => ({ ...step, ui: STORY_MOCKS[index] }));
+
+export const STORY_PRINCIPLES = HP_STORY.principles;
+
+export function StoryBand() {
+  const [first, second] = HP_STORY.lines;
+  return (
+    <LxSection labelledBy="hp-story-title" accent="violet" depth="flat" className="lx-story">
+      <div className="lx-head lx-head--center">
+        <div className="lx-head__copy">
+          <SectionChip>{HP_STORY.eyebrow}</SectionChip>
+          <h2 id="hp-story-title" className="hp-h2 lx-h2 lx-h2--xl">
+            <span className="lx-h2__line">{first}.</span> <span className="lx-h2__line lx-grad">{second}.</span>
+          </h2>
+          <p className="hp-lead lx-lead">{HP_STORY.lead}</p>
+        </div>
+      </div>
+      <div className="hp-story lx-after">
+        <div className="hp-story__aside lx-card lx-card--quiet">
+          <p className="lx-subhead">{HP_STORY.asideEyebrow}</p>
+          <h3 className="hp-h3">{HP_STORY.asideTitle}</h3>
+          <p className="hp-body">{HP_STORY.asideBody}</p>
+          <CheckList items={STORY_PRINCIPLES} />
+        </div>
+        <ol className="hp-tl lx-tl">
+          {STORY_STEPS.map((step, index) => (
+            <li key={step.title} className="hp-tl__step">
+              <span className="hp-tl__dot" aria-hidden="true" />
+              <p className="lx-kicker">{step.kicker}</p>
+              <h3 className="hp-tl__heading">
+                <span className="hp-tl__num" aria-hidden="true">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <span className="hp-tl__title">{step.title}</span>
+              </h3>
+              <p className="hp-tl__sub">{step.sub}</p>
+              <div className="hp-tl__ui">{step.ui}</div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </LxSection>
+  );
+}
+
+/* ----------------------------------------------------------------- packages */
 
 function CompareCell({ value }) {
   if (value === true) {
@@ -710,12 +748,15 @@ function CompareCell({ value }) {
   return <span>{value}</span>;
 }
 
-function PackageCard({ title, price, period, badge, status, features, cta, to, highlighted = false }) {
+const PACKAGE_ICONS = { free: "spark", starter: "layers", ctf_labs: "shield", cohort: "users", pentesting: "terminal" };
+
+function PackageCard({ id, title, price, period, badge, status, features, cta, to, highlighted = false }) {
   return (
-    <li className={`hp-lp-pkg${highlighted ? " is-highlighted" : ""}`}>
+    <li className={`hp-lp-pkg lx-pkg${highlighted ? " is-highlighted" : ""}`} data-package={id}>
+      {highlighted && badge ? <span className="lx-pkg__ribbon">{badge}</span> : null}
       <div className="hp-lp-pkg__top">
+        <IconTile name={PACKAGE_ICONS[id]} />
         <h3 className="hp-lp-pkg__title">{title}</h3>
-        {badge ? <span className="hp-lp-pkg__badge">{badge}</span> : null}
         {status ? <StatusPill kind="soon">{status}</StatusPill> : null}
       </div>
       {price ? (
@@ -731,7 +772,7 @@ function PackageCard({ title, price, period, badge, status, features, cta, to, h
           </li>
         ))}
       </ul>
-      <ButtonLink to={to} variant={highlighted ? "primary" : "secondary"} size="sm" arrow className="hp-lp-pkg__cta">
+      <ButtonLink to={to} variant={highlighted ? "primary" : "secondary"} size="sm" arrow className={`hp-lp-pkg__cta${highlighted ? " hx-cta" : ""}`}>
         {cta}
       </ButtonLink>
     </li>
@@ -749,32 +790,35 @@ export function PackagesBand({ courses = [], plans }) {
   const batch = selectOpenBatch(courses);
   const cohortFee = courseFee(batch);
   const P = HP_PACKAGES;
+  const rec = P.compareRecommended;
   return (
-    <section className="hp-band hp-rule-top" aria-labelledby="hp-packages-title" id="packages">
-      <div className="hp-frame">
-        <SectionIntro id="hp-packages-title" content={P} />
-        <div className="hp-after-head">
-          <ul className="hp-lp-pkgs" aria-label={P.eyebrow}>
-            <PackageCard {...P.free} price={rupees(0)} to={FREE_TIER.href} />
-            <PackageCard {...P.starter} price={packagePrice(merged, "starter", P.starter.price)} to="/pricing#osint" />
-            <PackageCard {...P.ctf_labs} price={packagePrice(merged, "ctf_labs", P.ctf_labs.price)} to="/pricing#osint" highlighted />
-            <PackageCard
-              {...P.cohort}
-              price={cohortFee || P.cohort.noPrice}
-              period={cohortFee ? P.cohort.period : ""}
-              to={batch ? `/courses/${batch.id}` : getCourseCategoryPath("osint")}
-            />
-            <PackageCard {...P.pentesting} to="/tracks/pentesting" />
-          </ul>
-        </div>
+    <LxSection id="packages" labelledBy="hp-packages-title" accent="emerald" depth="raised" className="lx-packages">
+      <SectionIntro id="hp-packages-title" content={P} />
+      <ul className="hp-lp-pkgs lx-after" aria-label={P.eyebrow}>
+        <PackageCard id="free" {...P.free} price={rupees(0)} to={FREE_TIER.href} />
+        <PackageCard id="starter" {...P.starter} price={packagePrice(merged, "starter", P.starter.price)} to="/pricing#osint" />
+        <PackageCard id="ctf_labs" {...P.ctf_labs} price={packagePrice(merged, "ctf_labs", P.ctf_labs.price)} to="/pricing#osint" highlighted />
+        <PackageCard
+          id="cohort"
+          {...P.cohort}
+          price={cohortFee || P.cohort.noPrice}
+          period={cohortFee ? P.cohort.period : ""}
+          to={batch ? `/courses/${batch.id}` : getCourseCategoryPath("osint")}
+        />
+        <PackageCard id="pentesting" {...P.pentesting} to="/tracks/pentesting" />
+      </ul>
+      <div className="lx-compare">
+        <p className="lx-subhead">{P.compareTitle}</p>
         <div className="hp-table-wrap hp-lp-compare">
-          <table className="hp-table">
+          <table className="hp-table lx-table">
             <caption className="hp-sr">{P.compareTitle}</caption>
             <thead>
               <tr>
-                <th scope="col">{P.compareTitle}</th>
-                {P.compareColumns.map((column) => (
-                  <th key={column} scope="col">
+                <th scope="col">
+                  <span className="hp-sr">Feature</span>
+                </th>
+                {P.compareColumns.map((column, index) => (
+                  <th key={column} scope="col" className={index === rec ? "is-rec" : undefined}>
                     {column}
                   </th>
                 ))}
@@ -785,7 +829,7 @@ export function PackagesBand({ courses = [], plans }) {
                 <tr key={row.feature}>
                   <th scope="row">{row.feature}</th>
                   {row.values.map((value, index) => (
-                    <td key={P.compareColumns[index]}>
+                    <td key={P.compareColumns[index]} className={index === rec ? "is-rec" : undefined}>
                       <CompareCell value={value} />
                     </td>
                   ))}
@@ -794,18 +838,20 @@ export function PackagesBand({ courses = [], plans }) {
             </tbody>
           </table>
         </div>
-        <div className="hp-actions hp-lp-actions">
-          <ButtonLink to="/pricing" variant="secondary" size="sm" arrow>
-            {P.pricingCta}
-          </ButtonLink>
-          <ButtonLink to="/roadmap" variant="ghost" size="sm" arrow>
-            {P.roadmapCta}
-          </ButtonLink>
-        </div>
       </div>
-    </section>
+      <div className="hp-actions lx-actions">
+        <ButtonLink to="/pricing" variant="secondary" size="sm" arrow>
+          {P.pricingCta}
+        </ButtonLink>
+        <ButtonLink to="/roadmap" variant="ghost" size="sm" arrow>
+          {P.roadmapCta}
+        </ButtonLink>
+      </div>
+    </LxSection>
   );
 }
+
+/* ------------------------------------------------------------------ rewards */
 
 const MOCK_BOARD = [
   { place: 1, handle: "@shadowtrace", xp: 1240 },
@@ -821,8 +867,8 @@ export function RewardsMock() {
   const segments = 10;
   const filled = Math.round(((xp - current.min_xp) / (next.min_xp - current.min_xp)) * segments);
   return (
-    <figure className="hp-lp-rmock" aria-label="Example: a student's rank, XP and leaderboard row">
-      <p className="hp-eyebrow">{HP_REWARDS.mockRankLabel}</p>
+    <figure className="hp-lp-rmock lx-card" aria-label="Example: a student's rank, XP and leaderboard row">
+      <p className="lx-subhead">{HP_REWARDS.mockRankLabel}</p>
       <div className="hp-lp-rank">
         <span className="hp-lp-rank__pip" aria-hidden="true">
           {current.number}
@@ -832,13 +878,16 @@ export function RewardsMock() {
       </div>
       <div className="hp-lp-meter" role="img" aria-label={`${filled} of ${segments} segments to ${next.title}`}>
         {Array.from({ length: segments }, (_, index) => (
-          <span key={index} className={index < filled ? "is-on" : undefined} />
+          <span key={index} className={index < filled ? "is-on" : undefined} style={{ "--lx-i": index }} />
         ))}
       </div>
       <p className="hp-lp-meter__caption">
-        {(next.min_xp - xp).toLocaleString("en-IN")} XP to {next.title}
+        <span>{current.title}</span>
+        <span>
+          {(next.min_xp - xp).toLocaleString("en-IN")} XP to {next.title}
+        </span>
       </p>
-      <p className="hp-eyebrow hp-lp-rmock__label">{HP_REWARDS.mockLeaderboardLabel}</p>
+      <p className="lx-subhead hp-lp-rmock__label">{HP_REWARDS.mockLeaderboardLabel}</p>
       <ol className="hp-lp-board">
         {MOCK_BOARD.map((row) => (
           <li key={row.handle} className={row.you ? "is-you" : undefined}>
@@ -855,39 +904,16 @@ export function RewardsMock() {
 export function RewardsBand() {
   const R = HP_REWARDS;
   return (
-    <section className="hp-band hp-rule-top" aria-labelledby="hp-rewards-title" id="rewards">
-      <div className="hp-frame">
-        <SectionIntro id="hp-rewards-title" content={R} />
-        <div className="hp-after-head hp-lp-split">
-          <div>
-            <h3 className="hp-lp-subhead">{R.xpTitle}</h3>
-            <dl className="hp-lp-xp">
-              {R.xp.map((item) => (
-                <div key={item.label}>
-                  <dt>{item.label}</dt>
-                  <dd>
-                    <span className="hp-lp-xp__value">{item.value}</span>
-                    <span className="hp-lp-xp__note">{item.note}</span>
-                  </dd>
-                </div>
-              ))}
-            </dl>
-            <h3 className="hp-lp-subhead">{R.prizesTitle}</h3>
-            <ul className="hp-lp-prizes">
-              {R.prizes.map((prize) => (
-                <li key={prize.place}>
-                  <span className="hp-lp-prizes__place">{prize.place}</span>
-                  <span>{prize.xp}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <RewardsMock />
+    <LxSection id="rewards" labelledBy="hp-rewards-title" accent="violet" depth="flat" className="lx-rewards">
+      <SectionIntro id="hp-rewards-title" content={R} />
+      <div className="lx-after lx-ladder-wrap">
+        <div className="lx-ladder-head">
+          <h3 className="lx-subhead">{R.ranksTitle}</h3>
+          <p className="lx-ladder-note">{R.ranksNote}</p>
         </div>
-        <h3 className="hp-lp-subhead">{R.ranksTitle}</h3>
-        <ol className="hp-lp-ranks" aria-label={R.ranksTitle}>
-          {LEVELS.map((level) => (
-            <li key={level.key}>
+        <ol className="hp-lp-ranks lx-ladder" aria-label={R.ranksTitle}>
+          {LEVELS.map((level, index) => (
+            <li key={level.key} style={{ "--lx-i": index }}>
               <span className="hp-lp-ranks__num" aria-hidden="true">
                 {level.number}
               </span>
@@ -896,7 +922,38 @@ export function RewardsBand() {
             </li>
           ))}
         </ol>
-        <div className="hp-lp-extras">
+      </div>
+      <div className="lx-rw-grid">
+        <div>
+          <h3 className="lx-subhead">{R.xpTitle}</h3>
+          <ul className="lx-xp">
+            {R.xp.map((item) => (
+              <li key={item.label} className="lx-card lx-xp__card">
+                <IconTile name={item.icon} />
+                <span className="lx-xp__value">{item.value}</span>
+                <span className="lx-xp__label">{item.label}</span>
+                <span className="lx-xp__note">{item.note}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <RewardsMock />
+      </div>
+      <div className="lx-rw-grid lx-rw-grid--b">
+        <div>
+          <h3 className="lx-subhead">{R.prizesTitle}</h3>
+          <ol className="lx-podium" aria-label={R.prizesTitle}>
+            {R.prizes.map((prize, index) => (
+              <li key={prize.place} className={`lx-podium__step lx-podium__step--${index + 1}`}>
+                <span className="lx-podium__place">{prize.place}</span>
+                <span className="lx-podium__xp">{prize.xp}</span>
+                <span className="lx-podium__label">{prize.label}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div className="lx-card lx-card--quiet lx-extras">
+          <h3 className="lx-subhead">{R.extrasTitle}</h3>
           <CheckList items={R.extras} />
           <div className="hp-actions">
             <ButtonLink to="/hall-of-fame" variant="secondary" size="sm" arrow>
@@ -908,39 +965,59 @@ export function RewardsBand() {
           </div>
         </div>
       </div>
-    </section>
+    </LxSection>
   );
 }
 
+/* ------------------------------------------------- community, final CTA */
+
 export function NeverAloneBand() {
   return (
-    <section id="about" className="hp-band hp-band--lg hp-rule-top" aria-labelledby="hp-about-title">
-      <div className="hp-frame">
-        <div className="hp-story">
-          <div>
-            <Eyebrow>
-              {HP_COMMUNITY.eyebrowPrefix} {siteBrand.name}
-            </Eyebrow>
-            <h2 id="hp-about-title" className="hp-h2" style={{ marginTop: 12 }}>
-              {HP_COMMUNITY.lead} <Hand>{HP_COMMUNITY.accent}</Hand>
-            </h2>
-            <p className="hp-lead" style={{ marginTop: 20 }}>
-              {HP_COMMUNITY.body}
-            </p>
-            <div className="hp-actions" style={{ marginTop: 32 }}>
-              <ButtonLink to="/about" variant="secondary" arrow>
-                {HP_COMMUNITY.aboutCta}
-              </ButtonLink>
-              <ButtonLink to="/hall-of-fame" variant="ghost" arrow>
-                {HP_COMMUNITY.hallCta}
-              </ButtonLink>
-            </div>
+    <LxSection id="about" labelledBy="hp-about-title" accent="cyan" depth="raised" className="lx-community">
+      <div className="hp-story lx-community__grid">
+        <div>
+          <SectionChip>
+            {HP_COMMUNITY.eyebrowPrefix} {siteBrand.name}
+          </SectionChip>
+          <h2 id="hp-about-title" className="hp-h2 lx-h2">
+            {HP_COMMUNITY.lead} <span className="lx-grad">{HP_COMMUNITY.accent}</span>
+          </h2>
+          <p className="hp-lead lx-lead">{HP_COMMUNITY.body}</p>
+          <div className="hp-actions lx-actions">
+            <ButtonLink to="/about" variant="secondary" arrow>
+              {HP_COMMUNITY.aboutCta}
+            </ButtonLink>
+            <ButtonLink to="/hall-of-fame" variant="ghost" arrow>
+              {HP_COMMUNITY.hallCta}
+            </ButtonLink>
           </div>
+        </div>
+        <div className="lx-mockframe">
           <ClassroomMock />
         </div>
-        <SiteStatStrip wide className="lp-stats hp-after-head" label={HP_COMMUNITY.statsLabel} />
       </div>
-    </section>
+      <SiteStatStrip wide className="lp-stats lx-stats lx-after" label={HP_COMMUNITY.statsLabel} />
+    </LxSection>
+  );
+}
+
+export function FinalCtaBand({ courses = [] }) {
+  const batch = selectOpenBatch(courses);
+  const C = HP_FINAL_CTA;
+  return (
+    <LxSection labelledBy="hp-final-title" accent="emerald" depth="flat" className="lx-final">
+      <div className="lx-final__panel">
+        <SectionIntro id="hp-final-title" content={C} center />
+        <div className="hp-actions lx-final__actions">
+          <ButtonLink to={FREE_TIER.href} variant="primary" size="lg" arrow className="hx-cta">
+            {C.primaryCta}
+          </ButtonLink>
+          <ButtonLink to={batch ? `/courses/${batch.id}` : "/courses"} variant="secondary" size="lg">
+            {batch ? C.secondaryCta : C.secondaryFallback}
+          </ButtonLink>
+        </div>
+      </div>
+    </LxSection>
   );
 }
 
@@ -955,16 +1032,21 @@ export default function LandingPageHP() {
   // /#about and /#contact deep links, once the data bands above them settled.
   useHashScroll(["about", "contact"], catalog.status !== "loading" && liveClasses.status !== "loading");
 
+  // Hero → Batches & live classes → Method → Packages → Rewards → Community → Watch → final CTA.
   return (
     <div className="lp lp--hp" data-brand={siteBrand.id}>
       <LandingHero isAuthenticated={isAuthenticated} liveBroadcast={liveBroadcast} gate={gate} />
-      <BatchesBand courses={catalog.courses} />
+      <BatchesBand courses={catalog.courses} liveClasses={liveClasses} liveBroadcast={liveBroadcast} />
+      <StoryBand />
       <PackagesBand courses={catalog.courses} plans={publicCatalog.plans} />
       <RewardsBand />
-      <OpenNow catalog={catalog} liveClasses={liveClasses} liveBroadcast={liveBroadcast} />
-      <StoryBand />
       <NeverAloneBand />
-      {showWatch ? <WatchBand theme="g100" youtube={youtube} /> : null}
+      {showWatch ? (
+        <div className="lx-watch">
+          <WatchBand theme="g100" youtube={youtube} />
+        </div>
+      ) : null}
+      <FinalCtaBand courses={catalog.courses} />
     </div>
   );
 }

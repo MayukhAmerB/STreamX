@@ -193,6 +193,7 @@ export const HP_OPEN_NOW = {
 };
 
 export const HP_STORY = {
+  eyebrow: "The method",
   lines: ["Learn it live", "Prove it on record"],
   lead: "Not a pile of videos: a weekly rhythm of live classes, a marked report and lab cases, ending in an exam and a certificate with its own reference number.",
   asideEyebrow: "How we teach",
@@ -223,13 +224,21 @@ export const HP_BATCHES = {
   accent: "start to certificate",
   body: "Every OSINT batch runs the same proven rhythm: live classes each weekend, recordings the same night, a marked report every week, then the exam and a certificate anyone can verify.",
   steps: [
-    { title: "Live classes", text: "Fri, Sat and Sun, 7–8 PM IST, with questions answered live." },
-    { title: "Recordings", text: "Every class is recorded, so a missed evening never sets you back." },
-    { title: "Weekly reports", text: "One investigation report a week, marked by an instructor." },
-    { title: "Exam", text: "A proctored, timed exam at the end of the batch." },
-    { title: "Certificate", text: "Pass the mark and your certificate is issued with a reference number and QR." },
+    { icon: "live", title: "Live classes", text: "Fri, Sat and Sun, 7–8 PM IST, with questions answered live." },
+    { icon: "play", title: "Recordings", text: "Every class is recorded, so a missed evening never sets you back." },
+    { icon: "report", title: "Weekly reports", text: "One investigation report a week, marked by an instructor." },
+    { icon: "exam", title: "Exam", text: "A proctored, timed exam at the end of the batch." },
+    { icon: "cert", title: "Certificate", text: "Pass the mark and your certificate is issued with a reference number and QR." },
   ],
   openLabel: "Open now",
+  enrollingChip: "Enrolling now",
+  kicker: "OSINT · live cohort",
+  scheduleLabel: "Schedule",
+  scheduleValue: "Fri–Sun · 7 PM IST",
+  formatLabel: "Format",
+  formatValue: "Live + recordings",
+  timelineTitle: "How every batch runs",
+  allCta: "All courses",
   openTitleFallback: "OSINT live cohort",
   startsLabel: "Starts",
   feeLabel: "Fee",
@@ -267,7 +276,7 @@ export const HP_PACKAGES = {
     title: "CTF Labs Member",
     price: 1499,
     period: "/ month",
-    badge: "Most complete",
+    badge: "Recommended",
     features: ["Every lab, new cases monthly", "Monthly course bundle", "Hints and write-ups", "Certification exam", "Members' leaderboard"],
     cta: "See membership",
   },
@@ -285,6 +294,8 @@ export const HP_PACKAGES = {
     cta: "Browse Pentesting",
   },
   compareTitle: "Compare at a glance",
+  // The highlighted column (CTF Labs) in compareColumns.
+  compareRecommended: 2,
   compareColumns: ["Free", "Starter", "CTF Labs", "Live cohort"],
   compareRows: [
     { feature: "Free challenges and monthly CTF", values: [true, true, true, true] },
@@ -306,18 +317,20 @@ export const HP_REWARDS = {
   body: "Every class, lecture and plan earns XP. XP sets your rank, the weekly leaderboard turns it into prizes, and certificates prove it.",
   xpTitle: "How XP is earned",
   xp: [
-    { value: "150 XP", label: "Live class, 40+ minutes", note: "+100 for your first" },
-    { value: "30 XP", label: "Partial live class", note: "Under 40 minutes" },
-    { value: "1 XP / 5 min", label: "Recordings", note: "Up to 60 a day, +20 per finished lecture" },
-    { value: "₹ × 0.5 XP", label: "Subscriptions", note: "Half an XP per rupee" },
+    { icon: "live", value: "150 XP", label: "Live class, 40+ minutes", note: "+100 for your first" },
+    { icon: "clock", value: "30 XP", label: "Partial live class", note: "Under 40 minutes" },
+    { icon: "play", value: "1 XP / 5 min", label: "Recordings", note: "Up to 60 a day, +20 per finished lecture" },
+    { icon: "card", value: "₹ × 0.5 XP", label: "Subscriptions", note: "Half an XP per rupee" },
   ],
   prizesTitle: "Weekly leaderboard prizes",
   prizes: [
-    { place: "#1", xp: "200 XP" },
-    { place: "#2–3", xp: "120 XP" },
-    { place: "#4–10", xp: "60 XP" },
+    { place: "#1", xp: "200 XP", label: "Top of the week" },
+    { place: "#2–3", xp: "120 XP", label: "Runners-up" },
+    { place: "#4–10", xp: "60 XP", label: "Top ten" },
   ],
   ranksTitle: "Eight ranks",
+  ranksNote: "Recruit to Elite Operator: every rank is earned in XP, never bought.",
+  extrasTitle: "Also on your record",
   extras: [
     { lead: "Badges.", text: "Earned for streaks, reports, labs and exams." },
     { lead: "Weekly leaderboard.", text: "Handles only, never real names." },
@@ -343,4 +356,15 @@ export const HP_COMMUNITY = {
   aboutCta: "About us",
   hallCta: "Hall of Fame",
   statsLabel: "About us in numbers",
+};
+
+// The closing call to action, after the Watch band.
+export const HP_FINAL_CTA = {
+  eyebrow: "Start tonight",
+  lead: "Your first case",
+  accent: "starts free",
+  body: "Open the free labs in a minute, or join the live batch and finish with a certificate anyone can verify.",
+  primaryCta: "Start free",
+  secondaryCta: "See the open batch",
+  secondaryFallback: "Browse courses",
 };

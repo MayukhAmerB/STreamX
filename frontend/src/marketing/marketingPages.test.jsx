@@ -13,7 +13,7 @@ vi.mock("../hooks/useAuth", () => ({ useAuth: () => state.auth }));
 
 import { EXAM_LAB, FREE_TIER, labAccess, LABS, labUrl } from "../data/freeLabs";
 import { landingVariant } from "../pages/landing/landingFlag";
-import { BatchesBand, heroStatItems, LandingHero, PackagesBand, qrModules, RewardsBand, selectOpenBatch, TrackPair } from "../pages/landing/LandingPageHP";
+import { BatchesBand, FinalCtaBand, heroStatItems, LandingHero, PackagesBand, qrModules, RewardsBand, selectOpenBatch, TrackPair } from "../pages/landing/LandingPageHP";
 import ChangelogPage from "../pages/ChangelogPage";
 import { CURRENT_VERSION, RELEASES } from "../config/releaseNotes";
 import { siteStatItems } from "./siteStats";
@@ -205,6 +205,33 @@ describe("landing: batches, packages and rewards (v4.0-Thrallback)", () => {
     expect(markup).toContain('class="hp-lp-rank"');
     expect(markup).toContain('class="hp-lp-meter"');
     expect(markup).toContain('class="hp-lp-board"');
+  });
+
+  it("features the open batch once, with the Enrolling now chip, its timeline and the section system", () => {
+    const markup = html(<BatchesBand courses={[OLD, BATCH_IV]} />);
+    expect(markup).toContain("Enrolling now");
+    expect(markup.match(/OSINT PROFESSIONAL TRAINING PROGRAM \(BATCH IV\)/g)).toHaveLength(1);
+    expect(markup.match(/class="lx-steps__item"/g)).toHaveLength(5);
+    expect(markup).toContain('data-accent="cyan"');
+    expect(markup).toContain('class="lx-chip"');
+    expect(markup).toContain('class="lx-grad"');
+  });
+
+  it("marks the member plan as recommended in the cards and the comparison table, and stands the prizes on a podium", () => {
+    const packages = html(<PackagesBand courses={[BATCH_IV]} plans={[]} />);
+    expect(packages).toMatch(/class="hp-lp-pkg lx-pkg is-highlighted" data-package="ctf_labs"/);
+    expect(packages).toContain("Recommended");
+    expect(packages.match(/class="is-rec"/g)).toHaveLength(1 + 6);
+    const rewards = html(<RewardsBand />);
+    expect(rewards.match(/class="lx-podium__step /g)).toHaveLength(3);
+    expect(rewards.match(/class="lx-card lx-xp__card"/g)).toHaveLength(4);
+  });
+
+  it("closes with a call to action to the free labs and the open batch", () => {
+    const markup = html(<FinalCtaBand courses={[BATCH_IV]} />);
+    expect(markup).toContain("Start free");
+    expect(markup).toContain('href="/courses/28"');
+    expect(html(<FinalCtaBand courses={[]} />)).toContain('href="/courses"');
   });
 });
 
