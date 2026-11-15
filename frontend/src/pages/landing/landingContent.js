@@ -102,6 +102,26 @@ export const HP_HERO = {
   statsLabel: "Al Syed Initiative in numbers",
 };
 
+/** The two course categories in the hero (OSINT live; Pentesting browsable, coming soon). */
+export const HP_HERO_TRACKS = {
+  label: "Course categories",
+  osint: {
+    kind: "Category 01",
+    title: "OSINT",
+    status: "Live now",
+    description: "Turn a photo, a username or a domain into evidence that holds up.",
+    fact: "Live Fri · Sat · Sun, 7 PM IST",
+  },
+  pentesting: {
+    kind: "Category 02",
+    title: "Pentesting",
+    status: "Coming soon",
+    statusOpen: "Enrolment open",
+    description: "Five tiers, from security thinking to Active Directory attacks.",
+    fact: "Browse every outline now",
+  },
+};
+
 /** The hero's terminal panel: one illustrative case, pivot by pivot (public sources only). */
 export const HP_HERO_TRACE = {
   title: "case-0419 · osint pivot chain",

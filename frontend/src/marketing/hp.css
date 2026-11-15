@@ -750,6 +750,8 @@ a:focus-visible > .hp-btn__arrow {
 
 @media (min-width: 1024px) {
   .hp-hero--console {
+    min-height: auto;
+    padding-top: 112px;
     padding-bottom: 96px;
   }
   .hp-hero__grid {
@@ -884,6 +886,131 @@ a:focus-visible > .hp-btn__arrow {
   background: #fff;
   box-shadow: none;
   animation: none;
+}
+
+/* The two course categories (OSINT live, Pentesting coming soon). */
+.hp-hero--console .hp-hero__tracks {
+  display: grid;
+  gap: 12px;
+  margin-top: 36px;
+  padding: 0;
+  list-style: none;
+  max-width: 40rem;
+}
+
+@media (min-width: 640px) {
+  .hp-hero--console .hp-hero__tracks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.hp-htrack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+  padding: 18px 44px 18px 18px;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.03);
+  color: var(--hp-fg);
+  text-decoration: none;
+  transition: border-color 160ms var(--hp-ease), background-color 160ms var(--hp-ease), transform 160ms var(--hp-ease);
+}
+
+.hp-htrack:hover {
+  border-color: rgb(255 255 255 / 0.4);
+  background: rgb(255 255 255 / 0.06);
+  transform: translateY(-2px);
+}
+
+.hp-htrack:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.hp-htrack__status {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px dashed rgb(255 255 255 / 0.3);
+  border-radius: 9999px;
+  font-family: var(--hp-font-mono);
+  font-size: 10px;
+  line-height: 16px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hp-muted);
+}
+
+.hp-htrack__status.is-live {
+  border: 1px solid #fff;
+  background: #fff;
+  color: #000;
+  font-weight: 600;
+}
+
+.hp-htrack__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: #000;
+}
+
+.hp-htrack__kind {
+  margin-top: 6px;
+  font-family: var(--hp-font-mono);
+  font-size: 10px;
+  line-height: 14px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hp-subtle);
+}
+
+.hp-htrack__title {
+  font-size: 1.375rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.hp-htrack__desc {
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+  color: var(--hp-muted);
+}
+
+.hp-htrack__fact {
+  margin-top: auto;
+  padding-top: 8px;
+  font-family: var(--hp-font-mono);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--hp-text-2);
+}
+
+.hp-htrack__arrow {
+  position: absolute;
+  top: 18px;
+  right: 16px;
+  color: var(--hp-muted);
+  transition: transform 160ms var(--hp-ease);
+}
+
+.hp-htrack:hover .hp-htrack__arrow {
+  transform: translateX(3px);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hp-htrack,
+  .hp-htrack:hover,
+  .hp-htrack:hover .hp-htrack__arrow {
+    transform: none;
+  }
 }
 
 /* The real figures, left-aligned under the actions. */

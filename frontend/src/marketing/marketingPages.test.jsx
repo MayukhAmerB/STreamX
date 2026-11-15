@@ -100,6 +100,17 @@ describe("landing (HackPath philosophy)", () => {
     expect(markup).toContain(">Browse courses<");
   });
 
+  it("highlights the two course categories in the hero: OSINT live (to its courses), Pentesting coming soon (browsable)", () => {
+    const markup = html(<LandingHero isAuthenticated={false} liveBroadcast={null} siteStats={[]} gate={CLOSED} />);
+    expect(markup).toContain('aria-label="Course categories"');
+    expect(markup).toMatch(/data-track="osint" data-state="open"><a class="hp-htrack" href="\/courses\?category=osint#course-category-results">/);
+    expect(markup).toContain("Live now");
+    expect(markup).toMatch(/data-track="web_pentesting" data-state="coming_soon"><a class="hp-htrack" href="\/tracks\/pentesting">/);
+    expect(markup).toContain("Coming soon");
+    const open = html(<LandingHero isAuthenticated={false} liveBroadcast={null} siteStats={[]} gate={{ enabled: true, reason: "" }} />);
+    expect(open).toContain('data-track="web_pentesting" data-state="open"');
+  });
+
   it("shows the real site figures (students, verified reviews, rating, live classes) and hides missing ones", () => {
     expect(heroStatItems(SITE_STATS).map((item) => [item.label, item.value])).toEqual([
       ["Students trained", "310+"],

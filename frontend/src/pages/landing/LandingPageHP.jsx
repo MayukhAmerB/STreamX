@@ -3,6 +3,8 @@
 // an OSINT pivot chain in a terminal panel, the live site figures), real product UI in a numbered
 // timeline, the open programmes and live classes (same data and states as
 // before), the Watch band, the pricing band and the footer wordmark (layout).
+import { Link as RouterLink } from "react-router-dom";
+
 import { siteBrand } from "../../config/siteBrand";
 import { useYouTubeChannel } from "../../features/youtube/youTubeStore";
 import { useAuth } from "../../hooks/useAuth";
@@ -30,11 +32,13 @@ import SiteStatStrip, { siteStatValues } from "../../marketing/SiteStatStrip";
 import { useSiteStats } from "../../marketing/siteStats";
 import { useMarketingData } from "../../marketing/useMarketingData";
 import { FREE_TIER } from "../../data/freeLabs";
+import { getCourseCategoryPath } from "../../utils/courseCatalog";
 import { BestsellersContent } from "./BestsellersBand";
 import { HeroCountdownStrip } from "./HeroBand";
 import {
   HP_COMMUNITY,
   HP_HERO_TRACE,
+  HP_HERO_TRACKS,
   HP_HERO,
   HP_OPEN_NOW,
   HP_PRACTISE,
@@ -116,11 +120,51 @@ export function TraceConsole({ steps = HP_HERO_TRACE.steps }) {
 }
 
 /**
+ * The two course categories, inside the hero: OSINT (live now, to its
+ * courses) and Pentesting (browsable; "Coming soon" until the server's
+ * purchase gate opens).
+ */
+export function HeroTracks({ gate }) {
+  const pentestingOpen = Boolean(gate?.enabled);
+  const tiles = [
+    { ...HP_HERO_TRACKS.osint, key: "osint", to: getCourseCategoryPath("osint"), status: HP_HERO_TRACKS.osint.status, live: true },
+    {
+      ...HP_HERO_TRACKS.pentesting,
+      key: "web_pentesting",
+      to: "/tracks/pentesting",
+      status: pentestingOpen ? HP_HERO_TRACKS.pentesting.statusOpen : HP_HERO_TRACKS.pentesting.status,
+      live: pentestingOpen,
+    },
+  ];
+  return (
+    <ul className="hp-hero__tracks" aria-label={HP_HERO_TRACKS.label}>
+      {tiles.map((tile) => (
+        <li key={tile.key} data-track={tile.key} data-state={tile.live ? "open" : "coming_soon"}>
+          <RouterLink to={tile.to} className="hp-htrack">
+            <span className={`hp-htrack__status${tile.live ? " is-live" : ""}`}>
+              {tile.live ? <span className="hp-htrack__dot" aria-hidden="true" /> : null}
+              {tile.status}
+            </span>
+            <span className="hp-htrack__kind">{tile.kind}</span>
+            <span className="hp-htrack__title">{tile.title}</span>
+            <span className="hp-htrack__desc">{tile.description}</span>
+            <span className="hp-htrack__fact">{tile.fact}</span>
+            <svg className="hp-htrack__arrow" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false">
+              <path d="M3 8h10M9 4l4 4-4 4" />
+            </svg>
+          </RouterLink>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
  * Hero: live schedule badge, headline, actions and the real figures, with the
  * trace console beside it (desktop) or below it (phone). `siteStats` overrides
  * the fetched figures (tests, previews).
  */
-export function LandingHero({ isAuthenticated, liveBroadcast, siteStats }) {
+export function LandingHero({ isAuthenticated, liveBroadcast, siteStats, gate }) {
   const live = useSiteStats();
   const rows = heroStatItems(Array.isArray(siteStats) ? siteStats : live.items);
   return (
@@ -159,6 +203,7 @@ export function LandingHero({ isAuthenticated, liveBroadcast, siteStats }) {
               {HP_HERO.secondaryCta}
             </ButtonLink>
           </div>
+          <HeroTracks gate={gate} />
           {rows.length ? <StatStrip items={siteStatValues(rows)} label={HP_HERO.statsLabel} className="hp-hero__stats" /> : null}
         </div>
         <div className="hp-hero__panel">
@@ -379,8 +424,7 @@ export default function LandingPageHP() {
 
   return (
     <div className="lp lp--hp" data-brand={siteBrand.id}>
-      <LandingHero isAuthenticated={isAuthenticated} liveBroadcast={liveBroadcast} />
-      <TrackPair gate={gate} />
+      <LandingHero isAuthenticated={isAuthenticated} liveBroadcast={liveBroadcast} gate={gate} />
       <OpenNow catalog={catalog} liveClasses={liveClasses} liveBroadcast={liveBroadcast} />
       <StoryBand />
       <PractiseBand />
