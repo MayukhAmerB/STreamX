@@ -13,23 +13,7 @@ class ReportsConfig(AppConfig):
         from apps.core.worker import register_periodic
 
         from . import checks  # noqa: F401  (registers system checks)
-        from .housekeeping import HOUSEKEEPING_INTERVAL_SECONDS, schedule_housekeeping
         from .rescan import schedule_periodic_rescan
 
         # Cheap: publishes at most one deduplicated outbox event per interval.
         register_periodic("reports.rescan", interval_seconds=600, func=schedule_periodic_rescan)
-        # Due-reminder backstop and staged-upload prune (hourly).
-        register_periodic(
-            "reports.housekeeping",
-            interval_seconds=HOUSEKEEPING_INTERVAL_SECONDS,
-            func=schedule_housekeeping,
-        )
-        # Self-service weekly reports: reminders, digests, SLA alert, automatic
-        # marks release, stuck-scan requeue (Phase 3). Publishes one deduplicated
-        # outbox tick per interval; the worker does the work.
-        from django.conf import settings
-
-        from .scheduler import interval_seconds, schedule_tick
-
-        if getattr(settings, "REPORTS_SCHEDULER_ENABLED", True):
-            register_periodic("reports.scheduler", interval_seconds=interval_seconds(), func=schedule_tick)

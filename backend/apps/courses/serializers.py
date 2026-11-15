@@ -385,46 +385,7 @@ class CourseDetailResponseSerializer(serializers.Serializer):
     errors = serializers.JSONField(allow_null=True, required=False)
 
 
-def can_see_instructor_email(request, course):
-    """Only staff and the course's own instructor see the instructor's email.
-
-    Public catalog responses (the course list and course detail) are read by
-    anonymous visitors and cached; the instructor's address is not public data.
-    """
-    user = getattr(request, "user", None)
-    if not user or not user.is_authenticated:
-        return False
-    return bool(user.is_staff or user.is_superuser or user.id == getattr(course, "instructor_id", None))
-
-
-def public_instructor_payload(course, request):
-    if not getattr(course, "instructor_id", None) or not getattr(course, "instructor", None):
-        return None
-    payload = {"id": course.instructor_id, "full_name": course.instructor.full_name}
-    if can_see_instructor_email(request, course):
-        payload["email"] = course.instructor.email
-    return payload
-
-
 class CourseEnrollmentStatusMixin:
-    # --- catalogue fields (WS catalog-plans; additive) ---------------------
-    def get_tier_label(self, obj):
-        return obj.get_tier_display() if obj.tier else ""
-
-    def get_module_count(self, obj):
-        modules = obj.public_curriculum or []
-        return len(modules) if isinstance(modules, list) else 0
-
-    def get_track_title(self, obj):
-        from .catalog_tracks import TRACKS
-
-        return dict(TRACKS).get(obj.category, obj.get_category_display())
-
-    def get_purchase_gate(self, obj):
-        from .features import purchase_gate
-
-        return purchase_gate(obj, block=course_purchase_block(obj))
-
     def get_price(self, obj):
         return format(get_plan_amount(obj, FULL_PLAN), ".2f")
 
@@ -517,10 +478,6 @@ class CourseListSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeriali
     purchase_unavailable_reason = serializers.SerializerMethodField()
     price = serializers.SerializerMethodField()
     monthly_price = serializers.SerializerMethodField()
-    tier_label = serializers.SerializerMethodField()
-    module_count = serializers.SerializerMethodField()
-    track_title = serializers.SerializerMethodField()
-    purchase_gate = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -556,19 +513,19 @@ class CourseListSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeriali
             "enrollment_status",
             "purchase_available",
             "purchase_unavailable_reason",
-            "tier",
-            "tier_label",
-            "tier_order",
-            "module_count",
-            "track_title",
-            "purchase_gate",
             "instructor",
             "created_at",
             "updated_at",
         )
 
     def get_instructor(self, obj):
-        return public_instructor_payload(obj, self.context.get("request"))
+        if not getattr(obj, "instructor_id", None) or not getattr(obj, "instructor", None):
+            return None
+        return {
+            "id": obj.instructor_id,
+            "full_name": obj.instructor.full_name,
+            "email": obj.instructor.email,
+        }
 
     def get_thumbnail(self, obj):
         request = self.context.get("request")
@@ -603,10 +560,6 @@ class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeria
     purchase_available = serializers.SerializerMethodField()
     purchase_unavailable_reason = serializers.SerializerMethodField()
     live_classes = serializers.SerializerMethodField()
-    tier_label = serializers.SerializerMethodField()
-    module_count = serializers.SerializerMethodField()
-    track_title = serializers.SerializerMethodField()
-    purchase_gate = serializers.SerializerMethodField()
     price = serializers.SerializerMethodField()
     monthly_price = serializers.SerializerMethodField()
     payment_plans = serializers.SerializerMethodField()
@@ -655,19 +608,19 @@ class CourseDetailSerializer(CourseEnrollmentStatusMixin, serializers.ModelSeria
             "installments_paid",
             "purchase_available",
             "purchase_unavailable_reason",
-            "tier",
-            "tier_label",
-            "tier_order",
-            "module_count",
-            "track_title",
-            "purchase_gate",
             "live_classes",
             "created_at",
             "updated_at",
         )
 
     def get_instructor(self, obj):
-        return public_instructor_payload(obj, self.context.get("request"))
+        if not getattr(obj, "instructor_id", None) or not getattr(obj, "instructor", None):
+            return None
+        return {
+            "id": obj.instructor_id,
+            "full_name": obj.instructor.full_name,
+            "email": obj.instructor.email,
+        }
 
     def get_thumbnail(self, obj):
         request = self.context.get("request")

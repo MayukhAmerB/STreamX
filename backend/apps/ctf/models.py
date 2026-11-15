@@ -16,8 +16,6 @@
 
 from __future__ import annotations
 
-import os
-import uuid
 from datetime import timedelta
 
 from django.conf import settings
@@ -115,21 +113,6 @@ class CtfExam(models.Model):
         help_text="Fingerprint of the answer pepper the answers were hashed with.",
     )
     content_loaded_at = models.DateTimeField(null=True, blank=True, editable=False)
-    # --- Lifecycle (ctf.scheduler, apps/ctf/scheduler.py) -------------------
-    # A draft with ``auto_publish`` is "scheduled": the scheduler publishes it
-    # at ``opens_at`` (re-checking the readiness checklist first). The
-    # ``*_at`` markers make every scheduler step run exactly once.
-    auto_publish = models.BooleanField(
-        default=False,
-        db_default=False,
-        help_text="Scheduled: publish automatically at the opening time (set from the Console).",
-    )
-    published_at = models.DateTimeField(null=True, blank=True, editable=False)
-    closed_at = models.DateTimeField(null=True, blank=True, editable=False)
-    publish_notified_at = models.DateTimeField(null=True, blank=True, editable=False)
-    opening_soon_notified_at = models.DateTimeField(null=True, blank=True, editable=False)
-    results_finalized_at = models.DateTimeField(null=True, blank=True, editable=False)
-    results_notified_at = models.DateTimeField(null=True, blank=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -264,11 +247,6 @@ class CtfParticipation(models.Model):
     wrong_count = models.PositiveIntegerField(default=0)
     attempt_count = models.PositiveIntegerField(default=0)
     last_correct_at = models.DateTimeField(null=True, blank=True, help_text="Leaderboard tie-break.")
-    # Student identity at submission time (apps.users.identity; additive, backfilled by
-    # ``manage.py backfill_identity_snapshots``). Shown before the record's own fields.
-    student_roll_number = models.CharField(max_length=16, null=True, blank=True, editable=False)
-    student_name_snapshot = models.CharField(max_length=255, null=True, blank=True, editable=False)
-    student_handle_snapshot = models.CharField(max_length=30, null=True, blank=True, editable=False)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -286,8 +264,6 @@ class CtfParticipation(models.Model):
             ),
             models.Index("exam", F("score").desc(), "last_correct_at", name="ctf_part_board_idx"),
             models.Index(fields=["user", "exam"], name="ctf_part_user_exam_idx"),
-            # ctf.scheduler: expire active participations whose time ran out.
-            models.Index(fields=["status", "deadline_at"], name="ctf_part_status_deadline_idx"),
         ]
 
     def __str__(self):
@@ -353,106 +329,3 @@ class CtfAttempt(models.Model):
 
     def delete(self, *args, **kwargs):
         raise AppendOnlyError("CTF attempts are append-only and cannot be deleted.")
-
-
-def material_upload_to(instance, filename):
-    """``ctf_materials/<exam slug>/<32 hex>.<ext>``: MEDIA_ROOT, but outside the
-    public /media/ allowlist (infra/hostinger/nginx/media.conf), so the file
-    only leaves through the signed, access-checked material view."""
-    extension = os.path.splitext(str(filename or ""))[1].lower().lstrip(".")[:10]
-    extension = extension if extension.isalnum() else "bin"
-    slug = getattr(instance.exam, "slug", "exam") or "exam"
-    return f"ctf_materials/{slug[:80]}/{uuid.uuid4().hex}.{extension}"
-
-
-class CtfMaterial(models.Model):
-    """An evidence file for an exam question, uploaded from the Console.
-
-    ``path`` is the identifier the exam file uses in ``questions[].materials``
-    (``/materials/exams/<slug>-<hex>/photo.jpg``). Students never get the
-    storage name: they get a short-lived signed URL, and only after starting.
-    """
-
-    exam = models.ForeignKey(CtfExam, on_delete=models.CASCADE, related_name="material_files")
-    path = models.CharField(max_length=300)
-    file = models.FileField(upload_to=material_upload_to, max_length=255)
-    original_name = models.CharField(max_length=255, blank=True, default="")
-    content_type = models.CharField(max_length=120, blank=True, default="")
-    size = models.PositiveBigIntegerField(default=0)
-    sha256 = models.CharField(max_length=64, blank=True, default="")
-    uploaded_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ("exam", "path")
-        verbose_name = "CTF exam material"
-        verbose_name_plural = "CTF exam materials"
-        constraints = [models.UniqueConstraint(fields=["exam", "path"], name="ctf_material_exam_path_unique")]
-
-    def __str__(self):
-        return f"{self.exam.slug}: {self.path}"
-
-
-class CtfExamResult(models.Model):
-    """One student's final result for one exam: the unified gradebook entry.
-
-    Written once by the scheduler after the exam closes (``scheduler.py``);
-    the score is frozen here even if an admin later re-scores attempts.
-    Staff preview runs never get a result.
-    """
-
-    exam = models.ForeignKey(CtfExam, on_delete=models.CASCADE, related_name="results")
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="ctf_results")
-    participation = models.OneToOneField(
-        CtfParticipation, on_delete=models.SET_NULL, null=True, blank=True, related_name="result"
-    )
-    batch_course = models.ForeignKey(
-        "courses.Course", on_delete=models.SET_NULL, null=True, blank=True, related_name="ctf_results"
-    )
-    status = models.CharField(max_length=20, choices=CtfParticipation.STATUS_CHOICES)
-    score = models.PositiveIntegerField(default=0)
-    total_points = models.PositiveIntegerField(default=0)
-    solved_count = models.PositiveIntegerField(default=0)
-    question_count = models.PositiveIntegerField(default=0)
-    rank = models.PositiveIntegerField(null=True, blank=True, help_text="Position among the exam's students.")
-    finalized_at = models.DateTimeField(default=timezone.now)
-    notified_at = models.DateTimeField(null=True, blank=True)
-    # Student identity at submission time (apps.users.identity; additive, backfilled by
-    # ``manage.py backfill_identity_snapshots``). Shown before the record's own fields.
-    student_roll_number = models.CharField(max_length=16, null=True, blank=True, editable=False)
-    student_name_snapshot = models.CharField(max_length=255, null=True, blank=True, editable=False)
-    student_handle_snapshot = models.CharField(max_length=30, null=True, blank=True, editable=False)
-
-    class Meta:
-        ordering = ("exam", "rank", "id")
-        verbose_name = "CTF exam result"
-        verbose_name_plural = "CTF exam results (gradebook)"
-        constraints = [
-            models.UniqueConstraint(fields=["exam", "user"], name="ctf_result_exam_user_unique"),
-        ]
-        indexes = [
-            models.Index(fields=["user", "finalized_at"], name="ctf_result_user_idx"),
-            models.Index(fields=["batch_course", "exam"], name="ctf_result_batch_idx"),
-        ]
-
-    def __str__(self):
-        return f"{self.user} {self.exam.slug}: {self.score}/{self.total_points}"
-
-    @property
-    def percentage(self):
-        if not self.total_points:
-            return None
-        return round(self.score * 100.0 / self.total_points, 1)
-
-
-# Monthly OSINT CTF seasons (apps/ctf/season_models.py), registered in this app.
-from .season_models import (  # noqa: E402,F401
-    CtfSeason,
-    CtfSeasonAttempt,
-    CtfSeasonAudit,
-    CtfSeasonEntry,
-    CtfSeasonReward,
-)

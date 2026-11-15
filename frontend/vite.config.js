@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -9,10 +8,10 @@ import react from "@vitejs/plugin-react";
 // (src/config/pageMeta.js). Keep in step with src/config/siteBrand.js.
 const BRAND_META = {
   alsyed: {
-    title: "Al syed Initiative | Live OSINT Training, Labs & CTF",
+    title: "Al syed Initiative | Cybersecurity Training",
     siteName: "Al syed Initiative",
     description:
-      "Live OSINT classes every Fri, Sat and Sun, weekly marked reports, real investigation labs and certificates anyone can verify. Start free; Pentesting coming soon.",
+      "Practical OSINT and web application penetration testing training with live classes, protected recordings, mentor support and verified certificates.",
     origin: "https://alsyedinitiative.com",
     image: "/og-image.jpg",
     imageAlt: "Al Syed Initiative: professional cybersecurity training",
@@ -96,87 +95,8 @@ function siteMetaPlugin(env) {
   };
 }
 
-/**
- * Landing LCP (plan §7.3 budgets): the landing route is a lazy chunk, which
- * would add a request after the main bundle runs. On "/" only, an inline
- * script asks the browser to fetch that chunk (and its CSS) in parallel with
- * the entry bundle. Other routes are unaffected.
- */
-function landingPreloadPlugin() {
-  return {
-    name: "landing-preload",
-    apply: "build",
-    transformIndexHtml: {
-      order: "post",
-      handler(html, ctx) {
-        const bundle = ctx?.bundle;
-        if (!bundle) return html;
-        const chunks = Object.values(bundle).filter((item) => item.type === "chunk");
-        const entry = chunks.find((chunk) => chunk.isEntry);
-        const isLandingModule = (id) => String(id || "").replace(/\\/g, "/").endsWith("/src/pages/LandingPage.jsx");
-        const landing = chunks.find(
-          (chunk) =>
-            isLandingModule(chunk.facadeModuleId) ||
-            (chunk.isDynamicEntry && (chunk.moduleIds || Object.keys(chunk.modules || {})).some(isLandingModule))
-        );
-        if (!entry || !landing) return html;
-        const loaded = new Set([entry.fileName, ...(entry.imports || [])]);
-        const scripts = [landing.fileName, ...(landing.imports || [])].filter((file) => !loaded.has(file));
-        const loadedCss = new Set(entry.viteMetadata?.importedCss || []);
-        const styles = [
-          ...new Set(
-            scripts.flatMap((file) => [...(bundle[file]?.viteMetadata?.importedCss || [])]).filter((file) => !loadedCss.has(file))
-          ),
-        ];
-        const toUrl = (file) => `/${file}`;
-        // HackPath hero (WS-KIT): the Qur'an 20:114 calligraphy is the landing LCP image. Preload the
-        // wide SVG above 640 px and the stacked one at or below, with high priority, on "/" only.
-        const heroAsset = (needle) =>
-          Object.values(bundle).find((item) => item.type === "asset" && item.fileName.includes(needle) && item.fileName.endsWith(".svg"));
-        const heroes = [
-          [heroAsset("hero-quran-20-114-stacked"), "(max-width: 640px)"],
-          [Object.values(bundle).find((item) => item.type === "asset" && /hero-quran-20-114(?!-stacked)[^/]*\.svg$/.test(item.fileName)), "(min-width: 641px)"],
-        ].filter(([asset]) => asset);
-        const heroLinks = heroes
-          .map(([asset, media]) => `var i=document.createElement("link");i.rel="preload";i.as="image";i.href=${JSON.stringify(toUrl(asset.fileName))};i.media=${JSON.stringify(media)};i.setAttribute("fetchpriority","high");h.appendChild(i);`)
-          .join("");
-        const script = `<script>(function(){if(location.pathname!=="/")return;var h=document.head;${heroLinks}${JSON.stringify(
-          scripts.map(toUrl)
-        )}.forEach(function(u){var l=document.createElement("link");l.rel="modulepreload";l.href=u;h.appendChild(l);});${JSON.stringify(
-          styles.map(toUrl)
-        )}.forEach(function(u){var l=document.createElement("link");l.rel="preload";l.as="style";l.href=u;h.appendChild(l);});})();</script>`;
-        return html.replace("</head>", `    ${script}
-  </head>`);
-      },
-    },
-  };
-}
-
-/**
- * Dev-only component gallery (WS-KIT): `npm run dev` serves src/kit/gallery/index.html
- * at /__kit. It is not a build input, so it never ships in production.
- */
-function kitGalleryPlugin() {
-  return {
-    name: "kit-gallery",
-    apply: "serve",
-    configureServer(server) {
-      server.middlewares.use((req, _res, next) => {
-        const [pathname, query = ""] = String(req.url || "").split("?");
-        if (pathname === "/__kit" || pathname === "/__kit/") req.url = `/src/kit/gallery/index.html${query ? `?${query}` : ""}`;
-        next();
-      });
-    },
-  };
-}
-
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), siteMetaPlugin(loadEnv(mode, process.cwd(), "")), landingPreloadPlugin(), kitGalleryPlugin()],
-  resolve: {
-    alias: {
-      "@kit": path.resolve(path.dirname(fileURLToPath(import.meta.url)), "src/kit"),
-    },
-  },
+  plugins: [react(), siteMetaPlugin(loadEnv(mode, process.cwd(), ""))],
   css: {
     preprocessorOptions: {
       scss: {

@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import re
+import unicodedata
 from collections.abc import Iterable, Sequence
 
 from django.conf import settings
@@ -23,31 +25,50 @@ from django.utils.crypto import salted_hmac
 
 from apps.core.errors import UpstreamUnavailable
 
-# The named rules are the shared normaliser (apps.core.textnorm), so weekly
-# report targets and exam answers are folded by exactly the same code. The
-# rule set and behaviour are frozen there: a stored digest never changes.
-from apps.core.textnorm import DEFAULT_RULES, QUOTE_CHARACTERS, RULE_NAMES, RULES, normalize, validate_rules
-
+DEFAULT_RULES: tuple[str, ...] = ("nfkc", "trim", "collapse_whitespace", "casefold")
 SEPARATOR = "\x1f"
+QUOTE_CHARACTERS = "\"'`‘’“”«»"
 
-__all__ = [
-    "DEFAULT_RULES",
-    "MIN_PEPPER_LENGTH",
-    "QUOTE_CHARACTERS",
-    "RULE_NAMES",
-    "RULES",
-    "SEPARATOR",
-    "CtfNotConfigured",
-    "answer_digest",
-    "answer_key_id",
-    "answer_pepper",
-    "exams_disabled_reason",
-    "hash_answers",
-    "normalize",
-    "pepper_problem",
-    "validate_rules",
-    "verify",
-]
+_WHITESPACE = re.compile(r"\s+")
+_URL_SCHEME = re.compile(r"^[a-z][a-z0-9+.\-]*://", re.IGNORECASE)
+_WWW = re.compile(r"^www\.", re.IGNORECASE)
+
+
+def _strip_punctuation(text: str) -> str:
+    return "".join(ch for ch in text if not unicodedata.category(ch).startswith("P"))
+
+
+def _strip_diacritics(text: str) -> str:
+    decomposed = unicodedata.normalize("NFD", text)
+    return unicodedata.normalize("NFC", "".join(ch for ch in decomposed if unicodedata.category(ch) != "Mn"))
+
+
+def _digits_only(text: str) -> str:
+    # Any script's decimal digits (e.g. Urdu ۱۲۳) count, written as ASCII.
+    digits = []
+    for ch in text:
+        value = unicodedata.decimal(ch, None)
+        if value is not None:
+            digits.append(str(value))
+    return "".join(digits)
+
+
+RULES = {
+    "nfkc": lambda text: unicodedata.normalize("NFKC", text),
+    "trim": lambda text: text.strip(),
+    "collapse_whitespace": lambda text: _WHITESPACE.sub(" ", text),
+    "remove_whitespace": lambda text: _WHITESPACE.sub("", text),
+    "casefold": lambda text: text.casefold(),
+    "strip_punctuation": _strip_punctuation,
+    "strip_diacritics": _strip_diacritics,
+    "strip_url_scheme": lambda text: _URL_SCHEME.sub("", text),
+    "strip_www": lambda text: _WWW.sub("", text),
+    "strip_trailing_slash": lambda text: text.rstrip("/"),
+    "strip_leading_at": lambda text: text.lstrip("@"),
+    "strip_quotes": lambda text: text.strip(QUOTE_CHARACTERS),
+    "digits_only": _digits_only,
+}
+RULE_NAMES = tuple(RULES)
 
 
 class CtfNotConfigured(UpstreamUnavailable):
@@ -56,70 +77,37 @@ class CtfNotConfigured(UpstreamUnavailable):
     default_message = "Exam answer checking is not configured on the server yet. Please tell your instructor."
 
 
+def validate_rules(rules: Iterable[str] | None) -> list[str]:
+    """Return the rule list (default when empty); raise ValueError on unknown names."""
+    names = [str(name) for name in (rules or [])]
+    unknown = [name for name in names if name not in RULES]
+    if unknown:
+        raise ValueError(f"unknown normalisation rule(s): {', '.join(unknown)}")
+    if len(set(names)) != len(names):
+        raise ValueError("normalisation rules must not repeat")
+    return names or list(DEFAULT_RULES)
+
+
+def normalize(text: str, rules: Sequence[str] | None = None) -> str:
+    value = str(text or "")
+    for name in validate_rules(rules):
+        value = RULES[name](value)
+    return value
+
+
 def _is_production() -> bool:
     return str(getattr(settings, "APP_ENV", "") or "").strip().lower() in {"production", "prod"}
 
 
-MIN_PEPPER_LENGTH = 32
-
-# pepper_problem() codes, each with the staff-facing reason the Console
-# readiness checklist and the startup check (apps/ctf/checks.py) show.
-PEPPER_MISSING = "missing"
-PEPPER_TOO_SHORT = "too_short"
-PEPPER_EQUALS_SECRET_KEY = "equals_secret_key"
-PEPPER_PROBLEMS = {
-    PEPPER_MISSING: "CTF_ANSWER_PEPPER is not set on the server, so answers cannot be checked.",
-    PEPPER_TOO_SHORT: (
-        f"CTF_ANSWER_PEPPER is shorter than {MIN_PEPPER_LENGTH} characters, so it is not used and answers "
-        "cannot be checked."
-    ),
-    PEPPER_EQUALS_SECRET_KEY: (
-        "CTF_ANSWER_PEPPER equals DJANGO_SECRET_KEY, so it is not used and answers cannot be checked."
-    ),
-}
-
-
-def _configured_pepper() -> str:
-    return str(getattr(settings, "CTF_ANSWER_PEPPER", "") or "").strip()
-
-
-def pepper_problem() -> str:
-    """Why the configured pepper cannot be used ("" when it can).
-
-    A missing pepper is reported in every environment (development then uses
-    the stand-in below); a weak one (too short, or equal to SECRET_KEY so one
-    leaked secret exposes both) is reported only when one is actually set."""
-    pepper = _configured_pepper()
-    if not pepper:
-        return PEPPER_MISSING
-    if len(pepper) < MIN_PEPPER_LENGTH:
-        return PEPPER_TOO_SHORT
-    if pepper == str(getattr(settings, "SECRET_KEY", "") or "").strip():
-        return PEPPER_EQUALS_SECRET_KEY
-    return ""
-
-
-def exams_disabled_reason() -> str:
-    """Staff-facing reason exams are switched off on this server ("" when they
-    are not). Only production disables them: a missing or weak pepper turns
-    off exam publishing, starting and answering, never the rest of the LMS."""
-    if not _is_production():
-        return ""
-    return PEPPER_PROBLEMS.get(pepper_problem(), "")
-
-
 def answer_pepper() -> bytes:
-    """The HMAC key. Production must configure a strong ``CTF_ANSWER_PEPPER``:
-    a missing or weak one raises ``CtfNotConfigured`` (503), which disables
-    exams only. Development and tests derive a stable stand-in from
-    ``SECRET_KEY`` when none is set so they work out of the box."""
-    if _is_production():
-        if pepper_problem():
-            raise CtfNotConfigured()
-        return _configured_pepper().encode("utf-8")
-    pepper = _configured_pepper()
+    """The HMAC key. Production must configure ``CTF_ANSWER_PEPPER``; development
+    and tests derive a stable stand-in from ``SECRET_KEY`` so they work out of
+    the box (``ctf.E001`` keeps that fallback out of production)."""
+    pepper = str(getattr(settings, "CTF_ANSWER_PEPPER", "") or "").strip()
     if pepper:
         return pepper.encode("utf-8")
+    if _is_production():
+        raise CtfNotConfigured()
     return salted_hmac("apps.ctf.development-pepper", "ctf", algorithm="sha256").hexdigest().encode("ascii")
 
 

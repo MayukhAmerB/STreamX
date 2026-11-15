@@ -51,12 +51,4 @@ describe("ProfilePage", () => {
     expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*type="submit"/);
     expect(html).toContain("Phone is invalid.");
   });
-
-  it("offers a Reduce motion toggle that reflects the saved choice", () => {
-    const off = render();
-    expect(off).toContain("Reduce motion");
-    expect(off).toContain('id="profile-reduce-motion"');
-    expect(off).toMatch(/aria-checked="false"/);
-    expect(render({ reducedMotion: true })).toMatch(/aria-checked="true"/);
-  });
 });

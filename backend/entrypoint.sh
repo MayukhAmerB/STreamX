@@ -24,8 +24,7 @@ if [ "${APP_ENV:-}" = "production" ] || [ "${DJANGO_SETTINGS_MODULE:-}" = "confi
 fi
 
 if [ "${RUN_MIGRATIONS:-1}" = "1" ]; then
-  # Direct connection with the timeouts lifted: see migrate.sh.
-  sh /app/migrate.sh --noinput
+  python manage.py migrate --noinput
 else
   echo "[entrypoint] RUN_MIGRATIONS=0, skipping migrate step."
 fi

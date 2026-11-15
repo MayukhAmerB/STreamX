@@ -5,7 +5,7 @@ import { Button, SkeletonPlaceholder, SkeletonText } from "@carbon/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getCourse, listLiveClasses } from "../api/courses";
-import { getRealtimeSession, joinRealtimeSession } from "../api/realtime";
+import { joinRealtimeSession, listRealtimeSessions } from "../api/realtime";
 import { EmptyState, PageHeader, PageNotification, PageSkeleton } from "../features/app-shell/ui";
 import { LiveTrackTile } from "../features/live-classes/LiveCards";
 import LiveStage from "../features/live-classes/LiveStage";
@@ -18,16 +18,60 @@ import {
   resolveLiveClassSchedule,
 } from "../utils/liveClassSchedule";
 import {
-  missingActiveSessionId,
   reconcileActiveLivePayload,
+  retainRealtimeSessionsOnRefresh,
 } from "../utils/realtimeSessionResilience";
-import { useLiveSessions } from "../services/realtime/liveSessionsStore";
-import useLivePresence from "../features/engagement-ui/useLivePresence";
-import useAttendancePresence from "../features/attendance/useAttendancePresence";
-import { liveJoinDisplayName } from "../features/profiles/publicName";
 
-// No fabricated fallback classes (plan §7.2 rule 5): an empty list shows an
-// honest empty state, a failed request an error with Try again.
+const fallbackLiveClasses = [
+  {
+    id: "osint-beginner-fallback",
+    title: "OSINT Live Class - Month 1 (Beginner)",
+    level: "beginner",
+    month_number: 1,
+    description:
+      "Foundational OSINT training covering introduction, intelligence lifecycle, legal boundaries, search engine intelligence, and SOCMINT basics.",
+    schedule_days: "Friday, Saturday, Sunday",
+    class_duration_minutes: 60,
+    price: 1499,
+    enrollment_count: 0,
+    is_enrolled: false,
+    enrollment_status: "none",
+    linked_course_id: null,
+    linked_course_title: "OSINT Beginner",
+  },
+  {
+    id: "osint-intermediate-fallback",
+    title: "OSINT Live Class - Month 2 (Intermediate)",
+    level: "intermediate",
+    month_number: 2,
+    description:
+      "Practical OSINT workflows for people and identity research, image/video analysis, domain intelligence, tools, and advanced search techniques.",
+    schedule_days: "Friday, Saturday, Sunday",
+    class_duration_minutes: 60,
+    price: 2499,
+    enrollment_count: 0,
+    is_enrolled: false,
+    enrollment_status: "none",
+    linked_course_id: null,
+    linked_course_title: "OSINT Intermediate",
+  },
+  {
+    id: "osint-advanced-fallback",
+    title: "OSINT Live Class - Month 3 (Advanced)",
+    level: "advanced",
+    month_number: 3,
+    description:
+      "Advanced investigation and intelligence workflows including dark web OSINT, profiling, geolocation, archive analysis, and end-to-end investigations.",
+    schedule_days: "Friday, Saturday, Sunday",
+    class_duration_minutes: 60,
+    price: 3999,
+    enrollment_count: 0,
+    is_enrolled: false,
+    enrollment_status: "none",
+    linked_course_id: null,
+    linked_course_title: "OSINT Advanced",
+  },
+];
 
 const monthByLevel = {
   beginner: { month: 1, label: "Month 1", subtitle: "Foundation" },
@@ -85,17 +129,8 @@ export default function LiveClassesPage() {
   const [tracks, setTracks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  // One shared, visibility-aware poll of the active sessions (paused while the
-  // tab is hidden; unchanged lists answer 304).
-  const liveSessions = useLiveSessions({ enabled: isAuthenticated, userKey: user?.id });
-  const realtimeSessions = liveSessions.sessions;
-  const liveSessionsFetchedAt = liveSessions.fetchedAt;
-  const absenceCheckedAtRef = useRef(0);
+  const [realtimeSessions, setRealtimeSessions] = useState([]);
   const [activeLivePayload, setActiveLivePayload] = useState(null);
-  // Live-attendance XP: one presence ping a minute while the class is open and visible.
-  useLivePresence(activeLivePayload?.session?.id || null);
-  // Attendance: once a minute while this live page is visible (live classes only).
-  useAttendancePresence(activeLivePayload?.session?.id || null);
   const [liveJoinState, setLiveJoinState] = useState({ loading: false, error: "" });
   const liveStageRef = useRef(null);
   const [courseAttempt, setCourseAttempt] = useState(0);
@@ -141,15 +176,17 @@ export default function LiveClassesPage() {
         );
         if (!active) return;
         const liveClasses = apiData(response, []);
-        setTracks(liveClasses);
+        setTracks(
+          liveClasses.length || isCourseClassroom ? liveClasses : fallbackLiveClasses
+        );
         setError("");
       } catch (err) {
         if (!active) return;
-        setTracks([]);
+        setTracks(isCourseClassroom ? [] : fallbackLiveClasses);
         setError(
           isCourseClassroom
             ? apiMessage(err, "Unable to load this course's live classes.")
-            : apiMessage(err, "Check your connection and try again.")
+            : "Showing local OSINT live classes preview. Backend is unavailable."
         );
       } finally {
         if (active) setLoading(false);
@@ -160,6 +197,31 @@ export default function LiveClassesPage() {
       active = false;
     };
   }, [isCourseClassroom, scopedCourseId, tracksAttempt]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setRealtimeSessions([]);
+      return undefined;
+    }
+    let active = true;
+    const loadRealtimeSessions = async () => {
+      try {
+        const response = await listRealtimeSessions({ status: "all" });
+        if (!active) return;
+        const rows = apiData(response, []);
+        setRealtimeSessions((previous) => retainRealtimeSessionsOnRefresh(rows, previous));
+      } catch {
+        // Keep the last successful state. A temporary API failure must not
+        // unmount an active broadcast and send viewers back to Join Now.
+      }
+    };
+    loadRealtimeSessions();
+    const refreshId = window.setInterval(loadRealtimeSessions, 10_000);
+    return () => {
+      active = false;
+      window.clearInterval(refreshId);
+    };
+  }, [isAuthenticated]);
 
   const scopedRealtimeSessions = useMemo(
     () =>
@@ -187,36 +249,6 @@ export default function LiveClassesPage() {
     );
   }, [scopedRealtimeSessions]);
 
-  // The list holds active sessions only, so a class that ended simply drops
-  // out of it. When the watched session is missing from a successful refresh,
-  // ask for that one session (once per refresh) and close the player only if
-  // it really ended or no longer exists; anything else keeps it mounted.
-  useEffect(() => {
-    const missingId = missingActiveSessionId(activeLivePayload, scopedRealtimeSessions);
-    if (!missingId || !liveSessionsFetchedAt || absenceCheckedAtRef.current === liveSessionsFetchedAt) {
-      return undefined;
-    }
-    absenceCheckedAtRef.current = liveSessionsFetchedAt;
-    let active = true;
-    const closeIfStillWatching = () => {
-      setActiveLivePayload((previous) =>
-        String(previous?.session?.id) === String(missingId) ? null : previous
-      );
-    };
-    getRealtimeSession(missingId)
-      .then((response) => {
-        if (active && String(apiData(response, null)?.status || "").toLowerCase() === "ended") {
-          closeIfStillWatching();
-        }
-      })
-      .catch((err) => {
-        if (active && err?.response?.status === 404) closeIfStillWatching();
-      });
-    return () => {
-      active = false;
-    };
-  }, [activeLivePayload, liveSessionsFetchedAt, scopedRealtimeSessions]);
-
   const orderedTracks = useMemo(() => {
     return [...tracks].sort((a, b) => {
       const aLevel = levelOrder[String(a?.level || "").toLowerCase()] || a?.month_number || 99;
@@ -233,7 +265,7 @@ export default function LiveClassesPage() {
         (session) => String(session.id) === String(sessionId),
       );
       const response = await joinRealtimeSession(sessionId, {
-        display_name: liveJoinDisplayName(user),
+        display_name: user?.full_name || "",
         prefer_broadcast: requestedSession?.session_type === "broadcasting",
       });
       const payload = apiData(response, null);
@@ -344,8 +376,8 @@ export default function LiveClassesPage() {
 
         {error ? (
           <PageNotification
-            kind="error"
-            title="Couldn't load the live classes."
+            kind={isCourseClassroom ? "error" : "warning"}
+            title={isCourseClassroom ? "Couldn't load the live classes." : "Showing a preview of the live classes."}
             subtitle={error}
             actionLabel="Try again"
             onAction={() => setTracksAttempt((value) => value + 1)}
@@ -401,10 +433,7 @@ export default function LiveClassesPage() {
             })}
           </div>
         ) : !error ? (
-          <EmptyState
-            icon={Video}
-            text={isCourseClassroom ? "No live classes are linked to this course yet." : "No live classes scheduled right now."}
-          />
+          <EmptyState icon={Video} text="No live classes are linked to this course yet." />
         ) : null}
       </section>
     </div>

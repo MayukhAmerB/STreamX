@@ -38,9 +38,8 @@ R = ClassRecording
 SOURCE_LABELS = {
     R.SOURCE_SERVER: "Server capture",
     R.SOURCE_OBS_UPLOAD: "OBS upload",
-    R.SOURCE_LIVEKIT_EGRESS: "LiveKit egress (meeting)",
+    R.SOURCE_LIVEKIT_EGRESS: "Host Studio",
     R.SOURCE_IMPORTED: "Imported",
-    R.SOURCE_BROWSER_FALLBACK: "Browser fallback",
 }
 # state -> (css modifier, icon, label)
 STATE_BADGES = {
@@ -180,21 +179,6 @@ class SourceFilter(admin.SimpleListFilter):
         return queryset.filter(source=self.value()) if self.value() in SOURCE_LABELS else queryset
 
 
-class NeedsReviewFilter(admin.SimpleListFilter):
-    title = "review"
-    parameter_name = "needs_review"
-
-    def lookups(self, request, model_admin):
-        return [("yes", "Needs review"), ("no", "Reviewed / not needed")]
-
-    def queryset(self, request, queryset):
-        if self.value() == "yes":
-            return queryset.filter(needs_review=True)
-        if self.value() == "no":
-            return queryset.filter(needs_review=False)
-        return queryset
-
-
 class StateFilter(admin.SimpleListFilter):
     title = "state"
     parameter_name = "state"
@@ -280,14 +264,7 @@ class ClassRecordingAdmin(admin.ModelAdmin):
         "row_actions",
     )
     list_display_links = ("id", "class_display")
-    list_filter = (
-        NeedsReviewFilter,
-        CourseFilter,
-        ModuleFilter,
-        SourceFilter,
-        StateFilter,
-        ("started_at", admin.DateFieldListFilter),
-    )
+    list_filter = (CourseFilter, ModuleFilter, SourceFilter, StateFilter, ("started_at", admin.DateFieldListFilter))
     search_fields = (
         "session__title",
         "module__title",
@@ -309,7 +286,7 @@ class ClassRecordingAdmin(admin.ModelAdmin):
     )
     ordering = ("-created_at", "-id")
     date_hierarchy = None
-    actions = ("publish_lectures", "unpublish_lectures", "retry_selected", "mark_reviewed")
+    actions = ("publish_lectures", "unpublish_lectures", "retry_selected")
     list_per_page = 50
     fieldsets = (
         (None, {"fields": ("player_panel",)}),
@@ -332,7 +309,6 @@ class ClassRecordingAdmin(admin.ModelAdmin):
             "Files",
             {"fields": ("files_panel", "duration_display", "size_display", "part_count", "attempts", "files_deleted_at")},
         ),
-        ("Review", {"fields": ("needs_review", "review_reason", "hold_unpublished", "next_retry_at", "alerted_at")}),
         (
             "Timeline",
             {
@@ -343,7 +319,6 @@ class ClassRecordingAdmin(admin.ModelAdmin):
                     "finalized_at",
                     "published_at",
                     "recorder_heartbeat_at",
-                    "last_media_at",
                     "created_at",
                     "updated_at",
                 ),
@@ -367,12 +342,6 @@ class ClassRecordingAdmin(admin.ModelAdmin):
         "part_count",
         "attempts",
         "files_deleted_at",
-        "needs_review",
-        "review_reason",
-        "hold_unpublished",
-        "next_retry_at",
-        "alerted_at",
-        "last_media_at",
         "started_at",
         "stop_requested_at",
         "finalized_at",
@@ -454,10 +423,6 @@ class ClassRecordingAdmin(admin.ModelAdmin):
                 note = f"{obj.part_count} part(s), {_human_bytes(obj.captured_bytes)}"
         elif obj.state == R.STATE_FAILED and obj.error:
             note = obj.error if len(obj.error) <= 90 else f"{obj.error[:87]}..."
-        elif obj.state == R.STATE_PROCESSING and obj.lecture_id and obj.lecture.is_published:
-            note = "published (MP4); HD stream building"
-        if obj.needs_review:
-            note = (note + " " if note else "") + "- needs review"
         if obj.delete_requested_at:
             note = (note + " " if note else "") + "(file deletion queued for the recorder)"
         if note:
@@ -501,9 +466,6 @@ class ClassRecordingAdmin(admin.ModelAdmin):
             links.append((url("retry"), "Retry"))
         if compact:
             return links
-        links.append((url("rerun_finalize"), "Re-run finalize"))
-        if obj.needs_review:
-            links.append((url("mark_reviewed"), "Mark reviewed"))
         if obj.state != R.STATE_FINALIZING and (obj.lecture_id or obj.module_id or obj.session_id):
             links.append((url("move"), "Move to another module"))
         if obj.session_id:
@@ -583,14 +545,6 @@ class ClassRecordingAdmin(admin.ModelAdmin):
     def unpublish_lectures(self, request, queryset):
         self._bulk_publish(request, queryset, False)
 
-    @admin.action(description="Mark selected recordings as reviewed", permissions=("change",))
-    def mark_reviewed(self, request, queryset):
-        changed = 0
-        for recording in queryset:
-            if services.mark_reviewed(recording, request=request):
-                changed += 1
-        self.message_user(request, f"{changed} recording(s) marked as reviewed.", messages.INFO)
-
     @admin.action(description="Retry selected failed recordings", permissions=("change",))
     def retry_selected(self, request, queryset):
         queued = 0
@@ -612,8 +566,6 @@ class ClassRecordingAdmin(admin.ModelAdmin):
             view(self.publish_view, "<int:recording_id>/publish/", "publish"),
             view(self.unpublish_view, "<int:recording_id>/unpublish/", "unpublish"),
             view(self.retry_view, "<int:recording_id>/retry/", "retry"),
-            view(self.rerun_finalize_view, "<int:recording_id>/rerun-finalize/", "rerun_finalize"),
-            view(self.mark_reviewed_view, "<int:recording_id>/mark-reviewed/", "mark_reviewed"),
             view(self.move_view, "<int:recording_id>/move/", "move"),
             view(self.assign_view, "<int:recording_id>/assign/", "assign"),
             view(self.delete_files_view, "<int:recording_id>/delete-files/", "delete_files"),
@@ -705,35 +657,6 @@ class ClassRecordingAdmin(admin.ModelAdmin):
             request, recording, title="Retry recording",
             intro=f"Retry this {recording.get_state_display().lower()} recording? Last error: {recording.error or '-'}",
             submit="Retry",
-        )
-
-    def rerun_finalize_view(self, request, recording_id):
-        recording = self._get(request, recording_id)
-        if request.method == "POST":
-            done, detail = services.rerun_finalize(recording, request=request)
-            if done:
-                self.log_change(request, recording, f"Re-run finalize: {detail}")
-            return self._done(request, recording, detail, messages.SUCCESS if done else messages.WARNING)
-        return self._render_action(
-            request, recording, title="Re-run finalize",
-            intro=(
-                f"Push this {recording.get_state_display().lower()} recording forward from where it is: a failed one "
-                "is retried, a capturing one is finalized now, a processing one has its HD stream queued again. "
-                "Recording and publishing are automatic; this is only for an exceptional case."
-            ),
-            submit="Re-run finalize",
-        )
-
-    def mark_reviewed_view(self, request, recording_id):
-        recording = self._get(request, recording_id)
-        if request.method == "POST":
-            services.mark_reviewed(recording, request=request)
-            self.log_change(request, recording, "Marked as reviewed.")
-            return self._done(request, recording, "Marked as reviewed.")
-        return self._render_action(
-            request, recording, title="Mark reviewed",
-            intro=f"{recording.review_reason or 'This recording was published automatically.'} Keep it where it is?",
-            submit="Mark reviewed",
         )
 
     def move_view(self, request, recording_id):

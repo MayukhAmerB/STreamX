@@ -1,17 +1,5 @@
 # Class recording runbook (OBS live classes -> module lectures)
 
-> **Phase 2 (no-click recordings) changes the defaults described below:**
-> - **Every broadcast is recorded.** That includes OBS and Host Studio, via `RECORDING_AUTO_ALL_BROADCASTS`. `STREAM_RECORDER_ENABLED` follows that flag unless it is set explicitly.
-> - **Meetings are never recorded automatically** (owner decision: broadcasts only; `RECORDING_AUTO_MEETINGS=0`). If a deployment ever sets it to 1, `recording.reconcile` records each live meeting with a LiveKit egress and holds the file unpublished, flagged *needs review*.
-> - **There is no Start/Stop Recording button.**
-> - **Stop** pauses the take for 10 min, and **End** finalizes at once. A feed that is offline for 15 min finalizes the take too.
-> - **The module is always derived:** the session module, then `LiveClass.default_module`, then an auto-created "Class recordings" section flagged *needs review*.
-> - **The MP4 is published immediately**, and HLS follows from the single-pass, blue/green transcoder.
-> - **Failures retry automatically and alert the admins.** Parts of a class that never became a lecture are never swept.
-> - **Checks:** `verify_recording_pipeline` also covers auto-publish and the real transcode, and runs nightly as a canary.
->
-> The manual enable steps below are only needed to switch the recorder back on after `STREAM_RECORDER_ENABLED=0`. Flags, rollback and alert rules are listed in the Phase 2 deploy notes and in `backend/.env.example`.
-
 ## What runs where
 
 | Piece | Where | Notes |

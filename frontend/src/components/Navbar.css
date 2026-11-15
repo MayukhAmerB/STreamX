@@ -1,138 +1,106 @@
 /*
- * Website header: the previous production navbar (7a444898) in the landing
- * hero's colour system (marketing/hp.css, .hp-hero--signal): cyan, emerald
- * and violet accents on black, red only for "Live", no gold.
- * - a dark translucent, blurred bar of one height in every state (stronger
- *   once scrolled, with a cyan-to-violet hairline);
- * - a centred pill of links; the active one is white with a cyan underline
- *   and glow; "More" and the account menu open dark cards with an accent
- *   border;
- * - "Start learning" / "Console" in the hero's cyan primary style.
- * Under 1024 px the links move into a full-height sheet.
+ * Website navbar (landing language): black, Inter, a centred floating pill
+ * with the key links, champagne ("golden glowing white") accent for the
+ * active link and the primary button. Every rule is scoped to .snav /
+ * .snav-sheet so nothing else on the website changes.
  */
-
-.snav,
-.snav-sheet-layer {
-  --hx-cyan: #22d3ee; /* palette-law: allow owner decision (Nov 2026): the hero colour system in the site navbar */
-  --hx-emerald: #34d399; /* palette-law: allow owner decision (Nov 2026): the hero colour system in the site navbar */
-  --hx-violet: #a78bfa; /* palette-law: allow owner decision (Nov 2026): the hero colour system in the site navbar */
-  --hx-live: #ff4d5e; /* palette-law: allow owner decision (Nov 2026): red = live only */
-  --snav-height: 4rem;
-  --snav-fg: #fafafa;
-  --snav-text-2: #d1d1d1;
-  --snav-muted: #a1a1a1;
-  --snav-subtle: #8a8a8a;
-  --snav-border: rgb(255 255 255 / 0.1);
-  --snav-accent: var(--hx-cyan);
-  --snav-accent-border: color-mix(in srgb, var(--hx-cyan) 34%, transparent);
-  --snav-accent-wash: color-mix(in srgb, var(--hx-cyan) 9%, transparent);
-  --snav-card: color-mix(in srgb, var(--hx-cyan) 4%, rgb(8 8 8 / 0.96));
-  --snav-ease: cubic-bezier(0.4, 0, 0.2, 1);
-}
 
 .snav {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  color: var(--snav-fg);
-  font-family: var(--hp-font-sans, var(--font-geist, Geist), "Geist Fallback", ui-sans-serif, system-ui, sans-serif);
-  border-bottom: 1px solid var(--snav-border);
-  isolation: isolate;
-  transition: border-color 200ms var(--snav-ease);
+  --snav-text: #ffffff;
+  --snav-text-2: rgba(255, 255, 255, 0.72);
+  --snav-border: rgba(255, 255, 255, 0.12);
+  --snav-border-strong: rgba(255, 255, 255, 0.2);
+  --snav-surface: #0a0a0a;
+  --snav-hover: rgba(255, 255, 255, 0.06);
+  --snav-accent: #f3e2b3;
+  --snav-accent-hover: #fff0c8;
+  --snav-accent-soft: rgba(243, 226, 179, 0.09);
+  --snav-accent-ring: rgba(243, 226, 179, 0.26);
+  --snav-on-accent: #0a0a0a;
+  --snav-glow: 0 0 0 1px rgba(243, 226, 179, 0.55), 0 0 22px rgba(243, 226, 179, 0.26);
+  --snav-glow-strong: 0 0 0 1px rgba(243, 226, 179, 0.8), 0 0 30px rgba(243, 226, 179, 0.42);
+  --snav-menu-bg: #0a0a0a;
+  --snav-danger: #ff8a8f;
+
+  /* One height in every state, identical to the previous bar: 44px of
+     content + 10px / 16px padding (+1px hairline) = 65px phones, 77px sm+. */
+  border-bottom: 1px solid transparent;
+  padding-top: env(safe-area-inset-top);
+  color: var(--snav-text);
+  font-family: "Inter", "Segoe UI", Arial, system-ui, sans-serif;
+  transition: border-color 200ms ease;
 }
 
-/*
- * The translucent, blurred surface lives on a pseudo-element: a backdrop
- * filter on the header itself would make it the containing block of the
- * position: fixed phone sheet and clip the sheet to the bar's 64 px.
- */
-.snav::before {
-  content: "";
+.snav[data-scrolled="true"] {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Blur lives on its own layer: a backdrop-filter on <header> itself would
+   trap the fixed phone sheet inside the bar. */
+.snav__backdrop {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: color-mix(in srgb, var(--hx-cyan) 3%, rgb(0 0 0 / 0.55));
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
-  backdrop-filter: blur(14px) saturate(140%);
-  transition: background-color 200ms var(--snav-ease);
+  background: rgba(0, 0, 0, 0.94);
+  transition: background-color 200ms ease;
   pointer-events: none;
 }
 
-/* The landing melts into the hero until the page scrolls. */
-.snav[data-hairline="scroll"][data-scrolled="false"] {
-  border-bottom-color: transparent;
-}
-
-.snav[data-scrolled="true"]::before,
-.snav[data-menu-open="true"]::before {
-  background: color-mix(in srgb, var(--hx-cyan) 4%, rgb(0 0 0 / 0.8));
-}
-
-/* Accent hairline once scrolled: cyan through emerald to violet, faint at the edges. */
-.snav::after {
-  content: "";
-  position: absolute;
-  right: 0;
-  bottom: -1px;
-  left: 0;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--hx-cyan) 55%, transparent) 25%,
-    color-mix(in srgb, var(--hx-emerald) 45%, transparent) 50%,
-    color-mix(in srgb, var(--hx-violet) 55%, transparent) 75%,
-    transparent
-  );
-  opacity: 0;
-  transition: opacity 200ms var(--snav-ease);
-  pointer-events: none;
-}
-
-.snav[data-scrolled="true"]::after {
-  opacity: 1;
+.snav[data-scrolled="true"] .snav__backdrop {
+  background: rgba(0, 0, 0, 0.72);
+  -webkit-backdrop-filter: saturate(140%) blur(18px);
+  backdrop-filter: saturate(140%) blur(18px);
 }
 
 .snav__bar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  width: 100%;
-  max-width: 80rem;
-  height: var(--snav-height);
-  margin-inline: auto;
-  padding-inline: 16px;
+  gap: 0.75rem;
+  box-sizing: content-box;
+  height: 2.75rem;
+  padding-block: 0.625rem;
+  /* Content box (padding is added): lines up with the landing hero's 1320px container. */
+  max-width: 82.5rem;
+  margin: 0 auto;
+  padding-inline: 0.75rem;
 }
 
 @media (min-width: 640px) {
   .snav__bar {
-    padding-inline: 32px;
+    gap: 1rem;
+    padding-block: 1rem;
+    padding-inline: 1.25rem;
   }
 }
 
 @media (min-width: 1024px) {
   .snav__bar {
+    padding-inline: 1rem;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   }
 }
 
 .snav__brand {
-  justify-self: start;
   min-width: 0;
+  justify-self: start;
+  border-radius: 10px;
 }
 
-.snav :is(a, button, [tabindex="0"]):focus-visible,
-.snav .snav__brand.brand-shell:focus-visible,
-.snav-sheet :is(a, button, [tabindex="0"]):focus-visible {
-  outline: 2px solid var(--hx-cyan);
+.snav__brand:focus-visible,
+.snav__link:focus-visible,
+.snav__menu-item:focus-visible,
+.snav__icon-btn:focus-visible,
+.snav__avatar-btn:focus-visible,
+.snav__ghost:focus-visible,
+.snav-sheet__link:focus-visible {
+  outline: 2px solid var(--snav-accent);
   outline-offset: 2px;
-  border-radius: 8px;
 }
 
-/* ------------------------------------------------------------ centred pill */
-
+/* ------------------------------------------------------------------ pill */
 .snav__primary {
   display: none;
 }
@@ -146,106 +114,60 @@
 .snav__pill {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 0.125rem;
   margin: 0;
-  padding: 4px;
-  border: 1px solid var(--snav-border);
-  border-radius: 9999px;
-  background: rgb(255 255 255 / 0.03);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  padding: 0.25rem;
   list-style: none;
-}
-
-.snav__pill > li {
-  position: relative;
+  border: 1px solid var(--snav-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 
 .snav__link {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 0 14px;
+  gap: 0.25rem;
+  height: 2.25rem;
+  padding: 0 0.95rem;
   border: 0;
-  border-radius: 9999px;
+  border-radius: 999px;
   background: transparent;
   color: var(--snav-text-2);
   font: inherit;
   font-size: 0.875rem;
-  font-weight: 400;
-  line-height: 1.25rem;
-  text-decoration: none;
+  font-weight: 500;
+  letter-spacing: -0.005em;
   white-space: nowrap;
   cursor: pointer;
-  transition:
-    color 150ms var(--snav-ease),
-    background-color 150ms var(--snav-ease);
+  text-decoration: none;
+  transition: color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
 }
 
-@media (min-width: 1280px) {
-  .snav__link {
-    padding: 0 16px;
-  }
+.snav__link:hover {
+  color: var(--snav-text);
+  background: var(--snav-hover);
 }
 
-.snav__link:hover,
-.snav__more-trigger[aria-expanded="true"] {
-  background: rgb(255 255 255 / 0.05);
-  color: #fff;
-}
-
-/* Active page: white text, a soft cyan wash and a glowing cyan underline. */
+/* Active page: soft champagne pill + a glowing hairline underneath. */
 .snav__link.is-active {
-  background: var(--snav-accent-wash);
-  color: #fff;
-  font-weight: 500;
-  text-shadow: 0 0 18px color-mix(in srgb, var(--hx-cyan) 55%, transparent);
+  color: #f6f1e7;
+  background: var(--snav-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--snav-accent-ring);
 }
 
 .snav__link.is-active::after {
-  content: "";
   position: absolute;
-  right: 14px;
-  bottom: 3px;
-  left: 14px;
+  bottom: 0.2rem;
+  left: 50%;
+  width: 0.875rem;
   height: 2px;
   border-radius: 2px;
-  background: var(--hx-cyan);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--hx-cyan) 80%, transparent);
-}
-
-.snav__more-trigger.is-active::after {
-  right: 30px;
-}
-
-.snav__link.is-disabled,
-.snav__link.is-disabled:hover {
-  background: transparent;
-  color: var(--snav-subtle);
-  cursor: not-allowed;
-}
-
-.snav__tooltip {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  z-index: 2;
-  padding: 6px 10px;
-  border: 1px solid var(--snav-accent-border);
-  border-radius: 8px;
-  background: var(--snav-card);
-  color: var(--snav-text-2);
-  font-size: 0.75rem;
-  white-space: nowrap;
+  background: var(--snav-accent);
+  box-shadow: 0 0 10px rgba(243, 226, 179, 0.85);
+  content: "";
   transform: translateX(-50%);
-  opacity: 0;
-  pointer-events: none;
-}
-
-.snav__link.is-disabled:hover .snav__tooltip,
-.snav__link.is-disabled:focus .snav__tooltip {
-  opacity: 1;
 }
 
 .snav__more {
@@ -253,45 +175,30 @@
 }
 
 .snav__chevron {
-  width: 14px;
-  height: 14px;
-  transition: transform 200ms ease-out;
+  width: 0.875rem;
+  height: 0.875rem;
+  flex: none;
+  transition: transform 160ms ease;
 }
 
 .snav__chevron.is-open {
   transform: rotate(180deg);
 }
 
-/* ------------------------------------------------------------ dropdowns (dark card, accent border) */
-
+/* ------------------------------------------------------------ dropdowns */
 .snav__menu {
   position: absolute;
-  top: calc(100% + 12px);
-  z-index: 60;
-  min-width: 15rem;
-  padding: 6px;
-  overflow: hidden;
-  border: 1px solid var(--snav-accent-border);
-  border-radius: 14px;
-  background: var(--snav-card);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
-  box-shadow:
-    0 24px 60px rgb(0 0 0 / 0.65),
-    0 0 0 1px rgb(0 0 0 / 0.4),
-    0 12px 40px -16px color-mix(in srgb, var(--hx-cyan) 45%, transparent);
-}
-
-/* The hero's gradient as a 2 px rule along the top of the card. */
-.snav__menu::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--hx-cyan), var(--hx-emerald) 50%, var(--hx-violet));
-  opacity: 0.85;
+  top: calc(100% + 0.75rem);
+  z-index: 30;
+  min-width: 13.5rem;
+  padding: 0.375rem;
+  border: 1px solid var(--snav-border);
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.05) 0%, transparent 40%),
+    var(--snav-menu-bg);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.62);
+  animation: snav-pop 140ms ease-out;
 }
 
 .snav__menu[hidden] {
@@ -301,16 +208,15 @@
 .snav__menu--more {
   left: 50%;
   transform: translateX(-50%);
+  animation-name: snav-pop-center;
 }
 
 .snav__menu--account {
   right: 0;
-  width: 18rem;
+  width: 17rem;
 }
 
 .snav__menu-list {
-  display: flex;
-  flex-direction: column;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -319,54 +225,54 @@
 .snav__menu-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
   width: 100%;
-  min-height: 40px;
-  padding: 8px 12px;
+  min-height: 2.5rem;
+  padding: 0 0.75rem;
   border: 0;
-  border-radius: 8px;
+  border-radius: 0.625rem;
   background: transparent;
-  color: var(--snav-text-2);
+  color: rgba(255, 255, 255, 0.82);
   font: inherit;
   font-size: 0.875rem;
+  font-weight: 500;
   text-align: left;
   text-decoration: none;
   cursor: pointer;
-  transition:
-    background-color 150ms var(--snav-ease),
-    color 150ms var(--snav-ease);
+  transition: background-color 120ms ease, color 120ms ease;
 }
 
 .snav__menu-item:hover {
-  background: var(--snav-accent-wash);
-  color: #fff;
+  background: var(--snav-hover);
+  color: var(--snav-text);
 }
 
 .snav__menu-item[aria-current="page"] {
-  background: var(--snav-accent-wash);
-  color: #fff;
-  font-weight: 500;
-  box-shadow: inset 2px 0 0 var(--hx-cyan);
+  background: var(--snav-accent-soft);
+  color: var(--snav-accent);
 }
 
-.snav__menu-item--danger,
+.snav__menu-item--danger {
+  color: var(--snav-danger);
+}
+
 .snav__menu-item--danger:hover {
-  color: #fff;
+  background: rgba(250, 77, 86, 0.1);
+  color: #ffb3b7;
 }
 
 .snav__external {
-  width: 14px;
-  height: 14px;
-  flex: none;
-  color: var(--snav-muted);
+  width: 0.8125rem;
+  height: 0.8125rem;
+  margin-left: auto;
+  opacity: 0.6;
 }
 
 .snav__menu-user {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border-bottom: 1px solid var(--snav-border);
+  gap: 0.75rem;
+  padding: 0.625rem 0.625rem 0.75rem;
 }
 
 .snav__menu-user-text {
@@ -377,88 +283,88 @@
 
 .snav__menu-user-name {
   overflow: hidden;
-  font-size: 0.875rem;
-  font-weight: 500;
+  color: var(--snav-text);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .snav__menu-user-email {
   overflow: hidden;
-  color: var(--snav-subtle);
+  margin-top: 0.125rem;
+  color: rgba(255, 255, 255, 0.56);
   font-size: 0.75rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .snav__menu-group {
-  padding-top: 6px;
-}
-
-.snav__menu-group + .snav__menu-group {
-  margin-top: 6px;
-  border-top: 1px solid var(--snav-border);
+  margin-top: 0.25rem;
+  padding-top: 0.375rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .snav__menu-label {
   margin: 0;
-  padding: 8px 12px 4px;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
+  padding: 0.375rem 0.75rem 0.25rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--hx-cyan) 55%, var(--snav-subtle));
 }
 
-/* ------------------------------------------------------------ right cluster */
-
+/* -------------------------------------------------------------- actions */
 .snav__actions {
   display: flex;
+  flex: none;
   align-items: center;
-  justify-content: flex-end;
   justify-self: end;
-  gap: 8px;
-}
-
-@media (min-width: 1024px) {
-  .snav__actions {
-    gap: 14px;
-  }
+  gap: 0.5rem;
 }
 
 .snav__icon {
-  width: 16px;
-  height: 16px;
+  width: 1rem;
+  height: 1rem;
   flex: none;
 }
 
 .snav__icon-btn {
   position: relative;
-  display: inline-grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--snav-fg);
+  display: inline-flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--snav-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--snav-text);
   cursor: pointer;
-  transition:
-    background-color 150ms var(--snav-ease),
-    border-color 150ms var(--snav-ease);
+  transition: background-color 150ms ease, border-color 150ms ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .snav__icon-btn:hover,
 .snav__icon-btn[aria-expanded="true"] {
-  border-color: var(--snav-border);
-  background: rgb(255 255 255 / 0.06);
+  border-color: var(--snav-border-strong);
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.snav__icon-btn .snav__icon,
-.snav__icon-btn svg {
-  width: 18px;
-  height: 18px;
+.snav__icon-btn .snav__icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+/* Phones: 44px touch targets, the full height of the bar's content row. */
+@media (max-width: 639px) {
+  .snav__icon-btn {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
 }
 
 @media (min-width: 1024px) {
@@ -467,141 +373,131 @@
   }
 }
 
-/* The hero's cyan primary ("Start learning", "Console"). */
+/* Primary: champagne, glowing. */
 .snav__cta {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 0 20px;
-  border: 0;
-  border-radius: 10px;
-  background: var(--hx-cyan);
-  color: #000;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding: 0 1.125rem;
+  border-radius: 999px;
+  background: var(--snav-accent);
+  color: var(--snav-on-accent);
   font-size: 0.875rem;
-  font-weight: 600;
-  text-decoration: none;
+  font-weight: 650;
+  letter-spacing: -0.01em;
   white-space: nowrap;
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--hx-cyan) 60%, transparent),
-    0 10px 32px -10px color-mix(in srgb, var(--hx-cyan) 70%, transparent);
-  transition:
-    transform 160ms var(--snav-ease),
-    background-color 160ms var(--snav-ease);
+  text-decoration: none;
+  box-shadow: var(--snav-glow);
+  transition: background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
 }
 
 .snav__cta:hover {
-  background: color-mix(in srgb, var(--hx-cyan) 82%, #fff);
-  transform: translateY(-1px);
+  background: var(--snav-accent-hover);
+  box-shadow: var(--snav-glow-strong);
 }
 
-.snav .snav__cta:focus-visible,
-.snav-sheet .snav__cta:focus-visible {
+.snav__cta:active {
+  transform: translateY(1px);
+}
+
+.snav__cta:focus-visible {
+  outline: 2px solid var(--snav-accent);
   outline-offset: 3px;
 }
 
 .snav__cta.is-active {
-  box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--hx-cyan) 45%, transparent),
-    0 0 24px color-mix(in srgb, var(--hx-cyan) 55%, transparent);
+  box-shadow: var(--snav-glow-strong);
 }
 
 .snav__ghost {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 40px;
-  padding: 0 12px;
-  border-radius: 10px;
-  color: var(--snav-text-2);
+  height: 2.5rem;
+  padding: 0 1rem;
+  border: 1px solid var(--snav-border-strong);
+  border-radius: 999px;
+  color: var(--snav-text);
   font-size: 0.875rem;
-  font-weight: 500;
-  text-decoration: none;
+  font-weight: 600;
   white-space: nowrap;
-  transition:
-    color 150ms var(--snav-ease),
-    background-color 150ms var(--snav-ease);
+  text-decoration: none;
+  transition: background-color 150ms ease, border-color 150ms ease;
 }
 
 .snav__ghost:hover {
-  background: rgb(255 255 255 / 0.05);
-  color: #fff;
+  border-color: rgba(255, 255, 255, 0.36);
+  background: var(--snav-hover);
 }
 
-/* 390: logo, the one cyan CTA, the menu button. */
+.snav__cta--bar,
 .snav__ghost--bar,
 .snav__account {
   display: none;
 }
 
-.snav__cta--bar {
-  padding: 0 14px;
-}
-
-@media (max-width: 359px) {
-  .snav__cta--bar {
-    display: none;
-  }
-}
-
 @media (min-width: 640px) {
-  .snav__ghost--bar,
-  .snav__account {
+  .snav__cta--bar,
+  .snav__ghost--bar {
     display: inline-flex;
   }
-  .snav__cta--bar {
-    padding: 0 20px;
-  }
-}
 
-.snav__account {
-  position: relative;
+  .snav__account {
+    position: relative;
+    display: block;
+  }
 }
 
 .snav__avatar-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 0 8px 0 4px;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding: 0 0.625rem 0 0.25rem;
   border: 1px solid var(--snav-border);
-  border-radius: 9999px;
-  background: rgb(255 255 255 / 0.03);
-  color: var(--snav-fg);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--snav-text);
   font: inherit;
   font-size: 0.875rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: border-color 150ms var(--snav-ease);
+  transition: background-color 150ms ease, border-color 150ms ease;
 }
 
 .snav__avatar-btn:hover,
 .snav__avatar-btn[aria-expanded="true"] {
-  border-color: var(--snav-accent-border);
+  border-color: var(--snav-border-strong);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .snav__avatar {
-  display: inline-grid;
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
   flex: none;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 9999px;
-  background: linear-gradient(135deg, var(--hx-cyan), var(--hx-violet));
-  color: #000;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #222 0%, #111 100%);
+  box-shadow: inset 0 0 0 1px rgba(243, 226, 179, 0.35);
+  color: var(--snav-accent);
   font-size: 0.75rem;
   font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .snav__avatar--lg {
-  width: 40px;
-  height: 40px;
+  width: 2.5rem;
+  height: 2.5rem;
   font-size: 0.875rem;
 }
 
 .snav__avatar-name {
   display: none;
-  max-width: 7rem;
+  max-width: 7.5rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -613,83 +509,19 @@
   }
 }
 
-.snav__live {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.75rem;
-  color: var(--hx-live);
-}
-
-.snav__menu-live {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-}
-
-.snav__menu-item.is-disabled,
-.snav__menu-item.is-disabled:hover,
-.snav-sheet__link--stacked.is-disabled,
-.snav-sheet__link--stacked.is-disabled:hover {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  background: transparent;
-  color: var(--snav-subtle);
-  cursor: not-allowed;
-}
-
-.snav__row-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.snav__lock {
-  width: 14px;
-  height: 14px;
-}
-
-.snav__menu-reason {
-  font-size: 0.75rem;
-  color: var(--snav-muted);
-}
-
-/* ------------------------------------------------------------ phone sheet */
-
-.snav-sheet-layer {
+/* ---------------------------------------------------------- phone sheet */
+.snav-sheet {
   position: fixed;
   inset: 0;
-  z-index: 70;
-}
-
-.snav-sheet__scrim {
-  position: absolute;
-  inset: 0;
-  background: rgb(0 0 0 / 0.6);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
-}
-
-.snav-sheet {
-  position: absolute;
-  inset: 0;
+  z-index: 60;
   display: flex;
   flex-direction: column;
+  padding-top: env(safe-area-inset-top);
   background:
-    radial-gradient(120% 50% at 100% 0%, color-mix(in srgb, var(--hx-cyan) 9%, transparent), transparent 60%),
-    radial-gradient(90% 40% at 0% 100%, color-mix(in srgb, var(--hx-violet) 8%, transparent), transparent 60%),
-    #000;
-  color: var(--snav-fg);
-  font-family: var(--hp-font-sans, var(--font-geist, Geist), "Geist Fallback", ui-sans-serif, system-ui, sans-serif);
-}
-
-@media (min-width: 672px) {
-  .snav-sheet {
-    left: auto;
-    width: 26rem;
-    border-left: 1px solid var(--snav-accent-border);
-  }
+    radial-gradient(circle at 100% 0%, rgba(243, 226, 179, 0.07), transparent 42%),
+    #000000;
+  color: var(--snav-text);
+  animation: snav-sheet-in 180ms ease-out;
 }
 
 .snav-sheet:focus {
@@ -700,152 +532,310 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: var(--snav-height);
-  padding-inline: 16px;
-  border-bottom: 1px solid var(--snav-border);
+  gap: 0.75rem;
+  flex: none;
+  box-sizing: content-box;
+  height: 2.75rem;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@media (min-width: 640px) {
+  .snav-sheet__top {
+    padding: 1rem 1.25rem;
+  }
 }
 
 .snav-sheet__body {
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 8px 16px 24px;
+  padding: 0.5rem 1rem 1.5rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 .snav-sheet__user {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--snav-border);
+  gap: 0.75rem;
+  margin: 0.75rem 0 0.25rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--snav-border);
+  border-radius: 1.25rem;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.055) 0%, transparent 38%),
+    #0a0a0a;
 }
 
 .snav-sheet__group {
-  padding-top: 20px;
+  padding-top: 1.25rem;
+}
+
+/* Phones: a red dot on the menu button while live (the sheet shows "Live"). */
+.snav__menu-live {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff3347;
+  box-shadow: 0 0 0 2px #000, 0 0 8px rgba(255, 51, 71, 0.85);
 }
 
 .snav-sheet__label {
-  margin: 0 0 4px;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
+  margin: 0 0 0.375rem;
+  padding: 0 0.25rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--hx-cyan) 55%, var(--snav-subtle));
 }
 
 .snav-sheet__list {
   margin: 0;
   padding: 0;
   list-style: none;
+  border: 1px solid var(--snav-border);
+  border-radius: 1.25rem;
+  background: #0a0a0a;
+  overflow: hidden;
 }
 
-.snav-sheet__list > li + li {
-  border-top: 1px solid var(--snav-border);
+.snav-sheet__list li + li {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .snav-sheet__link {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 0.75rem;
   width: 100%;
-  min-height: 56px;
-  padding: 0 4px;
+  min-height: 3.375rem;
+  padding: 0 1rem;
   border: 0;
   background: transparent;
-  color: var(--snav-fg);
+  color: var(--snav-text);
   font: inherit;
-  font-size: 1.125rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
   text-align: left;
   text-decoration: none;
   cursor: pointer;
-  transition: color 150ms var(--snav-ease);
+  -webkit-tap-highlight-color: transparent;
 }
 
-.snav-sheet__link:hover,
 .snav-sheet__link:active {
-  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
 }
 
-.snav-sheet__link:hover .snav-sheet__arrow {
-  color: var(--hx-cyan);
+.snav-sheet__link:focus-visible {
+  outline-offset: -2px;
+  border-radius: 1.25rem;
 }
 
 .snav-sheet__link[aria-current="page"] {
-  padding-left: 14px;
-  background: linear-gradient(90deg, var(--snav-accent-wash), transparent 70%);
-  color: #fff;
-  font-weight: 500;
-  box-shadow: inset 2px 0 0 var(--hx-cyan);
-}
-
-.snav-sheet__link[aria-current="page"] .snav-sheet__arrow {
-  color: var(--hx-cyan);
-}
-
-.snav-sheet__link.is-disabled,
-.snav-sheet__link.is-disabled:hover {
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 2px;
-  color: var(--snav-subtle);
-  cursor: not-allowed;
-}
-
-.snav-sheet__reason {
-  font-size: 0.8125rem;
-  color: var(--snav-muted);
-}
-
-.snav-sheet__label-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
+  color: var(--snav-accent);
+  text-shadow: 0 0 18px rgba(243, 226, 179, 0.35);
 }
 
 .snav-sheet__arrow {
-  width: 16px;
-  height: 16px;
+  width: 1rem;
+  height: 1rem;
   flex: none;
-  color: var(--snav-muted);
-  transition: color 150ms var(--snav-ease);
+  opacity: 0.45;
 }
 
 .snav-sheet__link--danger {
-  color: #fff;
+  min-height: 3.25rem;
+  border: 1px solid rgba(250, 77, 86, 0.28);
+  border-radius: 1.25rem;
+  color: var(--snav-danger);
 }
 
 .snav-sheet__footer {
   display: grid;
-  gap: 12px;
-  padding: 16px 16px max(16px, env(safe-area-inset-bottom));
-  border-top: 1px solid var(--snav-border);
+  flex: none;
+  gap: 0.625rem;
+  padding: 0.875rem 1rem max(0.875rem, env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.92);
 }
 
 .snav__cta--block,
 .snav__ghost--block {
-  display: flex;
   width: 100%;
-  min-height: 48px;
+  height: 3.25rem;
+  font-size: 1rem;
 }
 
-.snav__ghost--block {
-  border: 1px solid rgb(255 255 255 / 0.18);
-  background: rgb(255 255 255 / 0.04);
-  color: #fff;
+@keyframes snav-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes snav-pop-center {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+}
+
+@keyframes snav-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ------------------------------------------------- Watch: live indicator */
+/* While the YouTube channel is live: a small pulsing red dot + "Live". */
+.snav__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: 0.35rem;
+  padding: 0.15rem 0.45rem 0.15rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(229, 22, 43, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(255, 77, 94, 0.45);
+  color: #ff9aa3;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.snav__live-dot {
+  position: relative;
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff3347;
+  box-shadow: 0 0 8px rgba(255, 51, 71, 0.85);
+}
+
+.snav__live-dot::after {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid #ff3347;
+  content: "";
+  opacity: 0;
+  animation: snav-live-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes snav-live-ping {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.8;
+  }
+  80%,
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+.snav-sheet__label {
+  display: inline-flex;
+  align-items: center;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .snav,
   .snav *,
-  .snav::after,
+  .snav-sheet,
   .snav-sheet * {
-    transition-duration: 0ms !important;
     animation: none !important;
+    transition: none !important;
   }
+}
 
-  .snav__cta:hover {
-    transform: none;
-  }
+/* ------------------------------------------------------------ OwlCognito */
+/* OwlCognito keeps its light violet bar (see index.css `header.sticky`). */
+html[data-site-brand="owlcognito"] .snav {
+  --snav-text: #18131d;
+  --snav-text-2: #332b3a;
+  --snav-border: rgba(109, 40, 217, 0.24);
+  --snav-border-strong: rgba(109, 40, 217, 0.4);
+  --snav-hover: rgba(109, 40, 217, 0.07);
+  --snav-accent: #6d28d9;
+  --snav-accent-hover: #5b21b6;
+  --snav-accent-soft: rgba(109, 40, 217, 0.1);
+  --snav-accent-ring: rgba(109, 40, 217, 0.28);
+  --snav-on-accent: #ffffff;
+  --snav-glow: 0 8px 20px rgba(109, 40, 217, 0.24);
+  --snav-glow-strong: 0 10px 26px rgba(109, 40, 217, 0.34);
+  --snav-menu-bg: #ffffff;
+  --snav-danger: #b42318;
+}
+
+html[data-site-brand="owlcognito"] .snav__backdrop,
+html[data-site-brand="owlcognito"] .snav[data-scrolled="true"] .snav__backdrop {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+html[data-site-brand="owlcognito"] .snav__pill,
+html[data-site-brand="owlcognito"] .snav__icon-btn,
+html[data-site-brand="owlcognito"] .snav__avatar-btn {
+  background: #f6f3ff;
+  box-shadow: none;
+}
+
+html[data-site-brand="owlcognito"] .snav__link.is-active {
+  color: #5b21b6;
+}
+
+html[data-site-brand="owlcognito"] .snav__link.is-active::after {
+  box-shadow: none;
+}
+
+html[data-site-brand="owlcognito"] .snav__menu,
+html[data-site-brand="owlcognito"] .snav-sheet__list,
+html[data-site-brand="owlcognito"] .snav-sheet__user {
+  background: #ffffff;
+  box-shadow: 0 18px 48px rgba(76, 29, 149, 0.14);
+}
+
+html[data-site-brand="owlcognito"] .snav__menu-item {
+  color: #332b3a;
+}
+
+html[data-site-brand="owlcognito"] .snav__menu-user-email,
+html[data-site-brand="owlcognito"] .snav__menu-label,
+html[data-site-brand="owlcognito"] .snav-sheet__label {
+  color: #5b5163;
+}
+
+html[data-site-brand="owlcognito"] .snav__menu-group,
+html[data-site-brand="owlcognito"] .snav-sheet__list li + li,
+html[data-site-brand="owlcognito"] .snav-sheet__top,
+html[data-site-brand="owlcognito"] .snav-sheet__footer {
+  border-color: rgba(109, 40, 217, 0.16);
+}
+
+html[data-site-brand="owlcognito"] .snav__avatar {
+  background: #ede9fe;
+  box-shadow: inset 0 0 0 1px rgba(109, 40, 217, 0.3);
+  color: #5b21b6;
+}
+
+html[data-site-brand="owlcognito"] .snav-sheet {
+  background: #fbfaff;
+}
+
+html[data-site-brand="owlcognito"] .snav-sheet__footer {
+  background: rgba(255, 255, 255, 0.94);
+}
+
+html[data-site-brand="owlcognito"] .snav-sheet__link[aria-current="page"] {
+  text-shadow: none;
 }

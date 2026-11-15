@@ -7,21 +7,10 @@
 (() => {
     "use strict";
 
-    // The LMS auth cookies live on the API host (see server.js), the login page on the site.
-    const DEFAULT_API_BASE = "https://api.alsyedinitiative.com/api";
-    const DEFAULT_SITE = "https://alsyedinitiative.com";
+    const DEFAULT_API_BASE = "https://alsyedinitiative.com/api";
     const MAX_ANSWER_LENGTH = 512;
+    const MATERIAL_PATH = /^\/materials\/[A-Za-z0-9_\-./]+$/;
     const WARNING_SECONDS = 5 * 60;
-    // Pure rules (exam-core.js, loaded first). The fallback keeps the tab
-    // working with a cached page that does not load exam-core.js yet.
-    const LEGACY_MATERIAL_PATH = /^\/materials\/[A-Za-z0-9_\-./]+$/;
-    const Core = window.LabsExamCore || {
-        materialUrlAllowed: (url) => LEGACY_MATERIAL_PATH.test(String(url || "")) && !String(url).includes(".."),
-        signInUrl: (where, lms) => `${lms}/login?next=${encodeURIComponent(`${where.origin}${where.pathname}#exam`)}`,
-        termsUrl: (where, lms) => `${lms}/login?next=${encodeURIComponent(`${where.origin}${where.pathname}#exam`)}`,
-        eligibilityView: () => ({ locked: false, reason: "ok", action: null, nextExam: null }),
-        startView: (exam) => ({ enabled: Boolean(exam && exam.can_start), reason: exam && exam.can_start ? "ok" : "not_open" }),
-    };
 
     const STRINGS = {
         en: {
@@ -30,21 +19,6 @@
             heading: "OSINT Examination",
             intro: "A timed, graded OSINT examination. Every answer you submit is recorded against your LMS account, and your score is visible to your instructors.",
             scoreLabel: "SCORE:",
-            // Owner rule: the paper opens with the candidate block (roll number,
-            // real name, handle, stats), auto-filled from the LMS and read-only.
-            identityHeading: "CANDIDATE",
-            identityNote: "Auto-filled from your LMS account · read-only",
-            rollLabel: "ROLL NUMBER",
-            nameLabel: "REAL NAME",
-            handleLabel: "HANDLE",
-            handleAtStart: "HANDLE AT START",
-            handleRecent: "Most recent: {handle}",
-            xpLabel: "XP",
-            rankLabel: "RANK",
-            attendanceLabel: "ATTENDANCE",
-            reportsLabel: "REPORTS",
-            reportsNote: "Graded avg {avg}",
-            examScoreLabel: "EXAM SCORE",
             solvedLabel: "SOLVED:",
             timeLabel: "TIME LEFT:",
             loading: "Loading your examinations...",
@@ -52,23 +26,8 @@
             signedOut: "Sign in to the LMS to take the examination.",
             signInLink: "Sign in at alsyedinitiative.com",
             termsRequired: "Accept the current Terms and Conditions on the LMS before taking the examination.",
-            termsLink: "Accept the terms on alsyedinitiative.com",
+            termsLink: "Open alsyedinitiative.com",
             retry: "Try again",
-            locked: "Examination locked",
-            eligibility: {
-                no_batch: "You are not in a batch yet. Enrol in a course to take its examinations.",
-                access_expired: "Your course access has ended. Renew it to take your batch's examinations.",
-                not_assigned: "No examination is assigned to your batch yet. Your instructor will announce it.",
-            },
-            nextExam: "Your next examination, {title}, opens {when}.",
-            startReasons: {
-                not_open: "This examination has not opened yet.",
-                closed: "This examination has closed.",
-                no_questions: "This examination is not ready yet.",
-                not_configured: "Answer checking is not available right now. Tell your instructor.",
-                started: "You have already started this examination.",
-                completed: "You have already finished this examination.",
-            },
             open: "Open",
             startExam: "Start examination",
             resume: "Continue",
@@ -144,19 +103,6 @@
             heading: "OSINT امتحان",
             intro: "وقت کی پابندی والا، نمبروں والا OSINT امتحان۔ آپ کا ہر جواب آپ کے LMS اکاؤنٹ کے ساتھ محفوظ ہوتا ہے اور آپ کا اسکور آپ کے اساتذہ دیکھ سکتے ہیں۔",
             scoreLabel: "اسکور:",
-            identityHeading: "امیدوار",
-            identityNote: "آپ کے LMS اکاؤنٹ سے خودکار · صرف پڑھنے کے لیے",
-            rollLabel: "رول نمبر",
-            nameLabel: "اصل نام",
-            handleLabel: "ہینڈل",
-            handleAtStart: "آغاز پر ہینڈل",
-            handleRecent: "تازہ ترین: {handle}",
-            xpLabel: "XP",
-            rankLabel: "درجہ",
-            attendanceLabel: "حاضری",
-            reportsLabel: "رپورٹس",
-            reportsNote: "اوسط نمبر {avg}",
-            examScoreLabel: "امتحان اسکور",
             solvedLabel: "حل شدہ:",
             timeLabel: "باقی وقت:",
             loading: "آپ کے امتحانات لوڈ ہو رہے ہیں...",
@@ -164,23 +110,8 @@
             signedOut: "امتحان دینے کے لیے LMS میں سائن ان کریں۔",
             signInLink: "alsyedinitiative.com پر سائن ان کریں",
             termsRequired: "امتحان سے پہلے LMS پر موجودہ شرائط و ضوابط قبول کریں۔",
-            termsLink: "alsyedinitiative.com پر شرائط قبول کریں",
+            termsLink: "alsyedinitiative.com کھولیں",
             retry: "دوبارہ کوشش کریں",
-            locked: "امتحان بند ہے",
-            eligibility: {
-                no_batch: "آپ ابھی کسی بیچ میں شامل نہیں ہیں۔ امتحان دینے کے لیے کسی کورس میں داخلہ لیں۔",
-                access_expired: "آپ کے کورس تک رسائی ختم ہو چکی ہے۔ اپنے بیچ کے امتحانات کے لیے اسے دوبارہ فعال کریں۔",
-                not_assigned: "ابھی آپ کے بیچ کے لیے کوئی امتحان مقرر نہیں ہوا۔ آپ کے استاد اس کا اعلان کریں گے۔",
-            },
-            nextExam: "آپ کا اگلا امتحان، {title}، {when} کو شروع ہوگا۔",
-            startReasons: {
-                not_open: "یہ امتحان ابھی شروع نہیں ہوا۔",
-                closed: "یہ امتحان بند ہو چکا ہے۔",
-                no_questions: "یہ امتحان ابھی تیار نہیں ہے۔",
-                not_configured: "جوابات کی جانچ ابھی دستیاب نہیں۔ اپنے استاد کو بتائیں۔",
-                started: "آپ یہ امتحان پہلے ہی شروع کر چکے ہیں۔",
-                completed: "آپ یہ امتحان پہلے ہی مکمل کر چکے ہیں۔",
-            },
             open: "کھولیں",
             startExam: "امتحان شروع کریں",
             resume: "جاری رکھیں",
@@ -255,12 +186,9 @@
     const state = {
         lang: document.body && document.body.classList.contains("ur-mode") ? "ur" : "en",
         apiBase: "",
-        siteUrl: "",
         csrf: "",
         exams: null,
-        eligibility: null,
         detail: null,
-        identity: null,
         slug: "",
         clockOffsetMs: 0,
         timer: null,
@@ -335,8 +263,6 @@
             const payload = await response.json();
             const base = String(payload.lmsApiBase || "");
             state.apiBase = /^https?:\/\//.test(base) ? base.replace(/\/+$/, "") : DEFAULT_API_BASE;
-            const site = String(payload.siteUrl || "");
-            state.siteUrl = /^https?:\/\//.test(site) ? site.replace(/\/+$/, "") : "";
         } catch {
             state.apiBase = DEFAULT_API_BASE;
         }
@@ -348,31 +274,6 @@
         } catch {
             return "https://alsyedinitiative.com";
         }
-    };
-
-    // The LMS website (login, terms): the server's siteUrl, else the API
-    // origin without "api." (an API host has no login page).
-    const siteOrigin = () => {
-        if (state.siteUrl) return state.siteUrl;
-        try {
-            const url = new URL(lmsOrigin());
-            url.hostname = url.hostname.replace(/^api\./, "");
-            return url.origin;
-        } catch {
-            return DEFAULT_SITE;
-        }
-    };
-
-    // The LMS login page sends the student straight back here (?next= is
-    // validated on the LMS side: only this labs site is accepted).
-    const signInUrl = () => Core.signInUrl(window.location, siteOrigin());
-
-    // Terms are accepted on the LMS login page, which then returns here.
-    const termsUrl = () => Core.termsUrl(window.location, siteOrigin());
-
-    const reasonText = (group, reason) => {
-        const table = dict()[group] || {};
-        return table[reason] || (STRINGS.en[group] || {})[reason] || "";
     };
 
     const csrfToken = async (force = false) => {
@@ -483,10 +384,10 @@
         const { kind, message } = state.banner;
         let action = "";
         if (kind === "signed_out") {
-            action = `<a class="btn btn-primary exam-link-btn" href="${esc(signInUrl())}">${esc(t("signInLink"))}</a>
+            action = `<a class="btn btn-primary exam-link-btn" href="${esc(`${lmsOrigin()}/login`)}" target="_blank" rel="noopener">${esc(t("signInLink"))}</a>
                 <button type="button" class="btn exam-secondary-btn" data-action="reload">${esc(t("retry"))}</button>`;
         } else if (kind === "terms") {
-            action = `<a class="btn btn-primary exam-link-btn" href="${esc(termsUrl())}">${esc(t("termsLink"))}</a>
+            action = `<a class="btn btn-primary exam-link-btn" href="${esc(lmsOrigin())}" target="_blank" rel="noopener">${esc(t("termsLink"))}</a>
                 <button type="button" class="btn exam-secondary-btn" data-action="reload">${esc(t("retry"))}</button>`;
         } else if (kind === "error") {
             action = `<button type="button" class="btn exam-secondary-btn" data-action="reload">${esc(t("retry"))}</button>`;
@@ -508,21 +409,6 @@
         expired: t("statusExpired"),
     })[participation && participation.status] || "";
 
-    // The tab stays clickable (so the reason can be read) but shows locked.
-    const renderNavLock = (access) => {
-        const navButton = el("nav-exam-btn");
-        if (!navButton) return;
-        const locked = Boolean(access && access.locked);
-        navButton.classList.toggle("exam-nav-locked", locked);
-        if (locked) {
-            navButton.setAttribute("aria-disabled", "true");
-            navButton.title = reasonText("eligibility", access.reason) || t("locked");
-        } else {
-            navButton.removeAttribute("aria-disabled");
-            navButton.removeAttribute("title");
-        }
-    };
-
     const renderList = () => {
         const list = el("exam-list");
         const view = el("exam-view");
@@ -532,24 +418,6 @@
         el("exam-stats").hidden = true;
         if (state.exams === null) {
             list.innerHTML = state.loading ? `<p class="exam-muted">${esc(t("loading"))}</p>` : "";
-            return;
-        }
-        const access = Core.eligibilityView(state.eligibility);
-        renderNavLock(access);
-        if (access.locked) {
-            const next = access.nextExam;
-            const nextLine = next && next.opens_at
-                ? `<p>${esc(t("nextExam", { title: localized(next.title), when: formatMoment(next.opens_at) }))}</p>`
-                : "";
-            const button = access.action
-                ? `<div class="answer-row"><a class="btn btn-primary exam-link-btn" href="${esc(access.action.url)}" target="_blank" rel="noopener">${esc(access.action.label)}</a></div>`
-                : "";
-            list.innerHTML = `<div class="certification-lock-panel exam-empty exam-locked-panel" data-reason="${esc(access.reason)}">
-                <h3>${esc(t("locked"))}</h3>
-                <p>${esc(reasonText("eligibility", access.reason) || access.message)}</p>
-                ${nextLine}
-                ${button}
-            </div>`;
             return;
         }
         if (!state.exams.length) {
@@ -619,7 +487,7 @@
     };
 
     const renderMaterials = (question) => {
-        const items = (question.materials || []).filter((item) => Core.materialUrlAllowed(item.url, lmsOrigin()));
+        const items = (question.materials || []).filter((item) => MATERIAL_PATH.test(String(item.url || "")) && !String(item.url).includes(".."));
         const images = items
             .filter((item) => item.kind === "image")
             .map((item) => `<figure class="question-evidence"><img src="${esc(item.url)}" alt="${esc(localized(item.alt) || localized(item.label))}" loading="lazy"><figcaption>${esc(localized(item.label))}</figcaption></figure>`)
@@ -672,34 +540,6 @@
             </div>`;
     };
 
-    // The candidate block (owner order): roll number, real name, handle (with the
-    // most recent handle when it changed), then stats. Values come from the LMS
-    // (/api/ctf/exams/<slug>/identity/: the snapshot taken at start) and are never editable.
-    const percentText = (value) => (value === null || value === undefined || value === "" ? "—" : `${Number(value)}%`);
-    const renderIdentity = () => {
-        const who = state.identity;
-        if (!who) return "";
-        const handle = who.handle ? `@${who.handle}` : "—";
-        const recent = who.handle_changed ? t("handleRecent", { handle: who.handle_most_recent ? `@${who.handle_most_recent}` : "—" }) : "";
-        const cell = (label, value, note = "", extra = "") => `<div class="exam-identity-cell${extra}"><dt class="stat-label">${esc(label)}</dt><dd class="exam-identity-value">${esc(value)}</dd>${note ? `<dd class="exam-identity-note">${esc(note)}</dd>` : ""}</div>`;
-        const stats = who.stats || null;
-        const statCells = [];
-        if (stats) {
-            if (stats.xp !== null && stats.xp !== undefined) {
-                statCells.push(cell(t("xpLabel"), String(stats.xp)));
-                statCells.push(cell(t("rankLabel"), stats.rank || "—"));
-            }
-            statCells.push(cell(t("attendanceLabel"), percentText(stats.attendance_percent)));
-            statCells.push(cell(t("reportsLabel"), String(stats.reports_submitted ?? 0), t("reportsNote", { avg: percentText(stats.reports_graded_average) })));
-            statCells.push(cell(t("examScoreLabel"), percentText(stats.exam_score)));
-        }
-        return `<section class="desc-card exam-identity" aria-label="${esc(t("identityHeading"))}" data-testid="exam-identity">
-                <div class="exam-identity-head"><h3 class="exam-identity-heading">${esc(t("identityHeading"))}</h3><span class="exam-muted">${esc(t("identityNote"))}</span></div>
-                <dl class="exam-identity-grid">${cell(t("rollLabel"), who.roll_number || "—", "", " exam-identity-roll")}${cell(t("nameLabel"), who.real_name || "—")}${cell(who.snapshot ? t("handleAtStart") : t("handleLabel"), handle, recent)}</dl>
-                ${statCells.length ? `<dl class="exam-identity-stats">${statCells.join("")}</dl>` : ""}
-            </section>`;
-    };
-
     const renderExam = () => {
         const view = el("exam-view");
         const list = el("exam-list");
@@ -713,8 +553,6 @@
         view.hidden = false;
         const parts = [`<button type="button" class="btn exam-secondary-btn exam-back" data-action="back">${state.lang === "ur" ? "→" : "←"} ${esc(t("back"))}</button>`];
         parts.push(`<div class="exam-title-row"><h3 class="exam-title">${esc(localized(exam.title))}</h3><span class="q-badge exam-window exam-window-${esc(exam.window)}">${esc(participation ? statusLabel(participation) : windowLabel(exam))}</span></div>`);
-        // The paper opens with the candidate block, then the briefing and the questions.
-        parts.push(renderIdentity());
 
         const briefing = (exam.briefing && (exam.briefing[state.lang] || exam.briefing.en)) || [];
         const rules = (exam.rules && (exam.rules[state.lang] || exam.rules.en)) || [];
@@ -726,11 +564,10 @@
         }
 
         if (!participation) {
-            const start = Core.startView(exam);
-            const canStart = start.enabled;
+            const canStart = exam.can_start;
             parts.push(`<div class="certification-lock-panel exam-start-panel">
                 <h3>${esc(t("startTitle"))}</h3>
-                <p>${esc(canStart ? t("startText") : (reasonText("startReasons", start.reason) || t("notOpenText")))}</p>
+                <p>${esc(canStart ? t("startText") : (exam.window === "not_open" ? t("notOpenText") : errorText("ctf_exam_closed")))}</p>
                 <p class="exam-muted">${esc(exam.question_count)} ${esc(t("questions"))} · ${esc(exam.total_points)} ${esc(t("points"))} · ${esc(exam.time_limit_minutes ? `${exam.time_limit_minutes} ${t("minutes")}` : t("noTimeLimit"))}</p>
                 ${canStart ? `<div class="certification-unlock-row"><button type="button" class="btn btn-primary" data-action="start">${esc(t("startExam"))}</button></div>` : ""}
             </div>`);
@@ -832,17 +669,7 @@
         stopClock();
         renderList();
         try {
-            // Eligibility tells the student WHY nothing is available (no
-            // batch, access ended...). An older LMS without the endpoint
-            // simply leaves the tab unlocked.
-            const [eligibility, data] = await Promise.all([
-                api("/ctf/eligibility/").catch((error) => {
-                    if (error.status === 404) return null;
-                    throw error;
-                }),
-                api("/ctf/exams/"),
-            ]);
-            state.eligibility = eligibility;
+            const data = await api("/ctf/exams/");
             state.exams = Array.isArray(data) ? data : (data && data.results) || [];
             showBanner(null);
         } catch (error) {
@@ -856,13 +683,7 @@
 
     const loadExam = async (slug) => {
         try {
-            // The candidate block is informative: an LMS without the identity endpoint
-            // (or any error there) never blocks the exam itself.
-            const [data, identity] = await Promise.all([
-                api(`/ctf/exams/${encodeURIComponent(slug)}/`),
-                api(`/ctf/exams/${encodeURIComponent(slug)}/identity/`).catch(() => null),
-            ]);
-            state.identity = identity;
+            const data = await api(`/ctf/exams/${encodeURIComponent(slug)}/`);
             const serverTime = Date.parse(data.server_time);
             state.clockOffsetMs = Number.isNaN(serverTime) ? 0 : serverTime - Date.now();
             state.detail = data;
@@ -1037,18 +858,6 @@
             if (state.detail) renderExam();
             else renderList();
         });
-
-        // Signed in (or accepted the terms) in another tab: re-check on return.
-        const recheck = () => {
-            const kind = state.banner && state.banner.kind;
-            if (document.visibilityState !== "visible") return;
-            if (kind !== "signed_out" && kind !== "terms") return;
-            state.csrf = "";
-            if (state.slug) loadExam(state.slug);
-            else loadExams();
-        };
-        document.addEventListener("visibilitychange", recheck);
-        window.addEventListener("focus", recheck);
 
         if (window.location.hash === "#exam" && navButton) navButton.click();
     };

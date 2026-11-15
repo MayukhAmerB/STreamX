@@ -81,52 +81,8 @@ def _installment_entitlement(payments, course):
     return best
 
 
-def _platform_entitlement(user_id, course):
-    """Access from platform plans: active grants (Bootcamp/Lifetime) and Pentesting memberships."""
-    from .models import PlatformGrant, PlatformPlan, PlatformSubscription
-    from .platform_plans import plan_covers_course
-
-    now = timezone.now()
-    best = None
-    grants = PlatformGrant.objects.filter(
-        user_id=user_id, is_active=True, plan__product__in=PlatformPlan.PENTESTING_PRODUCTS
-    ).select_related("plan")
-    for grant in grants:
-        if grant.expires_at is not None and grant.expires_at <= now:
-            continue
-        if not plan_covers_course(grant.plan, course):
-            continue
-        if grant.expires_at is None:
-            return LIFETIME
-        if best is None or grant.expires_at > best.access_expires_at:
-            best = Entitlement(Enrollment.ACCESS_INSTALLMENT, access_expires_at=grant.expires_at)
-    subscriptions = PlatformSubscription.objects.filter(
-        user_id=user_id, access_until__gt=now, plan__product=PlatformPlan.PRODUCT_PT_MEMBERSHIP
-    ).select_related("plan")
-    for subscription in subscriptions:
-        if not plan_covers_course(subscription.plan, course):
-            continue
-        if best is None or subscription.access_until > best.access_expires_at:
-            best = Entitlement(Enrollment.ACCESS_INSTALLMENT, access_expires_at=subscription.access_until)
-    return best
-
-
-def _strongest(*entitlements):
-    candidates = [item for item in entitlements if item is not None]
-    if not candidates:
-        return None
-    for item in candidates:
-        if item.access_type != Enrollment.ACCESS_INSTALLMENT:
-            return item
-    return max(candidates, key=lambda item: item.access_expires_at)
-
-
 def derive_entitlement(user_id, course):
-    """Return the strongest access still backed by a payment, pass or platform plan, or None.
-
-    Strength: lifetime (payment, pass, one-time platform plan) > the latest
-    time-limited access (installments, Pentesting membership, dated grants).
-    """
+    """Return the strongest access still backed by a payment or pass, or None."""
     if user_has_covering_batch_pass(user_id, course):
         return LIFETIME
     payments = list(
@@ -138,10 +94,7 @@ def derive_entitlement(user_id, course):
     )
     if any(payment.plan in PERMANENT_PLANS for payment in payments):
         return LIFETIME
-    platform = _platform_entitlement(user_id, course)
-    if platform is LIFETIME:
-        return LIFETIME
-    return _strongest(platform, _installment_entitlement(payments, course))
+    return _installment_entitlement(payments, course)
 
 
 def _reduced_fields(enrollment, entitlement):

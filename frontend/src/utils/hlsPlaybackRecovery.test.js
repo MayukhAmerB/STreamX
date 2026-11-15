@@ -263,9 +263,7 @@ describe("evaluatePlaybackFreeze", () => {
   };
 
   it("does nothing during short stalls below the freeze threshold", () => {
-    // Phase 2: freeze recovery after 12-15 s (was 30 s).
-    expect(PLAYBACK_FREEZE_THRESHOLD_MS).toBeGreaterThanOrEqual(12_000);
-    expect(PLAYBACK_FREEZE_THRESHOLD_MS).toBeLessThanOrEqual(15_000);
+    expect(PLAYBACK_FREEZE_THRESHOLD_MS).toBeGreaterThanOrEqual(30_000);
     expect(
       evaluatePlaybackFreeze({ ...base, lastProgressAt: base.now - (PLAYBACK_FREEZE_THRESHOLD_MS - 1) }).action
     ).toBe("none");

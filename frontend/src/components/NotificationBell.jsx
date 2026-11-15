@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   fetchNotifications,
@@ -26,15 +26,6 @@ function BellIcon({ className = "" }) {
   );
 }
 
-/** Carbon "Notification" (20 px) inline, so the website bundle needs no icon package. */
-function CarbonBellIcon({ className = "" }) {
-  return (
-    <svg aria-hidden="true" className={className} width="20" height="20" viewBox="0 0 32 32" fill="currentColor" focusable="false">
-      <path d="M28.7071,19.293,26,16.5859V13a10.0136,10.0136,0,0,0-9-9.9492V1H15V3.0508A10.0136,10.0136,0,0,0,6,13v3.5859L3.2929,19.293A1,1,0,0,0,3,20v3a1,1,0,0,0,1,1h7v.7768a5.152,5.152,0,0,0,4.5,5.1987A5.0057,5.0057,0,0,0,21,25V24h7a1,1,0,0,0,1-1V20A1,1,0,0,0,28.7071,19.293ZM19,25a3,3,0,0,1-6,0V24h6Zm8-3H5V20.4141L7.707,17.707A1,1,0,0,0,8,17V13a8,8,0,0,1,16,0v4a1,1,0,0,0,.293.707L27,20.4141Z" />
-    </svg>
-  );
-}
-
 function formatNotificationTime(value) {
   if (!value) {
     return "";
@@ -54,92 +45,7 @@ function formatNotificationTime(value) {
 const DEFAULT_BUTTON_CLASS =
   "relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/25 bg-white/10 text-white transition hover:bg-white/15";
 
-/**
- * Console variant (plan §3.1, M19): a 48 px header action with a Carbon
- * bell, a small count badge that scales in once when the count rises (no
- * shake), and a floating panel styled by the Console shell (_shell.scss).
- */
-function ConsoleBellView({ rootRef, open, setOpen, items, unreadCount, loading, onOpen, onItem, onMarkAll }) {
-  const previousCount = useRef(unreadCount);
-  const [bump, setBump] = useState(0);
-  useEffect(() => {
-    if (unreadCount > previousCount.current) setBump((value) => value + 1);
-    previousCount.current = unreadCount;
-  }, [unreadCount]);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (event) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-        rootRef.current?.querySelector("button")?.focus();
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, rootRef, setOpen]);
-
-  const panelId = "cds-app-notifications";
-  return (
-    <div className="cds-app-bell" ref={rootRef}>
-      <button
-        type="button"
-        className={`cds-app-icon-button${open ? " is-open" : ""}`}
-        onClick={onOpen}
-        aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
-        aria-expanded={open}
-        aria-controls={panelId}
-      >
-        <CarbonBellIcon className="cds-app-bell__icon" />
-        {unreadCount > 0 ? (
-          <span key={bump} className="cds-app-bell__badge" aria-hidden="true">
-            {unreadCount > 9 ? "9+" : unreadCount}
-          </span>
-        ) : null}
-      </button>
-      <div id={panelId} className="cds-app-popover cds-app-bell__panel" role="region" aria-label="Notifications" hidden={!open}>
-        {open ? (
-          <>
-            <div className="cds-app-bell__head">
-              <div>
-                <h2 className="cds-app-bell__title">Notifications</h2>
-                <p className="cds-app-bell__count">{unreadCount ? `${unreadCount} unread` : "All caught up"}</p>
-              </div>
-              <button type="button" className="cds-app-text-button" disabled={!unreadCount} onClick={onMarkAll}>
-                Mark all read
-              </button>
-            </div>
-            <div className="cds-app-bell__list">
-              {loading && !items.length ? <p className="cds-app-bell__empty">Loading…</p> : null}
-              {!loading && !items.length ? (
-                <p className="cds-app-bell__empty">Nothing yet. Grades, report reminders and live classes appear here.</p>
-              ) : null}
-              {items.map((item) => {
-                const notification = item.notification || {};
-                const unread = !item.read_at;
-                return (
-                  <button key={item.id} type="button" className={`cds-app-bell__item${unread ? " is-unread" : ""}`} onClick={() => onItem(item)}>
-                    <span className="cds-app-bell__dot" aria-hidden="true" />
-                    <span className="cds-app-bell__text">
-                      <span className="cds-app-bell__item-title">
-                        {notification.title || "Notification"}
-                        {unread ? <span className="cds--visually-hidden"> (unread)</span> : null}
-                      </span>
-                      <span className="cds-app-bell__item-body">{notification.body || "You have a platform update."}</span>
-                      <span className="cds-app-bell__item-time">{formatNotificationTime(notification.created_at || item.created_at)}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-export default function NotificationBell({ buttonClassName = DEFAULT_BUTTON_CLASS, variant = "website" }) {
+export default function NotificationBell({ buttonClassName = DEFAULT_BUTTON_CLASS }) {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -151,7 +57,7 @@ export default function NotificationBell({ buttonClassName = DEFAULT_BUTTON_CLAS
 
   const canLoad = Boolean(isAuthenticated && user && !user.terms_acceptance_required);
 
-  const loadNotifications = useCallback(async () => {
+  const loadNotifications = async () => {
     if (!canLoad) {
       return;
     }
@@ -167,7 +73,7 @@ export default function NotificationBell({ buttonClassName = DEFAULT_BUTTON_CLAS
     } finally {
       setLoading(false);
     }
-  }, [canLoad]);
+  };
 
   useEffect(() => {
     if (!canLoad) {
@@ -176,22 +82,9 @@ export default function NotificationBell({ buttonClassName = DEFAULT_BUTTON_CLAS
       return undefined;
     }
     loadNotifications();
-    // Poll once a minute while the tab is visible; catch up when it returns.
-    const intervalId = window.setInterval(() => {
-      if (!document.hidden) loadNotifications();
-    }, 60000);
-    let lastVisibleLoad = Date.now();
-    const onVisible = () => {
-      if (document.hidden || Date.now() - lastVisibleLoad < 30000) return;
-      lastVisibleLoad = Date.now();
-      loadNotifications();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      window.clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [canLoad, loadNotifications]);
+    const intervalId = window.setInterval(loadNotifications, 60000);
+    return () => window.clearInterval(intervalId);
+  }, [canLoad]);
 
   useEffect(() => {
     setOpen(false);
@@ -249,27 +142,6 @@ export default function NotificationBell({ buttonClassName = DEFAULT_BUTTON_CLAS
       // Leave the list unchanged if the request fails.
     }
   };
-
-  if (variant === "console") {
-    return (
-      <ConsoleBellView
-        rootRef={rootRef}
-        open={open}
-        setOpen={setOpen}
-        items={items}
-        unreadCount={unreadCount}
-        loading={loading}
-        onOpen={() => {
-          setOpen((previous) => !previous);
-          if (!open) {
-            loadNotifications();
-          }
-        }}
-        onItem={handleNotificationClick}
-        onMarkAll={handleMarkAllRead}
-      />
-    );
-  }
 
   return (
     <div className="relative" ref={rootRef}>

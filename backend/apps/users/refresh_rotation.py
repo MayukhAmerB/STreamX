@@ -23,10 +23,6 @@ Every token in a chain carries the same session slot (see session_policy), so
 a rotated chain stays one device. A pre-slot (legacy) token is always rotated
 rather than re-issued, so its jti is blacklisted the moment it claims its slot
 and an evicted legacy device can never claim that slot again.
-
-A device evicted while in a live class keeps rotating (without a slot) until
-that class ends (see live_grace); its rotated session says so, and its first
-refresh after the class ends is rejected with reason ``live_class_ended``.
 """
 
 from dataclasses import dataclass
@@ -45,19 +41,15 @@ from rest_framework_simplejwt.utils import datetime_from_epoch, get_md5_hash_pas
 
 from config.audit import log_security_event
 
-from .live_grace import LIVE_CLASS_ENDED_REASON
 from .session_policy import (
     SESSION_SLOT_CLAIM,
-    SLOT_ACTIVE,
-    SLOT_LIVE_ENDED,
-    SLOT_LIVE_GRACE,
     SESSION_VERSION_CLAIM,
     claim_session_slot,
     enforces_session_limit,
     get_active_session_version,
     legacy_session_slot,
     release_session_slot,
-    session_slot_state,
+    session_slot_exists,
     token_matches_session_version,
     token_session_slot,
     touch_session_slot,
@@ -72,12 +64,10 @@ REJECT_REVOKED = "refresh_token_revoked"
 
 
 class RefreshRejected(Exception):
-    def __init__(self, code, detail, *, clear_cookies, reason=""):
+    def __init__(self, code, detail, *, clear_cookies):
         super().__init__(detail)
         self.code = code
         self.detail = detail
-        # Why, when the code alone does not say (LIVE_CLASS_ENDED_REASON).
-        self.reason = reason
         # A reused token's request may race a sibling that already stored the
         # successor cookie; clearing cookies then would log the browser out.
         self.clear_cookies = clear_cookies
@@ -88,8 +78,6 @@ class RotatedSession:
     user: object
     access: str
     refresh: str
-    # The device was evicted and is finishing a live class (see live_grace).
-    live_grace: bool = False
 
 
 class _PresentedRefreshToken(RefreshToken):
@@ -159,21 +147,11 @@ def _live_successor(used, user):
     return successor
 
 
-def _session(user, refresh, *, live_grace=False):
-    return RotatedSession(
-        user=user, access=str(refresh.access_token), refresh=str(refresh), live_grace=live_grace
-    )
+def _session(user, refresh):
+    return RotatedSession(user=user, access=str(refresh.access_token), refresh=str(refresh))
 
 
-def _session_replaced(*, live_class_ended=False):
-    if live_class_ended:
-        return RefreshRejected(
-            REJECT_SESSION_REPLACED,
-            "Your live class has ended. This account is signed in on another device, "
-            "so this device has been signed out. Please log in again.",
-            clear_cookies=True,
-            reason=LIVE_CLASS_ENDED_REASON,
-        )
+def _session_replaced():
     return RefreshRejected(
         REJECT_SESSION_REPLACED,
         "This account is active on another device. Please log in again.",
@@ -183,21 +161,6 @@ def _session_replaced(*, live_class_ended=False):
 
 class _SessionSlotEvicted(Exception):
     """The token's session slot was taken by a newer sign-in."""
-
-    def __init__(self, *, live_class_ended=False):
-        super().__init__()
-        self.live_class_ended = live_class_ended
-
-
-def _slot_live_grace(user, slot_id):
-    """False for an active slot, True for one finishing a live class; raises
-    _SessionSlotEvicted otherwise. Writes nothing except the activity touch."""
-    state = session_slot_state(user, slot_id)
-    if state == SLOT_ACTIVE:
-        return False
-    if state == SLOT_LIVE_GRACE:
-        return True
-    raise _SessionSlotEvicted(live_class_ended=state == SLOT_LIVE_ENDED)
 
 
 def _rotate_locked(presented, user, request):
@@ -220,18 +183,17 @@ def _rotate_locked(presented, user, request):
             claim_session_slot(user, slot_id, request=request)
             presented.blacklist()
             return _session(user, _issue_refresh_token(user, successor_jti(jti), slot_id))
-        live_grace = False
         if slot_id:
-            live_grace = _slot_live_grace(user, slot_id)
-            if not live_grace:
-                touch_session_slot(user, slot_id)
+            if not session_slot_exists(user, slot_id):
+                raise _SessionSlotEvicted()
+            touch_session_slot(user, slot_id)
         if not api_settings.ROTATE_REFRESH_TOKENS:
-            return _session(user, presented, live_grace=live_grace)
+            return _session(user, presented)
         if _minted_within_grace(outstanding):
-            return _session(user, _issue_refresh_token(user, jti, slot_id), live_grace=live_grace)
+            return _session(user, _issue_refresh_token(user, jti, slot_id))
         if api_settings.BLACKLIST_AFTER_ROTATION:
             presented.blacklist()
-        return _session(user, _issue_refresh_token(user, successor_jti(jti), slot_id), live_grace=live_grace)
+        return _session(user, _issue_refresh_token(user, successor_jti(jti), slot_id))
 
     # Revocation is checked before the slot: logging out frees the slot too,
     # and a tab replaying a logged-out token must not read as an eviction.
@@ -239,9 +201,10 @@ def _rotate_locked(presented, user, request):
     if successor is None:
         log_security_event("auth.refresh_reuse_rejected", request=request, target_user_id=user.pk)
         raise RefreshRejected(REJECT_REVOKED, "Token is blacklisted", clear_cookies=False)
-    live_grace = _slot_live_grace(user, slot_id) if slot_id else False
+    if slot_id and not session_slot_exists(user, slot_id):
+        raise _SessionSlotEvicted()
     log_security_event("auth.refresh_reuse_redeemed", request=request, target_user_id=user.pk)
-    return _session(user, _issue_refresh_token(user, successor.jti, slot_id), live_grace=live_grace)
+    return _session(user, _issue_refresh_token(user, successor.jti, slot_id))
 
 
 def rotate_refresh_token(raw_token, request=None):
@@ -259,16 +222,15 @@ def rotate_refresh_token(raw_token, request=None):
         # then write blacklist and session-slot rows, and opposite lock orders
         # deadlock.
         user = User.objects.select_for_update().get(pk=user_pk)
-        live_class_ended = False
         if token_matches_session_version(presented, user):
             try:
                 return _rotate_locked(presented, user, request)
-            except _SessionSlotEvicted as evicted:
+            except _SessionSlotEvicted:
                 # Raised before _rotate_locked writes anything.
-                live_class_ended = evicted.live_class_ended
+                pass
         presented.blacklist()
 
-    raise _session_replaced(live_class_ended=live_class_ended)
+    raise _session_replaced()
 
 
 def revoke_refresh_token(raw_token):

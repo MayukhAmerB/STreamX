@@ -1,34 +1,9 @@
-import "./BrandLogo.css";
-
 import { Link } from "react-router-dom";
 import { siteBrand } from "../config/siteBrand";
 import OwlCognitoMark from "./OwlCognitoMark";
 
-/**
- * Brand lock-up. `variant="shell"` is the Syed Carbon header/footer version
- * (token colours, works on the g100 shell for both brands); the default keeps
- * the previous look for pages that still use it (e.g. the login page).
- */
-export default function BrandLogo({ to = "/", className = "", variant = "default", showLabel = true }) {
+export default function BrandLogo({ to = "/", className = "" }) {
   const isOwlCognito = siteBrand.id === "owlcognito";
-
-  if (variant === "shell") {
-    return (
-      <Link to={to} className={`brand-shell ${className}`.trim()}>
-        <span className="brand-shell__mark" aria-hidden={isOwlCognito ? undefined : "true"}>
-          {isOwlCognito ? (
-            <OwlCognitoMark className="brand-shell__owl" />
-          ) : (
-            <img src="/logo-256.webp" alt="" width="256" height="256" decoding="async" />
-          )}
-        </span>
-        <span className="brand-shell__text">
-          <span className="brand-shell__name">{siteBrand.name}</span>
-          {showLabel ? <span className="brand-shell__label">{siteBrand.platformLabel}</span> : null}
-        </span>
-      </Link>
-    );
-  }
 
   return (
     <Link to={to} className={`inline-flex max-w-full items-center gap-2.5 ${className}`}>
@@ -63,3 +38,4 @@ export default function BrandLogo({ to = "/", className = "", variant = "default
     </Link>
   );
 }
+

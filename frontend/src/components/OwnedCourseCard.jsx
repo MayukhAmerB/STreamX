@@ -81,7 +81,7 @@ export default function OwnedCourseCard({ course }) {
 
   return (
     <article className="student-library-card group grid overflow-hidden rounded-[22px] border border-white/15 bg-[#0A0B0D] shadow-[0_18px_50px_rgba(0,0,0,0.3)] md:grid-cols-[230px_minmax(0,1fr)]">
-      <div className="relative min-h-[210px] overflow-hidden border-b border-white/10 bg-[#131313] md:min-h-full md:border-b-0 md:border-r">
+      <div className="relative min-h-[210px] overflow-hidden border-b border-white/10 bg-[#111417] md:min-h-full md:border-b-0 md:border-r">
         {artwork ? (
           <img
             src={artwork}
@@ -155,7 +155,7 @@ export default function OwnedCourseCard({ course }) {
           <dl className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
             {facts.map(([label, value]) => (
               <div key={label} className="student-library-fact rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2.5">
-                <dt className="student-library-muted text-[8px] font-bold uppercase tracking-[0.13em] text-[#8f8f8f]">{label}</dt>
+                <dt className="student-library-muted text-[8px] font-bold uppercase tracking-[0.13em] text-[#899198]">{label}</dt>
                 <dd className="student-library-fact-value mt-1 line-clamp-2 text-[10px] font-semibold leading-4 text-[#E5E8EA]">{value}</dd>
               </div>
             ))}

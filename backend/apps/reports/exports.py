@@ -9,8 +9,6 @@ import zipfile
 
 from django.utils import timezone
 
-from apps.users import identity
-
 from .models import SCAN_CLEAN, SCAN_INFECTED, ReportCriterion, ReportSubmission
 from .services import course_gradebook, format_marks
 
@@ -44,17 +42,15 @@ def _write_rows(rows):
 def course_marks_csv(course):
     book = course_gradebook(course)
     tasks = book["tasks"]
-    # Owner rule: the student block (roll number, real name, handle, stats) comes first.
-    header = [*identity.IDENTITY_HEADER, "Email"]
+    header = ["Student", "Email"]
     for task in tasks:
         label = f"W{task.week_number} " if task.week_number else ""
         header.append(f"{label}{task.title} (/{format_marks(task.max_marks)})")
     header += ["Total", "Out of (graded)", "Percent", "Graded", "Missing", "Late"]
     rows = [header]
-    blocks = identity.identity_blocks([(row["student"], None) for row in book["rows"]], course_id=course.pk)
-    for row, block in zip(book["rows"], blocks, strict=True):
+    for row in book["rows"]:
         student = row["student"]
-        line = [*identity.identity_cells(block), student.email]
+        line = [student.full_name or "", student.email]
         for cell in row["cells"]:
             if cell["final_marks"] is not None:
                 line.append(format_marks(cell["final_marks"]))
@@ -78,7 +74,7 @@ def course_marks_csv(course):
 def task_marks_csv(task):
     criteria = list(ReportCriterion.objects.filter(task=task).order_by("order", "id"))
     header = [
-        *identity.IDENTITY_HEADER,
+        "Student",
         "Email",
         "Status",
         "Submitted at",
@@ -92,45 +88,36 @@ def task_marks_csv(task):
     ]
     header += [f"{item.name} (/{format_marks(item.max_marks)})" for item in criteria]
     header += ["Graded by", "Graded at", "Feedback"]
-    auto = task.origin == "auto"
-    target_at = len(identity.IDENTITY_HEADER) + 1  # right after Email
-    if auto:  # self-service week: one row per target
-        header.insert(target_at, "Target")
     rows = [header]
     submissions = (
         ReportSubmission.objects.filter(task=task)
         .exclude(status=ReportSubmission.STATUS_NOT_SUBMITTED)
         .select_related("student", "grade", "grade__graded_by")
-        .order_by("student__full_name", "student__email", "target_key", "id")
+        .order_by("student__full_name", "student__email")
     )
-    submissions = list(submissions)
-    blocks = identity.identity_blocks(
-        [(submission.student, submission) for submission in submissions], course_id=task.course_id
-    )
-    for submission, block in zip(submissions, blocks, strict=True):
+    for submission in submissions:
         grade = getattr(submission, "grade", None)
         stored = (grade.criteria_marks or {}) if grade else {}
         graded_by = grade.graded_by if grade else None
-        row = [
-            *identity.identity_cells(block),
-            submission.student.email,
-            submission.get_status_display(),
-            _local(submission.submitted_at),
-            "yes" if submission.is_late else "no",
-            submission.minutes_late,
-            submission.version_count,
-            format_marks(grade.raw_marks) if grade else "",
-            format_marks(grade.late_penalty) if grade and grade.raw_marks is not None else "",
-            format_marks(grade.final_marks) if grade else "",
-            format_marks(task.max_marks),
-            *[stored.get(str(item.pk), "") for item in criteria],
-            (graded_by.full_name or graded_by.email) if graded_by else "",
-            _local(grade.graded_at) if grade else "",
-            grade.feedback if grade else "",
-        ]
-        if auto:
-            row.insert(target_at, submission.target_name)
-        rows.append(row)
+        rows.append(
+            [
+                submission.student.full_name or "",
+                submission.student.email,
+                submission.get_status_display(),
+                _local(submission.submitted_at),
+                "yes" if submission.is_late else "no",
+                submission.minutes_late,
+                submission.version_count,
+                format_marks(grade.raw_marks) if grade else "",
+                format_marks(grade.late_penalty) if grade and grade.raw_marks is not None else "",
+                format_marks(grade.final_marks) if grade else "",
+                format_marks(task.max_marks),
+                *[stored.get(str(item.pk), "") for item in criteria],
+                (graded_by.full_name or graded_by.email) if graded_by else "",
+                _local(grade.graded_at) if grade else "",
+                grade.feedback if grade else "",
+            ]
+        )
     return _write_rows(rows)
 
 
@@ -183,24 +170,14 @@ def iter_task_zip(task):
         .order_by("student__full_name", "student__email")
     )
     sink = _ZipSink()
-    manifest = [
-        [*identity.IDENTITY_HEADER, "Email", "Status", "Version", "Submitted at", "Late", "File", "Size (bytes)", "SHA-256"]
-    ]
+    manifest = [["Student", "Email", "Status", "Version", "Submitted at", "Late", "File", "Size (bytes)", "SHA-256"]]
     with zipfile.ZipFile(sink, mode="w", compression=zipfile.ZIP_DEFLATED, allowZip64=True) as archive:
         used = set()
-        for submission, block in identity.chunked_blocks(
-            submissions.iterator(), lambda item: item.student, lambda item: item, course_id=task.course_id
-        ):
+        for submission in submissions.iterator():
             student = submission.student
-            who = identity.identity_cells(block)
             folder = safe_component(
                 f"{student.full_name or student.email} ({student.pk})", fallback=f"student-{student.pk}"
             )
-            if task.origin == "auto" and submission.target_name:
-                # Self-service week: one sub-folder per target.
-                folder = (
-                    f"{folder}/{safe_component(submission.target_name, fallback=f'target-{submission.pk}', limit=60)}"
-                )
             version = submission.current_version
             for item in version.files.all().order_by("created_at", "id"):
                 if item.scan_status != SCAN_CLEAN:
@@ -208,7 +185,7 @@ def iter_task_zip(task):
                     label = "BLOCKED BY VIRUS SCANNER" if item.scan_status == SCAN_INFECTED else "NOT SCANNED YET"
                     manifest.append(
                         [
-                            *who,
+                            student.full_name,
                             student.email,
                             submission.status,
                             version.number,
@@ -236,7 +213,7 @@ def iter_task_zip(task):
                 except OSError:
                     manifest.append(
                         [
-                            *who,
+                            student.full_name,
                             student.email,
                             submission.status,
                             version.number,
@@ -257,7 +234,7 @@ def iter_task_zip(task):
                         yield sink.drain()
                 manifest.append(
                     [
-                        *who,
+                        student.full_name or "",
                         student.email,
                         submission.get_status_display(),
                         version.number,

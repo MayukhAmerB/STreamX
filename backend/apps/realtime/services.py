@@ -536,10 +536,6 @@ def refresh_obs_session_stream_health(session, *, force_refresh=False, persist=T
         next_status = session.STREAM_STARTING
     elif current_status == session.STREAM_FAILED:
         next_status = session.STREAM_FAILED
-    elif current_status == getattr(session, "STREAM_INTERRUPTED", "interrupted"):
-        # The live reconciler owns interrupted -> stopped (after its grace period).
-        next_status = current_status
-        grace_active = True
     elif current_status == session.STREAM_LIVE and offline_grace_seconds > 0 and cache.get(last_online_cache_key):
         next_status = session.STREAM_LIVE
         grace_active = True
@@ -1223,37 +1219,16 @@ def fetch_owncast_ip_bans(*, timeout=5):
     return _extract_owncast_collection(payload, "ipBans", "bans", "results", "data", "items")
 
 
-def expired_owncast_chat_timeouts_queryset(now=None):
-    from .models import OwncastChatIdentity
-
-    return OwncastChatIdentity.objects.filter(
-        owncast_timeout_until__isnull=False,
-        owncast_timeout_until__lte=now or timezone.now(),
-        owncast_disabled_at__isnull=False,
-    ).exclude(owncast_user_id="")
-
-
-def release_expired_owncast_chat_timeouts(*, timeout=10, limit=None):
-    """Re-enable Owncast chat users whose StreamX timeout has expired.
-
-    ``limit`` bounds one run (the periodic hook releases the rest on its next
-    tick). Each row is cleared with a conditional UPDATE, so a moderator who
-    re-timed-out the user meanwhile, or another worker that already released
-    them, is never overwritten.
-
-    Rows are taken least recently attempted first, and a failed attempt touches
-    ``updated_at``: a batch of permanently failing identities (for example a
-    user deleted in Owncast) rotates to the back instead of starving newer
-    expired timeouts forever.
-    """
+def release_expired_owncast_chat_timeouts(*, timeout=10):
     from .models import OwncastChatIdentity
 
     now = timezone.now()
-    candidates = expired_owncast_chat_timeouts_queryset(now).order_by("updated_at", "pk")
-    if limit is not None:
-        candidates = candidates[: max(1, int(limit))]
-    candidates = list(candidates)
-    checked = len(candidates)
+    candidates = OwncastChatIdentity.objects.filter(
+        owncast_timeout_until__isnull=False,
+        owncast_timeout_until__lte=now,
+        owncast_disabled_at__isnull=False,
+    ).exclude(owncast_user_id="")
+    checked = candidates.count()
     released = 0
     errors = []
 
@@ -1272,16 +1247,12 @@ def release_expired_owncast_chat_timeouts(*, timeout=10, limit=None):
                     "error": str(exc),
                 }
             )
-            OwncastChatIdentity.objects.filter(pk=identity.pk).update(updated_at=timezone.now())
             continue
 
-        cleared = OwncastChatIdentity.objects.filter(
-            pk=identity.pk,
-            owncast_timeout_until=identity.owncast_timeout_until,
-            owncast_disabled_at__isnull=False,
-        ).update(owncast_disabled_at=None, owncast_timeout_until=None, updated_at=timezone.now())
-        if cleared:
-            released += 1
+        identity.owncast_disabled_at = None
+        identity.owncast_timeout_until = None
+        identity.save(update_fields=["owncast_disabled_at", "owncast_timeout_until", "updated_at"])
+        released += 1
 
     return {
         "released": released,
@@ -1405,29 +1376,6 @@ def _list_room_participants(room_name):
     )
     participants = response.get("participants") or []
     return participants if isinstance(participants, list) else []
-
-
-def delete_livekit_room(room_name, *, timeout=None):
-    """RoomService.DeleteRoom: disconnects everyone and frees the room (End).
-
-    Raises LiveKitRoomServiceError (a 404 means the room is already gone; the
-    caller treats that as success) or LiveKitConfigError.
-    """
-    room_name = str(room_name or "").strip()
-    if not room_name:
-        return {}
-    room_timeout = timeout or max(1, int(getattr(settings, "LIVEKIT_EGRESS_STATUS_TIMEOUT_SECONDS", 5) or 5))
-    return _twirp_room_service_post(
-        room_name=room_name,
-        method_name="DeleteRoom",
-        payload={"room": room_name},
-        timeout=room_timeout,
-    )
-
-
-def list_room_participant_count(room_name):
-    """Participants currently in the LiveKit room (raises when LiveKit cannot be asked)."""
-    return len(_list_room_participants(room_name))
 
 
 def resolve_host_publisher_identity(*, room_name, session_id, preferred_identity=""):
@@ -1633,12 +1581,6 @@ def build_participant_token(
     )
 
 
-def _participant_name(user) -> str:
-    from apps.profiles.handles import public_display_name
-
-    return public_display_name(user) or "Participant"
-
-
 def build_participant_metadata(*, user, request=None):
     if not user:
         return {}
@@ -1650,8 +1592,7 @@ def build_participant_metadata(*, user, request=None):
             profile_image_url = ""
     return {
         "user_id": getattr(user, "id", None),
-        # Shared with every participant of the room: a student's handle only.
-        "full_name": _participant_name(user),
+        "full_name": getattr(user, "full_name", "") or getattr(user, "email", "") or "",
         "role": getattr(user, "role", ""),
         "is_admin": bool(getattr(user, "is_staff", False) or getattr(user, "is_superuser", False)),
         "profile_image_url": profile_image_url,
@@ -1853,7 +1794,7 @@ def build_host_publisher_token(*, session, user):
     token = build_participant_token(
         identity=identity,
         room_name=session.livekit_room_name or session.room_name,
-        participant_name=_participant_name(user),
+        participant_name=user.full_name or user.email,
         can_publish=True,
         can_subscribe=True,
         room_admin=True,

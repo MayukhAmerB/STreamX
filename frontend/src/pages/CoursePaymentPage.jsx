@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
-import apiClient, { featureDisabledDetail } from "../api/client";
+import apiClient from "../api/client";
 import PaymentPlanPicker, {
   availablePaymentPlans,
   configuredPlanSummary,
@@ -19,9 +19,6 @@ import { createPaymentOrder, verifyPayment } from "../api/payments";
 import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
-import ComingSoonPanel from "../marketing/auth/ComingSoonPanel";
-import { pentestingPurchaseGate } from "../marketing/auth/pentestingGate";
-import "../marketing/auth/auth.css";
 import { formatINR } from "../utils/currency";
 import { siteBrand } from "../config/siteBrand";
 import {
@@ -42,7 +39,7 @@ export const checkoutSteps = [
 ];
 
 const inputClassName =
-  "mt-2 block h-11 w-full rounded-none border-0 border-b border-white/35 bg-transparent px-0 text-base text-white outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-[#737373] focus:border-[#F3E2B3] focus:shadow-[0_1px_0_0_#F3E2B3] sm:h-10 sm:text-sm";
+  "mt-4 min-h-14 w-full rounded-xl border border-white/15 bg-black/65 px-4 py-3 text-base text-white outline-none transition placeholder:text-[#606060] focus:border-white/50 focus:bg-black";
 
 function ArrowIcon({ className = "h-5 w-5" }) {
   return (
@@ -267,7 +264,7 @@ export default function CoursePaymentPage() {
         || "";
     }
   });
-  const { user, capabilities } = useAuth();
+  const { user } = useAuth();
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
@@ -277,8 +274,6 @@ export default function CoursePaymentPage() {
   );
   const [plan, setPlan] = useState(initialCheckoutRecovery?.plan || "full");
   const [paymentResult, setPaymentResult] = useState(null);
-  // A 403 `feature_disabled` from the server (Pentesting switched off): show the coming-soon panel.
-  const [gateError, setGateError] = useState(null);
   const [pendingVerification, setPendingVerification] = useState(
     initialCheckoutRecovery?.pendingVerification || null,
   );
@@ -338,10 +333,7 @@ export default function CoursePaymentPage() {
           setPlan(defaultPaymentPlanId(loadedCourse));
         }
       } catch (err) {
-        if (active) {
-          if (featureDisabledDetail(err)) setGateError(err);
-          setError(apiMessage(err, "Failed to load payment details."));
-        }
+        if (active) setError(apiMessage(err, "Failed to load payment details."));
       } finally {
         if (active) setLoading(false);
       }
@@ -566,7 +558,6 @@ export default function CoursePaymentPage() {
           applicationReference,
         });
       }
-      if (featureDisabledDetail(err)) setGateError(err);
       setError(apiMessage(err, "Unable to start payment."));
       setPaying(false);
     }
@@ -579,33 +570,20 @@ export default function CoursePaymentPage() {
   if (!course) {
     return (
       <PageShell title="Secure checkout">
-        <p className="text-sm text-[#fafafa]" role="alert">{error || "Course not found."}</p>
-      </PageShell>
-    );
-  }
-
-  // Pentesting "Coming soon": buying is disabled (never hidden) with the server reason.
-  // Never shown over a captured payment that still needs verifying, or its receipt.
-  const purchaseGate = pentestingPurchaseGate(course, { caps: capabilities || user?.capabilities, error: gateError });
-  if (purchaseGate.blocked && !hasPermanentAccess && !paymentResult && !pendingVerification) {
-    return (
-      <PageShell title="Secure checkout" subtitle={course.title}>
-        <div className="au-scope max-w-3xl">
-          <ComingSoonPanel course={course} action="Buy" reason={purchaseGate.reason} titleId="checkout-coming-soon" />
-        </div>
+        <p className="text-sm text-red-400">{error || "Course not found."}</p>
       </PageShell>
     );
   }
 
   if (course.category === "web_pentesting" && !applicationReady) {
-    return <PageShell title="Complete your registration"><div className="au-scope"><p role="alert" className="text-sm leading-6 text-[#a1a1a1]">{error || "Submit your Pentesting application before viewing the fee and payment plans."}</p><div className="au-actions"><Link className="au-btn au-btn--primary" to={`/courses/${id}/register`}>Register now</Link></div></div></PageShell>;
+    return <PageShell title="Complete your registration"><p role="alert">{error || "Submit your Pentesting application before viewing the fee and payment plans."}</p><Link to={`/courses/${id}/register`}>Register now ?</Link></PageShell>;
   }
 
   if (hasPermanentAccess) {
     return (
       <PageShell title="You already have access" subtitle={course.title}>
-        <div className="max-w-2xl rounded-[10px] border border-white/10 bg-[#0a0a0a] p-6 sm:p-8">
-          <p className="text-sm leading-7 text-[#a1a1a1]">
+        <div className="max-w-2xl rounded-2xl border border-white/15 bg-white/[0.04] p-6 sm:p-8">
+          <p className="text-sm leading-7 text-[#B8C0CC]">
             This account is already enrolled, so another payment has not been started.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -657,23 +635,24 @@ export default function CoursePaymentPage() {
         containerClassName="max-w-[1040px] py-4 sm:py-8"
       >
         <div className="mx-auto max-w-[900px]">
-          <section className="au-scope relative overflow-hidden rounded-[10px] border border-white/10 bg-[#0a0a0a] px-5 py-9 sm:px-12 sm:py-12">
+          <section className="relative overflow-hidden rounded-[30px] border border-white/20 bg-[#080808] px-5 py-9 shadow-[0_26px_80px_rgba(0,0,0,0.55)] sm:px-12 sm:py-12">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_14%,rgba(255,255,255,0.055),transparent_34%)]" />
 
             <div className="relative text-center">
               <div className="mx-auto flex max-w-[700px] items-center gap-4 sm:gap-7">
-                <span className="h-px flex-1 bg-white/10" />
-                <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black text-white sm:h-32 sm:w-32">
+                <span className="h-px flex-1 bg-[linear-gradient(to_right,transparent,rgba(255,255,255,0.2))]" />
+                <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-full border border-white/20 text-white shadow-[0_0_32px_rgba(255,255,255,0.05)] sm:h-36 sm:w-36">
                   <SuccessIcon />
                 </div>
-                <span className="h-px flex-1 bg-white/10" />
+                <span className="h-px flex-1 bg-[linear-gradient(to_left,transparent,rgba(255,255,255,0.2))]" />
               </div>
-              <p className="mt-7 text-xs font-medium uppercase tracking-[0.22em] text-[#F3E2B3]">
+              <p className="mt-7 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#BEBEBE] sm:text-sm">
                 {isDuplicatePurchase ? "Payment received" : "Payment successful"}
               </p>
-              <h1 className="mt-4 text-4xl font-normal leading-none text-white sm:text-6xl">
+              <h1 className="mt-3 font-reference text-4xl font-semibold tracking-[-0.035em] text-white sm:text-6xl">
                 {isDuplicatePurchase ? "You already have this access" : "Payment Successful!"}
               </h1>
-              <p className="mx-auto mt-5 max-w-xl text-base leading-7 text-[#a1a1a1] sm:text-lg">
+              <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[#B8B8B8] sm:text-lg sm:leading-8">
                 {isDuplicatePurchase
                   ? paymentResult.message ||
                     "This email already owns this plan, so nothing new was added. This payment will be refunded to your original payment method."
@@ -681,49 +660,49 @@ export default function CoursePaymentPage() {
               </p>
             </div>
 
-            <dl className="relative mt-8 overflow-hidden rounded-[10px] border border-white/10 bg-black px-4 sm:mt-10 sm:px-7">
+            <dl className="relative mt-8 overflow-hidden rounded-2xl border border-white/15 bg-black/45 px-4 sm:mt-10 sm:px-7">
               <div className="grid grid-cols-[40px_1fr] items-center gap-3 border-b border-white/10 py-5 sm:grid-cols-[48px_1fr_auto]">
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 text-white sm:h-11 sm:w-11">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 text-white sm:h-11 sm:w-11">
                   <ReceiptIcon />
                 </span>
-                <dt className="text-sm text-[#a1a1a1] sm:text-base">Transaction ID</dt>
+                <dt className="text-sm text-[#D0D0D0] sm:text-base">Transaction ID</dt>
                 <dd className="col-span-2 break-all pl-[52px] text-right text-sm font-semibold text-white sm:col-span-1 sm:pl-0 sm:text-base">
                   {transactionId}
                 </dd>
               </div>
               <div className="grid grid-cols-[40px_1fr] items-center gap-3 border-b border-white/10 py-5 sm:grid-cols-[48px_1fr_auto]">
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 text-white sm:h-11 sm:w-11">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 text-white sm:h-11 sm:w-11">
                   <CalendarIcon />
                 </span>
-                <dt className="text-sm text-[#a1a1a1] sm:text-base">Plan Selected</dt>
+                <dt className="text-sm text-[#D0D0D0] sm:text-base">Plan Selected</dt>
                 <dd className="col-span-2 pl-[52px] text-right text-sm font-semibold text-white sm:col-span-1 sm:pl-0 sm:text-base">
                   {selectedPlan}
                 </dd>
               </div>
               <div className="grid grid-cols-[40px_1fr] items-center gap-3 py-5 sm:grid-cols-[48px_1fr_auto]">
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 text-white sm:h-11 sm:w-11">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 text-white sm:h-11 sm:w-11">
                   <ClockIcon />
                 </span>
-                <dt className="text-sm text-[#a1a1a1] sm:text-base">Access Duration</dt>
+                <dt className="text-sm text-[#D0D0D0] sm:text-base">Access Duration</dt>
                 <dd className="col-span-2 pl-[52px] text-right text-sm font-semibold text-white sm:col-span-1 sm:pl-0 sm:text-base">
                   {accessDuration}
                 </dd>
               </div>
             </dl>
 
-            <div className="relative mt-7 rounded-[10px] border border-white/10 bg-black p-5 sm:p-7">
+            <div className="relative mt-7 rounded-2xl border border-white/15 bg-black/45 p-5 sm:p-7">
               <div className="grid gap-5 sm:grid-cols-[120px_1fr] sm:items-center">
-                <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full border border-white/10 text-white sm:mx-0">
+                <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full border border-white/15 text-white sm:mx-0">
                   <WhatsAppIcon />
                 </div>
-                <div className="border-white/10 text-center sm:border-l sm:pl-7 sm:text-left">
-                  <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#8a8a8a]">
+                <div className="border-white/20 text-center sm:border-l sm:pl-7 sm:text-left">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#A0A0A0]">
                     Next step
                   </p>
-                  <h2 className="mt-2 text-2xl font-semibold leading-tight text-white sm:text-3xl">
+                  <h2 className="mt-2 font-reference text-2xl font-medium text-white sm:text-3xl">
                     Talk to our team for the remaining enrollment process.
                   </h2>
-                  <p className="mt-2 text-sm leading-6 text-[#a1a1a1]">
+                  <p className="mt-2 text-sm leading-6 text-[#9C9C9C]">
                     Our team will guide you through verification and credential delivery.
                   </p>
                 </div>
@@ -734,7 +713,7 @@ export default function CoursePaymentPage() {
                   href={paymentResult.support_whatsapp_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-md bg-white px-6 text-sm font-medium text-black transition-colors duration-150 hover:bg-white/90"
+                  className="mt-6 flex min-h-14 w-full items-center justify-center gap-3 rounded-xl border border-white/70 bg-transparent px-5 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-white hover:text-black sm:text-sm"
                 >
                   <WhatsAppIcon />
                   Message us on WhatsApp
@@ -743,7 +722,7 @@ export default function CoursePaymentPage() {
               ) : (
                 <Link
                   to="/courses"
-                  className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-md bg-white px-6 text-sm font-medium text-black transition-colors duration-150 hover:bg-white/90"
+                  className="mt-6 flex min-h-14 w-full items-center justify-center gap-3 rounded-xl border border-white/70 px-5 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-white hover:text-black sm:text-sm"
                 >
                   Return to courses
                   <ArrowIcon />
@@ -751,7 +730,7 @@ export default function CoursePaymentPage() {
               )}
             </div>
 
-            <div className="relative mt-7 flex items-start justify-center gap-3 text-left text-xs leading-5 text-[#8a8a8a] sm:text-sm">
+            <div className="relative mt-7 flex items-start justify-center gap-3 text-left text-xs leading-5 text-[#888] sm:text-sm">
               <span className="mt-0.5 shrink-0">
                 <ShieldIcon />
               </span>
@@ -762,7 +741,7 @@ export default function CoursePaymentPage() {
             </div>
           </section>
 
-          <div className="mt-6 flex items-center justify-center gap-2 text-xs text-[#8a8a8a] sm:text-sm">
+          <div className="mt-6 flex items-center justify-center gap-2 text-xs text-[#777] sm:text-sm">
             <ShieldIcon />
             <span>Secure Enrollment</span>
             <span aria-hidden="true">-</span>
@@ -786,24 +765,24 @@ export default function CoursePaymentPage() {
       subtitle={isPlanStep ? "" : "Confirm your details, then continue to the secure Razorpay checkout"}
       containerClassName={isPlanStep ? `${widePlanGrid ? "max-w-[1400px]" : "max-w-[1180px]"} py-4 sm:py-8` : ""}
     >
-      <section className="au-scope relative overflow-hidden rounded-[10px] border border-white/10 bg-[#0a0a0a]">
+      <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#080808] shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
         <div className="absolute inset-0">
           <img
             src={course.thumbnail || pageBackgroundImage}
             alt=""
             aria-hidden="true"
-            className="h-full w-full object-cover opacity-[0.06] grayscale"
+            className="h-full w-full object-cover opacity-[0.08]"
           />
-          <div className="absolute inset-0 bg-[#0a0a0a]/95" />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/95 via-black/90 to-[#111111]/95" />
         </div>
 
         <div className={`relative min-h-[610px] ${isPlanStep ? "" : "grid lg:grid-cols-[310px_1fr]"}`}>
           {!isPlanStep ? (
-          <aside className="border-b border-white/10 bg-black/40 p-5 lg:border-b-0 lg:border-r lg:p-7">
-            <p className="text-xs font-medium uppercase tracking-[0.22em] text-[#F3E2B3]">
+          <aside className="border-b border-white/10 bg-white/[0.025] p-5 lg:border-b-0 lg:border-r lg:p-7">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#888]">
               Secure enrollment
             </p>
-            <h2 className="mt-3 text-xl font-semibold leading-snug text-white">
+            <h2 className="mt-3 font-reference text-xl font-semibold text-white">
               {course.title}
             </h2>
 
@@ -823,27 +802,27 @@ export default function CoursePaymentPage() {
                           setError("");
                         }
                       }}
-                      className={`w-full rounded-md border p-3 text-left transition-colors duration-150 ${
+                      className={`w-full rounded-xl border p-3 text-left transition ${
                         active
-                          ? "border-white/25 bg-white/[0.06]"
-                          : "border-white/[0.06] bg-transparent"
+                          ? "border-white/45 bg-white/[0.1]"
+                          : "border-white/[0.07] bg-black/30"
                       } ${canNavigate ? "cursor-pointer" : "cursor-default"}`}
                     >
                       <span className="flex items-center gap-2">
                         <span
-                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-semibold tabular-nums ${
+                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
                             complete
                               ? "bg-white text-black"
                               : active
                                 ? "border border-white text-white"
-                                : "border border-dashed border-white/25 text-[#8a8a8a]"
+                                : "border border-white/15 text-[#666]"
                           }`}
                         >
                           {complete ? "OK" : index + 1}
                         </span>
                         <span className="text-xs font-semibold text-white">{step.label}</span>
                       </span>
-                      <span className="mt-2 hidden truncate pl-8 text-[11px] text-[#8a8a8a] lg:block">
+                      <span className="mt-2 hidden truncate pl-8 text-[11px] text-[#777] lg:block">
                         {stepSummary(step, checkoutProfile, plan, course)}
                       </span>
                     </button>
@@ -852,11 +831,11 @@ export default function CoursePaymentPage() {
               })}
             </ol>
 
-            <div className="mt-6 hidden rounded-[10px] border border-white/10 bg-[#070707] p-4 lg:block">
-              <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#8a8a8a]">
+            <div className="mt-6 hidden rounded-xl border border-white/[0.08] bg-black/40 p-4 lg:block">
+              <p className="text-[10px] uppercase tracking-[0.16em] text-[#777]">
                 Payment security
               </p>
-              <p className="mt-2 text-xs leading-5 text-[#a1a1a1]">
+              <p className="mt-2 text-xs leading-5 text-[#999]">
                 The amount is calculated by our server. Card and UPI details are handled only by
                 Razorpay.
               </p>
@@ -872,19 +851,19 @@ export default function CoursePaymentPage() {
             }`}
             onSubmit={isFinalStep ? handlePayNow : moveForward}
           >
-            <div key={activeStep.id} className="motion-safe:animate-[checkoutStepIn_260ms_ease-out]">
+            <div key={activeStep.id} className="animate-[checkoutStepIn_260ms_ease-out]">
               {!isPlanStep ? (
-                <p className="font-mono text-xs tabular-nums text-[#8a8a8a]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#858585]">
                   Step {currentStep + 1} of {checkoutSteps.length}
                 </p>
               ) : null}
 
               {activeStep.id === "identity" ? (
                 <div className="mt-5 max-w-2xl">
-                  <h3 className="text-3xl font-semibold leading-tight text-white sm:text-4xl">
+                  <h3 className="font-reference text-3xl font-semibold text-white sm:text-4xl">
                     What is your full name?
                   </h3>
-                  <p className="mt-3 text-sm leading-6 text-[#a1a1a1]">
+                  <p className="mt-3 text-sm leading-6 text-[#999]">
                     Use the name that should appear in the payment and verification record.
                   </p>
                   <label className="sr-only" htmlFor="checkout-buyer-name">Full name</label>
@@ -905,10 +884,10 @@ export default function CoursePaymentPage() {
 
               {activeStep.id === "email" ? (
                 <div className="mt-5 max-w-2xl">
-                  <h3 className="text-3xl font-semibold leading-tight text-white sm:text-4xl">
+                  <h3 className="font-reference text-3xl font-semibold text-white sm:text-4xl">
                     Where should we record your invoice?
                   </h3>
-                  <p className="mt-3 text-sm leading-6 text-[#a1a1a1]">
+                  <p className="mt-3 text-sm leading-6 text-[#999]">
                     Enter an email you can access. It will also help our admin match your
                     documents to this payment.
                   </p>
@@ -930,14 +909,14 @@ export default function CoursePaymentPage() {
 
               {activeStep.id === "contact" ? (
                 <div className="mt-5 max-w-2xl">
-                  <h3 className="text-3xl font-semibold leading-tight text-white sm:text-4xl">
+                  <h3 className="font-reference text-3xl font-semibold text-white sm:text-4xl">
                     How can our team reach you?
                   </h3>
-                  <p className="mt-3 text-sm leading-6 text-[#a1a1a1]">
+                  <p className="mt-3 text-sm leading-6 text-[#999]">
                     Include the country code. The alternate WhatsApp number is optional.
                   </p>
                   <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                    <label className="block text-[11px] font-medium text-[#8a8a8a]">
+                    <label className="text-xs font-semibold uppercase tracking-[0.12em] text-[#AFAFAF]">
                       WhatsApp number
                       <input
                         className={inputClassName}
@@ -951,7 +930,7 @@ export default function CoursePaymentPage() {
                         maxLength={24}
                       />
                     </label>
-                    <label className="block text-[11px] font-medium text-[#8a8a8a]">
+                    <label className="text-xs font-semibold uppercase tracking-[0.12em] text-[#AFAFAF]">
                       Alternate WhatsApp
                       <input
                         className={inputClassName}
@@ -971,16 +950,16 @@ export default function CoursePaymentPage() {
                 <div className={`mx-auto w-full [--ppc-bleed:0.75rem] sm:[--ppc-bleed:2rem] ${widePlanGrid ? "max-w-none" : "max-w-5xl"}`}>
                   <header className="pt-3 text-center sm:pt-0">
                     <div className="mx-auto flex max-w-3xl items-center gap-4 sm:gap-7">
-                      <span className="h-px flex-1 bg-white/10" aria-hidden="true" />
-                      <p className="max-w-[68vw] text-xs font-medium uppercase tracking-[0.22em] text-[#8a8a8a]">
+                      <span className="h-px flex-1 bg-[linear-gradient(90deg,transparent,rgba(147,166,194,0.45))]" aria-hidden="true" />
+                      <p className="max-w-[68vw] text-[0.66rem] font-semibold uppercase tracking-[0.25em] text-[#AAB5C7] sm:text-xs">
                         {course.title}
                       </p>
-                      <span className="h-px flex-1 bg-white/10" aria-hidden="true" />
+                      <span className="h-px flex-1 bg-[linear-gradient(90deg,rgba(147,166,194,0.45),transparent)]" aria-hidden="true" />
                     </div>
-                    <h1 className="mt-5 text-3xl font-semibold leading-tight text-white sm:text-5xl md:text-6xl">
-                      Choose your <span className="au-hand">plan</span>
+                    <h1 className="mt-4 font-reference text-4xl font-semibold uppercase tracking-[0.04em] text-white sm:text-6xl">
+                      Choose Your Plan
                     </h1>
-                    <p className="mx-auto mt-5 flex max-w-2xl flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-[#a1a1a1] sm:text-base">
+                    <p className="mx-auto mt-4 flex max-w-2xl flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-[#AAB3C1] sm:text-base">
                       <span>Live instruction</span>
                       <span aria-hidden="true">•</span>
                       <span>Server-verified pricing</span>
@@ -997,7 +976,7 @@ export default function CoursePaymentPage() {
                     disabled={!course.purchase_available}
                   />
 
-                  <div className="mt-8 flex flex-wrap items-center justify-center gap-x-2 gap-y-2 text-[10px] font-medium uppercase tracking-[0.14em] text-[#8a8a8a] sm:gap-x-4">
+                  <div className="mt-8 flex flex-wrap items-center justify-center gap-x-2 gap-y-2 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-[#8C98AA] sm:gap-x-4 sm:text-xs sm:tracking-[0.2em]">
                     <span className="h-px w-6 bg-white/15 sm:w-24" aria-hidden="true" />
                     <span className="whitespace-nowrap">Learn</span><span aria-hidden="true">•</span><span className="whitespace-nowrap">Investigate</span><span aria-hidden="true">•</span><span className="whitespace-nowrap">Make an impact</span>
                     <span className="h-px w-6 bg-white/15 sm:w-24" aria-hidden="true" />
@@ -1006,15 +985,15 @@ export default function CoursePaymentPage() {
               ) : null}
 
               {error ? (
-                <div role="alert" aria-live="polite" className="mt-6 max-w-3xl rounded-md bg-[#fafafa] px-4 py-3 text-sm font-medium text-black">
+                <div role="alert" aria-live="polite" className="mt-6 max-w-3xl rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                   {error}
                 </div>
               ) : null}
             </div>
 
             {isPlanStep ? (
-              <div className="mx-auto mt-7 flex w-full max-w-5xl items-center justify-center border-t border-white/10 pt-5">
-                <Link to={`/courses/${course.id}`} className="text-sm text-[#a1a1a1] transition-colors duration-150 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#F3E2B3]">
+              <div className="mx-auto mt-7 flex w-full max-w-5xl items-center justify-center border-t border-white/[0.07] pt-5">
+                <Link to={`/courses/${course.id}`} className="text-sm text-[#8490A2] transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#6FA5FF]">
                   View course details
                 </Link>
               </div>

@@ -7,7 +7,7 @@ const { after, before, test } = require("node:test");
 process.env.LABS_LMS_API_BASE = "https://lms.example.test/api/";
 process.env.LABS_PUBLIC_DIR = path.resolve(__dirname, "..");
 
-const { server, resolveLmsApiBase, resolveSiteUrl, resolvePublicFile, contentSecurityPolicy } = require("../server.js");
+const { server, resolveLmsApiBase, resolvePublicFile, contentSecurityPolicy } = require("../server.js");
 
 let base;
 
@@ -22,7 +22,7 @@ test("GET /api/config returns the LMS API base without a trailing slash", async 
   const response = await fetch(`${base}/api/config`);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.deepEqual(await response.json(), { lmsApiBase: "https://lms.example.test/api", siteUrl: "https://lms.example.test" });
+  assert.deepEqual(await response.json(), { lmsApiBase: "https://lms.example.test/api" });
 });
 
 test("the CSP lets the page call the LMS origin and nothing else new", async () => {
@@ -50,48 +50,9 @@ test("documents and scripts are never served from /materials/", () => {
   assert.equal(resolvePublicFile("/materials/../server.js"), null);
 });
 
-test("invalid LMS bases fall back to the production default (the API host that holds the session)", () => {
-  assert.equal(resolveLmsApiBase(""), "https://api.alsyedinitiative.com/api");
-  assert.equal(resolveLmsApiBase("javascript:alert(1)"), "https://api.alsyedinitiative.com/api");
-  assert.equal(resolveLmsApiBase("https://user:pw@evil.example/api"), "https://api.alsyedinitiative.com/api");
+test("invalid LMS bases fall back to the production default", () => {
+  assert.equal(resolveLmsApiBase(""), "https://alsyedinitiative.com/api");
+  assert.equal(resolveLmsApiBase("javascript:alert(1)"), "https://alsyedinitiative.com/api");
+  assert.equal(resolveLmsApiBase("https://user:pw@evil.example/api"), "https://alsyedinitiative.com/api");
   assert.equal(resolveLmsApiBase("http://127.0.0.1:8000/api"), "http://127.0.0.1:8000/api");
-});
-
-test("the LMS website is LABS_SITE_URL, else the API origin without api.", () => {
-  assert.equal(resolveSiteUrl("", "https://api.alsyedinitiative.com"), "https://alsyedinitiative.com");
-  assert.equal(resolveSiteUrl("", "https://alsyedinitiative.com"), "https://alsyedinitiative.com");
-  assert.equal(resolveSiteUrl("https://www.example.test/", "https://api.example.test"), "https://www.example.test");
-});
-
-test("exam-core.js is served and LMS evidence images are allowed by the CSP", async () => {
-  const core = await fetch(`${base}/exam-core.js`);
-  assert.equal(core.status, 200);
-  assert.match(core.headers.get("content-type"), /javascript/);
-  const csp = contentSecurityPolicy();
-  assert.match(csp, /img-src 'self' data: https:\/\/lms\.example\.test;/);
-  assert.doesNotMatch(csp, /img-src[^;]*\*/);
-});
-
-test("self-hosted fonts are served as font/woff2; nothing else under /fonts/", async () => {
-  for (const font of [
-    "/fonts/geist/geist-latin-wght-normal.woff2",
-    "/fonts/geist-mono/geist-mono-latin-wght-normal.woff2",
-    "/fonts/handlee/handlee-latin-400-normal.woff2",
-  ]) {
-    const response = await fetch(`${base}${font}`);
-    assert.equal(response.status, 200, font);
-    assert.equal(response.headers.get("content-type"), "font/woff2");
-    assert.match(response.headers.get("cache-control"), /max-age/);
-    await response.arrayBuffer();
-  }
-  for (const blocked of ["/fonts/geist/OFL.txt", "/fonts/../server.js", "/fonts/other/x.woff2", "/fonts/geist/x.woff"]) {
-    assert.equal(resolvePublicFile(blocked), null, blocked);
-  }
-});
-
-test("the CSP allows fonts and styles from this origin only (no Google Fonts)", () => {
-  const csp = contentSecurityPolicy();
-  assert.match(csp, /font-src 'self';/);
-  assert.match(csp, /style-src 'self' 'unsafe-inline';/);
-  assert.doesNotMatch(csp, /googleapis|gstatic/);
 });

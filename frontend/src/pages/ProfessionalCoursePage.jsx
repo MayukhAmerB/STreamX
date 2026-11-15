@@ -1,23 +1,12 @@
-// /courses/:id (PHILOSOPHY T4, BUILD_PLAN §2.1): track-page hero + lesson
-// outline. Data and actions unchanged (GET /api/courses/:id/ and
-// /experience/, reviews, hash scroll, Continue learning, installments, Buy /
-// Apply). Pentesting (owner rule): the course and its module outline are
-// browsable, and every enrol/apply/buy control is disabled with the server's
-// reason while the `pentesting` switch is off (the server answers 403
-// feature_disabled meanwhile).
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
 import apiClient from "../api/client";
 import { getCourse } from "../api/courses";
 import CourseReviews from "../components/CourseReviews";
-import { configuredCourseFeeLabel } from "../components/payments/paymentPlans";
 import { useAuth } from "../hooks/useAuth";
-import { coursePurchaseGate, pentestingGate, useCatalog } from "../marketing/catalogApi";
-import LineArt, { lineArtFor } from "../marketing/LineArt";
-import { ButtonLink, CheckList, ClockIcon, DisabledAction, InfoIcon, Kicker, StatusPill } from "../marketing/primitives";
-import { tierOf, PENTESTING_TIERS } from "../marketing/tiers";
 import { apiData, apiMessage } from "../utils/api";
+import { configuredCourseFeeLabel } from "../components/payments/paymentPlans";
 import { formatINR } from "../utils/currency";
 import { normalizeTextList } from "../utils/textList";
 import "../components/CourseExperience.css";
@@ -26,12 +15,20 @@ const CATEGORY_META = {
   osint: {
     label: "OSINT",
     longLabel: "Open Source Intelligence",
+    shortMark: "OS",
     heroImage: "/course-art/osint-detail-operations-v1.webp",
+    supportImage: "/course-art/osint-program-v2.webp",
+    visualEyebrow: "Investigation environment",
+    visualTitle: "From scattered public data to verified intelligence",
   },
   web_pentesting: {
     label: "Pentesting",
-    longLabel: "Pentesting",
+    longLabel: "Web Application & API Security",
+    shortMark: "PT",
     heroImage: "/course-art/pentesting-detail-lab-v1.webp",
+    supportImage: "/course-art/pentesting-program-v2.webp",
+    visualEyebrow: "Authorized security lab",
+    visualTitle: "Learn the workflow behind professional application testing",
   },
 };
 
@@ -43,7 +40,11 @@ export function getCourseDetailPriceLabel(course) {
 }
 
 export function shouldShowCoursePrice(course) {
-  return !course?.is_enrolled && course?.launch_status === "live" && !course?.registration_closed;
+  return (
+    !course?.is_enrolled &&
+    course?.launch_status === "live" &&
+    !course?.registration_closed
+  );
 }
 
 export function getCourseCatalogPath(course) {
@@ -55,7 +56,11 @@ export function formatCourseStartDate(value) {
   if (!value) return "To be announced";
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return "To be announced";
-  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(date);
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
 }
 
 export function getCourseDetailArtwork(course) {
@@ -81,80 +86,43 @@ export function scrollToCourseHash(hash, documentRef = document) {
   return true;
 }
 
-/**
- * The enrol/buy/apply block. `gate` is coursePurchaseGate(): when it is
- * disabled (Pentesting while the switch is off, or the server's
- * purchase_gate), every acquisition control is a DisabledAction with the reason.
- */
-export function CourseActions({ course, id, gate }) {
-  const pentesting = course.category === "web_pentesting";
-  const open = course.launch_status === "live" && !course.registration_closed;
-  if (course.is_enrolled) {
-    return (
-      <div className="hp-actions">
-        <ButtonLink to={`/learn/${id}`} variant="primary" size="lg" arrow>
-          Continue learning
-        </ButtonLink>
-        <ButtonLink to={`/courses/${id}/live`} variant="secondary" size="lg">
-          Live classes
-        </ButtonLink>
-        {course.enrollment_access_type === "installment" ? (
-          <ButtonLink to={`/courses/${id}/payment`} variant="secondary" size="lg" arrow>
-            Pay next installment
-          </ButtonLink>
-        ) : null}
-      </div>
-    );
-  }
-  if (gate.disabled) {
-    return (
-      <div className="hp-actions" data-purchase-state={gate.state}>
-        <DisabledAction label={`${pentesting ? "Apply" : "Enrol"} (coming soon)`} reason={gate.reason || "Enrolment opens at launch."} size="lg" />
-        <ButtonLink to="#curriculum" variant="secondary" size="lg">
-          Browse the outline
-        </ButtonLink>
-      </div>
-    );
-  }
-  if (open && (pentesting || course.purchase_available)) {
-    return (
-      <div className="hp-actions">
-        <ButtonLink to={`/courses/${id}/${pentesting ? "register" : "payment"}`} variant="primary" size="lg" arrow>
-          {pentesting ? "Apply now" : "Buy now"}
-        </ButtonLink>
-        <ButtonLink to="#curriculum" variant="secondary" size="lg">
-          See the curriculum
-        </ButtonLink>
-      </div>
-    );
-  }
+function SectionHeading({ number, eyebrow, title, description }) {
   return (
-    <div className="hp-actions">
-      <DisabledAction
-        label={course.registration_closed ? "Registration closed" : pentesting ? "Applications opening soon" : "Buy now - opening soon"}
-        reason="Contact the team for updates."
-        size="lg"
-      />
-      <ButtonLink to="/contact" variant="secondary" size="lg">
-        Contact the team
-      </ButtonLink>
+    <div className="detail-section-heading">
+      <span className="detail-section-number" aria-hidden="true">
+        {number}
+      </span>
+      <div>
+        <div className="eyebrow">{eyebrow}</div>
+        <h2>{title}</h2>
+        {description ? <p className="detail-section-description">{description}</p> : null}
+      </div>
     </div>
   );
 }
 
-function statusOf(course, gate) {
-  if (course.is_enrolled) return { kind: "open", label: "Course unlocked" };
-  if (gate.disabled && gate.code === "feature_disabled") return { kind: "soon", label: "Coming soon" };
-  if (course.registration_closed) return { kind: "closed", label: "Registration closed" };
-  if (course.launch_status === "live") return { kind: "open", label: "Admissions open" };
-  return { kind: "soon", label: "Coming soon" };
+function CourseArtwork({ course, category, showImage }) {
+  return (
+    <img
+      className="detail-hero-art"
+      src={getCourseDetailArtwork(course)}
+      width="1280"
+      height="720"
+      decoding="async"
+      fetchpriority="high"
+      alt={
+        showImage
+          ? course.image_alt || `${course.title} course artwork`
+          : `${category.longLabel} professional learning environment`
+      }
+    />
+  );
 }
 
 export default function ProfessionalCoursePage() {
   const { id } = useParams();
   const { hash } = useLocation();
   const { isAuthenticated } = useAuth();
-  const catalog = useCatalog();
   const [course, setCourse] = useState(null);
   const [experience, setExperience] = useState(null);
   const [error, setError] = useState("");
@@ -194,15 +162,11 @@ export default function ProfessionalCoursePage() {
 
   if (error) {
     return (
-      <div className="hp-frame hp-detail">
-        <p role="alert" className="hp-reason">
+      <div className="course-experience">
+        <p role="alert" className="message">
           {error}
         </p>
-        <p style={{ marginTop: 16 }}>
-          <Link className="hp-text-link" to="/courses">
-            Return to courses
-          </Link>
-        </p>
+        <Link to="/courses">Return to courses</Link>
       </div>
     );
   }
@@ -210,29 +174,47 @@ export default function ProfessionalCoursePage() {
   if (!course || !experience) {
     return (
       // Hold the page's height while loading so the footer does not jump (CLS).
-      <div className="hp-frame hp-detail min-h-[100svh]" role="status">
-        <p className="hp-body">Loading course…</p>
+      <div className="course-experience min-h-[100svh]" role="status">
+        Loading course...
       </div>
     );
   }
 
   const pentesting = course.category === "web_pentesting";
   const category = CATEGORY_META[course.category] || CATEGORY_META.osint;
-  const gate = coursePurchaseGate(course, pentesting ? pentestingGate(catalog, []) : null);
-  const status = statusOf(course, gate);
   const facts = experience.facts || {};
   const modules = Array.isArray(experience.modules) ? experience.modules : [];
   const benefits = Array.isArray(course.course_card_features) ? course.course_card_features : [];
   const learningOutcomes = normalizeTextList(course.what_you_will_learn);
   const expectedOutcomes = normalizeTextList(course.expected_outcomes);
   const showImage = Boolean(course.show_course_image && course.thumbnail);
+  const open = course.launch_status === "live" && !course.registration_closed;
+  const courseStatusLabel = course.is_enrolled
+    ? "Course unlocked"
+    : course.registration_closed
+      ? "Registration closed"
+      : course.launch_status === "live"
+        ? "Admissions open"
+        : "Coming soon";
   const priceLabel = getCourseDetailPriceLabel(course);
-  const instructorName = course.snapshot_instructor || course.instructor?.full_name || "Al Syed Initiative faculty";
+  const instructorName =
+    course.snapshot_instructor || course.instructor?.full_name || "Al Syed Initiative faculty";
   const courseTitle =
-    facts.batch && !course.title.toLowerCase().includes(String(facts.batch).toLowerCase()) ? `${course.title} (${facts.batch})` : course.title;
-  const tierKey = tierOf(course);
-  const tierLabel = course.tier_label || PENTESTING_TIERS.find((tier) => tier.key === tierKey)?.label || "";
-  const ratingLabel = experience.average_rating === null ? "New course" : `${experience.average_rating} / 5`;
+    facts.batch && !course.title.toLowerCase().includes(String(facts.batch).toLowerCase())
+      ? `${course.title} (${facts.batch})`
+      : course.title;
+  const ratingLabel =
+    experience.average_rating === null ? "New course" : `${experience.average_rating} / 5`;
+  const totalTopics = modules.reduce(
+    (total, module) =>
+      total +
+      normalizeTextList(module.topics).length +
+      (Array.isArray(module.lessons) ? module.lessons.length : 0),
+    0
+  );
+  const cardHighlights = normalizeTextList(course.card_highlights);
+  const hasInstallmentAccess = course.enrollment_access_type === "installment";
+  const focusAreas = (cardHighlights.length ? cardHighlights : learningOutcomes).slice(0, 4);
   const factItems = [
     ["Duration", facts.duration],
     ["Schedule", facts.schedule],
@@ -240,191 +222,409 @@ export default function ProfessionalCoursePage() {
     ["Total classes", facts.total_classes],
     ["Learning hours", facts.total_hours_label || facts.total_hours],
     ["Batch size", facts.batch_size_label || facts.batch_size],
-  ].filter(([, value]) => value === 0 || value);
+  ];
+
+  const action = course.is_enrolled ? (
+    <>
+      <Link className="action full" to={`/learn/${id}`}>
+        Continue learning <span aria-hidden="true">&rarr;</span>
+      </Link>
+      {hasInstallmentAccess ? (
+        <Link className="action secondary full" to={`/courses/${id}/payment`}>
+          Pay next installment <span aria-hidden="true">&rarr;</span>
+        </Link>
+      ) : null}
+    </>
+  ) : open && (pentesting || course.purchase_available) ? (
+    <Link
+      className="action full"
+      to={`/courses/${id}/${pentesting ? "register" : "payment"}`}
+    >
+      {pentesting ? "Apply now" : "Buy now"} <span aria-hidden="true">&rarr;</span>
+    </Link>
+  ) : (
+    <>
+      <button className="action full" disabled>
+        {course.registration_closed
+          ? "Registration closed"
+          : pentesting
+            ? "Applications opening soon"
+            : "Buy now - opening soon"}
+      </button>
+      <Link className="muted detail-contact-link" to="/contact">
+        Contact the team for updates
+      </Link>
+    </>
+  );
 
   return (
-    <div className="hp-frame hp-detail course-detail-hp" data-course-category={course.category}>
-      <nav aria-label="Course navigation">
-        <Link className="hp-detail__back hp-text-link" to={pentesting ? "/tracks/pentesting" : getCourseCatalogPath(course)}>
-          <span aria-hidden="true">←</span> {pentesting ? "All Pentesting tiers" : `All ${category.label} courses`}
+    <main className="course-experience course-detail-v2">
+      <nav className="detail-topline" aria-label="Course navigation">
+        <Link className="detail-back-link" to={getCourseCatalogPath(course)}>
+          <span aria-hidden="true">&larr;</span> All {category.label} courses
         </Link>
+        <span className={`detail-status ${open || course.is_enrolled ? "is-open" : ""}`}>
+          <span aria-hidden="true" />
+          {courseStatusLabel}
+        </span>
       </nav>
 
-      <header className="hp-detail__hero">
-        <div>
-          <Kicker lead={category.label} rest={tierLabel || String(course.level || "Professional").replace("_", " ")} />
-          <h1 className="hp-detail__h1">{courseTitle}</h1>
-          <p className="hp-detail__lead">{course.card_summary || course.description}</p>
-          <p className="hp-detail__note">
-            {gate.disabled && gate.code === "feature_disabled" ? <ClockIcon /> : <InfoIcon />}
-            <span>
-              <StatusPill kind={status.kind}>{status.label}</StatusPill>{" "}
-              {gate.disabled && gate.code === "feature_disabled" ? "Browse every module now; enrolment opens at launch." : null}
-            </span>
-          </p>
-          <p className="hp-detail__meta">
-            <span>{modules.length} modules</span>
-            {facts.total_hours_label || facts.total_hours ? <span>{facts.total_hours_label || `${facts.total_hours} hours`}</span> : null}
-            <span>{course.snapshot_level || String(course.level || "Professional").replace("_", " ")}</span>
-            <span>Starts {formatCourseStartDate(facts.start_date)}</span>
-          </p>
-          {shouldShowCoursePrice(course) && !gate.disabled ? (
-            <p className="hp-detail__price">
-              <span className="hp-eyebrow">Course fee</span>
-              <strong>{priceLabel}</strong>
-            </p>
-          ) : null}
-          <div className="hp-detail__actions">
-            <CourseActions course={course} id={id} gate={gate} />
+      <header className={`detail-hero${showImage ? " has-image" : ""}`}>
+        <div className="detail-hero-copy">
+          <div className="detail-hero-labels">
+            <span>{category.label}</span>
+            <span>{String(course.level || "Professional").replace("_", " ")}</span>
           </div>
-          <p className="hp-detail__fine">
-            {course.enrollment_message ||
-              (pentesting
-                ? "Applications are reviewed by the team before the payment stage."
-                : "Review the course fee and continue securely to the available payment options.")}{" "}
-            <Link to="/contact">Ask a question</Link>
-          </p>
-        </div>
-        <figure className="hp-detail__art">
-          {showImage ? (
-            <img src={getCourseDetailArtwork(course)} alt={course.image_alt || `${course.title} course artwork`} width="1280" height="720" decoding="async" fetchpriority="high" />
-          ) : (
-            <LineArt name={lineArtFor(course)} />
-          )}
-          <figcaption className="hp-detail__caption">Led by {instructorName}</figcaption>
-        </figure>
-      </header>
+          <p className="detail-program-name">{category.longLabel}</p>
+          <h1>{courseTitle}</h1>
+          <p className="detail-hero-description">{course.description}</p>
 
-      {factItems.length ? (
-        <dl className="hp-stats hp-stats--wide" style={{ "--hp-stats-n": Math.min(factItems.length, 6), marginTop: 40 }} aria-label="Course facts">
+          <section className="detail-mobile-enrollment" aria-label="Course enrollment">
+            <div className="detail-mobile-enrollment-meta">
+              {shouldShowCoursePrice(course) ? (
+                <div>
+                  <span>Course fee</span>
+                  <strong>{priceLabel}</strong>
+                </div>
+              ) : null}
+              <div>
+                <span>Starts</span>
+                <strong>{formatCourseStartDate(facts.start_date)}</strong>
+              </div>
+            </div>
+            {action}
+            {course.is_enrolled ? (
+              <Link className="action secondary full" to={`/courses/${id}/live`}>
+                Live classes
+              </Link>
+            ) : null}
+          </section>
+
+          <div className="detail-proof-row" aria-label="Course trust indicators">
+            <div>
+              <strong>{ratingLabel}</strong>
+              <span>
+                {experience.review_count
+                  ? `${experience.review_count} verified reviews`
+                  : "First cohort"}
+              </span>
+            </div>
+            <div>
+              <strong>{Number(experience.enrolled_students || 0).toLocaleString()}</strong>
+              <span>Confirmed students</span>
+            </div>
+            <div>
+              <strong>{modules.length}</strong>
+              <span>Curriculum modules</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="detail-hero-visual">
+          <CourseArtwork course={course} category={category} showImage={showImage} />
+          <div className="detail-art-scrim" />
+          <div className="detail-art-caption">
+            <span>Led by</span>
+            <strong>{instructorName}</strong>
+          </div>
+        </div>
+
+        <dl className="detail-fact-strip">
           {factItems.map(([label, value]) => (
             <div key={label}>
               <dt>{label}</dt>
-              <dd>{value}</dd>
+              <dd>{value === 0 || value ? value : "To be announced"}</dd>
             </div>
           ))}
         </dl>
-      ) : null}
+      </header>
 
-      <div className="hp-detail__body">
-        <aside className="hp-detail__sticky">
-          <Kicker lead="Your path" />
-          <h2>Course curriculum</h2>
-          <p className="hp-body" style={{ marginTop: 12 }}>
-            Open a module to read its topics and lesson plan.
-          </p>
-          <p className="hp-detail__figure">
-            {modules.length} <small>modules</small>
-          </p>
-          <p className="hp-meta" style={{ marginTop: 8 }}>
-            {ratingLabel} · {experience.review_count ? `${experience.review_count} verified reviews` : "First cohort"} ·{" "}
-            {Number(experience.enrolled_students || 0).toLocaleString()} students
-          </p>
-        </aside>
+      <div className="course-grid detail-layout">
+        <div className="stack detail-content-stack">
+          <section className="panel detail-section detail-overview-panel">
+            <SectionHeading
+              number="01"
+              eyebrow="Course overview"
+              title="Understand the program before you begin"
+              description="A clear overview first, followed by the practical capabilities configured by the academic team."
+            />
+            <div className="detail-overview-grid">
+              <div className="detail-overview-copy">
+                <span className="detail-copy-label">About this course</span>
+                <p className="detail-long-copy" style={{ whiteSpace: "pre-line" }}>
+                  {course.course_overview || course.about_the_course || course.description}
+                </p>
+              </div>
+              <div className="detail-learning-list">
+                <div className="detail-learning-heading">
+                  <span>Learning outcomes</span>
+                  <h3>What you will learn</h3>
+                  <p>Practical skills and workflows covered throughout the program.</p>
+                </div>
+                {learningOutcomes.length ? (
+                  <ul>
+                    {learningOutcomes.map((topic, index) => (
+                      <li key={index}>
+                        <span className="detail-learning-check" aria-hidden="true">&#10003;</span>
+                        <div>
+                          <small>Outcome {String(index + 1).padStart(2, "0")}</small>
+                          <p>{topic}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>Published learning outcomes are detailed in the curriculum below.</p>
+                )}
+              </div>
+            </div>
+          </section>
 
-        <div>
-          <section className="hp-detail__section" id="curriculum" tabIndex={-1} aria-labelledby="hp-curriculum-title">
-            <p className="hp-chapter" id="hp-curriculum-title">
-              Module outline
-            </p>
-            {modules.length ? (
-              <div className="hp-outline">
-                {modules.map((module, index) => {
+          <section className="panel detail-section">
+            <SectionHeading
+              number="02"
+              eyebrow="Program experience"
+              title="Everything included"
+              description="Course benefits and delivery details configured by the academic team."
+            />
+            <div className="benefits detail-benefit-grid">
+              {benefits.map((feature, index) => (
+                <article className="benefit detail-benefit-card" key={`${feature.title}-${index}`}>
+                  <span className="detail-benefit-index" aria-hidden="true">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <h3>{feature.title}</h3>
+                  <p className="muted">{feature.description}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="panel detail-section detail-curriculum" id="curriculum">
+            <SectionHeading
+              number="03"
+              eyebrow="Learning pathway"
+              title="Course curriculum"
+              description="Open a module to review its published topics and lesson plan."
+            />
+            <div className="detail-module-list">
+              {modules.length ? (
+                modules.map((module, index) => {
                   const moduleTopics = normalizeTextList(module.topics);
                   const moduleLessons = Array.isArray(module.lessons) ? module.lessons : [];
                   const lessonCount = moduleTopics.length + moduleLessons.length;
                   return (
-                    <details key={module.id || index} className="hp-module">
+                    <details key={module.id}>
                       <summary>
-                        <span className="hp-module__index">
-                          Module <b>{String(index + 1).padStart(2, "0")}</b>
+                        <span className="detail-module-index">
+                          {String(index + 1).padStart(2, "0")}
                         </span>
-                        <span>
-                          <span className="hp-module__title">{module.title}</span>
-                          {module.description ? <span className="hp-module__desc">{module.description}</span> : null}
-                        </span>
-                        <span className="hp-module__count">
+                        <span className="detail-module-title">{module.title}</span>
+                        <span className="detail-module-count">
                           {lessonCount} item{lessonCount === 1 ? "" : "s"}
                         </span>
-                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-                          <path d="m4 6 4 4 4-4" />
-                        </svg>
+                        <span className="detail-module-toggle" aria-hidden="true">
+                          +
+                        </span>
                       </summary>
-                      <div className="hp-module__body">
+                      <div className="module-body">
                         {module.description ? <p>{module.description}</p> : null}
-                        {lessonCount ? (
-                          <ul>
-                            {moduleTopics.map((topic, topicIndex) => (
-                              <li key={topicIndex}>{topic}</li>
-                            ))}
-                            {moduleLessons.map((lesson, lessonIndex) => (
-                              <li key={`lesson-${lessonIndex}`}>
-                                <strong>{lesson.title}</strong>
-                                {lesson.description ? <span className="hp-module__desc">{lesson.description}</span> : null}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p>Detailed lesson topics will be announced.</p>
-                        )}
+                        <ul>
+                          {moduleTopics.map((topic, topicIndex) => (
+                            <li key={topicIndex}>{topic}</li>
+                          ))}
+                          {moduleLessons.map((lesson, lessonIndex) => (
+                            <li key={`lesson-${lessonIndex}`}>
+                              <strong>{lesson.title}</strong>
+                              {lesson.description ? (
+                                <p className="muted">{lesson.description}</p>
+                              ) : null}
+                            </li>
+                          ))}
+                        </ul>
+                        {!moduleTopics.length && !moduleLessons.length ? (
+                          <p className="muted">Detailed lesson topics will be announced.</p>
+                        ) : null}
                       </div>
                     </details>
                   );
-                })}
-              </div>
-            ) : (
-              <p className="hp-body">The curriculum is being prepared. Contact the team for details before enrolling.</p>
-            )}
+                })
+              ) : (
+                <p>
+                  The curriculum is being prepared. Contact the team for details before enrolling.
+                </p>
+              )}
+            </div>
           </section>
-
-          <section className="hp-detail__section" aria-labelledby="hp-overview-title">
-            <p className="hp-chapter" id="hp-overview-title">
-              About this course
-            </p>
-            <p className="hp-detail__lead" style={{ marginTop: 0 }}>
-              {course.course_overview || course.about_the_course || course.description}
-            </p>
-          </section>
-
-          {learningOutcomes.length ? (
-            <section className="hp-detail__section" aria-labelledby="hp-learn-title">
-              <p className="hp-chapter" id="hp-learn-title">
-                What you will be able to do
-              </p>
-              <CheckList items={learningOutcomes.map((text) => ({ text }))} />
-            </section>
-          ) : null}
-
-          {benefits.length ? (
-            <section className="hp-detail__section" aria-labelledby="hp-included-title">
-              <p className="hp-chapter" id="hp-included-title">
-                Everything included
-              </p>
-              <ul className="hp-cols" style={{ marginTop: 0, paddingTop: 0, borderTop: 0 }}>
-                {benefits.map((feature, index) => (
-                  <li key={`${feature.title}-${index}`}>
-                    <h3>{feature.title}</h3>
-                    <p>{feature.description}</p>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
 
           {expectedOutcomes.length ? (
-            <section className="hp-detail__section" aria-labelledby="hp-outcomes-title">
-              <p className="hp-chapter" id="hp-outcomes-title">
-                What you can take forward
-              </p>
-              <CheckList items={expectedOutcomes.map((text) => ({ text }))} />
+            <section className="panel detail-section detail-outcomes">
+              <SectionHeading
+                number="04"
+                eyebrow="Professional outcomes"
+                title="What you can take forward"
+                description="Practical capabilities students should be able to demonstrate after completion."
+              />
+              <ol>
+                {expectedOutcomes.map((item, index) => (
+                  <li key={index}>
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <p>{item}</p>
+                  </li>
+                ))}
+              </ol>
             </section>
           ) : null}
 
-          <section className="hp-detail__section course-experience hp-reviews">
-            <CourseReviews key={`${id}-${isAuthenticated}`} courseId={id} experience={experience} refresh={refresh} />
-          </section>
+          <CourseReviews
+            key={`${id}-${isAuthenticated}`}
+            courseId={id}
+            experience={experience}
+            refresh={refresh}
+          />
         </div>
+
+        <aside className="panel enroll-panel detail-enroll-panel">
+          <div className="detail-enroll-topline">
+            <span className="eyebrow">Your next step</span>
+            <span className="detail-enroll-status">
+              {course.is_enrolled ? "Unlocked" : open ? "Open" : "Updates"}
+            </span>
+          </div>
+          <h2>
+            {course.is_enrolled
+              ? "Continue your course"
+              : pentesting
+                ? "Apply for the program"
+                : "Enroll in this course"}
+          </h2>
+          <p>
+            {course.enrollment_message ||
+              (pentesting
+                ? "Complete a short application, review your details, and then continue to the available payment stage."
+                : "Review the course fee and continue securely to the available payment options.")}
+          </p>
+
+          {shouldShowCoursePrice(course) ? (
+            <div className="course-detail-price">
+              <span>Course fee</span>
+              <strong>{priceLabel}</strong>
+            </div>
+          ) : null}
+
+          {action}
+
+          {course.is_enrolled ? (
+            <Link className="action secondary full" to={`/courses/${id}/live`}>
+              Live classes
+            </Link>
+          ) : null}
+
+          <dl className="detail-enroll-facts">
+            <div>
+              <dt>Starts</dt>
+              <dd>{formatCourseStartDate(facts.start_date)}</dd>
+            </div>
+            <div>
+              <dt>Instructor</dt>
+              <dd>{instructorName}</dd>
+            </div>
+            <div>
+              <dt>Format</dt>
+              <dd>{facts.schedule || "Structured professional training"}</dd>
+            </div>
+          </dl>
+
+          {benefits.length ? (
+            <div className="detail-included-list">
+              <span className="eyebrow">Included</span>
+              <ul>
+                {benefits.slice(0, 3).map((feature, index) => (
+                  <li key={`${feature.title}-${index}`}>{feature.title}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <div className="detail-enroll-footer">
+            <a href="#reviews">
+              {experience.review_count
+                ? `${experience.average_rating} / 5 from ${experience.review_count} reviews`
+                : "Read student reviews"}
+            </a>
+            <Link to="/contact">Ask a question</Link>
+          </div>
+        </aside>
       </div>
-    </div>
+
+      <section className="detail-program-dashboard" aria-label="Program at a glance">
+        <figure className="detail-program-visual">
+          <img
+            src={category.supportImage}
+            alt={`${category.label} course learning environment`}
+          />
+          <div className="detail-program-visual-scrim" />
+          <figcaption>
+            <span>{category.visualEyebrow}</span>
+            <strong>{category.visualTitle}</strong>
+          </figcaption>
+        </figure>
+
+        <div className="detail-program-intelligence">
+          <div className="detail-intelligence-heading">
+            <div>
+              <span className="eyebrow">Program intelligence</span>
+              <h2>A complete view before you enroll</h2>
+            </div>
+            <span className="detail-program-code">{category.shortMark} / {facts.batch || "Current"}</span>
+          </div>
+
+          <div className="detail-intelligence-metrics">
+            <div>
+              <strong>{modules.length}</strong>
+              <span>Published modules</span>
+            </div>
+            <div>
+              <strong>{totalTopics}</strong>
+              <span>Curriculum items</span>
+            </div>
+            <div>
+              <strong>{learningOutcomes.length}</strong>
+              <span>Learning outcomes</span>
+            </div>
+            <div>
+              <strong>{facts.total_classes || "TBA"}</strong>
+              <span>Live classes</span>
+            </div>
+          </div>
+
+          <div className="detail-program-context">
+            <div>
+              <span>Instructor</span>
+              <strong>{instructorName}</strong>
+            </div>
+            <div>
+              <span>Next start</span>
+              <strong>{formatCourseStartDate(facts.start_date)}</strong>
+            </div>
+            <div>
+              <span>Learning level</span>
+              <strong>{course.snapshot_level || course.level || "Professional"}</strong>
+            </div>
+          </div>
+
+          {focusAreas.length ? (
+            <div className="detail-focus-areas">
+              <span className="eyebrow">Key focus areas</span>
+              <div>
+                {focusAreas.map((area, index) => (
+                  <span key={`${area}-${index}`}>{area}</span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </section>
+    </main>
   );
 }

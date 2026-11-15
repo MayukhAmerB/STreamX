@@ -495,10 +495,7 @@ class PaymentPlanCatalogTests(SimpleTestCase):
 
     def test_catalog_is_the_only_plan_list(self):
         self.assertEqual(set(CreateOrderSerializer().fields["plan"].choices), set(plans.PLAN_IDS))
-        # Course plans only; platform plans (Bootcamp, Lifetime, memberships) have their own flow.
-        platform = {Payment.PLAN_PLATFORM_ONE_TIME, Payment.PLAN_PLATFORM_SUBSCRIPTION}
-        self.assertEqual(set(plans.PLAN_IDS), {code for code, _ in Payment.PLAN_CHOICES} - platform)
-        self.assertFalse(platform & set(plans.PLAN_IDS))
+        self.assertEqual(set(plans.PLAN_IDS), {code for code, _ in Payment.PLAN_CHOICES})
         self.assertEqual(set(plans.PERMANENT_PLANS), {"full", "batch_pass"})
         self.assertEqual(set(plans.INSTALLMENT_PLANS), {"monthly", "bundle"})
 

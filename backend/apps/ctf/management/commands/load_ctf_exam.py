@@ -14,7 +14,7 @@ import sys
 
 from django.core.management.base import BaseCommand, CommandError
 
-from apps.ctf.answers import CtfNotConfigured, exams_disabled_reason
+from apps.ctf.answers import CtfNotConfigured
 from apps.ctf.loader import MAX_FILE_BYTES, ExamFileError, load_exam
 
 
@@ -61,8 +61,7 @@ class Command(BaseCommand):
         except ExamFileError as exc:
             raise CommandError("The exam file was not loaded:\n- " + "\n- ".join(exc.problems)) from None
         except CtfNotConfigured:
-            reason = exams_disabled_reason() or "CTF_ANSWER_PEPPER is not configured."
-            raise CommandError(f"{reason} Set a valid CTF_ANSWER_PEPPER before loading an exam.") from None
+            raise CommandError("CTF_ANSWER_PEPPER is not configured; set it before loading an exam.") from None
 
         prefix = "[dry run, nothing saved] " if report.dry_run else ""
         action = "created" if report.exam_created else "updated"

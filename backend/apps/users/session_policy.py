@@ -13,9 +13,6 @@ user's row (select_for_update), the same lock refresh rotation takes before it
 writes blacklist rows, so the two can never deadlock. Recording activity
 (last_seen_at) only updates the slot row and takes no user lock.
 
-A slot evicted while its device is in a live class becomes a live grace
-(apps.users.live_grace): the device may finish that class, then is signed out.
-
 Tokens minted before slots existed carry no slot claim. They keep the old
 rule (their session_version must equal the user's active_session_version, so
 only the last device signed in before the upgrade qualifies) and are moved
@@ -32,23 +29,10 @@ from django.utils.crypto import salted_hmac
 
 from config.audit import log_security_event
 
-from .live_grace import (
-    GRACE_LIVE,
-    grant_live_graces,
-    live_grace_state,
-    purge_expired_live_graces,
-    release_all_live_graces,
-    release_live_grace,
-    request_allowed_during_live_grace,
-)
 from .models import SessionSlot
 
 
 SESSION_VERSION_CLAIM = "session_version"
-# session_slot_state() results.
-SLOT_ACTIVE = "active"
-SLOT_LIVE_GRACE = "live_grace"
-SLOT_LIVE_ENDED = "live_ended"
 SESSION_SLOT_CLAIM = "session_slot"
 DEFAULT_MAX_CONCURRENT_SESSIONS_PER_STUDENT = 2
 
@@ -187,63 +171,8 @@ def token_matches_active_session(token, user, *, record_activity=False):
     return True
 
 
-class SessionAccess:
-    """What a token may do: ``allowed`` for this request; ``live_grace`` when
-    its device was evicted and is finishing a live class."""
-
-    __slots__ = ("allowed", "live_grace")
-
-    def __init__(self, allowed, live_grace=False):
-        self.allowed = bool(allowed)
-        self.live_grace = bool(live_grace)
-
-
-def token_session_access(token, user, *, request=None, record_activity=False):
-    """Like token_matches_active_session, plus the evicted-in-class grace.
-
-    A token whose slot was evicted while its device was in a live class is
-    allowed only for that class's requests (see live_grace), only while the
-    class is live.
-    """
-    if token_matches_active_session(token, user, record_activity=record_activity):
-        return SessionAccess(True)
-    if not user or not enforces_session_limit(user) or not _session_version_matches(token, user):
-        return SessionAccess(False)
-    slot_id = token_session_slot(token)
-    if slot_id is None:
-        return SessionAccess(False)
-    grace = live_grace_state(user, slot_id)
-    if grace is None or grace[0] != GRACE_LIVE:
-        return SessionAccess(False)
-    allowed = request is not None and request_allowed_during_live_grace(request, grace[1])
-    return SessionAccess(allowed, live_grace=True)
-
-
 def session_slot_exists(user, slot_id):
     return SessionSlot.objects.filter(user_id=user.pk, slot_id=slot_id).exists()
-
-
-def session_slot_state(user, slot_id):
-    """SLOT_ACTIVE, SLOT_LIVE_GRACE (evicted, its class still live),
-    SLOT_LIVE_ENDED (evicted, its class has ended) or None (evicted)."""
-    if session_slot_exists(user, slot_id):
-        return SLOT_ACTIVE
-    grace = live_grace_state(user, slot_id)
-    if grace is None:
-        return None
-    return SLOT_LIVE_GRACE if grace[0] == GRACE_LIVE else SLOT_LIVE_ENDED
-
-
-def note_live_class_attendance(user, token, session_id):
-    """Remember the live class this device joined (for an eviction grace)."""
-    if not user or not session_id or not enforces_session_limit(user):
-        return
-    slot_id = token_session_slot(token) if token is not None else None
-    if not slot_id:
-        return
-    SessionSlot.objects.filter(user_id=user.pk, slot_id=slot_id).exclude(live_session_id=session_id).update(
-        live_session_id=session_id
-    )
 
 
 def touch_session_slot(user, slot_id):
@@ -267,20 +196,15 @@ def claim_session_slot(user, slot_id=None, *, request=None):
     evicted = list(
         SessionSlot.objects.filter(user_id=user.pk)
         .order_by("-last_seen_at", "-created_at", "-pk")
-        .values_list("pk", "slot_id", "live_session_id")[keep:]
+        .values_list("pk", flat=True)[keep:]
     )
-    purge_expired_live_graces(user)
     if evicted:
-        # A device in a live class finishes it (with a banner) before it is
-        # signed out; the grace does not count against the cap.
-        graced = grant_live_graces(user, [(slot_id, session_id) for _pk, slot_id, session_id in evicted])
-        SessionSlot.objects.filter(pk__in=[pk for pk, _slot_id, _session_id in evicted]).delete()
+        SessionSlot.objects.filter(pk__in=evicted).delete()
         log_security_event(
             "auth.session_evicted",
             request=request,
             target_user_id=user.pk,
             evicted_sessions=len(evicted),
-            live_class_graces=graced,
         )
     SessionSlot.objects.create(user=user, slot_id=slot_id)
     return slot_id
@@ -290,10 +214,8 @@ def release_session_slot(user, slot_id):
     """Free one device's slot. Caller holds the user's row lock."""
     if slot_id:
         SessionSlot.objects.filter(user_id=user.pk, slot_id=slot_id).delete()
-        release_live_grace(user, slot_id)
 
 
 def release_all_session_slots(user):
     """Sign every slot-holding device out. Caller holds the user's row lock."""
     SessionSlot.objects.filter(user_id=user.pk).delete()
-    release_all_live_graces(user)

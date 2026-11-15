@@ -1,83 +1,32 @@
 import axios from "axios";
 import { resolveApiBaseUrl } from "../utils/backendUrl";
-import {
-  SESSION_REPLACED_CODE,
-  isLiveGraceEviction,
-  isLiveGraceResponse,
-  isSessionEviction,
-} from "../utils/sessionEviction";
+import { isSessionEviction } from "../utils/sessionEviction";
 
 const unsafeMethods = new Set(["post", "put", "patch", "delete"]);
 let csrfTokenCache = "";
 let csrfBootstrapPromise = null;
-// Set once another device takes this session, and reported once per mode:
-// "live"  the server still lets this device finish the live class it is in
-//         (X-Session-State: live-grace), so refreshes continue and the class
-//         keeps playing past the access-token lifetime;
-// "final" this device is signed out: every later 401 is the same eviction and
-//         no further refreshes are attempted until this browser signs in again.
-let evictionMode = null;
+// Set once another device takes this session. Every later 401 is the same
+// eviction, so it is reported once and no further refreshes are attempted
+// until this browser signs in again.
+let sessionEvicted = false;
 
 export const AUTH_SESSION_EXPIRED_EVENT = "auth:session-expired";
-// A feature switch (UI overhaul plan §5.4) answered 403 `feature_disabled`:
-// the viewer's capabilities are stale. AuthContext re-fetches them and the
-// open page swaps to its "switched off" state.
-export const CAPABILITIES_STALE_EVENT = "capabilities:stale";
-export const FEATURE_DISABLED_CODE = "feature_disabled";
-
-/** `{ feature, reason }` when `error` is a 403 feature_disabled answer, else null. */
-export function featureDisabledDetail(error) {
-  const response = error?.response;
-  const data = response?.data;
-  if (response?.status !== 403 || !data || typeof data !== "object") {
-    return null;
-  }
-  const errors = data.errors && typeof data.errors === "object" ? data.errors : {};
-  const code = data.code || errors.code;
-  if (code !== FEATURE_DISABLED_CODE) {
-    return null;
-  }
-  return {
-    feature: String(errors.feature || data.feature || ""),
-    reason: String(data.detail || errors.detail || data.message || ""),
-  };
-}
-
-function notifyCapabilitiesStale(detail) {
-  if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") {
-    return;
-  }
-  window.dispatchEvent(new CustomEvent(CAPABILITIES_STALE_EVENT, { detail }));
-}
 
 export function resetSessionEviction() {
-  evictionMode = null;
+  sessionEvicted = false;
 }
-
-const LIVE_GRACE_DETAIL = "This account is active on another device. This class keeps playing here until it ends.";
 
 function notifySessionExpired(detail = {}) {
   if (isSessionEviction(detail)) {
-    const mode = isLiveGraceEviction(detail) ? "live" : "final";
-    if (evictionMode === "final" || evictionMode === mode) {
+    if (sessionEvicted) {
       return;
     }
-    evictionMode = mode;
+    sessionEvicted = true;
   }
   if (typeof window === "undefined") {
     return;
   }
   window.dispatchEvent(new CustomEvent(AUTH_SESSION_EXPIRED_EVENT, { detail }));
-}
-
-// True (and reported) when the server marked this response for a device that
-// was evicted but is finishing its live class.
-function noteLiveGrace(response) {
-  if (!isLiveGraceResponse(response)) {
-    return false;
-  }
-  notifySessionExpired({ code: SESSION_REPLACED_CODE, liveGrace: true, detail: LIVE_GRACE_DETAIL });
-  return true;
 }
 
 function extractCsrfToken(response) {
@@ -188,23 +137,13 @@ apiClient.interceptors.response.use(
     extractCsrfToken(response);
     if (String(response?.config?.url || "").includes("/auth/login/")) {
       resetSessionEviction();
-    } else {
-      noteLiveGrace(response);
     }
     return response;
   },
   async (error) => {
     extractCsrfToken(error?.response);
-    const disabled = featureDisabledDetail(error);
-    if (disabled) {
-      notifyCapabilitiesStale(disabled);
-      return Promise.reject(error);
-    }
     const requestUrl = error?.config?.url || "";
     const isRefreshRequest = requestUrl.includes("/auth/refresh/");
-    // The server refused this request because this device only keeps its
-    // live class; a refresh cannot change that.
-    const refusedDuringLiveGrace = !requestUrl.includes("/auth/login/") && noteLiveGrace(error?.response);
     const responseDetail =
       error?.response?.data?.errors?.detail ||
       error?.response?.data?.detail ||
@@ -230,7 +169,7 @@ apiClient.interceptors.response.use(
       !error.config._retry &&
       !isRefreshRequest
     ) {
-      if (evictionMode === "final" || refusedDuringLiveGrace) {
+      if (sessionEvicted) {
         return Promise.reject(error);
       }
       error.config._retry = true;
@@ -242,15 +181,10 @@ apiClient.interceptors.response.use(
         // must not log users out of a live class.
         if (!isTransientFailure(refreshError)) {
           const errors = refreshError?.response?.data?.errors || {};
-          const detail = {
+          notifySessionExpired({
             code: errors.code || "",
             detail: errors.detail || refreshError?.response?.data?.detail || "Your session is no longer active.",
-          };
-          if (errors.reason) {
-            // e.g. "live_class_ended": the class this evicted device kept is over.
-            detail.reason = errors.reason;
-          }
-          notifySessionExpired(detail);
+          });
         }
         return Promise.reject(error);
       }

@@ -27,8 +27,6 @@ import {
 import { formatScheduleSummary } from "../features/live-classes/schedule";
 import { useAuth } from "../hooks/useAuth";
 import useAdaptiveRealtimeSessionPolling from "../hooks/useAdaptiveRealtimeSessionPolling";
-import useLivePresence from "../features/engagement-ui/useLivePresence";
-import useAttendancePresence from "../features/attendance/useAttendancePresence";
 import {
   clearPersistedMeetingSessionId,
   persistMeetingSessionId,
@@ -41,7 +39,6 @@ import {
   isJoinableLiveSession,
   resolveLiveClassSchedule,
 } from "../utils/liveClassSchedule";
-import { liveJoinDisplayName } from "../features/profiles/publicName";
 
 const ACTIVE_BROADCAST_STORAGE_KEY = "streamx:join-live:active-broadcast";
 
@@ -115,10 +112,6 @@ export default function JoinLivePage() {
   const [error, setError] = useState("");
   const [joinState, setJoinState] = useState({ loadingId: null, error: "", info: "" });
   const [activeSession, setActiveSession] = useState(() => readPersistedBroadcastPayload());
-  // Live-attendance XP: one presence ping a minute while the class is open and visible.
-  useLivePresence(activeSession?.session?.id || null);
-  // Attendance: once a minute while this live page is visible (live classes only).
-  useAttendancePresence(activeSession?.session?.id || null);
   const [broadcastChatLaunch, setBroadcastChatLaunch] = useState({
     sessionId: null,
     sourceUrl: "",
@@ -189,7 +182,7 @@ export default function JoinLivePage() {
         (session) => String(session.id) === String(sessionId),
       );
       const response = await joinRealtimeSession(sessionId, {
-        display_name: liveJoinDisplayName(user),
+        display_name: user?.full_name || "",
         prefer_broadcast: requestedSession?.session_type === "broadcasting",
       });
       const data = apiData(response, null);
@@ -212,7 +205,7 @@ export default function JoinLivePage() {
       (session) => String(session.id) === String(sessionId),
     );
     const response = await joinRealtimeSession(sessionId, {
-      display_name: liveJoinDisplayName(user),
+      display_name: user?.full_name || "",
       prefer_broadcast: requestedSession?.session_type === "broadcasting",
     });
     const data = apiData(response, null);
@@ -346,14 +339,11 @@ export default function JoinLivePage() {
     });
   }, []);
 
-  // null while the player plays; otherwise its stall reason (see SecureHlsBroadcastPlayer).
-  const [broadcastPlaybackStalled, setBroadcastPlaybackStalled] = useState(null);
   const handleRefreshActiveBroadcast = useAdaptiveRealtimeSessionPolling({
     enabled: activeSession?.mode === "broadcast",
     sessionId: activeSession?.mode === "broadcast" ? activeSession?.session?.id : null,
     sessionStatus: activeSession?.session?.status,
     streamStatus: activeSession?.broadcast?.stream_status,
-    playbackStalled: broadcastPlaybackStalled,
     onSessionData: applyActiveBroadcastSessionUpdate,
   });
 
@@ -390,8 +380,6 @@ export default function JoinLivePage() {
     activeSession?.mode === "broadcast"
       ? activeSession?.session?.status === "ended"
         ? "This broadcast session has ended."
-        : String(activeSession?.broadcast?.stream_status || "").trim().toLowerCase() === "interrupted"
-          ? "Host reconnecting... The class continues here as soon as the host is back."
         : String(activeSession?.broadcast?.stream_status || "").trim().toLowerCase() === "starting"
           ? "The host is reconnecting OBS. Keep chat open and the video will resume here when the stream is back."
         : activeSession?.broadcast?.stream_status &&
@@ -569,7 +557,6 @@ export default function JoinLivePage() {
             statusMessage={activeBroadcastStatusMessage}
             onRefreshStream={handleRefreshActiveBroadcast}
             onRefreshChat={() => setBroadcastChatLaunchRefreshKey((previous) => previous + 1)}
-            onPlaybackStalledChange={setBroadcastPlaybackStalled}
             withContainer={false}
             actions={<LeaveClassButton onLeave={leaveBroadcast} />}
           />

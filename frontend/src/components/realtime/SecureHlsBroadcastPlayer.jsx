@@ -18,11 +18,6 @@ import {
   hasReachedOfflineTail,
   initialHlsRecoveryState,
   isAutoplayBlockedError,
-  isHostReconnecting,
-  LIVE_MAX_LATENCY_DURATION_COUNT,
-  LIVE_SYNC_DURATION_COUNT,
-  liveBehindSeconds,
-  shouldOfferJumpToLive,
   isEndedLevelDetails,
   isPlaylistMissingError,
   isSessionExpectedLive,
@@ -37,8 +32,6 @@ import {
   createLivePlaylistProber,
   createStreamReconnectController,
 } from "../../utils/streamReconnect";
-import { registerLiveClassPlayback } from "../../services/realtime/liveClassGuard";
-import { resolvePlaybackStallReason } from "../../utils/playbackStall";
 
 const PLAYBACK_WATCHDOG_INTERVAL_MS = 5_000;
 const PLAYBACK_REPORT_DEDUP_MS = 30_000;
@@ -152,14 +145,12 @@ function queueStreamOutageReport({ sessionId, report, timers, lastReportedIssueR
   timers.add(timerId);
 }
 
-function StreamReconnectOverlay({ offline = false, hadPlayback = true, hostReconnecting = false, onRetry }) {
+function StreamReconnectOverlay({ offline = false, hadPlayback = true, onRetry }) {
   const headline = offline
     ? "Waiting for your internet connection..."
-    : hostReconnecting
-      ? "Host reconnecting..."
-      : hadPlayback
-        ? "Reconnecting to class..."
-        : "Waiting for the live video to start...";
+    : hadPlayback
+      ? "Reconnecting to class..."
+      : "Waiting for the live video to start...";
   return (
     <div
       role="status"
@@ -171,11 +162,7 @@ function StreamReconnectOverlay({ offline = false, hadPlayback = true, hostRecon
         className="h-8 w-8 animate-spin rounded-full border-2 border-[#525252] border-t-[#F4F4F4] motion-reduce:animate-none"
       />
       <span className="text-sm font-medium text-[#F4F4F4]">{headline}</span>
-      <span className="text-xs text-[#C6C6C6]">
-        {hostReconnecting
-          ? "The class continues here as soon as the host is back."
-          : "The video will resume here automatically."}
-      </span>
+      <span className="text-xs text-[#C6C6C6]">The video will resume here automatically.</span>
       <button
         type="button"
         data-playback-gesture-ignore="true"
@@ -197,7 +184,6 @@ export default function SecureHlsBroadcastPlayer({
   streamStatus = "",
   sessionStatus = "",
   title = "Broadcast Stream",
-  onPlaybackStalledChange = null,
 }) {
   const videoRef = useRef(null);
   const playerRetryTimerRef = useRef(null);
@@ -230,45 +216,6 @@ export default function SecureHlsBroadcastPlayer({
   const [streamReconnect, setStreamReconnect] = useState(null);
   const normalizedStreamStatus = normalizeStreamStatus(streamStatus);
   const sessionExpectedLive = isSessionExpectedLive(sessionStatus);
-  const hostReconnecting = isHostReconnecting(normalizedStreamStatus);
-  // Phase 2: "Jump to live" once the viewer drifts behind the live edge.
-  const [jumpToLive, setJumpToLive] = useState(false);
-  const jumpToLiveRef = useRef(null);
-
-  // The feed itself looks gone: the live playlist answered 404/410 (hls.js
-  // keeps retrying it for ~40 s before calling it fatal) or ended, before the
-  // buffered tail has run out and the reconnect overlay shows.
-  const [feedLost, setFeedLost] = useState(false);
-
-  // Tell the page when playback stalls so it refreshes the session state now
-  // instead of on its 30 s live poll: viewers then see "Host reconnecting…"
-  // within seconds of a drop. null while playing, otherwise the reason; a new
-  // reason (a connection error that turns out to be a lost feed) is new
-  // evidence and triggers another immediate check.
-  const playbackStallReason = resolvePlaybackStallReason({ feedLost, streamReconnect, connectionIssue });
-  const onPlaybackStalledChangeRef = useRef(onPlaybackStalledChange);
-  useEffect(() => {
-    onPlaybackStalledChangeRef.current = onPlaybackStalledChange;
-  }, [onPlaybackStalledChange]);
-  useEffect(() => {
-    if (typeof onPlaybackStalledChangeRef.current === "function") {
-      onPlaybackStalledChangeRef.current(playbackStallReason);
-    }
-  }, [playbackStallReason]);
-  useEffect(
-    () => () => {
-      if (typeof onPlaybackStalledChangeRef.current === "function") {
-        onPlaybackStalledChangeRef.current(null);
-      }
-    },
-    []
-  );
-
-  // While this class plays, a sign-in elsewhere shows a banner, not a dialog.
-  useEffect(() => {
-    if (!sessionExpectedLive) return undefined;
-    return registerLiveClassPlayback(`broadcast-${sessionId ?? ""}`);
-  }, [sessionExpectedLive, sessionId]);
 
   const retryNow = () => {
     setConnectionIssue({ message: "Retrying the secure video connection..." });
@@ -396,7 +343,6 @@ export default function SecureHlsBroadcastPlayer({
     reconnectControllerRef.current?.dispose();
     streamOutageRef.current = null;
     setStreamReconnect(null);
-    setFeedLost(false);
   }, [sessionExpectedLive, sessionStatus]);
 
   // A different stream starts with a clean outage record.
@@ -405,7 +351,6 @@ export default function SecureHlsBroadcastPlayer({
       streamOutageRef.current = null;
       hasEverPlayedRef.current = false;
       setStreamReconnect(null);
-      setFeedLost(false);
     },
     [hlsUrl, sessionId]
   );
@@ -534,7 +479,6 @@ export default function SecureHlsBroadcastPlayer({
         clearPlayerRetryTimer();
         recoveringRef.current = true;
         setConnectionIssue(null);
-        setFeedLost(true);
         if (!streamOutageRef.current) {
           streamOutageRef.current = { startedAt: Date.now(), probeAttempt: 0 };
           queueStreamOutageReport({
@@ -555,7 +499,6 @@ export default function SecureHlsBroadcastPlayer({
       if (!outage || reconnect.isActive()) return;
       streamOutageRef.current = null;
       setStreamReconnect(null);
-      setFeedLost(false);
       queueStreamOutageReport({
         sessionId,
         report: buildStreamOutageReport({
@@ -848,27 +791,9 @@ export default function SecureHlsBroadcastPlayer({
     };
     // Ordinary buffering ("waiting"/"stalled") is left to hls.js's retry
     // policies; only a genuine freeze escalates, in place first.
-    jumpToLiveRef.current = () => {
-      const edge = Number(hls?.liveSyncPosition);
-      if (Number.isFinite(edge) && edge > 0) {
-        video.currentTime = edge;
-        lastPlaybackTime = edge;
-      } else if (video.seekable?.length) {
-        video.currentTime = Math.max(0, video.seekable.end(video.seekable.length - 1) - 6);
-      }
-      setJumpToLive(false);
-      if (video.paused) void video.play().catch(() => {});
-    };
     const playbackWatchdog = window.setInterval(() => {
       if (disposed) return;
       const currentTime = video.currentTime || 0;
-      if (hls) {
-        const behind = liveBehindSeconds({ liveSyncPosition: hls.liveSyncPosition, currentTime });
-        const targetDuration = hls.levels?.[hls.currentLevel]?.details?.targetduration;
-        setJumpToLive(
-          !reconnect.isActive() && shouldOfferJumpToLive({ behindSeconds: behind, targetDuration, paused: video.paused })
-        );
-      }
       if (!video.seeking && currentTime > lastPlaybackTime + 0.1) {
         lastPlaybackTime = currentTime;
         lastPlaybackProgressAt = Date.now();
@@ -977,8 +902,8 @@ export default function SecureHlsBroadcastPlayer({
         enableWorker: true,
         lowLatencyMode: false,
         backBufferLength: 60,
-        liveSyncDurationCount: LIVE_SYNC_DURATION_COUNT,
-        liveMaxLatencyDurationCount: LIVE_MAX_LATENCY_DURATION_COUNT,
+        liveSyncDurationCount: 5,
+        liveMaxLatencyDurationCount: 15,
         liveSyncOnStallIncrease: 2,
         maxBufferLength: 45,
         maxMaxBufferLength: 90,
@@ -1029,8 +954,6 @@ export default function SecureHlsBroadcastPlayer({
         if (disposed || !details) return;
         if (!isEndedLevelDetails(details)) {
           sawLivePlaylist = true;
-          // A playlist 404 that hls.js retried through was only a blip.
-          if (!streamOutageRef.current) setFeedLost(false);
           return;
         }
         offlineSlateStart = findOfflineSlateStart(details.fragments);
@@ -1041,16 +964,7 @@ export default function SecureHlsBroadcastPlayer({
       hls.on(Hls.Events.LEVEL_LOADED, handleLevelDetails);
       hls.on(Hls.Events.LEVEL_UPDATED, handleLevelDetails);
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (!data || disposed) return;
-        if (!data.fatal) {
-          // hls.js keeps retrying a missing live playlist for ~40 s before it
-          // gives up, but the first 404 already says the feed may be gone: let
-          // the page ask the server now (playback handling is unchanged).
-          if (isPlaylistMissingError({ type: data.type, details: data.details, httpStatus: data.response?.code })) {
-            setFeedLost(true);
-          }
-          return;
-        }
+        if (!data?.fatal || disposed) return;
         if (reconnect.isActive()) {
           // hls.js failing on the ended playlist or the offline clip is part
           // of the outage and never counts toward the error ladder.
@@ -1091,7 +1005,6 @@ export default function SecureHlsBroadcastPlayer({
     return () => {
       disposed = true;
       liveResumeRef.current = null;
-      jumpToLiveRef.current = null;
       playbackHealthyRef.current = false;
       reconnect.dispose();
       if (reconnectControllerRef.current === reconnect) reconnectControllerRef.current = null;
@@ -1183,19 +1096,8 @@ export default function SecureHlsBroadcastPlayer({
         <StreamReconnectOverlay
           offline={streamReconnect.offline}
           hadPlayback={streamReconnect.hadPlayback}
-          hostReconnecting={hostReconnecting}
           onRetry={retryNow}
         />
-      ) : null}
-      {bootstrapReady && jumpToLive && !streamReconnect && sessionExpectedLive && autoplayState !== "blocked" ? (
-        <button
-          type="button"
-          data-playback-gesture-ignore="true"
-          onClick={() => jumpToLiveRef.current?.()}
-          className="absolute bottom-14 right-3 z-30 rounded-full border border-[#F3E2B3] bg-[#F3E2B3] px-3 py-1.5 text-xs font-semibold text-[#0a0a0a] shadow-[0_8px_20px_rgba(0,0,0,0.35)] transition-colors hover:bg-[#F8EDCF]"
-        >
-          Jump to live
-        </button>
       ) : null}
       {bootstrapReady && !sessionExpectedLive ? (
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#161616]/90 px-6 text-center text-sm text-[#C6C6C6]">
@@ -1203,7 +1105,7 @@ export default function SecureHlsBroadcastPlayer({
         </div>
       ) : null}
       {bootstrapReady && connectionIssue && !streamReconnect && sessionExpectedLive && autoplayState !== "blocked" ? (
-        <div className="absolute inset-x-3 top-3 z-30 rounded-xl border border-[#F3E2B3]/30 bg-[#0a0a0a]/95 px-3 py-2.5 text-center text-xs leading-5 text-[#F3E2B3] shadow-[0_12px_30px_rgba(0,0,0,0.34)] backdrop-blur sm:left-1/2 sm:right-auto sm:w-[min(32rem,calc(100%-1.5rem))] sm:-translate-x-1/2">
+        <div className="absolute inset-x-3 top-3 z-30 rounded-xl border border-amber-300/30 bg-[#18140a]/95 px-3 py-2.5 text-center text-xs leading-5 text-amber-100 shadow-[0_12px_30px_rgba(0,0,0,0.34)] backdrop-blur sm:left-1/2 sm:right-auto sm:w-[min(32rem,calc(100%-1.5rem))] sm:-translate-x-1/2">
           <span>{connectionIssue.message}</span>
           <button
             type="button"

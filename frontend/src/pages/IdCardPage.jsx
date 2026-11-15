@@ -385,10 +385,10 @@ export default function IdCardPage() {
         }
 
         @keyframes idCardGlitch {
-          0% { text-shadow: 2px 0 rgba(243,226,179,.35), -2px 0 rgba(255,255,255,.15); }
-          25% { text-shadow: -2px 0 rgba(243,226,179,.35), 2px 0 rgba(255,255,255,.15); }
-          50% { text-shadow: 1px 0 rgba(243,226,179,.35), -1px 0 rgba(255,255,255,.15); }
-          75% { text-shadow: -1px 0 rgba(243,226,179,.35), 1px 0 rgba(255,255,255,.15); }
+          0% { text-shadow: 2px 0 rgba(130,150,210,.35), -2px 0 rgba(255,255,255,.15); }
+          25% { text-shadow: -2px 0 rgba(130,150,210,.35), 2px 0 rgba(255,255,255,.15); }
+          50% { text-shadow: 1px 0 rgba(130,150,210,.35), -1px 0 rgba(255,255,255,.15); }
+          75% { text-shadow: -1px 0 rgba(130,150,210,.35), 1px 0 rgba(255,255,255,.15); }
           100% { text-shadow: none; }
         }
 
@@ -413,8 +413,7 @@ export default function IdCardPage() {
           z-index: 1;
           opacity: 0.03;
           pointer-events: none;
-          /* Local SVG noise (the old third-party noise.svg answered 402 and logged an error). */
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+          background-image: url("https://grainy-gradients.vercel.app/noise.svg");
         }
 
         .asi-id-card-matrix {
@@ -441,13 +440,13 @@ export default function IdCardPage() {
         }
 
         .asi-id-card-glow-1 {
-          background: radial-gradient(circle, rgba(255,255,255,.05), transparent 70%);
+          background: radial-gradient(circle, rgba(100,120,200,.05), transparent 70%);
           top: -20%;
           left: -10%;
         }
 
         .asi-id-card-glow-2 {
-          background: radial-gradient(circle, rgba(255,255,255,.035), transparent 70%);
+          background: radial-gradient(circle, rgba(160,140,200,.035), transparent 70%);
           bottom: -20%;
           right: -10%;
         }
@@ -487,14 +486,14 @@ export default function IdCardPage() {
           height: 1px;
           z-index: 5;
           pointer-events: none;
-          background: linear-gradient(to right, transparent 3%, rgba(243,226,179,.15) 25%, rgba(255,255,255,.3) 50%, rgba(243,226,179,.15) 75%, transparent 97%);
+          background: linear-gradient(to right, transparent 3%, rgba(130,150,210,.15) 25%, rgba(255,255,255,.3) 50%, rgba(130,150,210,.15) 75%, transparent 97%);
           animation: idCardSweep 6s linear infinite;
         }
 
         .asi-id-card-stripe {
           height: 2px;
           opacity: 0.6;
-          background: linear-gradient(90deg,#1a1a1a,#8a8a8a 20%,#fff 50%,#8a8a8a 80%,#1a1a1a);
+          background: linear-gradient(90deg,#1a1a1a,#667 20%,#fff 50%,#667 80%,#1a1a1a);
           background-size: 300% 100%;
           animation: idCardHoloShift 5s ease-in-out infinite;
         }
@@ -621,7 +620,7 @@ export default function IdCardPage() {
           content: "";
           position: absolute;
           inset: 0;
-          background: linear-gradient(135deg, rgba(243,226,179,.05), transparent 60%);
+          background: linear-gradient(135deg, rgba(130,150,210,.05), transparent 60%);
         }
 
         .asi-id-card-avatar img {
@@ -630,8 +629,6 @@ export default function IdCardPage() {
           width: 100%;
           height: 100%;
           object-fit: cover;
-          /* Palette law: the photo reads in greyscale on the card. */
-          filter: grayscale(1);
         }
 
         .asi-id-card-avatar-status {
@@ -786,18 +783,18 @@ export default function IdCardPage() {
         }
 
         .asi-id-card-section-dot-blue {
-          background: rgba(243,226,179,.5);
-          box-shadow: 0 0 3px rgba(243,226,179,.25);
+          background: rgba(130,150,210,.5);
+          box-shadow: 0 0 3px rgba(130,150,210,.25);
         }
 
         .asi-id-card-section-dot-red {
-          background: rgba(250,250,250,.5);
-          box-shadow: 0 0 3px rgba(250,250,250,.25);
+          background: rgba(200,80,80,.5);
+          box-shadow: 0 0 3px rgba(200,80,80,.25);
         }
 
         .asi-id-card-section-dot-gold {
-          background: rgba(243,226,179,.5);
-          box-shadow: 0 0 3px rgba(243,226,179,.25);
+          background: rgba(200,180,100,.5);
+          box-shadow: 0 0 3px rgba(200,180,100,.25);
         }
 
         .asi-id-card-section-title {
@@ -839,7 +836,7 @@ export default function IdCardPage() {
         }
 
         .asi-id-card-course-status-enrolled {
-          background: rgba(243,226,179,.45);
+          background: rgba(130,150,210,.45);
         }
 
         .asi-id-card-course-name {
@@ -870,9 +867,9 @@ export default function IdCardPage() {
         }
 
         .asi-id-card-course-tag-enrolled {
-          color: rgba(243,226,179,.6);
-          background: rgba(243,226,179,.04);
-          border: 1px solid rgba(243,226,179,.08);
+          color: rgba(130,150,210,.6);
+          background: rgba(130,150,210,.04);
+          border: 1px solid rgba(130,150,210,.08);
         }
 
         .asi-id-card-cross-icon,
@@ -888,8 +885,8 @@ export default function IdCardPage() {
         }
 
         .asi-id-card-cross-icon {
-          border: 1px solid rgba(250,250,250,.15);
-          background: rgba(250,250,250,.08);
+          border: 1px solid rgba(200,80,80,.15);
+          background: rgba(200,80,80,.08);
         }
 
         .asi-id-card-cross-icon::before,
@@ -899,7 +896,7 @@ export default function IdCardPage() {
           width: 9px;
           height: 1px;
           border-radius: 1px;
-          background: rgba(250,250,250,.6);
+          background: rgba(200,80,80,.6);
         }
 
         .asi-id-card-cross-icon::before {
@@ -911,10 +908,10 @@ export default function IdCardPage() {
         }
 
         .asi-id-card-rank-icon {
-          border: 1px solid rgba(243,226,179,.15);
-          background: rgba(243,226,179,.08);
+          border: 1px solid rgba(200,180,100,.15);
+          background: rgba(200,180,100,.08);
           font-size: 10px;
-          color: rgba(243,226,179,.7);
+          color: rgba(200,180,100,.7);
         }
 
         .asi-id-card-status-text {
@@ -923,11 +920,11 @@ export default function IdCardPage() {
         }
 
         .asi-id-card-status-text-red {
-          color: rgba(250,250,250,.5);
+          color: rgba(200,80,80,.5);
         }
 
         .asi-id-card-status-text-gold {
-          color: rgba(243,226,179,.55);
+          color: rgba(200,180,100,.55);
         }
 
         .asi-id-card-status-sub {

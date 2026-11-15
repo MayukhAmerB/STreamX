@@ -19,9 +19,7 @@ from apps.notifications.models import Notification
 from apps.notifications.services import create_notification
 
 from . import rescan as _rescan  # noqa: F401  (registers the reports.rescan_stored_files handler)
-from . import scanning as _scanning  # noqa: F401  (registers reports.scan_upload)
-from . import scheduler as _scheduler  # noqa: F401  (registers reports.scheduler_tick)
-from . import services, weekly
+from . import services
 from .models import ReportSubmission, ReportTask
 
 
@@ -30,16 +28,8 @@ def format_ist(value):
     return local.strftime("%a %d %b, %I:%M %p IST").replace(" 0", " ")
 
 
-def _student_url(task_id, submission_id=None):
-    task = ReportTask.objects.filter(pk=task_id).only("origin").first()
-    if task is not None and task.origin == ReportTask.ORIGIN_AUTO:
-        # Self-service week: the Reports page opens the target.
-        return f"/reports?target={submission_id}" if submission_id else "/reports"
+def _student_url(task_id):
     return f"/reports/tasks/{task_id}"
-
-
-def _report_title(submission):
-    return submission.target_name or submission.task.title
 
 
 @outbox_handler(services.EVENT_TASK_PUBLISHED, max_attempts=6)
@@ -114,11 +104,11 @@ def notify_submission_graded(event):
     marks = services.format_marks(grade.final_marks) if grade else ""
     create_notification(
         kind=Notification.KIND_ANNOUNCEMENT,
-        title=f"Report marked: {_report_title(submission)}"[:180],
+        title=f"Report marked: {task.title}"[:180],
         body=f"You scored {marks}/{services.format_marks(task.max_marks)}. Open it to read the feedback.",
         recipients=[submission.student_id],
         event_key=f"report-graded:{submission.pk}:{event.payload.get('revision')}",
-        action_url=_student_url(task.pk, submission.pk),
+        action_url=_student_url(task.pk),
         course=task.course,
     )
 
@@ -131,11 +121,11 @@ def notify_submission_returned(event):
     task = submission.task
     create_notification(
         kind=Notification.KIND_ANNOUNCEMENT,
-        title=f"Report returned for revision: {_report_title(submission)}"[:180],
-        body=_returned_body(submission),
+        title=f"Report returned for revision: {task.title}"[:180],
+        body="Your instructor asked for changes. Read the feedback and submit again.",
         recipients=[submission.student_id],
         event_key=f"report-returned:{submission.pk}:{event.payload.get('revision')}",
-        action_url=_student_url(task.pk, submission.pk),
+        action_url=_student_url(task.pk),
         course=task.course,
     )
 
@@ -173,9 +163,8 @@ def notify_late_digest(event):
     )
     if not pending:
         return
-    # Instructor, else the staff "graders" group, else all staff (never dropped).
-    recipients = _scheduler.grader_ids(task.course)
-    if recipients:
+    instructor_id = task.course.instructor_id
+    if instructor_id:
         names = [item.student.full_name or item.student.email for item in pending]
         shown = ", ".join(names[:5]) + (f" and {len(names) - 5} more" if len(names) > 5 else "")
         count = len(pending)
@@ -183,39 +172,9 @@ def notify_late_digest(event):
             kind=Notification.KIND_ANNOUNCEMENT,
             title=f"{count} late report{'s' if count != 1 else ''}: {task.title}"[:180],
             body=f"Late submissions received from {shown}.",
-            recipients=recipients,
+            recipients=[instructor_id],
             event_key=f"report-late-digest:{task.pk}:{event.payload.get('bucket')}",
             action_url=f"/report-grading/queue?task={task.pk}&late=1",
             course=task.course,
         )
     ReportSubmission.objects.filter(pk__in=[item.pk for item in pending]).update(late_digest_sent_at=timezone.now())
-
-
-def _returned_body(submission):
-    text = "Your instructor asked for changes. Read the feedback and submit again"
-    if submission.revision_deadline:
-        return f"{text} by {format_ist(submission.revision_deadline)}."
-    return f"{text}."
-
-
-@outbox_handler(weekly.EVENT_RECEIPT, max_attempts=6)
-def notify_submission_receipt(event):
-    """Receipt for a self-service submission, sent after the undo window and
-    only if that version still exists (an undone submission gets none)."""
-    submission = _student_submission(event)
-    if submission is None:
-        return
-    version = submission.versions.filter(pk=int(event.payload.get("version_id") or 0)).first()
-    if version is None:
-        return
-    number = version.number
-    late = " (late)" if version.is_late else ""
-    create_notification(
-        kind=Notification.KIND_ANNOUNCEMENT,
-        title=f"Report received: {_report_title(submission)}"[:180],
-        body=f"{submission.task.course.title}: version {number} received {format_ist(version.submitted_at)}{late}.",
-        recipients=[submission.student_id],
-        event_key=f"report-receipt:{submission.pk}:{version.pk}",
-        action_url=_student_url(submission.task_id, submission.pk),
-        course=submission.task.course,
-    )

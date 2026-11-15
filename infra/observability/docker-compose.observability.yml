@@ -1,14 +1,5 @@
-# Cap Docker json-file logs per container (50 MB x 5 files) so container
-# logs can never fill the disk.
-x-logging: &default-logging
-  driver: json-file
-  options:
-    max-size: "50m"
-    max-file: "5"
-
 services:
   prometheus:
-    logging: *default-logging
     image: prom/prometheus:v2.55.1
     restart: unless-stopped
     command:
@@ -32,7 +23,6 @@ services:
       - postgres-exporter
 
   node-exporter:
-    logging: *default-logging
     image: prom/node-exporter:v1.9.1
     restart: unless-stopped
     command:
@@ -50,7 +40,6 @@ services:
       - streamx_appnet
 
   cadvisor:
-    logging: *default-logging
     image: gcr.io/cadvisor/cadvisor:v0.49.1
     restart: unless-stopped
     volumes:
@@ -63,7 +52,6 @@ services:
       - streamx_appnet
 
   redis-exporter:
-    logging: *default-logging
     image: oliver006/redis_exporter:v1.68.0
     restart: unless-stopped
     environment:
@@ -72,7 +60,6 @@ services:
       - streamx_appnet
 
   postgres-exporter:
-    logging: *default-logging
     image: quay.io/prometheuscommunity/postgres-exporter:v0.17.1
     restart: unless-stopped
     environment:
@@ -83,7 +70,6 @@ services:
       - streamx_appnet
 
   grafana:
-    logging: *default-logging
     image: grafana/grafana:11.4.0
     restart: unless-stopped
     ports:

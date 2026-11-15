@@ -13,9 +13,9 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from apps.courses.cache_utils import bump_course_list_cache_version
-from apps.courses.models import Lecture, Section
+from apps.courses.models import Lecture
 
-from . import config, ffmpeg, modules, state
+from . import config, ffmpeg, state
 from .models import ClassRecording
 
 
@@ -27,8 +27,10 @@ class RecordingPublishError(Exception):
     pass
 
 
-NO_MODULE_ERROR = modules.NO_COURSE_REASON
-CLASS_RECORDING_STREAM_PRIORITY = 10
+NO_MODULE_ERROR = (
+    "No target module is tagged for this session. Set the session's target module "
+    "(admin or PATCH /api/realtime/sessions/<id>/) and retry the recording."
+)
 
 
 def lecture_title_for(session, when=None):
@@ -37,38 +39,17 @@ def lecture_title_for(session, when=None):
     return f"{base} - {when:%d %b %Y}"[:255]
 
 
-def mark_needs_review(recording, reason):
-    """Flag the recording for an admin (the lecture is published regardless)."""
-    reason = str(reason or "")[:255]
-    ClassRecording.objects.filter(pk=recording.pk).update(needs_review=True, review_reason=reason)
-    recording.needs_review = True
-    recording.review_reason = reason
-
-
 def resolve_module(recording):
-    """The module this recording is published into; derived, never missing.
-
-    See recording/modules.py for the precedence. Only a class without any
-    course raises (there is nowhere to publish). A derived fallback flags the
-    recording ``needs_review``.
-    """
-    choice = modules.derive_module(recording)
-    if choice.module is None:
-        raise RecordingPublishError(choice.reason or NO_MODULE_ERROR)
-    if choice.needs_review:
-        mark_needs_review(recording, choice.reason)
-    return choice.module
-
-
-def lecture_description_for(recording, module):
-    session = recording.session if recording.session_id else None
-    description = str(getattr(session, "description", "") or "").strip()
-    return description or (module.description or "")
-
-
-def initially_published(recording):
-    """Instant MP4 publish (unless an admin is holding this recording back)."""
-    return config.instant_publish() and not getattr(recording, "hold_unpublished", False)
+    """The recording's module, falling back to the session's current tag."""
+    module = recording.module
+    if module is None and recording.session_id:
+        module = getattr(recording.session, "target_module", None)
+    if module is None:
+        return None
+    course_id = recording.session.resolve_course_id() if recording.session_id else module.course_id
+    if course_id and module.course_id != course_id:
+        raise RecordingPublishError("The tagged module does not belong to the session's course.")
+    return module
 
 
 def storage_name_for(recording, module, suffix=".mp4"):
@@ -79,28 +60,18 @@ def storage_name_for(recording, module, suffix=".mp4"):
     return f"lecture_videos/{course_slug}/module_{module.pk}/rec-{recording.pk}-{stamp}{suffix}"
 
 
-def next_lecture_order(module, *, lock=False):
-    """Next free lecture order in ``module``. ``lock`` (inside a transaction)
-    serialises concurrent finalizes into the same module on the Section row."""
-    if lock:
-        Section.objects.select_for_update().filter(pk=module.pk).first()
+def next_lecture_order(module):
     current = Lecture.objects.filter(section=module).aggregate(top=Max("order"))["top"]
     return int(current or 0) + 1
 
 
 def create_lecture(recording, module, *, storage_name, title=None):
-    """Create (once) the lecture for ``recording``. Idempotent.
-
-    Published at once (the faststart MP4 is playable) when
-    RECORDING_INSTANT_PUBLISH is on; the HLS stream follows in the background.
-    """
-    published = False
+    """Create (once) the unpublished lecture for ``recording``. Idempotent."""
     with transaction.atomic():
         locked = ClassRecording.objects.select_for_update().get(pk=recording.pk)
         if locked.lecture_id:
             recording.lecture_id = locked.lecture_id
             return locked.lecture
-        published = initially_published(locked)
         title = title or lecture_title_for(recording.session, recording.started_at)
         earlier_takes = (
             ClassRecording.objects.filter(session_id=recording.session_id, lecture__isnull=False)
@@ -115,10 +86,9 @@ def create_lecture(recording, module, *, storage_name, title=None):
         lecture = Lecture(
             section=module,
             title=title,
-            description=lecture_description_for(recording, module),
-            order=next_lecture_order(module, lock=True),
-            is_published=published,
-            stream_priority=CLASS_RECORDING_STREAM_PRIORITY,
+            description=module.description or "",
+            order=next_lecture_order(module),
+            is_published=False,
         )
         lecture.video_file.name = storage_name
         lecture.save()
@@ -127,14 +97,6 @@ def create_lecture(recording, module, *, storage_name, title=None):
         )
     recording.lecture = lecture
     recording.module = module
-    if published:
-        bump_course_list_cache_version()
-        logger.info(
-            "CLASS_RECORDING_LECTURE_PUBLISHED recording_id=%s lecture_id=%s module_id=%s instant=1",
-            recording.pk,
-            lecture.pk,
-            module.pk,
-        )
     return lecture
 
 
@@ -206,14 +168,7 @@ def finalize_into_lecture(recording, inputs, *, list_path):
 
 
 def publish_if_ready(recording):
-    """PROCESSING -> PUBLISHED once the lecture's HLS stream is ready.
-
-    With instant publish the lecture is already visible (MP4); PROCESSING
-    then only means "HD stream building". A transcode failure that the queue
-    will retry keeps the row PROCESSING; only an exhausted one fails it.
-    """
-    from apps.courses.transcode_queue import transcode_retry_pending
-
+    """PROCESSING -> PUBLISHED once the lecture's HLS stream is ready."""
     lecture = Lecture.objects.filter(pk=recording.lecture_id).first() if recording.lecture_id else None
     if lecture is None:
         return state.transition(
@@ -223,14 +178,10 @@ def publish_if_ready(recording):
             reason="lecture_missing",
         )
     if lecture.stream_status == Lecture.STREAM_FAILED:
-        if transcode_retry_pending(lecture):
-            return False
-        published_note = " The MP4 stays published." if lecture.is_published else ""
         return state.transition(
             recording,
             ClassRecording.STATE_FAILED,
-            error=f"HLS transcode failed after {lecture.stream_attempts} attempt(s): "
-            f"{lecture.stream_error or 'unknown error'}.{published_note}",
+            error=f"HLS transcode failed: {lecture.stream_error or 'unknown error'}",
             reason="transcode_failed",
         )
     if lecture.stream_status != Lecture.STREAM_READY or not lecture.stream_manifest_key:
@@ -243,8 +194,7 @@ def publish_if_ready(recording):
         duration_seconds=recording.duration_seconds or lecture.stream_duration_seconds,
     ):
         return False
-    hold = ClassRecording.objects.filter(pk=recording.pk).values_list("hold_unpublished", flat=True).first()
-    if not lecture.is_published and not hold:
+    if not lecture.is_published:
         lecture.is_published = True
         lecture.save(update_fields=["is_published", "updated_at"])
         bump_course_list_cache_version()
@@ -307,7 +257,6 @@ def finalize_obs_upload(recording):
             old_name = str(lecture.video_file.name or "")
             lecture.video_file.name = storage_name
             lecture.stream_status = Lecture.STREAM_UPLOADED
-            lecture.stream_priority = CLASS_RECORDING_STREAM_PRIORITY
             # Students were already told about this lecture; a better file for
             # the same class is not a new video.
             lecture._suppress_upload_notification = True
@@ -318,10 +267,9 @@ def finalize_obs_upload(recording):
             lecture = Lecture(
                 section=module,
                 title=lecture_title_for(recording.session, recording.started_at),
-                description=lecture_description_for(recording, module),
-                order=next_lecture_order(module, lock=True),
-                is_published=initially_published(locked),
-                stream_priority=CLASS_RECORDING_STREAM_PRIORITY,
+                description=module.description or "",
+                order=next_lecture_order(module),
+                is_published=False,
             )
             lecture.video_file.name = storage_name
             lecture.save()
@@ -415,8 +363,6 @@ def finalize_import(recording):
         state.transition(recording, ClassRecording.STATE_PROCESSING, reason="lecture_already_created")
         return recording.lecture
     module = recording.module
-    if module is None and recording.session_id:
-        module = resolve_module(recording)
     if module is None:
         raise RecordingPublishError(NO_IMPORT_MODULE_ERROR)
     if recording.work_dir:
@@ -469,56 +415,6 @@ def finalize_import(recording):
         recording,
         ClassRecording.STATE_PROCESSING,
         reason=f"import_{method}",
-        file_size_bytes=output_path.stat().st_size,
-        duration_seconds=ffmpeg.probe_duration_seconds(output_path) or recording.duration_seconds,
-        finalized_at=timezone.now(),
-    )
-    return recording.lecture
-
-
-# --------------------------------------------------------------------------
-# Browser-fallback recordings (MediaRecorder upload of a Host Studio/meeting)
-# --------------------------------------------------------------------------
-
-
-def browser_upload_path(recording):
-    """Absolute path of the uploaded file (``source_path`` is relative to MEDIA_ROOT)."""
-    media_root = Path(settings.MEDIA_ROOT).resolve()
-    path = (media_root / str(recording.source_path or "")).resolve()
-    try:
-        path.relative_to(media_root)
-    except ValueError as exc:
-        raise RecordingPublishError("The browser recording is outside the media folder and is not used.") from exc
-    return path
-
-
-def finalize_browser_fallback(recording):
-    """Browser (MediaRecorder) upload -> lecture of the derived module.
-
-    FINALIZING -> PROCESSING, the same path as every other recording. The file
-    (usually WebM, which MP4 cannot carry by stream copy) is linked or copied
-    as it is: browsers play it directly and the transcoder builds the HLS
-    stream from it. The uploaded original is never moved or deleted.
-    """
-    if recording.lecture_id:
-        state.transition(recording, ClassRecording.STATE_PROCESSING, reason="lecture_already_created")
-        return recording.lecture
-    if not recording.source_path:
-        raise RecordingPublishError("The browser recording has no file.")
-    source = browser_upload_path(recording)
-    if source.is_symlink() or not source.is_file() or source.stat().st_size == 0:
-        raise RecordingPublishError(f"The browser recording is no longer on the server: {recording.source_path}")
-    module = resolve_module(recording)
-    ensure_media_disk_space(source.stat().st_size, action="publish the browser recording")
-    suffix = source.suffix.lower() or ".webm"
-    storage_name = storage_name_for(recording, module, suffix)
-    output_path = Path(settings.MEDIA_ROOT) / storage_name
-    method = place_file(source, output_path)
-    create_lecture(recording, module, storage_name=storage_name)
-    state.transition(
-        recording,
-        ClassRecording.STATE_PROCESSING,
-        reason=f"browser_fallback_{method}",
         file_size_bytes=output_path.stat().st_size,
         duration_seconds=ffmpeg.probe_duration_seconds(output_path) or recording.duration_seconds,
         finalized_at=timezone.now(),

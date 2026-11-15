@@ -18,7 +18,6 @@ from rest_framework import permissions, status
 from rest_framework.parsers import JSONParser
 from rest_framework.views import APIView
 
-from apps.courses.features import course_acquisition_blocked, pentesting_gate_error
 from apps.courses.models import Course
 
 from .gateway_audit import safe_gateway_entity
@@ -607,14 +606,6 @@ def process_payment_webhook_payload(
     source="api",
     defer_provisioning=False,
 ):
-    # Platform plans (memberships, Bootcamp, Lifetime) have their own handlers;
-    # every other event continues below exactly as before.
-    from .platform_webhooks import route_platform_event
-
-    platform_result = route_platform_event(payload, request=request)
-    if platform_result is not None:
-        return platform_result
-
     event = str(payload.get("event") or "").strip().lower()
     payload_data = payload.get("payload") or {}
     payment_entity = ((payload_data.get("payment") or {}).get("entity") or {})
@@ -976,12 +967,8 @@ class CreateOrderView(APIView):
         # bought); their duplicates are caught after capture in provisioning.
         already_enrolled = user_owned_plan_message(course, plan, request.user) is not None
         amount = get_plan_amount(course, plan)
-        # Pentesting "coming soon" switch (apps.courses.features): blocks new
-        # orders only; verify/webhooks of existing orders are never gated.
-        pentesting_blocked = course_acquisition_blocked(course)
         checkout_currently_allowed = bool(
-            not pentesting_blocked
-            and course_available
+            course_available
             and not instructor_self_purchase
             and application_valid
             and plan_enabled
@@ -1018,14 +1005,6 @@ class CreateOrderView(APIView):
                 application=application,
                 allow_unpaid_resume=checkout_currently_allowed,
             )
-
-        if pentesting_blocked:
-            log_security_event(
-                "payment.create_order_feature_disabled",
-                request=request,
-                course_id=course.id,
-            )
-            raise pentesting_gate_error()
 
         if not course_available:
             log_security_event(

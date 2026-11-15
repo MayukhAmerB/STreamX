@@ -1,7 +1,7 @@
 import storyIllustration from "../assets/story-mission.webp";
 import { siteBrand } from "../config/siteBrand";
 
-export const journeyBlocks = [
+const journeyBlocks = [
   {
     title: "Our Story",
     body: `Al Syed Initiative is a cybersecurity education and awareness project under the ADL Front (Advanced Digital Lawforce Front), founded by cyber activist Al Syed. It was created to carry forward his work and mindset by building a generation capable of critical thinking, responsible investigation, and confidence in the digital world.
@@ -16,7 +16,7 @@ By teaching practical skills in ethical hacking, OSINT research, and security an
   },
 ];
 
-export const owlCognitoJourneyBlocks = [
+const owlCognitoJourneyBlocks = [
   {
     title: "Our Approach",
     body: `OwlCognito is a private intelligence learning environment for people who want to investigate public information with care, structure, and professional judgment.
@@ -42,7 +42,7 @@ export default function StoryJourneySection({ className = "" }) {
       <div className="relative z-10 grid lg:grid-cols-[1.1fr_0.9fr]">
         <div className="p-5 sm:p-7 lg:py-8 lg:pl-8 lg:pr-6">
           <div className="inline-flex items-center border-l-2 border-white/60 pl-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#8F8F8F]">
-            {isOwlCognito ? "Private intelligence learning" : "Founded in 2025"}
+            {isOwlCognito ? "Private intelligence learning" : "Founded in 2026"}
           </div>
 
           <div className="mt-5 space-y-6">

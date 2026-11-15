@@ -74,15 +74,10 @@ class RealtimeSession(models.Model):
     STREAM_LIVE = "live"
     STREAM_STOPPED = "stopped"
     STREAM_FAILED = "failed"
-    # Phase 2: the feed dropped while the class is live and the host is
-    # expected back (grace period). Viewers see "Host reconnecting...".
-    # Written only by the live reconciler (apps/realtime/reconciler.py).
-    STREAM_INTERRUPTED = "interrupted"
     STREAM_STATUS_CHOICES = [
         (STREAM_IDLE, "Idle"),
         (STREAM_STARTING, "Starting"),
         (STREAM_LIVE, "Live"),
-        (STREAM_INTERRUPTED, "Interrupted (host reconnecting)"),
         (STREAM_STOPPED, "Stopped"),
         (STREAM_FAILED, "Failed"),
     ]
@@ -145,18 +140,6 @@ class RealtimeSession(models.Model):
     )
     livekit_egress_id = models.CharField(max_length=255, blank=True, default="")
     livekit_egress_error = models.TextField(blank=True, default="")
-    # Phase 2 live lifecycle (expand-only, nullable/defaulted columns).
-    stream_interrupted_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text="When the feed dropped into the 'interrupted' (host reconnecting) state.",
-    )
-    end_reason = models.CharField(
-        max_length=40,
-        blank=True,
-        default="",
-        help_text="Why the session ended: host, admin, abandoned, never_started.",
-    )
 
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True)
@@ -341,19 +324,9 @@ class RealtimeSession(models.Model):
         ensure_stream_transition(self.stream_status, next_status)
         if self.stream_status == next_status:
             return False
-        previous_status = self.stream_status
         self.stream_status = next_status
         if persist:
-            # Compare-and-set: a request that loaded a stale row (say "live")
-            # must not resurrect a stream the host stopped in the meantime.
-            now = timezone.now()
-            updated = type(self).objects.filter(pk=self.pk, stream_status=previous_status).update(
-                stream_status=next_status, updated_at=now
-            )
-            if not updated:
-                self.refresh_from_db(fields=["stream_status", "updated_at"])
-                return False
-            self.updated_at = now
+            self.save(update_fields=["stream_status", "updated_at"])
         return True
 
     @staticmethod
@@ -454,31 +427,17 @@ class RealtimeSession(models.Model):
             return self.linked_live_class.linked_course.instructor_id
         return None
 
-    def _teaching_switched_off_for(self, user):
-        """Teachers section off (``apps.users.teaching``): a non-staff instructor
-        loses host/owner controls, except of a class already on air, which
-        keeps them until it ends (plan §5.3 in-flight rule)."""
-        from apps.users import teaching
-
-        return self.status != self.STATUS_LIVE and teaching.teaching_blocked(user)
-
     def is_instructor_owner(self, user):
         if not user or not getattr(user, "is_authenticated", False):
             return False
         instructor_user_id = self.get_instructor_user_id()
-        if not (instructor_user_id and getattr(user, "id", None) == instructor_user_id):
-            return False
-        return not self._teaching_switched_off_for(user)
+        return bool(instructor_user_id and getattr(user, "id", None) == instructor_user_id)
 
     def is_moderator_allowed(self, user):
         if not user or not getattr(user, "is_authenticated", False):
             return False
         is_admin = bool(getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))
-        if is_admin:
-            return True
-        if user.id == self.host_id and not self._teaching_switched_off_for(user):
-            return True
-        return self.is_instructor_owner(user)
+        return bool(is_admin or user.id == self.host_id or self.is_instructor_owner(user))
 
     def is_presenter_allowed(self, user):
         if self.is_moderator_allowed(user):

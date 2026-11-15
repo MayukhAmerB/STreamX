@@ -10,13 +10,13 @@ from config.request_security import (
     is_safe_public_stream_url,
 )
 from config.upload_validators import validate_video_upload
+from config.url_utils import get_media_public_url
 
 from apps.courses.models import LiveClass, Section
 
 from .models import RealtimeSession, RealtimeSessionRecording
 from .recording.serializers import ModuleRefSerializer, module_ref
 from .schedule import attendee_can_join_live_session, get_live_class_schedule_snapshot
-from .lifecycle import live_state_for
 from .services import build_session_join_url, resolve_broadcast_urls, resolve_obs_stream_server_url
 
 
@@ -34,9 +34,6 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
     live_schedule = serializers.SerializerMethodField()
     viewer_can_join_now = serializers.SerializerMethodField()
     target_module = serializers.SerializerMethodField()
-    # Phase 2: viewer-facing lifecycle state ("Host reconnecting...").
-    live_state = serializers.SerializerMethodField()
-    host_reconnecting = serializers.SerializerMethodField()
 
     class Meta:
         model = RealtimeSession
@@ -71,25 +68,11 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
             "viewer_can_join_now",
             "stream_status",
             "livekit_egress_error",
-            "live_state",
-            "host_reconnecting",
-            "stream_interrupted_at",
-            "end_reason",
             "started_at",
             "ended_at",
             "created_at",
             "updated_at",
         )
-
-    @extend_schema_field(
-        serializers.ChoiceField(choices=["ended", "waiting", "live", "reconnecting", "paused"])
-    )
-    def get_live_state(self, obj):
-        return live_state_for(obj)
-
-    @extend_schema_field(serializers.BooleanField())
-    def get_host_reconnecting(self, obj):
-        return obj.status == obj.STATUS_LIVE and obj.stream_status == obj.STREAM_INTERRUPTED
 
     def get_host(self, obj):
         return {
@@ -418,15 +401,6 @@ class RealtimeOwncastChatModerationActionSerializer(serializers.Serializer):
 class RealtimeSessionJoinSerializer(serializers.Serializer):
     display_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
     prefer_broadcast = serializers.BooleanField(required=False, default=False)
-    device_id = serializers.RegexField(
-        r"^[A-Za-z0-9_-]{8,64}$",
-        required=False,
-        allow_blank=True,
-        help_text=(
-            "Stable per-browser id. With the session slot it keeps the meeting identity stable across "
-            "rejoins, so LiveKit replaces a stale connection instead of leaving a ghost participant."
-        ),
-    )
 
 
 class RealtimeBroadcastPlaybackIssueSerializer(serializers.Serializer):
@@ -542,9 +516,9 @@ class RealtimeSessionRecordingSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if obj.output_download_url:
             return obj.output_download_url
-        # Browser recordings (video_file) are private media: always go through
-        # the access-checked download view, never a public /media/ URL.
-        if (getattr(obj, "video_file", None) or obj.output_file_path) and obj.pk:
+        if getattr(obj, "video_file", None):
+            return get_media_public_url(obj.video_file.url, request=request)
+        if obj.output_file_path and obj.pk:
             url = reverse("realtime-session-recording-download", kwargs={"recording_id": obj.pk})
             if request:
                 return request.build_absolute_uri(url)
@@ -585,14 +559,6 @@ class StreamHeartbeatSerializer(serializers.Serializer):
         default=False,
         help_text="True while the Host Studio has a connected room and a published video track.",
     )
-    state = serializers.ChoiceField(
-        choices=["publishing", "reconnecting", "connected"],
-        required=False,
-        help_text=(
-            "Host link state. 'reconnecting' while LiveKit rejoins: the server keeps the class live for the "
-            "grace period instead of marking delivery failed. Defaults from 'publishing'."
-        ),
-    )
 
 
 class BroadcastEgressStatusSerializer(serializers.Serializer):
@@ -613,11 +579,6 @@ class StreamHeartbeatDataSerializer(serializers.Serializer):
         help_text="Null for OBS sessions and for streams that are not live.",
     )
     restarted = serializers.BooleanField(help_text="True when this heartbeat replaced a dead egress.")
-    grace = serializers.BooleanField(
-        required=False,
-        help_text="True while the server is holding the class through a host reconnect.",
-    )
-    host_grace_seconds = serializers.IntegerField(required=False)
 
 
 class StreamHeartbeatResponseSerializer(serializers.Serializer):

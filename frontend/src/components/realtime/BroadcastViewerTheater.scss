@@ -8,42 +8,42 @@
 
 // Console values, used outside Carbon pages and inside legacy frames.
 @mixin dark-palette {
-  --bvt-text-primary: #fafafa;
-  --bvt-text-secondary: #a1a1a1;
+  --bvt-text-primary: #f6f1e7;
+  --bvt-text-secondary: #b8b3a8;
   --bvt-layer: #0a0a0a;
   --bvt-border: rgba(255, 255, 255, 0.12);
-  --bvt-icon: #fafafa;
+  --bvt-icon: #f6f1e7;
   --bvt-link: #f3e2b3;
-  --bvt-hover: rgba(255, 255, 255, 0.06);
-  --bvt-active: rgba(255, 255, 255, 0.12);
+  --bvt-hover: rgba(246, 241, 231, 0.06);
+  --bvt-active: rgba(246, 241, 231, 0.12);
   --bvt-focus: #f3e2b3;
-  --bvt-disabled: rgba(255, 255, 255, 0.38);
-  --bvt-warning: #f3e2b3;
-  --bvt-success: #fafafa;
-  --bvt-neutral-bg: rgba(255, 255, 255, 0.06);
-  --bvt-neutral-text: #a1a1a1;
+  --bvt-disabled: rgba(246, 241, 231, 0.38);
+  --bvt-warning: #f1c21b;
+  --bvt-success: #42be65;
+  --bvt-neutral-bg: rgba(246, 241, 231, 0.06);
+  --bvt-neutral-text: #b8b3a8;
 }
 
 $motion: cubic-bezier(0.2, 0, 0.38, 0.9);
 $side-by-side: 75rem; // video + chat columns from 1200px wide screens
 
 .bvt {
-  --bvt-text-primary: var(--cds-text-primary, #fafafa);
-  --bvt-text-secondary: var(--cds-text-secondary, #a1a1a1);
+  --bvt-text-primary: var(--cds-text-primary, #f6f1e7);
+  --bvt-text-secondary: var(--cds-text-secondary, #b8b3a8);
   --bvt-layer: var(--cds-layer-01, #0a0a0a);
   --bvt-border: var(--cds-border-subtle-01, rgba(255, 255, 255, 0.12));
-  --bvt-icon: var(--cds-icon-primary, #fafafa);
+  --bvt-icon: var(--cds-icon-primary, #f6f1e7);
   --bvt-link: var(--cds-link-primary, #f3e2b3);
-  --bvt-hover: var(--cds-background-hover, rgba(255, 255, 255, 0.06));
-  --bvt-active: var(--cds-background-active, rgba(255, 255, 255, 0.12));
+  --bvt-hover: var(--cds-background-hover, rgba(246, 241, 231, 0.06));
+  --bvt-active: var(--cds-background-active, rgba(246, 241, 231, 0.12));
   --bvt-focus: var(--cds-focus, #f3e2b3);
-  --bvt-disabled: var(--cds-text-disabled, rgba(255, 255, 255, 0.38));
-  --bvt-warning: var(--cds-support-warning, #f3e2b3);
-  --bvt-success: var(--cds-support-success, #fafafa);
-  --bvt-neutral-bg: var(--cds-tag-background-gray, rgba(255, 255, 255, 0.06));
-  --bvt-neutral-text: var(--cds-tag-color-gray, #a1a1a1);
-  --bvt-live-bg: #f3e2b3;
-  --bvt-live-text: #0a0a0a;
+  --bvt-disabled: var(--cds-text-disabled, rgba(246, 241, 231, 0.38));
+  --bvt-warning: var(--cds-support-warning, #f1c21b);
+  --bvt-success: var(--cds-support-success, #42be65);
+  --bvt-neutral-bg: var(--cds-tag-background-gray, rgba(246, 241, 231, 0.06));
+  --bvt-neutral-text: var(--cds-tag-color-gray, #b8b3a8);
+  --bvt-live-bg: #da1e28;
+  --bvt-live-text: #ffffff;
   --bvt-header-offset: var(--cds-app-header-height, 0px);
   --bvt-nav-offset: var(--cds-app-bottom-nav-height, 0px);
 
@@ -105,7 +105,7 @@ $side-by-side: 75rem; // video + chat columns from 1200px wide screens
 .bvt__empty--video {
   aspect-ratio: 16 / 9;
   background-color: #0a0a0a;
-  color: #a1a1a1;
+  color: #b8b3a8;
 }
 
 .bvt__empty--chat {
@@ -193,7 +193,6 @@ $side-by-side: 75rem; // video + chat columns from 1200px wide screens
 }
 
 .bvt__tag--starting,
-.bvt__tag--reconnecting,
 .bvt__tag--offline,
 .bvt__tag--ended {
   background-color: var(--bvt-neutral-bg);

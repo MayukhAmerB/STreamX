@@ -2,7 +2,6 @@ const crypto = require("crypto");
 const fs = require("fs");
 const http = require("http");
 const path = require("path");
-const { createAccess, gatePage } = require("./labs-access");
 
 const PORT = Number(process.env.PORT || 8080);
 const PUBLIC_DIR = path.resolve(process.env.LABS_PUBLIC_DIR || __dirname);
@@ -10,22 +9,11 @@ const BODY_LIMIT_BYTES = 8192;
 const ATTEMPT_WINDOW_MS = 60_000;
 const ATTEMPT_LIMIT = 30;
 const CERTIFICATION_ANSWER_SECRET = process.env.CERTIFICATION_ANSWER_SECRET || "";
-// The LMS signs students in through api.alsyedinitiative.com, so its auth
-// cookies are host-only there: calls to alsyedinitiative.com/api carry no
-// session (live E2E 2026-11-15: the Examination tab kept asking to sign in).
-const DEFAULT_LMS_API_BASE = "https://api.alsyedinitiative.com/api";
+const DEFAULT_LMS_API_BASE = "https://alsyedinitiative.com/api";
 // Where the Examination tab sends answers (the LMS API, which records every
 // attempt). Only http(s) URLs are accepted; anything else falls back.
 const LMS_API_BASE = resolveLmsApiBase(process.env.LABS_LMS_API_BASE);
 const LMS_API_ORIGIN = new URL(LMS_API_BASE).origin;
-// Members-only labs (LMS switch "labs_membership_required"; off = open labs).
-// The LMS website (sign-in, pricing): LABS_SITE_URL, else the API origin without "api.".
-const SITE_URL = resolveSiteUrl(process.env.LABS_SITE_URL, LMS_API_ORIGIN);
-const labsAccess = createAccess({ lmsApiBase: LMS_API_BASE });
-// Always public, even for visitors without a membership.
-const ALWAYS_PUBLIC = new Set(["/styles.css", "/favicon.ico", "/favicon-16x16.png", "/favicon-32x32.png", "/favicon-48x48.png", "/favicon-192x192.png", "/apple-touch-icon.png"]);
-// Self-hosted fonts (OSINTCTF/fonts, copied by scripts/copy-fonts.mjs): woff2 only.
-const PUBLIC_FONT_FILE = /^\/fonts\/(geist|geist-mono|handlee)\/[a-z0-9-]+\.woff2$/;
 // Student evidence files are served as-is; never anything a browser would
 // execute or render as a document on the labs origin.
 const BLOCKED_MATERIAL_EXTENSIONS = new Set([".htm", ".html", ".js", ".mjs", ".shtml", ".svg", ".svgz", ".xht", ".xhtml", ".xml"]);
@@ -104,7 +92,6 @@ const contentTypes = {
   ".sql": "text/plain; charset=utf-8",
   ".txt": "text/plain; charset=utf-8",
   ".webp": "image/webp",
-  ".woff2": "font/woff2",
   ".zip": "application/zip",
 };
 
@@ -113,7 +100,6 @@ const rootPublicFiles = new Set([
   "/index.html",
   "/app.js",
   "/exam.js",
-  "/exam-core.js",
   "/styles.css",
   "/favicon.ico",
   "/favicon-16x16.png",
@@ -122,18 +108,6 @@ const rootPublicFiles = new Set([
   "/favicon-192x192.png",
   "/apple-touch-icon.png",
 ]);
-
-function resolveSiteUrl(value, apiOrigin) {
-  const raw = String(value || "").trim();
-  if (raw) return raw.replace(/\/+$/, "");
-  try {
-    const url = new URL(apiOrigin);
-    url.hostname = url.hostname.replace(/^api\./, "");
-    return url.origin;
-  } catch {
-    return String(apiOrigin || "").replace(/\/+$/, "");
-  }
-}
 
 function resolveLmsApiBase(value) {
   const raw = String(value || "").trim();
@@ -155,10 +129,9 @@ function contentSecurityPolicy() {
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
     "script-src-attr 'none'",
-    "style-src 'self' 'unsafe-inline'",
-    "font-src 'self'",
-    // Exam evidence uploaded to the LMS is shown from short-lived signed URLs.
-    `img-src 'self' data: ${LMS_API_ORIGIN}`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data:",
     `connect-src 'self' https://cloudflareinsights.com ${LMS_API_ORIGIN}`,
     "form-action 'self'",
     "frame-src 'none'",
@@ -299,12 +272,6 @@ async function validateAnswer(req, res) {
     return;
   }
 
-  const access = await labsAccess.accessFor(req);
-  if (access.required && !access.allowed.includes(labsAccess.questionDifficulty(payload.category, question))) {
-    sendJson(res, 403, { error: "This challenge is for members.", code: "membership_required" });
-    return;
-  }
-
   const submittedHash = proofAnswer(payload.category, normalizeAnswer(payload.category, question, answer));
   if (!submittedHash) {
     sendJson(res, 503, { error: "Certification validation is not configured." });
@@ -326,8 +293,7 @@ function resolvePublicFile(urlPath) {
   const isRootImage = /^\/[^/]+\.png$/i.test(requestPath);
   const isStudentMaterial = requestPath.startsWith("/materials/")
     && !BLOCKED_MATERIAL_EXTENSIONS.has(path.extname(requestPath).toLowerCase());
-  const isFont = PUBLIC_FONT_FILE.test(requestPath);
-  if (!rootPublicFiles.has(requestPath) && !isRootImage && !isStudentMaterial && !isFont) {
+  if (!rootPublicFiles.has(requestPath) && !isRootImage && !isStudentMaterial) {
     return null;
   }
 
@@ -374,24 +340,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname === "/api/config" && req.method === "GET") {
-    sendJson(res, 200, { lmsApiBase: LMS_API_BASE, siteUrl: SITE_URL });
-    return;
-  }
-
-  if (url.pathname === "/api/access" && req.method === "GET") {
-    const access = await labsAccess.accessFor(req);
-    sendJson(res, 200, { membershipRequired: access.required, allowedDifficulties: access.allowed });
-    return;
-  }
-
-  if (url.pathname === "/api/session" && req.method === "POST") {
-    await startSession(req, res);
-    return;
-  }
-
-  if (url.pathname === "/api/session/clear" && req.method === "POST") {
-    res.setHeader("Set-Cookie", labsAccess.sessionCookie("", 0, isSecure(req)));
-    sendJson(res, 200, { cleared: true });
+    sendJson(res, 200, { lmsApiBase: LMS_API_BASE });
     return;
   }
 
@@ -410,54 +359,8 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (!ALWAYS_PUBLIC.has(url.pathname) && !PUBLIC_FONT_FILE.test(url.pathname)) {
-    const access = await labsAccess.accessFor(req);
-    if (access.required) {
-      const pathname = url.pathname;
-      if (pathname.startsWith("/materials/")) {
-        if (!access.allowed.includes(labsAccess.materialDifficulty(pathname))) {
-          sendJson(res, 403, { error: "This material is for members.", code: "membership_required" });
-          return;
-        }
-      } else if (!access.pages) {
-        if (pathname === "/" || pathname === "/index.html") {
-          securityHeaders(res);
-          res.statusCode = 200;
-          res.setHeader("Content-Type", "text/html; charset=utf-8");
-          res.setHeader("Cache-Control", "no-store");
-          res.end(req.method === "HEAD" ? undefined : gatePage({ lmsApiBase: LMS_API_BASE, siteUrl: SITE_URL }));
-          return;
-        }
-        sendJson(res, 403, { error: "The labs are for members.", code: "membership_required" });
-        return;
-      }
-    }
-  }
-
   serveStatic(req, res, url.pathname);
 });
-
-function isSecure(req) {
-  return String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim() === "https" || process.env.NODE_ENV === "production";
-}
-
-async function startSession(req, res) {
-  let payload;
-  try {
-    payload = await readJson(req);
-  } catch (error) {
-    sendJson(res, 400, { error: error.message });
-    return;
-  }
-  const pass = labsAccess.verify(String(payload.token || ""));
-  if (!pass) {
-    sendJson(res, 400, { error: "Invalid or expired pass.", code: "pass_invalid" });
-    return;
-  }
-  const maxAge = pass.exp - Math.floor(Date.now() / 1000);
-  res.setHeader("Set-Cookie", labsAccess.sessionCookie(String(payload.token), maxAge, isSecure(req)));
-  sendJson(res, 200, { allowedDifficulties: pass.staff ? ["easy", "medium", "expert", "professional"] : pass.dif });
-}
 
 if (require.main === module) {
   server.listen(PORT, "0.0.0.0", () => {
@@ -465,4 +368,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { server, resolveLmsApiBase, resolveSiteUrl, resolvePublicFile, contentSecurityPolicy, LMS_API_BASE, labsAccess };
+module.exports = { server, resolveLmsApiBase, resolvePublicFile, contentSecurityPolicy, LMS_API_BASE };

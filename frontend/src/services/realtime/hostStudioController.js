@@ -13,11 +13,6 @@
 //   restart a dead one, a beforeunload prompt guards the tab, and the
 //   controller is a module singleton so leaving the page inside the app does
 //   not cut the broadcast (a small badge links back to the studio).
-// - Phase 2: the heartbeat reports the link state (publishing | reconnecting |
-//   connected) and keeps running while the studio is connected, so the server
-//   holds the class through a host reconnect ("Host reconnecting..." for
-//   viewers) and knows the host is present. Go Live is asynchronous (202 +
-//   polling). A reload of a live studio resumes the broadcast on its own.
 import {
   DisconnectReason,
   LocalAudioTrack,
@@ -47,28 +42,6 @@ export const HOST_SOURCE = Object.freeze({
 export const RECONNECT_BACKOFF_MS = Object.freeze([1000, 2000, 4000, 8000, 15000]);
 export const HEARTBEAT_INTERVAL_MS = 10000;
 export const STUDIO_PATH = "/broadcasting";
-export const GO_LIVE_TIMEOUT_MS = 90000;
-export const GO_LIVE_CANCELLED = "go_live_cancelled";
-
-// Thrown by startLive() when the host pressed Cancel while it was starting.
-export class GoLiveCancelledError extends Error {
-  constructor() {
-    super("Go Live cancelled.");
-    this.name = "GoLiveCancelledError";
-    this.code = GO_LIVE_CANCELLED;
-  }
-}
-export const RESUME_STORAGE_KEY = "alsyed.hostStudio.resume";
-export const RESUME_MAX_AGE_MS = 6 * 60 * 60 * 1000;
-// Stream states a reload may resume into (anything but ended/idle).
-const RESUMABLE_STREAM_STATES = new Set(["live", "interrupted", "failed", "starting", "stopped"]);
-
-// What the heartbeat tells the server about the host's link.
-export const HOST_HEARTBEAT_STATE = Object.freeze({
-  PUBLISHING: "publishing",
-  RECONNECTING: "reconnecting",
-  CONNECTED: "connected",
-});
 
 // Disconnects that a rejoin cannot fix.
 const TERMINAL_DISCONNECT_REASONS = new Set([
@@ -88,10 +61,6 @@ const INITIAL_STATE = Object.freeze({
   lastSession: null,
   lastHeartbeatAt: 0,
   reconnectAttempt: 0,
-  // The server reports delivery failed while this studio is live: the page
-  // shows a blocking banner with a one-tap Resume.
-  deliveryFailed: false,
-  goingLive: false,
   error: "",
   info: "",
 });
@@ -115,14 +84,6 @@ function errorMessage(error, fallback) {
   );
 }
 
-function safeSessionStorage() {
-  try {
-    return typeof window !== "undefined" ? window.sessionStorage : null;
-  } catch {
-    return null;
-  }
-}
-
 function defaultDeps() {
   const hasWindow = typeof window !== "undefined";
   return {
@@ -137,18 +98,10 @@ function defaultDeps() {
     clearInterval: (id) => globalThis.clearInterval(id),
     window: hasWindow ? window : null,
     document: typeof document !== "undefined" ? document : null,
-    storage: safeSessionStorage(),
-    now: () => Date.now(),
-    sleep: null,
     // Supplied by the page (API calls).
     fetchToken: null,
     sendHeartbeat: null,
     startStream: null,
-    // Cancel while starting: stream/stop/ (resolves with the session row).
-    stopStream: null,
-    // Async Go Live: POST answers 202 {state:"starting"}; GET is the poll.
-    goLive: null,
-    getGoLiveStatus: null,
   };
 }
 
@@ -186,8 +139,6 @@ export class HostStudioController {
     this.handlePageHide = this.handlePageHide.bind(this);
     this.handleOnline = this.handleOnline.bind(this);
     this.windowListenersBound = false;
-    // The Go Live in progress ({ sessionId, cancelled }), for cancelGoLive().
-    this.goLiveAttempt = null;
   }
 
   // ---- state -------------------------------------------------------------
@@ -220,23 +171,7 @@ export class HostStudioController {
       }
     });
     this.syncWindowListeners();
-    this.syncHeartbeat();
     this.syncDetachedIndicator();
-  }
-
-  // What the heartbeat reports: "reconnecting" while LiveKit (or this
-  // controller) is rejoining, so the server holds the class instead of
-  // failing delivery for every viewer.
-  hostLinkState() {
-    if (this.isPublishing()) return HOST_HEARTBEAT_STATE.PUBLISHING;
-    if (
-      this.state.link === HOST_LINK.RECONNECTING ||
-      this.reconnectTimer !== null ||
-      (this.wantConnected && !this.room)
-    ) {
-      return HOST_HEARTBEAT_STATE.RECONNECTING;
-    }
-    return HOST_HEARTBEAT_STATE.CONNECTED;
   }
 
   isPublishing() {
@@ -511,22 +446,15 @@ export class HostStudioController {
 
   async afterReconnect() {
     if (!this.state.live) return;
-    // The egress may have ended while we were away: the heartbeat (and the
-    // server's live reconciler) restart a dead one. A stream the server marked
-    // failed, or stopped after the reconnect grace period, is started again
-    // because this studio never pressed Stop.
-    const sessionId = this.state.sessionId;
-    const data = await this.heartbeatNow({ fromReconnect: true });
+    // The egress may have ended while we were away: the heartbeat restarts a
+    // dead one, and Start Live revives a stream already marked failed.
+    const data = await this.heartbeatNow();
     const streamStatus = String(data?.session?.stream_status || "").toLowerCase();
-    const sessionStatus = String(data?.session?.status || "").toLowerCase();
-    // A timer heartbeat already in flight may have seen "stopped" and cleared
-    // `live`; this studio was live before the drop, so it still resumes.
-    if (!data?.session || sessionStatus === "ended" || !this.wantConnected || this.state.sessionId !== sessionId) {
-      return;
-    }
-    if (streamStatus === "failed" || streamStatus === "stopped") {
+    if (!this.state.live || !this.deps.startStream || !data?.session) return;
+    if (streamStatus === "failed") {
       try {
-        await this.startLive(this.state.sessionId);
+        const session = await this.deps.startStream(this.state.sessionId);
+        if (session) this.setState({ lastSession: session, error: "" });
       } catch (error) {
         this.setState({ error: errorMessage(error, "Live delivery could not be restarted. Press Start Live.") });
       }
@@ -668,7 +596,6 @@ export class HostStudioController {
     this.wantConnected = false;
     this.cancelReconnect();
     this.stopHeartbeat();
-    this.clearResume();
     const room = this.room;
     this.room = null;
     this.audioTrack = null;
@@ -690,190 +617,12 @@ export class HostStudioController {
     if (live) {
       if (this.state.sessionId !== null && this.state.sessionId !== sessionId) return;
       this.setState({ live: true, sessionId });
-      this.persistResume(sessionId);
       this.startHeartbeat();
       this.heartbeatNow();
     } else if (this.state.sessionId === sessionId || sessionId === undefined) {
-      this.clearResume();
-      // The heartbeat keeps running as a presence signal while the studio is
-      // still connected; syncHeartbeat (in setState) stops it otherwise.
-      this.setState({ live: false, egress: null, deliveryFailed: false });
+      this.stopHeartbeat();
+      this.setState({ live: false, egress: null });
     }
-  }
-
-  // ---- async Go Live ------------------------------------------------------
-
-  sleep(ms) {
-    if (this.deps.sleep) return this.deps.sleep(ms);
-    return new Promise((resolve) => {
-      this.deps.setTimeout(resolve, ms);
-    });
-  }
-
-  // Go Live without holding a request open on LiveKit: POST answers 202 and
-  // the studio polls until the server reports live (or failed).
-  async startLiveSynchronously(sessionId) {
-    if (!this.deps.startStream) throw new Error("Host Studio is not configured.");
-    const session = await this.deps.startStream(sessionId);
-    this.setLive(sessionId, true);
-    if (session) this.setState({ lastSession: session, deliveryFailed: false });
-    return session;
-  }
-
-  // Bounded: the poll ends live, failed, cancelled or after GO_LIVE_TIMEOUT_MS.
-  // When the server reports the queued job stalled (no worker picked it up)
-  // or the wait runs out, the studio starts the egress on the request path
-  // (stream/start/) once; a 409 there means a worker took the job meanwhile,
-  // so the studio keeps polling for one more timeout window.
-  async startLive(sessionId) {
-    if (!this.deps.goLive || !this.deps.getGoLiveStatus) {
-      return this.startLiveSynchronously(sessionId);
-    }
-    const attempt = { sessionId, cancelled: false };
-    this.goLiveAttempt = attempt;
-    this.setState({ goingLive: true, error: "", deliveryFailed: false });
-    const throwIfCancelled = () => {
-      if (attempt.cancelled) throw new GoLiveCancelledError();
-    };
-    try {
-      let deadline = this.deps.now() + GO_LIVE_TIMEOUT_MS;
-      let triedSynchronous = false;
-      let data;
-      try {
-        data = await this.deps.goLive(sessionId);
-      } catch (error) {
-        // Async Go Live switched off (or an older backend): use stream/start/.
-        const status = Number(error?.response?.status || 0);
-        if (status === 404 || status === 405) return await this.startLiveSynchronously(sessionId);
-        throw error;
-      }
-      throwIfCancelled();
-      while (data && (data.state === "starting" || data.state === "queued")) {
-        const timedOut = this.deps.now() > deadline;
-        if ((data.stalled || timedOut) && !triedSynchronous && this.deps.startStream) {
-          // The queued job is not running (worker down or backlogged): start
-          // the egress on the request path instead of leaving the host stuck.
-          triedSynchronous = true;
-          try {
-            const session = await this.startLiveSynchronously(sessionId);
-            if (attempt.cancelled) {
-              this.setLive(sessionId, false);
-              throw new GoLiveCancelledError();
-            }
-            return session;
-          } catch (error) {
-            if (Number(error?.response?.status || 0) !== 409) throw error;
-            deadline = this.deps.now() + GO_LIVE_TIMEOUT_MS;
-          }
-        } else if (timedOut) {
-          throw new Error("Going live is taking longer than expected. Check your connection and press Go Live again.");
-        }
-        await this.sleep(Math.max(250, Number(data.poll_after_ms) || 1000));
-        throwIfCancelled();
-        data = await this.deps.getGoLiveStatus(sessionId);
-        throwIfCancelled();
-      }
-      if (data?.session) this.setState({ lastSession: data.session });
-      if (data?.state === "live") {
-        this.setLive(sessionId, true);
-        return data.session || null;
-      }
-      throw new Error(data?.error || "The live stream could not start. Press Go Live again.");
-    } finally {
-      if (this.goLiveAttempt === attempt) this.goLiveAttempt = null;
-      this.setState({ goingLive: false });
-    }
-  }
-
-  // Cancel a Go Live that is still starting: the poll stops and the server
-  // stops the stream (starting -> stopped), so a queued job starts nothing.
-  // Resolves with the stopped session row (or null when nothing was starting).
-  async cancelGoLive() {
-    const attempt = this.goLiveAttempt;
-    if (!attempt) return null;
-    attempt.cancelled = true;
-    if (!this.deps.stopStream) return null;
-    const session = await this.deps.stopStream(attempt.sessionId);
-    if (session) this.setState({ lastSession: session });
-    return session || null;
-  }
-
-  // One-tap "Resume broadcast" after the server marked delivery failed.
-  resumeDelivery() {
-    const sessionId = this.state.sessionId;
-    if (sessionId === null) return Promise.resolve(null);
-    return this.startLive(sessionId);
-  }
-
-  // ---- resume after a reload ----------------------------------------------
-
-  persistResume(sessionId) {
-    try {
-      this.deps.storage?.setItem(RESUME_STORAGE_KEY, JSON.stringify({ sessionId, at: this.deps.now() }));
-    } catch {
-      // Storage unavailable (private mode): resume just will not happen.
-    }
-  }
-
-  clearResume() {
-    try {
-      this.deps.storage?.removeItem(RESUME_STORAGE_KEY);
-    } catch {
-      // ignore
-    }
-  }
-
-  readResumeCandidate() {
-    try {
-      const raw = this.deps.storage?.getItem(RESUME_STORAGE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed || parsed.sessionId === undefined || parsed.sessionId === null) return null;
-      if (this.deps.now() - Number(parsed.at || 0) > RESUME_MAX_AGE_MS) {
-        this.clearResume();
-        return null;
-      }
-      return parsed;
-    } catch {
-      return null;
-    }
-  }
-
-  // Called by the studio page after a reload with the session row it loaded.
-  // Reconnects the camera (a screen share needs a click) and resumes the
-  // broadcast this tab was publishing before the reload.
-  async resumeAfterReload(session) {
-    const candidate = this.readResumeCandidate();
-    if (!candidate || !session || String(candidate.sessionId) !== String(session.id)) return false;
-    if (this.room) return false;
-    const status = String(session.status || "").toLowerCase();
-    const streamStatus = String(session.stream_status || "").toLowerCase();
-    if (status !== "live" || !RESUMABLE_STREAM_STATES.has(streamStatus)) {
-      this.clearResume();
-      return false;
-    }
-    await this.connect(session.id, HOST_SOURCE.CAMERA);
-    if (streamStatus === "live" || streamStatus === "interrupted") {
-      // The heartbeat (publishing) lets the server restart the egress.
-      this.setLive(session.id, true);
-    } else {
-      await this.startLive(session.id);
-    }
-    this.setState({
-      info: "The page reloaded while you were live. Your camera reconnected and the broadcast resumed.",
-    });
-    return true;
-  }
-
-  // Presence heartbeat: while live, and while the studio is connected to a
-  // session (so the server knows the host is still there during a pause).
-  syncHeartbeat() {
-    const shouldRun =
-      Boolean(this.deps.sendHeartbeat) &&
-      this.state.sessionId !== null &&
-      (this.state.live || this.wantConnected);
-    if (shouldRun) this.startHeartbeat();
-    else this.stopHeartbeat();
   }
 
   startHeartbeat() {
@@ -890,47 +639,26 @@ export class HostStudioController {
     }
   }
 
-  heartbeatNow({ fromReconnect = false } = {}) {
-    if (
-      this.state.sessionId === null ||
-      !this.deps.sendHeartbeat ||
-      !(this.state.live || this.wantConnected)
-    ) {
+  heartbeatNow() {
+    if (!this.state.live || this.state.sessionId === null || !this.deps.sendHeartbeat) {
       return Promise.resolve(null);
     }
     if (this.heartbeatInFlight) return this.heartbeatInFlight;
     const sessionId = this.state.sessionId;
     this.heartbeatInFlight = (async () => {
       try {
-        const publishing = this.isPublishing();
-        const data = await this.deps.sendHeartbeat(sessionId, {
-          publishing,
-          state: this.hostLinkState(),
-        });
+        const data = await this.deps.sendHeartbeat(sessionId, { publishing: this.isPublishing() });
         if (!data || this.state.sessionId !== sessionId) return data;
         const session = data.session || null;
-        const status = String(session?.status || "").toLowerCase();
-        const streamStatus = String(session?.stream_status || "").toLowerCase();
-        const patch = {
-          egress: data.egress ?? null,
-          lastSession: session,
-          lastHeartbeatAt: this.deps.now(),
-          deliveryFailed: Boolean(this.state.live && streamStatus === "failed"),
-        };
+        const patch = { egress: data.egress ?? null, lastSession: session, lastHeartbeatAt: Date.now() };
         if (data.restarted) {
           patch.info = "Live delivery had stopped and was restarted automatically.";
         }
         this.setState(patch);
-        if (status === "ended") {
-          this.setLive(sessionId, false);
-        } else if (
-          streamStatus === "stopped" &&
-          !fromReconnect &&
-          this.state.live &&
-          this.state.link === HOST_LINK.CONNECTED
-        ) {
-          // Stopped from another tab or by an admin while this studio was
-          // connected. (After a reconnect, afterReconnect resumes instead.)
+        const status = String(session?.status || "").toLowerCase();
+        const streamStatus = String(session?.stream_status || "").toLowerCase();
+        if (status === "ended" || streamStatus === "stopped") {
+          // Stopped from another tab or by an admin.
           this.setLive(sessionId, false);
         }
         return data;

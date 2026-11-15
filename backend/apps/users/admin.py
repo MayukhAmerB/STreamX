@@ -1,4 +1,3 @@
-from config.audit import log_security_event
 from django import forms
 from django.contrib import admin
 from django.contrib.admin.sites import NotRegistered
@@ -7,64 +6,24 @@ from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import Group
 from django.core.exceptions import PermissionDenied
 from django.db.models import Count, Q
-from django.http import Http404, JsonResponse
+from django.http import Http404
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils.html import format_html
+from rest_framework.authtoken.models import Token
 
 from apps.courses.models import Enrollment, LiveClassEnrollment
+from config.audit import log_security_event
 
-from .models import AsyncJob, User, UserTermsStatus
+from .models import AsyncJob, TermsAcceptance, User, UserTermsStatus
 
 admin.site.enable_nav_sidebar = True
 
-# Groups are not used (roles live on the user). DRF registers its token admin
-# for the TokenProxy model; it stays, filed under System > API tokens.
-for model in (Group,):
+for model in (Group, Token):
     try:
         admin.site.unregister(model)
     except NotRegistered:
         pass
-
-
-# ---------------------------------------------------------------- palette
-# Al Syed Admin's Ctrl/Cmd+K palette (UI plan §4.5) searches records through
-# the same service as GET /api/admin/search/ (apps.console_api.search), but
-# with the admin session, so it works for staff who only signed in here.
-# ?format=json feeds the palette; without it the page is a plain search form
-# (the no-JS fallback of the header search button).
-def enterprise_search_view(request):
-    from apps.console_api.search import min_chars, search
-
-    query = " ".join(str(request.GET.get("q", "")).split())[:120]
-    payload = {"q": query, "groups": []}
-    if len(query) >= min_chars():
-        payload = search(request.user, query)
-    if request.GET.get("format") == "json":
-        response = JsonResponse(payload)
-        response["Cache-Control"] = "no-store, private"
-        return response
-    context = {
-        **admin.site.each_context(request),
-        "title": "Search",
-        "q": query,
-        "payload": payload,
-        "min_chars": min_chars(),
-    }
-    return TemplateResponse(request, "admin/enterprise_search.html", context)
-
-
-if not getattr(admin.site, "_enterprise_search_url", False):
-    _admin_get_urls = admin.site.get_urls
-
-    def _enterprise_admin_urls():
-        return [
-            path("search/", admin.site.admin_view(enterprise_search_view), name="enterprise_search"),
-            *_admin_get_urls(),
-        ]
-
-    admin.site.get_urls = _enterprise_admin_urls
-    admin.site._enterprise_search_url = True
 
 
 def highlighted_identity(value):

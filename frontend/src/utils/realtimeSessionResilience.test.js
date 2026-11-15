@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  missingActiveSessionId,
   reconcileActiveLivePayload,
   retainRealtimeSessionsOnRefresh,
 } from "./realtimeSessionResilience";
@@ -32,19 +31,5 @@ describe("realtime session resilience", () => {
     ]);
     expect(result.session.chat_enabled).toBe(false);
     expect(result.broadcast).toEqual(payload.broadcast);
-  });
-});
-
-describe("missing active session", () => {
-  it("reports the watched session only when a refresh no longer lists it", () => {
-    const payload = { session: { id: 7, status: "live" }, mode: "broadcast" };
-    expect(missingActiveSessionId(payload, [{ id: 7 }])).toBeNull();
-    expect(missingActiveSessionId(payload, [{ id: 8 }])).toBe(7);
-    expect(missingActiveSessionId(payload, [])).toBe(7);
-  });
-
-  it("ignores pages that are not watching anything", () => {
-    expect(missingActiveSessionId(null, [])).toBeNull();
-    expect(missingActiveSessionId({ session: {} }, [])).toBeNull();
   });
 });

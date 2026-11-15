@@ -15,19 +15,9 @@ One tick:
                runs on a separate finalize thread with its own bounded queue:
                the capture loop keeps starting new classes meanwhile.
 3. publish  - PROCESSING rows whose lecture HLS is ready -> PUBLISHED.
-4. sweep    - hourly: staged OBS uploads of FAILED recordings past
+4. sweep    - hourly: captured parts / staged uploads of FAILED recordings past
                STREAM_RECORDER_FAILED_RETENTION_DAYS, and work dirs or staged
-               uploads that no recording row owns any more. Captured parts of
-               a class that never reached a lecture are never swept.
-
-Phase 2 (no-click recordings):
-* every broadcast whose stream is live gets a take automatically (no Start
-  Recording button; RECORDING_AUTO_ALL_BROADCASTS);
-* one take per class: Stop only pauses the take for
-  STREAM_RECORDER_STOP_GRACE_SECONDS, and a feed that has been offline for
-  STREAM_RECORDER_IDLE_FINALIZE_SECONDS finalizes it (no 6 h wait);
-* browser-fallback uploads and the periodic import scan join the same
-  finalize path; a nightly canary runs ``verify_recording_pipeline``.
+               uploads that no recording row owns any more.
 
 The recorder is a viewer of Owncast's HLS output and never talks to OBS or the
 ingest, so a crash here cannot interrupt the live class.
@@ -39,7 +29,6 @@ import queue
 import re
 import shutil
 import subprocess
-import sys
 import threading
 import time
 from dataclasses import dataclass, field
@@ -47,7 +36,6 @@ from datetime import timedelta
 from pathlib import Path
 
 from django.conf import settings
-from django.core.cache import cache
 from django.db import close_old_connections, connections
 from django.db.models import Q
 from django.utils import timezone
@@ -68,10 +56,6 @@ WORK_DIR_PATTERN = re.compile(r"^class-recording-(\d+)$")
 # Leftovers younger than this are never swept: the row that owns a new work dir
 # or staged upload may not be visible yet.
 ORPHAN_GRACE_SECONDS = 3600
-LAST_TICK_CACHE_KEY = "recording:recorder:last_tick"
-CANARY_RESULT_CACHE_KEY = "recording:canary:last_result"
-CANARY_MAX_SECONDS = 30 * 60
-AUTO_START_INTERVAL_SECONDS = 4
 
 
 @dataclass
@@ -176,8 +160,6 @@ class StreamRecorder:
         should_finalize=None,
         hls_filter=None,
         recording_ids=None,
-        canary_popen=subprocess.Popen,
-        service_duties=False,
     ):
         """``recording_ids`` limits every query of this recorder to those rows
         (the ``verify_recording_pipeline`` check drives a recorder that must
@@ -191,14 +173,6 @@ class StreamRecorder:
         self._next_start = {}
         self._last_heartbeat = {}
         self._next_sweep = 0.0
-        self._next_import_scan = monotonic() + 300  # let the service settle first
-        self._next_auto_start = 0.0
-        self._canary_popen = canary_popen
-        # The periodic import scan and the nightly canary belong to the
-        # long-running service only (run_stream_recorder), never to a one-off
-        # tick, the verification command or a test.
-        self._service_duties = bool(service_duties)
-        self._canary = None  # (process, started_monotonic, day_key, log_path)
         self.finalizer = (
             FinalizeWorker(
                 self.finalize_recording,
@@ -219,13 +193,6 @@ class StreamRecorder:
         self._stop_orphan_captures()
         if self._recording_ids is None:
             self.sweep_if_due()
-            if self._service_duties:
-                self.import_scan_if_due()
-                self.canary_if_due()
-            try:
-                cache.set(LAST_TICK_CACHE_KEY, time.time(), timeout=3600)
-            except Exception:  # metrics only
-                pass
 
     def shutdown(self):
         for recording_id in list(self.captures):
@@ -251,13 +218,6 @@ class StreamRecorder:
                 status_cache["value"] = self._owncast_status(force_refresh=True) or {}
             return status_cache["value"]
 
-        if self._recording_ids is None and self._monotonic() >= self._next_auto_start:
-            self._next_auto_start = self._monotonic() + AUTO_START_INTERVAL_SECONDS
-            try:
-                self.ensure_live_broadcasts_recorded()
-            except Exception:  # never let the auto-start stop the capture loop
-                logger.exception("CLASS_RECORDING_AUTO_START_FAILED")
-
         recordings = self._scoped(
             R.objects.filter(source=R.SOURCE_SERVER, state=R.STATE_RECORDING).select_related("session")
         )
@@ -272,7 +232,7 @@ class StreamRecorder:
                 self._next_start.pop(recording.pk, None)
                 capture = None
 
-            stop_reason = self._finalize_reason(recording, owncast, capturing=capture is not None)
+            stop_reason = self._finalize_reason(recording)
             if stop_reason:
                 self._stop_capture(recording.pk, reason=stop_reason)
                 self._forget_filter_state(recording.pk)
@@ -294,45 +254,24 @@ class StreamRecorder:
             if capture is None and self._monotonic() >= self._next_start.get(recording.pk, 0):
                 status = owncast()
                 if status.get("online"):
-                    if self._start_capture(recording, connect_marker=str(status.get("lastConnectTime") or "")):
-                        self._mark_media(recording)
-            self._heartbeat(recording, media=recording.pk in self.captures)
+                    self._start_capture(recording, connect_marker=str(status.get("lastConnectTime") or ""))
+            self._heartbeat(recording)
 
     @staticmethod
     def _is_new_obs_connection(capture, status):
         marker = str(status.get("lastConnectTime") or "")
         return bool(status.get("online") and marker and capture.connect_marker and marker != capture.connect_marker)
 
-    def _finalize_reason(self, recording, owncast=None, *, capturing=False):
+    def _finalize_reason(self, recording):
         session = recording.session
         if session is None or session.status == session.STATUS_ENDED:
             return "session_ended"
-        now = timezone.now()
         started_at = recording.started_at or recording.created_at
-        if started_at and (now - started_at).total_seconds() > config.max_duration_seconds():
+        if started_at and (timezone.now() - started_at).total_seconds() > config.max_duration_seconds():
             return "max_duration_reached"
-        if recording.stop_requested_at is not None:
-            if (now - recording.stop_requested_at).total_seconds() >= config.stop_grace_seconds():
-                return "stream_stopped"
-            return ""
-        if capturing:
-            return ""
-        # Idle finalize: the feed has been gone long enough that the class is over.
-        last_media = recording.last_media_at
-        if last_media is None and list_parts(recording.work_dir):
-            last_media = recording.recorder_heartbeat_at or started_at
-        if last_media is None:
-            return ""  # nothing captured yet: wait for the class (or for its end)
-        if (now - last_media).total_seconds() < config.idle_finalize_seconds():
-            return ""
-        status = owncast() if owncast is not None else {}
-        if status.get("online"):
-            return ""
-        return "feed_offline_timeout"
+        return ""
 
     def _pause_reason(self, recording):
-        if recording.stop_requested_at is not None:
-            return "stop_requested"
         if captured_bytes(recording.work_dir) >= config.max_capture_bytes():
             return "size_cap_reached"
         free = publisher.free_disk_bytes(recording.work_dir or config.work_root())
@@ -437,7 +376,7 @@ class StreamRecorder:
                 self._stop_capture(recording_id, reason="no_longer_recording")
                 self._forget_filter_state(recording_id)
 
-    def _heartbeat(self, recording, note=None, *, media=False):
+    def _heartbeat(self, recording, note=None):
         now = self._monotonic()
         if now - self._last_heartbeat.get(recording.pk, -1e9) < config.heartbeat_seconds():
             return
@@ -451,68 +390,7 @@ class StreamRecorder:
         }
         if note is not None:
             updates["error"] = note
-        elif recording.error.startswith("Capture paused:"):
-            updates["error"] = ""
-        if media:
-            updates["last_media_at"] = timezone.now()
         R.objects.filter(pk=recording.pk, state=R.STATE_RECORDING).update(**updates)
-
-    def _mark_media(self, recording):
-        now = timezone.now()
-        recording.last_media_at = now
-        R.objects.filter(pk=recording.pk, state=R.STATE_RECORDING).update(last_media_at=now)
-
-    # ------------------------------------------------------ auto start
-    def ensure_live_broadcasts_recorded(self):
-        """Every broadcast whose stream is live gets a take (no button).
-
-        Owncast carries one feed, so the broadcast that most recently
-        entered "live" is recorded (``updated_at``: every stream transition
-        writes it), not the one created last. A Host Studio session only
-        counts while it really feeds Owncast (an egress id and a fresh host
-        heartbeat): a studio tab closed without End can stay "live" in shadow
-        mode and must not capture the real class's feed into its own take.
-        A capture belonging to another session that is still streaming is
-        left alone (ambiguous; the explicit start path or the live
-        reconciler decides); one whose session stopped streaming is
-        superseded.
-        """
-        if not config.recorder_enabled():
-            return None
-        from ..models import RealtimeSession
-
-        live = [
-            session
-            for session in RealtimeSession.objects.filter(
-                session_type=RealtimeSession.TYPE_BROADCASTING,
-                stream_status=RealtimeSession.STREAM_LIVE,
-            )
-            .exclude(status=RealtimeSession.STATUS_ENDED)
-            .select_related("target_module", "linked_live_class")
-            .order_by("-updated_at", "-pk")[:5]
-            if recording_services.is_recordable_broadcast(session) and _feeds_owncast(session)
-        ]
-        if not live:
-            return None
-        target = live[0]
-        capturing = list(R.objects.filter(source=R.SOURCE_SERVER, state=R.STATE_RECORDING).values_list(
-            "session_id", "stop_requested_at"
-        ))
-        own = [stop for session_id, stop in capturing if session_id == target.pk]
-        if own and own[0] is None:
-            return None  # already recording this class
-        live_ids = {session.pk for session in live}
-        if any(session_id != target.pk and session_id in live_ids for session_id, _stop in capturing):
-            return None
-        recording = recording_services.ensure_server_recording(target)
-        if recording is not None and not own:
-            logger.info(
-                "CLASS_RECORDING_AUTO_STARTED recording_id=%s session_id=%s stream_service=%s",
-                recording.pk,
-                target.pk,
-                target.stream_service,
-            )
-        return recording
 
     # -------------------------------------------------------------- finalize
     def finalize_pending(self):
@@ -544,8 +422,6 @@ class StreamRecorder:
                 self._finalize_egress(recording)
             elif recording.source == R.SOURCE_IMPORTED:
                 publisher.finalize_import(recording)
-            elif recording.source == R.SOURCE_BROWSER_FALLBACK:
-                publisher.finalize_browser_fallback(recording)
             elif is_pending_obs_remux(recording):
                 publisher.finalize_obs_upload(recording)
             else:
@@ -663,11 +539,8 @@ class StreamRecorder:
         retention_days = retention_seconds // 86400
         swept = {"failed": 0, "orphan_dirs": 0, "orphan_uploads": 0}
 
-        # Captured parts of a class that never became a lecture are the only
-        # copy of that class: they are never swept (an alert asks for action).
         expired = R.objects.filter(state=R.STATE_FAILED, updated_at__lt=cutoff).filter(
-            (Q(source=R.SOURCE_SERVER) & Q(lecture__isnull=False))
-            | (Q(source=R.SOURCE_OBS_UPLOAD) & ~Q(source_path=""))
+            Q(source=R.SOURCE_SERVER) | (Q(source=R.SOURCE_OBS_UPLOAD) & ~Q(source_path=""))
         )
         for recording in expired:
             note = ""
@@ -736,176 +609,6 @@ class StreamRecorder:
                 swept["orphan_uploads"] += 1
                 logger.info("CLASS_RECORDING_STAGED_UPLOAD_SWEPT file=%s", item.name)
         return swept
-
-
-    # ---------------------------------------------------------- import scan
-    def import_scan_if_due(self):
-        interval = config.import_scan_interval_seconds()
-        if interval <= 0:
-            return None
-        now = self._monotonic()
-        if now < self._next_import_scan:
-            return None
-        self._next_import_scan = now + interval
-        try:
-            return self.run_import_scan()
-        except Exception:
-            logger.exception("CLASS_RECORDING_IMPORT_SCAN_CRASH")
-            return None
-
-    def run_import_scan(self):
-        """List unlinked videos (as the admin "Scan" does) and publish the safe ones.
-
-        Only files of a class that has no recording lecture at all, linked to
-        its LiveKit recording and written within RECORDING_RECONCILE_LOOKBACK
-        are published automatically; everything else stays "imported" for an
-        admin, so deliberately deleted lectures never come back.
-        """
-        from . import importer
-
-        report = importer.scan_existing_recordings(probe=True, probe_budget_seconds=30, limit=50)
-        published = 0
-        if config.import_auto_publish():
-            cutoff = timezone.now() - timedelta(seconds=config.reconcile_lookback_seconds())
-            rows = R.objects.filter(
-                pk__in=[pk for pk in report.created if isinstance(pk, int)],
-                state=R.STATE_IMPORTED,
-                session__isnull=False,
-                livekit_recording__isnull=False,
-                started_at__gte=cutoff,
-            ).select_related("session")
-            for row in rows:
-                has_lecture = (
-                    R.objects.filter(session_id=row.session_id, lecture__isnull=False).exclude(pk=row.pk).exists()
-                )
-                if has_lecture:
-                    continue
-                if state.transition(row, R.STATE_FINALIZING, reason="import_auto_publish"):
-                    published += 1
-        if report.created or published:
-            logger.info(
-                "CLASS_RECORDING_IMPORT_SCAN created=%s auto_published=%s summary=%s",
-                len(report.created),
-                published,
-                report.summary(),
-            )
-        return {"created": len(report.created), "auto_published": published}
-
-    # ---------------------------------------------------------------- canary
-    def canary_if_due(self, *, now=None):
-        """Nightly ``verify_recording_pipeline`` in a subprocess (own settings,
-        own temp dirs, rolled-back rows); alert on failure."""
-        if self._canary is not None:
-            return self._poll_canary()
-        if not config.canary_enabled():
-            return None
-        local = timezone.localtime(now or timezone.now())
-        if local.hour != config.canary_hour():
-            return None
-        day_key = local.date().isoformat()
-        if R.objects.filter(state__in=R.ACTIVE_STATES).exists():
-            return None  # a class is being recorded or saved: try again later this hour
-        try:
-            if not cache.add(f"recording:canary:started:{day_key}", 1, timeout=2 * 86400):
-                return None
-        except Exception:
-            return None
-        log_path = config.work_root() / f"canary-{day_key}.log"
-        try:
-            log_path.parent.mkdir(parents=True, exist_ok=True)
-            handle = open(log_path, "wb")  # noqa: SIM115 - closed when the canary ends
-            process = self._canary_popen(
-                [sys.executable, str(Path(settings.BASE_DIR) / "manage.py"), "verify_recording_pipeline"],
-                stdin=subprocess.DEVNULL,
-                stdout=handle,
-                stderr=subprocess.STDOUT,
-                cwd=str(settings.BASE_DIR),
-                env=canary_environment(),
-            )
-        except OSError as exc:
-            logger.error("CLASS_RECORDING_CANARY_START_FAILED error=%s", exc)
-            return None
-        self._canary = (process, self._monotonic(), day_key, log_path, handle)
-        logger.info("CLASS_RECORDING_CANARY_STARTED day=%s log=%s", day_key, log_path)
-        return "started"
-
-    def _poll_canary(self):
-        process, started, day_key, log_path, handle = self._canary
-        code = process.poll()
-        if code is None:
-            if self._monotonic() - started < CANARY_MAX_SECONDS:
-                return "running"
-            process.kill()
-            code = "timeout"
-        self._canary = None
-        try:
-            handle.close()
-        except OSError:
-            pass
-        ok = code == 0
-        tail = ""
-        try:
-            tail = log_path.read_text(encoding="utf-8", errors="replace")[-1500:]
-        except OSError:
-            pass
-        try:
-            cache.set(CANARY_RESULT_CACHE_KEY, {"ok": ok, "at": time.time(), "day": day_key}, timeout=8 * 86400)
-        except Exception:
-            pass
-        if ok:
-            logger.info("CLASS_RECORDING_CANARY_PASSED day=%s", day_key)
-            return "passed"
-        logger.error("CLASS_RECORDING_CANARY_FAILED day=%s exit=%s", day_key, code)
-        from . import alerts
-
-        alerts.canary_failed(f"exit {code}. {tail}", day_key)
-        return "failed"
-
-
-_PGBOUNCER_HOST = re.compile(r"@pgbouncer(:\d+)?/")
-
-
-def canary_environment(environ=None):
-    """Environment for the nightly ``verify_recording_pipeline`` subprocess.
-
-    The canary holds ONE rolled-back transaction across real ffmpeg work for
-    minutes. Through PgBouncer (transaction pooling) that pins a pooled server
-    connection for the whole run, and the role's statement / idle-in-transaction
-    timeouts (infra/hostinger/apply-db-role-timeouts.sh) would cancel it: a false
-    "canary failed" every night. Like backend/migrate.sh, it therefore connects
-    DIRECTLY to PostgreSQL (RECORDING_CANARY_DATABASE_URL, else
-    DATABASE_MIGRATE_URL, else DATABASE_URL with the ``@pgbouncer`` host rewritten
-    to ``@postgres:5432``), where the libpq options below override the role
-    defaults. ``verification._lift_db_timeouts_for_this_transaction`` also lifts
-    them with SET LOCAL, so a URL that still goes through a pooler works too.
-    """
-    env = dict(os.environ if environ is None else environ)
-    url = env.get("RECORDING_CANARY_DATABASE_URL") or env.get("DATABASE_MIGRATE_URL") or env.get("DATABASE_URL") or ""
-    direct = _PGBOUNCER_HOST.sub("@postgres:5432/", url)
-    if direct:
-        env["DATABASE_URL"] = direct
-    if "@pgbouncer" not in direct:
-        env["DATABASE_BEHIND_POOLER"] = "0"
-    env["DATABASE_STATEMENT_TIMEOUT_MS"] = "0"
-    env["DATABASE_IDLE_IN_TX_TIMEOUT_MS"] = "0"
-    # The connection lives for one run; never keep it for reuse.
-    env["DATABASE_CONN_MAX_AGE"] = "0"
-    return env
-
-
-def _feeds_owncast(session):
-    """Could this live broadcast be the feed Owncast is carrying right now?
-
-    OBS publishes to Owncast directly. A Host Studio broadcast reaches it only
-    through its LiveKit egress while the host's studio is open.
-    """
-    if session.stream_service == session.STREAM_SERVICE_OBS:
-        return True
-    if not str(session.livekit_egress_id or "").strip():
-        return False
-    from .. import lifecycle
-
-    return lifecycle.read_host_heartbeat(session.pk) is not None
 
 
 def _norm(path):

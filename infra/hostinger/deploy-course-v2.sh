@@ -32,13 +32,6 @@ services=(backend backend-2 backend-3 backend-4 payment-backend-1 payment-backen
 for service in "${services[@]}"; do
   grep -Fxq "$service" <<< "$configured"
 done
-# Phase 2 recordings: the stream recorder runs the capture/finalize/publish
-# code, so it is rebuilt and recreated with every course release (it lives in
-# the optional async-workers compose file).
-recorder_services=()
-if grep -Fxq stream-recorder <<< "$configured"; then
-  recorder_services=(stream-recorder)
-fi
 docker exec streamx-gateway-1 nginx -t
 backup=""
 if [[ "${ALLOW_UNBACKED_RELEASE:-}" == "1" ]]; then
@@ -53,7 +46,7 @@ else
   done > "$backup/previous-images.txt"
 fi
 echo 'Building application images.'
-"${compose[@]}" build "${services[@]}" ${recorder_services[@]+"${recorder_services[@]}"}
+"${compose[@]}" build "${services[@]}"
 if [[ -n "$backup" ]]; then
   echo 'Backing up PostgreSQL without restarting it.'
   docker exec streamx-postgres-1 sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup/postgres.dump"
@@ -77,7 +70,7 @@ echo 'Checking and applying forward migrations.'
 "${compose[@]}" run --rm --no-deps -T --entrypoint python backend manage.py check
 "${compose[@]}" run --rm --no-deps -T --entrypoint python backend manage.py makemigrations --check --dry-run
 "${compose[@]}" run --rm --no-deps -T --entrypoint python backend manage.py migrate --plan
-"${compose[@]}" run --rm --no-deps -T --entrypoint sh backend /app/migrate.sh --noinput
+"${compose[@]}" run --rm --no-deps -T --entrypoint python backend manage.py migrate --noinput
 for service in backend backend-2 backend-3 backend-4 payment-backend-1 payment-backend-2; do
   "${compose[@]}" up -d --no-deps --no-build --wait --wait-timeout 180 "$service"
   docker exec streamx-gateway-1 nginx -t
@@ -85,11 +78,6 @@ for service in backend backend-2 backend-3 backend-4 payment-backend-1 payment-b
 done
 "${compose[@]}" up -d --no-deps --no-build --scale worker=2 --wait --wait-timeout 180 worker
 "${compose[@]}" up -d --no-deps --no-build --wait --wait-timeout 180 worker-2 transcoder
-if (( ${#recorder_services[@]} )); then
-  # A restart mid-class only starts the next part of the same take; still,
-  # release outside class times.
-  "${compose[@]}" up -d --no-deps --no-build --wait --wait-timeout 180 stream-recorder
-fi
 "${compose[@]}" exec -T backend python manage.py setup_course_experience --publish
 "${compose[@]}" up -d --no-deps --no-build --wait --wait-timeout 180 frontend owlcognito-frontend
 docker exec streamx-gateway-1 nginx -t

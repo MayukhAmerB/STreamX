@@ -136,13 +136,12 @@
     fill: var(--uc-text-2);
   }
 
-  // "Submitted" / "Resubmitted": a firm neutral outline. Champagne is never a
-  // status colour (plan §0), so the tone name stays but the hue is gray.
   .rpt-chip--accent {
-    border-color: var(--sc-border-strong, var(--uc-border-strong));
+    border-color: var(--uc-accent-line);
+    background-color: var(--uc-accent-soft);
 
     .rpt-chip__icon {
-      fill: var(--sc-text-primary, var(--uc-text));
+      fill: var(--uc-accent);
     }
   }
 
@@ -151,7 +150,7 @@
   }
 
   .rpt-chip--success {
-    border-color: rgba(255, 255, 255, 0.4);
+    border-color: rgba(66, 190, 101, 0.4);
 
     .rpt-chip__icon {
       fill: var(--uc-success);
@@ -159,7 +158,7 @@
   }
 
   .rpt-chip--warning {
-    border-color: rgba(243, 226, 179, 0.45);
+    border-color: rgba(241, 194, 27, 0.45);
 
     .rpt-chip__icon {
       fill: var(--uc-warning);
@@ -167,7 +166,7 @@
   }
 
   .rpt-chip--error {
-    border-color: rgba(255, 255, 255, 0.45);
+    border-color: rgba(250, 77, 86, 0.45);
 
     .rpt-chip__icon {
       fill: var(--uc-error);
@@ -201,7 +200,7 @@
   }
 
   .rpt-countdown--urgent {
-    box-shadow: inset 0 0 0 1px rgba(243, 226, 179, 0.5);
+    box-shadow: inset 0 0 0 1px rgba(241, 194, 27, 0.5);
     color: var(--uc-warning);
   }
 
@@ -752,21 +751,20 @@
     }
   }
 
-  // Selected = the plan's selected-row wash; champagne stays off borders/icons.
   .rpt-file--selected {
-    border-color: var(--sc-border-strong, var(--uc-border-strong));
-    background-color: var(--sc-accent-wash, var(--uc-accent-soft));
+    border-color: var(--uc-accent-line);
+    background-color: var(--uc-accent-soft);
   }
 
   .rpt-upload--error {
-    border-color: rgba(255, 255, 255, 0.45);
+    border-color: rgba(250, 77, 86, 0.45);
   }
 
   .rpt-file__icon {
     display: inline-flex;
 
     svg {
-      fill: var(--sc-text-secondary, var(--uc-text-2));
+      fill: var(--uc-accent);
     }
   }
 
@@ -1668,13 +1666,10 @@
   .rpt-gb {
     margin-block: $spacing-05;
 
-    // Sticky first column: same colour as the rows it covers, a hairline
-    // on its edge shows that the rest scrolls under it.
     .rpt-gb__student {
       position: sticky;
       z-index: 1;
-      background-color: var(--sc-surface-page, var(--uc-page));
-      box-shadow: inset -1px 0 0 var(--sc-border-subtle, var(--uc-border));
+      background-color: var(--uc-surface);
       inset-inline-start: 0;
       min-inline-size: 10rem;
     }
@@ -1700,16 +1695,8 @@
     color: var(--uc-text-muted);
   }
 
-  // Full task title, two lines at most (no mid-word cut-off).
   .rpt-gb__task {
-    display: -webkit-box;
-    overflow: hidden;
-    max-inline-size: 9rem;
-    margin-inline-start: auto;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    text-align: end;
-    white-space: normal;
+    display: block;
   }
 
   .rpt-gb__max {
@@ -1739,12 +1726,8 @@
     }
   }
 
-  // A link to the submission: primary text + underline, never champagne.
   .rpt-gb__status {
-    color: var(--sc-text-primary, var(--uc-text));
-    text-decoration: underline;
-    text-decoration-color: var(--sc-border-strong, var(--uc-border-strong));
-    text-underline-offset: 3px;
+    color: var(--uc-accent);
   }
 
   .rpt-gb__total {
@@ -1832,191 +1815,5 @@
 
   .rpt-due-tile__chevron {
     fill: var(--uc-text-muted);
-  }
-}
-
-// --- Self-service weekly reports (Phase 3) ---------------------------------
-.cds-app {
-  .rpt-weekly-list {
-    display: grid;
-    gap: $spacing-06;
-    margin-block-end: $spacing-07;
-  }
-
-  .rpt-weekly {
-    display: grid;
-    gap: $spacing-05;
-  }
-
-  .rpt-weekly__late {
-    color: var(--uc-warning, var(--cds-support-warning));
-  }
-
-  .rpt-weekly__form {
-    display: grid;
-    gap: $spacing-05;
-    max-inline-size: 40rem;
-  }
-
-  .rpt-weekly__files {
-    display: grid;
-    gap: $spacing-03;
-  }
-
-  .rpt-weekly__file-list {
-    display: grid;
-    gap: $spacing-02;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .rpt-weekly__file {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: $spacing-02 $spacing-03;
-    padding: $spacing-03;
-    border: 1px solid var(--uc-border, var(--cds-border-subtle));
-
-    .rpt-muted {
-      grid-column: 1;
-    }
-
-    .cds--btn {
-      grid-column: 2;
-      grid-row: 1 / span 2;
-    }
-  }
-
-  .rpt-weekly__file .rpt-row__title {
-    overflow-wrap: anywhere;
-  }
-
-  .rpt-weekly__actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: $spacing-03;
-  }
-
-  .rpt-weekly__notice {
-    display: grid;
-    gap: $spacing-02;
-
-    .cds--inline-notification {
-      max-inline-size: none;
-      margin: 0;
-    }
-  }
-
-  .rpt-weekly__notice-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: $spacing-03;
-  }
-
-  .rpt-weekly__existing {
-    display: grid;
-    gap: $spacing-03;
-  }
-
-  .rpt-queue__groups {
-    display: grid;
-    gap: $spacing-06;
-  }
-
-  .rpt-queue__target {
-    display: grid;
-    gap: $spacing-02;
-    margin-block-end: $spacing-05;
-  }
-
-  .rpt-queue__target-title {
-    @include type-style('heading-compact-01');
-
-    overflow-wrap: anywhere;
-  }
-
-  .rpt-policy {
-    display: grid;
-    gap: $spacing-04;
-    max-inline-size: 40rem;
-    margin-block-end: $spacing-06;
-  }
-
-  .rpt-switch-field {
-    display: grid;
-    gap: $spacing-02;
-  }
-
-  .rpt-switch {
-    display: inline-flex;
-    align-items: center;
-    justify-self: start;
-    min-block-size: 2.5rem;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--sc-text-primary, var(--uc-text));
-    cursor: pointer;
-    font: inherit;
-    gap: $spacing-04;
-
-    &:focus-visible {
-      outline: 2px solid var(--sc-focus, #fff);
-      outline-offset: 2px;
-    }
-  }
-
-  .rpt-switch__track {
-    position: relative;
-    display: inline-block;
-    border-radius: var(--sc-radius-pill, 999px);
-    background: var(--sc-border-strong, #6f6f6f);
-    block-size: 1.5rem;
-    inline-size: 3rem;
-    transition: background-color var(--sc-duration-fast-01, 70ms) linear;
-  }
-
-  .rpt-switch__knob {
-    position: absolute;
-    border-radius: var(--sc-radius-pill, 999px);
-    background: #f4f4f4;
-    block-size: 1.125rem;
-    inline-size: 1.125rem;
-    inset-block-start: 0.1875rem;
-    inset-inline-start: 0.1875rem;
-    transition: transform var(--sc-duration-fast-01, 70ms) var(--sc-ease-standard-productive, ease);
-  }
-
-  .rpt-switch[aria-checked='true'] {
-    .rpt-switch__track {
-      background: var(--sc-support-success, #fafafa);
-    }
-
-    .rpt-switch__knob {
-      transform: translateX(1.5rem);
-    }
-  }
-
-  .rpt-switch__label {
-    @include type-style('body-compact-01');
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .rpt-switch__track,
-    .rpt-switch__knob {
-      transition: none;
-    }
-  }
-
-  .rpt-policy__fields {
-    display: grid;
-    gap: $spacing-04;
-
-    @media (min-width: 42rem) {
-      grid-template-columns: 1fr 1fr;
-    }
   }
 }

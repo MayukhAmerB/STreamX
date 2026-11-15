@@ -33,17 +33,6 @@ server {
     add_header Permissions-Policy "accelerometer=(), autoplay=(), camera=(), clipboard-read=(), clipboard-write=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()" always;
     add_header Content-Security-Policy "frame-ancestors 'self'; object-src 'none'; base-uri 'self'; frame-src 'self' https://stream.alsyedinitiative.com" always;
 
-    # Access-checked downloads (lecture videos and resources, recordings):
-    # Django answers X-Accel-Redirect here after its permission check.
-    location ^~ /_protected_media/ {
-        internal;
-        proxy_pass http://media_app/_protected_media/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-
     location /api/ {
         proxy_pass http://backend_app;
         proxy_http_version 1.1;
@@ -71,9 +60,6 @@ server {
 
     location ^~ /media/lecture_videos/ { return 404; }
     location ^~ /media/streams/ { return 404; }
-    location ^~ /media/lecture_resources/ { return 404; }
-    location ^~ /media/realtime_recordings/ { return 404; }
-    location ^~ /media/class-recording-uploads/ { return 404; }
 
     location /media/ {
         proxy_pass http://media_app;

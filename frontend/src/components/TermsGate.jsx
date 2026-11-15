@@ -5,6 +5,7 @@ import { registerPushSubscription } from "../api/notifications";
 import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
 import { requestNotificationPermission, subscribeToBrowserPush } from "../utils/pushNotifications";
+import Button from "./Button";
 
 const fallbackTerms = {
   title: "Terms and Conditions",
@@ -79,91 +80,73 @@ export default function TermsGate() {
   };
 
   return (
-    <div className="fixed inset-0 z-[1000] overflow-y-auto overscroll-contain bg-black/90 px-3 py-3 backdrop-blur-md sm:px-4 sm:py-8">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="terms-gate-title"
-        aria-describedby="terms-gate-lead"
-        className="mx-auto max-w-4xl overflow-hidden rounded-[10px] border border-white/10 bg-[#0a0a0a] pb-[env(safe-area-inset-bottom)]"
-      >
-        <div className="border-b border-white/10 px-5 py-6 sm:px-8 sm:py-8">
-          <p className="flex items-center gap-3 text-xs font-medium uppercase tracking-[0.22em] text-[#8a8a8a]">
-            <span className="text-[#F3E2B3]">Required</span>
-            <span className="h-px w-8 bg-white/20" aria-hidden="true" />
-            <span>Legal consent</span>
+    <div className="fixed inset-0 z-[1000] overflow-y-auto overscroll-contain bg-black/86 px-3 py-3 backdrop-blur-xl sm:px-4 sm:py-6">
+      <div className="mx-auto max-w-4xl overflow-hidden rounded-[20px] border border-white/15 bg-[#080808] pb-[env(safe-area-inset-bottom)] shadow-[0_32px_90px_rgba(0,0,0,0.72)] sm:rounded-[28px]">
+        <div className="border-b border-white/10 bg-gradient-to-r from-[#151515] via-[#101010] to-[#1F1F1F] px-4 py-4 sm:px-7 sm:py-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#BDBDBD]">
+            Required Legal Consent
           </p>
-          <h2 id="terms-gate-title" className="mt-4 text-3xl font-normal leading-none text-white sm:text-5xl">
+          <h2 className="mt-2 font-reference text-2xl font-semibold text-white sm:text-3xl">
             Accept the Terms to continue
           </h2>
-          <p id="terms-gate-lead" className="mt-3 max-w-2xl text-sm leading-6 text-[#a1a1a1]">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#C7C7C7]">
             Every account must accept the current AlsyedInitiative Terms and Conditions before using the platform.
           </p>
         </div>
 
-        <div className="grid gap-5 p-5 sm:gap-6 sm:p-8 lg:grid-cols-[1fr_280px]">
-          <section
-            aria-label="Terms and Conditions text"
-            tabIndex={0}
-            className="max-h-[48vh] overflow-y-auto overscroll-contain rounded-[10px] border border-white/10 bg-black p-4 sm:min-h-[360px] sm:max-h-[58vh] sm:p-5"
-          >
-            <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-[#a1a1a1]">
-              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 font-mono tabular-nums">
+        <div className="grid gap-4 p-4 sm:gap-5 sm:p-7 lg:grid-cols-[1fr_280px]">
+          <section className="max-h-[48vh] overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-black/45 p-3 sm:min-h-[360px] sm:max-h-[58vh] sm:p-4">
+            <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-[#AFAFAF]">
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
                 Version {terms.version}
               </span>
-              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
                 Updated {terms.last_updated}
               </span>
             </div>
-            <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-7 text-[#d4d4d4]">
+            <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-7 text-[#D9D9D9]">
               {terms.body}
             </pre>
           </section>
 
-          <aside className="flex flex-col">
-            <h3 className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#8a8a8a]">
+          <aside className="rounded-2xl border border-white/10 bg-[#121212] p-4">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#E6E6E6]">
               Agreement
             </h3>
-            <p className="mt-3 text-sm leading-6 text-[#a1a1a1]">
+            <p className="mt-3 text-sm leading-6 text-[#BFBFBF]">
               By clicking I Agree, your account, timestamp, IP address, browser details, Terms version, and platform notification consent will be stored as a consent record.
             </p>
-            <p className="mt-3 text-xs leading-5 text-[#8a8a8a]">
+            <p className="mt-3 text-xs leading-5 text-[#9F9F9F]">
               Browser push permission is optional. You can deny the browser prompt and still continue using the platform.
             </p>
-            <label className="mt-5 flex cursor-pointer items-start gap-3 border-t border-white/10 pt-5 text-sm leading-6 text-[#d4d4d4]">
+            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-black/30 p-3 text-sm leading-6 text-[#E3E3E3]">
               <input
                 type="checkbox"
-                className="mt-1 h-4 w-4 shrink-0 accent-white"
+                className="mt-1 h-4 w-4 accent-white"
                 checked={checked}
                 onChange={(event) => setChecked(event.target.checked)}
               />
               <span>I have read, understood, and agree to the Terms and Conditions. I understand browser push notifications are optional.</span>
             </label>
             {error ? (
-              <div role="alert" className="mt-4 flex items-start gap-2 rounded-md bg-[#fafafa] px-3 py-2 text-sm font-medium text-black">
+              <div className="mt-3 rounded-xl border border-red-300/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">
                 {error}
               </div>
             ) : null}
-            <div className="mt-5 grid gap-2">
-              <button
-                type="button"
-                disabled={!checked || submitting}
-                aria-busy={submitting ? "true" : undefined}
-                onClick={handleAccept}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-[#F3E2B3] px-6 text-sm font-semibold text-[#0a0a0a] transition-colors duration-150 hover:bg-[#F8EDCF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F3E2B3] disabled:cursor-not-allowed disabled:border disabled:border-dashed disabled:border-white/25 disabled:bg-white/[0.06] disabled:text-[#a1a1a1]"
-              >
-                {submitting ? "Loading..." : "I Agree"}
-              </button>
+            <div className="mt-4 grid gap-2">
+              <Button type="button" disabled={!checked} loading={submitting} onClick={handleAccept}>
+                I Agree
+              </Button>
               <Link
                 to="/terms"
-                className="inline-flex min-h-11 items-center justify-center rounded-md border border-white/20 px-4 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-white/[0.08] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F3E2B3]"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
               >
                 Open Full Terms Page
               </Link>
               <button
                 type="button"
                 onClick={logout}
-                className="min-h-11 rounded-md px-4 py-2 text-sm font-medium text-[#a1a1a1] underline-offset-4 transition-colors duration-150 hover:text-white hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F3E2B3]"
+                className="min-h-11 rounded-xl border border-red-300/20 px-4 py-2 text-sm font-semibold text-red-200 transition hover:bg-red-500/10"
               >
                 Logout
               </button>

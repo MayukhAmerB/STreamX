@@ -1,22 +1,58 @@
-/* HackPath-philosophy tokens (generated: scripts/build-tokens.mjs). Must stay first. */
-@import "./styles/theme.css";
-@import "./styles/kit.css";
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* WS-KIT (HackPath redesign, PHILOSOPHY §3): Geist everywhere (site, Console,
-   admin), Handlee for the one handwritten accent, Geist Mono for code. The
-   faces live in src/styles/fonts.css (generated; Geist + Handlee latin are
-   preloaded in index.html). Black canvas, #fafafa text, golden-white focus. */
+/* Inter, self-hosted (SIL OFL 1.1, public/fonts/inter/LICENSE.txt), latin subset.
+   400 and 800 are preloaded in index.html. */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/inter/inter-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/inter/inter-latin-500-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/inter/inter-latin-600-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/inter/inter-latin-700-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/inter/inter-latin-800-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 
 :root {
-  color-scheme: dark;
-  /* The public site renders at 1:1 (plan §7.1: the old 0.9 zoom is gone).
-     Kept at 1 for code that still reads it. */
-  --site-zoom: 1;
-  --font-sans: var(--sc-font-sans, "Geist", "Geist Fallback", "Segoe UI", Arial, system-ui, sans-serif);
+  color-scheme: light;
+  --site-zoom: 0.9;
   --heading-scale: 1;
   --accent-primary: #F4F4F4;
   --accent-primary-hover: #FFFFFF;
@@ -49,15 +85,19 @@ html[data-site-brand="owlcognito"] ::selection {
 }
 
 html {
+  zoom: var(--site-zoom);
   -webkit-text-size-adjust: 100%;
-  /* The 48 px sticky header (+ safe area) plus 16 px: anchors never land under it. */
-  scroll-padding-top: calc(4rem + env(safe-area-inset-top));
+  scroll-padding-top: 6rem;
 }
 
-/* Public website (AppLayout): Geist (same as the Console). */
-.site-public {
-  --font-sans: var(--sc-font-sans);
-  font-family: var(--font-sans);
+@supports not (zoom: 1) {
+  body {
+    transform: scale(var(--site-zoom));
+    transform-origin: top left;
+    width: calc(100% / var(--site-zoom));
+    min-height: calc(100vh / var(--site-zoom));
+    overflow-x: hidden;
+  }
 }
 
 @font-face {
@@ -78,31 +118,11 @@ body,
 }
 
 body {
-  font-family: var(--font-sans);
+  font-family: "Inter", "Segoe UI", Arial, system-ui, sans-serif;
   background: #000000;
-  color: #fafafa;
+  color: #FFFFFF;
   overflow-x: hidden;
-  font-feature-settings: "liga" 1, "calt" 1;
   @apply antialiased;
-}
-
-/* Golden-white focus ring everywhere (PHILOSOPHY §5): 2px solid, 2px offset.
-   Components may draw their own ring, but never remove it without one. */
-:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
-  outline: 2px solid var(--brand-focus, #f3e2b3);
-  outline-offset: 2px;
-}
-
-::selection {
-  background: rgba(243, 226, 179, 0.28);
-  color: #ffffff;
-}
-
-/* Native smooth scrolling only when the visitor allows motion (no Lenis). */
-@media (prefers-reduced-motion: no-preference) {
-  html:not([data-motion="reduce"]) {
-    scroll-behavior: smooth;
-  }
 }
 
 button,
@@ -224,22 +244,22 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: var(--font-sans);
-  font-weight: 600;
+  font-family: "Inter", "Segoe UI", Arial, system-ui, sans-serif;
+  font-weight: 800;
   font-size: calc(1em * var(--heading-scale));
-  line-height: 1.1;
-  letter-spacing: normal;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
   text-transform: none;
   text-wrap: balance;
 }
 
 .font-editorial {
-  font-family: var(--font-sans);
+  font-family: "Inter", "Segoe UI", Arial, system-ui, sans-serif;
   font-weight: 700;
 }
 
 .font-reference {
-  font-family: var(--font-sans);
+  font-family: "Inter", "Segoe UI", Arial, system-ui, sans-serif;
   font-weight: 800;
 }
 
@@ -393,13 +413,13 @@ html[data-site-brand="owlcognito"] header.sticky {
   box-shadow: 0 10px 28px rgba(76, 29, 149, 0.1);
 }
 
-html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) {
+html[data-site-brand="owlcognito"] footer#contact {
   border-color: rgba(109, 40, 217, 0.32) !important;
   background: linear-gradient(135deg, #ffffff 0%, #f0ebff 100%) !important;
   color: var(--owl-ink);
 }
 
-html[data-site-brand="owlcognito"] footer#contact:not([data-theme])::after {
+html[data-site-brand="owlcognito"] footer#contact::after {
   position: absolute;
   top: 0;
   right: 9%;
@@ -478,26 +498,26 @@ html[data-site-brand="owlcognito"] header.sticky [class~="border-white/30"] {
   border-color: var(--owl-border) !important;
 }
 
-html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) .text-white,
-html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class~="text-white"] {
+html[data-site-brand="owlcognito"] footer#contact .text-white,
+html[data-site-brand="owlcognito"] footer#contact [class~="text-white"] {
   color: var(--owl-ink) !important;
 }
 
-html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class*="text-[#A"],
-html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class*="text-[#B"],
-html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class*="text-[#C"],
-html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class*="text-[#D"] {
+html[data-site-brand="owlcognito"] footer#contact [class*="text-[#A"],
+html[data-site-brand="owlcognito"] footer#contact [class*="text-[#B"],
+html[data-site-brand="owlcognito"] footer#contact [class*="text-[#C"],
+html[data-site-brand="owlcognito"] footer#contact [class*="text-[#D"] {
   color: var(--owl-muted) !important;
 }
 
-html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class~="bg-black/40"],
-html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class*="bg-[#0"],
-html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class*="bg-[#1"] {
+html[data-site-brand="owlcognito"] footer#contact [class~="bg-black/40"],
+html[data-site-brand="owlcognito"] footer#contact [class*="bg-[#0"],
+html[data-site-brand="owlcognito"] footer#contact [class*="bg-[#1"] {
   background-color: #f2eeff !important;
 }
 
-html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class~="border-white/10"],
-html[data-site-brand="owlcognito"] footer#contact:not([data-theme]) [class~="border-white/20"] {
+html[data-site-brand="owlcognito"] footer#contact [class~="border-white/10"],
+html[data-site-brand="owlcognito"] footer#contact [class~="border-white/20"] {
   border-color: var(--owl-border) !important;
 }
 
@@ -516,11 +536,11 @@ html[data-site-brand="owlcognito"] [data-protected-playback-surface] [class~="te
 
 /* Keep the OwlCognito hierarchy intentional: violet marks structure and action,
    while the content itself stays neutral black on the light surface. */
-html[data-site-brand="owlcognito"] :is(main, footer#contact:not([data-theme])) :is(h1, h2, h3, h4):not([data-theme] *) {
+html[data-site-brand="owlcognito"] :is(main, footer#contact) :is(h1, h2, h3, h4) {
   color: #4c1d95 !important;
 }
 
-html[data-site-brand="owlcognito"] :is(main, footer#contact:not([data-theme])) :is(p, li, label, dt, dd):not([data-theme] *) {
+html[data-site-brand="owlcognito"] :is(main, footer#contact) :is(p, li, label, dt, dd) {
   color: #1f1925;
 }
 
@@ -552,6 +572,115 @@ html[data-site-brand="owlcognito"] [data-protected-playback-surface] :is(h1, h2,
   color: #ffffff !important;
 }
 
+.hero-glitch-overlay {
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.34;
+}
+
+.hero-glitch-line {
+  position: absolute;
+  left: -42%;
+  width: 220%;
+  margin: 0;
+  white-space: nowrap;
+  font-family: "Courier New", "Consolas", monospace;
+  font-size: clamp(10px, 0.9vw, 13px);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.18);
+  text-shadow:
+    -1px 0 rgba(255,255,255,0.08),
+    1px 0 rgba(255,255,255,0.08);
+  mix-blend-mode: screen;
+}
+
+.hero-glitch-line-a {
+  top: 16%;
+  animation:
+    heroGlitchSlideA 16s linear infinite,
+    heroGlitchFlicker 2.6s steps(2, end) infinite;
+}
+
+.hero-glitch-line-b {
+  top: 42%;
+  animation:
+    heroGlitchSlideB 14s linear infinite,
+    heroGlitchFlicker 2.2s steps(3, end) infinite;
+}
+
+.hero-glitch-line-c {
+  top: 68%;
+  animation:
+    heroGlitchSlideC 18s linear infinite,
+    heroGlitchFlicker 2.9s steps(2, end) infinite;
+}
+
+@keyframes heroGlitchSlideA {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-18%);
+  }
+}
+
+@keyframes heroGlitchSlideB {
+  0% {
+    transform: translateX(-4%);
+  }
+  100% {
+    transform: translateX(10%);
+  }
+}
+
+@keyframes heroGlitchSlideC {
+  0% {
+    transform: translateX(6%);
+  }
+  100% {
+    transform: translateX(-12%);
+  }
+}
+
+@keyframes heroGlitchFlicker {
+  0%,
+  100% {
+    opacity: 0.34;
+  }
+  18% {
+    opacity: 0.16;
+  }
+  36% {
+    opacity: 0.42;
+  }
+  59% {
+    opacity: 0.22;
+  }
+  81% {
+    opacity: 0.4;
+  }
+}
+
+.hero-glitch-ribbon {
+  pointer-events: none;
+  border: 1px solid rgba(150,150,150,0.36);
+  background: rgba(0,0,0,0.56);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 10px 22px rgba(0,0,0,0.3);
+}
+
+.hero-glitch-ribbon-line {
+  margin: 0;
+  white-space: nowrap;
+  font-family: "Courier New", "Consolas", monospace;
+  font-size: clamp(9px, 0.76vw, 11px);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.34);
+  animation: heroGlitchSlideA 16s linear infinite;
+}
+
 @keyframes riseIn {
   from {
     opacity: 0;
@@ -572,6 +701,33 @@ html[data-site-brand="owlcognito"] [data-protected-playback-surface] :is(h1, h2,
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+@keyframes sheenSweep {
+  0% {
+    transform: translateX(-150%) skewX(-18deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.45;
+  }
+  55% {
+    opacity: 0.2;
+  }
+  100% {
+    transform: translateX(220%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+@keyframes slowFloat {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
   }
 }
 
@@ -712,6 +868,32 @@ html[data-site-brand="owlcognito"] [data-protected-playback-surface] :is(h1, h2,
     inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
+.glossy {
+  position: relative;
+  overflow: hidden;
+}
+
+.glossy::after {
+  content: "";
+  position: absolute;
+  top: -30%;
+  left: 0;
+  width: 42%;
+  height: 180%;
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0),
+    rgba(255,255,255,0.16),
+    rgba(255,255,255,0)
+  );
+  transform: translateX(-180%) skewX(-18deg);
+  pointer-events: none;
+}
+
+.glossy:hover::after {
+  animation: sheenSweep 900ms ease;
+}
+
 .hover-lift {
   transition:
     transform 250ms cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -723,6 +905,10 @@ html[data-site-brand="owlcognito"] [data-protected-playback-surface] :is(h1, h2,
   transform: translateY(-4px);
 }
 
+.floating-soft {
+  animation: slowFloat 6s ease-in-out infinite;
+}
+
 .soft-ring {
   box-shadow:
     0 0 0 1px rgba(255,255,255,0.45),
@@ -730,7 +916,15 @@ html[data-site-brand="owlcognito"] [data-protected-playback-surface] :is(h1, h2,
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .hero-glitch-line-a,
+  .hero-glitch-line-b,
+  .hero-glitch-line-c,
+  .hero-glitch-ribbon-line {
+    animation: none !important;
+  }
+
   .reveal-up,
+  .floating-soft,
   .hall-of-fame-card,
   .hall-of-fame-gold {
     animation: none !important;
@@ -743,9 +937,31 @@ html[data-site-brand="owlcognito"] [data-protected-playback-surface] :is(h1, h2,
     transition: none;
     transform: none;
   }
+
+  .glossy:hover::after {
+    animation: none;
+  }
+}
+
+@media (max-width: 1024px) {
+  .hero-glitch-overlay {
+    display: none;
+  }
 }
 
 @media (max-width: 767px) {
+  html {
+    zoom: 1;
+    scroll-padding-top: 5rem;
+  }
+
+  @supports not (zoom: 1) {
+    body {
+      width: 100%;
+      min-height: 100vh;
+      transform: none;
+    }
+  }
 
   input,
   select,
@@ -761,6 +977,10 @@ html[data-site-brand="owlcognito"] [data-protected-playback-surface] :is(h1, h2,
   .hover-lift:hover,
   .hall-of-fame-card:hover {
     transform: none;
+  }
+
+  .glossy:hover::after {
+    animation: none;
   }
 }
 

@@ -13,7 +13,6 @@ from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
 
 from apps.core.errors import DomainError
-from apps.users.identity_admin import IDENTITY_LIST_DISPLAY, StudentIdentityAdminMixin
 
 from . import services
 from .models import (
@@ -22,8 +21,6 @@ from .models import (
     ReportFile,
     ReportGrade,
     ReportGradeAudit,
-    ReportNoticeLog,
-    ReportPolicy,
     ReportQuarantineRecord,
     ReportSubmission,
     ReportSubmissionVersion,
@@ -259,15 +256,10 @@ def _file_links(files):
 
 
 @admin.register(ReportSubmission)
-class ReportSubmissionAdmin(StudentIdentityAdminMixin, _ReadOnlyAdmin):
-    # Owner rule: roll number, real name, handle, stats first; then the record.
-    identity_user_attr = "student"
-    identity_user_id_field = "student_id"
+class ReportSubmissionAdmin(_ReadOnlyAdmin):
     list_display = (
-        *IDENTITY_LIST_DISPLAY,
         "student",
         "task",
-        "target_name",
         "status",
         "submitted_at",
         "is_late",
@@ -276,12 +268,9 @@ class ReportSubmissionAdmin(StudentIdentityAdminMixin, _ReadOnlyAdmin):
         "final_marks",
     )
     list_filter = ("status", "is_late", "task__course", "task")
-    search_fields = ("student__email", "student__full_name", "task__title", "target_name", "target_key")
+    search_fields = ("student__email", "student__full_name", "task__title")
     date_hierarchy = "submitted_at"
     readonly_fields = (
-        "student_roll_number",
-        "student_name_snapshot",
-        "student_handle_snapshot",
         "task",
         "student",
         "status",
@@ -491,35 +480,3 @@ class ReportQuarantineRecordAdmin(_ReadOnlyAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
-
-
-@admin.register(ReportPolicy)
-class ReportPolicyAdmin(admin.ModelAdmin):
-    """Per-course weekly report settings (also editable in the Console)."""
-
-    list_display = (
-        "course",
-        "self_service",
-        "due_weekday",
-        "due_time",
-        "grace_hours",
-        "late_penalty_percent_per_day",
-        "max_targets_per_week",
-        "marks_visibility",
-        "updated_at",
-    )
-    list_filter = ("self_service", "marks_visibility")
-    search_fields = ("course__title",)
-    autocomplete_fields = ("course",)
-    readonly_fields = ("updated_by", "created_at", "updated_at")
-
-    def save_model(self, request, obj, form, change):
-        obj.updated_by = request.user
-        super().save_model(request, obj, form, change)
-
-
-@admin.register(ReportNoticeLog)
-class ReportNoticeLogAdmin(_ReadOnlyAdmin):
-    list_display = ("key", "created_at")
-    search_fields = ("key",)
-    date_hierarchy = "created_at"

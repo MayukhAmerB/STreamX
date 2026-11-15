@@ -470,14 +470,6 @@ class VersioningTests(ReportsTestCase):
         submission = self.submit_pdf()
         self.assertEqual(self.grade(submission, action="draft", marks="5").status_code, 200)
         self.as_user(self.student)
-        # Deadline-aware lock (Phase 3): a grader's draft does not lock the
-        # student before the deadline; after it, it does.
-        self.assertEqual(self.upload().status_code, 201)
-        ReportTask.objects.filter(pk=self.task.pk).update(
-            due_at=timezone.now() - timedelta(minutes=1),
-            late_policy=ReportTask.LATE_ALLOWED,
-            late_until=timezone.now() + timedelta(days=1),
-        )
         self.assertEqual(self.upload().status_code, 409)
         submission.refresh_from_db()
         self.assertEqual(self.grade(submission, marks="5").status_code, 200)
@@ -774,10 +766,7 @@ class ExportTests(ReportsTestCase):
         self.assertTrue(response["Content-Type"].startswith("text/csv"))
         self.assertIn("attachment;", response["Content-Disposition"])
         text = response.content.decode("utf-8-sig")
-        # Owner rule: roll number, real name, handle, stats first; then Email and the record columns.
-        self.assertTrue(text.splitlines()[0].startswith("Roll number,Real name,Handle,Handle (most recent),"))
-        self.assertIn("Exam score %,Email,Target: Acme Corp (/10)", text)
-        self.assertIn(f"AL-SYD-{evil.pk:05d}", text)
+        self.assertIn("Student,Email,Target: Acme Corp (/10)", text)
         self.assertIn("'=cmd", text)
         self.assertIn("7.5", text)
         response = self.client.get(reverse("reports-manage-export"), {"task": self.task.pk})

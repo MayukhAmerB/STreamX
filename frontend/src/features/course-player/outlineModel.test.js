@@ -5,9 +5,7 @@ import {
   findFirstPreviewLecture,
   findNextPlayableLecture,
   flattenCourseLectures,
-  hasFullCourseAccess,
   isLectureLocked,
-  membershipAccessLabel,
   pickInitialLecture,
   resolveAdjacentLectures,
   resolveLectureDescriptions,
@@ -135,22 +133,5 @@ describe("resolveLectureDescriptions", () => {
       moduleDescription: "",
     });
     expect(resolveLectureDescriptions({ description: "" }, { description: "Course\r\ntext" }).primary).toBe("Course\ntext");
-  });
-});
-
-describe("membership recordings (OSINT plans)", () => {
-  it("unlocks lessons for a member whose plan includes the course, with a label", () => {
-    const bundle = { is_enrolled: false, recording_access_source: "membership_bundle" };
-    expect(hasFullCourseAccess(bundle)).toBe(true);
-    expect(membershipAccessLabel(bundle)).toBe("Included this month");
-    expect(membershipAccessLabel({ recording_access_source: "starter" })).toBe("Included with Starter");
-  });
-
-  it("changes nothing for enrolled students, visitors or unknown sources", () => {
-    expect(membershipAccessLabel({ is_enrolled: true, recording_access_source: "membership_bundle" })).toBe("");
-    expect(hasFullCourseAccess({ is_enrolled: false })).toBe(false);
-    expect(hasFullCourseAccess({ recording_access_source: "something_else" })).toBe(false);
-    expect(hasFullCourseAccess({ recording_access_source: null })).toBe(false);
-    expect(membershipAccessLabel(null)).toBe("");
   });
 });

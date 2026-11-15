@@ -4,7 +4,7 @@ import { ArrowLeft, CheckmarkFilled, Renew, Report, Send } from "@carbon/icons-r
 import { Button, InlineLoading, InlineNotification, Modal, TextArea } from "@carbon/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { EmptyState, FeatureBoundary, PageNotification, PageSkeleton, useToast } from "../features/app-shell/ui";
+import { EmptyState, PageNotification, PageSkeleton, useToast } from "../features/app-shell/ui";
 import FilePreview, { FileList } from "../features/reports/FilePreview";
 import Markdown from "../features/reports/markdown";
 import { ReportUploaderView, useReportUploads } from "../features/reports/ReportUploader";
@@ -21,7 +21,6 @@ import {
 } from "../features/reports/reportModel";
 import StatusChip, { LateChip } from "../features/reports/StatusChip";
 import useNow from "../features/reports/useNow";
-import MyIdentityHeader from "../features/identity/StudentIdentityHeader";
 import { apiData, apiMessage } from "../utils/api";
 import { taskMeta } from "./ReportsPage";
 
@@ -279,18 +278,16 @@ function SubmitPanel({ task, now, onSubmitted, onCancel, replacing }) {
           ? "Keep the files you still want, remove the rest and add new ones."
           : "Add your report files, then submit. You can replace them until the deadline."}
       </p>
-      <FeatureBoundary label="The file uploader">
-        <ReportUploaderView
-          items={uploads.items}
-          rules={rules}
-          rejections={uploads.rejections}
-          onPick={(files) => uploads.addFiles(files, rules)}
-          onRetry={uploads.retry}
-          onRemove={uploads.remove}
-          onDismissRejections={uploads.dismissRejections}
-          disabled={submitting}
-        />
-      </FeatureBoundary>
+      <ReportUploaderView
+        items={uploads.items}
+        rules={rules}
+        rejections={uploads.rejections}
+        onPick={(files) => uploads.addFiles(files, rules)}
+        onRetry={uploads.retry}
+        onRemove={uploads.remove}
+        onDismissRejections={uploads.dismissRejections}
+        disabled={submitting}
+      />
       <TextArea
         id="rpt-note"
         labelText="Short note or summary (optional)"
@@ -336,7 +333,7 @@ function SubmitPanel({ task, now, onSubmitted, onCancel, replacing }) {
 }
 
 /** Presentational task page (also used by tests and the screenshot harness). */
-export function ReportTaskView({ task, now = Date.now(), onSubmitted, identity = null }) {
+export function ReportTaskView({ task, now = Date.now(), onSubmitted }) {
   const [replacing, setReplacing] = useState(false);
   const [lastTask, setLastTask] = useState(task);
   if (lastTask !== task) {
@@ -353,8 +350,6 @@ export function ReportTaskView({ task, now = Date.now(), onSubmitted, identity =
       <Link to="/reports" className="rpt-back">
         <ArrowLeft size={16} aria-hidden="true" /> All reports
       </Link>
-      {/* Owner rule: roll number, real name, handle, stats lead the submission screen. */}
-      {identity}
       <header className="rpt-task__header">
         <p className="rpt-eyebrow">{taskMeta(task)}</p>
         <h1 className="rpt-task__title">{task.title}</h1>
@@ -492,12 +487,5 @@ export default function ReportsTaskPage() {
   if (state.error && !state.task) {
     return <PageNotification kind="error" title="Couldn't load this report." subtitle={state.error} actionLabel="Try again" onAction={load} />;
   }
-  return (
-    <ReportTaskView
-      task={state.task}
-      now={now}
-      identity={<MyIdentityHeader courseId={state.task?.course?.id} />}
-      onSubmitted={(task) => setState((current) => ({ ...current, task }))}
-    />
-  );
+  return <ReportTaskView task={state.task} now={now} onSubmitted={(task) => setState((current) => ({ ...current, task }))} />;
 }

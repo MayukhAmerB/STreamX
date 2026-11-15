@@ -76,32 +76,7 @@ def invalidate_course_join_access_cache(*, user_id, course_id):
     )
 
 
-SESSION_LIST_STATUS_ACTIVE = "active"
-SESSION_LIST_STATUS_ALL = "all"
-
-
-def normalize_session_list_status(raw_status, *, is_admin):
-    """The status filter the session list really applies.
-
-    Omitted (or unknown) means ``active``: scheduled and live sessions only.
-    ``all`` (every session ever) is kept for staff; for everyone else it is the
-    same as ``active`` -- every student-facing page drops ended sessions anyway,
-    and all-time history is the most expensive thing this endpoint can return.
-    """
-    value = str(raw_status or "").strip().lower()
-    if value in {
-        RealtimeSession.STATUS_SCHEDULED,
-        RealtimeSession.STATUS_LIVE,
-        RealtimeSession.STATUS_ENDED,
-    }:
-        return value
-    if value == SESSION_LIST_STATUS_ALL and is_admin:
-        return SESSION_LIST_STATUS_ALL
-    return SESSION_LIST_STATUS_ACTIVE
-
-
-def base_list_queryset(*, session_type: str, status_filter: str):
-    """Sessions matching the type/status filters, before per-user visibility."""
+def list_queryset(*, session_type: str, status_filter: str, user):
     queryset = RealtimeSession.objects.with_related()
 
     if session_type in {RealtimeSession.TYPE_MEETING, RealtimeSession.TYPE_BROADCASTING}:
@@ -113,69 +88,10 @@ def base_list_queryset(*, session_type: str, status_filter: str):
         RealtimeSession.STATUS_ENDED,
     }:
         queryset = queryset.filter(status=status_filter)
-    elif status_filter != SESSION_LIST_STATUS_ALL:
+    elif status_filter != "all":
         queryset = queryset.filter(
             status__in=[RealtimeSession.STATUS_SCHEDULED, RealtimeSession.STATUS_LIVE]
         )
-    return queryset
-
-
-def session_visibility_meta(session):
-    """The columns ``list_queryset`` filters on, for filtering cached rows in Python."""
-    linked_course = getattr(session, "linked_course", None)
-    return {
-        "host_id": session.host_id,
-        "instructor_user_id": session.get_instructor_user_id(),
-        "linked_course_id": session.linked_course_id,
-        "linked_course_instructor_id": getattr(linked_course, "instructor_id", None),
-        "linked_live_class_id": session.linked_live_class_id,
-    }
-
-
-class SessionVisibility:
-    """Python twin of ``list_queryset``'s per-user filter for a non-admin user.
-
-    The accessible course / live-class ids are loaded lazily, once, and only
-    when a row is not visible for a cheaper reason.
-    """
-
-    def __init__(self, user):
-        self.user_id = getattr(user, "id", None)
-        self._user = user
-        self._course_ids = None
-        self._live_class_ids = None
-
-    def _accessible_course_ids(self):
-        if self._course_ids is None:
-            self._course_ids = set(accessible_course_ids_for_user(self._user))
-        return self._course_ids
-
-    def _accessible_live_class_ids(self):
-        if self._live_class_ids is None:
-            self._live_class_ids = set(accessible_live_class_ids_for_user(self._user))
-        return self._live_class_ids
-
-    def can_see(self, meta):
-        if not self.user_id:
-            return False
-        course_id = meta.get("linked_course_id")
-        live_class_id = meta.get("linked_live_class_id")
-        if meta.get("host_id") == self.user_id:
-            return True
-        if course_id is not None and meta.get("linked_course_instructor_id") == self.user_id:
-            return True
-        if course_id is None and live_class_id is None:
-            return True
-        if course_id is not None and course_id in self._accessible_course_ids():
-            return True
-        return live_class_id is not None and live_class_id in self._accessible_live_class_ids()
-
-    def is_moderator(self, meta):
-        return bool(self.user_id) and self.user_id in {meta.get("host_id"), meta.get("instructor_user_id")}
-
-
-def list_queryset(*, session_type: str, status_filter: str, user):
-    queryset = base_list_queryset(session_type=session_type, status_filter=status_filter)
 
     if not user or not getattr(user, "is_authenticated", False):
         return queryset.none()

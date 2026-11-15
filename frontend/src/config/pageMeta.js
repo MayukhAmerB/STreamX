@@ -12,7 +12,7 @@ const ROUTES = [
   {
     path: "/courses",
     title: "Courses",
-    description: "Every OSINT course, the four investigation labs, free practice and the five Pentesting tiers (coming soon), with module outlines open to read.",
+    description: "Browse OSINT and web application penetration testing courses, upcoming batches and live classes open for registration.",
   },
   { path: "/courses/:id", title: "Course details", description: "Curriculum, schedule, fees, reviews and enrollment for this training program." },
   { path: "/courses/:id/register", title: "Course registration", noindex: true },
@@ -23,39 +23,11 @@ const ROUTES = [
     description: "Free live classes, investigations and talks from the Al Syed YouTube channel, with the latest videos in one place.",
     when: () => siteBrand.youtube,
   },
-  { path: "/about", title: "About us", description: siteBrand.id === "alsyed" ? "Founded by cyber activist Al Syed under the ADL Front: lawful, evidence-first OSINT training to counter misinformation." : `Who we are, what we teach and how ${siteBrand.name} trains practical, ethical investigation skills.` },
+  { path: "/about", title: "About us", description: `Who we are, what we teach and how ${siteBrand.name} trains practical, ethical cybersecurity skills.` },
   { path: "/contact", title: "Contact", description: "Reach the team on WhatsApp, e-mail or social media, or send a message from the contact form." },
-  { path: "/faqs", title: "FAQs", description: "Access, payments, recordings, certificates and refunds, answered before you enrol." },
+  { path: "/faqs", title: "FAQs", description: "Answers about courses, payments, access, certificates, refunds and support before you enroll." },
   { path: "/terms", title: "Terms and conditions", description: `The terms and conditions for using ${siteBrand.name}.` },
-  {
-    path: "/pricing",
-    title: "Pricing",
-    description: "Start free on curated OSINT challenges and the monthly CTF, then choose Starter or the CTF Labs membership for every lab and new cases monthly.",
-  },
-  {
-    path: "/changelog",
-    title: "What's new",
-    description: "Release notes for every version of the website, the Console, the labs and the exams, starting with v4.0-Thrallback.",
-  },
-  { path: "/roadmap", title: "Roadmap", description: "What you can start today in OSINT, what opens next in Pentesting, and the order we recommend." },
-  {
-    path: "/tracks/osint",
-    title: "OSINT track",
-    description: "Turn usernames, photos and domains into evidence that holds up: live classes Fri to Sun, weekly marked reports, real labs, an exam and a verifiable certificate.",
-  },
-  {
-    path: "/tracks/pentesting",
-    title: "Pentesting track",
-    description: "Coming soon: five tiers from security thinking to Active Directory attacks. Browse every course and module outline now; enrolment opens at launch.",
-  },
-  { path: "/bootcamp", title: "Foundations bootcamp", description: "The Pentesting Foundations bootcamp: four courses as four phases. Coming soon." },
-  {
-    path: "/osint/free",
-    title: "Free OSINT challenges",
-    description: "A curated path through free OSINT challenges on other platforms, the monthly live CTF and progress you track yourself.",
-  },
   { path: "/login", title: "Sign in", description: `Sign in to your ${siteBrand.name} account to open your courses and live classes.` },
-  { path: "/reset-password", title: "Choose a new password", noindex: true },
   {
     path: "/as-accounts",
     title: "Verified accounts",
@@ -77,24 +49,9 @@ const ROUTES = [
   {
     path: "/hall-of-fame",
     title: "Hall of Fame",
-    description: "The Al Syed Initiative Hall of Fame: every investigator who passed the certification exam, by batch, each with a certificate anyone can verify.",
+    description: "Students who met the Al Syed certification standard through skill, discipline and investigation.",
     brandOnly: "alsyed",
   },
-  // Monthly OSINT CTF (WS-MONTHLY-CTF).
-  {
-    path: "/monthly-ctf",
-    title: "Monthly OSINT CTF",
-    description: "One free OSINT case every month for every registered student, with a live leaderboard, the Golden Aura and trophies.",
-  },
-  {
-    path: "/monthly-ctf/hall-of-fame",
-    title: "Monthly CTF Hall of Fame",
-    description: "The champions and top ten finalists of every Monthly OSINT CTF season.",
-  },
-  { path: "/monthly-ctf/certificates/:slug", title: "Finalist certificate", description: "Verify a Monthly OSINT CTF finalist certificate.", noindex: true },
-  // Verifiable certificates (WS-CERTIFICATES); the certificate page then sets its own title and preview image.
-  { path: "/certificates", title: "Verify a certificate", description: "Check a certificate by its reference number.", noindex: true },
-  { path: "/certificates/:reference", title: "Certificate", description: "A certificate issued by the Al Syed Initiative.", noindex: true },
 ];
 
 const NOT_FOUND = { title: "Page not found", description: "", noindex: true, notFound: true };

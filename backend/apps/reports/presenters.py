@@ -6,7 +6,7 @@ from django.db.models import Count, Q
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import SCAN_CLEAN, SCAN_INFECTED, ReportCriterion, ReportGradeAudit, ReportSubmission
+from .models import SCAN_CLEAN, ReportCriterion, ReportGradeAudit, ReportSubmission
 from .services import (
     active_student_ids,
     marks_visible_to_student,
@@ -275,38 +275,12 @@ def gradebook_task_dict(task):
     }
 
 
-def week_label_for(task):
-    if task.week_start is None:
-        return ""
-    from .weekly import policy_for, week_of_task
-
-    policy = policy_for(task.course)
-    if policy is None:
-        return ""
-    week = week_of_task(task, policy)
-    return week.label() if week else ""
-
-
-def queue_item(submission, signals=None, week_labels=None, identity_block=None):
+def queue_item(submission):
     grade = getattr(submission, "grade", None)
-    signals = signals or {}
-    task = submission.task
-    if identity_block is None:
-        from apps.users import identity
-
-        identity_block = identity.block_for_user(submission.student, record=submission)
     return {
-        "identity": identity_block,
         "id": submission.pk,
-        "task": gradebook_task_dict(task),
+        "task": gradebook_task_dict(submission.task),
         "student": person(submission.student),
-        "target_name": submission.target_name or task.title,
-        "target_key": submission.target_key,
-        "week_start": task.week_start,
-        "week_label": (week_labels or {}).get(task.pk, ""),
-        "same_target_count": signals.get("same_target", {}).get(submission.pk, 0),
-        "sha256_match_count": signals.get("sha256", {}).get(submission.pk, 0),
-        "different_target_confirmed": submission.different_target_confirmed,
         "status": submission.status,
         "submitted_at": submission.submitted_at,
         "is_late": submission.is_late,
@@ -338,23 +312,11 @@ def submission_detail(submission, neighbours):
         .select_related("actor")
         .order_by("-created_at", "-id")[:50]
     )
-    from apps.users import identity
-
     return {
-        # Owner rule: the student block comes first (snapshot at submission + most recent handle).
-        "identity": identity.block_for_user(submission.student, record=submission, course_id=task.course_id),
         "id": submission.pk,
-        "target_name": submission.target_name or task.title,
-        "different_target_confirmed": submission.different_target_confirmed,
-        "similar_targets": [str(item) for item in (submission.similar_targets or [])],
-        "revision_deadline": submission.revision_deadline,
-        "same_target": same_target_submissions(submission),
-        "sha256_matches": sha256_matches(submission),
         "task": {
             "id": task.pk,
             "title": task.title,
-            "origin": task.origin,
-            "week_start": task.week_start,
             "course": ref(task.course),
             "week_number": task.week_number,
             "due_at": task.due_at,
@@ -402,262 +364,4 @@ def submission_detail(submission, neighbours):
             for entry in audit
         ],
         "neighbours": neighbours,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Duplicate signals for graders (same target, identical files)
-# ---------------------------------------------------------------------------
-def queue_signals(submissions):
-    """{"same_target": {id: n}, "sha256": {id: n}} for a page of queue items:
-    how many OTHER students reported the same target that week, and how many
-    other students submitted a file with an identical sha256 in the course."""
-    from collections import defaultdict
-
-    from .models import ReportFile
-
-    items = list(submissions)
-    if not items:
-        return {"same_target": {}, "sha256": {}}
-    task_ids = {item.task_id for item in items}
-    keys = defaultdict(set)
-    for task_id, key, student_id in (
-        ReportSubmission.objects.filter(task_id__in=task_ids, current_version__isnull=False)
-        .exclude(target_key="")
-        .values_list("task_id", "target_key", "student_id")
-    ):
-        keys[(task_id, key)].add(student_id)
-    same = {
-        item.pk: len(keys.get((item.task_id, item.target_key), set()) - {item.student_id})
-        for item in items
-        if item.target_key
-    }
-    version_ids = [item.current_version_id for item in items if item.current_version_id]
-    mine = defaultdict(set)
-    for submission_id, digest in (
-        ReportFile.objects.filter(versions__in=version_ids)
-        .exclude(sha256="")
-        .values_list("versions__submission_id", "sha256")
-    ):
-        mine[submission_id].add(digest)
-    digests = set().union(*mine.values()) if mine else set()
-    course_ids = {item.task.course_id for item in items}
-    owners = defaultdict(set)
-    if digests:
-        for digest, owner_id in (
-            ReportFile.objects.filter(sha256__in=digests, submitted=True, task__course_id__in=course_ids)
-            .values_list("sha256", "owner_id")
-            .distinct()
-        ):
-            owners[digest].add(owner_id)
-    sha = {}
-    for item in items:
-        others = set()
-        for digest in mine.get(item.pk, ()):
-            others |= owners.get(digest, set()) - {item.student_id}
-        sha[item.pk] = len(others)
-    return {"same_target": same, "sha256": sha}
-
-
-def same_target_submissions(submission):
-    if not submission.target_key:
-        return []
-    rows = (
-        ReportSubmission.objects.filter(task_id=submission.task_id, target_key=submission.target_key)
-        .exclude(pk=submission.pk)
-        .exclude(student_id=submission.student_id)
-        .exclude(current_version__isnull=True)
-        .select_related("student")
-        .order_by("submitted_at", "id")[:20]
-    )
-    return [{"id": row.pk, "student": person(row.student), "status": row.status} for row in rows]
-
-
-def sha256_matches(submission):
-    """Other students' submitted files in the course with the same bytes."""
-    from .models import ReportFile
-
-    if not submission.current_version_id:
-        return []
-    files = list(submission.current_version.files.exclude(sha256=""))
-    if not files:
-        return []
-    by_digest = {item.sha256: item for item in files}
-    others = (
-        ReportFile.objects.filter(sha256__in=list(by_digest), submitted=True, task__course_id=submission.task.course_id)
-        .exclude(owner_id=submission.student_id)
-        .prefetch_related("versions__submission__student")
-        .order_by("created_at", "id")[:50]
-    )
-    matches = []
-    seen = set()
-    for other in others:
-        for version in other.versions.all():
-            sub = version.submission
-            key = (other.sha256, sub.pk)
-            if key in seen:
-                continue
-            seen.add(key)
-            mine = by_digest[other.sha256]
-            matches.append(
-                {
-                    "file_id": mine.pk,
-                    "file_name": mine.original_name,
-                    "sha256": other.sha256,
-                    "submission_id": sub.pk,
-                    "student": person(sub.student),
-                    "target_name": sub.target_name,
-                }
-            )
-    return matches[:20]
-
-
-# ---------------------------------------------------------------------------
-# Self-service student views
-# ---------------------------------------------------------------------------
-def draft_file_dict(item):
-    data = file_dict(item)
-    data["scan_pending"] = bool(item.scan_pending)
-    data["blocked_reason"] = (
-        (item.scan_threat or "Blocked by the virus scanner.") if item.scan_status == SCAN_INFECTED else ""
-    )
-    return data
-
-
-def rules_dict(task, policy=None):
-    return {
-        "allowed_extensions": task.allowed_extensions,
-        "max_files": task.max_files,
-        "max_file_size_mb": task.max_file_bytes // (1024 * 1024),
-        "max_total_size_mb": task.max_total_bytes // (1024 * 1024),
-        "max_marks": task.max_marks,
-        "late_penalty_percent_per_day": task.late_penalty_percent_per_day,
-        "grace_hours": int(policy.grace_hours) if policy else 0,
-        "max_targets_per_week": policy.max_targets_per_week if policy else None,
-        "marks_visibility": policy.marks_visibility if policy else task.marks_visibility,
-        "brief": task.brief or (policy.brief if policy else ""),
-    }
-
-
-def policy_rules_dict(policy):
-    from config.upload_validators import REPORT_ALLOWED_EXTENSIONS
-
-    chosen = {str(value).lower().lstrip(".") for value in (policy.allowed_file_types or [])}
-    if "jpg" in chosen or "jpeg" in chosen:
-        chosen |= {"jpg", "jpeg"}
-    allowed = [value for value in REPORT_ALLOWED_EXTENSIONS if not chosen or value in chosen]
-    return {
-        "allowed_extensions": allowed or list(REPORT_ALLOWED_EXTENSIONS),
-        "max_files": policy.max_files,
-        "max_file_size_mb": policy.max_file_size_mb,
-        "max_total_size_mb": policy.max_total_size_mb,
-        "max_marks": policy.max_marks,
-        "late_penalty_percent_per_day": policy.late_penalty_percent_per_day,
-        "grace_hours": int(policy.grace_hours),
-        "max_targets_per_week": policy.max_targets_per_week,
-        "marks_visibility": policy.marks_visibility,
-        "brief": policy.brief,
-    }
-
-
-def week_target_summary(submission, now=None):
-    from .models import ReportFile
-
-    task = submission.task
-    visible = marks_visible_to_student(submission)
-    grade = getattr(submission, "grade", None) if visible else None
-    can_change, _reason = student_can_change(task, submission, now)
-    file_count = submission.current_version.files.count() if submission.current_version_id else 0
-    return {
-        "id": submission.pk,
-        "target_name": submission.target_name,
-        "status": submission.status,
-        "submitted_at": submission.submitted_at,
-        "is_late": submission.is_late,
-        "minutes_late": submission.minutes_late,
-        "version_count": submission.version_count,
-        "file_count": file_count,
-        "draft_file_count": ReportFile.objects.filter(draft=submission, submitted=False).count(),
-        "marks_visible": visible,
-        "final_marks": grade.final_marks if grade else None,
-        "max_marks": task.max_marks,
-        "can_change": can_change,
-    }
-
-
-def course_week_dict(state, now=None):
-    policy = state.get("policy")
-    weeks = [
-        {**week, "targets": [week_target_summary(item, now) for item in week["targets"]]} for week in state["weeks"]
-    ]
-    return {
-        "course": state["course"],
-        "enabled": state["enabled"],
-        "reason": state["reason"],
-        "legacy_task_count": state["legacy_task_count"],
-        "weeks": weeks,
-        "rules": policy_rules_dict(policy) if policy else None,
-    }
-
-
-def target_detail(submission, now=None):
-    from .weekly import draft_files, policy_for, undo_until, week_of_task
-
-    now = now or timezone.now()
-    task = submission.task
-    policy = policy_for(task.course)
-    week = week_of_task(task, policy) if policy else None
-    can_change, reason = student_can_change(task, submission, now)
-    visible = marks_visible_to_student(submission)
-    try:
-        grade = submission.grade
-    except ReportSubmission.grade.RelatedObjectDoesNotExist:
-        grade = None
-    criteria = list(task.criteria.all())
-    current = version_dict(submission.current_version) if submission.current_version_id else None
-    return {
-        "id": submission.pk,
-        "course": ref(task.course),
-        "task_id": task.pk,
-        "week_start": task.week_start,
-        "week_label": week.label() if week else task.title,
-        "due_at": task.due_at,
-        "late_until": task.late_until if task.allows_late else None,
-        "window": submission_window(task, now),
-        "target_name": submission.target_name,
-        "status": submission.status,
-        "can_change": can_change,
-        "lock_reason": reason,
-        "is_late": submission.is_late,
-        "minutes_late": submission.minutes_late,
-        "submitted_at": submission.submitted_at,
-        "version_count": submission.version_count,
-        "revision": submission.revision,
-        "revision_deadline": submission.revision_deadline,
-        "undo_until": undo_until(submission),
-        "different_target_confirmed": submission.different_target_confirmed,
-        "draft_files": [draft_file_dict(item) for item in draft_files(submission)],
-        "current_version": current,
-        "marks_visible": visible,
-        "grade": None
-        if not (visible and grade)
-        else {
-            "raw_marks": grade.raw_marks,
-            "late_penalty": grade.late_penalty,
-            "final_marks": grade.final_marks,
-            "max_marks": task.max_marks,
-            "criteria": criteria_marks(task, grade, criteria),
-            "feedback": grade.feedback,
-            "graded_at": grade.graded_at,
-            "annotated_file": feedback_file_dict(grade),
-        },
-        "revision_feedback": (
-            grade.revision_feedback
-            if grade and submission.status in (ReportSubmission.STATUS_RETURNED, ReportSubmission.STATUS_RESUBMITTED)
-            else ""
-        ),
-        "marks_hidden_until_release": bool(
-            submission.status == ReportSubmission.STATUS_GRADED and not task.marks_released
-        ),
-        "rules": rules_dict(task, policy),
     }

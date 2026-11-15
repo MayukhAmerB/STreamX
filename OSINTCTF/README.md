@@ -40,9 +40,7 @@ The `05 EXAMINATION` tab (`exam.js`) is different from the practice labs:
   every attempt, right or wrong, in Postgres; scores are in Django admin under
   "OSINT CTF examinations".
 - `GET /api/config` returns `{lmsApiBase}` from `LABS_LMS_API_BASE`
-  (default `https://api.alsyedinitiative.com/api`, the host that holds the LMS
-  session cookies) and `{siteUrl}` from `LABS_SITE_URL` (default: that origin
-  without `api.`; used for the sign-in link); the CSP `connect-src` allows
+  (default `https://alsyedinitiative.com/api`); the CSP `connect-src` allows
   that origin only.
 - Nothing about the exam is stored in the browser, and no answer or hash is in
   any file served here.
@@ -59,23 +57,3 @@ LABS_LMS_API_BASE=http://127.0.0.1:8000/api PORT=8092 node server.js
 ```
 
 Server tests: `node --test OSINTCTF/tests/server.test.js` (not shipped in the image).
-
-## Design, fonts and deep links
-
-The page follows the main site's design language (black canvas, Geist,
-golden-white accent; no colour for status). Fonts are self-hosted from the
-frontend's Fontsource packages (SIL OFL) and served by `server.js` under
-`/fonts/` (woff2 only); the CSP allows fonts and styles from this origin only.
-After a font package upgrade, refresh them with:
-
-```bash
-node OSINTCTF/scripts/copy-fonts.mjs   # needs `npm ci` in frontend/
-```
-
-Tabs have deep links: `#hub`, `#realworld`, `#blackmeridian`, `#certification`
-(app.js) and `#exam` (exam.js). They work on load, on `hashchange` and with
-the back button; clicking a tab updates the address with `replaceState`.
-Tabs 01-04 show an access chip ("Open"; "Members" when `GET /api/config`
-returns `membershipRequired: true`); tab 05 shows "Sign-in".
-
-Tests: `node --test OSINTCTF/tests/*.test.js`.

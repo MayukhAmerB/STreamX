@@ -11,19 +11,16 @@ import {
   revokeRealtimePresenter,
   revokeRealtimeSpeaker,
   reportRealtimeConnectionEvent,
+  startRealtimeRecording,
+  stopRealtimeRecording,
+  uploadRealtimeBrowserRecording,
 } from "../../api/realtime";
 import { useAuth } from "../../hooks/useAuth";
 import useOwncastStreamLaunch from "../../hooks/useOwncastStreamLaunch";
+import { ScreenityFallbackRecorder } from "../../services/recording/ScreenityFallbackRecorder";
 import { resolveBroadcastEmbedUrls } from "../../utils/broadcastUrls";
 import { apiData, apiMessage } from "../../utils/api";
 import { copyTextToClipboard } from "../../utils/clipboard";
-// Phase 2: unbounded jittered rejoin (D9/D10) and the eviction banner guard (D5).
-import {
-  canRetryMeetingNow,
-  isTerminalRejoinError,
-  meetingRejoinDelay,
-} from "../../services/realtime/meetingReconnect";
-import { registerLiveClassPlayback } from "../../services/realtime/liveClassGuard";
 import {
   disconnectMessage,
   normalizeConnectionQuality,
@@ -67,6 +64,7 @@ const MOBILE_LISTENER_RECONNECT_DELAYS_MS = [
   7000,
   7000,
 ];
+const MEETING_REJOIN_DELAYS_MS = [0, 1500, 4000, 8000, 12000, 15000];
 
 function clampWholeNumber(value, min, max, fallback) {
   const numeric = Number(value);
@@ -789,31 +787,12 @@ export default function MeetingRoomExperience({
   const roomRef = useRef(null);
   const connectedAtRef = useRef(null);
   const stageRef = useRef(null);
+  const fallbackRecorderRef = useRef(null);
   const roomStateRefreshTimerRef = useRef(null);
   const rejoinTimerRef = useRef(null);
   const manualLeaveRef = useRef(false);
   const reconnectingRef = useRef(false);
   const reconnectAttemptRef = useRef(0);
-  // The last rejoin failure: a terminal one (class ended, access lost, signed
-  // in elsewhere) stops the otherwise unbounded automatic rejoin.
-  const lastRejoinErrorRef = useRef(null);
-  // While the student is in the meeting, a sign-in on another device shows a
-  // banner instead of a blocking dialog, so the class can be finished here.
-  // That includes a dropped connection being rejoined (or paused offline):
-  // only leaving, or an error a rejoin cannot fix (class ended, access lost),
-  // takes the student out of the class.
-  const rejoinStillPossible =
-    !rejoinState.error ||
-    Boolean(lastRejoinErrorRef.current && !isTerminalRejoinError(lastRejoinErrorRef.current));
-  const meetingInClass =
-    connected ||
-    (!manualLeaveRef.current &&
-      (/reconnect/i.test(String(connectionLabel || "")) ||
-        (connectionLabel === "disconnected" && rejoinStillPossible)));
-  useEffect(() => {
-    if (!meetingInClass) return undefined;
-    return registerLiveClassPlayback(`meeting-${session?.id ?? ""}`);
-  }, [meetingInClass, session?.id]);
   const previousSessionIdRef = useRef(session?.id || null);
   const [isStageFullscreen, setIsStageFullscreen] = useState(false);
   const defaultModeratorUserIds = useMemo(
@@ -1089,6 +1068,13 @@ export default function MeetingRoomExperience({
   useEffect(() => {
     return () => {
       clearPendingRejoinTimer();
+      const recorder = fallbackRecorderRef.current;
+      if (recorder?.isRecording) {
+        recorder.stop().catch(() => {
+          // best-effort cleanup
+        });
+      }
+      fallbackRecorderRef.current = null;
     };
   }, [clearPendingRejoinTimer]);
 
@@ -1117,11 +1103,9 @@ export default function MeetingRoomExperience({
       setConnectionLabel("reconnecting");
       try {
         await onReconnect(session.id);
-        lastRejoinErrorRef.current = null;
         setRejoinState({ loading: false, error: "", info: "Fresh meeting connection received." });
         return true;
       } catch (err) {
-        lastRejoinErrorRef.current = err;
         setRejoinState({
           loading: false,
           error: apiMessage(err, "Unable to reconnect to the meeting."),
@@ -1143,26 +1127,14 @@ export default function MeetingRoomExperience({
       if (!onReconnect || !session?.id || manualLeaveRef.current) {
         return;
       }
-      if (isTerminalRejoinError(lastRejoinErrorRef.current)) {
-        // Retrying cannot help (the class ended, access changed, or this
-        // device was signed out elsewhere). The error from the last attempt
-        // stays on screen; Rejoin Meeting is still available.
-        setConnecting(false);
-        setConnected(false);
-        setConnectionLabel("disconnected");
-        return;
-      }
-      if (!canRetryMeetingNow()) {
-        // Offline or in a background tab: pause; the online/visibility
-        // handlers resume from this attempt.
-        clearPendingRejoinTimer();
+      if (attemptIndex >= MEETING_REJOIN_DELAYS_MS.length) {
         setConnecting(false);
         setConnected(false);
         setConnectionLabel("disconnected");
         setRejoinState({
           loading: false,
-          error: "",
-          info: "Connection lost. We'll rejoin the meeting automatically when your connection is back.",
+          error: "Connection lost. Tap Rejoin Meeting to reconnect with a fresh token.",
+          info: "",
         });
         return;
       }
@@ -1171,8 +1143,7 @@ export default function MeetingRoomExperience({
         return;
       }
       clearPendingRejoinTimer();
-      // Unbounded: quick first attempts, then up to 30 s apart with jitter.
-      const retryDelay = meetingRejoinDelay(attemptIndex);
+      const retryDelay = MEETING_REJOIN_DELAYS_MS[attemptIndex];
       const offline =
         typeof navigator !== "undefined" && navigator.onLine === false;
       setConnecting(true);
@@ -2125,6 +2096,137 @@ export default function MeetingRoomExperience({
     }
   };
 
+  const handleStartRecording = async () => {
+    if (!session.id || !canManageParticipants) {
+      return;
+    }
+    setRecordingState((prev) => ({ ...prev, loading: true, error: "", info: "" }));
+    try {
+      const response = await startRealtimeRecording(session.id);
+      const recording = apiData(response, null);
+      setRecordingState((prev) => ({
+        ...prev,
+        loading: false,
+        error: "",
+        info: "Recording started.",
+        active: recording,
+        mode: resolveRecordingMode(recording) || "livekit-egress",
+      }));
+    } catch (livekitErr) {
+      try {
+        const fallbackRecorder =
+          fallbackRecorderRef.current || new ScreenityFallbackRecorder({ withMicrophone: true });
+        fallbackRecorderRef.current = fallbackRecorder;
+        if (!fallbackRecorder.isRecording) {
+          await fallbackRecorder.start();
+        }
+        setRecordingState((prev) => ({
+          ...prev,
+          loading: false,
+          error: "",
+          info: "LiveKit recorder unavailable. Browser fallback recording started.",
+          active: {
+            id: "browser-fallback",
+            status: "recording",
+            is_active: true,
+            source: "browser_fallback",
+          },
+          mode: "screenity-fallback",
+        }));
+      } catch (fallbackErr) {
+        fallbackRecorderRef.current = null;
+        const primaryError = apiMessage(livekitErr, "Unable to start recording.");
+        const fallbackError = resolveControlError(
+          fallbackErr,
+          "Browser fallback recording failed.",
+          "Screen recording"
+        );
+        setRecordingState((prev) => ({
+          ...prev,
+          loading: false,
+          error: `${primaryError} ${fallbackError}`,
+          info: "",
+          mode: "",
+        }));
+      }
+    }
+  };
+
+  const handleStopRecording = async () => {
+    if (!session.id || !canManageParticipants) {
+      return;
+    }
+    setRecordingState((prev) => ({ ...prev, loading: true, error: "", info: "" }));
+    if (recordingState.mode === "screenity-fallback") {
+      const fallbackRecorder = fallbackRecorderRef.current;
+      if (!fallbackRecorder || !fallbackRecorder.isRecording) {
+        setRecordingState((prev) => ({
+          ...prev,
+          loading: false,
+          error: "No active fallback recording found.",
+          info: "",
+          active: null,
+          mode: "",
+        }));
+        return;
+      }
+      try {
+        const localRecording = await fallbackRecorder.stop();
+        fallbackRecorderRef.current = null;
+
+        const formData = new FormData();
+        formData.append("video_file", localRecording.file, localRecording.file_name);
+        if (localRecording.started_at) {
+          formData.append("started_at", localRecording.started_at);
+        }
+        if (localRecording.ended_at) {
+          formData.append("ended_at", localRecording.ended_at);
+        }
+
+        const uploadResponse = await uploadRealtimeBrowserRecording(session.id, formData);
+        const storedRecording = apiData(uploadResponse, null);
+        setRecordingState((prev) => ({
+          ...prev,
+          loading: false,
+          error: "",
+          info: "Fallback recording uploaded and stored.",
+          active: null,
+          latestCompleted: storedRecording || prev.latestCompleted,
+          mode: "",
+        }));
+      } catch (err) {
+        setRecordingState((prev) => ({
+          ...prev,
+          loading: false,
+          error: resolveControlError(err, "Unable to stop/upload fallback recording.", "Screen recording"),
+          info: "",
+        }));
+      }
+      return;
+    }
+
+    try {
+      const response = await stopRealtimeRecording(session.id);
+      const recording = apiData(response, null);
+      setRecordingState((prev) => ({
+        ...prev,
+        loading: false,
+        error: "",
+        info: "Recording stopped and stored.",
+        active: recording?.is_active ? recording : null,
+        latestCompleted: recording?.status === "completed" ? recording : prev.latestCompleted,
+        mode: recording?.is_active ? resolveRecordingMode(recording) : "",
+      }));
+    } catch (err) {
+      setRecordingState((prev) => ({
+        ...prev,
+        loading: false,
+        error: apiMessage(err, "Unable to stop recording."),
+        info: "",
+      }));
+    }
+  };
+
   const handleDeleteLatestRecording = async () => {
     if (!session.id || !canManageParticipants) {
       return;
@@ -2161,6 +2263,13 @@ export default function MeetingRoomExperience({
     manualLeaveRef.current = true;
     clearPendingRejoinTimer();
     reconnectingRef.current = false;
+    const fallbackRecorder = fallbackRecorderRef.current;
+    if (fallbackRecorder?.isRecording) {
+      fallbackRecorder.stop().catch(() => {
+        // best-effort cleanup on leave
+      });
+    }
+    fallbackRecorderRef.current = null;
     const room = roomRef.current;
     if (room) {
       room.disconnect();
@@ -2238,13 +2347,13 @@ export default function MeetingRoomExperience({
   const connectionStatusToneClass = (() => {
     const normalized = String(connectionLabel || "").toLowerCase();
     if (normalized.includes("reconnect")) {
-      return "border-[#F3E2B3]/30 bg-[#F3E2B3]/[0.08] text-[#F3E2B3]";
+      return "border-amber-200/20 bg-amber-100/8 text-amber-100";
     }
     if (normalized.includes("connect")) {
       return "border-[#C0C0C0]/30 bg-[#C0C0C0]/14 text-[#F1F1F1]";
     }
     if (normalized.includes("fail") || normalized.includes("left") || normalized.includes("disconnect")) {
-      return "border-white/60 bg-white/[0.08] text-[#fafafa]";
+      return "border-red-300/25 bg-red-300/10 text-red-100";
     }
     return "border-black bg-[#161616]/80 text-[#E1E1E1]";
   })();
@@ -2428,20 +2537,29 @@ export default function MeetingRoomExperience({
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              {/* No Start/Stop Recording button. Meetings are never recorded
-                  automatically (only broadcasts are); the pill says so, and
-                  turns into a clear notice if a recording is running. */}
-              <span
-                className="rounded-full border border-black bg-[#101010] px-3 py-1.5 text-xs text-[#E1E1E1]"
-                role="status"
-                title={
-                  recordingState.active
-                    ? "This meeting is being recorded. The recording is held for an admin's review before anyone can watch it."
-                    : "Meetings are not recorded. Only broadcast classes (OBS and Host Studio) are recorded automatically."
-                }
-              >
-                {recordingState.active ? "This meeting is being recorded" : "Recording: off"}
+              <span className="rounded-full border border-black bg-[#101010] px-3 py-1.5 text-xs text-[#E1E1E1]">
+                Recording: {recordingState.active?.status || "idle"}
+                {recordingState.active
+                  ? ` (${recordingState.mode === "screenity-fallback" ? "browser fallback" : "livekit"})`
+                  : ""}
               </span>
+              <Button
+                className="rounded-full border border-[#D7D7D7] bg-gradient-to-r from-[#DADADA] to-[#AFAFAF] px-4 py-2 text-[#121212] shadow-none hover:from-[#E5E5E5] hover:to-[#C0C0C0]"
+                onClick={handleStartRecording}
+                loading={recordingState.loading}
+                disabled={Boolean(recordingState.active)}
+              >
+                Start recording
+              </Button>
+              <Button
+                variant="danger"
+                className="rounded-full border-[#A9A9A9] bg-[#737373] px-4 py-2 text-white shadow-none hover:bg-[#616161]"
+                onClick={handleStopRecording}
+                loading={recordingState.loading}
+                disabled={!recordingState.active}
+              >
+                Stop recording
+              </Button>
               {latestRecordingPlaybackUrl ? (
                 <a
                   href={latestRecordingPlaybackUrl}
@@ -2454,7 +2572,7 @@ export default function MeetingRoomExperience({
               ) : null}
               <Button
                 variant="danger"
-                className="rounded-md border-white bg-[#fafafa] px-4 py-2 text-black shadow-none hover:bg-white/90"
+                className="rounded-full border-red-400/40 bg-red-600 px-4 py-2 text-white shadow-none hover:bg-red-500"
                 onClick={handleDeleteLatestRecording}
                 loading={recordingState.loading}
                 disabled={!recordingState.latestCompleted?.id || Boolean(recordingState.active)}

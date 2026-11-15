@@ -32,12 +32,9 @@ from .engagement.views import (
     LectureEngagementView,
     LectureLikeView,
 )
-from .catalog_api import CatalogView
 from .experience_views import (CourseExperienceView, CourseReviewView, PentestingApplicationView, ApplicationCheckoutView)
 
 urlpatterns = [
-    # Public catalogue for the marketing pages (WS catalog-plans; contract §1).
-    path("catalog/", CatalogView.as_view(), name="catalog"),
     path("courses/<int:pk>/experience/", CourseExperienceView.as_view()),
     path("courses/<int:pk>/reviews/", CourseReviewView.as_view()),
     path("courses/<int:pk>/applications/", PentestingApplicationView.as_view()),

@@ -20,15 +20,6 @@ describe("live class schedule helpers", () => {
         stream_status: "stopped",
       })
     ).toBe(false);
-    // Phase 2: the host is reconnecting; the class is still live and joinable.
-    expect(
-      isJoinableLiveSession({
-        status: "live",
-        viewer_can_join_now: true,
-        session_type: "broadcasting",
-        stream_status: "interrupted",
-      })
-    ).toBe(true);
     expect(isJoinableLiveSession({ status: "scheduled", viewer_can_join_now: true })).toBe(false);
     expect(isJoinableLiveSession({ status: "live", viewer_can_join_now: false })).toBe(false);
   });

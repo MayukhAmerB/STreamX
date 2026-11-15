@@ -16,13 +16,10 @@ from django.contrib import admin, messages
 from django.db.models import Count, F, Q
 from django.http import Http404
 from django.urls import path, reverse
-from django.utils import timezone
 from django.utils.html import format_html
 
-from apps.users.identity_admin import IDENTITY_LIST_DISPLAY, StudentIdentityAdminMixin
-
 from . import answers, exports
-from .models import CtfAttempt, CtfExam, CtfExamResult, CtfMaterial, CtfParticipation, CtfQuestion
+from .models import CtfAttempt, CtfExam, CtfParticipation, CtfQuestion
 
 
 def _changelist(model, **params):
@@ -218,7 +215,7 @@ class CtfExamAdmin(admin.ModelAdmin):
         try:
             current = answers.answer_key_id()
         except answers.CtfNotConfigured:
-            return answers.exams_disabled_reason() or "CTF_ANSWER_PEPPER is not configured"
+            return "CTF_ANSWER_PEPPER is not configured"
         if obj.answer_key_id == current:
             return "Matches the server pepper"
         return "DOES NOT match the server pepper: reload the exam file"
@@ -232,10 +229,7 @@ class CtfExamAdmin(admin.ModelAdmin):
                 self.message_user(request, f"{exam.slug}: {problem}", messages.WARNING)
                 continue
             exam.status = CtfExam.STATUS_PUBLISHED
-            exam.auto_publish = False
-            # published_at lets ctf.scheduler send the "exam open" notice once.
-            exam.published_at = exam.published_at or timezone.now()
-            exam.save(update_fields=["status", "auto_publish", "published_at", "updated_at"])
+            exam.save(update_fields=["status", "updated_at"])
             done += 1
             if not exam.eligible_courses.exists():
                 self.message_user(
@@ -252,7 +246,7 @@ class CtfExamAdmin(admin.ModelAdmin):
         try:
             current = answers.answer_key_id()
         except answers.CtfNotConfigured:
-            return answers.exams_disabled_reason() or "CTF_ANSWER_PEPPER is not configured on the server."
+            return "CTF_ANSWER_PEPPER is not configured on the server."
         if exam.answer_key_id != current:
             return "its answer key was made with a different pepper. Reload the exam file."
         return ""
@@ -262,8 +256,7 @@ class CtfExamAdmin(admin.ModelAdmin):
         updated = 0
         for exam in queryset.exclude(status=CtfExam.STATUS_CLOSED):
             exam.status = CtfExam.STATUS_CLOSED
-            exam.closed_at = timezone.now()
-            exam.save(update_fields=["status", "closed_at", "updated_at"])
+            exam.save(update_fields=["status", "updated_at"])
             updated += 1
         self.message_user(request, f"Closed {updated} exam(s).", messages.SUCCESS)
 
@@ -315,12 +308,11 @@ class CtfAttemptInline(admin.TabularInline):
 
 
 @admin.register(CtfParticipation)
-class CtfParticipationAdmin(StudentIdentityAdminMixin, _ReadOnlyAdmin):
+class CtfParticipationAdmin(_ReadOnlyAdmin):
     model = CtfParticipation
-    # Owner rule: roll number, real name, handle, stats first; then the record.
     list_display = (
-        *IDENTITY_LIST_DISPLAY,
         "student_email",
+        "student_name",
         "exam",
         "batch_course",
         "status",
@@ -407,11 +399,9 @@ class QuestionListFilter(admin.SimpleListFilter):
 
 
 @admin.register(CtfAttempt)
-class CtfAttemptAdmin(StudentIdentityAdminMixin, _ReadOnlyAdmin):
+class CtfAttemptAdmin(_ReadOnlyAdmin):
     model = CtfAttempt
-    identity_record_attr = "participation"
     list_display = (
-        *IDENTITY_LIST_DISPLAY,
         "created_at",
         "student_email",
         "exam",
@@ -431,7 +421,7 @@ class CtfAttemptAdmin(StudentIdentityAdminMixin, _ReadOnlyAdmin):
     )
     date_hierarchy = "created_at"
     search_fields = ("user__email", "user__full_name", "submitted_answer")
-    list_select_related = ("exam", "user", "question", "participation")
+    list_select_related = ("exam", "user", "question")
     ordering = ("-created_at", "-id")
     actions = ("export_attempts_csv",)
     fields = (
@@ -472,41 +462,3 @@ class CtfAttemptAdmin(StudentIdentityAdminMixin, _ReadOnlyAdmin):
         return exports.csv_response(
             exports.iter_attempts_csv(queryset.order_by("created_at", "id")), exports.export_filename("ctf-attempts")
         )
-
-
-
-# --- Phase 3: gradebook entries and Console-uploaded evidence (read only) ---
-@admin.register(CtfExamResult)
-class CtfExamResultAdmin(StudentIdentityAdminMixin, admin.ModelAdmin):
-    """Written by ctf.scheduler when an exam closes; never edited by hand."""
-
-    list_display = (*IDENTITY_LIST_DISPLAY, "exam", "user", "batch_course", "score", "total_points", "rank", "status", "finalized_at", "notified_at")
-    list_filter = ("exam", ("batch_course", admin.RelatedOnlyFieldListFilter))
-    search_fields = ("user__email", "user__full_name", "exam__slug")
-    list_select_related = ("exam", "user", "batch_course")
-
-    def has_add_permission(self, request, obj=None):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
-
-
-@admin.register(CtfMaterial)
-class CtfMaterialAdmin(admin.ModelAdmin):
-    """Uploaded from Console -> Exams. The file itself is served only through
-    signed URLs, so no link to it is shown here."""
-
-    list_display = ("exam", "path", "size", "uploaded_by", "updated_at")
-    list_filter = ("exam",)
-    fields = ("exam", "path", "original_name", "content_type", "size", "sha256", "uploaded_by", "created_at", "updated_at")
-    readonly_fields = fields
-
-    def has_add_permission(self, request, obj=None):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
-
-# Monthly OSINT CTF seasons (season_admin.py registers its own admins).
-from . import season_admin  # noqa: E402,F401

@@ -2,7 +2,6 @@ import { Button, Tag } from "@carbon/react";
 import { useState } from "react";
 import CommentComposer, { Avatar } from "./CommentComposer";
 import { formatFullDate, formatRelativeTime } from "./formatters";
-import { publicName } from "../profiles/publicName";
 
 /**
  * A comment: initials avatar, name, "Instructor" tag, "2h ago", "Edited",
@@ -12,7 +11,7 @@ export default function CommentItem({ comment, onEdit, onDelete, now }) {
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const author = comment.author || {};
-  const name = publicName(author, "Learner");
+  const name = author.display_name || "Learner";
   const pending = Boolean(comment.pending) || String(comment.id).startsWith("temp-");
   const canEdit = Boolean(comment.is_mine) && !pending && typeof onEdit === "function";
   const canDelete = Boolean(comment.can_delete) && !pending && typeof onDelete === "function";

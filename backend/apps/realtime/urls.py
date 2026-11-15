@@ -36,9 +36,6 @@ from .views import (
     RealtimeSessionOwncastStreamLaunchView,
 )
 
-from .views import RealtimePreflightView, RealtimeSessionGoLiveView  # Phase 2
-from .recording.views import ClassRecordingModuleView, ClassRecordingRerunFinalizeView  # Phase 2 recordings
-
 urlpatterns = [
     path("sessions/", RealtimeSessionListCreateView.as_view(), name="realtime-session-list-create"),
     path("sessions/<int:pk>/", RealtimeSessionDetailView.as_view(), name="realtime-session-detail"),
@@ -157,19 +154,5 @@ urlpatterns = [
         "sessions/<int:pk>/speakers/<str:permission_action>/",
         RealtimeSessionSpeakerPermissionView.as_view(),
         name="realtime-session-speaker-permission",
-    ),
-    # --- Phase 2: live-class lifecycle ---
-    path("sessions/<int:pk>/go-live/", RealtimeSessionGoLiveView.as_view(), name="realtime-session-go-live"),
-    path("preflight/", RealtimePreflightView.as_view(), name="realtime-preflight"),
-    # --- Phase 2: no-click recordings (module override, admin re-run finalize) ---
-    path(
-        "class-recordings/<int:recording_id>/module/",
-        ClassRecordingModuleView.as_view(),
-        name="realtime-class-recording-module",
-    ),
-    path(
-        "class-recordings/<int:recording_id>/rerun-finalize/",
-        ClassRecordingRerunFinalizeView.as_view(),
-        name="realtime-class-recording-rerun-finalize",
     ),
 ]

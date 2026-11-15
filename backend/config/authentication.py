@@ -3,8 +3,7 @@ from rest_framework.authentication import CSRFCheck
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken
 
-from apps.users.live_grace import mark_live_grace
-from apps.users.session_policy import token_session_access
+from apps.users.session_policy import token_matches_active_session
 from apps.users.terms import TERMS_VERSION
 from config.cookies import ACCESS_COOKIE
 
@@ -49,13 +48,8 @@ class CookieJWTAuthentication(JWTAuthentication):
         except InvalidToken:
             return None
         # A token whose session slot was evicted authenticates nobody; the
-        # client's refresh then gets the "session_replaced" rejection. A
-        # device evicted mid-class may still make that class's requests until
-        # it ends; every response tells it so (X-Session-State: live-grace).
-        access = token_session_access(validated_token, user, request=request, record_activity=True)
-        if access.live_grace:
-            mark_live_grace(request)
-        if not access.allowed:
+        # client's refresh then gets the "session_replaced" rejection.
+        if not token_matches_active_session(validated_token, user, record_activity=True):
             return None
         if not using_header:
             self.enforce_csrf(request)

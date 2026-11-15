@@ -15,17 +15,13 @@ from urllib.parse import quote
 from django.http import StreamingHttpResponse
 from django.utils import timezone
 
-from apps.users import identity
-
 FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
-# Owner rule: the student block (roll number, real name, handle, stats) comes
-# first, then the record's own fields. The real name lives in the block.
 PARTICIPATION_HEADER = [
-    *identity.IDENTITY_HEADER,
     "Position",
     "Exam",
     "Student email",
+    "Student name",
     "Batch course",
     "Batch",
     "Status",
@@ -41,13 +37,13 @@ PARTICIPATION_HEADER = [
 ]
 
 ATTEMPT_HEADER = [
-    *identity.IDENTITY_HEADER,
     "Time",
     "Exam",
     "Question",
     "Question key",
     "Category",
     "Student email",
+    "Student name",
     "Batch course",
     "Attempt number",
     "Submitted answer",
@@ -79,16 +75,14 @@ class _Echo:
         return value
 
 
-def participation_row(participation, position, block=None):
+def participation_row(participation, position):
     user = participation.user
     course = participation.batch_course
-    if block is None:
-        block = identity.block_for_user(user, record=participation)
     return [
-        *identity.identity_cells(block),
         position,
         participation.exam.slug,
         user.email,
+        getattr(user, "full_name", "") or "",
         course.title if course else "",
         course.batch if course else "",
         participation.get_status_display(),
@@ -104,20 +98,18 @@ def participation_row(participation, position, block=None):
     ]
 
 
-def attempt_row(attempt, block=None):
+def attempt_row(attempt):
     user = attempt.user
     course = attempt.participation.batch_course
     question = attempt.question
-    if block is None:
-        block = identity.block_for_user(user, record=attempt.participation)
     return [
-        *identity.identity_cells(block),
         attempt.created_at,
         attempt.exam.slug,
         f"Q{question.order}: {question.title_en}",
         question.key,
         question.category,
         user.email,
+        getattr(user, "full_name", "") or "",
         course.title if course else "",
         attempt.attempt_number,
         attempt.submitted_answer,
@@ -139,17 +131,13 @@ def _iter_rows(header, rows):
 
 def iter_participations_csv(queryset):
     queryset = queryset.select_related("exam", "user", "batch_course")
-    pairs = identity.chunked_blocks(queryset.iterator(chunk_size=1000), lambda item: item.user, lambda item: item)
-    rows = (participation_row(item, position, block) for position, (item, block) in enumerate(pairs, 1))
+    rows = (participation_row(item, position) for position, item in enumerate(queryset.iterator(chunk_size=1000), 1))
     return _iter_rows(PARTICIPATION_HEADER, rows)
 
 
 def iter_attempts_csv(queryset):
     queryset = queryset.select_related("exam", "user", "question", "participation__batch_course")
-    pairs = identity.chunked_blocks(
-        queryset.iterator(chunk_size=2000), lambda item: item.user, lambda item: item.participation, size=1000
-    )
-    rows = (attempt_row(item, block) for item, block in pairs)
+    rows = (attempt_row(item) for item in queryset.iterator(chunk_size=2000))
     return _iter_rows(ATTEMPT_HEADER, rows)
 
 

@@ -182,22 +182,7 @@ class Course(models.Model):
     CATEGORY_WEB_PENTESTING = "web_pentesting"
     CATEGORY_CHOICES = [
         (CATEGORY_OSINT, "OSINT"),
-        (CATEGORY_WEB_PENTESTING, "Pentesting"),
-    ]
-
-    # Catalogue tiers (HackPath-style tier sections on /courses). Blank = no
-    # tier: OSINT and legacy courses group by category instead.
-    TIER_FOUNDATIONS = "foundations"
-    TIER_OFFENSIVE = "offensive"
-    TIER_DEFENSIVE = "defensive"
-    TIER_ADVANCED = "advanced"
-    TIER_QUICK_WINS = "quick_wins"
-    TIER_CHOICES = [
-        (TIER_FOUNDATIONS, "Foundations"),
-        (TIER_OFFENSIVE, "Offensive security"),
-        (TIER_DEFENSIVE, "Defensive security"),
-        (TIER_ADVANCED, "Advanced operations"),
-        (TIER_QUICK_WINS, "Quick wins"),
+        (CATEGORY_WEB_PENTESTING, "Web Application Pentesting"),
     ]
 
     LEVEL_BEGINNER = "beginner"
@@ -329,27 +314,6 @@ class Course(models.Model):
         related_name="courses",
     )
     is_published = models.BooleanField(default=False)
-    tier = models.CharField(
-        max_length=24,
-        choices=TIER_CHOICES,
-        blank=True,
-        default="",
-        help_text="Catalogue tier on the public course list (Pentesting). Leave blank for OSINT courses.",
-    )
-    tier_order = models.PositiveSmallIntegerField(
-        default=0, help_text="Position inside its tier on the public course list (lowest first)."
-    )
-    membership_always_included = models.BooleanField(
-        default=False,
-        help_text=(
-            "CTF Labs members can always play this course's published recordings, "
-            "whatever the month's membership bundle contains."
-        ),
-    )
-    # Provenance of rows written by ``manage.py seed_pentesting_catalog``; the
-    # hash of the seed-owned fields tells an admin edit apart from seed output.
-    seed_source = models.CharField(max_length=32, blank=True, default="", editable=False)
-    seed_hash = models.CharField(max_length=64, blank=True, default="", editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -360,7 +324,6 @@ class Course(models.Model):
             models.Index(fields=["is_published", "category", "level", "launch_status"]),
             models.Index(fields=["instructor", "is_published"]),
             models.Index(fields=["created_at"]),
-            models.Index(fields=["category", "tier", "tier_order"], name="courses_cat_tier_order_idx"),
         ]
 
     def clean(self):
@@ -659,23 +622,13 @@ class Lecture(models.Model):
     stream_manifest_key = models.CharField(max_length=1024, blank=True, default="")
     stream_duration_seconds = models.PositiveIntegerField(blank=True, null=True)
     stream_error = models.TextField(blank=True, default="")
-    # Phase 2 transcode queue (apps/courses/transcode_queue.py), expand-only:
-    # attempts with exponential backoff, a claim lease so several transcoders
-    # can run (select_for_update(skip_locked)), class recordings first, and the
-    # blue/green HLS revision (streams/<course>/lecture_<id>/v<revision>/).
-    stream_attempts = models.PositiveIntegerField(default=0)
-    stream_next_attempt_at = models.DateTimeField(null=True, blank=True)
-    stream_priority = models.SmallIntegerField(default=0)
-    stream_claimed_at = models.DateTimeField(null=True, blank=True)
-    stream_claimed_by = models.CharField(max_length=128, blank=True, default="")
-    stream_revision = models.PositiveIntegerField(default=0)
     order = models.PositiveIntegerField(default=1)
     is_preview = models.BooleanField(default=False)
     is_published = models.BooleanField(
         default=True,
         help_text=(
-            "Unpublished lectures are hidden from students. Class recordings are published as soon as "
-            "their MP4 exists (the HD stream follows) unless RECORDING_INSTANT_PUBLISH is off."
+            "Unpublished lectures are hidden from students. Class recordings are created "
+            "unpublished and published automatically once their HLS stream is ready."
         ),
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -688,7 +641,6 @@ class Lecture(models.Model):
         indexes = [
             models.Index(fields=["section", "order"]),
             models.Index(fields=["stream_status"]),
-            models.Index(fields=["stream_status", "stream_next_attempt_at"], name="lecture_stream_queue_idx"),
         ]
 
     def clean(self):
@@ -723,12 +675,6 @@ class Lecture(models.Model):
             self.stream_manifest_key = ""
             self.stream_duration_seconds = None
             self.stream_error = ""
-            # A new video is a new transcode job: fresh retry budget. The old
-            # HLS revision stays on disk until the transcoder's grace cleanup.
-            self.stream_attempts = 0
-            self.stream_next_attempt_at = None
-            if self.stream_status in {self.STREAM_FAILED, self.STREAM_PROCESSING}:
-                self.stream_status = self.STREAM_UPLOADED
 
         has_source = bool(self.video_file or self.video_key)
         has_manifest = bool(self.stream_manifest_key)
@@ -1075,16 +1021,6 @@ class LiveClass(models.Model):
     month_number = models.PositiveIntegerField(default=1)
     schedule_days = models.CharField(max_length=255, default="Friday, Saturday, Sunday")
     class_duration_minutes = models.PositiveIntegerField(default=60)
-    # Phase 2: where this class's recordings are published when the session
-    # itself names no module (before the auto-created "Class recordings").
-    default_module = models.ForeignKey(
-        "courses.Section",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="default_for_live_classes",
-        help_text="Module of the linked course that receives this class's recordings by default.",
-    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1103,8 +1039,6 @@ class LiveClass(models.Model):
         validate_no_active_content(self.title, "title")
         validate_no_active_content(self.description, "description")
         validate_no_active_content(self.schedule_days, "schedule_days")
-        if self.default_module_id and self.default_module.course_id != self.linked_course_id:
-            raise ValidationError({"default_module": "The default module must belong to the linked course."})
 
     def save(self, *args, **kwargs):
         if not self.slug:

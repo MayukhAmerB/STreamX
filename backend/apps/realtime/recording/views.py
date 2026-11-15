@@ -16,9 +16,7 @@ from ..models import RealtimeSession
 from . import replacement, services
 from .models import ClassRecording
 from .serializers import (
-    ClassRecordingActionResponseSerializer,
     ClassRecordingListResponseSerializer,
-    ClassRecordingModuleSerializer,
     ClassRecordingResponseSerializer,
     ClassRecordingSerializer,
     ModuleOptionsResponseSerializer,
@@ -212,80 +210,3 @@ class ClassRecordingRetryView(APIView):
         recording.refresh_from_db()
         return api_response(message="Class recording queued for retry.", data=ClassRecordingSerializer(recording).data)
 
-
-def _can_manage_recording(user, recording):
-    if user.is_staff or user.is_superuser:
-        return True
-    return recording.session is not None and recording.session.is_moderator_allowed(user)
-
-
-class ClassRecordingModuleView(APIView):
-    """Optional override: choose (or change) the module of a class recording."""
-
-    permission_classes = [permissions.IsAuthenticated]
-
-    @extend_schema(
-        operation_id="realtime_class_recording_set_module",
-        tags=TAGS,
-        description=(
-            "Choose the module that receives this recording. Optional: without a choice the server derives one "
-            "(session module, the live class's default module, or an auto-created 'Class recordings' section). "
-            "Moves an existing lecture, clears the review flag and retries a failed recording."
-        ),
-        request=ClassRecordingModuleSerializer,
-        responses={
-            200: ClassRecordingResponseSerializer,
-            400: ClassRecordingResponseSerializer,
-            403: ClassRecordingResponseSerializer,
-        },
-    )
-    def post(self, request, recording_id):
-        recording = get_object_or_404(_recordings_queryset(), pk=recording_id)
-        if not _can_manage_recording(request.user, recording):
-            return _denied("Only host, assigned instructor, or admin can choose the recording's module.")
-        serializer = ClassRecordingModuleSerializer(data=request.data)
-        if not serializer.is_valid():
-            return _bad_request("Invalid module.", serializer.errors)
-        module = serializer.validated_data["module"]
-        problem = services.module_choice_error(request.user, recording, module)
-        if problem:
-            return _bad_request("Invalid module.", {"module_id": [problem]})
-        try:
-            services.set_module(recording, module, request=request)
-        except DjangoValidationError as exc:
-            return _bad_request("Module not changed.", {"detail": exc.messages})
-        recording = _recordings_queryset().get(pk=recording.pk)
-        return api_response(
-            message=f"Recording will be published to {module.title}.",
-            data=ClassRecordingSerializer(recording).data,
-        )
-
-
-class ClassRecordingRerunFinalizeView(APIView):
-    """Admin only: push a recording forward from where it is (never needed normally)."""
-
-    permission_classes = [permissions.IsAuthenticated]
-
-    @extend_schema(
-        operation_id="realtime_class_recording_rerun_finalize",
-        tags=TAGS,
-        request=None,
-        responses={
-            200: ClassRecordingActionResponseSerializer,
-            400: ClassRecordingActionResponseSerializer,
-            403: ClassRecordingActionResponseSerializer,
-        },
-    )
-    def post(self, request, recording_id):
-        if not (request.user.is_staff or request.user.is_superuser):
-            return _denied("Only admins can re-run a recording's finalize.")
-        recording = get_object_or_404(_recordings_queryset(), pk=recording_id)
-        done, detail = services.rerun_finalize(recording, request=request)
-        recording = _recordings_queryset().get(pk=recording.pk)
-        payload = {"done": done, "detail": detail, "recording": ClassRecordingSerializer(recording).data}
-        if not done:
-            return api_response(
-                success=False, message=detail, data=payload, errors={"detail": detail},
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-        return api_response(message=detail, data=payload)

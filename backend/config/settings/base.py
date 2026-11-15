@@ -65,10 +65,6 @@ INSTALLED_APPS = [
     "apps.reports.apps.ReportsConfig",
     "apps.site_media.apps.SiteMediaConfig",
     "apps.ctf.apps.CtfConfig",
-    # Resumable (chunked) class recording uploads + personal upload tokens.
-    "apps.recording_uploads.apps.RecordingUploadsConfig",
-    # UI overhaul: Console workspace + admin API (/api/console/, /api/admin/).
-    "apps.console_api.apps.ConsoleApiConfig",
 ]
 
 MIDDLEWARE = [
@@ -90,8 +86,6 @@ MIDDLEWARE += [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    # X-Session-State: live-grace for a device evicted mid-class (apps/users/live_grace.py).
-    "apps.users.live_grace.LiveGraceHeaderMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -127,17 +121,6 @@ _db_name = str(DATABASES["default"].get("NAME", "")).strip()
 if "sqlite3" in _db_engine_name and _db_name and not Path(_db_name).is_absolute():
     DATABASES["default"]["NAME"] = str((BASE_DIR / _db_name).resolve())
 DATABASE_CONN_HEALTH_CHECKS = env_bool("DATABASE_CONN_HEALTH_CHECKS", True)
-# Behind PgBouncer (transaction pooling) the pooler already checks its server
-# connections, so Django's per-request "SELECT 1" health check is pure cost.
-# Detected from the DATABASE_URL host; DATABASE_BEHIND_POOLER overrides it.
-_db_host = str(DATABASES["default"].get("HOST", "") or "").strip().lower()
-DATABASE_BEHIND_POOLER = env_bool("DATABASE_BEHIND_POOLER", "pgbouncer" in _db_host)
-if DATABASE_BEHIND_POOLER:
-    DATABASE_CONN_HEALTH_CHECKS = env_bool("DATABASE_POOLER_CONN_HEALTH_CHECKS", False)
-# Server-side cursors (QuerySet.iterator()) cannot cross transactions in
-# PgBouncer transaction mode ("cursor ... does not exist" under load), so they
-# are off for PostgreSQL; iterator() then fetches client-side.
-DATABASE_DISABLE_SERVER_SIDE_CURSORS = env_bool("DATABASE_DISABLE_SERVER_SIDE_CURSORS", True)
 DATABASE_STATEMENT_TIMEOUT_MS = env_int("DATABASE_STATEMENT_TIMEOUT_MS", 15000)
 DATABASE_LOCK_TIMEOUT_MS = env_int("DATABASE_LOCK_TIMEOUT_MS", 10000)
 DATABASE_IDLE_IN_TX_TIMEOUT_MS = env_int("DATABASE_IDLE_IN_TX_TIMEOUT_MS", 30000)
@@ -155,10 +138,6 @@ if "postgresql" in _db_engine:
     db_options.setdefault("connect_timeout", DATABASE_CONNECT_TIMEOUT_SECONDS)
     db_options["options"] = f"{existing_option_string} {hardening_options}".strip()
     DATABASES["default"]["OPTIONS"] = db_options
-    # PgBouncer discards the libpq "options" above (IGNORE_STARTUP_PARAMETERS),
-    # so production also sets these timeouts on the database role:
-    # infra/hostinger/apply-db-role-timeouts.sh.
-    DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = DATABASE_DISABLE_SERVER_SIDE_CURSORS
 
 CACHE_DEFAULT_TIMEOUT_SECONDS = env_int("CACHE_DEFAULT_TIMEOUT_SECONDS", 300)
 REDIS_URL = env("REDIS_URL", "").strip()
@@ -274,10 +253,7 @@ REST_FRAMEWORK = {
         "lecture_comment_write": env("LECTURE_COMMENT_WRITE_RATE", "10/minute"),
         "class_recording_upload": env("CLASS_RECORDING_UPLOAD_RATE", "20/hour"),
         "realtime_session_create": "30/hour",
-        # Per account (config.throttling.RealtimeJoinUserRateThrottle), plus a
-        # high per-IP ceiling: classrooms and carrier NAT share one address.
-        "realtime_session_join": env("REALTIME_SESSION_JOIN_RATE", "240/hour"),
-        "realtime_session_join_ip": env("REALTIME_SESSION_JOIN_IP_RATE", "6000/hour"),
+        "realtime_session_join": "240/hour",
         "realtime_connection_telemetry": "600/hour",
         # Weekly reports: one file per upload request, so the upload budget
         # covers several files per task plus retries.
@@ -288,18 +264,10 @@ REST_FRAMEWORK = {
         # Public website YouTube section (GET /api/site/youtube/), per client IP. Generous:
         # classrooms share one NAT address and every open tab polls once a minute.
         "site_youtube": env("SITE_YOUTUBE_RATE", "300/minute"),
-        # Public website figures (GET /api/site/stats/): one cached payload for everyone.
-        "site_stats": env("SITE_STATS_RATE", "120/minute"),
         # OSINT CTF exams (apps.ctf). Per student; the per-question attempt cap
         # is the real brute-force limit.
         "ctf_attempt": env("CTF_ATTEMPT_RATE", "30/minute"),
         "ctf_read": env("CTF_READ_RATE", "240/minute"),
-        # Resumable class recording uploads (apps.recording_uploads). A 3 GB
-        # file is ~96 chunks of 32 MiB; retries and 3 parallel streams fit.
-        "recording_upload_create": env("RECORDING_UPLOAD_CREATE_RATE", "60/hour"),
-        "recording_upload_chunk": env("RECORDING_UPLOAD_CHUNK_RATE", "1200/hour"),
-        "recording_upload_read": env("RECORDING_UPLOAD_READ_RATE", "600/hour"),
-        "recording_upload_token": env("RECORDING_UPLOAD_TOKEN_RATE", "20/hour"),
     },
 }
 
@@ -338,9 +306,6 @@ SPECTACULAR_SETTINGS = {
         "CtfQuestionCategoryEnum": "apps.ctf.models.CATEGORY_CHOICES",
         "CtfQuestionDifficultyEnum": "apps.ctf.models.DIFFICULTY_CHOICES",
         "CtfMaterialKindEnum": "apps.ctf.serializers.MATERIAL_KIND_CHOICES",
-        # Phase 3: Console exams and the unified gradebook.
-        "CtfConsoleExamStateEnum": "apps.ctf.console.STATE_CHOICES",
-        "UnifiedGradebookItemKindEnum": "apps.ctf.gradebook_serializers.KIND_CHOICES",
     },
 }
 
@@ -375,10 +340,7 @@ SESSION_CACHE_ALIAS = "default"
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", ["http://localhost:5173"])
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False
-# If-None-Match/ETag: conditional polling of the realtime session list (304).
-CORS_ALLOW_HEADERS = (*default_headers, "idempotency-key", "if-none-match")
-# X-Session-State: a device evicted mid-class finishes it with a banner.
-CORS_EXPOSE_HEADERS = ["ETag", "X-Session-State"]
+CORS_ALLOW_HEADERS = (*default_headers, "idempotency-key")
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", ["http://localhost:5173"])
 
 if DEBUG:
@@ -406,18 +368,6 @@ CSRF_TRUSTED_ORIGINS = _dedupe_preserve_order([*CSRF_TRUSTED_ORIGINS, *CTF_LABS_
 # HMAC key for exam answer hashes. A separate secret (not SECRET_KEY), at
 # least 32 characters; rotating it requires reloading every exam file.
 CTF_ANSWER_PEPPER = env("CTF_ANSWER_PEPPER", "").strip()
-# >>> Phase 3: exams lifecycle, materials and gradebook (apps.ctf) >>>
-# ctf.scheduler (apps/ctf/scheduler.py): auto-publish at opens_at, auto-close,
-# expire participations, write results to the gradebook, notify students.
-CTF_SCHEDULER_ENABLED = env_bool("CTF_SCHEDULER_ENABLED", True)
-CTF_SCHEDULER_INTERVAL_SECONDS = max(15, env_int("CTF_SCHEDULER_INTERVAL_SECONDS", 60))
-CTF_OPENING_SOON_MINUTES = max(5, env_int("CTF_OPENING_SOON_MINUTES", 60))
-# Where exam notifications and the Console card send students.
-CTF_LABS_EXAM_URL = env("CTF_LABS_EXAM_URL", "https://labs.alsyedinitiative.com/#exam").strip()
-# Exam evidence uploaded from the Console: signed URL lifetime and size cap.
-CTF_MATERIAL_URL_TTL_SECONDS = max(60, env_int("CTF_MATERIAL_URL_TTL_SECONDS", 7200))
-CTF_MATERIAL_MAX_UPLOAD_MB = max(1, env_int("CTF_MATERIAL_MAX_UPLOAD_MB", 25))
-# <<< Phase 3: exams lifecycle, materials and gradebook <<<
 
 SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", False)
 USE_X_FORWARDED_HOST = env_bool("USE_X_FORWARDED_HOST", True)
@@ -575,16 +525,6 @@ REALTIME_DEFAULT_MEETING_CAPACITY = env_int("REALTIME_DEFAULT_MEETING_CAPACITY",
 REALTIME_DEFAULT_MAX_AUDIENCE = env_int("REALTIME_DEFAULT_MAX_AUDIENCE", 500)
 REALTIME_JOIN_TOKEN_TTL_SECONDS = env_int("REALTIME_JOIN_TOKEN_TTL_SECONDS", 10800)
 REALTIME_SESSION_LIST_CACHE_TTL_SECONDS = env_int("REALTIME_SESSION_LIST_CACHE_TTL_SECONDS", 10)
-# Shared (all students) active-session rows, single-flight filled; and the
-# hard cap on unpaginated list responses.
-REALTIME_SESSION_LIST_SHARED_CACHE_TTL_SECONDS = env_int("REALTIME_SESSION_LIST_SHARED_CACHE_TTL_SECONDS", 4)
-REALTIME_SESSION_LIST_MAX_ROWS = env_int("REALTIME_SESSION_LIST_MAX_ROWS", 200)
-# How often the async worker persists OBS stream health (the only writer).
-REALTIME_OBS_STREAM_HEALTH_INTERVAL_SECONDS = env_int("REALTIME_OBS_STREAM_HEALTH_INTERVAL_SECONDS", 5)
-# Attendees may join a live session whatever the weekly clock says, but only for
-# this many hours after it went live: a room the host never ended is abandoned,
-# not a class. Managers are not bound. 0 disables the bound.
-REALTIME_ATTENDEE_JOIN_MAX_LIVE_HOURS = env_int("REALTIME_ATTENDEE_JOIN_MAX_LIVE_HOURS", 6)
 REALTIME_PARTICIPANT_COUNT_CACHE_TTL_SECONDS = env_int("REALTIME_PARTICIPANT_COUNT_CACHE_TTL_SECONDS", 5)
 REALTIME_ENROLLMENT_ACCESS_CACHE_TTL_SECONDS = env_int("REALTIME_ENROLLMENT_ACCESS_CACHE_TTL_SECONDS", 10)
 REALTIME_BROADCAST_URL_CACHE_TTL_SECONDS = env_int("REALTIME_BROADCAST_URL_CACHE_TTL_SECONDS", 15)
@@ -703,20 +643,6 @@ REPORTS_PRIVATE_ROOT = env("REPORTS_PRIVATE_ROOT", str(BASE_DIR / "private_media
 REPORTS_QUARANTINE_ROOT = env("REPORTS_QUARANTINE_ROOT", str(BASE_DIR / "private_quarantine")).strip() or str(
     BASE_DIR / "private_quarantine"
 )
-# --- Resumable class recording uploads (apps.recording_uploads) ---
-# Chunks are staged in a private directory, by default inside the noexec
-# report volume (/app/private_media/.recording-uploads on the VPS), never
-# under MEDIA_ROOT. See apps/recording_uploads/config.py for every knob.
-RECORDING_UPLOAD_STAGING_ROOT = env("RECORDING_UPLOAD_STAGING_ROOT", "").strip() or str(
-    Path(REPORTS_PRIVATE_ROOT) / ".recording-uploads"
-)
-RECORDING_UPLOAD_CHUNK_BYTES = env_int("RECORDING_UPLOAD_CHUNK_BYTES", 32 * 1024 * 1024)
-RECORDING_UPLOAD_MAX_BYTES = env_int("RECORDING_UPLOAD_MAX_BYTES", 8 * 1024 * 1024 * 1024)
-RECORDING_UPLOAD_EXPIRY_HOURS = env_int("RECORDING_UPLOAD_EXPIRY_HOURS", 48)
-RECORDING_UPLOAD_MAX_ACTIVE_PER_USER = env_int("RECORDING_UPLOAD_MAX_ACTIVE_PER_USER", 3)
-RECORDING_UPLOAD_MIN_FREE_BYTES = env_int("RECORDING_UPLOAD_MIN_FREE_BYTES", 2 * 1024 * 1024 * 1024)
-RECORDING_UPLOAD_REVERT_RETENTION_DAYS = env_int("RECORDING_UPLOAD_REVERT_RETENTION_DAYS", 14)
-RECORDING_UPLOAD_MEDIA_RUNNER = env("RECORDING_UPLOAD_MEDIA_RUNNER", "").strip()
 # Hard ceilings an instructor cannot exceed when configuring a task.
 REPORTS_MAX_FILE_SIZE_MB_CAP = max(1, env_int("REPORTS_MAX_FILE_SIZE_MB_CAP", 200))
 REPORTS_MAX_FILES_CAP = max(1, env_int("REPORTS_MAX_FILES_CAP", 20))
@@ -884,314 +810,3 @@ LOGGING = {
     },
 }
 
-
-# --- Phase 2: live-class lifecycle (apps/realtime/lifecycle.py, reconciler.py) ---
-# LIVE_RECONCILER_MODE: off | shadow | enforce. "shadow" only logs the
-# transitions the reconciler would make; "enforce" applies them. Production
-# starts in shadow (backend/.env.example); the test suite runs in enforce.
-import sys as _phase2_sys  # noqa: E402
-
-_PHASE2_RUNNING_TESTS = len(_phase2_sys.argv) > 1 and _phase2_sys.argv[1] == "test"
-LIVE_RECONCILER_MODE = env("LIVE_RECONCILER_MODE", "enforce" if _PHASE2_RUNNING_TESTS else "shadow").strip().lower()
-LIVE_RECONCILER_INTERVAL_SECONDS = max(2, env_int("LIVE_RECONCILER_INTERVAL_SECONDS", 5))
-# Host Studio heartbeat freshness (Redis TTL) and the reconnect grace period
-# before an interrupted stream is declared stopped.
-REALTIME_HOST_HEARTBEAT_TTL_SECONDS = max(10, env_int("REALTIME_HOST_HEARTBEAT_TTL_SECONDS", 30))
-REALTIME_HOST_GRACE_SECONDS = max(10, env_int("REALTIME_HOST_GRACE_SECONDS", 60))
-# A live class whose feed has been gone (and whose host has been silent) this
-# long is ended automatically. Classes that never went live end after the
-# attendee bound (REALTIME_ATTENDEE_JOIN_MAX_LIVE_HOURS, default 6 h).
-REALTIME_ABANDONED_END_MINUTES = max(1, env_int("REALTIME_ABANDONED_END_MINUTES", 20))
-REALTIME_STREAM_STARTING_TIMEOUT_SECONDS = max(30, env_int("REALTIME_STREAM_STARTING_TIMEOUT_SECONDS", 180))
-REALTIME_EGRESS_RESTART_BACKOFF_SECONDS = max(1, env_int("REALTIME_EGRESS_RESTART_BACKOFF_SECONDS", 5))
-# Go Live returns 202 and a worker starts the egress (POST .../go-live/).
-REALTIME_ASYNC_GO_LIVE = env_bool("REALTIME_ASYNC_GO_LIVE", True)
-# Calendar-aware server resource profile (broadcast before/while a class,
-# content 10 min after). Off by default: the owner turns it on after the
-# shadow weekends.
-REALTIME_AUTO_RESOURCE_PROFILE = env_bool("REALTIME_AUTO_RESOURCE_PROFILE", False)
-# Off under `manage.py test` so suites never probe real services in the T-10 window.
-REALTIME_PRECLASS_PROBE_ENABLED = env_bool("REALTIME_PRECLASS_PROBE_ENABLED", not _PHASE2_RUNNING_TESTS)
-# Egress health port (egress.yaml health_port; shares LiveKit's network namespace).
-LIVEKIT_EGRESS_HEALTH_URL = env("LIVEKIT_EGRESS_HEALTH_URL", "").strip()
-# Process liveness file for the async worker healthcheck (written every ~10 s).
-WORKER_HEARTBEAT_FILE = env("WORKER_HEARTBEAT_FILE", "").strip()
-# --- end Phase 2 live-class lifecycle ---
-
-
-# --- Phase 2: no-click automatic class recordings (apps/realtime/recording) ---
-# Record every broadcast (OBS and Host Studio both reach Owncast) with the
-# server recorder; no Start/Stop Recording button exists any more.
-RECORDING_AUTO_ALL_BROADCASTS = env_bool("RECORDING_AUTO_ALL_BROADCASTS", True)
-# STREAM_RECORDER_ENABLED (above) follows RECORDING_AUTO_ALL_BROADCASTS unless
-# it is set explicitly in the environment.
-import os as _phase2_rec_os  # noqa: E402
-
-if "STREAM_RECORDER_ENABLED" not in _phase2_rec_os.environ:
-    STREAM_RECORDER_ENABLED = RECORDING_AUTO_ALL_BROADCASTS
-# Meetings: a LiveKit room-composite egress starts when the meeting goes live
-# and is stopped and published when it ends (recording.reconcile, 30 s).
-# OFF by default and in every shipped env example: a meeting records students'
-# cameras and microphones, and the owner decision is that meetings are never
-# auto-recorded (broadcasts only). If a deployment ever turns it on, the meeting
-# room shows "This meeting is being recorded" to its hosts and every meeting
-# recording is held unpublished and flagged "needs review" for an admin.
-RECORDING_AUTO_MEETINGS = env_bool("RECORDING_AUTO_MEETINGS", False)
-RECORDING_RECONCILE_INTERVAL_SECONDS = max(10, env_int("RECORDING_RECONCILE_INTERVAL_SECONDS", 30))
-# Only egress/browser recordings that completed this recently are picked up
-# automatically (older ones stay for the admin "Scan" review).
-RECORDING_RECONCILE_LOOKBACK_HOURS = max(1, env_int("RECORDING_RECONCILE_LOOKBACK_HOURS", 24))
-# Publish the faststart MP4 as soon as finalize completes; HLS follows.
-RECORDING_INSTANT_PUBLISH = env_bool("RECORDING_INSTANT_PUBLISH", True)
-# Section auto-created in the class's course when no module can be derived.
-RECORDING_AUTO_MODULE_TITLE = env("RECORDING_AUTO_MODULE_TITLE", "Class recordings").strip() or "Class recordings"
-# Feed offline this long -> the take is finalized (one take per class).
-STREAM_RECORDER_IDLE_FINALIZE_SECONDS = max(60, env_int("STREAM_RECORDER_IDLE_FINALIZE_SECONDS", 900))
-# "Stop Live" without "End": wait this long for a restart (same take) before
-# finalizing. 0 = finalize on Stop immediately (pre-Phase-2 behaviour).
-STREAM_RECORDER_STOP_GRACE_SECONDS = max(0, env_int("STREAM_RECORDER_STOP_GRACE_SECONDS", 600))
-# Failed recordings retry automatically (attempt n waits RETRY_BACKOFF[n]).
-RECORDING_AUTO_RETRY_MAX = max(0, env_int("RECORDING_AUTO_RETRY_MAX", 3))
-RECORDING_AUTO_RETRY_BACKOFF_SECONDS = env("RECORDING_AUTO_RETRY_BACKOFF_SECONDS", "300,1800,7200").strip()
-# Periodic import scan in the stream recorder (0 disables); unclaimed egress
-# files of classes that never got a recording are published automatically.
-RECORDING_IMPORT_SCAN_INTERVAL_SECONDS = max(0, env_int("RECORDING_IMPORT_SCAN_INTERVAL_SECONDS", 3600))
-RECORDING_IMPORT_AUTO_PUBLISH = env_bool("RECORDING_IMPORT_AUTO_PUBLISH", True)
-# Admin alerts (in-app notification + ERROR log line) for failed/stuck recordings.
-RECORDING_ALERTS_ENABLED = env_bool("RECORDING_ALERTS_ENABLED", True)
-RECORDING_PROCESSING_ALERT_SECONDS = max(600, env_int("RECORDING_PROCESSING_ALERT_SECONDS", 6 * 3600))
-RECORDING_FINALIZING_ALERT_SECONDS = max(300, env_int("RECORDING_FINALIZING_ALERT_SECONDS", 3600))
-RECORDING_HEARTBEAT_ALERT_SECONDS = max(60, env_int("RECORDING_HEARTBEAT_ALERT_SECONDS", 180))
-# Nightly canary: the stream recorder runs `verify_recording_pipeline` in a
-# subprocess at this local hour when no class is being recorded.
-RECORDING_CANARY_ENABLED = env_bool("RECORDING_CANARY_ENABLED", True)
-RECORDING_CANARY_HOUR = min(23, max(0, env_int("RECORDING_CANARY_HOUR", 3)))
-# Liveness file the stream recorder touches every loop (compose healthcheck).
-STREAM_RECORDER_HEARTBEAT_FILE = env("STREAM_RECORDER_HEARTBEAT_FILE", "").strip()
-# Transcoder (transcode_lecture_streams --pending): one ffmpeg pass for every
-# rendition, faster preset, hard timeout, retries with backoff, blue/green HLS.
-COURSE_HLS_SINGLE_PASS = env_bool("COURSE_HLS_SINGLE_PASS", True)
-COURSE_HLS_SINGLE_PASS_PRESET = env("COURSE_HLS_SINGLE_PASS_PRESET", "veryfast").strip().lower() or "veryfast"
-COURSE_HLS_SINGLE_PASS_CRF = min(30, max(16, env_int("COURSE_HLS_SINGLE_PASS_CRF", 23)))
-# Top rendition by stream copy when the source is already H.264 at that size.
-COURSE_HLS_TOP_RUNG_COPY = env_bool("COURSE_HLS_TOP_RUNG_COPY", False)
-COURSE_HLS_TRANSCODE_TIMEOUT_BASE_SECONDS = max(60, env_int("COURSE_HLS_TRANSCODE_TIMEOUT_BASE_SECONDS", 600))
-COURSE_HLS_TRANSCODE_TIMEOUT_FACTOR = float(env("COURSE_HLS_TRANSCODE_TIMEOUT_FACTOR", "3") or 3)
-COURSE_HLS_TRANSCODE_MAX_TIMEOUT_SECONDS = max(600, env_int("COURSE_HLS_TRANSCODE_MAX_TIMEOUT_SECONDS", 6 * 3600))
-COURSE_HLS_MAX_ATTEMPTS = max(1, env_int("COURSE_HLS_MAX_ATTEMPTS", 5))
-COURSE_HLS_RETRY_BACKOFF_SECONDS = env("COURSE_HLS_RETRY_BACKOFF_SECONDS", "60,300,1800,7200").strip()
-# Old HLS revisions are kept this long after a swap (viewers mid-playback).
-COURSE_HLS_REVISION_GRACE_SECONDS = max(0, env_int("COURSE_HLS_REVISION_GRACE_SECONDS", 86400))
-TRANSCODER_HEARTBEAT_FILE = env("TRANSCODER_HEARTBEAT_FILE", "").strip()
-# --- end Phase 2 no-click recordings ---
-# --- Phase 3 self-service weekly reports (apps.reports) ---
-# Weeks, deadlines and late windows are computed in this zone (IST).
-REPORTS_TIME_ZONE = env("REPORTS_TIME_ZONE", "Asia/Kolkata").strip() or "Asia/Kolkata"
-# reports.scheduler: reminders, grader digest, SLA alert, automatic marks release.
-REPORTS_SCHEDULER_ENABLED = env_bool("REPORTS_SCHEDULER_ENABLED", True)
-REPORTS_SCHEDULER_INTERVAL_SECONDS = max(60, env_int("REPORTS_SCHEDULER_INTERVAL_SECONDS", 300))
-REPORTS_GRADER_DIGEST_HOUR = min(23, max(0, env_int("REPORTS_GRADER_DIGEST_HOUR", 9)))
-REPORTS_GRADING_SLA_HOURS = max(1, env_int("REPORTS_GRADING_SLA_HOURS", 72))
-# Seconds a student can take back a first submission (the UI shows a 10 s Undo).
-REPORTS_UNDO_SECONDS = max(0, env_int("REPORTS_UNDO_SECONDS", 15))
-# One OpenAPI name for the "this week / last week" choice used by two serializers.
-SPECTACULAR_SETTINGS["ENUM_NAME_OVERRIDES"]["ReportWeekWhichEnum"] = "apps.reports.serializers.WEEK_WHICH_CHOICES"
-# --- end Phase 3 self-service weekly reports ---
-
-# --- UI overhaul (plan §5.1, §4.4, §4.5; frozen after WS-0) ---
-# Feature switches (apps.core.features). Both are JSON objects of
-# {"<key>": true|false} read from the environment:
-#   FEATURE_FORCE              emergency lock; the admin switch shows "Locked by
-#                              server configuration" and cannot change it.
-#                              Rollback without a deploy: FEATURE_FORCE='{"teaching": true}'.
-#   FEATURE_DEFAULT_OVERRIDES  replaces registry defaults (no admin override stored).
-# Production default: {} so "teaching" (Teachers section) starts OFF. Under
-# `manage.py test` the default is {"teaching": true} so suites that act as
-# instructors keep passing; tests that need production behaviour use
-# override_settings(FEATURE_DEFAULT_OVERRIDES={}).
-import json as _ui_json  # noqa: E402
-
-
-def _ui_json_flags(name, default):
-    raw = env(name, "")
-    if raw is None or not str(raw).strip():
-        return dict(default)
-    try:
-        value = _ui_json.loads(raw)
-    except ValueError:
-        logging.getLogger("config.settings").warning("%s is not valid JSON; ignoring it.", name)
-        return dict(default)
-    if not isinstance(value, dict):
-        logging.getLogger("config.settings").warning("%s must be a JSON object; ignoring it.", name)
-        return dict(default)
-    return {str(key): bool(flag) for key, flag in value.items()}
-
-
-FEATURE_FORCE = _ui_json_flags("FEATURE_FORCE", {})
-FEATURE_DEFAULT_OVERRIDES = _ui_json_flags(
-    "FEATURE_DEFAULT_OVERRIDES", {"teaching": True} if _PHASE2_RUNNING_TESTS else {}
-)
-# Shared snapshot cache (Redis) and the per-process memo in front of it: a flip
-# reaches every worker within ~FEATURE_PROCESS_MEMO_SECONDS.
-FEATURE_SNAPSHOT_CACHE_KEY = "features:snapshot:v1"
-FEATURE_SNAPSHOT_CACHE_SECONDS = max(1, env_int("FEATURE_SNAPSHOT_CACHE_SECONDS", 300))
-FEATURE_PROCESS_MEMO_SECONDS = max(0, env_int("FEATURE_PROCESS_MEMO_SECONDS", 2))
-# Admin "needs attention" queues (GET /api/admin/attention/ and the Django index).
-ADMIN_ATTENTION_CACHE_SECONDS = max(0, env_int("ADMIN_ATTENTION_CACHE_SECONDS", 30))
-# Command palette record search (GET /api/admin/search/?q=).
-ADMIN_SEARCH_MIN_CHARS = max(1, env_int("ADMIN_SEARCH_MIN_CHARS", 2))
-ADMIN_SEARCH_GROUP_LIMIT = max(1, env_int("ADMIN_SEARCH_GROUP_LIMIT", 5))
-# Where staff land after sign-in (owner decision D3).
-CONSOLE_STAFF_HOME = (env("CONSOLE_STAFF_HOME", "/console/admin") or "").strip() or "/console/admin"
-# Back-office product name (owner decision D9).
-ADMIN_SITE_NAME = (env("ADMIN_SITE_NAME", "Al Syed Admin") or "").strip() or "Al Syed Admin"
-REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"].update(
-    {
-        # Console Home / Admin home / capabilities: polled about once a minute per tab.
-        "console_read": env("CONSOLE_READ_RATE", "600/minute"),
-        "admin_search": env("ADMIN_SEARCH_RATE", "240/minute"),
-        "admin_action": env("ADMIN_ACTION_RATE", "1200/hour"),
-        "feature_write": env("FEATURE_WRITE_RATE", "60/hour"),
-    }
-)
-# --- end UI overhaul ---
-
-# --- Engagement (apps.engagement: XP, streaks, badges, leaderboards) ---
-INSTALLED_APPS += ["apps.engagement.apps.EngagementConfig"]
-# Adds X-Engagement ({xp, level, streak, pending_xp}) to responses of requests
-# that queued an XP-earning event; every other request pays one contextvar set.
-MIDDLEWARE += ["apps.engagement.middleware.EngagementSnapshotMiddleware"]
-CORS_EXPOSE_HEADERS = [*CORS_EXPOSE_HEADERS, "X-Engagement"]
-ENGAGEMENT_READ_RATE = env("ENGAGEMENT_READ_RATE", "240/minute")
-ENGAGEMENT_WRITE_RATE = env("ENGAGEMENT_WRITE_RATE", "30/minute")
-ENGAGEMENT_PRESENCE_RATE = env("ENGAGEMENT_PRESENCE_RATE", "12/minute")
-ENGAGEMENT_PUBLIC_RATE = env("ENGAGEMENT_PUBLIC_RATE", "60/minute")
-ENGAGEMENT_STAFF_RATE = env("ENGAGEMENT_STAFF_RATE", "600/hour")
-# XP economy v2 (owner rules A/B; defaults and meaning in apps/engagement/rules.py).
-# Empty = the rules.py default. Read at call time, so a restart applies a change.
-ENGAGEMENT_LIVE_PRESENT_XP = env("ENGAGEMENT_LIVE_PRESENT_XP", "")  # 150
-ENGAGEMENT_LIVE_PARTIAL_XP = env("ENGAGEMENT_LIVE_PARTIAL_XP", "")  # 30
-ENGAGEMENT_FIRST_LIVE_BONUS_XP = env("ENGAGEMENT_FIRST_LIVE_BONUS_XP", "")  # 100
-ENGAGEMENT_PURCHASE_XP_PER_RUPEE = env("ENGAGEMENT_PURCHASE_XP_PER_RUPEE", "")  # 0.5
-ENGAGEMENT_ONE_TIME_PURCHASE_XP_CAP = env("ENGAGEMENT_ONE_TIME_PURCHASE_XP_CAP", "")  # 1000 per payment
-ENGAGEMENT_SUBSCRIPTION_XP_CAP = env("ENGAGEMENT_SUBSCRIPTION_XP_CAP", "")  # 0 = no cap
-ENGAGEMENT_WEEKLY_FIRST_XP = env("ENGAGEMENT_WEEKLY_FIRST_XP", "")  # 200
-ENGAGEMENT_WEEKLY_PODIUM_XP = env("ENGAGEMENT_WEEKLY_PODIUM_XP", "")  # 120 (#2-3)
-ENGAGEMENT_WEEKLY_TOP10_XP = env("ENGAGEMENT_WEEKLY_TOP10_XP", "")  # 60 (#4-10)
-ENGAGEMENT_MONTHLY_TOP10_XP = env("ENGAGEMENT_MONTHLY_TOP10_XP", "")  # 100
-ENGAGEMENT_STANDING_AWARDS = env_bool("ENGAGEMENT_STANDING_AWARDS", True)
-ENGAGEMENT_LEADERBOARD_COUNT_PURCHASE_XP = env_bool("ENGAGEMENT_LEADERBOARD_COUNT_PURCHASE_XP", True)
-# JSON list of 8 ascending integers from 0 (rank thresholds); empty = the documented curve.
-ENGAGEMENT_LEVEL_THRESHOLDS = env("ENGAGEMENT_LEVEL_THRESHOLDS", "")
-# Release day (owner's legacy plan, apps.engagement.legacy). ENGAGEMENT_RELEASE_AT is
-# the launch moment (ISO with offset, e.g. 2026-12-01T00:00:00+05:30): streaks and the
-# weekly leaderboard start from it, legacy students are those enrolled before it.
-# Empty = no epoch (dev, tests).
-ENGAGEMENT_RELEASE_AT = (env("ENGAGEMENT_RELEASE_AT", "") or "").strip()
-ENGAGEMENT_LEGACY_ACTIVE_DAYS = max(1, env_int("ENGAGEMENT_LEGACY_ACTIVE_DAYS", 30))
-ENGAGEMENT_FOUNDING_GLOW_DAYS = max(1, env_int("ENGAGEMENT_FOUNDING_GLOW_DAYS", 30))
-# --- end Engagement ---
-# Engagement and the Monthly CTF ship ON in production (registry defaults,
-# owner decision: rewards from release day). Test runs pin both explicitly
-# unless FEATURE_DEFAULT_OVERRIDES names them: engagement on, monthly_ctf off
-# (the Monthly CTF suites turn it on per test), so a registry change never
-# silently changes what the other suites exercise.
-if _PHASE2_RUNNING_TESTS:
-    FEATURE_DEFAULT_OVERRIDES.setdefault("engagement", True)
-    FEATURE_DEFAULT_OVERRIDES.setdefault("monthly_ctf", False)
-    # No release epoch under tests unless a test sets one (override_settings).
-    ENGAGEMENT_RELEASE_AT = ""
-
-# --- Catalogue, platform plans, memberships and labs access (WS catalog-plans) ---
-INSTALLED_APPS += ["apps.osint_labs.apps.OsintLabsConfig"]
-# Membership access continues this many days past a subscription's paid
-# period (covers Razorpay's charge retries and late webhooks).
-SUBSCRIPTION_GRACE_DAYS = max(0, env_int("SUBSCRIPTION_GRACE_DAYS", 3))
-# Razorpay requires a total_count for every subscription.
-MEMBERSHIP_TOTAL_COUNT_MONTHLY = max(1, env_int("MEMBERSHIP_TOTAL_COUNT_MONTHLY", 120))
-MEMBERSHIP_TOTAL_COUNT_YEARLY = max(1, env_int("MEMBERSHIP_TOTAL_COUNT_YEARLY", 10))
-# Labs site <-> LMS: HMAC secret shared with OSINTCTF/server.js (LABS_PASS_SECRET)
-# for the short-lived labs pass. Empty = no pass can be issued (labs gating then
-# refuses members-only content while "labs_membership_required" is on).
-LABS_PASS_SECRET = env("LABS_PASS_SECRET", "")
-LABS_PASS_TTL_SECONDS = max(60, env_int("LABS_PASS_TTL_SECONDS", 1800))
-LABS_PUBLIC_URL = (env("LABS_PUBLIC_URL", "https://labs.alsyedinitiative.com") or "").strip().rstrip("/")
-REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"].update(
-    {
-        "catalog_read": env("CATALOG_READ_RATE", "600/minute"),
-        "plan_checkout": env("PLAN_CHECKOUT_RATE", "20/hour"),
-        "labs_pass": env("LABS_PASS_RATE", "120/hour"),
-        "directory_write": env("DIRECTORY_WRITE_RATE", "120/hour"),
-    }
-)
-# Purchase-gate tests turn "pentesting" off explicitly; every other suite keeps
-# testing the purchase mechanics with it on (production default: off).
-if _PHASE2_RUNNING_TESTS:
-    FEATURE_DEFAULT_OVERRIDES.setdefault("pentesting", True)
-# --- end catalog-plans ---
-
-# --- Student profiles (apps.profiles: /u/<handle>, PII guard, moderation) ---
-INSTALLED_APPS += ["apps.profiles.apps.ProfilesConfig"]
-# Profile images live outside MEDIA_ROOT (default <REPORTS_PRIVATE_ROOT>/profiles)
-# and leave only through /api/profiles/media/<id>/ after a permission check.
-PROFILES_PRIVATE_ROOT = env("PROFILES_PRIVATE_ROOT", "")
-PROFILES_IMAGE_MAX_BYTES = max(256 * 1024, env_int("PROFILES_IMAGE_MAX_BYTES", 8 * 1024 * 1024))
-PROFILES_READ_RATE = env("PROFILES_READ_RATE", "240/minute")
-PROFILES_WRITE_RATE = env("PROFILES_WRITE_RATE", "60/minute")
-PROFILES_PUBLISH_RATE = env("PROFILES_PUBLISH_RATE", "30/hour")
-PROFILES_UPLOAD_RATE = env("PROFILES_UPLOAD_RATE", "40/hour")
-PROFILES_REPORT_RATE = env("PROFILES_REPORT_RATE", "10/hour")
-PROFILES_PUBLIC_RATE = env("PROFILES_PUBLIC_RATE", "120/minute")
-PROFILES_STAFF_RATE = env("PROFILES_STAFF_RATE", "600/hour")
-# "public_profiles" ships ON in production (registry default, owner decision);
-# test runs pin it on explicitly.
-if _PHASE2_RUNNING_TESTS:
-    FEATURE_DEFAULT_OVERRIDES.setdefault("public_profiles", True)
-# --- end Student profiles ---
-
-# --- Attendance & class calendar (apps.attendance) ---
-INSTALLED_APPS += ["apps.attendance.apps.AttendanceConfig"]
-# Present = at least this many minutes in the LIVE class (recordings never count).
-# Admin-editable afterwards in Admin > Attendance rule; these seed that row.
-ATTENDANCE_PRESENT_MIN_MINUTES = max(1, env_int("ATTENDANCE_PRESENT_MIN_MINUTES", 40))
-# A class on air for less than the minutes above is a "short session": present =
-# this share of its on-air time (flagged for staff).
-ATTENDANCE_SHORT_SESSION_RATIO = float(env("ATTENDANCE_SHORT_SESSION_RATIO", "0.80") or 0.80)
-ATTENDANCE_LOW_PERCENT = max(1, env_int("ATTENDANCE_LOW_PERCENT", 75))
-ATTENDANCE_FLUSH_INTERVAL_SECONDS = max(15, env_int("ATTENDANCE_FLUSH_INTERVAL_SECONDS", 120))
-ATTENDANCE_FINALIZE_DELAY_SECONDS = max(0, env_int("ATTENDANCE_FINALIZE_DELAY_SECONDS", 90))
-ATTENDANCE_PRESENCE_RATE = env("ATTENDANCE_PRESENCE_RATE", "12/minute")
-ATTENDANCE_READ_RATE = env("ATTENDANCE_READ_RATE", "240/minute")
-ATTENDANCE_STAFF_RATE = env("ATTENDANCE_STAFF_RATE", "1200/hour")
-ATTENDANCE_WRITE_RATE = env("ATTENDANCE_WRITE_RATE", "120/hour")
-# Calendar: occurrences 30 days ahead; a RealtimeSession is created for a class
-# starting within the lead time (kept short so the Live classes list stays tidy).
-CALENDAR_HORIZON_DAYS = max(1, env_int("CALENDAR_HORIZON_DAYS", 30))
-CALENDAR_SESSION_LEAD_HOURS = max(1, env_int("CALENDAR_SESSION_LEAD_HOURS", 24))
-CALENDAR_MATERIALIZE_INTERVAL_SECONDS = max(60, env_int("CALENDAR_MATERIALIZE_INTERVAL_SECONDS", 600))
-CALENDAR_FEED_RATE = env("CALENDAR_FEED_RATE", "120/hour")
-CALENDAR_PUBLIC_RATE = env("CALENDAR_PUBLIC_RATE", "60/minute")
-# "attendance" ships ON (registry default); nothing to override for tests.
-# --- end Attendance & class calendar ---
-
-# --- Certification, delivery and Hall of Fame (apps.certification) ---
-INSTALLED_APPS += ["apps.certification.apps.CertificationConfig"]
-CERTIFICATION_ENABLED = env_bool("CERTIFICATION_ENABLED", True)
-# Default pass mark for a new certification exam policy (admin can change it per exam).
-CERTIFICATION_DEFAULT_PASS_MARK = env("CERTIFICATION_DEFAULT_PASS_MARK", "70") or "70"
-CERTIFICATION_SWEEP_INTERVAL_SECONDS = max(15, env_int("CERTIFICATION_SWEEP_INTERVAL_SECONDS", 60))
-CERTIFICATION_DELIVERY_MAX_ATTEMPTS = max(1, env_int("CERTIFICATION_DELIVERY_MAX_ATTEMPTS", 8))
-# Sender of the certificate e-mail (empty: DEFAULT_FROM_EMAIL). SMTP itself is EMAIL_*.
-CERTIFICATION_EMAIL_FROM = env("CERTIFICATION_EMAIL_FROM", "").strip()
-# WhatsApp Business Cloud API (Meta). DISABLED until token, phone number id and the
-# certificate template are all set; nothing is ever reported as sent while disabled.
-WHATSAPP_CLOUD_API_TOKEN = env("WHATSAPP_CLOUD_API_TOKEN", "").strip()
-WHATSAPP_PHONE_NUMBER_ID = env("WHATSAPP_PHONE_NUMBER_ID", "").strip()
-WHATSAPP_API_VERSION = env("WHATSAPP_API_VERSION", "v21.0").strip() or "v21.0"
-WHATSAPP_GRAPH_BASE_URL = env("WHATSAPP_GRAPH_BASE_URL", "https://graph.facebook.com").strip()
-WHATSAPP_TEMPLATE_CERTIFICATE = env("WHATSAPP_TEMPLATE_CERTIFICATE", "").strip()
-WHATSAPP_TEMPLATE_LETTER = env("WHATSAPP_TEMPLATE_LETTER", "").strip()
-WHATSAPP_TEMPLATE_LANGUAGE = env("WHATSAPP_TEMPLATE_LANGUAGE", "en").strip() or "en"
-WHATSAPP_DEFAULT_COUNTRY_CODE = env("WHATSAPP_DEFAULT_COUNTRY_CODE", "91").strip()
-WHATSAPP_HTTP_TIMEOUT_SECONDS = max(1, env_int("WHATSAPP_HTTP_TIMEOUT_SECONDS", 15))
-# --- end Certification ---

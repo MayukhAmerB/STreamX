@@ -14,8 +14,10 @@
   align-items: center;
   margin-block-end: $spacing-06;
   padding: $spacing-05;
-  border-color: var(--sc-border-subtle, #393939);
-  background: var(--sc-surface-01, #262626);
+  border-color: var(--uc-accent-line);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(243, 226, 179, 0.1), transparent 45%),
+    var(--uc-surface);
   gap: $spacing-05;
 }
 
@@ -150,137 +152,4 @@
 .cds-app .cds-course-tile__primary {
   flex: 1 1 100%;
   max-inline-size: none;
-}
-
-// The one champagne action on the page: the course to continue (WS-C).
-.cds-app .cds-course-tile__primary--accent.cds--btn {
-  border-color: transparent;
-  background-color: var(--sc-accent, #f3e2b3);
-  box-shadow: none;
-  color: var(--sc-accent-on, #161616);
-
-  &:hover {
-    background-color: var(--sc-accent-hover, #fff0c8);
-    color: var(--sc-accent-on, #161616);
-  }
-
-  &:active {
-    background-color: var(--sc-accent-active, #e6d29c);
-  }
-}
-
-// "Included this month" (OSINT memberships; renders only for active members).
-// HackPath hairline list: eyebrow, section title, rows with a word chip.
-.cds-app .mc-included {
-  margin-block-start: $spacing-09;
-  padding-block-start: $spacing-07;
-  border-block-start: 1px solid var(--hp-border, rgba(255, 255, 255, 0.1));
-}
-
-.cds-app .mc-included__eyebrow {
-  margin: 0;
-  color: var(--hp-accent, #f3e2b3);
-  font-size: 0.6875rem;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  line-height: 1rem;
-  text-transform: uppercase;
-}
-
-.cds-app .mc-included__title {
-  margin: $spacing-03 0 0;
-  color: var(--hp-text, #fafafa);
-  font-size: 1.5rem;
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-.cds-app .mc-included__lead,
-.cds-app .mc-included__empty {
-  max-inline-size: 42rem;
-  margin: $spacing-03 0 0;
-  color: var(--hp-muted, #a1a1a1);
-  font-size: 0.875rem;
-  line-height: 1.5rem;
-}
-
-.cds-app .mc-included__list {
-  margin: $spacing-06 0 0;
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid var(--hp-border, rgba(255, 255, 255, 0.1));
-  border-radius: 10px;
-  list-style: none;
-
-  > li + li {
-    border-block-start: 1px solid var(--hp-border, rgba(255, 255, 255, 0.1));
-  }
-}
-
-.cds-app .mc-included__row {
-  display: flex;
-  align-items: center;
-  min-block-size: 3.5rem;
-  padding: $spacing-04 $spacing-05;
-  gap: $spacing-04;
-  background: var(--hp-card, #0a0a0a);
-  color: var(--hp-text, #fafafa);
-  text-decoration: none;
-  transition:
-    background-color 300ms ease,
-    color 300ms ease;
-
-  &:hover,
-  &:focus-visible {
-    background: #fff;
-    color: #000;
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--hp-ring, #f3e2b3);
-    outline-offset: -2px;
-  }
-}
-
-.cds-app .mc-included__name {
-  flex: 1;
-  min-inline-size: 0;
-  font-size: 0.9375rem;
-  font-weight: 500;
-  overflow-wrap: anywhere;
-}
-
-.cds-app .mc-included__chip {
-  flex: none;
-  padding: 0.25rem 0.625rem;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  line-height: 1;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.cds-app .mc-included__arrow {
-  flex: none;
-  fill: currentColor;
-}
-
-@media (max-width: 479.98px) {
-  .cds-app .mc-included__row {
-    flex-wrap: wrap;
-    row-gap: $spacing-03;
-  }
-
-  .cds-app .mc-included__name {
-    flex-basis: calc(100% - 2rem);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cds-app .mc-included__row {
-    transition: none;
-  }
 }

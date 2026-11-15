@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { submitPublicEnrollmentLead } from "../api/courses";
 import { apiMessage } from "../utils/api";
@@ -28,10 +28,6 @@ export default function PublicEnrollmentRequestModal({
   const turnstile = useTurnstileChallenge(turnstileEnabled);
   const [form, setForm] = useState(EMPTY_FORM);
   const [state, setState] = useState({ loading: false, error: "", success: "" });
-  const headingId = useId();
-  const dialogRef = useRef(null);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
 
   const heading = useMemo(() => {
     if (targetType === "live_class") return "Live Class Enrollment Request";
@@ -45,22 +41,6 @@ export default function PublicEnrollmentRequestModal({
     setState({ loading: false, error: "", success: "" });
     turnstile.reset();
   }, [isOpen, targetType, targetId]);
-
-  // A modal dialog: focus moves into it, Escape closes it, and focus returns
-  // to whatever opened it.
-  useEffect(() => {
-    if (!isOpen) return undefined;
-    const opener = typeof document !== "undefined" ? document.activeElement : null;
-    dialogRef.current?.focus();
-    const onKeyDown = (event) => {
-      if (event.key === "Escape") onCloseRef.current?.();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      if (opener && typeof opener.focus === "function") opener.focus();
-    };
-  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -138,11 +118,6 @@ export default function PublicEnrollmentRequestModal({
       role="presentation"
     >
       <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={headingId}
-        tabIndex={-1}
         className="my-auto max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-black panel-gradient p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_28px_80px_rgba(0,0,0,0.55)] sm:max-h-[calc(100dvh-4rem)] sm:p-5"
         onClick={(event) => event.stopPropagation()}
       >
@@ -151,7 +126,7 @@ export default function PublicEnrollmentRequestModal({
             <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#949494]">
               Access Request
             </div>
-            <h3 id={headingId} className="mt-1 font-reference text-xl font-semibold text-white sm:text-2xl">{heading}</h3>
+            <h3 className="mt-1 font-reference text-xl font-semibold text-white sm:text-2xl">{heading}</h3>
             <p className="mt-2 text-sm text-[#BBBBBB]">
               {targetName
                 ? `Target: ${targetName}`

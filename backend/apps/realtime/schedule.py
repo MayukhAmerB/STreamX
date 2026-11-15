@@ -1,7 +1,6 @@
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from django.conf import settings
 from django.utils import timezone
 
 
@@ -59,41 +58,11 @@ def get_live_class_schedule_snapshot(now=None):
     }
 
 
-# A live session older than this is treated as abandoned for attendees: the
-# host forgot to end it, so it must not stay an unmoderated, joinable room
-# forever. Long enough for any overrun, rejoin or make-up class. Hosts,
-# instructors and admins are not bound by it. 0 disables the bound.
-DEFAULT_ATTENDEE_JOIN_MAX_LIVE_HOURS = 6
-
-
-def attendee_join_max_live_hours():
-    try:
-        hours = float(getattr(settings, "REALTIME_ATTENDEE_JOIN_MAX_LIVE_HOURS", DEFAULT_ATTENDEE_JOIN_MAX_LIVE_HOURS))
-    except (TypeError, ValueError):
-        hours = DEFAULT_ATTENDEE_JOIN_MAX_LIVE_HOURS
-    return max(0.0, hours)
-
-
-def live_session_is_stale(session, *, now=None):
-    """True when a live session started longer ago than the attendee bound."""
-    if getattr(session, "status", None) != getattr(session, "STATUS_LIVE", "live"):
-        return False
-    started_at = getattr(session, "started_at", None)
-    max_hours = attendee_join_max_live_hours()
-    if not started_at or max_hours <= 0:
-        return False
-    return (now or timezone.now()) - started_at > timedelta(hours=max_hours)
-
-
 def attendee_can_join_live_session(session, *, now=None):
-    """An attendee may join while the host has the session live, within a bound.
-
-    The session's live state is authoritative, not the weekly wall-clock window:
-    rejoining a meeting that overruns 20:00 IST, or a make-up class on another
-    day, must work. A broadcast stays joinable while its encoder is briefly
-    offline; the player shows a waiting state until the video returns. A
-    session live for more than ``REALTIME_ATTENDEE_JOIN_MAX_LIVE_HOURS``
-    (default 6) is treated as abandoned (the host never ended it) and no longer
-    admits attendees.
-    """
-    return session.status == session.STATUS_LIVE and not live_session_is_stale(session, now=now)
+    if session.status != session.STATUS_LIVE:
+        return False
+    if session.session_type == session.TYPE_BROADCASTING:
+        # The host's explicit broadcast state is authoritative, including
+        # delayed or make-up classes outside the normal weekly window.
+        return session.stream_status == session.STREAM_LIVE
+    return bool(get_live_class_schedule_snapshot(now=now)["is_open"])

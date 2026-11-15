@@ -4,7 +4,6 @@ import { Link, useLocation } from "react-router-dom";
 import apiClient from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { apiData, apiMessage } from "../utils/api";
-import { publicName } from "../features/profiles/publicName";
 
 export function formatReviewDate(value) {
   if (!value) return "Date unavailable";
@@ -163,8 +162,8 @@ export default function CourseReviews({ courseId, experience, refresh }) {
                 {review.rating} / 5
               </span>
               <span className="detail-review-identity">
-                <span className="detail-review-meta-label">Handle</span>
-                <strong>{publicName(review.author, "Learner")}</strong>
+                <span className="detail-review-meta-label">Roll number</span>
+                <strong>{review.author}</strong>
               </span>
               <span className="detail-verified-label">Verified</span>
               <span className="detail-review-date">

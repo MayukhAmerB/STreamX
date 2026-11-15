@@ -174,18 +174,3 @@ class IdempotencyInProgress(Conflict):
 class IdempotencyKeyReused(Unprocessable):
     code = "idempotency_key_reused"
     default_message = "This Idempotency-Key was already used with a different request."
-
-
-# --- feature switches (UI overhaul plan §5.3; owner WS-F) ---------------------
-
-
-class FeatureDisabled(PermissionDenied):
-    """A feature switch (``apps.core.features``) is off for this viewer.
-
-    Renders 403 ``{"code": "feature_disabled", "detail": <reason>,
-    "errors": {"feature": "<key>", ...}}``; the Console api client treats it
-    as "capabilities are stale" and re-fetches them.
-    """
-
-    code = "feature_disabled"
-    default_message = "This section is switched off for now."

@@ -20,7 +20,6 @@ anything that is not ``clean``. See SECURITY.md.
 from __future__ import annotations
 
 import math
-from datetime import time as dt_time
 from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -63,112 +62,6 @@ def quantize_marks(value):
     return Decimal(value).quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
 
 
-# --- Self-service weekly reports (Phase 3) ----------------------------------
-PENDING_PREFIX = ".pending/"  # uploads waiting for the async virus scan
-
-
-class ReportPolicy(models.Model):
-    """How weekly reports work for one course, set once (no weekly admin work).
-
-    With ``self_service`` on, the week is computed on the server in IST, the
-    week's ``ReportTask`` (``origin="auto"``) is created on first use from this
-    policy, and a student names each target they report on. Off: the course
-    keeps the instructor-created weekly tasks (legacy flow).
-    """
-
-    MARKS_ON_GRADE = "on_grade"
-    MARKS_ON_RELEASE = "on_release"
-    MARKS_AUTO_RELEASE = "auto_release"
-    MARKS_VISIBILITY_CHOICES = [
-        (MARKS_ON_GRADE, "Show each student's marks as soon as they are graded"),
-        (MARKS_ON_RELEASE, "Release all marks together (by hand)"),
-        (MARKS_AUTO_RELEASE, "Release all marks automatically after the late window"),
-    ]
-    WEEKDAY_CHOICES = [
-        (0, "Monday"),
-        (1, "Tuesday"),
-        (2, "Wednesday"),
-        (3, "Thursday"),
-        (4, "Friday"),
-        (5, "Saturday"),
-        (6, "Sunday"),
-    ]
-
-    course = models.OneToOneField("courses.Course", on_delete=models.CASCADE, related_name="report_policy")
-    self_service = models.BooleanField(
-        default=False,
-        help_text="Students submit a report for any target each week; no weekly task setup.",
-    )
-    due_weekday = models.PositiveSmallIntegerField(
-        choices=WEEKDAY_CHOICES, default=6, validators=[MaxValueValidator(6)], help_text="Weekly deadline day (IST)."
-    )
-    due_time = models.TimeField(default=dt_time(23, 59), help_text="Weekly deadline time (IST), end of that minute.")
-    grace_hours = models.PositiveIntegerField(
-        default=48,
-        validators=[MaxValueValidator(24 * 6)],
-        help_text="Late reports accepted this long after the deadline.",
-    )
-    late_penalty_percent_per_day = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=Decimal("10.00"),
-        validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))],
-        help_text="Percent of the maximum marks deducted per started day late.",
-    )
-    max_marks = models.DecimalField(
-        max_digits=6, decimal_places=2, default=Decimal("10.00"), validators=[MinValueValidator(Decimal("0.01"))]
-    )
-    max_targets_per_week = models.PositiveSmallIntegerField(
-        null=True, blank=True, validators=[MinValueValidator(1)], help_text="Empty: no limit."
-    )
-    marks_visibility = models.CharField(max_length=20, choices=MARKS_VISIBILITY_CHOICES, default=MARKS_ON_GRADE)
-    auto_release_delay_hours = models.PositiveIntegerField(
-        default=24, help_text="With automatic release: hours after the late window closes."
-    )
-    revision_window_hours = models.PositiveIntegerField(
-        default=72, validators=[MinValueValidator(1)], help_text="Time a student has to resubmit a returned report."
-    )
-    brief = models.TextField(blank=True, default="", help_text="Standing instructions shown every week (Markdown).")
-    allowed_file_types = models.JSONField(default=list, blank=True)
-    max_files = models.PositiveSmallIntegerField(default=5, validators=[MinValueValidator(1)])
-    max_file_size_mb = models.PositiveIntegerField(default=50, validators=[MinValueValidator(1)])
-    max_total_size_mb = models.PositiveIntegerField(default=200, validators=[MinValueValidator(1)])
-    updated_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = "weekly report policy"
-        verbose_name_plural = "weekly report policies"
-
-    def __str__(self):
-        return f"Report policy for {self.course_id}"
-
-    @property
-    def task_marks_visibility(self):
-        """The task-level setting a week's task gets (auto release = held until released)."""
-        return (
-            ReportTask.MARKS_ON_GRADE if self.marks_visibility == self.MARKS_ON_GRADE else ReportTask.MARKS_ON_RELEASE
-        )
-
-
-class ReportNoticeLog(models.Model):
-    """Exactly-once ledger for scheduler side effects (reminders, digests,
-    alerts, automatic releases): a key is inserted before the action and a
-    duplicate insert means "already done"."""
-
-    key = models.CharField(max_length=200, unique=True)
-    created_at = models.DateTimeField(default=timezone.now, db_index=True)
-
-    class Meta:
-        verbose_name = "report scheduler notice"
-
-    def __str__(self):
-        return self.key
-
-
 class ReportTask(models.Model):
     STATUS_DRAFT = "draft"
     STATUS_PUBLISHED = "published"
@@ -190,18 +83,8 @@ class ReportTask(models.Model):
         (MARKS_ON_GRADE, "Show each student's marks as soon as they are graded"),
         (MARKS_ON_RELEASE, "Release all marks together"),
     ]
-    ORIGIN_ADMIN = "admin"
-    ORIGIN_AUTO = "auto"
-    ORIGIN_CHOICES = [
-        (ORIGIN_ADMIN, "Created by an instructor"),
-        (ORIGIN_AUTO, "Automatic weekly bucket (self-service course)"),
-    ]
 
     course = models.ForeignKey("courses.Course", on_delete=models.CASCADE, related_name="report_tasks")
-    origin = models.CharField(max_length=8, choices=ORIGIN_CHOICES, default=ORIGIN_ADMIN)
-    week_start = models.DateField(
-        null=True, blank=True, help_text="First day (IST) of the week an automatic task covers."
-    )
     section = models.ForeignKey(
         "courses.Section",
         on_delete=models.SET_NULL,
@@ -260,18 +143,7 @@ class ReportTask(models.Model):
             models.Index(fields=["course", "status", "due_at"]),
             models.Index(fields=["status", "due_at"]),
         ]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["course", "week_start"],
-                condition=models.Q(origin="auto"),
-                name="reports_task_auto_week_unique",
-            ),
-        ]
         verbose_name = "report task"
-
-    @property
-    def is_auto(self):
-        return self.origin == self.ORIGIN_AUTO
 
     def __str__(self):
         return f"{self.title} ({self.course_id})"
@@ -393,14 +265,6 @@ class ReportFile(models.Model):
     size = models.PositiveBigIntegerField(default=0)
     sha256 = models.CharField(max_length=64, blank=True, default="")
     submitted = models.BooleanField(default=False)
-    draft = models.ForeignKey(
-        "ReportSubmission",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="draft_files",
-        help_text="Self-service: the target (submission) this staged file was uploaded for.",
-    )
     scan_status = models.CharField(
         max_length=16,
         choices=SCAN_STATUS_CHOICES,
@@ -424,10 +288,6 @@ class ReportFile(models.Model):
     def __str__(self):
         return self.original_name
 
-    @property
-    def scan_pending(self):
-        return str(self.file.name or "").startswith(PENDING_PREFIX)
-
 
 class ReportSubmission(models.Model):
     STATUS_NOT_SUBMITTED = "not_submitted"
@@ -448,22 +308,6 @@ class ReportSubmission(models.Model):
 
     task = models.ForeignKey(ReportTask, on_delete=models.CASCADE, related_name="submissions")
     student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="report_submissions")
-    target_name = models.CharField(
-        max_length=200, blank=True, default="", help_text="The target as the student typed it."
-    )
-    target_key = models.CharField(
-        max_length=200,
-        blank=True,
-        default="",
-        help_text="Normalised target (apps.core.textnorm.target_key); one report per target per week.",
-    )
-    different_target_confirmed = models.BooleanField(
-        default=False, help_text="The student confirmed this is not the similar target they were warned about."
-    )
-    similar_targets = models.JSONField(default=list, blank=True, help_text="Similar target names at creation.")
-    revision_deadline = models.DateTimeField(
-        null=True, blank=True, help_text="Returned for revision: resubmit by this time (empty: no limit)."
-    )
     status = models.CharField(max_length=24, choices=STATUS_CHOICES, default=STATUS_NOT_SUBMITTED)
     current_version = models.ForeignKey(
         "ReportSubmissionVersion", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
@@ -477,27 +321,17 @@ class ReportSubmission(models.Model):
         default=1, help_text="Optimistic-concurrency token; bumped by every submission and grading change."
     )
     late_digest_sent_at = models.DateTimeField(null=True, blank=True)
-    # Student identity at submission time (apps.users.identity; additive, backfilled by
-    # ``manage.py backfill_identity_snapshots``). Shown before the record's own fields.
-    student_roll_number = models.CharField(max_length=16, null=True, blank=True, editable=False)
-    student_name_snapshot = models.CharField(max_length=255, null=True, blank=True, editable=False)
-    student_handle_snapshot = models.CharField(max_length=30, null=True, blank=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-submitted_at", "-id"]
         constraints = [
-            # One report per target per week (expand/contract: the old
-            # (task, student) constraint is dropped by migration 0005).
-            models.UniqueConstraint(
-                fields=["task", "student", "target_key"], name="reports_submission_task_student_target_unique"
-            ),
+            models.UniqueConstraint(fields=["task", "student"], name="reports_submission_task_student_unique"),
         ]
         indexes = [
             models.Index(fields=["task", "status"]),
             models.Index(fields=["student", "status"]),
-            models.Index(fields=["task", "target_key"], name="reports_sub_task_target_idx"),
         ]
         verbose_name = "report submission"
 

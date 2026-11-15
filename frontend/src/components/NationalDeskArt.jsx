@@ -9,8 +9,8 @@ function AshokaEmblem({ x = 0, y = 0, scale = 1, color = "#1c1b18", opacity = 1 
       <path d="M13 -2c3-4 2-9-1-11-2 4-3 5-6 6 1 2 1 4 0 6 2 0 5-1 7-1Z" />
       {/* center lion head */}
       <path d="M0 -16c4 0 7 3 7 8 0 3-1 5-2 7h-10c-1-2-2-4-2-7 0-5 3-8 7-8Z" />
-      <circle cx="-2.4" cy="-9" r="0.9" fill="#d6d6d6" />
-      <circle cx="2.4" cy="-9" r="0.9" fill="#d6d6d6" />
+      <circle cx="-2.4" cy="-9" r="0.9" fill="#d8d6cf" />
+      <circle cx="2.4" cy="-9" r="0.9" fill="#d8d6cf" />
       {/* abacus */}
       <rect x="-13" y="1" width="26" height="3" rx="1" />
       {/* chakra */}
@@ -98,9 +98,9 @@ export function FirPaperHero({ className = "" }) {
         {/* header */}
         <AshokaEmblem x={0} y={-168} scale={1.15} color="#20201c" />
         <text x="0" y="-130" textAnchor="middle" fontFamily="'Noto Sans', sans-serif" fontSize="9" letterSpacing="2" fill="#3a382f">सत्यमेव जयते</text>
-        <text x="0" y="-92" textAnchor="middle" fontFamily="Georgia, serif" fontWeight="800" fontSize="52" letterSpacing="4" fill="#1b1b1b">FIR</text>
-        <text x="0" y="-68" textAnchor="middle" fontFamily="Georgia, serif" fontWeight="700" fontSize="15" letterSpacing="1.5" fill="#1b1b1b">FIRST INFORMATION REPORT</text>
-        <line x1="-120" y1="-56" x2="120" y2="-56" stroke="#1b1b1b" strokeWidth="1" opacity="0.4" />
+        <text x="0" y="-92" textAnchor="middle" fontFamily="Georgia, serif" fontWeight="800" fontSize="52" letterSpacing="4" fill="#1b1a16">FIR</text>
+        <text x="0" y="-68" textAnchor="middle" fontFamily="Georgia, serif" fontWeight="700" fontSize="15" letterSpacing="1.5" fill="#1b1a16">FIRST INFORMATION REPORT</text>
+        <line x1="-120" y1="-56" x2="120" y2="-56" stroke="#1b1a16" strokeWidth="1" opacity="0.4" />
         {/* fields */}
         <g fontFamily="Georgia, serif" fontSize="12" fill="#2a271f">
           {[
@@ -112,11 +112,11 @@ export function FirPaperHero({ className = "" }) {
           ].map(([label, yy]) => (
             <g key={label} transform={`translate(-120 ${yy})`}>
               <text x="0" y="0">{label}</text>
-              <line x1="4" y1="6" x2="240" y2="6" stroke="#1b1b1b" strokeWidth="0.8" opacity="0.4" />
+              <line x1="4" y1="6" x2="240" y2="6" stroke="#1b1a16" strokeWidth="0.8" opacity="0.4" />
             </g>
           ))}
-          <line x1="-116" y1="126" x2="124" y2="126" stroke="#1b1b1b" strokeWidth="0.8" opacity="0.4" />
-          <line x1="-116" y1="150" x2="124" y2="150" stroke="#1b1b1b" strokeWidth="0.8" opacity="0.4" />
+          <line x1="-116" y1="126" x2="124" y2="126" stroke="#1b1a16" strokeWidth="0.8" opacity="0.4" />
+          <line x1="-116" y1="150" x2="124" y2="150" stroke="#1b1a16" strokeWidth="0.8" opacity="0.4" />
         </g>
       </g>
 
@@ -200,8 +200,8 @@ export function LawBooksHero({ className = "" }) {
       <g transform="translate(405 338) rotate(-16)">
         <rect x="-70" y="22" width="150" height="20" rx="6" fill="#16130d" stroke="#000" />
         <rect x="-40" y="-10" width="70" height="26" rx="10" fill="#2a2620" stroke="#0a0a0a" strokeWidth="1.5" />
-        <rect x="-44" y="-12" width="12" height="30" rx="4" fill="#363636" />
-        <rect x="26" y="-12" width="12" height="30" rx="4" fill="#363636" />
+        <rect x="-44" y="-12" width="12" height="30" rx="4" fill="#3a352b" />
+        <rect x="26" y="-12" width="12" height="30" rx="4" fill="#3a352b" />
         <rect x="-6" y="14" width="10" height="70" rx="5" fill="#241f18" transform="rotate(14)" />
       </g>
 
@@ -221,7 +221,7 @@ export function SupremeCourtHero({ className = "" }) {
         </linearGradient>
         <linearGradient id="sc-stone" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#4a4843" />
-          <stop offset="100%" stopColor="#1b1b1b" />
+          <stop offset="100%" stopColor="#1b1a17" />
         </linearGradient>
         <linearGradient id="sc-dome" x1="0" y1="0" x2="0.3" y2="1">
           <stop offset="0%" stopColor="#5a5852" />
@@ -268,15 +268,15 @@ export function SupremeCourtHero({ className = "" }) {
         <path d="M280 112v40" /><path d="M258 118c0 18 0 28 0 34" /><path d="M302 118c0 18 0 28 0 34" />
       </g>
       {/* finial */}
-      <rect x="277" y="92" width="6" height="22" rx="2" fill="#2a2a2a" />
+      <rect x="277" y="92" width="6" height="22" rx="2" fill="#2a2a28" />
       <circle cx="280" cy="90" r="5" fill="#3a3a36" />
 
       {/* Flag */}
-      <line x1="280" y1="90" x2="280" y2="70" stroke="#2a2a2a" strokeWidth="1.5" />
+      <line x1="280" y1="90" x2="280" y2="70" stroke="#2a2a28" strokeWidth="1.5" />
       <path d="M280 72h20v10h-20Z" fill="#555" opacity="0.7" />
 
       {/* steps */}
-      <rect x="150" y="352" width="260" height="8" fill="#1b1b1b" />
+      <rect x="150" y="352" width="260" height="8" fill="#1b1a17" />
       <rect x="166" y="344" width="228" height="8" fill="#222019" />
 
       <rect width="560" height="360" fill="url(#sc-vign)" />

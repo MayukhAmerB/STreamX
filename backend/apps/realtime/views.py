@@ -36,22 +36,12 @@ from config.metrics import (
 from config.pagination import apply_optional_pagination
 from config.request_security import find_disallowed_query_params
 from config.response import api_response
-from config.throttling import (
-    ClientIpScopedRateThrottle,
-    RealtimeJoinIpCeilingThrottle,
-    RealtimeJoinUserRateThrottle,
-)
+from config.throttling import ClientIpScopedRateThrottle
 
-from apps.users import teaching
-from apps.users.session_policy import note_live_class_attendance, token_session_slot
-
-from . import lifecycle as live_lifecycle
-from . import session_list
 from .domain import (
     build_permission_set,
     get_access_decision,
     list_queryset,
-    normalize_session_list_status,
     resolve_participant_state,
     session_payload_for_create,
 )
@@ -70,7 +60,7 @@ from .serializers import (
     StreamHeartbeatResponseSerializer,
     StreamHeartbeatSerializer,
 )
-from .schedule import attendee_join_max_live_hours, get_live_class_schedule_snapshot, live_session_is_stale
+from .schedule import get_live_class_schedule_snapshot
 from .recording import services as class_recording_services
 from .recording.serializers import SessionModuleUpdateSerializer
 from .services import (
@@ -257,9 +247,6 @@ def _build_same_origin_owncast_stream_urls(*, session, user, request):
 
 
 def _resolve_owncast_display_name(user):
-    """The account name the bridge keeps OUT of Owncast chat (staff moderation
-    data only). Chat itself shows the viewer's Owncast handle, never this name:
-    the bridge clears a stored chat name equal to it (owner privacy rule)."""
     full_name = str(getattr(user, "full_name", "") or "").strip()
     if full_name:
         return full_name[:80]
@@ -271,20 +258,6 @@ def _resolve_owncast_display_name(user):
             return local_part[:80]
 
     return "Viewer"
-
-
-def _owncast_chat_handle(user):
-    """The Owncast chat name a NEW chat identity is registered with.
-
-    Owner privacy rule (handle only): other students see a student's profile
-    handle in live-class chat, never the real name. Staff and instructors get
-    Owncast's own generated name (their account name is the platform name the
-    bridge keeps out of chat)."""
-    from apps.profiles.handles import is_staff_like, public_handle
-
-    if user is None or is_staff_like(user):
-        return ""
-    return public_handle(user)[:80]
 
 
 def _clean_owncast_display_name(value, *, max_length=80):
@@ -487,19 +460,7 @@ def _render_owncast_chat_bridge_html(*, bridge_token, access_token, display_name
 
 
 def _can_manage_session(user, session):
-    allowed = bool(getattr(session, "is_moderator_allowed", None) and session.is_moderator_allowed(user))
-    if not allowed and _teaching_switch_refuses(user, session):
-        # Teachers section off: say so (403 feature_disabled) instead of a bare refusal.
-        raise teaching.disabled_error()
-    return allowed
-
-
-def _teaching_switch_refuses(user, session):
-    """True when only the Teachers section switch stops this instructor managing ``session``."""
-    if not teaching.acts_as_instructor(user) or teaching.teaching_enabled():
-        return False
-    user_id = getattr(user, "id", None)
-    return bool(user_id and user_id in {session.host_id, session.get_instructor_user_id()})
+    return bool(getattr(session, "is_moderator_allowed", None) and session.is_moderator_allowed(user))
 
 
 def _build_session_list_cache_key(
@@ -684,8 +645,7 @@ class RealtimeSessionListCreateView(APIView):
             )
 
         session_type = (request.query_params.get("session_type") or "").strip().lower()
-        if session_type not in {RealtimeSession.TYPE_MEETING, RealtimeSession.TYPE_BROADCASTING}:
-            session_type = ""  # unknown values were always ignored; keep cache keys bounded
+        status_filter = (request.query_params.get("status") or "").strip().lower()
         paginate_requested = str(request.query_params.get("paginate", "")).strip().lower() in {
             "1",
             "true",
@@ -694,37 +654,6 @@ class RealtimeSessionListCreateView(APIView):
         page = request.query_params.get("page", "1")
         page_size = request.query_params.get("page_size", "20")
         is_admin = bool(getattr(request.user, "is_staff", False) or getattr(request.user, "is_superuser", False))
-        # Omitted status means active sessions only; "all" stays a staff view.
-        status_filter = normalize_session_list_status(request.query_params.get("status"), is_admin=is_admin)
-
-        payload = None
-        if (
-            not paginate_requested
-            and status_filter in session_list.SHARED_STATUSES
-            and not session_list.is_privileged_user(request.user)
-        ):
-            rows = session_list.shared_rows(request=request, session_type=session_type, status_filter=status_filter)
-            payload = session_list.personalise_shared_rows(rows, request.user)
-        if payload is None:
-            payload = self._direct_payload(
-                request,
-                session_type=session_type,
-                status_filter=status_filter,
-                is_admin=is_admin,
-                paginate_requested=paginate_requested,
-                page=page,
-                page_size=page_size,
-            )
-
-        etag = session_list.build_etag(payload)
-        if session_list.if_none_match_matches(request, etag):
-            return session_list.not_modified(etag)
-        response = api_response(success=True, message="Realtime sessions fetched.", data=payload)
-        response["ETag"] = etag
-        return response
-
-    def _direct_payload(self, request, *, session_type, status_filter, is_admin, paginate_requested, page, page_size):
-        """Per-user rows: staff, instructors, session moderators and paginated lists."""
         cache_ttl = max(0, int(getattr(settings, "REALTIME_SESSION_LIST_CACHE_TTL_SECONDS", 5)))
         cache_key = _build_session_list_cache_key(
             user_id=request.user.id,
@@ -739,7 +668,7 @@ class RealtimeSessionListCreateView(APIView):
         if cache_ttl > 0:
             cached = cache.get(cache_key)
             if cached is not None:
-                return cached
+                return api_response(success=True, message="Realtime sessions fetched.", data=cached)
 
         queryset = list_queryset(
             session_type=session_type,
@@ -752,12 +681,17 @@ class RealtimeSessionListCreateView(APIView):
             default_page_size=20,
             max_page_size=100,
         )
-        if page_meta is None:
-            paged_queryset = paged_queryset[: session_list.max_rows()]
-        sessions = list(paged_queryset)
-        # Cached Owncast status, applied in memory: a GET never writes.
-        session_list.apply_in_memory_stream_health(sessions)
-        serializer = RealtimeSessionListSerializer(sessions, many=True, context={"request": request})
+        # Owncast is the authority for OBS availability. Refresh before
+        # serializing so an ended encoder connection cannot leave a stale
+        # viewer_can_join_now flag on the student-facing live-class page.
+        for session in paged_queryset:
+            if (
+                session.session_type == RealtimeSession.TYPE_BROADCASTING
+                and session.stream_service == RealtimeSession.STREAM_SERVICE_OBS
+                and session.status != RealtimeSession.STATUS_ENDED
+            ):
+                refresh_obs_session_stream_health(session)
+        serializer = RealtimeSessionListSerializer(paged_queryset, many=True, context={"request": request})
         payload = (
             {"results": serializer.data, "pagination": page_meta}
             if page_meta is not None
@@ -765,7 +699,7 @@ class RealtimeSessionListCreateView(APIView):
         )
         if cache_ttl > 0:
             cache.set(cache_key, payload, timeout=cache_ttl)
-        return payload
+        return api_response(success=True, message="Realtime sessions fetched.", data=payload)
 
     def post(self, request):
         if not request.user or not request.user.is_authenticated:
@@ -776,10 +710,7 @@ class RealtimeSessionListCreateView(APIView):
                 status_code=status.HTTP_401_UNAUTHORIZED,
             )
         is_admin = bool(getattr(request.user, "is_staff", False) or getattr(request.user, "is_superuser", False))
-        # Teachers section off: a non-staff instructor gets 403 feature_disabled
-        # with the reason; classes already on air are not affected.
-        teaching.require_teaching(request.user)
-        is_instructor = teaching.teaching_allowed(request.user)
+        is_instructor = str(getattr(request.user, "role", "")).strip().lower() == "instructor"
         if not (is_admin or is_instructor):
             return api_response(
                 success=False,
@@ -864,9 +795,7 @@ class RealtimeSessionDetailView(APIView):
                 errors={"detail": access_decision.detail},
                 status_code=access_decision.status_code,
             )
-        # Cached Owncast status applied in memory only: viewer polls never
-        # write stream_status (the periodic stream-health hook does).
-        refresh_obs_session_stream_health(session, persist=False)
+        refresh_obs_session_stream_health(session)
         data = RealtimeSessionListSerializer(session, context={"request": request}).data
         return api_response(success=True, message="Realtime session fetched.", data=data)
 
@@ -914,25 +843,10 @@ class RealtimeSessionDetailView(APIView):
         return api_response(success=True, message="Realtime session updated.", data=data)
 
 
-def build_stable_meeting_identity(*, user_id, slot_id=None, device_id=""):
-    """``user-<id>-<device>``: the same browser always rejoins as the same
-    participant, so LiveKit replaces its stale connection (no ghost
-    participants counted against meeting capacity, D9). The session slot is
-    preferred (one per signed-in device); the client's stable device id is
-    the fallback; the legacy per-join timestamp is the last resort.
-    ``_LIVEKIT_USER_IDENTITY_RE`` (``user-<digits>-``) still parses it."""
-    raw = str(slot_id or "").strip() or str(device_id or "").strip()
-    if raw:
-        digest = hashlib.sha256(f"{user_id}:{raw}".encode()).hexdigest()[:12]
-        return f"user-{user_id}-{digest}"
-    return f"user-{user_id}-{int(time.time())}"
-
-
 class RealtimeSessionJoinView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    # Per account with a high per-IP ceiling: a whole class behind one NAT
-    # reconnecting at once must not lock everyone out.
-    throttle_classes = [RealtimeJoinUserRateThrottle, RealtimeJoinIpCeilingThrottle]
+    throttle_classes = [ClientIpScopedRateThrottle]
+    throttle_scope = "realtime_session_join"
 
     def post(self, request, pk):
         session = get_object_or_404(RealtimeSession.objects.with_related(), pk=pk)
@@ -979,45 +893,36 @@ class RealtimeSessionJoinView(APIView):
                 errors={"detail": f"Your class schedule is {schedule_snapshot['label']}."},
                 status_code=status.HTTP_409_CONFLICT,
             )
-        if not is_session_manager and live_session_is_stale(session):
-            # The host never ended it: an abandoned room must not stay joinable
-            # (and unmoderated) indefinitely. Managers can still enter and end it.
-            _record_join_metric(result="failure", mode="meeting", reason="session_abandoned")
-            max_hours = attendee_join_max_live_hours()
+        if (
+            not is_session_manager
+            and session.session_type != RealtimeSession.TYPE_BROADCASTING
+            and not schedule_snapshot["is_open"]
+        ):
+            _record_join_metric(result="failure", mode="meeting", reason="outside_schedule_window")
             return api_response(
                 success=False,
-                message="This live class has already finished.",
-                errors={
-                    "detail": (
-                        f"It started more than {max_hours:g} hours ago. "
-                        "Ask your instructor to start a new session."
-                    )
-                },
+                message="Live class is outside its scheduled time.",
+                errors={"detail": f"Your class schedule is {schedule_snapshot['label']}."},
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        # Cached, single-flight Owncast status: a whole class joining at once
+        # must cost one Owncast call, not one blocked worker per student.
+        refresh_obs_session_stream_health(session)
+        if (
+            not is_session_manager
+            and session.session_type == RealtimeSession.TYPE_BROADCASTING
+            and session.stream_service == RealtimeSession.STREAM_SERVICE_OBS
+            and session.stream_status != RealtimeSession.STREAM_LIVE
+        ):
+            _record_join_metric(result="failure", mode="broadcast", reason="stream_not_live")
+            return api_response(
+                success=False,
+                message="Live class has ended or is currently offline.",
+                errors={"detail": "The broadcast is no longer live. It will reopen when the instructor resumes streaming."},
                 status_code=status.HTTP_409_CONFLICT,
             )
-        # From here on an attendee's session is live (scheduled ones were refused
-        # above, ended ones at the top). The host started it, so the class is
-        # open whatever the wall clock says: a meeting rejoin at 20:05 IST and a
-        # make-up class both work (the weekly window only labels the schedule).
-        # A broadcast is admitted even while its encoder is offline or
-        # reconnecting; the player shows its own "waiting for video" state.
-        #
-        # Cached, single-flight Owncast status applied in memory only: a whole
-        # class joining at once costs one Owncast call and no row writes.
-        refresh_obs_session_stream_health(session, persist=False)
         if session.status == RealtimeSession.STATUS_SCHEDULED:
             session.mark_live()
-        # If a newer sign-in evicts this device mid-class, it finishes this
-        # class with a banner (apps/users/live_grace.py).
-        note_live_class_attendance(request.user, request.auth, session.pk)
-        # Attendance (apps.attendance): starts the student's clock in Redis only;
-        # fail-safe, never raises and never queries the database.
-        try:
-            from apps.attendance.hooks import on_live_join
-
-            on_live_join(session=session, user=request.user, is_manager=is_session_manager)
-        except Exception:  # noqa: BLE001 - attendance must never break joining a class
-            pass
         room_name = session.livekit_room_name or session.room_name
 
         permissions_set = build_permission_set(session, request.user, access_decision)
@@ -1097,7 +1002,6 @@ class RealtimeSessionJoinView(APIView):
                     "chat_embed_url": urls["chat_embed_url"],
                     "max_audience": session.max_audience,
                     "stream_status": session.stream_status,
-                    "live_state": live_lifecycle.live_state_for(session),
                 },
             }
             return api_response(success=True, message="Broadcast join payload created.", data=data)
@@ -1116,20 +1020,8 @@ class RealtimeSessionJoinView(APIView):
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        from apps.profiles.handles import is_staff_like, public_display_name
-
-        # Owner privacy rule: other participants see a student's handle only (the
-        # client-sent name is honoured for instructors and staff).
-        display_name = (
-            (serializer.validated_data.get("display_name") or public_display_name(request.user))
-            if is_staff_like(request.user)
-            else public_display_name(request.user)
-        )
-        identity = build_stable_meeting_identity(
-            user_id=request.user.id,
-            slot_id=token_session_slot(request.auth) if request.auth is not None else None,
-            device_id=serializer.validated_data.get("device_id") or "",
-        )
+        display_name = serializer.validated_data.get("display_name") or request.user.full_name or request.user.email
+        identity = f"user-{request.user.id}-{int(time.time())}"
         participant_metadata = build_participant_metadata(user=request.user, request=request)
 
         try:
@@ -1341,8 +1233,6 @@ class RealtimeSessionOwncastStreamLaunchView(APIView):
             user=request.user,
             request=request,
         )
-        if session.status == RealtimeSession.STATUS_LIVE:
-            note_live_class_attendance(request.user, request.auth, session.pk)
 
         return api_response(
             success=True,
@@ -1386,8 +1276,11 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
                 errors={"detail": "Enable OWNCAST_CHAT_BRIDGE_ENABLED to use personalized Owncast chat launch."},
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
-        # Expired chat timeouts are released by the periodic
-        # ``realtime.chat_timeouts`` worker hook, never on this hot path.
+        try:
+            release_expired_owncast_chat_timeouts(timeout=4)
+        except (OwncastConfigError, OwncastAdminError) as exc:
+            realtime_ops_logger.warning("Owncast chat timeout release skipped during launch: %s", exc)
+
         urls = resolve_broadcast_urls(session, request=request)
         chat_embed_url = str(urls.get("chat_embed_url") or "").strip()
         chat_origin = _resolve_owncast_chat_origin(chat_embed_url)
@@ -1414,7 +1307,7 @@ class RealtimeSessionOwncastChatLaunchView(APIView):
 
         if not access_token:
             try:
-                chat_user = register_owncast_chat_user(display_name=_owncast_chat_handle(request.user))
+                chat_user = register_owncast_chat_user(display_name="")
             except (OwncastConfigError, OwncastAdminError) as exc:
                 return api_response(
                     success=False,
@@ -2178,15 +2071,18 @@ class RealtimeSessionEndView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-        # Phase 2: the one idempotent End (CAS to ENDED, stream stopped,
-        # recording finalize, OBS key re-sync, and a live.ended outbox event
-        # that stops the LiveKit egress and deletes the room in the worker).
-        is_admin = bool(getattr(request.user, "is_staff", False) or getattr(request.user, "is_superuser", False))
-        reason = live_lifecycle.END_REASON_HOST
-        if is_admin and request.user.id != session.host_id and not session.is_instructor_owner(request.user):
-            reason = live_lifecycle.END_REASON_ADMIN
-        result = live_lifecycle.end_session(session.pk, reason=reason, actor=request.user, request=request)
-        session = RealtimeSession.objects.with_related().get(pk=result.session.pk)
+        if session.status != RealtimeSession.STATUS_ENDED:
+            session.mark_ended()
+        _finalize_class_recording_non_blocking(session=session, request=request, reason="session_ended")
+
+        if (
+            session.stream_service == RealtimeSession.STREAM_SERVICE_OBS
+            and session.stream_status != RealtimeSession.STREAM_STOPPED
+        ):
+            rotation_result = _rotate_obs_stream_key_if_enabled(session=session)
+            if rotation_result["error"]:
+                session.livekit_egress_error = str(rotation_result["error"])[:1000]
+                session.save(update_fields=["livekit_egress_error", "updated_at"])
 
         data = RealtimeSessionListSerializer(session, context={"request": request}).data
         return api_response(success=True, message="Realtime session ended.", data=data)
@@ -2398,10 +2294,6 @@ class RealtimeSessionHostTokenView(APIView):
                 "room_name": session.livekit_room_name or session.room_name,
                 "participant_identity": token_payload["identity"],
                 "token": token_payload["token"],
-                # Phase 2: readiness probe for the in-app host notice, and the
-                # reconnect grace the studio can rely on.
-                "preflight": _latest_preflight_or_none(),
-                "host_grace_seconds": live_lifecycle.host_grace_seconds(),
                 "broadcast_profile": realtime_config.to_broadcast_dict(
                     audience_count=session.max_audience,
                     max_audience=session.max_audience,
@@ -2412,15 +2304,6 @@ class RealtimeSessionHostTokenView(APIView):
                 },
             },
         )
-
-
-def _latest_preflight_or_none():
-    try:
-        from .preflight import latest_preflight
-
-        return latest_preflight()
-    except Exception:  # noqa: BLE001
-        return None
 
 
 def _host_egress_lock_key(session_id):
@@ -2519,7 +2402,7 @@ def _stop_orphan_host_egress(*, session_id, egress_id, reason):
     )
 
 
-def _restart_host_broadcast_egress(*, session, request, rtmp_target_url, expected_stream_status, publisher_user_id=None):
+def _restart_host_broadcast_egress(*, session, request, rtmp_target_url, expected_stream_status):
     """Replace the session's broadcast egress with a new one (single-flight, compare-and-set).
 
     ``session`` is the caller's (possibly stale) snapshot: its ``livekit_egress_id``
@@ -2535,12 +2418,8 @@ def _restart_host_broadcast_egress(*, session, request, rtmp_target_url, expecte
       it) the new egress is stopped again so nothing double-publishes to Owncast.
 
     Returns ``(outcome, error)`` with outcome one of ``EGRESS_RESTART_*``.
-    ``request`` may be None (worker: async Go Live, live reconciler); then
-    ``publisher_user_id`` names the host whose studio publishes.
     """
     expected_egress_id = session.livekit_egress_id or ""
-    if publisher_user_id is None:
-        publisher_user_id = getattr(getattr(request, "user", None), "id", None) or session.host_id
     lock_key = _host_egress_lock_key(session.id)
     lock_timeout = int(getattr(settings, "LIVEKIT_EGRESS_TWIRP_TIMEOUT_SECONDS", 60) or 60) * 2 + 10
     lock_token = uuid.uuid4().hex
@@ -2567,7 +2446,7 @@ def _restart_host_broadcast_egress(*, session, request, rtmp_target_url, expecte
             egress_id = start_room_broadcast_egress(
                 room_name=session.livekit_room_name or session.room_name,
                 rtmp_target_url=rtmp_target_url,
-                participant_identity=build_host_publisher_identity(publisher_user_id, session.id),
+                participant_identity=build_host_publisher_identity(request.user.id, session.id),
                 session_id=session.id,
             )
         except (LiveKitConfigError, LiveKitEgressError) as exc:
@@ -2588,7 +2467,6 @@ def _restart_host_broadcast_egress(*, session, request, rtmp_target_url, expecte
             stream_status=RealtimeSession.STREAM_LIVE,
             livekit_egress_id=egress_id or "",
             livekit_egress_error="",
-            stream_interrupted_at=None,
         )
         if not claimed:
             # Stopped, ended or restarted elsewhere while LiveKit started this one.
@@ -2698,21 +2576,11 @@ class RealtimeSessionStreamStartView(APIView):
                 errors={"detail": str(exc)},
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
-        # Start Live opens the class: students can join and wait for the feed,
-        # and the reconciler (live sessions only) takes over from here.
-        live_lifecycle.open_session_for_start(session)
         refresh_obs_session_stream_health(session, force_refresh=True)
         session.livekit_egress_error = ""
         session.save(update_fields=["livekit_egress_error", "updated_at"])
         _sync_owncast_chat_settings_non_blocking(session=session)
         _start_class_recording_non_blocking(session=session, request=request)
-        live_lifecycle.mark_live_activity()
-        try:
-            from .resource_profile import nudge_resource_profile
-
-            nudge_resource_profile()
-        except Exception:  # noqa: BLE001
-            realtime_ops_logger.debug("resource profile nudge failed", exc_info=True)
         data = RealtimeSessionListSerializer(session, context={"request": request}).data
         message = "OBS stream prepared. Start streaming from OBS now."
         if was_obs_marked_live:
@@ -2767,7 +2635,6 @@ class RealtimeSessionStreamStartView(APIView):
             ):
                 raise InvalidRealtimeTransition({"stream_status": "The stream state changed while starting."})
             session.refresh_from_db()
-            live_lifecycle.open_session_for_start(session)
             expected_stream_status = RealtimeSession.STREAM_STARTING
 
         outcome, error = _restart_host_broadcast_egress(
@@ -2848,10 +2715,6 @@ class RealtimeSessionStreamHeartbeatView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
         publishing = bool(serializer.validated_data.get("publishing", False))
-        host_state = live_lifecycle.normalize_host_state(
-            serializer.validated_data.get("state"), publishing=publishing
-        )
-        grace_active = False
 
         def respond(*, egress=None, restarted=False, message="Stream heartbeat recorded."):
             return api_response(
@@ -2861,25 +2724,12 @@ class RealtimeSessionStreamHeartbeatView(APIView):
                     "session": RealtimeSessionListSerializer(session, context={"request": request}).data,
                     "egress": egress,
                     "restarted": restarted,
-                    "grace": grace_active,
-                    "host_grace_seconds": live_lifecycle.host_grace_seconds(),
                 },
             )
 
         if session.stream_service == RealtimeSession.STREAM_SERVICE_OBS:
-            if session.status != RealtimeSession.STATUS_ENDED:
-                # The OBS host has the Host Studio open: "present", so the
-                # reconciler never auto-ends an attended class (OBS stopped
-                # for a break or while fixing the encoder) as abandoned.
-                live_lifecycle.record_host_heartbeat(
-                    session.pk, state=live_lifecycle.HOST_CONNECTED, user_id=request.user.id
-                )
             refresh_obs_session_stream_health(session)
             return respond()
-        if session.status != RealtimeSession.STATUS_ENDED:
-            # Phase 2: the live reconciler reads this (host grace, server-side
-            # egress restart, abandoned-class auto-end).
-            live_lifecycle.record_host_heartbeat(session.pk, state=host_state, user_id=request.user.id)
         if (
             session.status == RealtimeSession.STATUS_ENDED
             or session.stream_status != RealtimeSession.STREAM_LIVE
@@ -2922,15 +2772,6 @@ class RealtimeSessionStreamHeartbeatView(APIView):
         ):
             session.refresh_from_db()
             return respond(message="Stream state changed; nothing to restart.")
-        if host_state == live_lifecycle.HOST_RECONNECTING:
-            # D2: the host's LiveKit link is rejoining. Keep the class live
-            # through the grace period instead of failing it for every viewer.
-            # In enforce mode the reconciler owns live -> interrupted -> stopped
-            # and restarts the egress once the host publishes again.
-            reconnecting_for = live_lifecycle.host_reconnecting_for(session.pk) or 0.0
-            if live_lifecycle.enforcing() or reconnecting_for < live_lifecycle.host_grace_seconds():
-                grace_active = True
-                return respond(egress=egress, message="Host reconnecting; the class stays live during the grace period.")
         if not publishing:
             _mark_host_stream_failed_if_current(
                 session,
@@ -3112,24 +2953,6 @@ class RealtimeSessionRecordingListView(APIView):
         return api_response(success=True, message="Session recordings fetched.", data=data)
 
 
-def _media_root_file(field_file):
-    """Absolute path of a FileField's file when it is a regular file in MEDIA_ROOT."""
-    from pathlib import Path
-
-    name = str(getattr(field_file, "name", "") or "").replace("\\", "/").strip().lstrip("/")
-    if not name or ".." in name.split("/"):
-        return None
-    media_root = Path(settings.MEDIA_ROOT).resolve()
-    path = media_root / name
-    try:
-        path.resolve().relative_to(media_root)
-    except (ValueError, OSError):
-        return None
-    if path.is_symlink() or not path.is_file():
-        return None
-    return path
-
-
 class RealtimeSessionRecordingDownloadView(APIView):
     authentication_classes = [SessionAuthentication, CookieJWTAuthentication]
     permission_classes = [permissions.IsAuthenticated]
@@ -3152,14 +2975,6 @@ class RealtimeSessionRecordingDownloadView(APIView):
         filename = f"recording-{recording.id}.mp4"
 
         if recording.video_file:
-            # Browser recordings live under MEDIA_ROOT/realtime_recordings/,
-            # which is not public: nginx serves them via X-Accel-Redirect (with
-            # byte ranges) only after the access check above.
-            local_path = _media_root_file(recording.video_file)
-            if local_path is not None:
-                from .recording.media import staff_file_response
-
-                return staff_file_response(request, local_path, download=request.GET.get("download") == "1")
             try:
                 stream = recording.video_file.open("rb")
                 filename = str(recording.video_file.name or filename).replace("\\", "/").split("/")[-1]
@@ -3406,141 +3221,3 @@ class RealtimeSessionBrowserRecordingUploadView(APIView):
             data=data,
             status_code=status.HTTP_201_CREATED,
         )
-
-
-# --- Phase 2: async Go Live and the pre-class probe ---------------------------
-
-
-class RealtimeSessionGoLiveView(APIView):
-    """Host Studio Go Live without holding a request thread on LiveKit (D7).
-
-    POST moves the stream to "starting" (compare-and-set) and queues the
-    egress start for the worker: **202** with the state to poll. GET is the
-    poll: ``state`` is starting | live | failed | stopped | ended.
-    """
-
-    permission_classes = [permissions.IsAuthenticated]
-
-    def _load(self, request, pk):
-        session = get_object_or_404(RealtimeSession, pk=pk)
-        if not _can_manage_session(request.user, session):
-            return session, api_response(
-                success=False,
-                message="Access denied.",
-                errors={"detail": "Only host, assigned instructor, or admin can start streaming."},
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
-        return session, None
-
-    def _payload(self, request, session):
-        return {
-            **live_lifecycle.go_live_status_payload(session),
-            "session": RealtimeSessionListSerializer(session, context={"request": request}).data,
-            "poll_after_ms": 1000,
-        }
-
-    @extend_schema(operation_id="realtime_session_go_live_status", responses={200: OpenApiTypes.OBJECT})
-    def get(self, request, pk):
-        session, denied = self._load(request, pk)
-        if denied:
-            return denied
-        # A start stuck past the start timeout fails here in every reconciler
-        # mode, so the studio shows the error and the host can press Go Live.
-        live_lifecycle.expire_stuck_go_live(session)
-        return api_response(success=True, message="Go Live status.", data=self._payload(request, session))
-
-    @extend_schema(
-        operation_id="realtime_session_go_live",
-        request=None,
-        responses={200: OpenApiTypes.OBJECT, 202: OpenApiTypes.OBJECT, 409: OpenApiTypes.OBJECT},
-    )
-    def post(self, request, pk):
-        session, denied = self._load(request, pk)
-        if denied:
-            return denied
-        if not getattr(settings, "REALTIME_ASYNC_GO_LIVE", True):
-            # Kill switch: the studio falls back to the synchronous stream/start/.
-            return api_response(
-                success=False,
-                message="Asynchronous Go Live is turned off.",
-                errors={"detail": "Use stream/start/.", "code": "go_live_async_disabled"},
-                status_code=status.HTTP_404_NOT_FOUND,
-            )
-        if session.status == RealtimeSession.STATUS_ENDED:
-            return api_response(
-                success=False,
-                message="Session has ended.",
-                errors={"detail": "This session has ended. Create a new broadcast to go live again."},
-                status_code=status.HTTP_409_CONFLICT,
-            )
-        if session.session_type != RealtimeSession.TYPE_BROADCASTING or (
-            session.stream_service == RealtimeSession.STREAM_SERVICE_OBS
-        ):
-            return api_response(
-                success=False,
-                message="Go Live is for Host Studio broadcasts.",
-                errors={"detail": "OBS classes go live from OBS after Start (stream/start/)."},
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-        if not session.resolve_stream_target_url():
-            return api_response(
-                success=False,
-                message="Streaming target unavailable.",
-                errors={"detail": "Set OWNCAST_RTMP_TARGET in backend environment."},
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-        if session.stream_status == RealtimeSession.STREAM_LIVE:
-            # Already live: the heartbeat/reconciler verify and revive the egress.
-            return api_response(success=True, message="Stream already live.", data=self._payload(request, session))
-        try:
-            outcome = live_lifecycle.request_go_live(session, user=request.user)
-        except InvalidRealtimeTransition as exc:
-            return api_response(
-                success=False,
-                message="Stream state changed. Refresh and try again.",
-                errors={"detail": " ".join(exc.messages)},
-                status_code=status.HTTP_409_CONFLICT,
-            )
-        if outcome["queued"]:
-            try:
-                from .resource_profile import nudge_resource_profile
-
-                nudge_resource_profile()
-            except Exception:  # noqa: BLE001
-                realtime_ops_logger.debug("resource profile nudge failed", exc_info=True)
-        session.refresh_from_db()
-        return api_response(
-            success=True,
-            message="Going live. The stream starts in a few seconds.",
-            data=self._payload(request, session),
-            status_code=status.HTTP_202_ACCEPTED,
-        )
-
-
-class RealtimePreflightView(APIView):
-    """Latest pre-class readiness probe; managers may run a fresh one."""
-
-    permission_classes = [permissions.IsAuthenticated]
-
-    @extend_schema(operation_id="realtime_preflight", responses={200: OpenApiTypes.OBJECT})
-    def get(self, request):
-        user = request.user
-        is_manager = bool(
-            getattr(user, "is_staff", False)
-            or getattr(user, "is_superuser", False)
-            or getattr(user, "role", "") in {"instructor", "admin"}
-        )
-        if not is_manager:
-            return api_response(
-                success=False,
-                message="Access denied.",
-                errors={"detail": "Only instructors and admins can see the pre-class probe."},
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
-        from . import preflight
-
-        result = preflight.latest_preflight()
-        refresh = str(request.query_params.get("refresh") or "").strip().lower() in {"1", "true", "yes"}
-        if refresh and cache.add(f"realtime:preflight:manual:{user.pk}", 1, timeout=30):
-            result = preflight.run_preflight()
-        return api_response(success=True, message="Pre-class probe.", data={"preflight": result})

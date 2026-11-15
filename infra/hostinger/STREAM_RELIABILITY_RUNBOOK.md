@@ -173,7 +173,7 @@ sudo HOSTINGER_ENV_FILE="$ENV_FILE" bash infra/hostinger/prepare-livekit-config.
 "${COMPOSE[@]}" config -q
 # Build first so the migration runs with the new code (adds users.0012_session_slot).
 "${COMPOSE[@]}" build backend frontend
-"${COMPOSE[@]}" run --rm --no-deps -T --entrypoint sh backend /app/migrate.sh --noinput
+"${COMPOSE[@]}" run --rm --no-deps -T --entrypoint python backend manage.py migrate --noinput
 "${COMPOSE[@]}" up -d --no-deps --force-recreate owncast livekit-egress
 "${COMPOSE[@]}" up -d --build --no-deps frontend backend backend-2 backend-3 backend-4
 

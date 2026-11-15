@@ -13,18 +13,6 @@ from apps.realtime.recording.recorder import StreamRecorder
 LEADER_KEY = "realtime:stream-recorder:leader"
 
 
-def touch_heartbeat_file():
-    """Liveness for the compose healthcheck (STREAM_RECORDER_HEARTBEAT_FILE)."""
-    path = config.recorder_heartbeat_file()
-    if not path:
-        return
-    try:
-        with open(path, "w", encoding="utf-8") as handle:
-            handle.write(str(int(time.time())))
-    except OSError:
-        pass
-
-
 class LeaderLease:
     """Best-effort single-runner guard (two recorders would double-capture).
 
@@ -42,32 +30,16 @@ class LeaderLease:
         self._stop = threading.Event()
         self._thread = None
         self.held = False
-        self._held_confirmed_at = None
-        self._clock = time.monotonic
 
     def try_hold(self):
-        """Take or keep the lease. Fail-static on a cache (Redis) outage.
-
-        A Redis hiccup must not stop the captures of a running class: while
-        the cache cannot be asked, a lease confirmed less than ``ttl`` ago is
-        kept (no other recorder can have taken it in that time), and a fresh
-        start without a confirmed lease waits.
-        """
         with self._lock:
-            try:
-                if self._cache.add(LEADER_KEY, self.identity, timeout=self.ttl):
-                    self.held = True
-                elif self._cache.get(LEADER_KEY) == self.identity:
-                    self._cache.set(LEADER_KEY, self.identity, timeout=self.ttl)
-                    self.held = True
-                else:
-                    self.held = False
-            except Exception:  # cache unreachable
-                confirmed = self._held_confirmed_at
-                self.held = bool(self.held and confirmed is not None and self._clock() - confirmed < self.ttl)
-                return self.held
-            if self.held:
-                self._held_confirmed_at = self._clock()
+            if self._cache.add(LEADER_KEY, self.identity, timeout=self.ttl):
+                self.held = True
+            elif self._cache.get(LEADER_KEY) == self.identity:
+                self._cache.set(LEADER_KEY, self.identity, timeout=self.ttl)
+                self.held = True
+            else:
+                self.held = False
             return self.held
 
     def renew(self):
@@ -77,7 +49,6 @@ class LeaderLease:
                 return False
             if self._cache.get(LEADER_KEY) == self.identity:
                 self._cache.set(LEADER_KEY, self.identity, timeout=self.ttl)
-                self._held_confirmed_at = self._clock()
                 return True
             self.held = False
             return False
@@ -101,19 +72,15 @@ class LeaderLease:
         if self._thread is not None:
             self._thread.join(timeout=5)
         with self._lock:
-            try:
-                if self._cache.get(LEADER_KEY) == self.identity:
-                    self._cache.delete(LEADER_KEY)
-            except Exception:  # the key expires on its own
-                pass
+            if self._cache.get(LEADER_KEY) == self.identity:
+                self._cache.delete(LEADER_KEY)
             self.held = False
 
 
 class Command(BaseCommand):
     help = (
-        "Record every live broadcast (OBS and Host Studio) from the Owncast HLS feed (ffmpeg stream copy), "
-        "finalize each class into a lecture of its module (published as MP4 at once, HLS later), run the "
-        "periodic import scan and the nightly canary. Run exactly one."
+        "Record live OBS classes from the Owncast HLS feed (ffmpeg stream copy), finalize them "
+        "into module lectures and publish them when their HLS transcode is ready. Run exactly one."
     )
 
     def add_arguments(self, parser):
@@ -138,9 +105,7 @@ class Command(BaseCommand):
         lease = LeaderLease(identity, int(max(30, poll_seconds * 10)))
         # Long concats/remuxes run on the finalize thread, so a new class can
         # start capturing while an earlier one is still being finalized.
-        recorder = StreamRecorder(
-            background_finalize=True, should_finalize=lambda: lease.held, service_duties=True
-        )
+        recorder = StreamRecorder(background_finalize=True, should_finalize=lambda: lease.held)
         lease.start_renewing()
         if not config.recorder_enabled():
             self.stdout.write("STREAM_RECORDER_ENABLED is off: no new captures will start (finalize/publish still run).")
@@ -152,7 +117,6 @@ class Command(BaseCommand):
                         recorder.tick()
                     except Exception as exc:  # never let one bad tick kill the service
                         self.stderr.write(self.style.ERROR(f"Recorder tick failed: {exc}"))
-                touch_heartbeat_file()
                 time.sleep(poll_seconds)
         finally:
             recorder.shutdown()

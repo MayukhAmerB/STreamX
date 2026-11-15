@@ -1,8 +1,7 @@
-{% extends "admin/base.html" %}
-{% load static i18n enterprise_admin %}
-{# "Al Syed Admin": the back office in the HackPath philosophy (hackpath BUILD_PLAN §2.3). Extends admin/base.html directly so no other base_site sits in the chain. #}
+{% extends "admin/base_site.html" %}
+{% load static i18n %}
 
-{% block title %}{% if title %}{{ title }} | {% endif %}{% enterprise_site_name %}{% endblock %}
+{% block title %}{% if title %}{{ title }} | {% endif %}Al syed Initiative Enterprise Control{% endblock %}
 
 {# The admin is dark only: drop Django's dark_mode.css and theme.js (the light/dark/auto toggle). #}
 {% block dark-mode-vars %}{% endblock %}
@@ -11,12 +10,9 @@
   {{ block.super }}
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#000000">
-  {# Geist (one variable file, every weight) and Handlee (the wordmark half): preloaded like the site. #}
-  <link rel="preload" href="{% static 'admin/fonts/geist/geist-latin-wght-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="{% static 'admin/fonts/handlee/handlee-latin-400-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
-  {% enterprise_admin_tokens_href as admin_tokens_href %}
-  {% if admin_tokens_href %}<link rel="stylesheet" href="{{ admin_tokens_href }}">{% endif %}
   {# Loaded in extrahead so it comes after page CSS (changelists.css, forms.css) and wins. #}
+  <link rel="preload" href="{% static 'admin/fonts/inter-latin-400-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{% static 'admin/fonts/inter-latin-600-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{% static 'admin/css/enterprise.css' %}">
   <script>try { if (localStorage.getItem("enterprise.navRail") === "1") document.documentElement.classList.add("enterprise-nav-rail"); } catch (e) {}</script>
   <script src="{% static 'admin/js/enterprise-shell.js' %}" defer></script>
@@ -29,38 +25,27 @@
       <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-menu"></use></svg>
     </button>
   {% endif %}
-  <div id="site-name">
-    {% enterprise_brand as brand %}
-    <a href="{% url 'admin:index' %}">{{ brand.head }}{% if brand.tail %} <span class="enterprise-brand-suffix">{{ brand.tail }}</span>{% endif %}</a>
-  </div>
+  <h1 id="site-name">
+    <a href="{% url 'admin:index' %}"><span class="enterprise-brand-prefix">Al syed Initiative</span> <span class="enterprise-brand-suffix">Enterprise Control</span></a>
+  </h1>
 {% endblock %}
 
 {% block welcome-msg %}
-  {% url 'admin:enterprise_search' as palette_search_url %}
-  <a class="enterprise-palette-trigger" href="{{ palette_search_url }}" data-palette-open aria-haspopup="dialog" aria-keyshortcuts="Control+K Meta+K" title="Search or jump to (Ctrl K)">
-    <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-search"></use></svg>
-    <span class="enterprise-palette-trigger-label">Search or jump to</span>
-    <kbd class="enterprise-kbd" data-palette-kbd>Ctrl K</kbd>
-  </a>
-  <a class="enterprise-header-action enterprise-header-console" href="/console/admin" title="Open the Console admin">
-    <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-dashboard"></use></svg>
-    <span class="enterprise-header-label">Console</span>
-  </a>
-  <span class="enterprise-header-user" title="{% translate 'Signed in as' %} {% firstof user.full_name user.get_username %}">
+  <span class="enterprise-header-user" title="{% translate 'Signed in as' %} {% firstof user.get_short_name user.get_username %}">
     <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-user-avatar"></use></svg>
-    <span class="enterprise-header-label">{% firstof user.full_name user.get_username %}</span>
+    <span class="enterprise-header-label">{% firstof user.get_short_name user.get_username %}</span>
   </span>
 {% endblock %}
 
 {% block userlinks %}
   {% if site_url %}
-    <a class="enterprise-header-action enterprise-header-secondary" href="{{ site_url }}" title="{% translate 'View site' %}">
+    <a class="enterprise-header-action" href="{{ site_url }}" title="{% translate 'View site' %}">
       <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-launch"></use></svg>
       <span class="enterprise-header-label">{% translate 'View site' %}</span>
     </a>
   {% endif %}
   {% if user.has_usable_password %}
-    <a class="enterprise-header-action enterprise-header-secondary" href="{% url 'admin:password_change' %}" title="{% translate 'Change password' %}">
+    <a class="enterprise-header-action" href="{% url 'admin:password_change' %}" title="{% translate 'Change password' %}">
       <svg class="enterprise-icon" aria-hidden="true"><use href="#icon-password"></use></svg>
       <span class="enterprise-header-label">{% translate 'Change password' %}</span>
     </a>
@@ -83,28 +68,10 @@
     <nav class="enterprise-breadcrumbs" aria-label="{% translate 'Breadcrumbs' %}">
       {% block breadcrumbs %}
         <div class="breadcrumbs">
-          <a href="{% url 'admin:index' %}">{% translate 'Overview' %}</a>
+          <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
           {% if title %} &rsaquo; {{ title }}{% endif %}
         </div>
       {% endblock %}
     </nav>
-  {% endif %}
-{% endblock %}
-
-{% block footer %}
-  {% if not is_popup and has_permission %}
-    {% enterprise_palette_data available_apps as palette_data %}
-    {{ palette_data|json_script:"enterprise-palette-data" }}
-    {% url 'admin:enterprise_search' as palette_search_url %}
-    <dialog class="enterprise-palette" id="enterprise-palette" aria-label="Search and jump" data-search-url="{{ palette_search_url }}">
-      <div class="enterprise-palette-field">
-        <svg class="enterprise-icon enterprise-icon-lg" aria-hidden="true"><use href="#icon-search"></use></svg>
-        <input type="text" id="enterprise-palette-input" role="combobox" aria-expanded="false" aria-controls="enterprise-palette-list" aria-autocomplete="list" autocomplete="off" spellcheck="false" placeholder="Search people, courses, payments, or type an action" aria-label="Search people, courses, payments, or type an action">
-        <kbd class="enterprise-kbd">Esc</kbd>
-      </div>
-      <div class="enterprise-palette-list" id="enterprise-palette-list" role="listbox" aria-label="Results"></div>
-      <p class="enterprise-palette-status" id="enterprise-palette-status" role="status" aria-live="polite"></p>
-      <noscript><p class="enterprise-palette-status">Search needs JavaScript. Use the sidebar instead.</p></noscript>
-    </dialog>
   {% endif %}
 {% endblock %}

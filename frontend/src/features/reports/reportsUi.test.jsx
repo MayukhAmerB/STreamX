@@ -513,8 +513,7 @@ describe("gradebook", () => {
     expect(html).toContain("8.5/10");
     expect(html).toContain("85%");
     expect(html).toContain("Missing");
-    expect(html).toContain('href="/console/admin/grading/queue?task=2&amp;status=all&amp;submission=11"');
-    expect(html).toContain('href="/console/admin/grading/students/3"');
+    expect(html).toContain('href="/report-grading/queue?task=2&amp;submission=11"');
     expect(html).toContain("ravi@example.com");
   });
 

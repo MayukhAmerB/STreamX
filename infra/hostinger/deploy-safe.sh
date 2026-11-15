@@ -68,16 +68,7 @@ wait_for_backend_health
 bash "$SCRIPT_DIR/prepare-report-storage.sh" finalize
 
 log "Running Django production checks."
-check_output="$(compose exec -T backend python manage.py check --deploy 2>&1)" || {
-  printf '%s\n' "$check_output"
-  exit 1
-}
-printf '%s\n' "$check_output"
-# A missing or weak CTF_ANSWER_PEPPER switches off exams only (INFO, never a
-# failure: apps/ctf/checks.py). Repeat it as a deploy warning so it is seen.
-if printf '%s\n' "$check_output" | grep -q '(ctf\.I00[123])'; then
-  log "WARNING: OSINT CTF exams are switched off on this server: see the ctf.I00x lines above and set CTF_ANSWER_PEPPER."
-fi
+compose exec -T backend python manage.py check --deploy
 
 if [[ "${SKIP_POST_DEPLOY_SMOKE:-0}" != "1" ]]; then
   log "Running post-deploy smoke checks."

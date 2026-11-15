@@ -1,14 +1,8 @@
 // Pure model for the website navbar (no React): which links show in the
 // centred pill, which go under "More", and what the account menu and the
 // phone sheet contain. Kept separate so it can be unit tested per brand.
-//
-// Restored to the production navbar of 7a444898 (owner, Nov 2026: "the same
-// as before with all its functionalities"). Pentesting, Roadmap, Labs and
-// Pricing stay reachable from Courses, the footer and the landing page.
 
 export const SITE_CONSOLE_PATH = "/console";
-/** The OSINT labs (CTF) site: external, Al Syed brand only (footer, free labs). */
-export const LABS_URL = "https://labs.alsyedinitiative.com";
 
 const LINKS = {
   courses: { id: "courses", label: "Courses", to: "/courses" },
@@ -48,32 +42,18 @@ export function getSiteNavLinks(brandId = "alsyed", options = {}) {
 /** Phone sheet groups: every website link, grouped. */
 export function getSiteNavGroups(brandId = "alsyed", options = {}) {
   const visible = visibleFor(brandId, options);
-  const pick = (keys) => keys.map((key) => LINKS[key]).filter(visible);
   return [
-    { id: "explore", label: "Explore", links: pick(["courses", "watch", "about", "contact", "faqs"]) },
-    { id: "community", label: "Al Syed", links: pick(["nationalDesk", "accounts", "join", "hallOfFame"]) },
+    { id: "explore", label: "Explore", links: ["courses", "watch", "about", "contact", "faqs"].map((key) => LINKS[key]).filter(visible) },
+    {
+      id: "community",
+      label: "Al Syed",
+      links: ["nationalDesk", "accounts", "join", "hallOfFame"].map((key) => LINKS[key]).filter(visible),
+    },
   ].filter((group) => group.links.length > 0);
-}
-
-/**
- * Watch (the YouTube channel) in the header, sheet and footer (plan §7.2 rule 4):
- * - "hidden" when the brand has no channel or the server switched the section off;
- * - "disabled" ("No videos yet") when it is on but has nothing to play;
- * - "live" while the channel is on air (the only time the live dot shows);
- * - "ready" otherwise (also while the first answer is loading).
- */
-export const WATCH_EMPTY_REASON = "No videos yet";
-
-export function getWatchNavState({ brandHasYouTube = false, youtube = null } = {}) {
-  if (!brandHasYouTube || youtube?.enabled === false) return "hidden";
-  if (youtube?.status === "ready" && !youtube?.model) return "disabled";
-  if (youtube?.model?.live) return "live";
-  return "ready";
 }
 
 /** True when the current path belongs to one of the links (prefix match like NavLink). */
 export function isSiteLinkActive(link, pathname = "") {
-  if (!link?.to) return false;
   const path = String(pathname || "").split(/[?#]/)[0].replace(/\/+$/, "") || "/";
   return path === link.to || path.startsWith(`${link.to}/`);
 }
@@ -88,7 +68,7 @@ export function getAccountMenuGroups({ isInstructor = false, isAdmin = false, dj
   const canAccessControls = Boolean(isAdmin || isInstructor);
   const staff = [
     isInstructor ? { id: "instructor", label: "Instructor", to: "/instructor/dashboard" } : null,
-    isAdmin ? { id: "control-center", label: "Admin Control Center", to: "/control-center" } : null,
+    canAccessControls ? { id: "control-center", label: "Admin Control Center", to: "/control-center" } : null,
     canAccessControls ? { id: "meeting", label: "Meeting Control", to: "/meeting" } : null,
     canAccessControls ? { id: "broadcasting", label: "Broadcast Control", to: "/broadcasting" } : null,
     isAdmin ? { id: "lecture-questions", label: "Lecture Questions", to: "/lecture-questions" } : null,

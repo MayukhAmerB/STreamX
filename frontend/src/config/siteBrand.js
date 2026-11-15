@@ -5,13 +5,13 @@ const brands = {
     id: "alsyed",
     name: "Al syed Initiative",
     platformLabel: "Cybersecurity Platform",
-    documentTitle: "Al syed Initiative | Live OSINT Training, Labs & CTF",
+    documentTitle: "Al syed Initiative | Cybersecurity Training",
     footerDescription:
-      "Live OSINT training: real cases, marked reports and certificates anyone can verify. Founded by cyber activist Al Syed under the ADL Front.",
-    footerKicker: "Public sources. Lawful use.",
+      "Enterprise-focused cybersecurity learning with structured courses, live classes, and practical workflow training.",
+    footerKicker: "Controlled learning access",
     siteOrigin: "https://alsyedinitiative.com",
     description:
-      "Live OSINT classes every Fri, Sat and Sun, weekly marked reports, real investigation labs and certificates anyone can verify. Start free; Pentesting coming soon.",
+      "Practical OSINT and web application penetration testing training with live classes, protected recordings, mentor support and verified certificates.",
     youtube: true,
   },
   owlcognito: {

@@ -1,4 +1,3 @@
-from config.audit import log_security_event
 from django.contrib import admin, messages
 from django.db import transaction
 from django.db.models import Prefetch, Q
@@ -7,36 +6,37 @@ from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils.html import format_html
 
+from config.audit import log_security_event
+
 from .batch_pass import activate_batch_pass, deactivate_batch_pass
 from .credentials import issue_credentials_for_paid_user
-from .models import BatchPass, Payment, PaymentWebhookEvent, SuccessfulPaymentUser
+from .models import Payment, PaymentWebhookEvent, SuccessfulPaymentUser
+from .models import BatchPass
 from .refunds import record_refund
 
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
-    # What an admin scans first (who, what, how much, where it stands), then the
-    # identifiers. Same columns as before; the table scrolls in its own region.
     list_display = (
         "id",
+        "internal_reference",
         "user_email_snapshot",
         "course_title_snapshot",
-        "amount",
         "status",
-        "provisioning_status",
         "plan",
         "installment_number",
-        "paid_at",
-        "created_at",
+        "provisioning_status",
         "invoice_number",
-        "internal_reference",
         "gateway_status",
+        "amount",
         "currency",
         "razorpay_order_id",
         "razorpay_payment_id",
         "payment_method",
         "buyer_name",
         "whatsapp_number",
+        "paid_at",
+        "created_at",
     )
     search_fields = (
         "user__email",
@@ -519,263 +519,3 @@ class BatchPassAdmin(admin.ModelAdmin):
             target_user_id=obj.user_id,
             **result,
         )
-
-
-# ---------------------------------------------------------------------------
-# Platform plans, grants, subscriptions, membership bundles (WS catalog-plans)
-# ---------------------------------------------------------------------------
-from django.contrib.admin.models import CHANGE, LogEntry  # noqa: E402
-from django.contrib.contenttypes.models import ContentType  # noqa: E402
-from django.core.exceptions import ValidationError  # noqa: E402
-
-from .models import MembershipBundle, PlatformGrant, PlatformPlan, PlatformSubscription  # noqa: E402
-from .plans import format_inr  # noqa: E402
-
-
-def _audit(request, obj, message):
-    LogEntry.objects.log_action(
-        user_id=request.user.pk,
-        content_type_id=ContentType.objects.get_for_model(obj).pk,
-        object_id=str(obj.pk),
-        object_repr=str(obj)[:200],
-        action_flag=CHANGE,
-        change_message=message,
-    )
-
-
-@admin.register(PlatformPlan)
-class PlatformPlanAdmin(admin.ModelAdmin):
-    list_display = (
-        "title",
-        "key",
-        "product",
-        "price_display",
-        "price_status",
-        "is_enabled",
-        "highlighted",
-        "display_order",
-    )
-    list_filter = ("product", "is_enabled", "billing_period")
-    search_fields = ("key", "title")
-    filter_horizontal = ("courses",)
-    raw_id_fields = ("starter_course",)
-    readonly_fields = (
-        "kind",
-        "catalog_group",
-        "confirmed_price",
-        "price_confirmed_at",
-        "price_confirmed_by",
-        "version",
-        "created_at",
-        "updated_at",
-        "enable_checklist",
-    )
-    actions = ("confirm_price", "disable_plans")
-    fieldsets = (
-        (
-            None,
-            {
-                "fields": (
-                    "key",
-                    "product",
-                    "kind",
-                    "catalog_group",
-                    "title",
-                    "subtitle",
-                    "badge",
-                    "cta_label",
-                    "highlighted",
-                    "display_order",
-                )
-            },
-        ),
-        (
-            "Price (INR)",
-            {
-                "description": (
-                    "Changing the price or the period un-confirms the plan and switches it off "
-                    "until the owner confirms again."
-                ),
-                "fields": ("price_inr", "billing_period", "confirmed_price", "price_confirmed_at", "price_confirmed_by"),
-            },
-        ),
-        ("Card bullets", {"fields": ("features",)}),
-        ("What it unlocks", {"fields": ("courses", "include_future", "starter_course")}),
-        ("Selling", {"fields": ("razorpay_plan_id", "is_enabled", "enable_checklist")}),
-        ("Record", {"fields": ("version", "created_at", "updated_at")}),
-    )
-
-    @admin.display(description="Price")
-    def price_display(self, obj):
-        period = {"monthly": " / month", "yearly": " / year"}.get(obj.billing_period, " one-time")
-        return format_inr(obj.price_inr) + period
-
-    @admin.display(description="Price status")
-    def price_status(self, obj):
-        return "Confirmed" if obj.price_is_confirmed else "Waiting for confirmation"
-
-    @admin.display(description="Before it can be switched on")
-    def enable_checklist(self, obj):
-        if not obj or not obj.pk:
-            return "-"
-        blockers = obj.enable_blockers()
-        return "Ready: every requirement is met." if not blockers else " / ".join(blockers)
-
-    @admin.action(description="Confirm price (records who and when; does not switch the plan on)")
-    def confirm_price(self, request, queryset):
-        from .platform_plans import confirm_price
-
-        done = 0
-        for plan in queryset:
-            try:
-                plan = confirm_price(plan, by=request.user)
-            except ValidationError as exc:
-                self.message_user(request, f"{plan.title}: {' '.join(exc.messages)}", messages.ERROR)
-                continue
-            _audit(request, plan, f"Confirmed price {format_inr(plan.price_inr)}")
-            log_security_event("admin.platform_plan_price_confirmed", request=request, plan=plan.key)
-            done += 1
-        if done:
-            self.message_user(
-                request, f"Confirmed the price of {done} plan(s). Switch them on when ready.", messages.SUCCESS
-            )
-
-    @admin.action(description="Switch selected plans off")
-    def disable_plans(self, request, queryset):
-        for plan in queryset.filter(is_enabled=True):
-            plan.is_enabled = False
-            plan.save(update_fields=["is_enabled"])
-            _audit(request, plan, "Switched off")
-        self.message_user(request, "Selected plans are off.", messages.SUCCESS)
-
-    def save_model(self, request, obj, form, change):
-        was_confirmed = bool(
-            change and PlatformPlan.objects.filter(pk=obj.pk, price_confirmed_at__isnull=False).exists()
-        )
-        super().save_model(request, obj, form, change)
-        if was_confirmed and not obj.price_confirmed_at:
-            self.message_user(
-                request,
-                "The price or period changed: the plan is now unconfirmed and switched off. "
-                "Confirm the new price to sell it.",
-                messages.WARNING,
-            )
-
-
-@admin.register(PlatformGrant)
-class PlatformGrantAdmin(admin.ModelAdmin):
-    list_display = ("user", "plan", "is_active", "expires_at", "granted_at", "revoked_at", "payment")
-    list_filter = ("is_active", "plan")
-    search_fields = ("user__email", "user__full_name", "note")
-    raw_id_fields = ("user", "payment")
-    readonly_fields = ("granted_at", "revoked_at", "granted_by")
-    fields = ("user", "plan", "payment", "is_active", "expires_at", "note", "granted_by", "granted_at", "revoked_at")
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-    @transaction.atomic
-    def save_model(self, request, obj, form, change):
-        from .platform_orders import activate_grant, deactivate_grant, grant_scope_lifetime
-
-        was_active = bool(change and PlatformGrant.objects.filter(pk=obj.pk, is_active=True).exists())
-        if not change:
-            obj.granted_by = request.user
-        super().save_model(request, obj, form, change)
-        if was_active and not obj.is_active:
-            deactivate_grant(obj)
-            log_security_event("admin.platform_grant_deactivated", request=request, grant_id=obj.pk)
-        elif obj.is_active and not was_active:
-            if obj.payment_id:
-                activate_grant(obj.payment)
-            else:
-                grant_scope_lifetime(obj)
-            log_security_event("admin.platform_grant_activated", request=request, grant_id=obj.pk)
-
-
-@admin.register(PlatformSubscription)
-class PlatformSubscriptionAdmin(admin.ModelAdmin):
-    list_display = (
-        "user",
-        "plan",
-        "status",
-        "paid_count",
-        "current_end",
-        "access_until",
-        "cancel_at_cycle_end",
-        "updated_at",
-    )
-    list_filter = ("status", "plan", "cancel_at_cycle_end")
-    search_fields = ("user__email", "razorpay_subscription_id")
-    actions = ("cancel_now",)
-
-    def get_readonly_fields(self, request, obj=None):
-        return [field.name for field in PlatformSubscription._meta.fields]
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-    @admin.action(description="Cancel immediately at Razorpay (no automatic refund)")
-    def cancel_now(self, request, queryset):
-        from .subscriptions import SubscriptionError, cancel_subscription
-
-        for sub in queryset:
-            try:
-                cancel_subscription(sub.user, sub.pk, at_cycle_end=False, request=request)
-            except SubscriptionError as exc:
-                self.message_user(request, f"{sub}: {exc.message}", messages.ERROR)
-                continue
-            _audit(request, sub, "Cancelled immediately by an admin")
-        self.message_user(request, "Done. Refunds stay manual.", messages.SUCCESS)
-
-
-@admin.register(MembershipBundle)
-class MembershipBundleAdmin(admin.ModelAdmin):
-    list_display = ("month", "status", "course_count", "published_at", "note")
-    list_filter = ("status",)
-    filter_horizontal = ("courses",)
-    readonly_fields = ("published_at", "published_by", "preview")
-    fields = ("month", "status", "courses", "note", "preview", "published_at", "published_by")
-    actions = ("publish", "copy_to_next_month")
-
-    @admin.display(description="Courses")
-    def course_count(self, obj):
-        return obj.courses.count()
-
-    @admin.display(description="What members can play that month")
-    def preview(self, obj):
-        if not obj or not obj.pk:
-            return "Save first to preview."
-        from apps.courses.models import Course
-
-        bundled = list(obj.courses.order_by("title").values_list("title", flat=True))
-        always = list(
-            Course.objects.filter(membership_always_included=True).order_by("title").values_list("title", flat=True)
-        )
-        return format_html(
-            "<strong>Bundle:</strong> {}<br><strong>Always included:</strong> {}",
-            ", ".join(bundled) or "none",
-            ", ".join(always) or "none",
-        )
-
-    @admin.action(description="Publish selected bundles")
-    def publish(self, request, queryset):
-        from .platform_plans import publish_bundle
-
-        for bundle in queryset:
-            publish_bundle(bundle, by=request.user)
-            _audit(request, bundle, "Published")
-        self.message_user(request, "Published. Members can play these recordings in that month.", messages.SUCCESS)
-
-    @admin.action(description="Copy into the following month (draft)")
-    def copy_to_next_month(self, request, queryset):
-        from .platform_plans import copy_previous_bundle
-
-        for bundle in queryset:
-            month = bundle.month
-            next_month = month.replace(year=month.year + (month.month // 12), month=month.month % 12 + 1)
-            copy_previous_bundle(next_month, by=request.user)
-        self.message_user(request, "Draft created for the following month. Review and publish it.", messages.SUCCESS)

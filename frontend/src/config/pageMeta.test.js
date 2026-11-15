@@ -5,7 +5,7 @@ import { resolvePageMeta } from "./pageMeta";
 describe("page meta", () => {
   it("gives the home page the brand title and description", () => {
     const meta = resolvePageMeta("/");
-    expect(meta.title).toBe("Al syed Initiative | Live OSINT Training, Labs & CTF");
+    expect(meta.title).toBe("Al syed Initiative | Cybersecurity Training");
     expect(meta.description).toMatch(/OSINT/);
     expect(meta).toMatchObject({ noindex: false, notFound: false, canonicalPath: "/" });
   });
@@ -15,7 +15,6 @@ describe("page meta", () => {
     expect(resolvePageMeta("/courses/28/")).toMatchObject({ title: "Course details | Al syed Initiative", canonicalPath: "/courses/28" });
     expect(resolvePageMeta("/watch").title).toBe("Watch | Al syed Initiative");
     expect(resolvePageMeta("/national-desk").title).toBe("National Desk | Al syed Initiative");
-    expect(resolvePageMeta("/changelog")).toMatchObject({ title: "What's new | Al syed Initiative", noindex: false, canonicalPath: "/changelog" });
   });
 
   it("keeps payment steps and unknown addresses out of search results", () => {

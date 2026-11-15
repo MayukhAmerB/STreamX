@@ -13,12 +13,3 @@ export function scrollToWatchSection() {
   element.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
   return true;
 }
-
-/** Smoothly scrolls to any element by id (scroll-margin handles the header); false when absent. */
-export function scrollToSection(id) {
-  if (typeof document === "undefined" || !id) return false;
-  const element = document.getElementById(id);
-  if (!element) return false;
-  element.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
-  return true;
-}

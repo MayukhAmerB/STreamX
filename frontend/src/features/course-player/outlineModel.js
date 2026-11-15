@@ -18,30 +18,9 @@ export function flattenCourseLectures(course) {
   );
 }
 
-/**
- * Enrolled students and the course's instructor can play every lesson. OSINT
- * members whose plan includes this course's recordings (CTF Labs bundle of the
- * month, or the Starter plan's batch) can too: the course payload says so with
- * `recording_access_source` ("membership_bundle" | "starter"); the server
- * still decides every playback.
- */
+/** Enrolled students and the course's instructor can play every lesson. */
 export function hasFullCourseAccess(course) {
-  return Boolean(course?.is_enrolled || course?.enrollment_status === "approved" || membershipAccessSource(course));
-}
-
-/** "membership_bundle" | "starter" | "" (recordings included with an OSINT plan, not an enrollment). */
-export function membershipAccessSource(course) {
-  if (!course || course.is_enrolled || course.enrollment_status === "approved") return "";
-  const source = String(course.recording_access_source || "");
-  return source === "membership_bundle" || source === "starter" ? source : "";
-}
-
-/** Label for the lesson header: why a non-enrolled member can play this course. */
-export function membershipAccessLabel(course) {
-  const source = membershipAccessSource(course);
-  if (source === "membership_bundle") return "Included this month";
-  if (source === "starter") return "Included with Starter";
-  return "";
+  return Boolean(course?.is_enrolled || course?.enrollment_status === "approved");
 }
 
 /** A lesson is locked when the viewer has no full access and it is not a free preview. */

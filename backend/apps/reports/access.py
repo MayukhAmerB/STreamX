@@ -4,8 +4,7 @@
   to (``apps.courses.access``), once ``opens_at`` has passed. Only their own
   submission, files and (visible) marks.
 * Graders: staff/superusers for every course; an instructor for the courses
-  they teach (``Course.instructor``) while the Teachers section is on
-  (``apps.users.teaching``; off -> 403 ``feature_disabled``).
+  they teach (``Course.instructor``).
 
 Objects a user may not see answer 404 (not 403) so ids do not leak.
 """
@@ -18,7 +17,6 @@ from django.utils import timezone
 from apps.core.errors import NotFound, PermissionDenied
 from apps.courses.access import accessible_course_ids_for_user, user_has_course_access
 from apps.courses.models import Course
-from apps.users import teaching
 
 from .models import ReportSubmission, ReportTask
 
@@ -32,33 +30,31 @@ def can_grade_course(user, course_or_id):
         return False
     if is_staff_user(user):
         return True
-    if teaching.teaching_blocked(user):
-        return False
     instructor_id = (
         course_or_id.instructor_id
         if isinstance(course_or_id, Course)
         else Course.objects.filter(pk=course_or_id).values_list("instructor_id", flat=True).first()
     )
-    return teaching.owns_course(user, instructor_id)
+    return bool(instructor_id and instructor_id == user.id)
 
 
 def is_grader(user):
     """May open the grading area at all (staff, or teaches at least one course)."""
     if is_staff_user(user):
         return True
-    return bool(user and user.is_authenticated and teaching.taught_courses(user).exists())
+    return bool(user and user.is_authenticated and Course.objects.filter(instructor_id=user.id).exists())
 
 
 def gradable_courses(user):
     if is_staff_user(user):
         return Course.objects.all()
-    return teaching.taught_courses(user)
+    if not user or not user.is_authenticated:
+        return Course.objects.none()
+    return Course.objects.filter(instructor_id=user.id)
 
 
 def require_grader(user):
     if not is_grader(user):
-        # An instructor while the Teachers section is off: the calm reason (403 feature_disabled).
-        teaching.require_teaching(user)
         raise PermissionDenied("Only course instructors and admins can grade reports.", code="not_a_grader")
 
 
@@ -87,18 +83,12 @@ def manageable_submission_or_404(user, submission_id):
     return submission
 
 
-def student_visible_tasks(user, at=None, *, include_auto=False):
-    """Instructor-created tasks a student can open (legacy flow). Automatic
-    week tasks of self-service courses are reached through /api/reports/me/
-    instead; ``include_auto`` adds them (marks)."""
+def student_visible_tasks(user, at=None):
     at = at or timezone.now()
-    queryset = ReportTask.objects.filter(
+    return ReportTask.objects.filter(
         course_id__in=accessible_course_ids_for_user(user),
         status__in=[ReportTask.STATUS_PUBLISHED, ReportTask.STATUS_CLOSED],
     ).filter(Q(opens_at__isnull=True) | Q(opens_at__lte=at))
-    if not include_auto:
-        queryset = queryset.exclude(origin=ReportTask.ORIGIN_AUTO)
-    return queryset
 
 
 def student_task_or_404(user, task_id):

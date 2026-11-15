@@ -3,7 +3,7 @@ import { forwardRef } from "react";
 import { formatDuration } from "./formatters";
 
 /** Lesson title (the page's h1) with "Module 2 · Lesson 5 of 20 · 12:34". */
-const LessonHeader = forwardRef(function LessonHeader({ lecture, position, total, locked, fullAccess, accessLabel = "" }, ref) {
+const LessonHeader = forwardRef(function LessonHeader({ lecture, position, total, locked, fullAccess }, ref) {
   if (!lecture) return null;
   const duration = Number(lecture.stream_duration_seconds || lecture.progress?.duration_seconds || 0);
   const meta = [];
@@ -31,11 +31,6 @@ const LessonHeader = forwardRef(function LessonHeader({ lecture, position, total
         {locked ? (
           <Tag type="gray" size="sm" className="cp-lesson-header__tag">
             Locked
-          </Tag>
-        ) : null}
-        {accessLabel && !locked ? (
-          <Tag type="gray" size="sm" className="cp-lesson-header__tag cp-lesson-header__tag--included">
-            {accessLabel}
           </Tag>
         ) : null}
       </div>
