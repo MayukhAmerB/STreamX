@@ -121,6 +121,7 @@ const rootPublicFiles = new Set([
   "/favicon-48x48.png",
   "/favicon-192x192.png",
   "/apple-touch-icon.png",
+  "/free-directory.json",
 ]);
 
 function resolveSiteUrl(value, apiOrigin) {
@@ -380,7 +381,14 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === "/api/access" && req.method === "GET") {
     const access = await labsAccess.accessFor(req);
-    sendJson(res, 200, { membershipRequired: access.required, allowedDifficulties: access.allowed });
+    const pass = labsAccess.passFor(req);
+    sendJson(res, 200, {
+      membershipRequired: access.required,
+      allowedDifficulties: access.allowed,
+      // A valid labs pass is held (the visitor signed in on this browser).
+      pass: Boolean(pass),
+      passExpiresAt: pass ? pass.exp : null,
+    });
     return;
   }
 
@@ -456,7 +464,8 @@ async function startSession(req, res) {
   }
   const maxAge = pass.exp - Math.floor(Date.now() / 1000);
   res.setHeader("Set-Cookie", labsAccess.sessionCookie(String(payload.token), maxAge, isSecure(req)));
-  sendJson(res, 200, { allowedDifficulties: pass.staff ? ["easy", "medium", "expert", "professional"] : pass.dif });
+  const allowed = pass.staff ? ["easy", "medium", "expert", "professional"] : [...new Set([...pass.dif, ...(pass.exam ? ["easy", "medium"] : [])])];
+  sendJson(res, 200, { allowedDifficulties: allowed });
 }
 
 if (require.main === module) {

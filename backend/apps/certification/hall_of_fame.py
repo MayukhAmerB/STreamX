@@ -191,9 +191,62 @@ def _audit(entry, action, *, actor=None, reason=""):
     )
 
 
-def _batch_order(label: str, fallback: int) -> int:
-    match = re.search(r"(\d+)", label or "")
-    return int(match.group(1)) if match else fallback
+# "Batch 3", "BATCH III", "(batch iv)", "Batch-2", "Batch #5", "Batch No. 6".
+_BATCH_IN_TEXT = re.compile(r"\bbatch\s*(?:no\.?|#|-|:)?\s*(\d{1,4}|[ivxlcdm]{1,12})\b", re.IGNORECASE)
+_BARE_BATCH = re.compile(r"^\s*(\d{1,4}|[ivxlcdm]{1,12})\s*$", re.IGNORECASE)
+_ROMAN = re.compile(r"^M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$")
+_ROMAN_VALUES = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}
+MAX_BATCH_NUMBER = 999
+
+
+def _number(token: str) -> int | None:
+    """An Arabic or (strictly formed) Roman batch number, 1-999; else None."""
+    token = (token or "").strip().upper()
+    if token.isdigit():
+        value = int(token)
+    elif token and _ROMAN.match(token):
+        value, previous = 0, 0
+        for char in reversed(token):
+            digit = _ROMAN_VALUES[char]
+            value = value - digit if digit < previous else value + digit
+            previous = max(previous, digit)
+    else:
+        return None
+    return value if 0 < value <= MAX_BATCH_NUMBER else None
+
+
+def batch_number(text: str, *, bare: bool = False) -> int | None:
+    """The batch number named in ``text``: "OSINT ... (BATCH III)" -> 3, "Batch 4" -> 4.
+
+    ``bare`` also accepts a lone number or numeral ("3", "III"), as written in a
+    course's ``batch`` field. Never guesses from other numbers ("January 2027").
+    """
+    text = str(text or "")
+    match = _BATCH_IN_TEXT.search(text) or (_BARE_BATCH.match(text) if bare else None)
+    return _number(match.group(1)) if match else None
+
+
+def _batch_course(decision):
+    participation = getattr(decision, "participation", None)
+    return getattr(participation, "batch_course", None) if participation is not None else None
+
+
+def batch_identity(decision, batch_label: str = "") -> tuple[str, int | None]:
+    """(wall label, batch number) for an automatic entry.
+
+    A batch number found in the given label, the batch course's ``batch`` field
+    or its title gives "Batch N" (so "BATCH III" and "Batch 3" share one group).
+    Otherwise the given label, else the course title, with no number.
+    """
+    course = _batch_course(decision)
+    course_batch = str(getattr(course, "batch", "") or "").strip()
+    course_title = " ".join(str(getattr(course, "title", "") or "").split())
+    label = " ".join(str(batch_label or "").split())
+    for text, bare in ((label, True), (course_batch, True), (course_title, False)):
+        number = batch_number(text, bare=bare)
+        if number:
+            return f"Batch {number}", number
+    return (label or course_batch or course_title)[:80], None
 
 
 def add_for_decision(decision, *, batch_label: str, achievement: str):
@@ -202,6 +255,7 @@ def add_for_decision(decision, *, batch_label: str, achievement: str):
     existing = HallOfFameEntry.objects.filter(Q(decision=decision) | Q(certificate=certificate)).first()
     if existing is not None:
         return existing
+    batch_label, number = batch_identity(decision, batch_label)
     achieved_on = timezone.localdate(certificate.issued_at) if certificate else timezone.localdate()
     # Merge: a curated entry already mapped to this student in this batch, without a certificate.
     curated = (
@@ -216,14 +270,16 @@ def add_for_decision(decision, *, batch_label: str, achievement: str):
         curated.achieved_on = curated.achieved_on or achieved_on
         curated.band = decision.band
         curated.percent = decision.percent
-        curated.batch_label = curated.batch_label or batch_label
+        if not curated.batch_label and batch_label:
+            curated.batch_label = batch_label
+            curated.batch_order = number or curated.batch_order or achieved_on.year
         curated.save()
         _audit(curated, HallOfFameAudit.ACTION_MERGED, reason="Certification passed")
         return curated
     entry = HallOfFameEntry.objects.create(
         user_id=decision.user_id,
         batch_label=batch_label[:80],
-        batch_order=_batch_order(batch_label, achieved_on.year),
+        batch_order=number or achieved_on.year,  # no batch number: newest first, by year
         achievement=achievement[:160],
         achieved_on=achieved_on,
         band=decision.band,

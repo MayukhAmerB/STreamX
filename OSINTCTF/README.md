@@ -62,8 +62,9 @@ Server tests: `node --test OSINTCTF/tests/server.test.js` (not shipped in the im
 
 ## Design, fonts and deep links
 
-The page follows the main site's design language (black canvas, Geist,
-golden-white accent; no colour for status). Fonts are self-hosted from the
+The page is a dark investigation dashboard in the main site's language (black
+canvas, Geist, golden-white accent; no colour for status; one column under
+960px, safe-area insets, no horizontal scroll down to 320px). Fonts are self-hosted from the
 frontend's Fontsource packages (SIL OFL) and served by `server.js` under
 `/fonts/` (woff2 only); the CSP allows fonts and styles from this origin only.
 After a font package upgrade, refresh them with:
@@ -72,10 +73,45 @@ After a font package upgrade, refresh them with:
 node OSINTCTF/scripts/copy-fonts.mjs   # needs `npm ci` in frontend/
 ```
 
-Tabs have deep links: `#hub`, `#realworld`, `#blackmeridian`, `#certification`
-(app.js) and `#exam` (exam.js). They work on load, on `hashchange` and with
-the back button; clicking a tab updates the address with `replaceState`.
-Tabs 01-04 show an access chip ("Open"; "Members" when `GET /api/config`
-returns `membershipRequired: true`); tab 05 shows "Sign-in".
+## Sections and access
+
+Top-level navigation: **Free CTFs** (`#hub`) | **Paid Labs** (`#paid`) |
+**Examination** (`#exam`, exam.js) | **Leaderboard** (`#leaderboard`). The
+labs open from those pages: `#realworld` (The Zenith Footprint),
+`#blackmeridian`, `#certification`, with a lab switcher under the header.
+Deep links work on load, on `hashchange` and with the back button; clicking a
+tab updates the address with `replaceState`.
+
+The free/paid split is the labs' own difficulty map (`labs-access.js`
+`QUESTION_DIFFICULTY`): **easy and medium = Free** (Zenith cases 1-6, plus the
+curated community CTFs from the LMS directory `/api/ctf/labs/directory/`, or
+`free-directory.json` when that is empty); **expert and professional = Paid**
+(Zenith 7-10, Black Meridian, Certification CTF).
+
+| Who | Free CTFs | Paid labs | Examination |
+|---|---|---|---|
+| Signed out | locked (sign in) | locked | sign-in banner (exam.js) |
+| Enrolled student with active course access (Batch 2 / Batch 3): `/api/ctf/eligibility/` reason `ok` or `not_assigned`; pass claim `exm` | open | locked | open (LMS assigns exams per batch) |
+| Starter (`ctf_starter`, billing `easy_ctfs` / `free_ctfs`) | open | locked | per LMS |
+| CTF Labs member (`ctf_labs`, billing `all_labs`) and staff (`/api/ctf/labs/entitlement/`) | open | open | per LMS |
+
+The page reads these from the LMS with the student's session and shows the
+handle, monthly-CTF rank and XP (`/api/ctf/seasons/me/`, the current season,
+directory XP) in the header. Server-side enforcement is the labs pass: with
+the LMS switch `labs_membership_required` on, `/api/validate` and
+`/materials/` accept easy/medium for a pass with `exm` (enrolled students) or
+Starter difficulties, and expert/professional only for members. With the
+switch off (today) the server accepts every answer and the locks are display
+only. Signed-in visitors get a pass automatically (`POST /api/ctf/labs/pass/`
+then `POST /api/session`) when `LABS_PASS_SECRET` is configured on both sides.
+`GET /api/access` reports `{membershipRequired, allowedDifficulties, pass, passExpiresAt}`.
+
+Adding a lab: a rail button and a tab section in `index.html`, its cases in
+`app.js` (question set, `DIFFICULTY`, `CASE_TITLES`, `LAB_TABS`/`PARENT`),
+its answer hashes in `server.js` and its difficulty in `labs-access.js`.
+
+Local preview against a mock LMS: run any stub that answers the endpoints
+above on `127.0.0.1:8000`, then
+`LABS_LMS_API_BASE=http://127.0.0.1:8000/api PORT=8092 node server.js`.
 
 Tests: `node --test OSINTCTF/tests/*.test.js`.

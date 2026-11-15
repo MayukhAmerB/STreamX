@@ -142,3 +142,31 @@ test("a Starter pass opens easy/medium only; a session cookie is HttpOnly", asyn
   });
   assert.equal(bad.status, 400);
 });
+
+test("an enrolled student's pass (Batch 2 / Batch 3) opens the Free CTFs only, never the paid labs", async () => {
+  const token = makePass({ sub: 11, dif: [], stf: false, exm: true, exp: future() });
+  const session = await fetch(`${base}/api/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+  assert.equal(session.status, 200);
+  assert.deepEqual((await session.json()).allowedDifficulties, ["easy", "medium"]);
+  const headers = { Cookie: session.headers.get("set-cookie").split(";")[0] };
+  assert.doesNotMatch(await (await fetch(`${base}/`, { headers })).text(), /For <em>members<\/em>/);
+  const accessBody = await (await fetch(`${base}/api/access`, { headers })).json();
+  assert.deepEqual(accessBody.allowedDifficulties, ["easy", "medium"]);
+  assert.equal(accessBody.pass, true);
+  const check = (category, question) => fetch(`${base}/api/validate`, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ category, question, answer: "x" }),
+  });
+  assert.equal((await check("realworld", 0)).status, 200);
+  assert.equal((await check("realworld", 5)).status, 200);
+  assert.equal((await check("realworld", 6)).status, 403);
+  assert.equal((await check("blackmeridian", 0)).status, 403);
+  assert.equal((await check("certification", 0)).status, 403);
+  assert.equal((await fetch(`${base}/materials/medium/leak_email.txt`, { headers })).status, 200);
+  assert.equal((await fetch(`${base}/materials/black-meridian/START_HERE.md`, { headers })).status, 403);
+});

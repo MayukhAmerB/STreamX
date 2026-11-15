@@ -95,3 +95,17 @@ test("the CSP allows fonts and styles from this origin only (no Google Fonts)", 
   assert.match(csp, /style-src 'self' 'unsafe-inline';/);
   assert.doesNotMatch(csp, /googleapis|gstatic/);
 });
+
+test("the free directory fallback is served as JSON", async () => {
+  const response = await fetch(`${base}/free-directory.json`);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type"), /application\/json/);
+  const body = await response.json();
+  assert.ok(Array.isArray(body.items) && body.items.length > 0);
+});
+
+test("/api/access reports the labs pass state", async () => {
+  const body = await (await fetch(`${base}/api/access`)).json();
+  assert.equal(body.pass, false);
+  assert.ok(Array.isArray(body.allowedDifficulties));
+});

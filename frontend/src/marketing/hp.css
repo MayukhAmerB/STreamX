@@ -3720,6 +3720,9 @@ a.hp-panel__foot:hover {
 
 .hp-detail__hero {
   display: grid;
+  /* One screen-wide column on phones: an implicit auto column grows to the
+     content's min-content and pushes the hero past the right edge at 320px. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 40px;
   margin-top: 40px;
   padding-bottom: 64px;
@@ -3736,11 +3739,14 @@ a.hp-panel__foot:hover {
 
 .hp-detail__h1 {
   margin-top: 20px;
-  font-size: 2.75rem;
+  /* 2.75rem from 400px up; scales down on smaller phones so a long title word
+     ("PROFESSIONAL") still fits inside the screen at 320px. */
+  font-size: clamp(2rem, 11vw, 2.75rem);
   line-height: 0.98;
   font-weight: 600;
   letter-spacing: -0.04em;
   text-wrap: balance;
+  overflow-wrap: break-word;
 }
 
 @media (min-width: 640px) {

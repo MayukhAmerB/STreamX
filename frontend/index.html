@@ -2,7 +2,9 @@
 <html lang="en" translate="no">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Scale 1 on every phone, no maximum-scale lock (pinch zoom stays available); viewport-fit=cover lets the
+         page reach under the notch and home bar, with env(safe-area-inset-*) padding in src/index.css. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="google" content="notranslate" />
     <!-- Geist (variable) and Handlee are self-hosted (OFL, /fonts/*; src/styles/fonts.css). The hero weights all live in
          the one Geist latin file, and Handlee carries the handwritten tagline/accent, so Geist is preloaded everywhere and Handlee on hero routes. Geist Mono is not. -->

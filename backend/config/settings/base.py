@@ -1160,6 +1160,13 @@ ATTENDANCE_SHORT_SESSION_RATIO = float(env("ATTENDANCE_SHORT_SESSION_RATIO", "0.
 ATTENDANCE_LOW_PERCENT = max(1, env_int("ATTENDANCE_LOW_PERCENT", 75))
 ATTENDANCE_FLUSH_INTERVAL_SECONDS = max(15, env_int("ATTENDANCE_FLUSH_INTERVAL_SECONDS", 120))
 ATTENDANCE_FINALIZE_DELAY_SECONDS = max(0, env_int("ATTENDANCE_FINALIZE_DELAY_SECONDS", 90))
+# ISO datetime (or date, read in IST) when live presence started being
+# recorded. A class that went on air before it has no presence data, so it is
+# never finalised (that would mark every student absent). Empty = no cut-off.
+ATTENDANCE_TRACKING_SINCE = env("ATTENDANCE_TRACKING_SINCE", "")
+# Only batches (course ids) at or above this are tracked and judged; empty =
+# every course. Production: 28 (OSINT Batch IV and every later batch).
+ATTENDANCE_FROM_COURSE_ID = env("ATTENDANCE_FROM_COURSE_ID", "")
 ATTENDANCE_PRESENCE_RATE = env("ATTENDANCE_PRESENCE_RATE", "12/minute")
 ATTENDANCE_READ_RATE = env("ATTENDANCE_READ_RATE", "240/minute")
 ATTENDANCE_STAFF_RATE = env("ATTENDANCE_STAFF_RATE", "1200/hour")

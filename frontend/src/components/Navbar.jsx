@@ -231,6 +231,7 @@ function AccountMenu({ user, groups, onSignOut, pathname }) {
           </span>
           <span className="snav__menu-user-text">
             <span className="snav__menu-user-name">{user?.full_name || user?.email}</span>
+            {user?.handle ? <span className="snav__menu-user-email">@{user.handle}</span> : null}
             {user?.full_name && user?.email ? <span className="snav__menu-user-email">{user.email}</span> : null}
           </span>
         </div>
@@ -330,7 +331,8 @@ function MobileSheet({ id, isAuthenticated, user, siteGroups, accountGroups, onS
             </span>
             <span className="snav__menu-user-text">
               <span className="snav__menu-user-name">{user?.full_name || user?.email}</span>
-              {user?.full_name && user?.email ? <span className="snav__menu-user-email">{user.email}</span> : null}
+              {user?.handle ? <span className="snav__menu-user-email">@{user.handle}</span> : null}
+            {user?.full_name && user?.email ? <span className="snav__menu-user-email">{user.email}</span> : null}
             </span>
           </div>
         ) : null}

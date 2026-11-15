@@ -10,6 +10,7 @@ import HeroCountdown from "../components/HeroCountdown";
 import StoryJourneySection from "../components/StoryJourneySection";
 import YouTubeSection from "../features/youtube/YouTubeSection";
 import LandingRewardsBand from "../features/rewards/LandingRewardsBand";
+import LandingRewardsCard from "../features/landing-rewards/LandingRewardsCard";
 import { useAuth } from "../hooks/useAuth";
 import { getCourseLaunchStatus } from "../utils/courseStatus";
 import { selectLandingCourses } from "../utils/landingCourses";
@@ -749,7 +750,9 @@ export default function LandingPage() {
         </div>
 
         <div className="relative mx-auto max-w-[1320px] pt-7 sm:pt-9 lg:pt-10">
-          <div className="grid min-h-0 items-center gap-7 pb-7 sm:min-h-[470px] lg:grid-cols-[0.78fr_1.22fr] lg:gap-9 xl:gap-12">
+          {/* grid-cols-1 = minmax(0, 1fr): below lg the one column is the screen width, so the
+              track-card scroller's min-content cannot push the hero past the right edge. */}
+          <div className="grid min-h-0 grid-cols-1 items-center gap-7 pb-7 sm:min-h-[470px] lg:grid-cols-[0.78fr_1.22fr] lg:gap-9 xl:gap-12">
             <div className="reveal-up py-1 sm:py-2 lg:py-4">
               <p className="hero-eyebrow flex items-center gap-3 text-[10px] font-bold uppercase tracking-[0.24em] text-[#B8C0C5] sm:text-xs">
                 <span className="h-px w-10 bg-white/65" aria-hidden="true" />
@@ -806,13 +809,13 @@ export default function LandingPage() {
               <div className="mt-6 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
                 <Link
                   to="/courses"
-                  className="hero-primary-action inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-6 text-sm font-semibold text-black transition hover:bg-[#E5E5E5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f3e2b3] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                  className="hero-primary-action inline-flex min-h-12 items-center justify-center rounded-lg bg-white px-3 text-center text-sm font-semibold text-black sm:px-6 transition hover:bg-[#E5E5E5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f3e2b3] focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                 >
                   Browse Courses
                 </Link>
                 <Link
                   to={isAuthenticated ? "/console" : "/login"}
-                  className="hero-secondary-action inline-flex min-h-12 items-center justify-center rounded-lg border border-white/20 bg-[#090909] px-6 text-sm font-semibold text-white transition hover:border-white/40 hover:bg-[#111111] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f3e2b3]"
+                  className="hero-secondary-action inline-flex min-h-12 items-center justify-center rounded-lg border border-white/20 bg-[#090909] px-3 text-center text-sm font-semibold text-white sm:px-6 transition hover:border-white/40 hover:bg-[#111111] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f3e2b3]"
                 >
                   {isAuthenticated ? "Console" : "Get Started"}
                 </Link>
@@ -856,6 +859,7 @@ export default function LandingPage() {
 
       <div className="relative z-10 px-4 pb-20 pt-8">
         <div className="mx-auto max-w-6xl space-y-8">
+          {isOwlCognito || !isAuthenticated ? null : <LandingRewardsCard variant="compact" />}
           <YouTubeSection />
 
           <SectionCard className="!p-0">

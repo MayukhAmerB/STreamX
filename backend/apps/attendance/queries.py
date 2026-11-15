@@ -114,7 +114,7 @@ def _ratio(attended: int, total: int) -> float:
 def student_summary(user) -> dict:
     policy_row = AttendancePolicy.current()
     rows = list(
-        AttendanceRecord.objects.filter(user=user, finalized_at__isnull=False)
+        access.tracked_records(AttendanceRecord.objects.filter(user=user, finalized_at__isnull=False))
         .order_by("-class_start", "-id")
         .values_list("status", "course_id")
     )
@@ -161,7 +161,7 @@ def _summary_map(session_ids) -> dict[int, SessionAttendance]:
 
 
 def student_classes(user, *, course_id=None, status=None, page=1, page_size=25) -> dict:
-    queryset = AttendanceRecord.objects.filter(user=user, finalized_at__isnull=False)
+    queryset = access.tracked_records(AttendanceRecord.objects.filter(user=user, finalized_at__isnull=False))
     if course_id:
         queryset = queryset.filter(course_id=course_id)
     if status in AttendanceRecord.STATUSES:
@@ -232,7 +232,7 @@ def staff_sessions(scope, *, course_id=None, day_from=None, day_to=None, short_o
 
     if course_id:
         access.require_course_in_scope(scope, course_id)
-    queryset = _scoped(SessionAttendance.objects.filter(finalized_at__isnull=False), scope)
+    queryset = _scoped(access.tracked_records(SessionAttendance.objects.filter(finalized_at__isnull=False)), scope)
     if course_id:
         queryset = queryset.filter(course_id=course_id)
     start, end = _day_bounds(_parse_day(day_from), _parse_day(day_to))
@@ -248,7 +248,9 @@ def staff_sessions(scope, *, course_id=None, day_from=None, day_to=None, short_o
     rows = list(queryset.order_by("-class_start", "-id")[(page - 1) * page_size : page * page_size])
     courses = _course_map([row.course_id for row in rows])
 
-    live_queryset = RealtimeSession.objects.filter(status=RealtimeSession.STATUS_LIVE).select_related("linked_live_class")
+    live_queryset = access.tracked_sessions(
+        RealtimeSession.objects.filter(status=RealtimeSession.STATUS_LIVE).select_related("linked_live_class")
+    )
     if scope is not access.ALL:
         live_queryset = live_queryset.filter(
             Q(linked_course_id__in=sorted(scope)) | Q(linked_live_class__linked_course_id__in=sorted(scope))
@@ -458,7 +460,10 @@ def low_attendance(scope, *, course_id=None, threshold=None, min_classes: int = 
     threshold = int(threshold if threshold is not None else policy_row.low_attendance_percent)
     if course_id:
         access.require_course_in_scope(scope, course_id)
-    queryset = _scoped(AttendanceRecord.objects.filter(finalized_at__isnull=False, course_id__isnull=False), scope)
+    queryset = _scoped(
+        access.tracked_records(AttendanceRecord.objects.filter(finalized_at__isnull=False, course_id__isnull=False)),
+        scope,
+    )
     if course_id:
         queryset = queryset.filter(course_id=course_id)
     aggregates = list(

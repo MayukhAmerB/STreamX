@@ -40,11 +40,21 @@ def redis_client():
         from django.core.cache.backends.redis import RedisCache
     except ImportError:  # pragma: no cover
         return None
-    if not isinstance(cache, RedisCache):
+    # Check the real backend: ``django.core.cache.cache`` is a ConnectionProxy
+    # and is never an instance of RedisCache, which silently kept every
+    # production process on its own in-memory buffer (XP was never flushed).
+    from django.core.cache import caches
+
+    try:
+        backend = caches["default"]
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(backend, RedisCache):
         return None
     try:
-        return cache._cache.get_client(PREFIX, write=True)  # noqa: SLF001 - documented Django internals
+        return backend._cache.get_client(PREFIX, write=True)  # noqa: SLF001 - documented Django internals
     except Exception:  # noqa: BLE001
+        logger.error("engagement.buffer.redis_client_unavailable", exc_info=True)
         return None
 
 

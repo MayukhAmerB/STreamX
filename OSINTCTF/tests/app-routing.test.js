@@ -260,3 +260,35 @@ test("styles.css comments never close early (a stray */ drops the next rule)", (
   }
   assert.equal((css.match(/@font-face/g) || []).length, 4);
 });
+
+test("index.html: the four sections in order, and Free / Paid labs from the labs config", () => {
+  const order = ["nav-hub-btn", "nav-paid-btn", "nav-exam-btn", "nav-leaderboard-btn"].map((id) => INDEX.indexOf(`id="${id}"`));
+  assert.ok(order.every((index) => index > 0), "every section button exists");
+  assert.deepEqual(order.slice().sort((a, b) => a - b), order, "Free CTFs | Paid Labs | Examination | Leaderboard");
+  for (const id of ["tab-paid", "tab-leaderboard", "free-access", "paid-access", "free-directory", "season-board", "hof-board", "user-slot"]) {
+    assert.match(INDEX, new RegExp(`id="${id}"`), id);
+  }
+  assert.match(INDEX, /viewport-fit=cover/);
+  // The free tier mirrors labs-access.js: easy and medium are free, the rest is paid.
+  const { QUESTION_DIFFICULTY, FREE_DIFFICULTIES } = require("../labs-access.js");
+  assert.deepEqual(FREE_DIFFICULTIES, ["easy", "medium"]);
+  assert.match(APP_SOURCE, new RegExp(`realworld: ${JSON.stringify(QUESTION_DIFFICULTY.realworld).replace(/,/g, ", ").replace(/[[\]]/g, "\$&")}`));
+});
+
+test("app.js and the free directory carry no answers or answer hashes", () => {
+  assert.doesNotMatch(APP_SOURCE, /\b[0-9a-f]{64}\b/);
+  const directory = JSON.parse(fs.readFileSync(path.join(ROOT, "free-directory.json"), "utf8"));
+  assert.ok(directory.items.length > 0);
+  for (const item of directory.items) {
+    assert.ok(/^https:\/\//.test(item.url), item.slug);
+    for (const key of ["flag", "flag_sha256", "answer", "answers"]) assert.equal(item[key], undefined, `${item.slug}.${key}`);
+  }
+});
+
+test("the paid-labs link and the Batch 2 / Batch 3 wording are in the page logic", () => {
+  assert.match(APP_SOURCE, /https:\/\/alsyedinitiative\.com\/courses/);
+  assert.match(APP_SOURCE, /Batch 2 and Batch 3/);
+  // Free access comes from the LMS eligibility (active course access) and labs entitlement endpoints.
+  assert.match(APP_SOURCE, /\/ctf\/eligibility\//);
+  assert.match(APP_SOURCE, /\/ctf\/labs\/entitlement\//);
+});

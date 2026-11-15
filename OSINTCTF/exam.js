@@ -25,7 +25,7 @@
 
     const STRINGS = {
         en: {
-            nav: "EXAMINATION",
+            nav: "Examination",
             subheading: "PROCTORED EXAMINATION",
             heading: "OSINT Examination",
             intro: "A timed, graded OSINT examination. Every answer you submit is recorded against your LMS account, and your score is visible to your instructors.",

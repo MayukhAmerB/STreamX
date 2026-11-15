@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from apps.core.errors import NotFound, ValidationFailed
 
-from . import access, flush, policy
+from . import access, conf, flush, policy
 from .models import AttendanceAudit, AttendancePolicy, AttendanceRecord, SessionAttendance
 
 logger = logging.getLogger("apps.attendance.services")
@@ -74,6 +74,12 @@ def _apply_status(record, *, on_air: int, rule: policy.Rule, now) -> None:
     record.updated_at = now
 
 
+def started_before_tracking(session) -> bool:
+    """True for a class that went on air before ``ATTENDANCE_TRACKING_SINCE``."""
+    since = conf.tracking_since()
+    return since is not None and session.started_at is not None and session.started_at < since
+
+
 def finalize_session(session_id, *, now=None, flush_first: bool = True) -> SessionAttendance | None:
     """Finalise one ended class: absent rows for non-joiners, statuses, counts."""
     from apps.courses.models import Course
@@ -84,13 +90,25 @@ def finalize_session(session_id, *, now=None, flush_first: bool = True) -> Sessi
         return None
     if not session.started_at or not session.ended_at:
         return None  # never went on air: nothing to attend
+    if started_before_tracking(session):
+        # On air before presence was recorded: there is no data to judge it by.
+        logger.info(
+            "attendance.finalize_skipped_before_tracking session_id=%s started_at=%s",
+            session.pk,
+            session.started_at.isoformat(),
+        )
+        return None
+    course_id = access.session_course_id(session)
+    if not access.course_tracked(course_id):
+        # A batch attendance does not apply to (ATTENDANCE_FROM_COURSE_ID).
+        logger.info("attendance.finalize_skipped_course_not_tracked session_id=%s course_id=%s", session.pk, course_id)
+        return None
     if flush_first:
         flush.flush(now=now)
     now = now or timezone.now()
     rule = current_rule()
     on_air = on_air_seconds(session)
     threshold = policy.threshold_for(on_air, rule)
-    course_id = access.session_course_id(session)
     course = session.linked_course
     if course is None and course_id:
         course = Course.objects.filter(pk=course_id).only("id", "instructor_id").first()
@@ -163,23 +181,21 @@ def finalize_pending_sessions(*, now=None, limit: int = 20) -> list[int]:
 
     from apps.realtime.models import RealtimeSession
 
-    from . import conf
-
     now = now or timezone.now()
     since = now - timedelta(hours=conf.finalize_sweep_lookback_hours())
     settle = now - timedelta(seconds=conf.finalize_delay_seconds())
     done_ids = SessionAttendance.objects.filter(finalized_at__isnull=False).values_list("session_ref_id", flat=True)
-    candidates = list(
-        RealtimeSession.objects.filter(
-            status=RealtimeSession.STATUS_ENDED,
-            started_at__isnull=False,
-            ended_at__gte=since,
-            ended_at__lte=settle,
-        )
-        .exclude(pk__in=done_ids)
-        .order_by("ended_at")
-        .values_list("pk", flat=True)[:limit]
+    sessions = RealtimeSession.objects.filter(
+        status=RealtimeSession.STATUS_ENDED,
+        started_at__isnull=False,
+        ended_at__gte=since,
+        ended_at__lte=settle,
     )
+    tracking_since = conf.tracking_since()
+    if tracking_since is not None:  # never finalised (see finalize_session): do not retry them forever
+        sessions = sessions.filter(started_at__gte=tracking_since)
+    sessions = access.tracked_sessions(sessions)  # ATTENDANCE_FROM_COURSE_ID: excluded batches are never retried
+    candidates = list(sessions.exclude(pk__in=done_ids).order_by("ended_at").values_list("pk", flat=True)[:limit])
     finalized = []
     flushed = False
     for session_id in candidates:

@@ -7,6 +7,8 @@
 // cookie (POST /api/session) and verified locally with LABS_PASS_SECRET.
 //   - CTF Labs members (and staff): easy, medium, expert, professional.
 //   - Starter members: easy and medium only.
+//   - Enrolled students (pass claim "exm", e.g. Batch 2 and Batch 3): the Free
+//     CTFs (easy and medium) and the Examination tab.
 // The policy (is the switch on?) is read from the LMS (GET <LMS>/labs/policy/)
 // at most every POLICY_TTL_MS; if the LMS cannot be reached the last known
 // answer is kept, and before any answer the labs stay open (no lock-out at
@@ -19,6 +21,8 @@ const PASS_COOKIE = "labs_pass";
 const PASS_VERSION = "v1";
 const POLICY_TTL_MS = 30_000;
 const DIFFICULTIES = ["easy", "medium", "expert", "professional"];
+// The Free CTFs tier (Starter members and enrolled students).
+const FREE_DIFFICULTIES = ["easy", "medium"];
 
 // Difficulty of every lab question (index = question number) and material folder.
 const QUESTION_DIFFICULTY = {
@@ -60,7 +64,13 @@ function verifyPass(token, secret, nowSeconds = Math.floor(Date.now() / 1000)) {
   }
   if (!payload || typeof payload !== "object" || !(Number(payload.exp) > nowSeconds)) return null;
   const dif = Array.isArray(payload.dif) ? payload.dif.filter((item) => DIFFICULTIES.includes(item)) : [];
-  return { sub: Number(payload.sub) || 0, dif, staff: payload.stf === true, exam: payload.exm === true, exp: Number(payload.exp) };
+  return {
+    sub: Number(payload.sub) || 0,
+    dif,
+    staff: payload.stf === true,
+    exam: payload.exm === true,
+    exp: Number(payload.exp),
+  };
 }
 
 function readCookie(req, name) {
@@ -114,10 +124,16 @@ function createAccess({ lmsApiBase, secret = process.env.LABS_PASS_SECRET || "",
     const required = await membershipRequired();
     if (!required) return { required: false, allowed: DIFFICULTIES.slice(), member: true, pages: true };
     const pass = passFor(req);
-    const allowed = pass ? (pass.staff ? DIFFICULTIES.slice() : pass.dif) : [];
-    // Pages open for members, and for enrolled students (Examination tab only:
-    // lab answers and materials still need the difficulty).
-    return { required: true, allowed, member: allowed.length > 0, pages: allowed.length > 0 || Boolean(pass && pass.exam) };
+    let allowed = [];
+    if (pass && pass.staff) allowed = DIFFICULTIES.slice();
+    else if (pass) {
+      // Enrolled students (Batch 2 / Batch 3) also get the Free CTFs tier.
+      const granted = new Set([...pass.dif, ...(pass.exam ? FREE_DIFFICULTIES : [])]);
+      allowed = DIFFICULTIES.filter((item) => granted.has(item));
+    }
+    const member = Boolean(pass && (pass.staff || pass.dif.length > 0));
+    // Pages open for members and for enrolled students.
+    return { required: true, allowed, member, pages: allowed.length > 0 || Boolean(pass && pass.exam) };
   }
 
   function questionDifficulty(category, question) {
@@ -171,7 +187,7 @@ a.btn:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
 <body><main><section class="gate" aria-live="polite">
 <div class="eyebrow">Al Syed OSINT Labs</div>
 <h1>For <em>members</em>.</h1>
-<p id="gate-text">Checking your membership…</p>
+<p id="gate-text">Checking your access…</p>
 <div class="actions" id="gate-actions" hidden>
 <a class="btn primary" id="gate-signin" href="#">Sign in</a>
 <a class="btn" id="gate-pricing" href="#">See membership plans</a>
@@ -192,7 +208,7 @@ a.btn:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
   }).then(function(body){
     if(!body)return;
     var data=body.data||{};
-    if(!data.token||!((data.allowed_difficulties||[]).length||data.exam_access)){show("The labs are open to CTF Labs and Starter members.");return;}
+    if(!data.token||!((data.allowed_difficulties||[]).length||data.exam_access)){show("The labs are open to Batch 2 and Batch 3 students and to CTF Labs and Starter members.");return;}
     return fetch("/api/session",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({token:data.token})}).then(function(r){if(r.ok){location.reload();}else{show("We could not open the labs. Try again.");}});
   }).catch(function(){show("We could not reach your account. Sign in and try again.");});
@@ -200,4 +216,4 @@ a.btn:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
 </script></body></html>`;
 }
 
-module.exports = { createAccess, gatePage, verifyPass, readCookie, DIFFICULTIES, QUESTION_DIFFICULTY, MATERIAL_DIFFICULTY, PASS_COOKIE };
+module.exports = { createAccess, gatePage, verifyPass, readCookie, DIFFICULTIES, FREE_DIFFICULTIES, QUESTION_DIFFICULTY, MATERIAL_DIFFICULTY, PASS_COOKIE };

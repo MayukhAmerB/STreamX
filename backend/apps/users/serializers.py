@@ -37,6 +37,8 @@ class UserSerializer(serializers.ModelSerializer):
     # What this viewer may use in the Console (UI overhaul Appendix A.1), so
     # the Console boot needs no extra request.
     capabilities = serializers.SerializerMethodField()
+    # The student's public handle (the user's own account payload only).
+    handle = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -56,6 +58,7 @@ class UserSerializer(serializers.ModelSerializer):
             "terms_required_version",
             "terms_acceptance_required",
             "capabilities",
+            "handle",
             "created_at",
             "updated_at",
         )
@@ -66,6 +69,13 @@ class UserSerializer(serializers.ModelSerializer):
         try:
             return build_capabilities(obj)
         except Exception:  # noqa: BLE001 - never block sign-in; the Console falls back to /api/me/capabilities/
+            return None
+
+    def get_handle(self, obj) -> str | None:
+        profile = getattr(obj, "student_profile", None)
+        try:
+            return profile.handle if profile is not None else None
+        except Exception:  # noqa: BLE001 - the handle is decorative here
             return None
 
     def get_profile_image_url(self, obj):

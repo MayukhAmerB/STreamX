@@ -1,0 +1,153 @@
+/*
+ * Signed-in rewards showcase on the Friday landing (features/landing-rewards).
+ * Black panels, white hairlines, greys only (no gold). Motion: transform and
+ * opacity only; the badge shine plays 3 times then stops; everything is off
+ * under reduced motion (OS setting or :root[data-motion="reduce"]).
+ */
+
+.lr-card {
+  animation: lr-rise 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.lr-card__glow {
+  background: radial-gradient(60% 120% at 0% 0%, rgba(255, 255, 255, 0.07), transparent 70%);
+}
+
+/* ------------------------------------------------------------ emblem */
+
+.lr-emblem {
+  display: block;
+  flex: none;
+  overflow: visible;
+}
+
+.lr-emblem__shine {
+  opacity: 0;
+  transform: translateX(-40px);
+  animation: lr-shine 4.8s cubic-bezier(0.4, 0, 0.2, 1) 0.7s 3;
+}
+
+/* ------------------------------------------------------------- meter */
+
+.lr-meter {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.lr-meter__seg {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.lr-meter__fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #d4d4d4, #ffffff);
+  transform: scaleX(var(--lr-f, 0));
+  transform-origin: left center;
+  animation: lr-fill 640ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--lr-i, 0) * 70ms + 260ms);
+}
+
+/* ------------------------------------------------- badge medals (scoped) */
+
+.lr-card .eg-medal {
+  flex: none;
+  fill: none;
+  stroke: #fafafa;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.lr-card .eg-medal__frame,
+.lr-card .eg-medal__inner {
+  stroke-width: 1;
+}
+
+.lr-card .eg-medal__inner {
+  stroke: rgba(255, 255, 255, 0.45);
+}
+
+.lr-card .eg-medal__glyph {
+  stroke-width: 1.1;
+}
+
+.lr-card .eg-medal__pip {
+  fill: #fafafa;
+  stroke: none;
+}
+
+.lr-badge {
+  animation: lr-pop 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  animation-delay: calc(var(--lr-i, 0) * 80ms + 420ms);
+}
+
+/* --------------------------------------------------------- keyframes */
+
+@keyframes lr-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes lr-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes lr-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+}
+
+@keyframes lr-shine {
+  0% {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  6% {
+    opacity: 1;
+  }
+  30% {
+    opacity: 1;
+    transform: translateX(150px);
+  }
+  34%,
+  100% {
+    opacity: 0;
+    transform: translateX(150px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lr-card,
+  .lr-badge,
+  .lr-meter__fill {
+    animation: none;
+  }
+
+  .lr-emblem__shine {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+:root[data-motion="reduce"] .lr-card,
+:root[data-motion="reduce"] .lr-badge,
+:root[data-motion="reduce"] .lr-meter__fill {
+  animation: none;
+}
+
+:root[data-motion="reduce"] .lr-emblem__shine {
+  animation: none;
+  opacity: 0;
+}

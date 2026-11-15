@@ -16,7 +16,7 @@ from datetime import timezone as dt_timezone
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from . import buffer, policy
+from . import buffer, conf, policy
 from .metrics import record_flush_rows
 from .models import AttendanceFlushLog, AttendancePolicy, AttendanceRecord, SessionAttendance
 
@@ -62,6 +62,11 @@ def apply_pairs(pairs: dict[tuple[int, int], dict[str, float]], *, now=None) -> 
     rule = policy.Rule.from_policy(AttendancePolicy.current())
     to_create, to_update = [], []
     for (session_id, user_id), values in pairs.items():
+        session = sessions.get(session_id)
+        if session is not None and not conf.course_tracked(
+            session["linked_course_id"] or session["linked_live_class__linked_course_id"]
+        ):
+            continue  # batch excluded by ATTENDANCE_FROM_COURSE_ID (pings buffered before the rule)
         seconds = int(values.get("sec", 0) or 0)
         first = _dt(values.get("first"))
         last = _dt(values.get("last"))

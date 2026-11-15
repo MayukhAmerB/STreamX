@@ -80,7 +80,7 @@ export default function TermsGate() {
   };
 
   return (
-    <div className="fixed inset-0 z-[1000] overflow-y-auto overscroll-contain bg-black/86 px-3 py-3 backdrop-blur-xl sm:px-4 sm:py-6">
+    <div className="fixed inset-0 z-[1000] overflow-y-auto overscroll-contain bg-black/86 py-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] backdrop-blur-xl sm:py-6 sm:pl-[max(1rem,env(safe-area-inset-left))] sm:pr-[max(1rem,env(safe-area-inset-right))]">
       <div className="mx-auto max-w-4xl overflow-hidden rounded-[20px] border border-white/15 bg-[#080808] pb-[env(safe-area-inset-bottom)] shadow-[0_32px_90px_rgba(0,0,0,0.72)] sm:rounded-[28px]">
         <div className="border-b border-white/10 bg-gradient-to-r from-[#151515] via-[#101010] to-[#1F1F1F] px-4 py-4 sm:px-7 sm:py-5">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#BDBDBD]">

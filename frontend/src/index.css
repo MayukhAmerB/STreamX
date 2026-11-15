@@ -58,7 +58,8 @@
 
 :root {
   color-scheme: light;
-  --site-zoom: 0.9;
+  /* 1:1 everywhere; the Friday website's 0.9 is set for desktop pointers below. */
+  --site-zoom: 1;
   --heading-scale: 1;
   --accent-primary: #F4F4F4;
   --accent-primary-hover: #FFFFFF;
@@ -116,19 +117,38 @@ html {
   scroll-padding-top: 6rem;
 }
 
-/* The website renders at 0.9 (Friday); the Console renders at 1:1. */
+/* The website renders at 0.9 (Friday) on desktop only: a mouse or trackpad
+   screen at least 768px wide. Phones (portrait and landscape) and tablets keep
+   1:1, because CSS zoom on <html> fights the mobile viewport (iOS sizes the
+   page and its auto-zoom on focus from unzoomed px). The Console is 1:1. */
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  html[data-surface="website"] {
+    --site-zoom: 0.9;
+  }
+}
+
 html[data-surface="website"] {
   zoom: var(--site-zoom);
 }
 
 @supports not (zoom: 1) {
-  html[data-surface="website"] body {
-    transform: scale(var(--site-zoom));
-    transform-origin: top left;
-    width: calc(100% / var(--site-zoom));
-    min-height: calc(100vh / var(--site-zoom));
-    overflow-x: hidden;
+  @media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+    html[data-surface="website"] body {
+      transform: scale(var(--site-zoom));
+      transform-origin: top left;
+      width: calc(100% / var(--site-zoom));
+      min-height: calc(100vh / var(--site-zoom));
+      overflow-x: hidden;
+    }
   }
+}
+
+/* viewport-fit=cover (index.html): keep the website clear of the notch and
+   rounded corners in landscape. Insets are 0 in portrait and on desktop, so
+   nothing moves there. The Console shell pads itself (app-shell/_shell.scss). */
+html[data-surface="website"] body {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }
 
 @font-face {
@@ -1047,20 +1067,6 @@ html[data-site-brand="owlcognito"] [data-protected-playback-surface] :is(h1, h2,
     scroll-padding-top: 5rem;
   }
 
-  @supports not (zoom: 1) {
-    html[data-surface="website"] body {
-      width: 100%;
-      min-height: 100vh;
-      transform: none;
-    }
-  }
-
-  input,
-  select,
-  textarea {
-    font-size: 16px !important;
-  }
-
   .panel-gradient.p-5,
   .panel-gradient.p-6 {
     padding: 1rem;
@@ -1073,6 +1079,16 @@ html[data-site-brand="owlcognito"] [data-protected-playback-surface] :is(h1, h2,
 
   .glossy:hover::after {
     animation: none;
+  }
+}
+
+/* 16px fields on phones, portrait or landscape (a touch screen with a
+   phone-sized short side), so iOS never zooms the page on focus. */
+@media (max-width: 767px), (pointer: coarse) and (max-height: 540px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
   }
 }
 

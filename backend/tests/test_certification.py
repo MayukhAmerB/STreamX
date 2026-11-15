@@ -696,6 +696,69 @@ class HallOfFameTests(CertificationBase):
         self.assertEqual(curated.certificate, self.decision().certificate)
         self.assertEqual(HallOfFameEntry.objects.filter(user=self.student).count(), 1)
 
+    def rename_course(self, title, batch=""):
+        self.course.title, self.course.batch = title, batch
+        self.course.save(update_fields=["title", "batch"])
+
+    def test_batch_number_reads_roman_and_arabic_numerals(self):
+        cases = {
+            "OSINT PROFESSIONAL TRAINING PROGRAM (BATCH III)": 3,
+            "OSINT PROFESSIONAL TRAINING PROGRAM (BATCH IV)": 4,
+            "Batch 12": 12,
+            "batch-2 evening": 2,
+            "Batch No. 6": 6,
+            "Batch #XIV": 14,
+            "6-MONTH WEB & API PENTESTING COURSE": None,  # a number, but not a batch number
+            "Batch January 2027": None,
+            "Batch IIII": None,  # not a well-formed numeral
+            "Batch civil": None,
+            "Batch 0": None,
+            "": None,
+        }
+        for text, expected in cases.items():
+            with self.subTest(text=text):
+                self.assertEqual(hall_of_fame.batch_number(text), expected)
+        self.assertEqual(hall_of_fame.batch_number("III", bare=True), 3)
+        self.assertEqual(hall_of_fame.batch_number("5", bare=True), 5)
+        self.assertIsNone(hall_of_fame.batch_number("III"))  # a lone numeral only counts in a batch field
+
+    def test_course_without_batch_field_groups_by_the_batch_in_its_title(self):
+        self.rename_course("OSINT PROFESSIONAL TRAINING PROGRAM (BATCH III)")
+        self.profile(self.student, "asha_r")
+        self.sit(self.student, range(1, 11))
+        self.drain()
+        entry = HallOfFameEntry.objects.get(decision=self.decision())
+        self.assertEqual((entry.batch_label, entry.batch_order), ("Batch 3", 3))
+        data = self.public().json()["data"]
+        self.assertEqual(data["entries"][0]["group"], "Batch 3")
+        self.assertIn("Batch 3", [batch["label"] for batch in data["batches"]])
+        self.assertNotIn(str(timezone.localdate().year), [batch["label"] for batch in data["batches"]])
+
+    def test_roman_batch_field_is_normalised(self):
+        self.rename_course("OSINT Professional Training Program", batch="IV")
+        self.sit(self.student, range(1, 11))
+        self.drain()
+        entry = HallOfFameEntry.objects.get(decision=self.decision())
+        self.assertEqual((entry.batch_label, entry.batch_order), ("Batch 4", 4))
+
+    def test_course_without_any_batch_number_falls_back_to_its_title(self):
+        self.rename_course("Advanced GEOINT Workshop")
+        self.sit(self.student, range(1, 11))
+        self.drain()
+        entry = HallOfFameEntry.objects.get(decision=self.decision())
+        self.assertEqual(entry.batch_label, "Advanced GEOINT Workshop")
+        self.assertEqual(entry.batch_order, timezone.localdate().year)
+
+    def test_title_batch_merges_with_the_curated_entry_of_that_batch(self):
+        self.rename_course("OSINT PROFESSIONAL TRAINING PROGRAM (BATCH III)")
+        curated = HallOfFameEntry.objects.create(user=self.student, batch_label="Batch 3", batch_order=3, source="manual")
+        self.sit(self.student, range(1, 11))
+        self.drain()
+        curated.refresh_from_db()
+        self.assertEqual(curated.certificate, self.decision().certificate)
+        self.assertEqual((curated.batch_label, curated.batch_order), ("Batch 3", 3))
+        self.assertEqual(HallOfFameEntry.objects.filter(user=self.student).count(), 1)
+
     def test_pagination(self):
         for index in range(5):
             HallOfFameEntry.objects.create(display_handle=f"h{index}", batch_label="Batch 9", batch_order=9, position=index)

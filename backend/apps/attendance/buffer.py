@@ -27,7 +27,7 @@ import threading
 import time
 from collections import defaultdict
 
-from django.core.cache import cache
+from django.core.cache import caches
 
 logger = logging.getLogger("apps.attendance.buffer")
 
@@ -42,19 +42,39 @@ _client_override = None
 
 
 def redis_client():
-    """The raw redis-py client behind Django's cache, or None (locmem etc.)."""
+    """The raw redis-py client behind Django's cache, or None (locmem etc.).
+
+    The type check must look at the real backend (``caches["default"]``), not
+    at ``django.core.cache.cache``: that is a ``ConnectionProxy`` and is never
+    an instance of ``RedisCache``. Checking the proxy made every production
+    process fall back to its own in-memory buffer, so the web containers
+    buffered presence the worker could never see and no attendance was ever
+    written (``AttendanceFlushLog`` stayed empty).
+    """
     if _client_override is not None:
         return _client_override
     try:
         from django.core.cache.backends.redis import RedisCache
     except ImportError:  # pragma: no cover
         return None
-    if not isinstance(cache, RedisCache):
-        return None
     try:
-        return cache._cache.get_client(PREFIX, write=True)  # noqa: SLF001 - documented Django internals
+        backend = caches["default"]
     except Exception:  # noqa: BLE001
         return None
+    if not isinstance(backend, RedisCache):
+        return None
+    try:
+        return backend._cache.get_client(PREFIX, write=True)  # noqa: SLF001 - documented Django internals
+    except Exception:  # noqa: BLE001
+        # Redis is the configured store but unusable: say so loudly. The local
+        # fallback below is per process and is never flushed by the worker.
+        logger.error("attendance.buffer.redis_client_unavailable", exc_info=True)
+        return None
+
+
+def uses_redis() -> bool:
+    """True when presence is buffered in the shared Redis (diagnostics, tests)."""
+    return redis_client() is not None
 
 
 class _LocalBuffer:

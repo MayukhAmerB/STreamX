@@ -69,6 +69,42 @@ def session_status(session_id) -> str:
     return status
 
 
+def _tracked_key(session_id, first) -> str:
+    return f"att:trk:{int(first)}:{int(session_id)}"
+
+
+def session_tracked(session_id) -> bool:
+    """Does attendance apply to this class's batch (``ATTENDANCE_FROM_COURSE_ID``)?
+
+    No rule = always (no query). Otherwise one query per class, cached 5 min,
+    so pings for an excluded batch are dropped without touching the database.
+    """
+    first = conf.from_course_id()
+    if first is None:
+        return True
+    key = _tracked_key(session_id, first)
+    try:
+        cached = cache.get(key)
+    except Exception:  # noqa: BLE001
+        cached = None
+    if cached is not None:
+        return bool(cached)
+    from apps.realtime.models import RealtimeSession
+
+    row = (
+        RealtimeSession.objects.filter(pk=session_id)
+        .values_list("linked_course_id", "linked_live_class__linked_course_id")
+        .first()
+    )
+    course_id = (row[0] or row[1]) if row else None
+    tracked = conf.course_tracked(course_id)
+    try:
+        cache.set(key, 1 if tracked else 0, timeout=ACCESS_CACHE_SECONDS)
+    except Exception:  # noqa: BLE001
+        pass
+    return tracked
+
+
 def forget_session_status(session_id) -> None:
     try:
         cache.delete(_status_key(session_id))
@@ -161,6 +197,10 @@ def ping(session_id: int, user, *, kind: str = "ping") -> PingResult:
     status = session_status(session_id)
     if status == "missing":
         raise NotFound("Live class not found.", code="live_session_not_found")
+    if not session_tracked(session_id):
+        # A batch attendance does not apply to (ATTENDANCE_FROM_COURSE_ID): ignored,
+        # before the access check so it costs no more than the cached flag.
+        return PingResult(False, 0, "not_tracked")
     role = viewer_role(session_id, user)
     if role == ROLE_DENIED:
         raise PermissionDenied("You do not have access to this class.", code="live_session_forbidden")

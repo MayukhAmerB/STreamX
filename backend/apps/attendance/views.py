@@ -131,6 +131,7 @@ class StaffCoursesView(_StaffView):
 
         scope = self.scope(request)
         courses = Course.objects.all() if scope is access.ALL else Course.objects.filter(pk__in=sorted(scope))
+        courses = access.tracked_records(courses, "pk")  # ATTENDANCE_FROM_COURSE_ID
         data = [
             {"id": row["id"], "title": row["title"], "batch": row["batch"] or ""}
             for row in courses.order_by("title", "id").values("id", "title", "batch")[:500]

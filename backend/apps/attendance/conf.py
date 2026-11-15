@@ -31,6 +31,61 @@ def _int(name: str, default: int, *, minimum: int = 0, maximum: int | None = Non
     return min(maximum, value) if maximum is not None else value
 
 
+def tracking_since():
+    """Aware datetime from ``ATTENDANCE_TRACKING_SINCE`` (None when unset or invalid).
+
+    Classes that went on air before it are never finalised: no live presence
+    was recorded for them, so every student would be marked absent. A bare
+    date or a naive datetime is read in IST."""
+    from datetime import datetime
+
+    from django.utils import timezone
+    from django.utils.dateparse import parse_date, parse_datetime
+
+    raw = str(getattr(settings, "ATTENDANCE_TRACKING_SINCE", "") or "").strip()
+    if not raw:
+        return None
+    try:
+        value = parse_datetime(raw)
+        if value is None:
+            day = parse_date(raw)
+            value = datetime(day.year, day.month, day.day) if day else None
+    except (TypeError, ValueError):
+        value = None
+    if value is None:
+        return None
+    if timezone.is_naive(value):
+        from zoneinfo import ZoneInfo
+
+        value = timezone.make_aware(value, ZoneInfo(TIMEZONE_NAME))
+    return value
+
+
+def from_course_id() -> int | None:
+    """``ATTENDANCE_FROM_COURSE_ID``: only batches (courses) with an id at or
+    above it are tracked and judged; None (unset, 0 or invalid) = every course.
+
+    Owner rule (Nov 2026): attendance starts with Batch 4 (course 28); earlier
+    batches are never tracked, finalised or shown."""
+    try:
+        value = int(str(getattr(settings, "ATTENDANCE_FROM_COURSE_ID", "") or "").strip() or 0)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def course_tracked(course_id) -> bool:
+    """True when attendance applies to this course. Without a rule every class
+    counts (even one with no batch); with a rule a class needs a batch >= it."""
+    first = from_course_id()
+    if first is None:
+        return True
+    try:
+        return course_id is not None and int(course_id) >= first
+    except (TypeError, ValueError):
+        return False
+
+
 def _float(name: str, default: float, *, minimum: float = 0.0, maximum: float = 1.0) -> float:
     try:
         value = float(getattr(settings, name, default))

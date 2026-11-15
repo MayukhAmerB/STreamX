@@ -10,9 +10,10 @@
 from __future__ import annotations
 
 from apps.core import features
-from apps.core.errors import PermissionDenied
+from apps.core.errors import NotFound, PermissionDenied
 from apps.users import teaching
 
+from . import conf
 from .conf import FEATURE_KEY
 
 ALL = None  # scope value: every course
@@ -50,6 +51,37 @@ def in_scope(scope, course_id) -> bool:
 def require_course_in_scope(scope, course_id) -> None:
     if not in_scope(scope, course_id):
         raise PermissionDenied("You do not teach this batch.", code="attendance_out_of_scope")
+    require_course_tracked(course_id)
+
+
+# --- which batches attendance applies to (ATTENDANCE_FROM_COURSE_ID) -----------------------
+def course_tracked(course_id) -> bool:
+    return conf.course_tracked(course_id)
+
+
+def require_course_tracked(course_id) -> None:
+    if not conf.course_tracked(course_id):
+        raise NotFound("Attendance is not tracked for this batch.", code="attendance_course_not_tracked")
+
+
+def tracked_records(queryset, field: str = "course_id"):
+    """Rows (records, summaries, courses) of tracked batches only."""
+    first = conf.from_course_id()
+    if first is None:
+        return queryset
+    return queryset.filter(**{f"{field}__gte": first})
+
+
+def tracked_sessions(queryset):
+    """``RealtimeSession`` rows whose batch (own course, else the live class's) is tracked."""
+    from django.db.models import Q
+
+    first = conf.from_course_id()
+    if first is None:
+        return queryset
+    return queryset.filter(
+        Q(linked_course_id__gte=first) | Q(linked_course__isnull=True, linked_live_class__linked_course_id__gte=first)
+    )
 
 
 def student_course_ids(user) -> set[int]:

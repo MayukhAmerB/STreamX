@@ -1,0 +1,586 @@
+{
+ "source": "backend/apps/osint_labs/data/starter_directory.json (metadata only, link-out). Shown only when the LMS directory (/api/ctf/labs/directory/) is empty or unreachable.",
+ "paths": [
+  {
+   "key": "first_steps",
+   "title": "First steps",
+   "summary": "Short cases that teach you to read an image and a document before you search.",
+   "order": 1
+  },
+  {
+   "key": "going_deeper",
+   "title": "Going deeper",
+   "summary": "Longer investigations that chain several sources together.",
+   "order": 2
+  },
+  {
+   "key": "hard_cases",
+   "title": "Hard cases",
+   "summary": "Cases with little to go on. Plan your pivots before you start.",
+   "order": 3
+  }
+ ],
+ "items": [
+  {
+   "slug": "gralhix-exercise-006",
+   "title": "Gralhix OSINT Exercise #006",
+   "summary": "A single-image puzzle: work out where or when the picture was taken.",
+   "platform": "Gralhix",
+   "url": "https://gralhix.com/list-of-osint-exercises/osint-exercise-006/",
+   "difficulty": "easy",
+   "skills": [
+    "geolocation",
+    "image analysis"
+   ],
+   "estimated_minutes": 20,
+   "xp": 10,
+   "path": "first_steps",
+   "path_order": 1,
+   "attribution": "Exercise by Sofia Santos (Gralhix). Played on gralhix.com."
+  },
+  {
+   "slug": "gralhix-exercise-021",
+   "title": "Gralhix OSINT Exercise #021",
+   "summary": "A single-image puzzle: work out where or when the picture was taken.",
+   "platform": "Gralhix",
+   "url": "https://gralhix.com/list-of-osint-exercises/osint-exercise-021/",
+   "difficulty": "easy",
+   "skills": [
+    "geolocation",
+    "image analysis"
+   ],
+   "estimated_minutes": 20,
+   "xp": 10,
+   "path": "first_steps",
+   "path_order": 2,
+   "attribution": "Exercise by Sofia Santos (Gralhix). Played on gralhix.com."
+  },
+  {
+   "slug": "gralhix-exercise-023",
+   "title": "Gralhix OSINT Exercise #023",
+   "summary": "A single-image puzzle: work out where or when the picture was taken.",
+   "platform": "Gralhix",
+   "url": "https://gralhix.com/list-of-osint-exercises/osint-exercise-023/",
+   "difficulty": "easy",
+   "skills": [
+    "geolocation",
+    "image analysis"
+   ],
+   "estimated_minutes": 20,
+   "xp": 10,
+   "path": "first_steps",
+   "path_order": 3,
+   "attribution": "Exercise by Sofia Santos (Gralhix). Played on gralhix.com."
+  },
+  {
+   "slug": "gralhix-exercise-027",
+   "title": "Gralhix OSINT Exercise #027",
+   "summary": "A single-image puzzle: work out where or when the picture was taken.",
+   "platform": "Gralhix",
+   "url": "https://gralhix.com/list-of-osint-exercises/osint-exercise-027/",
+   "difficulty": "easy",
+   "skills": [
+    "geolocation",
+    "image analysis"
+   ],
+   "estimated_minutes": 20,
+   "xp": 10,
+   "path": "first_steps",
+   "path_order": 4,
+   "attribution": "Exercise by Sofia Santos (Gralhix). Played on gralhix.com."
+  },
+  {
+   "slug": "gralhix-exercise-031",
+   "title": "Gralhix OSINT Exercise #031",
+   "summary": "A single-image puzzle: work out where or when the picture was taken.",
+   "platform": "Gralhix",
+   "url": "https://gralhix.com/list-of-osint-exercises/osint-exercise-031/",
+   "difficulty": "easy",
+   "skills": [
+    "geolocation",
+    "image analysis"
+   ],
+   "estimated_minutes": 20,
+   "xp": 10,
+   "path": "first_steps",
+   "path_order": 5,
+   "attribution": "Exercise by Sofia Santos (Gralhix). Played on gralhix.com."
+  },
+  {
+   "slug": "gralhix-exercise-004",
+   "title": "Gralhix OSINT Exercise #004",
+   "summary": "A single-image puzzle: work out where or when the picture was taken.",
+   "platform": "Gralhix",
+   "url": "https://gralhix.com/list-of-osint-exercises/osint-exercise-004/",
+   "difficulty": "easy",
+   "skills": [
+    "geolocation",
+    "image analysis"
+   ],
+   "estimated_minutes": 20,
+   "xp": 10,
+   "path": "first_steps",
+   "path_order": 6,
+   "attribution": "Exercise by Sofia Santos (Gralhix). Played on gralhix.com."
+  },
+  {
+   "slug": "gralhix-exercise-008",
+   "title": "Gralhix OSINT Exercise #008",
+   "summary": "A single-image puzzle: work out where or when the picture was taken.",
+   "platform": "Gralhix",
+   "url": "https://gralhix.com/list-of-osint-exercises/osint-exercise-008/",
+   "difficulty": "easy",
+   "skills": [
+    "geolocation",
+    "image analysis"
+   ],
+   "estimated_minutes": 20,
+   "xp": 10,
+   "path": "first_steps",
+   "path_order": 7,
+   "attribution": "Exercise by Sofia Santos (Gralhix). Played on gralhix.com."
+  },
+  {
+   "slug": "gralhix-exercise-003",
+   "title": "Gralhix OSINT Exercise #003",
+   "summary": "A single-image puzzle: work out where or when the picture was taken.",
+   "platform": "Gralhix",
+   "url": "https://gralhix.com/list-of-osint-exercises/osint-exercise-003/",
+   "difficulty": "medium",
+   "skills": [
+    "geolocation",
+    "image analysis"
+   ],
+   "estimated_minutes": 40,
+   "xp": 20,
+   "path": "going_deeper",
+   "path_order": 1,
+   "attribution": "Exercise by Sofia Santos (Gralhix). Played on gralhix.com."
+  },
+  {
+   "slug": "gralhix-exercise-013",
+   "title": "Gralhix OSINT Exercise #013",
+   "summary": "A single-image puzzle: work out where or when the picture was taken.",
+   "platform": "Gralhix",
+   "url": "https://gralhix.com/list-of-osint-exercises/osint-exercise-013/",
+   "difficulty": "medium",
+   "skills": [
+    "geolocation",
+    "image analysis"
+   ],
+   "estimated_minutes": 40,
+   "xp": 20,
+   "path": "going_deeper",
+   "path_order": 2,
+   "attribution": "Exercise by Sofia Santos (Gralhix). Played on gralhix.com."
+  },
+  {
+   "slug": "gralhix-exercise-018",
+   "title": "Gralhix OSINT Exercise #018",
+   "summary": "A single-image puzzle: work out where or when the picture was taken.",
+   "platform": "Gralhix",
+   "url": "https://gralhix.com/list-of-osint-exercises/osint-exercise-018/",
+   "difficulty": "medium",
+   "skills": [
+    "geolocation",
+    "image analysis"
+   ],
+   "estimated_minutes": 40,
+   "xp": 20,
+   "path": "going_deeper",
+   "path_order": 3,
+   "attribution": "Exercise by Sofia Santos (Gralhix). Played on gralhix.com."
+  },
+  {
+   "slug": "gralhix-exercise-002",
+   "title": "Gralhix OSINT Exercise #002",
+   "summary": "A single-image puzzle: work out where or when the picture was taken.",
+   "platform": "Gralhix",
+   "url": "https://gralhix.com/list-of-osint-exercises/osint-exercise-002/",
+   "difficulty": "medium",
+   "skills": [
+    "geolocation",
+    "image analysis"
+   ],
+   "estimated_minutes": 40,
+   "xp": 20,
+   "path": "going_deeper",
+   "path_order": 4,
+   "attribution": "Exercise by Sofia Santos (Gralhix). Played on gralhix.com."
+  },
+  {
+   "slug": "gralhix-exercise-007",
+   "title": "Gralhix OSINT Exercise #007",
+   "summary": "A single-image puzzle: work out where or when the picture was taken.",
+   "platform": "Gralhix",
+   "url": "https://gralhix.com/list-of-osint-exercises/osint-exercise-007/",
+   "difficulty": "medium",
+   "skills": [
+    "geolocation",
+    "image analysis"
+   ],
+   "estimated_minutes": 40,
+   "xp": 20,
+   "path": "going_deeper",
+   "path_order": 5,
+   "attribution": "Exercise by Sofia Santos (Gralhix). Played on gralhix.com."
+  },
+  {
+   "slug": "gralhix-exercise-012",
+   "title": "Gralhix OSINT Exercise #012",
+   "summary": "A single-image puzzle: work out where or when the picture was taken.",
+   "platform": "Gralhix",
+   "url": "https://gralhix.com/list-of-osint-exercises/osint-exercise-012/",
+   "difficulty": "medium",
+   "skills": [
+    "geolocation",
+    "image analysis"
+   ],
+   "estimated_minutes": 40,
+   "xp": 20,
+   "path": "going_deeper",
+   "path_order": 6,
+   "attribution": "Exercise by Sofia Santos (Gralhix). Played on gralhix.com."
+  },
+  {
+   "slug": "gralhix-exercise-001",
+   "title": "Gralhix OSINT Exercise #001",
+   "summary": "A single-image puzzle: work out where or when the picture was taken.",
+   "platform": "Gralhix",
+   "url": "https://gralhix.com/list-of-osint-exercises/osint-exercise-001/",
+   "difficulty": "hard",
+   "skills": [
+    "geolocation",
+    "image analysis"
+   ],
+   "estimated_minutes": 60,
+   "xp": 30,
+   "path": "hard_cases",
+   "path_order": 1,
+   "attribution": "Exercise by Sofia Santos (Gralhix). Played on gralhix.com."
+  },
+  {
+   "slug": "hacktoria-the-handover",
+   "title": "Hacktoria contract: The Handover",
+   "summary": "A story-driven investigation contract: download the case file and work the leads.",
+   "platform": "Hacktoria",
+   "url": "https://hacktoria.com/#contracts",
+   "difficulty": "easy",
+   "skills": [
+    "investigation",
+    "geolocation"
+   ],
+   "estimated_minutes": 45,
+   "xp": 15,
+   "path": "first_steps",
+   "path_order": 8,
+   "attribution": "Contract by Hacktoria. Download and play on hacktoria.com."
+  },
+  {
+   "slug": "hacktoria-naval-intrusion",
+   "title": "Hacktoria contract: Naval Intrusion",
+   "summary": "A story-driven investigation contract: download the case file and work the leads.",
+   "platform": "Hacktoria",
+   "url": "https://hacktoria.com/#contracts",
+   "difficulty": "easy",
+   "skills": [
+    "investigation",
+    "geolocation"
+   ],
+   "estimated_minutes": 45,
+   "xp": 15,
+   "path": "first_steps",
+   "path_order": 9,
+   "attribution": "Contract by Hacktoria. Download and play on hacktoria.com."
+  },
+  {
+   "slug": "hacktoria-cold-war-enemies",
+   "title": "Hacktoria contract: Cold War Enemies",
+   "summary": "A story-driven investigation contract: download the case file and work the leads.",
+   "platform": "Hacktoria",
+   "url": "https://hacktoria.com/#contracts",
+   "difficulty": "easy",
+   "skills": [
+    "investigation",
+    "geolocation"
+   ],
+   "estimated_minutes": 45,
+   "xp": 15,
+   "path": "first_steps",
+   "path_order": 10,
+   "attribution": "Contract by Hacktoria. Download and play on hacktoria.com."
+  },
+  {
+   "slug": "hacktoria-saving-isabella",
+   "title": "Hacktoria contract: Saving Isabella",
+   "summary": "A story-driven investigation contract: download the case file and work the leads.",
+   "platform": "Hacktoria",
+   "url": "https://hacktoria.com/#contracts",
+   "difficulty": "easy",
+   "skills": [
+    "investigation",
+    "geolocation"
+   ],
+   "estimated_minutes": 45,
+   "xp": 15,
+   "path": "first_steps",
+   "path_order": 11,
+   "attribution": "Contract by Hacktoria. Download and play on hacktoria.com."
+  },
+  {
+   "slug": "hacktoria-the-spy-who-vanished",
+   "title": "Hacktoria contract: The Spy Who Vanished",
+   "summary": "A story-driven investigation contract: download the case file and work the leads.",
+   "platform": "Hacktoria",
+   "url": "https://hacktoria.com/#contracts",
+   "difficulty": "easy",
+   "skills": [
+    "investigation",
+    "geolocation"
+   ],
+   "estimated_minutes": 45,
+   "xp": 15,
+   "path": "first_steps",
+   "path_order": 12,
+   "attribution": "Contract by Hacktoria. Download and play on hacktoria.com."
+  },
+  {
+   "slug": "hacktoria-lost-at-sea",
+   "title": "Hacktoria contract: Lost at Sea",
+   "summary": "A story-driven investigation contract: download the case file and work the leads.",
+   "platform": "Hacktoria",
+   "url": "https://hacktoria.com/#contracts",
+   "difficulty": "easy",
+   "skills": [
+    "investigation",
+    "geolocation"
+   ],
+   "estimated_minutes": 45,
+   "xp": 15,
+   "path": "first_steps",
+   "path_order": 13,
+   "attribution": "Contract by Hacktoria. Download and play on hacktoria.com."
+  },
+  {
+   "slug": "hacktoria-kidnapped",
+   "title": "Hacktoria contract: Kidnapped",
+   "summary": "A story-driven investigation contract: download the case file and work the leads.",
+   "platform": "Hacktoria",
+   "url": "https://hacktoria.com/#contracts",
+   "difficulty": "easy",
+   "skills": [
+    "investigation",
+    "geolocation"
+   ],
+   "estimated_minutes": 45,
+   "xp": 15,
+   "path": "first_steps",
+   "path_order": 14,
+   "attribution": "Contract by Hacktoria. Download and play on hacktoria.com."
+  },
+  {
+   "slug": "hacktoria-operation-wiretap",
+   "title": "Hacktoria contract: Operation Wiretap",
+   "summary": "A story-driven investigation contract: download the case file and work the leads.",
+   "platform": "Hacktoria",
+   "url": "https://hacktoria.com/#contracts",
+   "difficulty": "medium",
+   "skills": [
+    "investigation",
+    "geolocation"
+   ],
+   "estimated_minutes": 90,
+   "xp": 25,
+   "path": "going_deeper",
+   "path_order": 7,
+   "attribution": "Contract by Hacktoria. Download and play on hacktoria.com."
+  },
+  {
+   "slug": "hacktoria-catch-me-if-you-can",
+   "title": "Hacktoria contract: Catch Me If You Can",
+   "summary": "A story-driven investigation contract: download the case file and work the leads.",
+   "platform": "Hacktoria",
+   "url": "https://hacktoria.com/#contracts",
+   "difficulty": "medium",
+   "skills": [
+    "investigation",
+    "geolocation"
+   ],
+   "estimated_minutes": 90,
+   "xp": 25,
+   "path": "going_deeper",
+   "path_order": 8,
+   "attribution": "Contract by Hacktoria. Download and play on hacktoria.com."
+  },
+  {
+   "slug": "hacktoria-last-flight",
+   "title": "Hacktoria contract: Last Flight",
+   "summary": "A story-driven investigation contract: download the case file and work the leads.",
+   "platform": "Hacktoria",
+   "url": "https://hacktoria.com/#contracts",
+   "difficulty": "medium",
+   "skills": [
+    "investigation",
+    "geolocation"
+   ],
+   "estimated_minutes": 90,
+   "xp": 25,
+   "path": "going_deeper",
+   "path_order": 9,
+   "attribution": "Contract by Hacktoria. Download and play on hacktoria.com."
+  },
+  {
+   "slug": "hacktoria-road-to-nowhere",
+   "title": "Hacktoria contract: Road to Nowhere",
+   "summary": "A story-driven investigation contract: download the case file and work the leads.",
+   "platform": "Hacktoria",
+   "url": "https://hacktoria.com/#contracts",
+   "difficulty": "medium",
+   "skills": [
+    "investigation",
+    "geolocation"
+   ],
+   "estimated_minutes": 90,
+   "xp": 25,
+   "path": "going_deeper",
+   "path_order": 10,
+   "attribution": "Contract by Hacktoria. Download and play on hacktoria.com."
+  },
+  {
+   "slug": "hacktoria-intro-to-maritime-osint",
+   "title": "Hacktoria contract: Intro to Maritime OSINT",
+   "summary": "A story-driven investigation contract: download the case file and work the leads.",
+   "platform": "Hacktoria",
+   "url": "https://hacktoria.com/#contracts",
+   "difficulty": "hard",
+   "skills": [
+    "maritime",
+    "investigation"
+   ],
+   "estimated_minutes": 120,
+   "xp": 40,
+   "path": "hard_cases",
+   "path_order": 2,
+   "attribution": "Contract by Hacktoria. Download and play on hacktoria.com."
+  },
+  {
+   "slug": "hacktoria-lost-down-under",
+   "title": "Hacktoria contract: Lost Down Under",
+   "summary": "A story-driven investigation contract: download the case file and work the leads.",
+   "platform": "Hacktoria",
+   "url": "https://hacktoria.com/#contracts",
+   "difficulty": "hard",
+   "skills": [
+    "investigation",
+    "geolocation"
+   ],
+   "estimated_minutes": 120,
+   "xp": 40,
+   "path": "hard_cases",
+   "path_order": 3,
+   "attribution": "Contract by Hacktoria. Download and play on hacktoria.com."
+  },
+  {
+   "slug": "thm-ohsint",
+   "title": "TryHackMe: OhSINT",
+   "summary": "Start from one picture and follow the trail across public profiles.",
+   "platform": "TryHackMe",
+   "url": "https://tryhackme.com/room/ohsint",
+   "difficulty": "easy",
+   "skills": [
+    "image metadata",
+    "social media"
+   ],
+   "estimated_minutes": 30,
+   "xp": 10,
+   "path": "first_steps",
+   "path_order": 15,
+   "attribution": "Room on TryHackMe. Sign in to TryHackMe (free account) to play."
+  },
+  {
+   "slug": "thm-searchlight-imint",
+   "title": "TryHackMe: Searchlight (IMINT)",
+   "summary": "Image intelligence drills: read signs, landmarks and context in photos.",
+   "platform": "TryHackMe",
+   "url": "https://tryhackme.com/room/searchlightosint",
+   "difficulty": "easy",
+   "skills": [
+    "image analysis",
+    "geolocation"
+   ],
+   "estimated_minutes": 60,
+   "xp": 10,
+   "path": "first_steps",
+   "path_order": 16,
+   "attribution": "Room on TryHackMe. Sign in to TryHackMe (free account) to play."
+  },
+  {
+   "slug": "thm-geolocating-images",
+   "title": "TryHackMe: Geolocating Images",
+   "summary": "Practise placing photos on a map with reverse image search and visual clues.",
+   "platform": "TryHackMe",
+   "url": "https://tryhackme.com/room/geolocatingimages",
+   "difficulty": "easy",
+   "skills": [
+    "geolocation",
+    "reverse image search"
+   ],
+   "estimated_minutes": 30,
+   "xp": 10,
+   "path": "first_steps",
+   "path_order": 17,
+   "attribution": "Room on TryHackMe. Sign in to TryHackMe (free account) to play."
+  },
+  {
+   "slug": "thm-google-dorking",
+   "title": "TryHackMe: Google Dorking",
+   "summary": "Learn how search engines index sites and how advanced operators narrow results.",
+   "platform": "TryHackMe",
+   "url": "https://tryhackme.com/room/googledorking",
+   "difficulty": "easy",
+   "skills": [
+    "search operators"
+   ],
+   "estimated_minutes": 30,
+   "xp": 10,
+   "path": "first_steps",
+   "path_order": 18,
+   "attribution": "Room on TryHackMe. Sign in to TryHackMe (free account) to play."
+  },
+  {
+   "slug": "thm-sakura",
+   "title": "TryHackMe: Sakura Room",
+   "summary": "A full investigation built by OSINT Dojo: identities, accounts and travel.",
+   "platform": "TryHackMe",
+   "url": "https://tryhackme.com/room/sakura",
+   "difficulty": "easy",
+   "skills": [
+    "investigation",
+    "pivoting",
+    "social media"
+   ],
+   "estimated_minutes": 90,
+   "xp": 10,
+   "path": "first_steps",
+   "path_order": 19,
+   "attribution": "Room on TryHackMe. Sign in to TryHackMe (free account) to play."
+  },
+  {
+   "slug": "seintpl-osint-quiz",
+   "title": "SEINT_pl OSINT & geolocation quizzes",
+   "summary": "Yearly sets of step-by-step geolocation quizzes; solve each step to open the next.",
+   "platform": "GitHub (SEINT_pl)",
+   "url": "https://github.com/seintpl/osintquiz",
+   "difficulty": "medium",
+   "skills": [
+    "geolocation",
+    "image analysis"
+   ],
+   "estimated_minutes": 60,
+   "xp": 15,
+   "path": "going_deeper",
+   "path_order": 11,
+   "attribution": "Quizzes by SEINT_pl, published on GitHub (no licence stated: link-out only)."
+  }
+ ]
+}

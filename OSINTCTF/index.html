@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -10,253 +10,236 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192x192.png">
     <link rel="shortcut icon" href="/favicon.ico">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <title>AL SYED - LABS</title>
+    <title>Al Syed Labs · OSINT CTFs</title>
+    <meta name="description" content="Free CTFs, paid investigation labs, examinations and the leaderboard of the Al Syed Initiative.">
     <meta name="color-scheme" content="dark">
-    <meta name="theme-color" content="#000000">
+    <meta name="theme-color" content="#050505">
     <!-- Self-hosted (SIL OFL, OSINTCTF/fonts): no third-party font requests. -->
     <link rel="preload" href="/fonts/geist/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/fonts/handlee/handlee-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="styles.css?v=hp-20261115">
+    <link rel="stylesheet" href="styles.css?v=labs-20261116">
 </head>
-<body>
-    <div class="app-container">
-        <aside class="sidebar" aria-label="Labs">
-            <div class="brand">
-                <a class="brand-mark" href="#hub" data-goto="hub" aria-label="Al Syed Labs, home">
-                    <span class="brand-al">Al</span>
-                    <span class="brand-syed">Syed</span>
-                    <span class="brand-sep" aria-hidden="true">-</span>
-                    <span class="brand-cases" id="brand-labs-text">Labs</span>
-                </a>
-                <button type="button" class="lang-switcher" id="lang-toggle" aria-label="Switch language: English or Urdu">EN / Urdu</button>
-            </div>
+<body data-group="section">
+    <a class="skip-link" href="#main">Skip to content</a>
 
-            <div class="progress-section">
-                <h3 id="progress-header-text">Overall Progress</h3>
-                <div class="progress-bar-container" aria-hidden="true">
-                    <div class="progress-bar" id="overall-progress-bar" style="width: 0%"></div>
-                </div>
-                <div class="progress-metrics">
-                    <div class="metric-item">
-                        <span class="label" id="progress-solved-label">SOLVED:</span>
-                        <span class="val-wrapper">
-                            <span class="val" id="overall-solved">0</span><span class="slash">/</span><span class="total" id="overall-total">30</span>
-                        </span>
-                    </div>
-                    <div class="metric-item">
-                        <span class="label" id="progress-score-label">SCORE:</span>
-                        <span class="val-wrapper">
-                            <span class="val" id="overall-score">0.0</span><span class="pts" id="progress-pts-label"> pts</span>
-                        </span>
-                    </div>
-                </div>
-            </div>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <a class="brand-mark" href="#hub" data-goto="hub" aria-label="Al Syed Labs, Free CTFs">
+                <span class="brand-glyph" aria-hidden="true"></span>
+                <span class="brand-words"><span class="brand-al">Al Syed</span><span class="brand-cases" id="brand-labs-text">Labs</span></span>
+            </a>
 
-            <nav class="main-nav" aria-label="Labs">
-                <button type="button" class="nav-btn active" data-tab="hub" id="nav-hub-btn" aria-current="page">
-                    <span class="icon">01</span>
-                    <span class="nav-body"><span class="nav-label" id="nav-hub-text">CTF HUB</span>
-                        <span class="nav-meta"><span class="nav-chip" data-access-chip>Open</span></span></span>
+            <nav class="seg-nav" aria-label="Sections">
+                <button type="button" class="nav-btn seg active" data-tab="hub" id="nav-hub-btn" aria-current="page">
+                    <svg class="seg-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 1.5 14.5 5v6L8 14.5 1.5 11V5L8 1.5Zm0 1.7L3 5.9v4.2l5 2.7 5-2.7V5.9L8 3.2Z"/></svg>
+                    <span class="seg-label" id="nav-hub-text">Free CTFs</span>
                 </button>
-                <button type="button" class="nav-btn" data-tab="realworld" id="nav-labs-btn">
-                    <span class="icon">02</span>
-                    <span class="nav-body"><span class="nav-label" id="nav-labs-text">OSINT LABS</span>
-                        <span class="nav-meta"><span class="nav-chip" data-access-chip>Open</span><span class="badge" id="badge-realworld">0/10</span></span></span>
+                <button type="button" class="nav-btn seg" data-tab="paid" id="nav-paid-btn">
+                    <svg class="seg-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M5 7V5a3 3 0 1 1 6 0v2h1v7H4V7h1Zm1.5 0h3V5a1.5 1.5 0 1 0-3 0v2Z"/></svg>
+                    <span class="seg-label" id="nav-paid-text">Paid Labs</span>
+                    <span class="nav-chip seg-chip" id="chip-paid" data-access-chip></span>
                 </button>
-                <button type="button" class="nav-btn" data-tab="blackmeridian" id="nav-blackmeridian-btn">
-                    <span class="icon">03</span>
-                    <span class="nav-body"><span class="nav-label" id="nav-blackmeridian-text">BLACK MERIDIAN</span>
-                        <span class="nav-meta"><span class="nav-chip" data-access-chip>Open</span><span class="badge" id="badge-blackmeridian">0/10</span></span></span>
+                <button type="button" class="nav-btn seg" data-tab="exam" id="nav-exam-btn">
+                    <svg class="seg-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 1.5h7l3 3v10H3v-13Zm1.5 1.5v10h7V5.1L9.4 3H4.5Zm1.5 4h4v1.5H6V7Zm0 3h4v1.5H6V10Z"/></svg>
+                    <span class="seg-label" id="nav-exam-text">Examination</span>
+                    <span class="nav-chip nav-chip-signin"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M5 7V5a3 3 0 1 1 6 0v2h1v7H4V7h1Zm1.5 0h3V5a1.5 1.5 0 1 0-3 0v2Z"/></svg>Sign-in</span>
                 </button>
-                <button type="button" class="nav-btn" data-tab="certification" id="nav-certification-btn">
-                    <span class="icon">04</span>
-                    <span class="nav-body"><span class="nav-label" id="nav-certification-text">CERTIFICATION CTF</span>
-                        <span class="nav-meta"><span class="nav-chip" data-access-chip>Open</span><span class="badge" id="badge-certification">0/10</span></span></span>
-                </button>
-                <button type="button" class="nav-btn" data-tab="exam" id="nav-exam-btn">
-                    <span class="icon">05</span>
-                    <span class="nav-body"><span class="nav-label" id="nav-exam-text">EXAMINATION</span>
-                        <span class="nav-meta"><span class="nav-chip nav-chip-signin"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M5 7V5a3 3 0 1 1 6 0v2h1v7H4V7h1Zm1.5 0h3V5a1.5 1.5 0 1 0-3 0v2Z"/></svg>Sign-in</span></span></span>
+                <button type="button" class="nav-btn seg" data-tab="leaderboard" id="nav-leaderboard-btn">
+                    <svg class="seg-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M2 9h3v5H2V9Zm4.5-6h3v11h-3V3ZM11 6h3v8h-3V6Z"/></svg>
+                    <span class="seg-label" id="nav-leaderboard-text">Leaderboard</span>
                 </button>
             </nav>
 
-            <p class="sidebar-foot">Practice cases from the <a href="https://alsyedinitiative.com/">Al Syed Initiative</a>.</p>
-        </aside>
+            <div class="topbar-tools">
+                <div class="user-slot" id="user-slot" aria-live="polite"></div>
+                <button type="button" class="lang-switcher" id="lang-toggle" aria-label="Switch language: English or Urdu">اردو</button>
+            </div>
+        </div>
+    </header>
 
-        <main class="content-area">
-            <section id="tab-hub" class="tab-content active">
-                <div class="hero-left">
-                    <p class="lab-kicker"><span class="lab-kicker-num">Hub 01</span><span class="lab-kicker-rule" aria-hidden="true"></span><span class="hero-subheading" id="hub-subheading-text">INTELLIGENCE LABS</span></p>
-                    <h1 class="hero-heading" id="hub-heading-text">
-                        Labs that<br>
-                        <span class="text-demand">demand</span><br>
-                        excellence.
-                    </h1>
+    <!-- Lab switcher: shown while a lab is open. -->
+    <nav class="lab-rail" id="lab-rail" aria-label="Labs">
+        <div class="lab-rail-inner">
+            <button type="button" class="nav-btn rail-btn" data-tab="realworld" id="nav-labs-btn">
+                <span class="rail-name" id="nav-labs-text">Zenith Footprint</span>
+                <span class="rail-meta"><span class="nav-chip" id="chip-realworld" data-access-chip></span><span class="badge" id="badge-realworld">0/10</span></span>
+            </button>
+            <button type="button" class="nav-btn rail-btn" data-tab="blackmeridian" id="nav-blackmeridian-btn">
+                <span class="rail-name" id="nav-blackmeridian-text">Black Meridian</span>
+                <span class="rail-meta"><span class="nav-chip" id="chip-blackmeridian" data-access-chip></span><span class="badge" id="badge-blackmeridian">0/10</span></span>
+            </button>
+            <button type="button" class="nav-btn rail-btn" data-tab="certification" id="nav-certification-btn">
+                <span class="rail-name" id="nav-certification-text">Certification CTF</span>
+                <span class="rail-meta"><span class="nav-chip" id="chip-certification" data-access-chip></span><span class="badge" id="badge-certification">0/10</span></span>
+            </button>
+        </div>
+    </nav>
 
-                    <div class="desc-card">
-                        <h3 id="hub-desc-title">The Zenith Footprint</h3>
-                        <p id="hub-desc-p1">Welcome, Investigator. We need your live OSINT skills to identify an unknown operator and trace their digital footprint.</p>
-                        <p id="hub-desc-p2">This is a live, expert-level Open Source Intelligence investigation. Begin with <code>@xcfwjoo310</code>, discover the operator's wider footprint, and build the evidence chain yourself.</p>
+    <main class="content-area" id="main" tabindex="-1">
+        <!-- ============ FREE CTFs ============ -->
+        <section id="tab-hub" class="tab-content active" aria-labelledby="hub-heading-text">
+            <header class="page-head">
+                <p class="kicker"><span class="kicker-dot" aria-hidden="true"></span><span id="hub-subheading-text">Free CTFs</span></p>
+                <h1 class="page-title" id="hub-heading-text">Investigate. <span class="text-demand">For free.</span></h1>
+                <p class="page-lede" id="hub-lede">Starter cases from our own labs and hand-picked free CTFs from the OSINT community. Included for Batch 2 and Batch 3 students.</p>
+            </header>
+            <div class="access-banner" id="free-access" role="status"></div>
+            <div class="stat-strip" id="free-stats"></div>
 
-                        <div class="rules-box">
-                            <h4 id="hub-rules-title">Scoring Rules</h4>
-                            <ul>
-                                <li id="hub-rule-points"><strong>Max Points per Question:</strong> 1.0 point.</li>
-                                <li id="hub-rule-score"><strong>Overall Score:</strong> Your total score is calculated dynamically based on solved questions.</li>
-                            </ul>
-                        </div>
-
-                        <div class="guidelines-box">
-                            <h4 id="hub-instructions-title">Instructions</h4>
-                            <p id="hub-instructions-desc">Select a lab to receive investigative objectives. Prompts intentionally omit file paths, repository names, branches, encodings, and tools. Pivot between identities and artifacts until the evidence supports an exact answer.</p>
-                        </div>
-                    </div>
+            <section class="block" aria-labelledby="free-labs-title">
+                <div class="block-head">
+                    <h2 class="block-title" id="free-labs-title">Al Syed starter cases</h2>
+                    <p class="block-note" id="free-labs-note">Checked on our server. Your progress is saved in this browser.</p>
                 </div>
-
-                <section class="lab-picker" aria-labelledby="lab-picker-title" dir="ltr">
-                    <div class="lab-picker-head">
-                        <h2 id="lab-picker-title">Pick a lab</h2>
-                        <p>3 labs &middot; 30 challenges &middot; 1 examination</p>
-                    </div>
-                    <div class="lab-picker-grid">
-                        <a class="lab-cell" href="#realworld" data-goto="realworld">
-                            <span class="lab-cell-eyebrow">Lab 02 &middot; 10 challenges</span>
-                            <span class="lab-cell-title">The Zenith Footprint</span>
-                            <span class="lab-cell-copy">Start from one public handle and rebuild an operator&rsquo;s identities, infrastructure and mistakes.</span>
-                            <span class="lab-cell-foot"><span>Live investigation</span><span class="lab-cell-go">Open lab <span class="lab-cell-arrow" aria-hidden="true">&rarr;</span></span></span>
-                        </a>
-                        <a class="lab-cell" href="#blackmeridian" data-goto="blackmeridian">
-                            <span class="lab-cell-eyebrow">Lab 03 &middot; 10 challenges</span>
-                            <span class="lab-cell-title">Black Meridian</span>
-                            <span class="lab-cell-copy">Expert correlation across branches, commit history, metadata, DNS residue and a protected payload.</span>
-                            <span class="lab-cell-foot"><span>Expert</span><span class="lab-cell-go">Open lab <span class="lab-cell-arrow" aria-hidden="true">&rarr;</span></span></span>
-                        </a>
-                        <a class="lab-cell" href="#certification" data-goto="certification">
-                            <span class="lab-cell-eyebrow">Lab 04 &middot; 10 challenges</span>
-                            <span class="lab-cell-title">Certification CTF</span>
-                            <span class="lab-cell-copy">Ten standalone cases with exact-answer checks. No hints and no walkthroughs.</span>
-                            <span class="lab-cell-foot"><span>Exam practice</span><span class="lab-cell-go">Open lab <span class="lab-cell-arrow" aria-hidden="true">&rarr;</span></span></span>
-                        </a>
-                        <a class="lab-cell" href="#exam" data-goto="exam">
-                            <span class="lab-cell-eyebrow">05 &middot; Proctored</span>
-                            <span class="lab-cell-title">OSINT Examination</span>
-                            <span class="lab-cell-copy">A timed, graded examination recorded against your LMS account. Sign in to take it.</span>
-                            <span class="lab-cell-foot"><span>For enrolled students</span><span class="lab-cell-go">Sign in <span class="lab-cell-arrow" aria-hidden="true">&rarr;</span></span></span>
-                        </a>
-                    </div>
-                </section>
+                <div class="lab-grid" id="free-labs"></div>
             </section>
 
-            <section id="tab-realworld" class="tab-content">
-                <div class="lab-container">
-                    <div class="lab-main-header">
-                        <div class="lab-info">
-                            <p class="lab-kicker"><span class="lab-kicker-num">Lab 02</span><span class="lab-kicker-rule" aria-hidden="true"></span><span class="hero-subheading" id="lab-subheading-text">ACTIVE INVESTIGATION</span></p>
-                            <h2 class="lab-title" id="lab-title-text">The Zenith Footprint</h2>
-                            <p class="lab-description" id="lab-desc-text">Start with @xcfwjoo310. Discover the operator's identities, infrastructure, historical mistakes, and protected artifacts without being given the investigation path.</p>
-                        </div>
-                        <div class="lab-stats">
-                            <div class="stat-box">
-                                <div class="stat-label" id="lab-stat-solved-label">SOLVED:</div>
-                                <div class="stat-value" id="solved-realworld">0</div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="stat-label" id="lab-stat-score-label">SCORE:</div>
-                                <div class="stat-value" id="score-realworld">0.0</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="questions-container" id="realworld-questions">
-                        <!-- Loaded dynamically via JS -->
-                    </div>
+            <section class="block" aria-labelledby="free-dir-title">
+                <div class="block-head">
+                    <h2 class="block-title" id="free-dir-title">Community free CTFs</h2>
+                    <p class="block-note" id="free-dir-note">Curated exercises on other platforms. They open in a new tab.</p>
                 </div>
+                <div class="filter-row" id="free-dir-filters" role="group" aria-label="Filter by difficulty"></div>
+                <div class="dir-groups" id="free-directory"></div>
             </section>
+        </section>
 
-            <section id="tab-blackmeridian" class="tab-content">
-                <div class="lab-container">
-                    <div class="lab-main-header">
-                        <div class="lab-info">
-                            <p class="lab-kicker"><span class="lab-kicker-num">Lab 03</span><span class="lab-kicker-rule" aria-hidden="true"></span><span class="hero-subheading" id="black-subheading-text">ELITE INVESTIGATION</span></p>
-                            <h2 class="lab-title" id="black-title-text">Black Meridian</h2>
-                            <p class="lab-description" id="black-desc-text">A 10/10 live OSINT correlation lab. Start from @xcfwjoo310, pivot into the controlled GitHub account, and work across black-meridian branches, commit history, metadata, DNS residue, crypto notes, and a protected payload.</p>
-                            <p class="lab-description lab-materials-note">Live evidence index: <code>/materials/black-meridian/START_HERE.md</code></p>
-                        </div>
-                        <div class="lab-stats">
-                            <div class="stat-box">
-                                <div class="stat-label" id="black-stat-solved-label">SOLVED:</div>
-                                <div class="stat-value" id="solved-blackmeridian">0</div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="stat-label" id="black-stat-score-label">SCORE:</div>
-                                <div class="stat-value" id="score-blackmeridian">0.0</div>
-                            </div>
-                        </div>
-                    </div>
+        <!-- ============ PAID LABS ============ -->
+        <section id="tab-paid" class="tab-content" aria-labelledby="paid-heading-text">
+            <header class="page-head">
+                <p class="kicker"><span class="kicker-dot" aria-hidden="true"></span><span id="paid-subheading-text">Paid labs</span></p>
+                <h1 class="page-title" id="paid-heading-text">Labs that <span class="text-demand">demand</span> excellence.</h1>
+                <p class="page-lede" id="paid-lede">Live, expert-level investigations with exact-answer checks. Unlocked with a CTF Labs membership or a course plan that includes all labs.</p>
+            </header>
+            <div class="access-banner" id="paid-access" role="status"></div>
+            <div class="lab-grid lab-grid-paid" id="paid-labs"></div>
+        </section>
 
-                    <div class="questions-container" id="blackmeridian-questions">
-                        <!-- Loaded dynamically via JS -->
-                    </div>
+        <!-- ============ LAB: ZENITH FOOTPRINT ============ -->
+        <section id="tab-realworld" class="tab-content lab-view" data-lab="realworld" aria-labelledby="lab-title-text">
+            <header class="lab-head">
+                <a class="crumb" href="#hub" data-goto="hub" id="realworld-crumb">&larr; Free CTFs</a>
+                <p class="kicker"><span class="kicker-dot" aria-hidden="true"></span><span id="lab-subheading-text">Live investigation</span></p>
+                <h1 class="page-title lab-title" id="lab-title-text">The Zenith Footprint</h1>
+                <p class="page-lede" id="lab-desc-text">Start with @xcfwjoo310. Discover the operator's identities, infrastructure, historical mistakes and protected artifacts without being given the investigation path.</p>
+                <div class="lab-meta" id="realworld-meta"></div>
+                <div class="lab-stats">
+                    <div class="stat-box"><div class="stat-label" id="lab-stat-solved-label">Solved</div><div class="stat-value" id="solved-realworld">0</div></div>
+                    <div class="stat-box"><div class="stat-label" id="lab-stat-score-label">Score</div><div class="stat-value" id="score-realworld">0.0</div></div>
                 </div>
-            </section>
+            </header>
+            <div class="workspace">
+                <nav class="case-list" id="realworld-cases" aria-label="Cases"></nav>
+                <article class="case-detail" id="realworld-detail" aria-live="polite"></article>
+            </div>
+        </section>
 
-            <section id="tab-certification" class="tab-content">
-                <div class="lab-container">
-                    <div class="lab-main-header">
-                        <div class="lab-info">
-                            <p class="lab-kicker"><span class="lab-kicker-num">Lab 04</span><span class="lab-kicker-rule" aria-hidden="true"></span><span class="hero-subheading" id="certification-subheading-text">CERTIFICATION EXAM</span></p>
-                            <h2 class="lab-title" id="certification-title-text">Certification CTF</h2>
-                            <p class="lab-description" id="certification-desc-text">A 10-question OSINT certification exam. No hints, no walkthroughs, and exact-answer validation.</p>
-                        </div>
-                        <div class="lab-stats">
-                            <div class="stat-box">
-                                <div class="stat-label" id="certification-stat-solved-label">SOLVED:</div>
-                                <div class="stat-value" id="solved-certification">0</div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="stat-label" id="certification-stat-score-label">SCORE:</div>
-                                <div class="stat-value" id="score-certification">0.0</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="questions-container" id="certification-questions">
-                        <!-- Loaded dynamically via JS -->
-                    </div>
+        <!-- ============ LAB: BLACK MERIDIAN ============ -->
+        <section id="tab-blackmeridian" class="tab-content lab-view" data-lab="blackmeridian" aria-labelledby="black-title-text">
+            <header class="lab-head">
+                <a class="crumb" href="#paid" data-goto="paid" id="blackmeridian-crumb">&larr; Paid labs</a>
+                <p class="kicker"><span class="kicker-dot" aria-hidden="true"></span><span id="black-subheading-text">Elite investigation</span></p>
+                <h1 class="page-title lab-title" id="black-title-text">Black Meridian</h1>
+                <p class="page-lede" id="black-desc-text">A live OSINT correlation lab across branches, commit history, metadata, DNS residue, crypto notes and a protected payload.</p>
+                <div class="lab-meta" id="blackmeridian-meta"></div>
+                <div class="lab-stats">
+                    <div class="stat-box"><div class="stat-label" id="black-stat-solved-label">Solved</div><div class="stat-value" id="solved-blackmeridian">0</div></div>
+                    <div class="stat-box"><div class="stat-label" id="black-stat-score-label">Score</div><div class="stat-value" id="score-blackmeridian">0.0</div></div>
                 </div>
-            </section>
+            </header>
+            <div class="workspace">
+                <nav class="case-list" id="blackmeridian-cases" aria-label="Cases"></nav>
+                <article class="case-detail" id="blackmeridian-detail" aria-live="polite"></article>
+            </div>
+        </section>
 
-            <section id="tab-exam" class="tab-content">
-                <div class="lab-container">
-                    <div class="lab-main-header">
-                        <div class="lab-info">
-                            <p class="lab-kicker"><span class="lab-kicker-num">Exam 05</span><span class="lab-kicker-rule" aria-hidden="true"></span><span class="hero-subheading" id="exam-subheading-text">PROCTORED EXAMINATION</span></p>
-                            <h2 class="lab-title" id="exam-heading-text">OSINT Examination</h2>
-                            <p class="lab-description" id="exam-intro-text">A timed, graded OSINT examination. Every answer you submit is recorded against your LMS account.</p>
-                        </div>
-                        <div class="lab-stats" id="exam-stats" hidden>
-                            <div class="stat-box">
-                                <div class="stat-label" id="exam-stat-score-label">SCORE:</div>
-                                <div class="stat-value" id="exam-score">0</div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="stat-label" id="exam-stat-solved-label">SOLVED:</div>
-                                <div class="stat-value" id="exam-solved">0</div>
-                            </div>
-                            <div class="stat-box">
-                                <div class="stat-label" id="exam-stat-time-label">TIME LEFT:</div>
-                                <div class="stat-value exam-timer" id="exam-timer">--:--</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="exam-banner" id="exam-banner" role="status" aria-live="polite" hidden></div>
-                    <div class="exam-list" id="exam-list"><!-- Loaded from the LMS by exam.js --></div>
-                    <div class="exam-view" id="exam-view" hidden></div>
+        <!-- ============ LAB: CERTIFICATION CTF ============ -->
+        <section id="tab-certification" class="tab-content lab-view" data-lab="certification" aria-labelledby="certification-title-text">
+            <header class="lab-head">
+                <a class="crumb" href="#paid" data-goto="paid" id="certification-crumb">&larr; Paid labs</a>
+                <p class="kicker"><span class="kicker-dot" aria-hidden="true"></span><span id="certification-subheading-text">Certification practice</span></p>
+                <h1 class="page-title lab-title" id="certification-title-text">Certification CTF</h1>
+                <p class="page-lede" id="certification-desc-text">Ten standalone cases with exact-answer checks. No hints and no walkthroughs.</p>
+                <div class="lab-meta" id="certification-meta"></div>
+                <div class="lab-stats">
+                    <div class="stat-box"><div class="stat-label" id="certification-stat-solved-label">Solved</div><div class="stat-value" id="solved-certification">0</div></div>
+                    <div class="stat-box"><div class="stat-label" id="certification-stat-score-label">Score</div><div class="stat-value" id="score-certification">0.0</div></div>
                 </div>
-            </section>
-        </main>
-    </div>
+            </header>
+            <div class="workspace">
+                <nav class="case-list" id="certification-cases" aria-label="Cases"></nav>
+                <article class="case-detail" id="certification-detail" aria-live="polite"></article>
+            </div>
+        </section>
+
+        <!-- ============ EXAMINATION ============ -->
+        <section id="tab-exam" class="tab-content" aria-labelledby="exam-heading-text">
+            <div class="lab-container">
+                <header class="page-head lab-main-header">
+                    <div class="lab-info">
+                        <p class="kicker"><span class="kicker-dot" aria-hidden="true"></span><span class="hero-subheading" id="exam-subheading-text">Proctored examination</span></p>
+                        <h1 class="page-title lab-title" id="exam-heading-text">OSINT Examination</h1>
+                        <p class="page-lede lab-description" id="exam-intro-text">A timed, graded OSINT examination. Every answer you submit is recorded against your LMS account.</p>
+                    </div>
+                    <div class="lab-stats exam-stats" id="exam-stats" hidden>
+                        <div class="stat-box"><div class="stat-label" id="exam-stat-score-label">Score</div><div class="stat-value" id="exam-score">0</div></div>
+                        <div class="stat-box"><div class="stat-label" id="exam-stat-solved-label">Solved</div><div class="stat-value" id="exam-solved">0</div></div>
+                        <div class="stat-box"><div class="stat-label" id="exam-stat-time-label">Time left</div><div class="stat-value exam-timer" id="exam-timer">--:--</div></div>
+                    </div>
+                </header>
+                <div class="exam-banner" id="exam-banner" role="status" aria-live="polite" hidden></div>
+                <div class="exam-list" id="exam-list"><!-- Loaded from the LMS by exam.js --></div>
+                <div class="exam-view" id="exam-view" hidden></div>
+            </div>
+        </section>
+
+        <!-- ============ LEADERBOARD ============ -->
+        <section id="tab-leaderboard" class="tab-content" aria-labelledby="leaderboard-heading-text">
+            <header class="page-head">
+                <p class="kicker"><span class="kicker-dot" aria-hidden="true"></span><span id="leaderboard-subheading-text">Leaderboard</span></p>
+                <h1 class="page-title" id="leaderboard-heading-text">The <span class="text-demand">board</span>.</h1>
+                <p class="page-lede" id="leaderboard-lede">The Monthly OSINT CTF ranks every solver by time. Finalists join the Hall of Fame.</p>
+            </header>
+
+            <div class="board-layout">
+                <div class="board-main">
+                    <section class="panel" aria-labelledby="season-title">
+                        <div class="panel-head">
+                            <h2 class="panel-title" id="season-title">This month</h2>
+                            <span class="panel-note" id="season-note"></span>
+                        </div>
+                        <div id="season-board"></div>
+                    </section>
+                    <section class="panel" aria-labelledby="hof-title">
+                        <div class="panel-head"><h2 class="panel-title" id="hof-title">Hall of Fame</h2></div>
+                        <div id="hof-board"></div>
+                    </section>
+                </div>
+                <aside class="board-side">
+                    <section class="panel record-panel" aria-labelledby="progress-header-text">
+                        <div class="panel-head"><h2 class="panel-title" id="progress-header-text">Your labs record</h2></div>
+                        <div class="record-total">
+                            <div class="metric-item"><span class="label" id="progress-solved-label">Solved</span>
+                                <span class="val-wrapper"><span class="val" id="overall-solved">0</span><span class="slash">/</span><span class="total" id="overall-total">30</span></span></div>
+                            <div class="metric-item"><span class="label" id="progress-score-label">Score</span>
+                                <span class="val-wrapper"><span class="val" id="overall-score">0.0</span><span class="pts" id="progress-pts-label"> pts</span></span></div>
+                        </div>
+                        <div class="progress-bar-container" aria-hidden="true"><div class="progress-bar" id="overall-progress-bar" style="width: 0%"></div></div>
+                        <ul class="record-list" id="record-list"></ul>
+                        <p class="panel-foot" id="record-foot">Practice progress is kept in this browser.</p>
+                    </section>
+                    <section class="panel" id="me-panel" aria-labelledby="me-title" hidden>
+                        <div class="panel-head"><h2 class="panel-title" id="me-title">Your standing</h2></div>
+                        <div id="me-board"></div>
+                    </section>
+                </aside>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-foot">
+        <p>Practice cases from the <a href="https://alsyedinitiative.com/">Al Syed Initiative</a>. Passive research only: never contact, touch or attack a target.</p>
+    </footer>
 
     <script src="app.js"></script>
     <script src="exam-core.js"></script>

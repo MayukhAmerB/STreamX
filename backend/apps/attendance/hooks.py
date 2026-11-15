@@ -28,6 +28,8 @@ def on_live_join(*, session, user, is_manager: bool = False) -> None:
             return
         if getattr(session, "status", None) != "live":
             return
+        if not presence.session_tracked(session.pk):
+            return  # batch excluded by ATTENDANCE_FROM_COURSE_ID
         presence.remember_role(session.pk, user.pk, presence.ROLE_ATTENDEE)
         presence.credit_join(int(session.pk), int(user.pk))
     except Exception:  # noqa: BLE001 - attendance must never break joining a class

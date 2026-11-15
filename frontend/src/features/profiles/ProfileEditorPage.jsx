@@ -7,7 +7,7 @@
 // Inner app page template (PHILOSOPHY T8): golden eyebrow, h1, tab bar
 // between hairlines, hairline cards.
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { StatusBadge } from "../../kit/Badge";
 import { Button } from "../../kit/Button";
@@ -587,7 +587,8 @@ export default function ProfileEditorPage() {
   const [notice, setNotice] = useState(null); // { tone: "ok" | "error", text }
   const [findings, setFindings] = useState([]);
   const [findingMessage, setFindingMessage] = useState("");
-  const [tab, setTab] = useState("edit");
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(() => searchParams.get("tab") || "edit");
   const [preview, setPreview] = useState({ status: "idle", data: null });
 
   const accept = useCallback((payload, { keepDraft = false } = {}) => {

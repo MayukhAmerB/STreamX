@@ -1,9 +1,13 @@
 // The reward-system band at the very end of the Friday landing page (just
 // before the footer). Same panel as the landing's SectionCard/SectionTitle
 // (black panel, hairline border, brand eyebrow rule); greys and white only.
+// A signed-in student also sees their own rank badge, XP and latest badges
+// (LandingRewardsCard "full"); a guest gets a "Sign in to see your rank" link.
 import { Link } from "react-router-dom";
 
 import { siteBrand } from "../../config/siteBrand";
+import { useAuth } from "../../hooks/useAuth";
+import LandingRewardsCard from "../landing-rewards/LandingRewardsCard";
 import { RANKS_NOTE, RECORD_POINTS, REWARDS_INTRO } from "./rewardsContent";
 import { PrizePodium, RankLadder, RewardPoints, RewardsMock, XpWays } from "./RewardsVisuals";
 
@@ -13,6 +17,7 @@ const linkSecondary =
   "inline-flex min-h-11 items-center justify-center rounded-xl border border-white/15 px-5 text-sm font-semibold text-white transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70";
 
 export default function LandingRewardsBand() {
+  const { isAuthenticated } = useAuth() || {};
   return (
     <section
       id="rewards"
@@ -31,10 +36,19 @@ export default function LandingRewardsBand() {
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[#A7A7A7] sm:text-base">{REWARDS_INTRO.subtitle}</p>
           </div>
-          <Link to="/rewards" className={`${linkPrimary} self-start lg:self-auto`}>
-            See all rewards
-          </Link>
+          <div className="flex flex-col gap-2 self-stretch sm:flex-row sm:self-start lg:self-auto">
+            <Link to="/rewards" className={linkPrimary}>
+              See all rewards
+            </Link>
+            {isAuthenticated ? null : (
+              <Link to="/login" state={{ from: "/" }} className={linkSecondary}>
+                Sign in to see your rank
+              </Link>
+            )}
+          </div>
         </div>
+
+        {isAuthenticated ? <LandingRewardsCard variant="full" className="mt-8" /> : null}
 
         <div className="mt-8">
           <RankLadder note={RANKS_NOTE} />
