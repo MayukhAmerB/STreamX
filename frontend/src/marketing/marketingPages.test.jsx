@@ -18,7 +18,6 @@ import ChangelogPage from "../pages/ChangelogPage";
 import { CURRENT_VERSION, RELEASES } from "../config/releaseNotes";
 import { siteStatItems } from "./siteStats";
 import BootcampPage from "../pages/BootcampPage";
-import { resolveCatalogFilter } from "../pages/CourseListPage";
 import PricingPage, { ComparisonTable } from "../pages/PricingPage";
 import { CourseActions } from "../pages/ProfessionalCoursePage";
 import RoadmapPage from "../pages/RoadmapPage";
@@ -401,14 +400,6 @@ describe("OSINT track, free tier and roadmap", () => {
     expect(markup).toContain('data-status="open"');
   });
 
-  it("maps catalogue filters from the URL, keeping ?view=live and ?category=", () => {
-    const params = (query) => new URLSearchParams(query);
-    expect(resolveCatalogFilter(params(""))).toBe("all");
-    expect(resolveCatalogFilter(params("view=live"))).toBe("live");
-    expect(resolveCatalogFilter(params("category=osint"))).toBe("osint");
-    expect(resolveCatalogFilter(params("category=web_pentesting"))).toBe("web_pentesting");
-    expect(resolveCatalogFilter(params("tier=quick_wins"))).toBe("quick_wins");
-    expect(resolveCatalogFilter(params("tier=nope"))).toBe("all");
-    expect(resolveCatalogFilter(params("filter=free"))).toBe("free");
-  });
+  // Hybrid release: /courses is the Friday 13 Nov catalogue again (its own
+  // ?view=live and ?category= handling is covered by CourseListPage.test.jsx).
 });

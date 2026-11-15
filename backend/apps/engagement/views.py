@@ -438,14 +438,27 @@ class AchievementVerifyView(APIView):
 
         data["recipient_name"] = public_handle(achievement.user_id)
         data["recipient_handle"] = data["recipient_name"]
+        # Certificates are private to their holder: only the holder and staff get the file links.
+        from .certificate_views import viewer
+
+        user = viewer(request)
+        if not (user is not None and (is_staff(user) or user.pk == achievement.user_id)):
+            data["share_card_url"] = None
+            data["certificate_url"] = None
         response = api_response(
             success=True,
             message="Valid achievement." if achievement.revoked_at is None else "This achievement was revoked.",
             data=data,
         )
-        response["Cache-Control"] = "public, max-age=300"
+        response["Cache-Control"] = "private, no-store"
         response["X-Robots-Tag"] = "noindex"
         return response
+
+
+def require_full_access(request, certificate):
+    from .certificate_views import require_full_access as _require
+
+    _require(request, certificate)
 
 
 class AchievementCardView(APIView):
@@ -454,8 +467,9 @@ class AchievementCardView(APIView):
 
     def get(self, request, slug):
         certificate = certificates.ensure_for_achievement(_achievement_or_404(slug))
+        require_full_access(request, certificate)
         response = HttpResponse(certificate_render.og_png(certificate), content_type="image/png")
-        response["Cache-Control"] = "public, max-age=300"
+        response["Cache-Control"] = "private, no-store"
         response["Content-Disposition"] = f'inline; filename="{certificate.reference}-preview.png"'
         response["X-Robots-Tag"] = "noindex"
         return response
@@ -467,8 +481,9 @@ class AchievementCertificateView(APIView):
 
     def get(self, request, slug):
         certificate = certificates.ensure_for_achievement(_achievement_or_404(slug))
+        require_full_access(request, certificate)
         response = HttpResponse(certificate_render.certificate_pdf(certificate), content_type="application/pdf")
-        response["Cache-Control"] = "public, max-age=300"
+        response["Cache-Control"] = "private, no-store"
         response["Content-Disposition"] = f'attachment; filename="{certificate.reference}.pdf"'
         response["X-Robots-Tag"] = "noindex"
         return response
@@ -683,3 +698,60 @@ class StaffBadgeView(APIView):
                 "revoked_at": row.revoked_at.isoformat() if row.revoked_at else None,
             },
         )
+
+
+# --- reward history and highlights (profile tabs) --------------------------------------
+class RewardHistoryView(APIView):
+    """``GET /api/engagement/me/history/``: the caller's XP ledger (paginated), badges,
+    batches and own certificates, each with its ``highlighted`` flag. Works whatever
+    the ``engagement`` switch says (it is the student's own record)."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_throttles(self):
+        return [ClientIpUserRateThrottle(), EngagementReadThrottle()]
+
+    def get(self, request):
+        from . import history
+
+        def _int(name, default):
+            try:
+                return int(request.query_params.get(name) or default)
+            except (TypeError, ValueError):
+                raise ValidationFailed(details={name: ["Send a whole number."]}) from None
+
+        data = history.history_payload(
+            request.user, page=_int("page", 1), page_size=_int("page_size", history.DEFAULT_PAGE_SIZE)
+        )
+        response = api_response(success=True, message="Reward history.", data=data)
+        response["Cache-Control"] = "private, no-store"
+        response["Vary"] = "Cookie, Authorization"
+        return response
+
+
+class RewardHighlightsView(APIView):
+    """``PATCH /api/engagement/me/highlights/`` (POST accepted): choose up to 3 badges or
+    certificates to feature on the public profile. ``GET`` returns the current choice."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_throttles(self):
+        if self.request.method == "GET":
+            return [ClientIpUserRateThrottle(), EngagementReadThrottle()]
+        return [ClientIpUserRateThrottle(), EngagementWriteThrottle()]
+
+    def get(self, request):
+        from . import history
+
+        response = api_response(success=True, message="Highlights.", data=history.highlights_dict(request.user.pk))
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+    def patch(self, request):
+        from . import history
+
+        data = history.set_highlights(request.user, request.data)
+        return api_response(success=True, message="Highlights saved.", data=data)
+
+    def post(self, request):
+        return self.patch(request)

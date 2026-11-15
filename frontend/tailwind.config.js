@@ -1,3 +1,9 @@
+// HYBRID RELEASE (Friday 13 Nov website + 13ca6b79 Console): Tailwind's
+// default hues are kept (the Friday website uses red/amber/emerald states),
+// and the radii and sans stack read CSS variables so the website
+// (html[data-surface="website"], src/index.css) keeps Tailwind's defaults
+// while the Console keeps the kit values.
+//
 // Tailwind 3.4 theme for the HackPath-philosophy redesign (PHILOSOPHY §3.2,
 // BUILD_PLAN §1 + D1). OWNER: WS-KIT.
 //
@@ -33,6 +39,17 @@ function lawfulPalette() {
   return out;
 }
 
+/** Tailwind's default palette without the deprecated aliases. */
+function defaultPalette() {
+  const out = {};
+  for (const name of Object.keys(defaultColors)) {
+    if (DEPRECATED.has(name)) continue;
+    out[name] = defaultColors[name];
+  }
+  return out;
+}
+void lawfulPalette;
+
 const withAlpha = (name) => `rgb(var(--${name}) / <alpha-value>)`;
 
 /** @type {import('tailwindcss').Config} */
@@ -40,7 +57,9 @@ export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     colors: {
-      ...lawfulPalette(),
+      // Hybrid: real hues (Friday website). The lawful grey mapping is kept
+      // below for reference but not applied.
+      ...defaultPalette(),
       transparent: "transparent",
       current: "currentColor",
       inherit: "inherit",
@@ -68,10 +87,15 @@ export default {
       ring: withAlpha("ring"),
       border: { DEFAULT: "var(--border)", soft: "var(--border-soft)", strong: "var(--border-strong)" },
       input: "var(--input)",
+      // Friday 13 Nov website colours.
+      ink: "#06040b",
+      paper: "#ffffff",
+      panel: "#100c19",
+      panel2: "#332554",
     },
     extend: {
       fontFamily: {
-        sans: ["Geist", '"Geist Fallback"', "ui-sans-serif", "system-ui", "-apple-system", '"Segoe UI"', "Roboto", "Arial", "sans-serif"],
+        sans: ["var(--tw-font-sans)"],
         mono: ['"Geist Mono"', '"Geist Mono Fallback"', "ui-monospace", "Menlo", "Consolas", "monospace"],
         hand: ["Handlee", '"Handlee Fallback"', '"Segoe Print"', '"Bradley Hand"', "cursive"],
       },
@@ -93,11 +117,11 @@ export default {
         "h2-tight": "-0.03em",
       },
       borderRadius: {
-        sm: "calc(var(--radius) - 4px)",
-        md: "calc(var(--radius) - 2px)",
-        lg: "var(--radius)",
-        xl: "calc(var(--radius) + 4px)",
-        "2xl": "calc(var(--radius) + 8px)",
+        sm: "var(--tw-radius-sm)",
+        md: "var(--tw-radius-md)",
+        lg: "var(--tw-radius-lg)",
+        xl: "var(--tw-radius-xl)",
+        "2xl": "var(--tw-radius-2xl)",
         plan: "1.3rem",
         "plan-outer": "1.35rem",
       },

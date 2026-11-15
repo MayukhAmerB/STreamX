@@ -894,7 +894,15 @@ def my_summary(user, *, now: datetime | None = None) -> dict:
     }
 
 
-def certificate(slug: str) -> dict:
+def _may_see_certificate(reward, viewer) -> bool:
+    if viewer is None or not getattr(viewer, "is_authenticated", False):
+        return False
+    return bool(getattr(viewer, "is_staff", False) or getattr(viewer, "is_superuser", False) or viewer.pk == reward.user_id)
+
+
+def certificate(slug: str, viewer=None) -> dict:
+    """Verification facts for a Finalist certificate. The holder's real name is
+    returned only to the holder and to staff (certificates are private)."""
     reward = (
         CtfSeasonReward.objects.select_related("season", "user")
         .filter(kind=CtfSeasonReward.KIND_CERTIFICATE, verify_slug=str(slug or "")[:32])
@@ -904,8 +912,9 @@ def certificate(slug: str) -> dict:
         raise NotFound("Certificate not found.", code="season_certificate_not_found")
     return {
         "valid": reward.revoked_at is None,
-        # A certificate is the one place a real name is printed (owner rule).
-        "name": certificate_name(reward.user),
+        # A certificate is the one place a real name is printed (owner rule), and
+        # only its holder (and staff) may see it.
+        "name": certificate_name(reward.user) if _may_see_certificate(reward, viewer) else "",
         "season": reward.season.slug,
         "season_title": reward.season.title,
         "month": reward.season.month_label,

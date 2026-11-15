@@ -433,3 +433,9 @@
     print-color-adjust: exact;
   }
 }
+
+/* Certificates are private: the note under the minimal "Verified" card. */
+.cv-private-note {
+  margin-top: 20px;
+  font-size: 0.9375rem;
+}

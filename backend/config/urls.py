@@ -83,3 +83,6 @@ urlpatterns += [
 
 # Automatic certification, certificate delivery and the Hall of Fame (apps.certification).
 urlpatterns += [path("api/certification/", include("apps.certification.urls"))]
+
+# Billing: catalogue, quotes, checkout and entitlements (apps.billing, see its README).
+urlpatterns += [path("api/billing/", include("apps.billing.urls"))]

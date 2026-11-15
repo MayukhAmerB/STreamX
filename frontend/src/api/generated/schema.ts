@@ -698,6 +698,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/billing/checkout/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description ``POST /api/billing/checkout/ {plan_id}``: a Razorpay order for the plan's current price. */
+        post: operations["billing_checkout_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/billing/checkout/verify/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description ``POST /api/billing/checkout/verify/ {order_id, payment_id, signature}``. */
+        post: operations["billing_checkout_verify_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/billing/entitlements/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description ``GET /api/billing/entitlements/``: what the signed-in user can use now. */
+        get: operations["billing_entitlements_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/billing/plans/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description ``GET /api/billing/plans/?product=<key>&course=<id>&entitlement=<key>&billing_type=...`` */
+        get: operations["billing_plans_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/billing/quote/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description ``POST /api/billing/quote/ {plan_id}``: the server-side amount. */
+        post: operations["billing_quote_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/calendar/feed/{token}.ics": {
         parameters: {
             query?: never;
@@ -2073,7 +2158,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description ``GET /api/engagement/certificates/<ref>/``: verify a certificate. */
+        /** @description ``GET /api/engagement/certificates/<ref>/``: verify a certificate (full payload for the holder and staff). */
         get: operations["engagement_certificates_retrieve_by_id"];
         put?: never;
         post?: never;
@@ -2245,6 +2330,55 @@ export interface paths {
             cookie?: never;
         };
         get: operations["engagement_me_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/engagement/me/highlights/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description ``PATCH /api/engagement/me/highlights/`` (POST accepted): choose up to 3 badges or
+         *     certificates to feature on the public profile. ``GET`` returns the current choice.
+         */
+        get: operations["engagement_me_highlights_retrieve"];
+        put?: never;
+        /**
+         * @description ``PATCH /api/engagement/me/highlights/`` (POST accepted): choose up to 3 badges or
+         *     certificates to feature on the public profile. ``GET`` returns the current choice.
+         */
+        post: operations["engagement_me_highlights_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * @description ``PATCH /api/engagement/me/highlights/`` (POST accepted): choose up to 3 badges or
+         *     certificates to feature on the public profile. ``GET`` returns the current choice.
+         */
+        patch: operations["engagement_me_highlights_partial_update"];
+        trace?: never;
+    };
+    "/engagement/me/history/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description ``GET /api/engagement/me/history/``: the caller's XP ledger (paginated), badges,
+         *     batches and own certificates, each with its ``highlighted`` flag. Works whatever
+         *     the ``engagement`` switch says (it is the student's own record).
+         */
+        get: operations["engagement_me_history_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5343,6 +5477,9 @@ export interface components {
             next_exam: components["schemas"]["EligibilityExam"] | null;
             /** Format: date-time */
             server_time: string;
+            entitlements?: {
+                [key: string]: unknown;
+            }[];
         };
         EligibilityAction: {
             label: string;
@@ -8643,6 +8780,147 @@ export interface operations {
             };
         };
     };
+    billing_checkout_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+                "application/x-www-form-urlencoded": {
+                    [key: string]: unknown;
+                };
+                "multipart/form-data": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    billing_checkout_verify_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+                "application/x-www-form-urlencoded": {
+                    [key: string]: unknown;
+                };
+                "multipart/form-data": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    billing_entitlements_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    billing_plans_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    billing_quote_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+                "application/x-www-form-urlencoded": {
+                    [key: string]: unknown;
+                };
+                "multipart/form-data": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     "calendar_feed_.ics_retrieve_by_id": {
         parameters: {
             query?: never;
@@ -11375,6 +11653,114 @@ export interface operations {
         };
     };
     engagement_me_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    engagement_me_highlights_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    engagement_me_highlights_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+                "application/x-www-form-urlencoded": {
+                    [key: string]: unknown;
+                };
+                "multipart/form-data": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    engagement_me_highlights_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+                "application/x-www-form-urlencoded": {
+                    [key: string]: unknown;
+                };
+                "multipart/form-data": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    engagement_me_history_retrieve: {
         parameters: {
             query?: never;
             header?: never;

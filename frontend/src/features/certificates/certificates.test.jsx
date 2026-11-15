@@ -190,6 +190,39 @@ describe("certificate page", () => {
     expect(path.props.fill).toBe(LAYOUT.colors[LAYOUT.qr.color]);
   });
 
+  it("shows everyone but the holder only the minimal verified card", async () => {
+    api.fetchCertificate.mockResolvedValue({
+      reference: BACKEND_REFERENCE,
+      status: "verified",
+      valid: true,
+      type: "OSINT",
+      type_label: "Open Source Intelligence",
+      issued_at: "2026-11-15T10:00:00+05:30",
+      issued_on: "2026-11-15",
+      issuer: { name: "Al Syed Initiative" },
+      revoked_at: null,
+      full: false,
+      is_owner: false,
+    });
+    const page = await mount(`/certificates/${BACKEND_REFERENCE}`);
+    const words = page.text();
+    expect(words).toContain("Verified: valid OSINT certificate issued 15 November 2026.");
+    expect(words).toContain(BACKEND_REFERENCE);
+    expect(words).toContain("private to its holder");
+    expect(words).not.toContain("Asha Kumar");
+    expect(page.find((node) => node.type === "figure")).toBeFalsy();
+    const links = page.all((node) => node.type === "a").map((node) => String(node.props.href || ""));
+    expect(links.some((href) => href.includes(".pdf") || href.includes(".png") || href.includes("linkedin"))).toBe(false);
+    expect(links.some((href) => href.startsWith("/login?next="))).toBe(true);
+  });
+
+  it("shows the full certificate to the holder", async () => {
+    api.fetchCertificate.mockResolvedValue(certificate({ full: true, is_owner: true }));
+    const page = await mount(`/certificates/${BACKEND_REFERENCE}`);
+    expect(page.text()).toContain("Asha Kumar");
+    expect(page.find((node) => node.type === "figure")).toBeTruthy();
+  });
+
   it("shows a revoked certificate clearly, without the LinkedIn button", async () => {
     api.fetchCertificate.mockResolvedValue(certificate({ valid: false }));
     const page = await mount(`/certificates/${BACKEND_REFERENCE}`);

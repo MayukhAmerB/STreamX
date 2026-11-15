@@ -3,10 +3,10 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 
 import { getJoinSettings, listJoinLocations, submitJoinApplication } from "../api/join";
+import joinSideImage from "../assets/join-side.jpg";
 import TurnstileWidget from "../components/TurnstileWidget";
 import { useAuth } from "../hooks/useAuth";
 import { useTurnstileChallenge } from "../hooks/useTurnstileChallenge";
-import { AuthArt } from "../marketing/auth/AuthSplit";
 import { apiData, apiMessage } from "../utils/api";
 import "./JoinAlSyedPage.css";
 
@@ -752,10 +752,10 @@ export default function JoinAlSyedPage() {
   };
 
   return (
-    <section className="join-page au-page">
-      <div className="au-split">
-      <AuthArt credit="Al Syed Initiative · coordinated legal and civic response." />
-      <div className="au-panel au-panel--long join-panel">
+    <section className="join-page">
+      <div className="join-side" aria-hidden="true">
+        <img src={joinSideImage} alt="" decoding="async" />
+      </div>
       <div className="join-container">
         {step === "role" ? (
           <RoleStep
@@ -805,8 +805,7 @@ export default function JoinAlSyedPage() {
         ) : null}
         {step === "submitted" ? <SubmittedStep instagramUrl={instagramUrl} /> : null}
       </div>
-      </div>
-      </div>
+      <JoinArchOrnament />
       <TermsDialog
         open={termsOpen}
         onClose={closeTerms}

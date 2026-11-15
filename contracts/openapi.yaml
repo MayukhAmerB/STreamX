@@ -1070,6 +1070,136 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /billing/checkout/:
+    post:
+      operationId: billing_checkout_create
+      description: '``POST /api/billing/checkout/ {plan_id}``: a Razorpay order for
+        the plan''s current price.'
+      tags:
+      - billing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /billing/checkout/verify/:
+    post:
+      operationId: billing_checkout_verify_create
+      description: '``POST /api/billing/checkout/verify/ {order_id, payment_id, signature}``.'
+      tags:
+      - billing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /billing/entitlements/:
+    get:
+      operationId: billing_entitlements_retrieve
+      description: '``GET /api/billing/entitlements/``: what the signed-in user can
+        use now.'
+      tags:
+      - billing
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /billing/plans/:
+    get:
+      operationId: billing_plans_retrieve
+      description: '``GET /api/billing/plans/?product=<key>&course=<id>&entitlement=<key>&billing_type=...``'
+      tags:
+      - billing
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /billing/quote/:
+    post:
+      operationId: billing_quote_create
+      description: '``POST /api/billing/quote/ {plan_id}``: the server-side amount.'
+      tags:
+      - billing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /calendar/feed/{token}.ics:
     get:
       operationId: calendar_feed_.ics_retrieve_by_id
@@ -3405,7 +3535,8 @@ paths:
   /engagement/certificates/{ref}/:
     get:
       operationId: engagement_certificates_retrieve_by_id
-      description: '``GET /api/engagement/certificates/<ref>/``: verify a certificate.'
+      description: '``GET /api/engagement/certificates/<ref>/``: verify a certificate
+        (full payload for the holder and staff).'
       parameters:
       - in: path
         name: ref
@@ -3635,6 +3766,109 @@ paths:
   /engagement/me/:
     get:
       operationId: engagement_me_retrieve
+      tags:
+      - engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/me/highlights/:
+    get:
+      operationId: engagement_me_highlights_retrieve
+      description: |-
+        ``PATCH /api/engagement/me/highlights/`` (POST accepted): choose up to 3 badges or
+        certificates to feature on the public profile. ``GET`` returns the current choice.
+      tags:
+      - engagement
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    post:
+      operationId: engagement_me_highlights_create
+      description: |-
+        ``PATCH /api/engagement/me/highlights/`` (POST accepted): choose up to 3 badges or
+        certificates to feature on the public profile. ``GET`` returns the current choice.
+      tags:
+      - engagement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+    patch:
+      operationId: engagement_me_highlights_partial_update
+      description: |-
+        ``PATCH /api/engagement/me/highlights/`` (POST accepted): choose up to 3 badges or
+        certificates to feature on the public profile. ``GET`` returns the current choice.
+      tags:
+      - engagement
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - cookieJWT: []
+      - bearerJWT: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /engagement/me/history/:
+    get:
+      operationId: engagement_me_history_retrieve
+      description: |-
+        ``GET /api/engagement/me/history/``: the caller's XP ledger (paginated), badges,
+        batches and own certificates, each with its ``highlighted`` flag. Works whatever
+        the ``engagement`` switch says (it is the student's own record).
       tags:
       - engagement
       security:
@@ -9787,6 +10021,11 @@ components:
         server_time:
           type: string
           format: date-time
+        entitlements:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
       required:
       - action
       - enabled

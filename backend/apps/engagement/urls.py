@@ -4,6 +4,8 @@ from . import certificate_views, journey, views
 
 urlpatterns = [
     path("me/", views.MeView.as_view(), name="engagement-me"),
+    path("me/history/", views.RewardHistoryView.as_view(), name="engagement-me-history"),
+    path("me/highlights/", views.RewardHighlightsView.as_view(), name="engagement-me-highlights"),
     path("me/level-seen/", views.LevelSeenView.as_view(), name="engagement-level-seen"),
     path("levels/", views.LevelChartView.as_view(), name="engagement-levels"),
     path("journey/", journey.JourneyView.as_view(), name="engagement-journey"),

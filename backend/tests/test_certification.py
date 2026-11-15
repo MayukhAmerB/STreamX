@@ -7,6 +7,7 @@ real name or e-mail)."""
 
 from __future__ import annotations
 
+import io
 import json
 from decimal import Decimal
 from unittest import mock
@@ -569,7 +570,10 @@ class HallOfFameTests(CertificationBase):
         self.assertEqual(entry["batch"], "Batch 7")
         self.assertEqual(entry["achievement"], "Certified OSINT Investigator")
         self.assertEqual(entry["achieved_on"], timezone.localdate().isoformat())
-        self.assertEqual(entry["certificate_url"], f"/certificates/{reference}")
+        self.assertTrue(reference)
+        # Certificates are private to their holder: the wall never links to one.
+        self.assertEqual((entry["certificate_url"], entry["certificate_reference"], entry["has_certificate"]), (None, None, True))
+        self.assertNotIn(reference, self.public().content.decode())
         self.assertEqual(entry["profile_url"], "/u/asha_r")
         self.assertEqual(entry["band"], "Distinction")
         self.assertEqual(data["counters"]["graduates"], 1)
@@ -592,6 +596,45 @@ class HallOfFameTests(CertificationBase):
             self.assertNotIn(secret, body)
         # A student without a handle is not listed until they choose one.
         self.assertEqual(self.public().json()["data"]["counters"]["graduates"], 1)
+
+    def test_automatic_handles_wait_until_the_student_chooses_one(self):
+        from django.core.management import call_command
+
+        from apps.profiles.models import StudentProfile
+
+        profile = StudentProfile.objects.create(
+            user=self.student, handle="operative_ab12cd", handle_auto=True,
+            visibility=StudentProfile.VISIBILITY_PUBLIC, published_at=timezone.now(),
+        )
+        self.sit(self.student, range(1, 11))
+        self.drain()
+        body = self.public().content.decode()
+        self.assertNotIn("operative_ab12cd", body)
+        self.assertNotIn("Asha Rao", body)
+        self.assertEqual(self.public().json()["data"]["counters"]["graduates"], 0)
+        # A staff-set handle that is really the automatic one is not shown either.
+        HallOfFameEntry.objects.filter(user=self.student).update(display_handle="operative_ab12cd")
+        self.assertNotIn("operative_ab12cd", self.public().content.decode())
+        awaiting = list(hall_of_fame.awaiting_handle_queryset())
+        self.assertEqual([row.user_id for row in awaiting], [self.student.pk])
+        out = io.StringIO()
+        call_command("hall_of_fame_awaiting_handles", "--emails", stdout=out)
+        self.assertEqual(out.getvalue().split(), [self.student.email])
+        # The student chooses a handle: the entry appears automatically.
+        profile.handle, profile.handle_auto = "asha_r", False
+        profile.save()
+        entry = self.public().json()["data"]["entries"][0]
+        self.assertEqual(entry["handle"], "asha_r")
+        self.assertEqual(list(hall_of_fame.awaiting_handle_queryset()), [])
+        out = io.StringIO()
+        call_command("hall_of_fame_awaiting_handles", stdout=out)
+        self.assertIn("Every listed graduate has chosen a handle", out.getvalue())
+
+    def test_legacy_entries_keep_their_published_handle(self):
+        legacy = HallOfFameEntry.objects.filter(seed_key__startswith="legacy:").exclude(display_handle="").first()
+        if legacy is None:
+            self.skipTest("no seeded legacy entry with a handle")
+        self.assertIn(legacy.display_handle, self.public().content.decode())
 
     def test_members_only_profile_shows_the_handle_without_a_link(self):
         self.profile(self.student, "asha_r", public=False)

@@ -2,10 +2,14 @@
 
 Owner rule: public surfaces show the student's HANDLE only, never the real
 name or e-mail. The handle is the linked user's live profile handle
-(``profiles.StudentProfile``), else a ``display_handle`` set by staff. An
-entry with neither is not public (curated entries imported from the old page
-wait until staff map them to a user or set a handle). The certificate a card
-links to shows the real name; that is intended.
+(``profiles.StudentProfile``) ONLY when the student chose it themselves
+(``handle_auto`` False and not an ``operative_`` handle), else a
+``display_handle`` set by staff (legacy entries keep theirs). An entry with
+neither is not public: a graduate who still has only the automatic
+``operative_xxxxxx`` handle (or no profile) appears automatically once they
+choose a handle (``awaiting_handle_queryset`` lists them for staff).
+
+Certificates are private to their holder: cards never link to one.
 
 An entry is public when: not hidden by staff, the student has not opted out
 (``CertificationPreferences.hall_of_fame_listed``), its certificate (if any)
@@ -35,6 +39,7 @@ FEATURED = 3
 # The academy was founded in 2025: the curated Batch 1 and 2 graduates (seeded
 # without a date) were honoured that year, and no honour predates it.
 FOUNDING_YEAR = 2025
+AUTO_HANDLE_PREFIX = "operative_"  # profiles.handles.AUTO_PREFIX (reserved for automatic handles)
 HANDLE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,38}[A-Za-z0-9._-]?$")
 
 
@@ -50,25 +55,46 @@ def _annotated(queryset):
     if profile is None:
         return queryset.annotate(
             profile_handle=Value("", output_field=CharField()), profile_public=Value(0, output_field=IntegerField())
-        ).annotate(public_handle=NullIf(F("display_handle"), Value("")))
+        ).annotate(public_handle=NullIf(F("display_handle"), Value("")))  # pragma: no cover
     profiles = profile.objects.filter(user_id=OuterRef("user_id"))
-    linkable = profiles.filter(
+    chosen = profiles.filter(handle_auto=False).exclude(handle__startswith=AUTO_HANDLE_PREFIX)
+    linkable = chosen.filter(
         status=profile.STATUS_ACTIVE, visibility=profile.VISIBILITY_PUBLIC, published_at__isnull=False
     )
     return queryset.annotate(
-        profile_handle=Subquery(profiles.values("handle")[:1]),
+        profile_handle=Subquery(chosen.values("handle")[:1]),
         profile_public=Coalesce(Subquery(linkable.annotate(one=Value(1, output_field=IntegerField())).values("one")[:1]), 0),
-    ).annotate(public_handle=Coalesce(NullIf(F("profile_handle"), Value("")), NullIf(F("display_handle"), Value(""))))
+    ).annotate(
+        staff_handle=Case(
+            When(display_handle__startswith=AUTO_HANDLE_PREFIX, then=Value("")),
+            default=F("display_handle"),
+            output_field=CharField(),
+        )
+    ).annotate(public_handle=Coalesce(NullIf(F("profile_handle"), Value("")), NullIf(F("staff_handle"), Value(""))))
 
 
-def public_queryset():
-    queryset = (
+def _eligible():
+    return (
         HallOfFameEntry.objects.filter(is_hidden=False)
         .exclude(user__certification_preferences__hall_of_fame_listed=False)
         .exclude(certificate__revoked_at__isnull=False)
         .select_related("certificate")
     )
-    return _annotated(queryset).filter(public_handle__isnull=False)
+
+
+def public_queryset():
+    return _annotated(_eligible()).filter(public_handle__isnull=False)
+
+
+def awaiting_handle_queryset():
+    """Graduates who would be on the wall but have no chosen handle yet (only the
+    automatic ``operative_`` one, or no profile). Staff ask them to choose one."""
+    return (
+        _annotated(_eligible())
+        .filter(public_handle__isnull=True, user__isnull=False)
+        .select_related("user")
+        .order_by("-batch_order", "position", "id")
+    )
 
 
 def group_key(entry) -> str:
@@ -80,9 +106,8 @@ def group_key(entry) -> str:
 
 
 def entry_dict(entry) -> dict:
-    """Public card. Handle, batch, achievement, date and certificate link only."""
+    """Public card. Handle, batch, achievement and date only (certificates are private to their holder)."""
     handle = entry.public_handle
-    reference = entry.certificate.reference if entry.certificate_id and entry.certificate else None
     return {
         "id": entry.pk,
         "handle": handle,
@@ -93,8 +118,9 @@ def entry_dict(entry) -> dict:
         "achieved_on": entry.achieved_on.isoformat() if entry.achieved_on else None,
         "year": entry.achieved_on.year if entry.achieved_on else None,
         "band": entry.band or "",
-        "certificate_reference": reference,
-        "certificate_url": f"/certificates/{reference}" if reference else None,
+        "has_certificate": bool(entry.certificate_id),
+        "certificate_reference": None,
+        "certificate_url": None,
     }
 
 

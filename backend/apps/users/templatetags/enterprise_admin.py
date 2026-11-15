@@ -37,6 +37,7 @@ JOB_GROUPS = (
     ("live", "Live classes", "video"),
     ("content", "Content", "education"),
     ("students", "Students & sales", "user-multiple"),
+    ("billing", "Billing", "wallet"),
     ("assessments", "Assessments", "flag"),
     ("community", "Community", "chat"),
     ("settings", "Settings", "settings-adjust"),
@@ -76,6 +77,13 @@ MODEL_JOBS = {
     "payments.platformsubscription": ("students", "Subscriptions"),
     "payments.platformgrant": ("students", "Plan grants"),
     "payments.membershipbundle": ("students", "Membership bundles"),
+    # Billing (apps.billing): catalogue, plans, purchases, entitlements
+    "billing.plan": ("billing", "Plans"),
+    "billing.product": ("billing", "Products"),
+    "billing.price": ("billing", "Prices"),
+    "billing.purchase": ("billing", "Purchases"),
+    "billing.entitlementgrant": ("billing", "Entitlement grants"),
+    "billing.entitlementkey": ("billing", "Entitlement keys"),
     # Assessments
     "reports.reporttask": ("assessments", "Report tasks"),
     "reports.reportsubmission": ("assessments", "Report submissions"),

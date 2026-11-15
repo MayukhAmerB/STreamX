@@ -35,7 +35,20 @@ const baselinePath = path.join(root, "scripts/palette-baseline.json");
 
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", ".vite", "generated", "coverage"]);
 const SKIP_FILE = /\.(test|spec)\.[cm]?[jt]sx?$|\.d\.ts$/;
-const EXEMPT_PATH = [/^frontend\/src\/assets\/brand\//];
+// Hybrid release (owner, Nov 2026): the public website is the Friday 13 Nov
+// site (7a444898) restored verbatim, with its own colours. These files are
+// exempt as a whole; every other file (and every new piece) stays under the law.
+const FRIDAY_WEBSITE = [
+  "frontend/src/components/NationalDeskArt.jsx",
+  "frontend/src/components/Navbar.css",
+  "frontend/src/features/youtube/YouTube.css",
+  "frontend/src/pages/AccountsDirectoryPage.css",
+  "frontend/src/pages/HallOfFamePage.jsx",
+  "frontend/src/pages/JoinAlSyedPage.css",
+  "frontend/src/pages/LandingPage.jsx",
+  "frontend/src/pages/WatchPage.jsx",
+];
+const EXEMPT_PATH = [/^frontend\/src\/assets\/brand\//, { test: (relative) => FRIDAY_WEBSITE.includes(relative) }];
 
 function walk(directory, pattern, out = [], { recurse = true } = {}) {
   if (!fs.existsSync(directory)) return out;

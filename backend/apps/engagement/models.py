@@ -487,3 +487,30 @@ class CertificateRevision(models.Model):
 
     def __str__(self):
         return f"{self.get_action_display()} r{self.revision} ({self.certificate_id})"
+
+
+class RewardHighlight(models.Model):
+    """A badge or certificate the student chose to feature on their public profile (at most 3).
+
+    ``key`` is the badge key or the certificate reference. A new table (nothing
+    else references it), so older code is unaffected by it.
+    """
+
+    KIND_BADGE = "badge"
+    KIND_CERTIFICATE = "certificate"
+    KIND_CHOICES = [(KIND_BADGE, "Badge"), (KIND_CERTIFICATE, "Certificate")]
+    MAX = 3
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reward_highlights")
+    kind = models.CharField(max_length=12, choices=KIND_CHOICES)
+    key = models.CharField(max_length=64, help_text="Badge key or certificate reference.")
+    position = models.PositiveSmallIntegerField(default=0, db_default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["position", "id"]
+        verbose_name = "reward highlight"
+        constraints = [models.UniqueConstraint(fields=["user", "kind", "key"], name="eng_highlight_user_kind_key_uniq")]
+
+    def __str__(self):
+        return f"{self.kind} {self.key} for user {self.user_id}"

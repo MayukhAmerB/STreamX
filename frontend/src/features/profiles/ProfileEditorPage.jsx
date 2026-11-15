@@ -18,6 +18,7 @@ import { cn } from "../../kit/lib/cn";
 import { Notice } from "../../kit/Layout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../kit/Tabs";
 import { Eyebrow } from "../../kit/Typography";
+import { RewardRecordTabContents, RewardRecordTabTriggers, useRewardHistory } from "../rewards/RewardRecord";
 import ProfileImage from "./ProfileImage";
 import ProfileView from "./ProfileView";
 import {
@@ -576,6 +577,8 @@ function HandleForm({ me, onSaved, onError }) {
 }
 
 export default function ProfileEditorPage() {
+  // Rewards / Batches / Certificates tabs (Task C): loaded with the page so the tab opens instantly.
+  const record = useRewardHistory();
   const [me, setMe] = useState(null);
   const [draft, setDraft] = useState(null);
   const [load, setLoad] = useState({ status: "loading", error: null });
@@ -803,6 +806,7 @@ export default function ProfileEditorPage() {
           <TabsTrigger value="edit">Edit</TabsTrigger>
           <TabsTrigger value="preview">Preview</TabsTrigger>
           <TabsTrigger value="privacy">Privacy</TabsTrigger>
+          <RewardRecordTabTriggers />
         </TabsList>
 
         <TabsContent value="edit" className="mt-6 space-y-6">
@@ -896,7 +900,7 @@ export default function ProfileEditorPage() {
           <p className="mb-4 text-sm text-muted-foreground">
             This is your saved draft. {dirty ? "Save to see your latest edits here." : null}
           </p>
-          <div className="overflow-hidden rounded-lg border border-white/10">
+          <div className="overflow-hidden rounded-lg border border-white/10" data-console-type="off">
             {preview.status === "ready" ? (
               <ProfileView profile={preview.data} headingLevel="h2" showReport={false} />
             ) : (
@@ -962,6 +966,7 @@ export default function ProfileEditorPage() {
             .
           </p>
         </TabsContent>
+        <RewardRecordTabContents record={record} />
       </Tabs>
     </div>
   );

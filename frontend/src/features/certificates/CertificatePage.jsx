@@ -2,11 +2,14 @@
 //   /certificates                 the "Verify a certificate" form
 //   /certificates/:reference      the certificate itself (a slug or a loose spelling is
 //                                 replaced by the canonical reference number)
-// No sign-in. It keeps working when the engagement switch is off, because the API does.
+// No sign-in needed to VERIFY. Certificates are private: the full certificate (name,
+// artwork, PDF/PNG) is shown only to the signed-in holder and to staff (the API sends
+// `full: true`); everyone else sees the minimal "Verified" card (`full: false`).
+// It keeps working when the engagement switch is off, because the API does.
 import "./certificates.css";
 
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import CertificateArtwork from "./CertificateArtwork";
 import { certificateErrorKind, fetchCertificate } from "./certificateApi";
@@ -14,6 +17,29 @@ import { REFERENCE_PROBLEMS, looksLikeReference, parseReference } from "./refere
 import VerifyCertificateForm from "./VerifyCertificateForm";
 
 const ISSUER = "Al Syed Initiative";
+
+// Short names for the minimal card ("Verified: valid OSINT certificate issued ...").
+const TYPE_NAMES = {
+  OSINT: "OSINT",
+  PEN: "penetration testing",
+  CTF: "CTF",
+  COURSE: "course",
+  EXAM: "exam",
+  BADGE: "badge",
+  LEVEL: "learner progression",
+};
+
+/** True when the payload is the full certificate (older APIs sent no `full` flag: always full). */
+function isFullCertificate(data) {
+  return Boolean(data) && data.full !== false;
+}
+
+function formatIssued(isoDate) {
+  if (!isoDate) return "";
+  const parsed = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return isoDate;
+  return parsed.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+}
 
 const PROBLEMS = {
   missing: {
@@ -62,28 +88,23 @@ function useCertificate(identifier) {
   return state.key === identifier ? state : { status: "loading", data: null };
 }
 
-/** Sets <title>, description and the Open Graph image while the page is open, then restores them. */
+/** Sets <title> and description while the page is open, then restores them.
+ * Certificates are private: the head never carries the holder's name or the artwork. */
 function useCertificateMeta(data) {
   useEffect(() => {
     if (typeof document === "undefined" || !data?.reference) return undefined;
-    const name = data.recipient_name || "Certificate holder";
-    const title = data.valid ? `${name}: ${data.heading} | ${ISSUER}` : `Revoked certificate ${data.reference} | ${ISSUER}`;
+    const title = data.valid ? `Verified certificate ${data.reference} | ${ISSUER}` : `Revoked certificate ${data.reference} | ${ISSUER}`;
     const description = data.valid
-      ? `${data.title}. Reference ${data.reference}. Verified by ${ISSUER}.`
+      ? `A genuine certificate issued by ${ISSUER}. Reference ${data.reference}.`
       : `${ISSUER} revoked this certificate. It is no longer valid.`;
     const wanted = [
       ["name", "description", description],
       ["name", "robots", "noindex, follow"],
       ["property", "og:title", title],
       ["property", "og:description", description],
-      ["property", "og:url", data.verify_url],
-      ["property", "og:image", data.og_image_url],
-      ["property", "og:image:width", "1200"],
-      ["property", "og:image:height", "630"],
-      ["name", "twitter:card", "summary_large_image"],
+      ["name", "twitter:card", "summary"],
       ["name", "twitter:title", title],
       ["name", "twitter:description", description],
-      ["name", "twitter:image", data.og_image_url],
     ];
     const previousTitle = document.title;
     const restore = wanted.map(([attr, key, content]) => {
@@ -134,6 +155,55 @@ function CopyLink({ url }) {
       <span className="cv-sr" role="status" aria-live="polite">
         {message}
       </span>
+    </>
+  );
+}
+
+/** What everyone but the holder sees: genuine or not, the type, the issue date and the reference. */
+function MinimalCertificateView({ data }) {
+  const valid = Boolean(data.valid);
+  const kind = TYPE_NAMES[data.type] || (data.type_label ? data.type_label.toLowerCase() : "");
+  const issued = formatIssued(data.issued_on);
+  const location = useLocation();
+  const next = encodeURIComponent(`${location.pathname}${location.search || ""}`);
+  return (
+    <>
+      <header className="cv-head">
+        <StatusBadge valid={valid} />
+        <h1 className="cv-head__title">{valid ? "This certificate is genuine" : "This certificate was revoked"}</h1>
+        <p className="cv-head__lede" data-testid="cv-minimal">
+          {valid
+            ? `Verified: valid ${kind ? `${kind} ` : ""}certificate issued ${issued}.`
+            : `${ISSUER} withdrew this certificate. It is no longer valid and should not be relied on.`}
+        </p>
+        <p className="cv-head__ref">
+          Reference number <span className="cv-mono">{data.reference}</span>
+        </p>
+      </header>
+
+      <dl className="cv-facts">
+        <div>
+          <dt>Certificate type</dt>
+          <dd>{data.type_label || data.type}</dd>
+        </div>
+        <div>
+          <dt>Date of issue</dt>
+          <dd>{issued}</dd>
+        </div>
+        <div>
+          <dt>Issued by</dt>
+          <dd>{data.issuer?.name || ISSUER}</dd>
+        </div>
+        <div>
+          <dt>Status</dt>
+          <dd>{valid ? "Verified" : "Revoked"}</dd>
+        </div>
+      </dl>
+
+      <p className="cv-head__lede cv-private-note">
+        The certificate itself is private to its holder. If it is yours,{" "}
+        <Link to={`/login?next=${next}`}>sign in</Link> to see and download it.
+      </p>
     </>
   );
 }
@@ -268,7 +338,9 @@ export default function CertificatePage() {
           </section>
         ) : null}
 
-        {status === "ready" && data ? <CertificateView data={data} /> : null}
+        {status === "ready" && data ? (
+          isFullCertificate(data) ? <CertificateView data={data} /> : <MinimalCertificateView data={data} />
+        ) : null}
 
         {status !== "loading" ? (
           <section className="cv-verify-band">

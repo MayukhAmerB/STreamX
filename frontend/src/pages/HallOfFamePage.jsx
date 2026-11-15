@@ -1,336 +1,197 @@
-// /hall-of-fame: the grand Hall of Fame (HackPath design language, palette law:
-// black, greys, whites, one golden white with a soft glow).
-//
-// Data: GET /api/certification/hall-of-fame/ (apps.certification). Students who
-// pass the certification exam are added automatically; curated entries are
-// merged in by staff. Owner rule: every card shows the student's HANDLE only
-// (never the real name), links to their public profile when it is public, and
-// to the verified certificate page (/certificates/<reference>), which is
-// where the real name appears.
-//
-// Layout: a monumental hero (one handwritten accent word, golden light),
-// counters (real numbers only), large hero cards for the most recent and the
-// top graduates, then the wall of honour grouped by batch/year with big
-// handles, paginated ("Show more"). Motion: CSS-only glow plus the kit
-// <Reveal> for below-the-fold cards; reduced motion shows the final state.
-import "./HallOfFamePage.css";
-
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-
+import { useEffect, useState } from "react";
+import PageShell from "../components/PageShell";
 import { fetchHallOfFame } from "../features/certification/certificationApi";
-import { Reveal } from "../kit/motion";
-import { ArrowRightIcon, ButtonLink, Hand, Tagline, cx } from "../marketing/primitives";
 
-const DATE = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const certifiedBatches = [
+  {
+    name: "Batch 1",
+    students: ["Araxis", "Al Haris", "Zulqarnain", "Orvax", "Ibn Adam"],
+  },
+  {
+    name: "Batch 2",
+    students: [
+      "ALHaq",
+      "Bani Adam",
+      "Baseej",
+      "Fly-Nightingale",
+      "Jarvis",
+      "Khalid",
+      "Laisullah",
+      "LegallyStalking",
+      "RadicalGates",
+      "Shaikh Sahab",
+      "Spectre",
+      "STOIC MURDOCK",
+      "Vision",
+      "Yamach",
+    ],
+  },
+];
 
-export function formatAchievedOn(value) {
-  if (!value) return "";
-  const date = new Date(`${value}T00:00:00Z`);
-  return Number.isNaN(date.getTime()) ? "" : DATE.format(date);
+// Batch 1 and 2 are the curated Friday list above. Every later batch (Batch 3
+// onwards) comes from GET /api/certification/hall-of-fame/, which sends the
+// graduate's own chosen handle only: never a real name, never an automatic
+// "operative_" handle (the backend leaves those out until a handle is chosen).
+const STATIC_BATCHES = new Set(certifiedBatches.map((batch) => batch.name.toLowerCase()));
+const MAX_PAGES = 10;
+
+function batchNumber(label) {
+  const match = /(\d+)/.exec(label || "");
+  return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
 }
 
-/** Group loaded entries by batch (or year), keeping the server's order. */
-export function groupEntries(entries = []) {
-  const groups = [];
-  const index = new Map();
+export function groupHallOfFameEntries(entries = []) {
+  const groups = new Map();
   for (const entry of entries) {
-    const key = entry.group || entry.batch || "Graduates";
-    if (!index.has(key)) {
-      index.set(key, { key, entries: [] });
-      groups.push(index.get(key));
-    }
-    index.get(key).entries.push(entry);
+    const handle = String(entry?.handle || "").trim();
+    const name = String(entry?.group || entry?.batch || "Graduates").trim() || "Graduates";
+    if (!handle || /^operative_/i.test(handle) || STATIC_BATCHES.has(name.toLowerCase())) continue;
+    if (!groups.has(name)) groups.set(name, []);
+    const students = groups.get(name);
+    if (!students.includes(handle)) students.push(handle);
   }
-  return groups;
+  return [...groups.entries()]
+    .map(([name, students]) => ({ name, students }))
+    .sort((a, b) => batchNumber(a.name) - batchNumber(b.name) || a.name.localeCompare(b.name));
 }
 
-/** Counters with real numbers only: zero or missing figures are left out. */
-export function counterItems(counters = {}) {
-  return [
-    { key: "graduates", label: "Certified graduates", value: counters.graduates },
-    { key: "batches", label: counters.batches === 1 ? "Batch" : "Batches", value: counters.batches },
-    { key: "verified", label: "Verified certificates", value: counters.verified_certificates },
-    { key: "since", label: "Honoured since", value: counters.since },
-  ].filter((item) => Number.isFinite(item.value) && item.value > 0);
+function useLiveBatches() {
+  const [batches, setBatches] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const entries = [];
+      try {
+        for (let page = 1; page <= MAX_PAGES; page += 1) {
+          const data = await fetchHallOfFame({ page });
+          entries.push(...(Array.isArray(data?.entries) ? data.entries : []));
+          if (!data?.has_more) break;
+        }
+      } catch {
+        // The curated batches still show; later batches appear when the API answers.
+      }
+      if (!cancelled) setBatches(groupHallOfFameEntries(entries));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return batches;
 }
 
-const groupId = (key) => `hof-group-${String(key).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-
-function Handle({ entry, className }) {
-  const label = `@${entry.handle}`;
-  if (entry.profile_url) {
-    return (
-      <Link to={entry.profile_url} className={cx(className, "hof-handle-link")}>
-        {label}
-      </Link>
-    );
-  }
-  return <span className={className}>{label}</span>;
-}
-
-function CertificateLink({ entry, className }) {
-  if (!entry.certificate_url) return null;
+function LaurelsMark() {
   return (
-    <Link to={entry.certificate_url} className={cx("hof-cert-link", className)}>
-      View certificate
-      <span className="hp-sr"> of @{entry.handle}</span>
-      <ArrowRightIcon className="hof-cert-link__arrow" />
-    </Link>
-  );
-}
-
-function Meta({ entry }) {
-  const parts = [entry.batch, formatAchievedOn(entry.achieved_on)].filter(Boolean);
-  return parts.length ? <p className="hof-meta hp-mono">{parts.join(" · ")}</p> : null;
-}
-
-export function FeaturedCard({ entry, kind, index = 0 }) {
-  return (
-    <Reveal as="li" index={index} className="hof-feature" data-kind={kind}>
-      <article className="hof-feature__card" aria-label={`@${entry.handle}`}>
-        <p className="hof-feature__kicker">
-          <span className="hof-feature__rank hp-mono" aria-hidden="true">
-            {String(index + 1).padStart(2, "0")}
-          </span>
-          {kind === "top" && entry.band ? entry.band : entry.achievement}
-        </p>
-        <h3 className="hof-feature__handle">
-          <Handle entry={entry} />
-        </h3>
-        <Meta entry={entry} />
-        {kind === "top" ? <p className="hof-feature__achievement">{entry.achievement}</p> : null}
-        <CertificateLink entry={entry} />
-      </article>
-    </Reveal>
-  );
-}
-
-export function WallTile({ entry, index = 0 }) {
-  return (
-    <Reveal as="li" index={index} className="hof-tile">
-      <Handle entry={entry} className="hof-tile__handle" />
-      <p className="hof-tile__achievement">{entry.achievement}</p>
-      <Meta entry={entry} />
-      <CertificateLink entry={entry} className="hof-tile__cert" />
-    </Reveal>
-  );
-}
-
-/** Presentational page (tests render it with fixed data). */
-export function HallOfFameView({ data, status = "ready", batch = "", loadingMore = false, onBatch, onMore, onRetry }) {
-  const counters = counterItems(data?.counters);
-  const recent = data?.featured?.recent || [];
-  const recentIds = new Set(recent.map((entry) => entry.id));
-  // With few graduates the top list repeats the recent one: show it only when it adds someone.
-  const top = (data?.featured?.top || []).some((entry) => !recentIds.has(entry.id)) ? data.featured.top : [];
-  const groups = useMemo(() => groupEntries(data?.entries || []), [data?.entries]);
-  const batches = data?.batches || [];
-  const empty = status === "ready" && !(data?.entries || []).length && !batch;
-
-  return (
-    <div data-page="hall-of-fame" className="hof">
-      <section className="hof-hero" aria-labelledby="hof-title">
-        <div className="hof-hero__light" aria-hidden="true" />
-        <Tagline>Earned, not given</Tagline>
-        <h1 id="hof-title" className="hof-hero__title">
-          <span className="hof-hero__line">The Hall</span> <span className="hof-hero__line">
-            of <Hand accent>Fame</Hand>
-          </span>
-        </h1>
-        <p className="hof-hero__lead">
-          A permanent record of the investigators who met the Al Syed certification standard through skill, discipline and
-          careful method. Every name here links to a certificate anyone can verify.
-        </p>
-        {counters.length ? (
-          <dl className="hof-counters" aria-label="Hall of Fame in numbers" style={{ "--hof-counters": counters.length }}>
-            {counters.map((item) => (
-              <div key={item.key} className="hof-counter">
-                <dt>{item.label}</dt>
-                <dd className="hp-mono">{item.value}</dd>
-              </div>
-            ))}
-          </dl>
-        ) : null}
-      </section>
-
-      <div className="hp-frame hof-body">
-        {status === "loading" ? (
-          <p className="hof-state" role="status">
-            Opening the Hall of Fame…
-          </p>
-        ) : null}
-        {status === "error" ? (
-          <div className="hof-state hof-state--error" role="alert">
-            <p>The Hall of Fame could not be loaded just now.</p>
-            <button type="button" className="hp-btn hp-btn--secondary" onClick={onRetry}>
-              Try again
-            </button>
-          </div>
-        ) : null}
-        {empty ? (
-          <div className="hof-state">
-            <p className="hof-state__title">The first names are being engraved.</p>
-            <p>Graduates appear here as soon as they pass the certification exam.</p>
-          </div>
-        ) : null}
-
-        {recent.length && !batch ? (
-          <section className="hof-section" aria-labelledby="hof-recent">
-            <header className="hof-section__head">
-              <p className="hof-eyebrow">Newest honours</p>
-              <h2 id="hof-recent" className="hof-section__title">
-                Most recent graduates
-              </h2>
-            </header>
-            <ol className="hof-features">
-              {recent.map((entry, index) => (
-                <FeaturedCard key={`recent-${entry.id}`} entry={entry} kind="recent" index={index} />
-              ))}
-            </ol>
-          </section>
-        ) : null}
-
-        {top.length && !batch ? (
-          <section className="hof-section" aria-labelledby="hof-top">
-            <header className="hof-section__head">
-              <p className="hof-eyebrow">Highest results</p>
-              <h2 id="hof-top" className="hof-section__title">
-                Top graduates
-              </h2>
-            </header>
-            <ol className="hof-features hof-features--top">
-              {top.map((entry, index) => (
-                <FeaturedCard key={`top-${entry.id}`} entry={entry} kind="top" index={index} />
-              ))}
-            </ol>
-          </section>
-        ) : null}
-
-        {status === "ready" && (groups.length || batch) ? (
-          <section className="hof-section hof-wall" aria-labelledby="hof-wall">
-            <header className="hof-section__head hof-wall__head">
-              <div>
-                <p className="hof-eyebrow">Wall of honour</p>
-                <h2 id="hof-wall" className="hof-section__title">
-                  Every certified graduate
-                </h2>
-              </div>
-              {batches.length > 1 ? (
-                <div className="hof-filter" role="group" aria-label="Show a batch">
-                  <button type="button" className="hof-chip" aria-pressed={!batch} onClick={() => onBatch?.("")}>
-                    All
-                  </button>
-                  {batches.map((item) => (
-                    <button
-                      key={item.label}
-                      type="button"
-                      className="hof-chip"
-                      aria-pressed={batch === item.label}
-                      onClick={() => onBatch?.(item.label)}
-                    >
-                      {item.label}
-                      <span className="hof-chip__count hp-mono">{item.count}</span>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </header>
-            {groups.map((group) => {
-              const total = batches.find((item) => item.label === group.key)?.count ?? group.entries.length;
-              return (
-                <section key={group.key} className="hof-group" aria-labelledby={groupId(group.key)}>
-                  <div className="hof-group__head">
-                    <h3 id={groupId(group.key)} className="hof-group__title">
-                      {group.key}
-                    </h3>
-                    <p className="hof-group__count hp-mono">
-                      {total} certified
-                    </p>
-                  </div>
-                  <ol className="hof-wall__grid">
-                    {group.entries.map((entry, index) => (
-                      <WallTile key={entry.id} entry={entry} index={index} />
-                    ))}
-                  </ol>
-                </section>
-              );
-            })}
-            {data?.has_more ? (
-              <div className="hof-more">
-                <button type="button" className="hp-btn hp-btn--secondary" onClick={onMore} disabled={loadingMore}>
-                  {loadingMore ? "Loading…" : "Show more graduates"}
-                </button>
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-
-        <div className="hof-close">
-          <p className="hof-close__line">
-            Earned through knowledge. <Hand>Remembered</Hand> through excellence.
-          </p>
-          <ButtonLink to="/tracks/osint" variant="secondary" arrow>
-            Work towards the certificate
-          </ButtonLink>
-        </div>
-      </div>
-    </div>
+    <svg viewBox="0 0 96 96" className="h-full w-full" aria-hidden="true">
+      <defs>
+        <linearGradient id="hall-gold" x1="10" y1="8" x2="84" y2="88" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#FFF1A8" />
+          <stop offset="0.3" stopColor="#C99524" />
+          <stop offset="0.65" stopColor="#F4D777" />
+          <stop offset="1" stopColor="#805A0A" />
+        </linearGradient>
+      </defs>
+      <circle cx="48" cy="48" r="27" fill="none" stroke="url(#hall-gold)" strokeWidth="1.5" />
+      <path
+        d="M37 58c-8-5-13-13-13-23m9 31c-12-6-20-18-20-32m46 24c8-5 13-13 13-23m-9 31c12-6 20-18 20-32"
+        fill="none"
+        stroke="url(#hall-gold)"
+        strokeLinecap="round"
+        strokeWidth="2"
+      />
+      <path
+        d="m48 29 4.3 8.8 9.7 1.4-7 6.8 1.7 9.6-8.7-4.5-8.7 4.5L41 46l-7-6.8 9.7-1.4L48 29Z"
+        fill="url(#hall-gold)"
+      />
+      <path d="M34 69c8 5 20 7 28 0" fill="none" stroke="url(#hall-gold)" strokeLinecap="round" strokeWidth="1.5" />
+    </svg>
   );
 }
 
 export default function HallOfFamePage() {
-  const [data, setData] = useState(null);
-  const [status, setStatus] = useState("loading");
-  const [batch, setBatch] = useState("");
-  const [loadingMore, setLoadingMore] = useState(false);
-  const request = useRef(0);
-
-  const load = useCallback(async (nextBatch = "") => {
-    const id = ++request.current;
-    setStatus("loading");
-    try {
-      const result = await fetchHallOfFame({ page: 1, batch: nextBatch });
-      if (id !== request.current) return;
-      setData((previous) => (nextBatch && previous ? { ...result, featured: previous.featured, counters: previous.counters } : result));
-      setStatus("ready");
-    } catch {
-      if (id === request.current) setStatus("error");
-    }
-  }, []);
-
-  useEffect(() => {
-    load("");
-  }, [load]);
-
-  const onBatch = (value) => {
-    setBatch(value);
-    load(value);
-  };
-
-  const onMore = async () => {
-    if (!data?.has_more || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const next = await fetchHallOfFame({ page: (data.page || 1) + 1, batch });
-      setData((previous) => ({ ...previous, ...next, featured: previous.featured, counters: previous.counters,
-        entries: [...(previous?.entries || []), ...(next?.entries || [])] }));
-    } catch {
-      // Keep what is shown; the button stays for another try.
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
+  const liveBatches = useLiveBatches();
+  const batches = [...certifiedBatches, ...liveBatches];
   return (
-    <HallOfFameView
-      data={data}
-      status={status}
-      batch={batch}
-      loadingMore={loadingMore}
-      onBatch={onBatch}
-      onMore={onMore}
-      onRetry={() => load(batch)}
-    />
+    <PageShell containerClassName="hall-of-fame-page">
+      <section className="relative overflow-hidden rounded-[22px] border border-[#4A3A16] bg-[#080704] px-4 py-7 shadow-[0_24px_70px_rgba(0,0,0,0.45)] sm:rounded-[30px] sm:px-8 sm:py-14 sm:shadow-[0_30px_90px_rgba(0,0,0,0.48)] lg:px-12">
+        <div className="pointer-events-none absolute inset-0 hall-of-fame-atmosphere" aria-hidden="true" />
+        <div className="pointer-events-none absolute left-1/2 top-0 h-px w-3/5 -translate-x-1/2 bg-gradient-to-r from-transparent via-[#E8C567]/80 to-transparent" aria-hidden="true" />
+
+        <div className="relative mx-auto max-w-4xl text-center">
+          <div className="mx-auto h-16 w-16 sm:h-24 sm:w-24">
+            <LaurelsMark />
+          </div>
+          <p className="mt-4 text-[9px] font-semibold uppercase tracking-[0.28em] text-[#B99A52] sm:mt-5 sm:text-xs sm:tracking-[0.32em]">
+            Certified Excellence
+          </p>
+          <h1 className="mt-3 text-[2.15rem] font-extrabold uppercase leading-[0.95] tracking-[-0.045em] text-white sm:mt-4 sm:text-6xl lg:text-7xl">
+            Hall of Fame
+          </h1>
+          <p className="mx-auto mt-4 max-w-2xl text-[13px] leading-6 text-[#AAA28F] sm:mt-5 sm:text-base sm:leading-7">
+            A permanent record of students who have met the certification standard through skill,
+            discipline, and determined investigation.
+          </p>
+          <div className="mx-auto mt-6 flex max-w-xl items-center gap-3 sm:mt-8 sm:gap-4" aria-hidden="true">
+            <span className="h-px flex-1 bg-gradient-to-r from-transparent to-[#7D642B]" />
+            <span className="h-1.5 w-1.5 rotate-45 border border-[#D7B95F] bg-[#241B08]" />
+            <span className="h-px flex-1 bg-gradient-to-l from-transparent to-[#7D642B]" />
+          </div>
+        </div>
+
+        <div className="relative mt-8 space-y-10 sm:mt-12 sm:space-y-14">
+          {batches.map((batch, batchIndex) => (
+            <section key={batch.name} aria-labelledby={`hall-${batch.name.toLowerCase().replace(/\s+/g, "-")}`}>
+              <div className="mb-4 grid grid-cols-[auto_1fr_auto] items-center gap-3 sm:mb-6 sm:gap-4">
+                <h2
+                  id={`hall-${batch.name.toLowerCase().replace(/\s+/g, "-")}`}
+                  className="shrink-0 text-[11px] font-bold uppercase tracking-[0.22em] text-[#D7B95F] sm:text-sm sm:tracking-[0.28em]"
+                >
+                  {batch.name}
+                </h2>
+                <span className="h-px flex-1 bg-gradient-to-r from-[#6A5222] to-transparent" aria-hidden="true" />
+                <span className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-[#A08F68] sm:text-[10px] sm:tracking-[0.2em]">
+                  {batch.students.length} certified
+                </span>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+                {batch.students.map((student, index) => (
+                  <article
+                    key={student}
+                    className="hall-of-fame-card group relative min-h-[8.75rem] overflow-hidden rounded-[18px] border border-[#3E321A] bg-[#0C0B08] p-4 sm:min-h-44 sm:rounded-2xl sm:p-6"
+                    style={{ "--hall-delay": `${Math.min(batchIndex * 2 + index, 8) * 55}ms` }}
+                  >
+                    <div className="pointer-events-none absolute inset-0 hall-of-fame-card-glow" aria-hidden="true" />
+                    <div className="relative flex h-full flex-col justify-between gap-5 sm:gap-8">
+                      <div className="flex items-start justify-between gap-4">
+                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#5C4820] bg-[#161207] text-[#D5B65F] sm:h-9 sm:w-9">
+                          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                            <path d="m12 3 2.5 5.1 5.6.8-4 3.9.9 5.5-5-2.6-5 2.6.9-5.5-4-3.9 5.6-.8L12 3Z" fill="currentColor" />
+                          </svg>
+                        </span>
+                        <span className="text-right text-[10px] font-semibold uppercase tracking-[0.16em] text-[#A08F68] sm:text-[10px] sm:tracking-[0.22em]">
+                          Certified Student
+                        </span>
+                      </div>
+                      <div>
+                        <h3 className="hall-of-fame-gold [overflow-wrap:anywhere] text-[1.35rem] font-bold leading-tight tracking-[-0.025em] sm:text-[1.7rem]">
+                          {student}
+                        </h3>
+                        <div className="mt-3 h-px w-12 bg-gradient-to-r from-[#D8B653] to-transparent transition-all duration-500 group-hover:w-24 sm:mt-4" aria-hidden="true" />
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+
+        <div className="relative mt-8 rounded-[18px] border border-[#312817] bg-black/25 px-4 py-4 text-center sm:mt-12 sm:rounded-2xl sm:px-8 sm:py-5">
+          <p className="text-[9px] font-semibold uppercase leading-5 tracking-[0.16em] text-[#9B844D] sm:text-xs sm:tracking-[0.22em]">
+            Earned through knowledge. Remembered through excellence.
+          </p>
+        </div>
+      </section>
+    </PageShell>
   );
 }

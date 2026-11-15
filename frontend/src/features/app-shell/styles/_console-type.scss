@@ -1,0 +1,117 @@
+// Console type scale, compact (hybrid release, owner: "make the font size
+// smaller across the board"). Loaded LAST by carbon-app.scss, so it only
+// re-tunes the Console's type tokens and the type roles that read them; the
+// public website never loads this file.
+//
+// Scale (rem = 16px; the Console renders at zoom 1):
+//   body / UI text ........ 14px  (--console-type-body)
+//   small / meta .......... 12px  (--console-type-small)
+//   page title ............ 22px phone, 24px from 40rem (--console-type-page-title)
+//   section heading (h2) .. 16px  (--console-type-section)
+//   panel title (h3) ...... 15px  (--console-type-panel)
+//   nav row ............... 13px, 36px rows with a fine pointer (touch keeps 40px+)
+//   table rows ............ 14px text, 8-10px vertical padding
+// Contrast is unchanged (the palette tokens are untouched): every size keeps
+// the Console's #fafafa / #d4d4d4 / #a1a1a1 / #8a8a8a text on black (AA).
+
+.cds-app {
+  --console-type-body: 0.875rem;
+  --console-type-small: 0.75rem;
+  --console-type-page-title: 1.375rem;
+  --console-type-section: 1rem;
+  --console-type-panel: 0.9375rem;
+  --console-type-nav: 0.8125rem;
+  --console-type-number: 1.5rem;
+
+  // Carbon's own type tokens (read by every Carbon widget through
+  // `type-style()`) and the --sc-* foundations the Console building blocks use.
+  --cds-body-02-font-size: var(--console-type-body);
+  --cds-body-02-line-height: 1.42857;
+  --cds-heading-02-font-size: var(--console-type-section);
+  --cds-heading-03-font-size: var(--console-type-section);
+  --cds-heading-04-font-size: 1.25rem;
+  --cds-heading-05-font-size: var(--console-type-page-title);
+  --sc-type-body-02-size: var(--console-type-body);
+  --sc-type-body-02-line-height: 1.42857;
+  --sc-type-heading-02-size: var(--console-type-panel);
+  --sc-type-heading-03-size: var(--console-type-section);
+  --sc-type-heading-04-size: 1.25rem;
+  --sc-type-page-title-size: var(--console-type-page-title);
+  --sc-type-page-title-line-height: 1.25;
+  --sc-type-greeting-size: 1.75rem;
+  --sc-type-number-xl-size: 2rem;
+  --sc-type-number-m-size: 1.125rem;
+  --sc-type-h2-size: 1.5rem;
+
+  font-size: var(--console-type-body);
+
+  @media (min-width: 40rem) {
+    --console-type-page-title: 1.5rem;
+  }
+}
+
+// ---------------------------------------------------------------- headings
+// Page and panel headings across every Console page (Carbon PageHeader, the
+// kit pages' Tailwind headings and feature SCSS). `$main` keeps the shell
+// chrome out and outranks the learn-workspace T8 rules in _shell.scss
+// (`.cds-app[data-workspace='learn'] .cds-app__main ...`). It covers the
+// kit pages framed in `.cds-legacy-frame` too (same Console, same scale).
+// Opt-out: `[data-console-type='off']` (the public-profile preview, which
+// must look like the public page).
+$main: ".cds-app[data-workspace] .cds-app__main, .cds-app .cds-app__main";
+$keep: ":not(:where([data-console-type='off'] *))";
+
+:is(#{$main}) :is(.cds-page-header__title, h1)#{$keep} {
+  font-size: var(--console-type-page-title);
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+:is(#{$main}) h2#{$keep} {
+  font-size: var(--console-type-section);
+  line-height: 1.4;
+}
+
+:is(#{$main}) h3#{$keep} {
+  font-size: var(--console-type-panel);
+  line-height: 1.4;
+}
+
+:is(#{$main}) :is(h4, h5, h6)#{$keep} {
+  font-size: var(--console-type-body);
+  line-height: 1.4;
+}
+
+:is(#{$main}) .cds-page-header__description {
+  font-size: var(--console-type-body);
+  line-height: 1.4286;
+}
+
+// ---------------------------------------------------------------- nav
+
+.cds-app .cds-app-nav-row {
+  font-size: var(--console-type-nav);
+  letter-spacing: 0.1px;
+}
+
+@media (pointer: fine) {
+  .cds-app .cds-app-sidenav:not(.cds-app-sidenav--rail) .cds-app-nav-row {
+    min-block-size: 2.25rem;
+  }
+}
+
+// ---------------------------------------------------------------- tables
+// Carbon DataTable and the kit <Table>: 14px cells, tighter rows.
+
+.cds-app .cds-app__main :where(table) :is(td, th)#{$keep} {
+  font-size: var(--console-type-body);
+  padding-block: 0.5rem;
+}
+
+.cds-app .cds-app__main :where(table) th#{$keep} {
+  font-size: var(--console-type-small);
+}
+
+.cds-app .cds--data-table :is(thead, tbody) tr {
+  block-size: 2.5rem;
+}

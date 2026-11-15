@@ -82,6 +82,9 @@ def labs_entitlements(user, at=None) -> dict:
     staff = _is_staff(user)
     labs = _entitlement(user, "ctf_labs", at) if authenticated else {"active": False, "until": None, "source": None}
     starter = _entitlement(user, "ctf_starter", at) if authenticated else {"active": False, "until": None, "source": None}
+    billing = _billing_entitlements(user, at) if authenticated else []
+    labs = _merge_billing(labs, billing, "all_labs")
+    starter = _merge_billing(starter, billing, "easy_ctfs")
     if not required or staff or labs["active"]:
         allowed = list(ALL_DIFFICULTIES)
     elif starter["active"]:
@@ -94,7 +97,25 @@ def labs_entitlements(user, at=None) -> dict:
         "ctf_labs": labs,
         "ctf_starter": {"active": starter["active"], "until": starter["until"]},
         "allowed_difficulties": allowed,
+        "entitlements": billing,
     }
+
+
+def _billing_entitlements(user, at) -> list:
+    """``apps.billing.entitlements_for`` (plans bought through the billing module)."""
+    from apps import billing
+
+    return billing.entitlements_for(user, at)
+
+
+def _merge_billing(current: dict, billing: list, key: str) -> dict:
+    """A billing grant (``all_labs`` / ``easy_ctfs``) also opens the matching labs tier."""
+    row = next((item for item in billing if item["key"] == key), None)
+    if row is None or (current["active"] and current["until"] is None):
+        return current
+    if current["active"] and not row["lifetime"] and (row["ends_at"] or "") <= (current["until"] or ""):
+        return current
+    return {"active": True, "until": None if row["lifetime"] else row["ends_at"], "source": "billing"}
 
 
 def exam_eligible(user) -> bool:

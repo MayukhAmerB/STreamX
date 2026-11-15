@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { siteBrand } from "../config/siteBrand";
 
 const TURNSTILE_SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 
@@ -74,8 +73,7 @@ export default function TurnstileWidget({
           widgetIdRef.current = turnstile.render(containerRef.current, {
             sitekey: siteKey,
             action,
-            // The site canvas is black (the OwlCognito brand keeps its light pages).
-            theme: siteBrand.id === "owlcognito" ? "auto" : "dark",
+            theme: "auto",
             callback: (token) => callbacksRef.current.onToken?.(token),
             "expired-callback": () => callbacksRef.current.onExpire?.(),
             "error-callback": (errorCode) => callbacksRef.current.onError?.(errorCode),
@@ -124,7 +122,7 @@ export default function TurnstileWidget({
     <div className={className}>
       <div ref={containerRef} className="min-h-[65px]" />
       {loadError ? (
-        <div role="alert" className="mt-2 rounded-md bg-[#fafafa] px-3 py-2 text-xs font-medium text-black">
+        <div className="mt-2 rounded-xl border border-red-300/20 bg-red-500/10 px-3 py-2 text-xs text-red-200">
           {loadError}
         </div>
       ) : null}

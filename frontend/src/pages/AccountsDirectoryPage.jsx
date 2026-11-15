@@ -144,7 +144,7 @@ export function AccountsDirectoryContent({ categories, loading = false, error = 
 
       {loading ? (
         <div className="as-directory-state" role="status">
-          Loading the verified directory…
+          <span className="as-state-pulse" /> Loading the verified directory...
         </div>
       ) : error ? (
         <div className="as-directory-state as-directory-error" role="alert">

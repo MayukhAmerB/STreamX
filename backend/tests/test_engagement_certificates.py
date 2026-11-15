@@ -252,8 +252,15 @@ class CertificateApiCase(TestCase):
         reset_engagement_state()
         super().tearDown()
 
-    def get(self, ref, suffix=""):
-        return APIClient().get(f"{API}{ref}/{suffix}")
+    OWNER = object()
+
+    def get(self, ref, suffix="", user=OWNER):
+        """Certificates are private: by default this reads as the signed-in holder."""
+        client = APIClient()
+        viewer = self.student if user is self.OWNER else user
+        if viewer is not None:
+            client.force_authenticate(viewer)
+        return client.get(f"{API}{ref}/{suffix}")
 
     def staff_post(self, action, data, user=None):
         client = APIClient()
@@ -265,9 +272,10 @@ class PublicApiTests(CertificateApiCase):
     def test_lookup(self):
         response = self.get(self.reference)
         self.assertEqual(response.status_code, 200, response.content)
-        self.assertIn("public", response["Cache-Control"])
+        self.assertEqual(response["Cache-Control"], "private, no-store")
         data = response.json()["data"]
         self.assertEqual((data["reference"], data["status"], data["valid"]), (self.reference, "verified", True))
+        self.assertEqual((data["full"], data["is_owner"]), (True, True))
         self.assertEqual(data["recipient_name"], "Asha Kumar")
         self.assertEqual(data["title"], "Operative")
         self.assertTrue(data["verify_url"].endswith(f"/certificates/{self.reference}"))
@@ -276,6 +284,46 @@ class PublicApiTests(CertificateApiCase):
         self.assertIn("linkedin.com/profile/add", data["linkedin_add_url"])
         self.assertIn(f"certId={self.reference}", data["linkedin_add_url"])
         self.assertIn("certUrl=", data["linkedin_add_url"])
+
+    def test_everyone_else_sees_only_the_verification_facts(self):
+        stranger = f.make_user(full_name="Someone Else")
+        for viewer in (None, stranger):
+            response = self.get(self.reference, user=viewer)
+            self.assertEqual(response.status_code, 200, response.content)
+            self.assertEqual(response["Cache-Control"], "private, no-store")
+            data = response.json()["data"]
+            self.assertEqual(
+                set(data),
+                {"reference", "status", "valid", "type", "type_label", "issued_at", "issued_on", "issuer",
+                 "revoked_at", "full", "is_owner"},
+            )
+            self.assertEqual((data["reference"], data["valid"], data["full"], data["is_owner"]), (self.reference, True, False, False))
+            self.assertEqual(data["type"], self.certificate.cert_type)
+            blob = json.dumps(data)
+            self.assertNotIn("Asha", blob)
+            self.assertNotIn(".pdf", blob)
+            self.assertNotIn(".png", blob)
+            for suffix in ("certificate.pdf", "certificate.png", "preview.png"):
+                denied = self.get(self.reference, suffix, user=viewer)
+                self.assertEqual(denied.status_code, 404, suffix)
+                self.assertEqual(denied.json()["code"], "certificate_private")
+        staff = self.get(self.reference, user=self.staff).json()["data"]
+        self.assertEqual((staff["full"], staff["is_owner"], staff["recipient_name"]), (True, False, "Asha Kumar"))
+        self.assertEqual(self.get(self.reference, "certificate.pdf", user=self.staff).status_code, 200)
+        # The older achievement routes follow the same rule.
+        slug = self.achievement.slug
+        for viewer in (None, stranger):
+            client = APIClient()
+            if viewer is not None:
+                client.force_authenticate(viewer)
+            self.assertEqual(client.get(f"/api/engagement/achievements/{slug}/card.png").status_code, 404)
+            self.assertEqual(client.get(f"/api/engagement/achievements/{slug}/certificate.pdf").status_code, 404)
+            verify = client.get(f"/api/engagement/achievements/{slug}/").json()["data"]
+            self.assertIsNone(verify["certificate_url"])
+            self.assertIsNone(verify["share_card_url"])
+        owner = APIClient()
+        owner.force_authenticate(self.student)
+        self.assertEqual(owner.get(f"/api/engagement/achievements/{slug}/certificate.pdf").status_code, 200)
 
     def test_no_email_phone_or_ids_are_exposed(self):
         data = self.get(self.reference).json()["data"]
@@ -324,7 +372,8 @@ class PublicApiTests(CertificateApiCase):
         image = Image.open(io.BytesIO(png.content))
         self.assertEqual(image.size, (2339, 1654))
         self.assertEqual(image.text["Reference"], self.reference)
-        self.assertIn("attachment", APIClient().get(f"{API}{self.reference}/certificate.png?download=1")["Content-Disposition"])
+        self.assertIn("attachment", self.get(self.reference, "certificate.png?download=1")["Content-Disposition"])
+        self.assertEqual(pdf["Cache-Control"], "private, no-store")
         og = self.get(self.reference, "preview.png")
         self.assertEqual(Image.open(io.BytesIO(og.content)).size, (1200, 630))
         self.assertIn(self.reference.encode(), og.content)
@@ -341,11 +390,14 @@ class PublicApiTests(CertificateApiCase):
         response = self.get(self.reference, "share/")
         self.assertEqual(response.status_code, 200)
         html = response.content.decode()
-        self.assertIn('property="og:image"', html)
-        self.assertIn(f"/certificates/{self.reference}/preview.png", html)
+        # Private certificates: crawlers get the verification facts only (no name, no image).
+        self.assertNotIn('property="og:image"', html)
+        self.assertNotIn("preview.png", html)
         self.assertIn('rel="canonical" href="', html)
         self.assertIn(f"/certificates/{self.reference}", html)
-        self.assertIn("summary_large_image", html)
+        self.assertIn(f"Verified certificate {self.reference}", html)
+        self.assertIn('content="summary"', html)
+        self.assertNotIn("Asha", html)
         self.assertNotIn("asha.private", html)
         # Served at /certificates/<ref> to crawlers by the gateway: never cached for people,
         # and people who land on it go to "?view=page", which the gateway always gives the SPA.
@@ -597,8 +649,16 @@ class CtfCertificateTests(TestCase):
         response = APIClient().get(f"{API}{reward.verify_slug}/")
         self.assertEqual(response.status_code, 301)
         self.assertEqual(response["Location"], f"{API}{certificate.reference}/")
-        data = APIClient().get(f"{API}{certificate.reference}/").json()["data"]
+        holder = APIClient()
+        holder.force_authenticate(reward.user)
+        data = holder.get(f"{API}{certificate.reference}/").json()["data"]
         self.assertEqual((data["type"], data["status"], data["recipient_name"]), ("CTF", "verified", "Finalist Number 0"))
+        public = APIClient().get(f"{API}{certificate.reference}/").json()["data"]
+        self.assertEqual((public["type"], public["status"], public["full"]), ("CTF", "verified", False))
+        self.assertNotIn("recipient_name", public)
+        # The Monthly CTF verification endpoint hides the real name from everyone but the holder.
+        self.assertEqual(APIClient().get(f"/api/ctf/seasons/certificates/{reward.verify_slug}/").json()["data"]["name"], "")
+        self.assertEqual(holder.get(f"/api/ctf/seasons/certificates/{reward.verify_slug}/").json()["data"]["name"], "Finalist Number 0")
         # The Monthly CTF's own verification endpoint is untouched.
         self.assertEqual(APIClient().get(f"/api/ctf/seasons/certificates/{reward.verify_slug}/").status_code, 200)
         self.season_services.revoke_reward(reward, actor=f.make_admin(), reason="Rule breach")
@@ -613,7 +673,9 @@ class CtfCertificateTests(TestCase):
             self.finalise()
         self.assertEqual(Certificate.objects.filter(cert_type="CTF").count(), 0)
         reward = CtfSeasonReward.objects.get(season=self.season, kind="certificate", rank=3)
-        response = APIClient().get(f"{API}{reward.verify_slug}/", follow=True)
+        holder = APIClient()
+        holder.force_authenticate(reward.user)
+        response = holder.get(f"{API}{reward.verify_slug}/", follow=True)
         self.assertEqual(response.json()["data"]["statement"], "placed 3rd in")
         self.assertEqual(Certificate.objects.filter(cert_type="CTF").count(), 1)
 

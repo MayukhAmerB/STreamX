@@ -662,6 +662,48 @@ def public_dict(certificate: Certificate, request=None) -> dict:
     }
 
 
+def can_view_full(certificate: Certificate, user) -> bool:
+    """Owner privacy rule: only the certified person (signed in) and staff see the
+    full certificate (name, artwork, PDF/PNG). Everyone else gets ``minimal_dict``."""
+    if user is None or not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_staff", False) or getattr(user, "is_superuser", False):
+        return True
+    return bool(certificate.user_id and certificate.user_id == user.pk)
+
+
+def minimal_dict(certificate: Certificate) -> dict:
+    """What anyone may see: genuine or not, the certificate type, the issue date and the reference.
+
+    No name, no title text, no artwork and no file links.
+    """
+    valid = certificate.is_valid
+    issued = timezone.localtime(certificate.issued_at, rules.IST)
+    return {
+        "reference": certificate.reference,
+        "status": "verified" if valid else "revoked",
+        "valid": valid,
+        "type": certificate.cert_type,
+        "type_label": TYPE_LABELS.get(certificate.cert_type, ""),
+        "issued_at": certificate.issued_at.isoformat(),
+        "issued_on": issued.date().isoformat(),
+        "issuer": {"name": ISSUER_NAME},
+        "revoked_at": None if valid else certificate.source_revoked_at.isoformat(),
+        "full": False,
+        "is_owner": False,
+    }
+
+
+def viewer_dict(certificate: Certificate, user, request=None) -> dict:
+    """The full payload for the owner and staff, the minimal one for everyone else."""
+    if not can_view_full(certificate, user):
+        return minimal_dict(certificate)
+    data = public_dict(certificate, request)
+    data["full"] = True
+    data["is_owner"] = bool(certificate.user_id and certificate.user_id == getattr(user, "pk", None))
+    return data
+
+
 def staff_dict(certificate: Certificate, request=None) -> dict:
     data = public_dict(certificate, request)
     data.update(

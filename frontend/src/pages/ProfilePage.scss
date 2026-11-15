@@ -11,7 +11,8 @@
     gap: $spacing-06;
     grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
 
-    > .cds-page-notification {
+    > .cds-page-notification,
+    > .reward-record {
       grid-column: 1 / -1;
     }
   }

@@ -11,6 +11,13 @@
     "frontend/src/index.css | @keyframes hallOfFameShimmer | background-position": "TODO(WS-H (Hall of Fame page)): animate transform/opacity instead",
     "frontend/src/pages/AccountsDirectoryPage.css | transition | box-shadow": "TODO(WS-H): animate transform/opacity instead",
     "frontend/src/pages/JoinAlSyedPage.css | transition | box-shadow": "TODO(WS-H): animate transform/opacity instead",
-    "frontend/src/pages/MyCoursesPage.scss | transition | box-shadow": "TODO(WS-C): animate transform/opacity instead"
+    "frontend/src/pages/MyCoursesPage.scss | transition | box-shadow": "TODO(WS-C): animate transform/opacity instead",
+    "frontend/src/components/Navbar.css | transition | box-shadow": "HYBRID: Friday 13 Nov website file restored verbatim (owner decision); animate transform/opacity in a later pass",
+    "frontend/src/features/youtube/YouTube.css | transition | box-shadow": "HYBRID: Friday 13 Nov website file restored verbatim (owner decision); animate transform/opacity in a later pass",
+    "frontend/src/features/youtube/YouTube.css | @keyframes yt-shimmer | background-position": "HYBRID: Friday 13 Nov website file restored verbatim (owner decision); animate transform/opacity in a later pass",
+    "frontend/src/marketing/auth/auth.css | transition | box-shadow": "TODO(13ca6b79 pre-existing finding, failed check-motion before the hybrid release): animate transform/opacity instead",
+    "frontend/src/marketing/hp.css | transition | box-shadow": "TODO(13ca6b79 pre-existing finding, failed check-motion before the hybrid release): animate transform/opacity instead",
+    "frontend/src/marketing/hp.css | @keyframes hp-live | box-shadow": "TODO(13ca6b79 pre-existing finding, failed check-motion before the hybrid release): animate transform/opacity instead",
+    "backend/apps/users/static/admin/css/enterprise.css | transition | box-shadow": "TODO(13ca6b79 pre-existing finding, failed check-motion before the hybrid release): animate transform/opacity instead"
   }
 }

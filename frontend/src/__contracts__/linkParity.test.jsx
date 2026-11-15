@@ -356,7 +356,7 @@ describe("link parity: public navbar, landing page and footer", () => {
     expect(actual.guest.footer.anchors).toContain("contact");
   });
 
-  it("only allows the planned additions (Labs, National Desk, AS-Accounts, Join Al Syed, the HackPath nav, v4.0 release notes)", () => {
+  it("only allows the planned additions (Labs, National Desk, AS-Accounts, Join Al Syed, the HackPath nav, v4.0 release notes, /rewards)", () => {
     const labs = "https://labs.alsyedinitiative.com";
     // HackPath-style redesign (b03f085a): Pricing, Roadmap and the Tracks pages.
     const hackpathNav = ["/pricing", "/roadmap", "/tracks/pentesting"];
@@ -364,11 +364,11 @@ describe("link parity: public navbar, landing page and footer", () => {
     expect(fixture.allowedHrefAdditions.navbarSheet).toEqual([labs, ...hackpathNav]);
     expect([...fixture.allowedHrefAdditions.footer].sort()).toEqual(
       // v4.0-Thrallback: the version pill opens /changelog.
-      [labs, "/as-accounts", "/changelog", "/join-alsyed", "/national-desk", "/pricing", "/roadmap", "/tracks/osint", "/tracks/pentesting"].sort()
+      [labs, "/as-accounts", "/changelog", "/join-alsyed", "/national-desk", "/pricing", "/rewards", "/roadmap", "/tracks/osint", "/tracks/pentesting"].sort()
     );
     expect([...fixture.allowedHrefAdditions.landing].sort()).toEqual(
       // v4.0-Thrallback landing sections: packages link to /pricing#osint, rewards to certificate verification.
-      ["/about", "/certificates", "/hall-of-fame", "/osint/free", "/pricing", "/pricing#osint", "/roadmap", "/tracks/osint", "/tracks/pentesting"].sort()
+      ["/about", "/certificates", "/hall-of-fame", "/osint/free", "/pricing", "/pricing#osint", "/rewards", "/roadmap", "/tracks/osint", "/tracks/pentesting"].sort()
     );
     expect([...fixture.allowedRouteAdditions].sort()).toEqual(
       [
@@ -383,6 +383,8 @@ describe("link parity: public navbar, landing page and footer", () => {
         "/monthly-ctf/hall-of-fame",
         "/monthly-ctf/certificates/:slug",
         "/monthly-ctf/play",
+        // Hybrid release: the public reward-system page (footer + landing reward band).
+        "/rewards",
       ].sort()
     );
     // A removal never reaches the footer, and every removed in-app target is still a route.

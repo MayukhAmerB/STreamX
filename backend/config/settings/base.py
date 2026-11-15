@@ -1195,3 +1195,6 @@ WHATSAPP_TEMPLATE_LANGUAGE = env("WHATSAPP_TEMPLATE_LANGUAGE", "en").strip() or 
 WHATSAPP_DEFAULT_COUNTRY_CODE = env("WHATSAPP_DEFAULT_COUNTRY_CODE", "91").strip()
 WHATSAPP_HTTP_TIMEOUT_SECONDS = max(1, env_int("WHATSAPP_HTTP_TIMEOUT_SECONDS", 15))
 # --- end Certification ---
+
+# --- Billing (apps.billing): products, versioned prices, plans, entitlements ---
+INSTALLED_APPS += ["apps.billing.apps.BillingConfig"]

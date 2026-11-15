@@ -1,8 +1,14 @@
 """Certificate API (``/api/engagement/certificates/`` and ``/api/engagement/staff/certificates/``).
 
 Public endpoints need no sign-in and work whatever the ``engagement`` switch
-says: a certificate that was issued stays verifiable. They expose the holder's
-name and the achievement only (no e-mail, phone, user id or revocation reason).
+says: a certificate that was issued stays verifiable.
+
+Privacy (owner rule): a certificate is visible only to the certified person.
+Anyone may VERIFY a reference (genuine or not, type, issue date, reference;
+``certificates.minimal_dict``). The full certificate -- the real name, the
+artwork and the PDF/PNG files -- is served only to the signed-in holder and to
+staff. The sign-in cookie is read when present; a bad or missing cookie just
+means "not the owner" (never an error on the public route).
 
 ``<ref>`` is a reference number (any case, spaces or dashes) or the older
 achievement slug; anything but the canonical reference answers ``301`` to the
@@ -12,8 +18,6 @@ both end at ``/certificates/ASI-2026-...``.
 
 from __future__ import annotations
 
-from urllib.parse import urlencode
-
 from config.response import api_response
 from config.throttling import ClientIpAnonRateThrottle, ClientIpUserRateThrottle
 from django.http import HttpResponse, HttpResponsePermanentRedirect
@@ -22,13 +26,13 @@ from django.utils.html import escape
 from rest_framework import permissions, serializers
 from rest_framework.views import APIView
 
-from apps.core.errors import PermissionDenied, ValidationFailed
+from apps.core.errors import NotFound, PermissionDenied, ValidationFailed
 
 from . import certificate_render, certificates
+from .models import Certificate
 from .throttles import CertificateLookupThrottle, EngagementPublicThrottle, EngagementStaffThrottle
 
 PUBLIC_MAX_AGE = 60
-FILE_MAX_AGE = 300
 
 
 def _canonical(request, ref: str, url_name: str):
@@ -51,13 +55,39 @@ def _public_headers(response, max_age: int):
     return response
 
 
-def _absolute(request, path: str) -> str:
-    origin = certificates.public_origin()
-    return f"{origin}{path}" if origin.startswith("http") else request.build_absolute_uri(path)
+def _private_headers(response):
+    response["Cache-Control"] = "private, no-store"
+    response["X-Robots-Tag"] = "noindex"
+    response["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response["Vary"] = "Cookie, Authorization"
+    return response
+
+
+def viewer(request):
+    """The signed-in user (cookie or bearer), or None. Never raises."""
+    try:
+        user = getattr(request, "user", None)
+        if user is not None and getattr(user, "is_authenticated", False):
+            return user
+    except Exception:  # noqa: BLE001 - a broken credential on a public route means "anonymous"
+        pass
+    try:
+        from config.authentication import CookieJWTAuthentication
+
+        result = CookieJWTAuthentication().authenticate(request)
+    except Exception:  # noqa: BLE001
+        return None
+    return result[0] if result else None
+
+
+def require_full_access(request, certificate: Certificate):
+    """404 ``certificate_private`` unless the viewer is the holder or staff (no probing for files)."""
+    if not certificates.can_view_full(certificate, viewer(request)):
+        raise NotFound("This certificate is private to its holder.", code="certificate_private")
 
 
 class CertificateView(APIView):
-    """``GET /api/engagement/certificates/<ref>/``: verify a certificate."""
+    """``GET /api/engagement/certificates/<ref>/``: verify a certificate (full payload for the holder and staff)."""
 
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
@@ -71,9 +101,9 @@ class CertificateView(APIView):
         response = api_response(
             success=True,
             message="This certificate is genuine." if valid else "This certificate was revoked.",
-            data=certificates.public_dict(certificate, request),
+            data=certificates.viewer_dict(certificate, viewer(request), request),
         )
-        return _public_headers(response, PUBLIC_MAX_AGE)
+        return _private_headers(response)
 
 
 class _CertificateFileView(APIView):
@@ -92,11 +122,12 @@ class _CertificateFileView(APIView):
         certificate, redirect = _canonical(request, ref, self.url_name)
         if redirect is not None:
             return redirect
+        require_full_access(request, certificate)
         response = HttpResponse(self.render(certificate), content_type=self.content_type)
         attachment = self.always_attachment or request.GET.get("download") in ("1", "true")
         filename = f"{certificate.reference}{self.extension}"
         response["Content-Disposition"] = f'{"attachment" if attachment else "inline"}; filename="{filename}"'
-        return _public_headers(response, FILE_MAX_AGE)
+        return _private_headers(response)
 
 
 class CertificatePdfView(_CertificateFileView):
@@ -148,12 +179,12 @@ class CertificateShareView(APIView):
         page = certificates.public_url(certificate.reference)
         # People who land here follow this link; nginx always gives "?view=page" the SPA (no loop).
         human = f"{page}?view=page"
-        version = certificates.render_version(certificate)
-        image = _absolute(request, reverse("engagement-certificate-og", kwargs={"ref": certificate.reference}) + "?" + urlencode({"v": version}))
-        name = certificate.recipient_name or "Certificate holder"
-        title = f"{name}: {certificate.heading}" if valid else f"Revoked certificate {certificate.reference}"
+        # Privacy: crawlers get the verification facts only -- no name and no certificate image.
+        issued = certificates.minimal_dict(certificate)["issued_on"]
+        label = certificates.TYPE_LABELS.get(certificate.cert_type, "") or "Certificate"
+        title = f"Verified certificate {certificate.reference}" if valid else f"Revoked certificate {certificate.reference}"
         description = (
-            f"{certificate.title}. Reference {certificate.reference}. Issued by {certificates.ISSUER_NAME}."
+            f"A genuine {label} certificate issued by {certificates.ISSUER_NAME} on {issued}. Reference {certificate.reference}."
             if valid
             else f"{certificates.ISSUER_NAME} revoked this certificate. It is no longer valid."
         )
@@ -164,14 +195,9 @@ class CertificateShareView(APIView):
             ("property", "og:title", title),
             ("property", "og:description", description),
             ("property", "og:url", page),
-            ("property", "og:image", image),
-            ("property", "og:image:width", "1200"),
-            ("property", "og:image:height", "630"),
-            ("property", "og:image:alt", f"{certificate.heading} for {name}, reference {certificate.reference}"),
-            ("name", "twitter:card", "summary_large_image"),
+            ("name", "twitter:card", "summary"),
             ("name", "twitter:title", title),
             ("name", "twitter:description", description),
-            ("name", "twitter:image", image),
             ("name", "description", description),
         ]
         head = "\n".join(f'<meta {attr}="{escape(key)}" content="{escape(value)}">' for attr, key, value in tags)
@@ -183,7 +209,7 @@ class CertificateShareView(APIView):
             f'</head><body><p><a href="{escape(human)}">View certificate {escape(certificate.reference)}</a></p></body></html>\n'
         )
         response = HttpResponse(html, content_type="text/html; charset=utf-8")
-        _public_headers(response, FILE_MAX_AGE)
+        _public_headers(response, PUBLIC_MAX_AGE)
         # The gateway serves this at /certificates/<ref> to link-preview crawlers only:
         # a shared cache must never hand it to a person.
         response["Cache-Control"] = "private, no-store"

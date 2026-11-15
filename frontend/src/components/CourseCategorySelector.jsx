@@ -1,7 +1,4 @@
-import { useId } from "react";
 import { Link } from "react-router-dom";
-
-import { describeTrackAvailability } from "../utils/catalogTracks";
 
 import osintTrackLogo from "../assets/course-track-osint.webp";
 import pentestingTrackLogo from "../assets/course-track-pentesting.webp";
@@ -149,45 +146,11 @@ export function CourseTrackCards({
   );
 }
 
-/**
- * A directory tile for a track the server reports as not open (plan §7.2
- * rule 2): no href, role="link" + aria-disabled, still focusable so the
- * visible reason is reachable (aria-describedby), no arrow, no count.
- */
-function DisabledTrackSection({ track, index, reason }) {
-  const reasonId = useId();
-  return (
-    <div
-      role="link"
-      aria-disabled="true"
-      tabIndex={0}
-      aria-describedby={reasonId}
-      data-state="coming_soon"
-      className="flex min-h-[132px] cursor-not-allowed items-stretch justify-between gap-4 rounded-2xl border border-dashed border-white/15 bg-[#0B0B0B] p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white sm:p-5"
-    >
-      <div className="min-w-0">
-        <span className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#8F8F8F]">
-          {String(index + 1).padStart(2, "0")}
-          <span className="rounded-full border border-white/25 px-2 py-0.5 text-xs font-semibold normal-case tracking-normal text-[#C6C6C6]">
-            Coming soon
-          </span>
-        </span>
-        <h3 className="mt-3 font-reference text-xl font-semibold text-[#C6C6C6] sm:text-2xl">{track.title}</h3>
-        <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#8F8F8F]">{track.subtitle}</p>
-        <p id={reasonId} className="mt-3 text-sm leading-5 text-[#C6C6C6]">
-          {reason}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 export function CourseCategorySections({
   selectedCategory = "",
   counts = {},
   onSelect = () => {},
   getHref,
-  tracks,
 }) {
   return (
     <section className="mb-8 overflow-hidden rounded-[24px] border border-white/10 bg-[#070707] p-4 shadow-[0_24px_70px_rgba(0,0,0,0.3)] sm:p-6">
@@ -207,10 +170,6 @@ export function CourseCategorySections({
 
       <nav className="grid gap-3 sm:grid-cols-2" aria-label="Course disciplines">
         {COURSE_TRACKS.map((track, index) => {
-          const availability = describeTrackAvailability(tracks, track.category);
-          if (availability.closed) {
-            return <DisabledTrackSection key={track.category} track={track} index={index} reason={availability.reason} />;
-          }
           const selected = selectedCategory === track.category;
           const count = Number(counts[track.category] || 0);
           const href = typeof getHref === "function" ? getHref(track.category) : "";

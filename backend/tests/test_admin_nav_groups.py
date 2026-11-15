@@ -35,7 +35,7 @@ class AdminNavGroupsTests(TestCase):
         titles = [group["title"] for group in groups]
         self.assertEqual(
             titles,
-            ["Live classes", "Content", "Students & sales", "Assessments", "Community", "Settings", "System"],
+            ["Live classes", "Content", "Students & sales", "Billing", "Assessments", "Community", "Settings", "System"],
         )
         self.assertNotIn("Not grouped yet", titles)
         for title in titles:

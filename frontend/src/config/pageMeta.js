@@ -25,6 +25,11 @@ const ROUTES = [
   },
   { path: "/about", title: "About us", description: siteBrand.id === "alsyed" ? "Founded by cyber activist Al Syed under the ADL Front: lawful, evidence-first OSINT training to counter misinformation." : `Who we are, what we teach and how ${siteBrand.name} trains practical, ethical investigation skills.` },
   { path: "/contact", title: "Contact", description: "Reach the team on WhatsApp, e-mail or social media, or send a message from the contact form." },
+  {
+    path: "/rewards",
+    title: "Rewards",
+    description: "How XP is earned, the eight ranks, badges, weekly leaderboard prizes, the Monthly CTF reward and private, verifiable certificates.",
+  },
   { path: "/faqs", title: "FAQs", description: "Access, payments, recordings, certificates and refunds, answered before you enrol." },
   { path: "/terms", title: "Terms and conditions", description: `The terms and conditions for using ${siteBrand.name}.` },
   {

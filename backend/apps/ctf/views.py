@@ -105,7 +105,10 @@ class EligibilityView(_CtfView):
 
     @extend_schema(operation_id="ctf_eligibility_retrieve", responses={200: EligibilitySerializer})
     def get(self, request):
-        return _ok(EligibilitySerializer, eligibility.eligibility_for(request.user))
+        from apps import billing
+
+        payload = {**eligibility.eligibility_for(request.user), "entitlements": billing.entitlements_for(request.user)}
+        return _ok(EligibilitySerializer, payload)
 
 
 class MaterialUrlView(_CtfView):

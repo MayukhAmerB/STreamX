@@ -138,3 +138,5 @@ body:has(.cds-app) {
 @include meta.load-css('./building-blocks');
 // WS-KIT: the HackPath bridge (palette-law Carbon tokens, Geist, .625rem, golden focus). Last, so it wins.
 @include meta.load-css('./carbon-bridge');
+// Hybrid release: the compact Console type scale (tokens + type roles). After the bridge, so it wins.
+@include meta.load-css('./console-type');

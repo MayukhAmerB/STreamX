@@ -400,11 +400,14 @@ class VerificationTests(ApiCase):
         self.assertTrue(all(len(slug) >= 21 for slug in slugs))
 
     def test_share_card_png_and_certificate_pdf(self):
-        card = APIClient().get(f"/api/engagement/achievements/{self.achievement.slug}/card.png")
+        # Certificates are private: only the holder (and staff) may fetch the files.
+        self.assertEqual(APIClient().get(f"/api/engagement/achievements/{self.achievement.slug}/card.png").status_code, 404)
+        holder = self.as_user(self.achievement.user)
+        card = holder.get(f"/api/engagement/achievements/{self.achievement.slug}/card.png")
         self.assertEqual(card.status_code, 200)
         self.assertEqual(card["Content-Type"], "image/png")
         self.assertEqual(Image.open(io.BytesIO(card.content)).size, (1200, 630))
-        pdf = APIClient().get(f"/api/engagement/achievements/{self.achievement.slug}/certificate.pdf")
+        pdf = holder.get(f"/api/engagement/achievements/{self.achievement.slug}/certificate.pdf")
         self.assertEqual(pdf["Content-Type"], "application/pdf")
         self.assertTrue(pdf.content.startswith(b"%PDF"))
 

@@ -36,6 +36,7 @@ const EditCoursePage = lazy(() => import("../pages/EditCoursePage"));
 const FaqPage = lazy(() => import("../pages/FaqPage"));
 const GuidesPage = lazy(() => import("../pages/GuidesPage"));
 const HallOfFamePage = lazy(() => import("../pages/HallOfFamePage"));
+const RewardsPage = lazy(() => import("../features/rewards/RewardsPage"));
 const IdCardPage = lazy(() => import("../pages/IdCardPage"));
 const InstructorDashboardPage = lazy(() => import("../pages/InstructorDashboardPage"));
 const JoinAlSyedPage = lazy(() => import("../pages/JoinAlSyedPage"));
@@ -145,6 +146,7 @@ export default function AppRoutes() {
           {siteBrand.id !== "owlcognito" ? <Route path="/join-alsyed" element={<JoinAlSyedPage />} /> : null}
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/faqs" element={<FaqPage />} />
+          <Route path="/rewards" element={<RewardsPage />} />
           {siteBrand.id !== "owlcognito" ? <Route path="/hall-of-fame" element={<HallOfFamePage />} /> : null}
           <Route path="/courses" element={new URLSearchParams(location.search).get("view") === "owned" ? <Navigate to="/my-courses" replace /> : <CourseListPage />} />
           <Route path="/courses/:id" element={siteBrand.id === "owlcognito" ? <LegacyCourseDetailPage /> : <CourseDetailPage />} />

@@ -535,7 +535,8 @@ class ThrottleAndQueryTests(ProfileApiCase):
         with CaptureQueriesContext(connection) as queries:
             response = viewer.get(f"/api/profiles/u/{handle}/")
         self.assertEqual(response.status_code, 200)
-        self.assertLessEqual(len(queries), 4, [q["sql"][:120] for q in queries])
+        # +1 for the reward highlights the student chose (constant, not per badge).
+        self.assertLessEqual(len(queries), 5, [q["sql"][:120] for q in queries])
 
 
 class _patched_rate:

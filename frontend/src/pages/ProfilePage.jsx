@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { updateProfile } from "../api/auth";
 import UserAvatar from "../features/app-shell/UserAvatar";
 import CertificationSettings from "../features/certification/CertificationSettings";
+import RewardRecord from "../features/rewards/RewardRecord";
 import { useMotionPreference } from "../features/app-shell/motionPreference";
 import { PageHeader, PageNotification, useToast } from "../features/app-shell/ui";
 import { useAuth } from "../hooks/useAuth";
@@ -83,6 +84,7 @@ export function ProfileView({
   reducedMotion = false,
   onReducedMotionChange,
   extraSettings = null,
+  record = null,
 }) {
   const fileInputRef = useRef(null);
   const fileInputId = useId();
@@ -188,6 +190,8 @@ export function ProfileView({
 
         {extraSettings}
 
+        {record}
+
         <PageNotification
           kind="info"
           title="Password and 2-step sign-in"
@@ -259,6 +263,7 @@ export default function ProfilePage() {
       reducedMotion={reducedMotion}
       onReducedMotionChange={setReducedMotion}
       extraSettings={<CertificationSettings />}
+      record={<RewardRecord />}
       name={name}
       phone={phone}
       previewUrl={filePreview}

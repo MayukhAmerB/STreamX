@@ -138,21 +138,42 @@ class HallOfFameAuditInline(admin.TabularInline):
         return False
 
 
+class AwaitingHandleFilter(admin.SimpleListFilter):
+    """Graduates hidden from the wall until they choose their own handle (only the automatic one so far)."""
+
+    title = "public handle"
+    parameter_name = "handle_state"
+
+    def lookups(self, request, model_admin):
+        return [("awaiting", "Waiting for the student to choose a handle"), ("public", "Shown on the wall")]
+
+    def queryset(self, request, queryset):
+        if self.value() == "awaiting":
+            return queryset.filter(pk__in=hall_of_fame.awaiting_handle_queryset().values("pk"))
+        if self.value() == "public":
+            return queryset.filter(pk__in=hall_of_fame.public_queryset().values("pk"))
+        return queryset
+
+
 @admin.register(HallOfFameEntry)
 class HallOfFameEntryAdmin(admin.ModelAdmin):
     list_display = ("__str__", "public_handle_shown", "legacy_name", "user", "batch_label", "achievement", "achieved_on",
                     "source", "is_hidden")
-    list_filter = ("source", "is_hidden", "batch_label")
+    list_filter = (AwaitingHandleFilter, "source", "is_hidden", "batch_label")
     search_fields = ("display_handle", "legacy_name", "user__email", "certificate__reference")
     raw_id_fields = ("user", "certificate", "decision", "hidden_by")
     readonly_fields = ("source", "seed_key", "percent", "hidden_at", "hidden_by", "created_at", "updated_at")
     inlines = [HallOfFameAuditInline]
-    actions = ["hide", "restore", "use_curated_name_as_handle"]
+    actions = ["hide", "restore", "use_curated_name_as_handle", "list_awaiting_handle"]
 
     @admin.display(description="Public handle")
     def public_handle_shown(self, obj):
         row = hall_of_fame._annotated(HallOfFameEntry.objects.filter(pk=obj.pk)).first()  # noqa: SLF001
-        return (row.public_handle if row else "") or "— (not public until mapped)"
+        if row and row.public_handle:
+            return row.public_handle
+        if obj.user_id:
+            return "— (not public until the student chooses a handle)"
+        return "— (not public until mapped)"
 
     def save_model(self, request, obj, form, change):
         if obj.display_handle:
@@ -171,6 +192,20 @@ class HallOfFameEntryAdmin(admin.ModelAdmin):
     def restore(self, request, queryset):
         _run(self, request, queryset.filter(is_hidden=True),
              lambda e: hall_of_fame.set_hidden(e, hidden=False, actor=request.user, reason="Restored by staff in admin"), "Restored")
+
+    @admin.action(description="List graduates waiting to choose a handle (not shown on the wall yet)")
+    def list_awaiting_handle(self, request, queryset):
+        rows = list(hall_of_fame.awaiting_handle_queryset().filter(pk__in=queryset.values("pk"))[:200])
+        if not rows:
+            self.message_user(request, "Every selected graduate already has a chosen handle (or is hidden/opted out).",
+                              level=messages.SUCCESS)
+            return
+        emails = ", ".join(sorted({row.user.email for row in rows if row.user_id and row.user.email}))
+        self.message_user(
+            request,
+            f"{len(rows)} graduate(s) are not on the wall until they choose a handle on their profile: {emails}",
+            level=messages.WARNING,
+        )
 
     @admin.action(description="Use the curated name as the public display handle (only if it is a handle, not a real name)")
     def use_curated_name_as_handle(self, request, queryset):
@@ -194,3 +229,23 @@ class HallOfFameAuditAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+def _register_nav_groups():
+    """Place the certification screens in the Al Syed Admin sidebar groups."""
+    try:
+        from apps.users.templatetags.enterprise_admin import MODEL_JOBS
+    except Exception:  # noqa: BLE001
+        return
+    for key, value in (
+        ("certification.examcertificationpolicy", ("assessments", "Certification policies")),
+        ("certification.certificationdecision", ("assessments", "Certification decisions")),
+        ("certification.certificatedelivery", ("students", "Certificate deliveries")),
+        ("certification.certificationpreferences", ("settings", "Certification preferences")),
+        ("certification.halloffameentry", ("community", "Hall of Fame")),
+        ("certification.halloffameaudit", ("system", "Hall of Fame audit log")),
+    ):
+        MODEL_JOBS.setdefault(key, value)
+
+
+_register_nav_groups()

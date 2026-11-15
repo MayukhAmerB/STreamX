@@ -134,7 +134,15 @@ class PrivacyScanTests(TestCase):
             HallOfFameEntry.objects.create(user=target, batch_label="Batch 1", achievement="Certified OSINT Investigator")
         response = APIClient().get(reverse("certification-hall-of-fame"))
         body = self.assert_no_identity(response, "certification hall of fame")
-        self.assertIn(handles.public_handle(self.targets[0]), body)
+        # Automatic "operative_" handles are not public: graduates wait until they choose one.
+        self.assertNotIn(handles.AUTO_PREFIX, body)
+        profile = profile_services.get_or_create_profile(self.targets[0])
+        profile.handle, profile.handle_auto = "chosen_falcon", False
+        profile.save()
+        response = APIClient().get(reverse("certification-hall-of-fame"))
+        body = self.assert_no_identity(response, "certification hall of fame (chosen handle)")
+        self.assertIn("chosen_falcon", body)
+        self.assertNotIn(handles.AUTO_PREFIX, body)
 
     def test_lecture_comments_show_student_handles(self):
         target = self.targets[0]

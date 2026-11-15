@@ -43,7 +43,10 @@ def route_platform_event(payload: dict, *, request=None):
                 .first()
             )
     if payment is None:
-        return None
+        # Orders owned by other modules (apps.billing) via ``gateway``; None otherwise.
+        from .gateway import route_registered_order_event
+
+        return route_registered_order_event(payload, request=request)
     from .platform_orders import handle_order_event
 
     return handle_order_event(payment, payload, request=request)

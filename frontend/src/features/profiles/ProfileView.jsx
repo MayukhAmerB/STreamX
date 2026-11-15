@@ -218,6 +218,39 @@ export function FoundingGlow({ frame, children }) {
   );
 }
 
+/**
+ * The owner's highlighted badges and certificates (at most 3, chosen in the
+ * Console). Handle only: a certificate shows as a badge title, never with a
+ * reference, link or name.
+ */
+export function HighlightsStrip({ items }) {
+  const list = Array.isArray(items) ? items.slice(0, 3) : [];
+  if (!list.length) return null;
+  return (
+    <section aria-labelledby="profile-highlights" className="border-b border-white/10">
+      <Frame className="py-10 sm:py-12">
+        <Eyebrow aria-hidden="true">Highlights</Eyebrow>
+        <h2 id="profile-highlights" className="sr-only">
+          Highlights
+        </h2>
+        <ul className="mt-4 grid gap-3 sm:grid-cols-3">
+          {list.map((item, index) => (
+            <li key={`${item.kind}-${item.key || item.title}-${index}`} className="flex items-center gap-4 rounded-lg border border-white/15 bg-surface-1 p-4">
+              <BadgeGlyph tier={item.kind === "certificate" ? "gold" : item.tier} />
+              <div className="min-w-0">
+                <p className="text-sm font-medium leading-snug text-white">{item.title}</p>
+                <p className="mt-1 text-eyebrow font-medium uppercase text-subtle">
+                  {item.kind === "certificate" ? "Certified" : `${item.tier || ""} badge`.trim()}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Frame>
+    </section>
+  );
+}
+
 const BLOCK_VIEWS = { bio: BioBlock, badges: BadgesBlock, skills: SkillsBlock, writeups: WriteupsBlock, gallery: GalleryBlock, links: LinksBlock };
 
 function countLabel(block) {
@@ -283,6 +316,8 @@ export default function ProfileView({ profile, headingLevel = "h1", showReport =
           <StatStrip items={stats} columns={3} className={cn("mt-10 grid-cols-3", !centered && "mx-0")} />
         </Frame>
       </header>
+
+      <HighlightsStrip items={profile?.highlights} />
 
       {blocks.length ? (
         <Frame className="space-y-20 py-16 sm:space-y-24 sm:py-24">

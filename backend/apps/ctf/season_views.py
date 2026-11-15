@@ -292,4 +292,6 @@ class CertificateView(_SeasonView):
 
     @extend_schema(operation_id="ctf_seasons_certificate_retrieve", responses={200: CertificateSerializer})
     def get(self, request, slug):
-        return _ok(CertificateSerializer, services.certificate(slug), cache_seconds=300)
+        response = _ok(CertificateSerializer, services.certificate(slug, viewer=request.user), cache_seconds=300)
+        response["Cache-Control"] = "private, no-store"
+        return response

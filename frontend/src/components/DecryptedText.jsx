@@ -50,11 +50,8 @@ export default function DecryptedText({
     return () => clearInterval(timer);
   }, [targetText, durationMs, fps, charset]);
 
-  // aria-label is not allowed on a plain span (axe aria-prohibited-attr), so
-  // the real text is a visually hidden sibling and the scramble is hidden.
   return (
-    <span className={className}>
-      <span className="sr-only">{targetText}</span>
+    <span className={className} aria-label={targetText}>
       <span aria-hidden="true">{displayText}</span>
     </span>
   );

@@ -169,6 +169,8 @@ class EligibilitySerializer(serializers.Serializer):
     exam = EligibilityExamSerializer(allow_null=True)
     next_exam = EligibilityExamSerializer(allow_null=True)
     server_time = serializers.DateTimeField()
+    # apps.billing.entitlements_for(user): [{key, label, lifetime, ends_at}].
+    entitlements = serializers.ListField(child=serializers.DictField(), required=False)
 
 
 class MaterialUrlSerializer(serializers.Serializer):

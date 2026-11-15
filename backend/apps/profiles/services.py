@@ -593,8 +593,18 @@ def public_payload(profile: StudentProfile, viewer, *, draft: bool = False) -> d
         "status": profile.status if (is_owner or is_staff(viewer)) else StudentProfile.STATUS_ACTIVE,
         # Release-day Founding Glow frame (30 days, active legacy students); null otherwise.
         "frame": _profile_frame(profile.user_id),
+        # Rewards the student chose to feature (handle only; certificates as a plain badge, no link).
+        "highlights": reward_highlights(profile.user_id),
         **render_document(profile, source, rules=rules),
     }
+
+
+def reward_highlights(user_id) -> list[dict]:
+    try:
+        from apps.engagement.history import public_highlights
+    except ImportError:  # pragma: no cover
+        return []
+    return public_highlights(user_id)
 
 
 def _profile_frame(user_id) -> dict | None:
@@ -662,6 +672,7 @@ def owner_payload(profile: StudentProfile, *, request=None) -> dict:
         "handle_prompt": handle_prompt_pending(profile),
         "images": images,
         "earned_badges": [catalogue[key] for key in sorted(earned or ()) if key in catalogue],
+        "highlights": reward_highlights(profile.user_id),
         "limits": {
             **document.LIMITS,
             "bio": richtext.MAX_SOURCE_LENGTH,

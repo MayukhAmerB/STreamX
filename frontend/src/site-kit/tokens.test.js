@@ -161,11 +161,16 @@ describe("public bundle boundary", () => {
     }
   });
 
-  it("renders the public site at 1:1 (no html zoom) with Plex on the public layout", () => {
+  it("hybrid release: zooms only the Friday website surface; the Console renders at 1:1", () => {
     const index = read("src/index.css");
-    expect(index).not.toMatch(/^\s*zoom:/m);
-    expect(index).toMatch(/\.site-public \{\s+--font-sans: var\(--sc-font-sans\);/);
-    expect(read("src/layouts/AppLayout.jsx")).toContain("site-public");
+    // Every html zoom sits behind html[data-surface="website"] (or resets it to 1).
+    const zooms = [...index.matchAll(/^([^\n{]*)\{[^}]*?^\s*zoom:\s*([^;]+);/gm)];
+    expect(zooms.length).toBeGreaterThan(0);
+    for (const [, selector, value] of zooms) {
+      if (value.trim() === "1") continue;
+      expect(selector).toContain('html[data-surface="website"]');
+    }
+    expect(read("src/layouts/AppLayout.jsx")).toContain('root.dataset.surface = "website"');
   });
 
   it("hands over from the boot loader in at most 150 ms with no extra hold", () => {

@@ -141,7 +141,21 @@ def derive_entitlement(user_id, course):
     platform = _platform_entitlement(user_id, course)
     if platform is LIFETIME:
         return LIFETIME
-    return _strongest(platform, _installment_entitlement(payments, course))
+    external = [provider(user_id, course) for provider in _EXTERNAL_PROVIDERS]
+    if any(item is not None and item.access_type != Enrollment.ACCESS_INSTALLMENT for item in external):
+        return LIFETIME
+    return _strongest(platform, _installment_entitlement(payments, course), *external)
+
+
+# Other modules (apps.billing via apps.courses.billing_hooks) that also back course
+# access register ``provider(user_id, course) -> Entitlement | None`` here, so a
+# refund elsewhere never revokes access they still justify.
+_EXTERNAL_PROVIDERS = []
+
+
+def register_entitlement_provider(provider):
+    if provider not in _EXTERNAL_PROVIDERS:
+        _EXTERNAL_PROVIDERS.append(provider)
 
 
 def _reduced_fields(enrollment, entitlement):

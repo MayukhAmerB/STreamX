@@ -1,12 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { StaticRouter } from "react-router-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock("../api/client", () => ({ default: api }));
 
 import { act, renderTree } from "../test-utils/renderTree";
-import AboutPage from "../pages/AboutPage";
 import SiteStatStrip, { siteStatValues } from "./SiteStatStrip";
 import { fetchSiteStats, honestCount, resetSiteStatsCache, siteStatItems } from "./siteStats";
 
@@ -139,12 +137,6 @@ describe("fetch and strips", () => {
     await tree.unmount();
   });
 
-  it("the About page has no typed-in figures", () => {
-    const markup = renderToStaticMarkup(
-      <StaticRouter location="/about">
-        <AboutPage />
-      </StaticRouter>,
-    );
-    for (const fake of ["1000+", "98%", "Learner satisfaction", "Mentor support", "6x"]) expect(markup).not.toContain(fake);
-  });
+  // Hybrid release: /about is the Friday 13 Nov page again (owner decision),
+  // with its own copy; the strip rule applies to the 13ca6b79 marketing pages.
 });

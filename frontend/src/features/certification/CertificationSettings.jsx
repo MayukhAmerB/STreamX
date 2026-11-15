@@ -80,7 +80,7 @@ export function CertificationSettingsView({ prefs, saving = false, error = "", o
       <Switch
         id="certification-hall-of-fame"
         label="List me in the Hall of Fame"
-        help="Shows your handle (never your real name) with your batch and a link to your certificate."
+        help="Shows your chosen handle (never your real name) with your batch. Your certificate stays private to you."
         on={prefs.hall_of_fame_listed}
         disabled={saving}
         onChange={(value) => onChange?.({ hall_of_fame_listed: value })}
