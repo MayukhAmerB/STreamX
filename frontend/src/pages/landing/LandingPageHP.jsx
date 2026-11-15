@@ -1,14 +1,11 @@
 // The public landing page in the HackPath philosophy (PHILOSOPHY T1/T2/T5,
-// BUILD_PLAN §2.1 "/"): black canvas, the golden Qur'an 20:114 calligraphy as
-// the hero, one handwritten accent per headline, real product UI in a numbered
+// BUILD_PLAN §2.1 "/"): black canvas, an investigation-console hero (headline,
+// an OSINT pivot chain in a terminal panel, the live site figures), real product UI in a numbered
 // timeline, the open programmes and live classes (same data and states as
 // before), the Watch band, the pricing band and the footer wordmark (layout).
 import { siteBrand } from "../../config/siteBrand";
 import { useYouTubeChannel } from "../../features/youtube/youTubeStore";
 import { useAuth } from "../../hooks/useAuth";
-import heroStacked from "../../assets/brand/hero-quran-20-114-stacked.svg";
-import heroWide from "../../assets/brand/hero-quran-20-114.svg";
-import heroMeta from "../../assets/brand/hero-quran-20-114.meta.json";
 import { CardShell } from "../../marketing/CatalogCard";
 import {
   CertificateMock,
@@ -28,18 +25,16 @@ import {
   Hand,
   StatStrip,
   StatusPill,
-  Tagline,
 } from "../../marketing/primitives";
-import SiteStatStrip from "../../marketing/SiteStatStrip";
+import SiteStatStrip, { siteStatValues } from "../../marketing/SiteStatStrip";
+import { useSiteStats } from "../../marketing/siteStats";
 import { useMarketingData } from "../../marketing/useMarketingData";
 import { FREE_TIER } from "../../data/freeLabs";
 import { BestsellersContent } from "./BestsellersBand";
 import { HeroCountdownStrip } from "./HeroBand";
 import {
-  HERO_REFERENCE,
-  HERO_TAGLINE,
-  HERO_TRANSLATION,
   HP_COMMUNITY,
+  HP_HERO_TRACE,
   HP_HERO,
   HP_OPEN_NOW,
   HP_PRACTISE,
@@ -52,67 +47,124 @@ import { liveBroadcastJoinPath, useLandingLiveClasses, useHeroLiveBroadcast } fr
 import WatchBand, { watchBandVisible } from "./WatchBand";
 import "./landing.css";
 
-// Copy lives in landingContent.js; re-exported for the existing imports and tests.
-export { HERO_REFERENCE, HERO_TAGLINE, HERO_TRANSLATION };
-
-/** The calligraphy (wide ≥ 641 px, stacked below), with a same-ratio slot if the art is missing. */
-export function Calligraphy({ wide = heroWide, stacked = heroStacked, alt = heroMeta?.alt }) {
-  if (!wide) {
-    return (
-      <span className="hp-calligraphy" role="img" aria-label={alt || HERO_REFERENCE}>
-        <span className="hp-calligraphy__slot" />
-      </span>
-    );
+/**
+ * The hero's figures from GET /api/site/stats/ (via siteStats.js), in the
+ * order a visitor cares about: students trained, verified reviews, average
+ * rating, live classes held. A figure the server left out (null / below its
+ * minimum) is simply not shown; no figure at all means no strip.
+ */
+export function heroStatItems(items = []) {
+  const byKey = Object.fromEntries((Array.isArray(items) ? items : []).map((item) => [item.key, item]));
+  const rows = [];
+  const students = byKey.students_enrolled;
+  if (students) rows.push({ ...students, label: "Students trained" });
+  const rating = byKey.average_rating;
+  if (rating && typeof rating.reviews === "number") {
+    rows.push({ key: "rating_count", label: "Verified reviews", value: String(rating.reviews), count: rating.reviews, plus: false, note: "" });
   }
+  if (rating) rows.push({ ...rating, label: "Average rating", note: "" });
+  const classes = byKey.live_classes_delivered;
+  if (classes) rows.push({ ...classes, label: "Live classes held" });
+  return rows;
+}
+
+/** The terminal panel: one OSINT case, pivot by pivot, ending in "case closed". */
+export function TraceConsole({ steps = HP_HERO_TRACE.steps }) {
   return (
-    <picture className="hp-calligraphy">
-      {stacked ? <source media="(max-width: 640px)" srcSet={stacked} width="760" height="800" /> : null}
-      <img src={wide} alt={alt || `${HERO_REFERENCE}: ${HERO_TRANSLATION}`} width="1500" height="500" fetchpriority="high" decoding="async" />
-    </picture>
+    <figure className="hp-console" aria-labelledby="hp-console-caption">
+      <div className="hp-console__bar" aria-hidden="true">
+        <span className="hp-console__dots">
+          <span />
+          <span />
+          <span />
+        </span>
+        <span className="hp-console__title">{HP_HERO_TRACE.title}</span>
+      </div>
+      <div className="hp-console__body">
+        <p className="hp-console__cmd">
+          <span className="hp-console__prompt" aria-hidden="true">
+            $
+          </span>{" "}
+          {HP_HERO_TRACE.command}
+        </p>
+        <ol className="hp-console__steps">
+          {steps.map((step, index) => (
+            <li key={step.tag} className="hp-console__step" style={{ "--hp-step": index + 1 }}>
+              <span className="hp-console__num" aria-hidden="true">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              <span className="hp-console__tag">{step.tag}</span>
+              <span className="hp-console__detail">{step.detail}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="hp-console__done" style={{ "--hp-step": steps.length + 1 }}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" focusable="false">
+            <path d="M6.5 11.2 3.3 8l-.7.7 3.9 3.9 7-7-.7-.7z" />
+          </svg>
+          <span>
+            {HP_HERO_TRACE.closed}
+            <span className="hp-console__cursor" aria-hidden="true" />
+          </span>
+        </p>
+      </div>
+      <figcaption id="hp-console-caption" className="hp-sr">
+        {HP_HERO_TRACE.caption}
+      </figcaption>
+    </figure>
   );
 }
 
-export function LandingHero({ isAuthenticated, liveBroadcast, stats }) {
-  const strip = [
-    { label: "Courses", value: stats.courses || null },
-    { label: "Modules", value: stats.modules || null },
-    { label: "Free challenges", value: stats.freeChallenges || "Free" },
-    { label: "Live cohorts", value: stats.liveCohorts || null },
-  ];
+/**
+ * Hero: live schedule badge, headline, actions and the real figures, with the
+ * trace console beside it (desktop) or below it (phone). `siteStats` overrides
+ * the fetched figures (tests, previews).
+ */
+export function LandingHero({ isAuthenticated, liveBroadcast, siteStats }) {
+  const live = useSiteStats();
+  const rows = heroStatItems(Array.isArray(siteStats) ? siteStats : live.items);
   return (
-    <section className="hp-hero" aria-labelledby="hp-home-title">
-      <Tagline>{HERO_TAGLINE}</Tagline>
-      <Calligraphy />
-      <figure className="hp-verse">
-        <blockquote className="hp-verse__translation">
-          <p>{HERO_TRANSLATION}</p>
-        </blockquote>
-        <figcaption>
-          <cite className="hp-kicker hp-verse__ref">{HERO_REFERENCE}</cite>
-        </figcaption>
-      </figure>
-      <h1 id="hp-home-title" className="hp-display hp-display--hero hp-hero__title">
-        <span className="hp-display__line">{HP_HERO.lead}</span> <span className="hp-display__line"><Hand accent>{HP_HERO.accent}</Hand>.</span>
-      </h1>
-      <p className="hp-lead">{HP_HERO.sub}</p>
-      {liveBroadcast ? (
-        <p className="hp-hero__note" role="status">
-          <StatusPill kind="live">{HP_HERO.liveLabel}</StatusPill>
-          <span>{liveBroadcast.title || HP_HERO.liveFallback}</span>
-          <ButtonLink to={isAuthenticated ? liveBroadcastJoinPath(liveBroadcast) : "/login"} variant="ghost" size="sm" arrow>
-            {HP_HERO.liveCta}
-          </ButtonLink>
-        </p>
-      ) : null}
-      <div className="hp-actions">
-        <ButtonLink to={FREE_TIER.href} variant="primary" size="lg" arrow>
-          {HP_HERO.primaryCta}
-        </ButtonLink>
-        <ButtonLink to="/courses" variant="secondary" size="lg">
-          {HP_HERO.secondaryCta}
-        </ButtonLink>
+    <section className="hp-hero hp-hero--console" aria-labelledby="hp-home-title">
+      <div className="hp-hero__grid">
+        <div className="hp-hero__copy">
+          <p className="hp-hero__badge">
+            <span className="hp-hero__badge-live">
+              <span className="hp-hero__badge-dot" aria-hidden="true" />
+              {HP_HERO.badgeLive}
+            </span>
+            <span>{HP_HERO.badgeSchedule}</span>
+          </p>
+          <h1 id="hp-home-title" className="hp-display hp-display--hero hp-hero__title">
+            {HP_HERO.headline.map((line, index) => (
+              <span key={line} className={`hp-hero__line${index === HP_HERO.headline.length - 1 ? " hp-hero__line--strong" : ""}`}>
+                {line}{" "}
+              </span>
+            ))}
+          </h1>
+          <p className="hp-lead hp-hero__lead">{HP_HERO.sub}</p>
+          {liveBroadcast ? (
+            <p className="hp-hero__note" role="status">
+              <StatusPill kind="live">{HP_HERO.liveLabel}</StatusPill>
+              <span>{liveBroadcast.title || HP_HERO.liveFallback}</span>
+              <ButtonLink to={isAuthenticated ? liveBroadcastJoinPath(liveBroadcast) : "/login"} variant="ghost" size="sm" arrow>
+                {HP_HERO.liveCta}
+              </ButtonLink>
+            </p>
+          ) : null}
+          <div className="hp-actions hp-hero__actions">
+            <ButtonLink to={FREE_TIER.href} variant="primary" size="lg" arrow>
+              {HP_HERO.primaryCta}
+            </ButtonLink>
+            <ButtonLink to="/courses" variant="secondary" size="lg">
+              {HP_HERO.secondaryCta}
+            </ButtonLink>
+          </div>
+          {rows.length ? <StatStrip items={siteStatValues(rows)} label={HP_HERO.statsLabel} className="hp-hero__stats" /> : null}
+        </div>
+        <div className="hp-hero__panel">
+          <TraceConsole />
+        </div>
       </div>
-      <StatStrip items={strip} label={HP_HERO.statsLabel} />
     </section>
   );
 }
@@ -317,7 +369,7 @@ export function NeverAloneBand() {
 /** The landing page. Header and footer come from the layout. */
 export default function LandingPageHP() {
   const { isAuthenticated } = useAuth();
-  const { courses: catalog, gate, stats } = useMarketingData();
+  const { courses: catalog, gate } = useMarketingData();
   const liveClasses = useLandingLiveClasses(isAuthenticated);
   const liveBroadcast = useHeroLiveBroadcast(isAuthenticated);
   const youtube = useYouTubeChannel();
@@ -327,7 +379,7 @@ export default function LandingPageHP() {
 
   return (
     <div className="lp lp--hp" data-brand={siteBrand.id}>
-      <LandingHero isAuthenticated={isAuthenticated} liveBroadcast={liveBroadcast} stats={stats} />
+      <LandingHero isAuthenticated={isAuthenticated} liveBroadcast={liveBroadcast} />
       <TrackPair gate={gate} />
       <OpenNow catalog={catalog} liveClasses={liveClasses} liveBroadcast={liveBroadcast} />
       <StoryBand />

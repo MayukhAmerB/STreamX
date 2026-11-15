@@ -89,22 +89,32 @@ export const CTA_BODY =
  * `accent` is the one handwritten (Handlee) word of a headline.
  * ---------------------------------------------------------------------- */
 
-/** The Qur'an 20:114 hero: tagline, translation and reference stay exactly as approved. */
-export const HERO_TAGLINE = "Seek knowledge, then put it to work";
-export const HERO_TRANSLATION = "And say: My Lord, increase me in knowledge";
-export const HERO_REFERENCE = "Qur'an 20:114";
-
 export const HP_HERO = {
-  // "Turn public traces into proof." (accent: proof)
-  lead: "Turn public traces into",
-  accent: "proof",
-  sub: "Live OSINT classes every Fri, Sat and Sun at 7 PM IST. Weekly reports an instructor marks, real cases in the labs and a certificate anyone can verify.",
+  headline: ["Trace it.", "Verify it.", "Prove it."],
+  sub: "Live OSINT investigation training. Start from a photo, a username or a domain, pivot through public sources and finish with evidence that holds up, marked by an instructor every week.",
+  badgeLive: "Live",
+  badgeSchedule: "Fri · Sat · Sun 7 PM IST",
   primaryCta: "Start free",
   secondaryCta: "Browse courses",
   liveLabel: "Class is live",
   liveFallback: "Join your live classroom",
   liveCta: "Join now",
-  statsLabel: "The catalogue in numbers",
+  statsLabel: "Al Syed Initiative in numbers",
+};
+
+/** The hero's terminal panel: one illustrative case, pivot by pivot (public sources only). */
+export const HP_HERO_TRACE = {
+  title: "case-0419 · osint pivot chain",
+  command: "trace --from photo_0419.jpg",
+  steps: [
+    { tag: "photo", detail: "Shadow falls at 212°: late afternoon, facing south-west" },
+    { tag: "metadata", detail: "EXIF stripped; embedded thumbnail keeps the capture date" },
+    { tag: "street view", detail: "Shop sign and kerb paint matched to one junction" },
+    { tag: "username", detail: "Same handle reused on 3 public platforms" },
+    { tag: "crt.sh", detail: "Certificate-transparency log names the owner's domain" },
+  ],
+  closed: "Case closed: 5 pivots, public sources only",
+  caption: "An example investigation: from a single photo to a closed case in five pivots.",
 };
 
 export const HP_TRACKS = {

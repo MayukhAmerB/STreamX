@@ -79,6 +79,7 @@ export function siteStatItems(payload) {
       count: null,
       plus: false,
       note: `from ${reviews.toLocaleString("en-US")} reviews`,
+      reviews,
     });
   }
   return items;

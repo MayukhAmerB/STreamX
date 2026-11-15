@@ -13,7 +13,8 @@ vi.mock("../hooks/useAuth", () => ({ useAuth: () => state.auth }));
 
 import { EXAM_LAB, FREE_TIER, labAccess, LABS, labUrl } from "../data/freeLabs";
 import { landingVariant } from "../pages/landing/landingFlag";
-import { Calligraphy, HERO_REFERENCE, HERO_TRANSLATION, LandingHero, TrackPair } from "../pages/landing/LandingPageHP";
+import { heroStatItems, LandingHero, TrackPair } from "../pages/landing/LandingPageHP";
+import { siteStatItems } from "./siteStats";
 import BootcampPage from "../pages/BootcampPage";
 import { resolveCatalogFilter } from "../pages/CourseListPage";
 import PricingPage, { ComparisonTable } from "../pages/PricingPage";
@@ -77,23 +78,43 @@ describe("landing (HackPath philosophy)", () => {
     expect(landingVariant("off")).toBe("v1");
   });
 
-  it("renders the calligraphy (wide + stacked), the translation, the attribution and one handwritten word in the h1", () => {
-    const markup = html(<LandingHero isAuthenticated={false} liveBroadcast={null} stats={catalogStats(COURSES)} />);
-    expect(markup).toContain('media="(max-width: 640px)"');
-    expect(markup).toMatch(/<img[^>]+width="1500" height="500"[^>]+fetchpriority="high"/);
-    expect(markup).toContain("Qur&#x27;an 20:114 in golden Arabic calligraphy");
-    expect(markup).toContain(HERO_TRANSLATION);
-    expect(markup).toContain(HERO_REFERENCE.replace("'", "&#x27;"));
-    const h1 = markup.match(/<h1[^>]*>.*?<\/h1>/)[0];
-    expect(h1.match(/class="hp-hand[ "]/g)).toHaveLength(1);
-    expect(markup).toContain(`href="${FREE_TIER.href}"`);
-    expect(markup).toContain('href="/courses"');
+  const SITE_STATS = siteStatItems({
+    stats: { students_enrolled: 311, live_classes_delivered: 114, recorded_hours: 55, certificates_issued: null, ctf_cases: null, average_rating: 5, rating_count: 19 },
   });
 
-  it("keeps a same-ratio slot when the artwork is missing (no CLS)", () => {
-    const markup = html(<Calligraphy wide="" />);
-    expect(markup).toContain("hp-calligraphy__slot");
-    expect(markup).toContain('role="img"');
+  it("is an investigation console: headline, live badge, actions and the OSINT pivot chain; no verse and no handwritten accent", () => {
+    const markup = html(<LandingHero isAuthenticated={false} liveBroadcast={null} siteStats={SITE_STATS} />);
+    const h1 = markup.match(/<h1[^>]*>.*?<\/h1>/)[0];
+    expect(h1).toContain("Trace it.");
+    expect(h1).toContain("Verify it.");
+    expect(h1).toContain("Prove it.");
+    expect(h1).not.toContain("hp-hand");
+    expect(markup).toContain("Fri · Sat · Sun 7 PM IST");
+    expect(markup).toMatch(/class="hp-hero__badge-live"[^>]*>.*?Live</);
+    for (const tag of ["photo", "metadata", "street view", "username", "crt.sh"]) expect(markup).toContain(`<span class="hp-console__tag">${tag}</span>`);
+    expect(markup).toContain("Case closed");
+    expect(markup).not.toMatch(/Qur|calligraphy|hp-verse|increase me in knowledge/i);
+    expect(markup).toContain(`href="${FREE_TIER.href}"`);
+    expect(markup).toContain('href="/courses"');
+    expect(markup).toContain(">Start free<");
+    expect(markup).toContain(">Browse courses<");
+  });
+
+  it("shows the real site figures (students, verified reviews, rating, live classes) and hides missing ones", () => {
+    expect(heroStatItems(SITE_STATS).map((item) => [item.label, item.value])).toEqual([
+      ["Students trained", "310+"],
+      ["Verified reviews", "19"],
+      ["Average rating", "5.0/5"],
+      ["Live classes held", "110+"],
+    ]);
+    const markup = html(<LandingHero isAuthenticated={false} liveBroadcast={null} siteStats={SITE_STATS} />);
+    expect(markup).toContain("<dt>Students trained</dt>");
+    expect(markup).toContain("<dd>5.0/5</dd>");
+    // Too few reviews: no rating, no review count; nothing below its minimum.
+    const sparse = siteStatItems({ stats: { students_enrolled: 40, live_classes_delivered: 3, average_rating: 4.9, rating_count: 4 } });
+    expect(heroStatItems(sparse).map((item) => item.label)).toEqual(["Students trained"]);
+    // No figures at all: no strip (never "0" or a placeholder).
+    expect(html(<LandingHero isAuthenticated={false} liveBroadcast={null} siteStats={[]} />)).not.toContain("hp-stats");
   });
 
   it("lists both tracks; Pentesting is browsable and says Coming soon while the switch is off", () => {
