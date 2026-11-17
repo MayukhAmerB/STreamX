@@ -22,7 +22,19 @@ class InvalidIdempotencyKey(ValueError):
 
 
 class IdempotencyConflict(ValueError):
-    pass
+    code = "idempotency_conflict"
+
+
+class IdempotencyKeyReusedConflict(IdempotencyConflict):
+    """The key belongs to a different checkout request: the client must rotate it."""
+
+    code = "idempotency_key_reused"
+
+
+class IdempotencyInFlightConflict(IdempotencyConflict):
+    """The first request with this key is still running: retry shortly."""
+
+    code = "idempotency_in_progress"
 
 
 @dataclass(frozen=True)
@@ -74,7 +86,7 @@ def find_completed_create_order_replay(
     except PaymentIdempotencyRecord.DoesNotExist:
         return None
     if record.request_fingerprint != _request_fingerprint(request_payload):
-        raise IdempotencyConflict(
+        raise IdempotencyKeyReusedConflict(
             "This Idempotency-Key was already used with a different payment request."
         )
     if record.status != PaymentIdempotencyRecord.STATUS_COMPLETED:
@@ -146,7 +158,7 @@ def claim_create_order(
                 created = False
 
         if not created and record.request_fingerprint != fingerprint:
-            raise IdempotencyConflict(
+            raise IdempotencyKeyReusedConflict(
                 "This Idempotency-Key was already used with a different payment request."
             )
         if not created and record.status == PaymentIdempotencyRecord.STATUS_PROCESSING:
@@ -156,7 +168,7 @@ def claim_create_order(
             )
             lease_cutoff = timezone.now() - timedelta(seconds=lease_seconds)
             if record.updated_at > lease_cutoff:
-                raise IdempotencyConflict("This payment request is already being processed.")
+                raise IdempotencyInFlightConflict("This payment request is already being processed.")
 
             # A new token fences a former worker that resumes after its lease
             # expired; only the current owner may publish the final response.

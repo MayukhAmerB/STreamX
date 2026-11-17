@@ -40,12 +40,28 @@ function normalizeRecovery(value) {
     typeof value.applicationReference === "string"
     && APPLICATION_REFERENCE_PATTERN.test(value.applicationReference)
   ) ? value.applicationReference : undefined;
+  // When this browser last opened a Razorpay order for the course (epoch ms):
+  // lets the page tell a returning buyer that pressing Pay again is safe (the
+  // server finds that order instead of charging twice).
+  const orderStartedAt = Number.isSafeInteger(value.orderStartedAt) && value.orderStartedAt > 0
+    ? value.orderStartedAt
+    : undefined;
   return {
     idempotencyKey: value.idempotencyKey,
     pendingVerification: null,
     ...(plan ? { plan } : {}),
     ...(applicationReference ? { applicationReference } : {}),
+    ...(orderStartedAt ? { orderStartedAt } : {}),
   };
+}
+
+const UNFINISHED_CHECKOUT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/** True when this browser opened a Razorpay order for the course within the last day. */
+export function hasRecentUnfinishedCheckout(recovery, now = Date.now()) {
+  const startedAt = Number(recovery?.orderStartedAt);
+  const age = now - startedAt;
+  return Number.isFinite(startedAt) && startedAt > 0 && age >= 0 && age < UNFINISHED_CHECKOUT_MAX_AGE_MS;
 }
 
 export function loadCheckoutRecovery(storage, courseId) {

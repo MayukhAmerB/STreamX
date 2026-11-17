@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 import { AuthContext } from "../../context/AuthContext";
 import PlatformPlanCheckout from "./PlatformPlanCheckout";
 import {
+  PAYMENT_PENDING_MESSAGE,
+  PAYMENTS_PAUSED_MESSAGE,
   PLAN_UNAVAILABLE_REASON,
   PRICE_AT_LAUNCH_REASON,
   isSubscriptionPlan,
@@ -100,6 +102,59 @@ describe("startPlatformCheckout", () => {
     expect(instances[0].options).toMatchObject({ order_id: "order_1", amount: 839900, currency: "INR" });
     instances[0].options.modal.ondismiss();
     await expect(pending).resolves.toEqual({ status: "dismissed" });
+  });
+
+  it("retries a transient verify failure after payment instead of reporting failure", async () => {
+    const { Razorpay, instances } = fakeRazorpay();
+    const api = {
+      post: vi
+        .fn()
+        .mockResolvedValueOnce({ data: { data: { order_id: "order_r", key_id: "rzp", amount_paise: 839900, currency: "INR" } } })
+        .mockRejectedValueOnce({ response: { status: 503, data: { errors: { code: "payment_gateway_unavailable" } }, headers: {} } })
+        .mockResolvedValueOnce({ data: { data: { plan_key: "pentesting_lifetime", granted: true } } }),
+    };
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const pending = startPlatformCheckout(lifetime, { api, loadCheckout: async () => Razorpay, idempotencyKey: "k3", retrySleep: sleep });
+    await vi.waitFor(() => expect(instances).toHaveLength(1));
+    await instances[0].options.handler({ razorpay_order_id: "order_r", razorpay_payment_id: "pay_r", razorpay_signature: "sig" });
+    await expect(pending).resolves.toEqual({ status: "paid", data: { plan_key: "pentesting_lifetime", granted: true } });
+    expect(api.post).toHaveBeenCalledTimes(3);
+    expect(sleep).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a still-unconfirmed payment as pending, never failed", async () => {
+    const { Razorpay, instances } = fakeRazorpay();
+    const outage = { response: { status: 502, data: {}, headers: {} } };
+    const api = {
+      post: vi
+        .fn()
+        .mockResolvedValueOnce({ data: { data: { order_id: "order_p", key_id: "rzp", amount_paise: 839900, currency: "INR" } } })
+        .mockRejectedValue(outage),
+    };
+    const pending = startPlatformCheckout(lifetime, { api, loadCheckout: async () => Razorpay, idempotencyKey: "k4", retrySleep: async () => {} });
+    await vi.waitFor(() => expect(instances).toHaveLength(1));
+    await instances[0].options.handler({ razorpay_order_id: "order_p", razorpay_payment_id: "pay_p", razorpay_signature: "sig" });
+    await expect(pending).resolves.toEqual({ status: "pending", error: PAYMENT_PENDING_MESSAGE });
+  });
+
+  it("still reports a rejected signature as failed", async () => {
+    const { Razorpay, instances } = fakeRazorpay();
+    const api = {
+      post: vi
+        .fn()
+        .mockResolvedValueOnce({ data: { data: { order_id: "order_s", key_id: "rzp", amount_paise: 839900, currency: "INR" } } })
+        .mockRejectedValueOnce({ response: { status: 400, data: { code: "signature_invalid", detail: "Payment verification failed." } } }),
+    };
+    const pending = startPlatformCheckout(lifetime, { api, loadCheckout: async () => Razorpay, idempotencyKey: "k5", retrySleep: async () => {} });
+    await vi.waitFor(() => expect(instances).toHaveLength(1));
+    await instances[0].options.handler({ razorpay_order_id: "order_s", razorpay_payment_id: "pay_s", razorpay_signature: "bad" });
+    await expect(pending).resolves.toEqual({ status: "failed", error: "Payment verification failed." });
+    expect(api.post).toHaveBeenCalledTimes(2);
+  });
+
+  it("explains paused payments (circuit open) without blaming the buyer", () => {
+    const paused = { response: { status: 503, data: { code: "payment_gateway_unavailable", errors: { code: "payment_gateway_unavailable" } } } };
+    expect(platformCheckoutError(paused)).toBe(PAYMENTS_PAUSED_MESSAGE);
   });
 
   it("turns refusals into calm sentences", () => {

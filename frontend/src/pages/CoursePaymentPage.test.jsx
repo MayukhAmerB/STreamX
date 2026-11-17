@@ -54,4 +54,15 @@ describe("course checkout flow", () => {
     expect(shouldRotateCheckoutIntentAfterError({ response: { status: 400 } })).toBe(false);
     expect(shouldRotateCheckoutIntentAfterError(new Error("network interrupted"))).toBe(false);
   });
+
+  it("rotates the key when the server says it belonged to a different request (plan or details changed)", () => {
+    expect(shouldRotateCheckoutIntentAfterError({
+      response: { status: 409, data: { data: { rotate_checkout_key: true }, errors: { code: "idempotency_key_reused" } } },
+    })).toBe(true);
+    // In-progress conflicts and recovery conflicts keep the key.
+    expect(shouldRotateCheckoutIntentAfterError({
+      response: { status: 409, data: { data: null, errors: { code: "idempotency_in_progress" } } },
+    })).toBe(false);
+    expect(shouldRotateCheckoutIntentAfterError({ response: { status: 409, data: { data: null } } })).toBe(false);
+  });
 });

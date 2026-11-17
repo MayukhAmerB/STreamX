@@ -7,6 +7,13 @@ from config.response import api_response
 from rest_framework import permissions, serializers
 from rest_framework.views import APIView
 
+from apps.core.idempotency import IdempotencyMixin
+from apps.payments.throttles import (
+    BillingCheckoutThrottle,
+    BillingVerifyThrottle,
+    PaymentIpCeilingThrottle,
+)
+
 from . import services
 from .registry import describe
 
@@ -43,12 +50,15 @@ def plan_payload(plan) -> dict:
 
 
 def _error(exc: services.BillingError):
-    return api_response(
+    response = api_response(
         success=False,
         message=exc.message,
         errors={"detail": exc.message, "code": exc.code},
         status_code=exc.status,
     )
+    if exc.status == 503:
+        response["Retry-After"] = "30"
+    return response
 
 
 class _PlanInput(serializers.Serializer):
@@ -102,10 +112,14 @@ class QuoteView(APIView):
         return _no_store(api_response(success=True, message="Quote.", data=quote.as_dict()))
 
 
-class CheckoutView(APIView):
-    """``POST /api/billing/checkout/ {plan_id}``: a Razorpay order for the plan's current price."""
+class CheckoutView(IdempotencyMixin, APIView):
+    """``POST /api/billing/checkout/ {plan_id}``: a Razorpay order for the plan's current price.
+
+    An optional ``Idempotency-Key`` replays the first answer (double submit).
+    """
 
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [BillingCheckoutThrottle, PaymentIpCeilingThrottle]
 
     def post(self, request):
         data = _PlanInput(data=request.data)
@@ -119,9 +133,10 @@ class CheckoutView(APIView):
 
 
 class CheckoutVerifyView(APIView):
-    """``POST /api/billing/checkout/verify/ {order_id, payment_id, signature}``."""
+    """``POST /api/billing/checkout/verify/ {order_id, payment_id, signature}`` (idempotent by design)."""
 
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [BillingVerifyThrottle, PaymentIpCeilingThrottle]
 
     def post(self, request):
         data = _VerifyInput(data=request.data)

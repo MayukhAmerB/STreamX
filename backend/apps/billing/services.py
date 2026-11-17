@@ -204,6 +204,13 @@ def start_checkout(user, plan_id) -> dict:
     if reusable is not None:
         return _checkout_payload(reusable)
 
+    from apps.payments.gateway import ensure_available
+
+    try:
+        # Circuit open: refuse before the Purchase row exists.
+        ensure_available()
+    except GatewayError as exc:
+        raise BillingError("payment_gateway_unavailable", str(exc), 503) from exc
     plan = get_plan(current.plan_id)
     purchase = Purchase.objects.create(
         user=user,
@@ -481,10 +488,18 @@ def handle_gateway_event(payload: dict, *, request=None):
         }
 
     if event in REFUND_EVENTS:
+        refund_payment_id = str(entity.get("id") or refund.get("payment_id") or "").strip()
+        if purchase.provider_payment_id and refund_payment_id and refund_payment_id != purchase.provider_payment_id:
+            # Razorpay auto-refunds a second/late payment on an already paid
+            # order; that refund must not revoke this purchase's grants.
+            logger.warning("billing webhook refund for another payment of purchase %s ignored", purchase.pk)
+            return result("Webhook ignored.", False)
         try:
             paise = max(int(refund.get("amount") or 0), int(entity.get("amount_refunded") or 0))
         except (TypeError, ValueError):
             paise = 0
+        if paise <= 0:
+            return result("Webhook ignored.", False)
         on_payment_refunded(purchase, amount_refunded=Decimal(paise) / 100, reason=f"Razorpay {event}")
         return result("Billing refund recorded.", True)
     if event == "payment.captured" or str(entity.get("status") or "").lower() == "captured":

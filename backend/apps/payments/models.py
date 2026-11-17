@@ -133,6 +133,8 @@ class Payment(models.Model):
             models.Index(fields=["razorpay_payment_id"]),
             models.Index(fields=["user", "course", "razorpay_order_id"]),
             models.Index(fields=["user", "status", "created_at"]),
+            # Stuck-payment reconciliation walks open orders oldest-checked first.
+            models.Index(fields=["status", "updated_at"], name="payments_pay_status_upd_idx"),
         ]
         constraints = [
             # One Payment row per subscription charge (webhook replays and the
@@ -218,6 +220,8 @@ class PaymentWebhookEvent(models.Model):
         indexes = [
             models.Index(fields=["status", "received_at"]),
             models.Index(fields=["event_type", "received_at"]),
+            # Replay check: the same signed body under another event id.
+            models.Index(fields=["payload_hash"], name="payments_whe_payload_idx"),
         ]
 
     def __str__(self):

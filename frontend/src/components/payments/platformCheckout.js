@@ -14,6 +14,12 @@
 
 import apiClient, { featureDisabledDetail } from "../../api/client";
 import { apiData } from "../../utils/api";
+import { isPaymentGatewayUnavailable, isTransientPaymentError, withPaymentRetries } from "../../utils/paymentRetry";
+
+export const PAYMENT_PENDING_MESSAGE =
+  "Payment received. We could not confirm it yet; your access will appear in the Console within a few minutes. Do not pay again.";
+export const PAYMENTS_PAUSED_MESSAGE =
+  "Payments are temporarily unavailable. Please try again in a minute; you have not been charged.";
 
 export const RAZORPAY_CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
 export const PRICE_AT_LAUNCH_REASON = "The price is confirmed at launch. This plan opens then.";
@@ -110,6 +116,9 @@ export function platformCheckoutError(err) {
   const code = data?.code || data?.errors?.code;
   if (code === "already_subscribed") return "You already have this membership. Manage it from your Console.";
   if (code === "already_owned") return "You already own this plan.";
+  if (isPaymentGatewayUnavailable(err) || (Number(err?.response?.status) === 503 && code === "upstream_unavailable")) {
+    return PAYMENTS_PAUSED_MESSAGE;
+  }
   if (code === "plan_unavailable") return text(data?.detail || data?.errors?.detail) || PLAN_UNAVAILABLE_REASON;
   return text(data?.errors?.detail || data?.detail || data?.message) || text(err?.message) || "Unable to start payment.";
 }
@@ -127,6 +136,7 @@ export async function startPlatformCheckout(
     idempotencyKey = createPlanIdempotencyKey(),
     brandName = "",
     prefill = {},
+    retrySleep = undefined,
   } = {}
 ) {
   const gate = platformPlanGate(plan);
@@ -156,20 +166,29 @@ export async function startPlatformCheckout(
       prefill: { ...(created.prefill || {}), ...prefill },
       notes: { plan_key: plan.key },
       handler: async (response) => {
+        const verify = () => (subscription
+          ? api.post("/payment/subscriptions/verify/", {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_subscription_id: response.razorpay_subscription_id,
+              razorpay_signature: response.razorpay_signature,
+            })
+          : api.post("/payment/platform/orders/verify/", {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }));
         try {
-          const verified = subscription
-            ? await api.post("/payment/subscriptions/verify/", {
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_subscription_id: response.razorpay_subscription_id,
-                razorpay_signature: response.razorpay_signature,
-              })
-            : await api.post("/payment/platform/orders/verify/", {
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-              });
+          // Razorpay already took the money: retry transient failures
+          // (verify is idempotent on the server).
+          const verified = await withPaymentRetries(verify, { sleep: retrySleep });
           resolve({ status: "paid", data: apiData(verified) });
         } catch (err) {
+          if (isTransientPaymentError(err)) {
+            // Still unconfirmed after the retries: the webhook/reconciliation
+            // finalizes it. Never tell a paying buyer the payment failed.
+            resolve({ status: "pending", error: PAYMENT_PENDING_MESSAGE });
+            return;
+          }
           resolve({ status: "failed", error: platformCheckoutError(err) });
         }
       },

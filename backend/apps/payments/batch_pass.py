@@ -11,7 +11,7 @@ from django.db import transaction
 from django.db.models import Q
 
 from apps.courses.models import Course, Enrollment
-from apps.realtime.domain import invalidate_course_join_access_cache
+from apps.payments.access_cache import invalidate_course_join_access_cache
 
 from .entitlements import resync_enrollment_access, tally
 from .models import BatchPass

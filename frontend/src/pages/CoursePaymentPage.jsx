@@ -26,11 +26,13 @@ import { formatINR } from "../utils/currency";
 import { siteBrand } from "../config/siteBrand";
 import {
   clearCheckoutRecovery,
+  hasRecentUnfinishedCheckout,
   loadCheckoutRecovery,
   loadCourseApplicationReference,
   saveCheckoutRecovery,
   saveCourseApplicationReference,
 } from "../utils/paymentRecovery";
+import { isCheckoutKeyReused, withPaymentRetries } from "../utils/paymentRetry";
 
 const pageBackgroundImage = "";
 
@@ -171,9 +173,18 @@ export function hasPermanentCourseAccess(course) {
 }
 
 export function shouldRotateCheckoutIntentAfterError(error) {
-  return Number(error?.response?.status) === 503
-    && error?.response?.data?.data?.rotate_checkout_key === true;
+  // 503: the gateway order could not be created; 409: the key was used for a
+  // different request (plan or details changed). Either way the server says
+  // to start a new key; its open-order check still prevents a second charge.
+  return (Number(error?.response?.status) === 503
+    && error?.response?.data?.data?.rotate_checkout_key === true)
+    || isCheckoutKeyReused(error);
 }
+
+export const CHECKOUT_DETAILS_CHANGED_MESSAGE =
+  "Your checkout details changed since the last attempt. Press the button again to continue; you will not be charged twice.";
+export const UNFINISHED_CHECKOUT_NOTICE =
+  "You started a payment for this course earlier. If money left your account, continue with the same plan and details: we will find that payment and you will not be charged twice.";
 
 function paymentRecoveryStorage() {
   try {
@@ -285,6 +296,15 @@ export default function CoursePaymentPage() {
   const checkoutIntentKey = useRef(
     initialCheckoutRecovery?.idempotencyKey || createCheckoutIdempotencyKey(),
   );
+  // When this browser last opened a Razorpay order (kept across reloads).
+  const [orderStartedAt, setOrderStartedAt] = useState(
+    initialCheckoutRecovery?.orderStartedAt || null,
+  );
+  const [showUnfinishedNotice] = useState(() => hasRecentUnfinishedCheckout(initialCheckoutRecovery));
+  // Synchronous guards: a second click (or Enter) in the same tick never
+  // starts a second order or a parallel verification.
+  const submitLock = useRef(false);
+  const verifyLock = useRef(false);
   const [checkoutProfile, setCheckoutProfile] = useState({
     buyer_name: location.state?.applicant?.buyer_name || user?.full_name || "",
     buyer_email: location.state?.applicant?.buyer_email || user?.email || "",
@@ -318,8 +338,9 @@ export default function CoursePaymentPage() {
       pendingVerification,
       plan,
       applicationReference,
+      orderStartedAt,
     });
-  }, [applicationReference, id, paymentResult, pendingVerification, plan]);
+  }, [applicationReference, id, orderStartedAt, paymentResult, pendingVerification, plan]);
 
   useEffect(() => {
     let active = true;
@@ -414,24 +435,45 @@ export default function CoursePaymentPage() {
   };
 
   const confirmCapturedPayment = async (verificationPayload) => {
-    if (!verificationPayload) return;
+    if (!verificationPayload || verifyLock.current) return;
+    verifyLock.current = true;
     setPaying(true);
     setError("");
     try {
-      const verifyResponse = await verifyPayment(verificationPayload);
+      // The money has moved: transient failures (gateway briefly down, proxy
+      // 5xx, network drop) are retried automatically; verify is idempotent.
+      const verifyResponse = await withPaymentRetries(
+        () => verifyPayment(verificationPayload),
+        {
+          onRetry: () => setError("Payment received. Confirming it with the payment gateway; please keep this page open."),
+        },
+      );
       clearCheckoutRecovery(paymentRecoveryStorage(), Number(id));
       setPendingVerification(null);
+      setOrderStartedAt(null);
+      setError("");
       setPaymentResult(apiData(verifyResponse));
     } catch (verifyError) {
       const verificationMessage = apiMessage(verifyError, "Payment verification is still pending.");
       setError(`${verificationMessage} Retry verification below; do not make another payment.`);
     } finally {
+      verifyLock.current = false;
       setPaying(false);
     }
   };
 
   const handlePayNow = async (event) => {
     event.preventDefault();
+    if (submitLock.current) return;
+    submitLock.current = true;
+    try {
+      await startPayment();
+    } finally {
+      submitLock.current = false;
+    }
+  };
+
+  const startPayment = async () => {
     if (pendingVerification) {
       await confirmCapturedPayment(pendingVerification);
       return;
@@ -506,6 +548,7 @@ export default function CoursePaymentPage() {
         throw new Error("Course pricing changed before checkout. Refresh the page and confirm the current plan price.");
       }
       if (checkoutPlan !== plan) setPlan(checkoutPlan);
+      setOrderStartedAt(Date.now());
 
       const checkout = new window.Razorpay({
         key: razorpayKey,
@@ -564,10 +607,15 @@ export default function CoursePaymentPage() {
           pendingVerification: null,
           plan,
           applicationReference,
+          orderStartedAt,
         });
       }
       if (featureDisabledDetail(err)) setGateError(err);
-      setError(apiMessage(err, "Unable to start payment."));
+      setError(
+        isCheckoutKeyReused(err)
+          ? CHECKOUT_DETAILS_CHANGED_MESSAGE
+          : apiMessage(err, "Unable to start payment."),
+      );
       setPaying(false);
     }
   };
@@ -1003,6 +1051,12 @@ export default function CoursePaymentPage() {
                     <span className="h-px w-6 bg-white/15 sm:w-24" aria-hidden="true" />
                   </div>
                 </div>
+              ) : null}
+
+              {showUnfinishedNotice && !pendingVerification && !error ? (
+                <p role="status" data-testid="unfinished-checkout-notice" className="mt-6 max-w-3xl rounded-md border border-white/10 px-4 py-3 text-sm leading-6 text-[#a1a1a1]">
+                  {UNFINISHED_CHECKOUT_NOTICE}
+                </p>
               ) : null}
 
               {error ? (

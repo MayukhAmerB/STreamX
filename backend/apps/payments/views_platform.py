@@ -10,7 +10,6 @@ already have been captured).
 from __future__ import annotations
 
 from config.response import api_response
-from config.throttling import ClientIpScopedRateThrottle
 from rest_framework import permissions, status
 from rest_framework.views import APIView
 
@@ -19,6 +18,7 @@ from apps.core.idempotency import IdempotencyMixin
 from . import platform_orders, subscriptions
 from .models import PlatformSubscription
 from .subscriptions import SubscriptionError
+from .throttles import PaymentIpCeilingThrottle, PlanCheckoutThrottle, PlanVerifyThrottle
 
 
 def error_response(exc: SubscriptionError):
@@ -26,14 +26,20 @@ def error_response(exc: SubscriptionError):
     if exc.feature:
         errors.update({"feature": exc.feature, "reason": exc.message})
     response = api_response(success=False, message=exc.message, errors=errors, status_code=exc.status)
+    if exc.status == 503:
+        response["Retry-After"] = "30"
     if hasattr(response, "data") and isinstance(response.data, dict):
         response.data["code"] = exc.code
         response.data["detail"] = exc.message
     return response
 
 
-class PlanCheckoutThrottle(ClientIpScopedRateThrottle):
-    scope = "plan_checkout"
+# The previous PlanCheckoutThrottle subclassed ScopedRateThrottle, which reads
+# the scope from ``view.throttle_scope``; these views never set one, so the
+# "plan_checkout" budget was never applied. These throttles key on the account
+# (falling back to the IP) and fail open if Redis is down.
+CHECKOUT_THROTTLES = [PlanCheckoutThrottle, PaymentIpCeilingThrottle]
+VERIFY_THROTTLES = [PlanVerifyThrottle, PaymentIpCeilingThrottle]
 
 
 def _prefill(user) -> dict:
@@ -42,7 +48,7 @@ def _prefill(user) -> dict:
 
 class PlatformOrderCreateView(IdempotencyMixin, APIView):
     permission_classes = [permissions.IsAuthenticated]
-    throttle_classes = [PlanCheckoutThrottle]
+    throttle_classes = CHECKOUT_THROTTLES
 
     def post(self, request):
         try:
@@ -56,6 +62,7 @@ class PlatformOrderCreateView(IdempotencyMixin, APIView):
 
 class PlatformOrderVerifyView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = VERIFY_THROTTLES
 
     def post(self, request):
         try:
@@ -75,7 +82,7 @@ class PlatformOrderVerifyView(APIView):
 
 class SubscriptionCreateView(IdempotencyMixin, APIView):
     permission_classes = [permissions.IsAuthenticated]
-    throttle_classes = [PlanCheckoutThrottle]
+    throttle_classes = CHECKOUT_THROTTLES
 
     def post(self, request):
         try:
@@ -103,6 +110,7 @@ class SubscriptionCreateView(IdempotencyMixin, APIView):
 
 class SubscriptionVerifyView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = VERIFY_THROTTLES
 
     def post(self, request):
         try:

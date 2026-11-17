@@ -24,7 +24,7 @@ from django.utils import timezone
 
 from apps.courses.access import active_enrollment_q
 from apps.courses.models import Enrollment
-from apps.realtime.domain import invalidate_course_join_access_cache
+from apps.payments.access_cache import invalidate_course_join_access_cache
 
 from .models import BatchPass, Payment
 from .plans import INSTALLMENT_PLANS, PERMANENT_PLANS, get_plan_terms

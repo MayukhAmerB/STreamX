@@ -13,12 +13,20 @@ from django.conf import settings
 
 from .services import (
     RazorpayServiceError,
+    RazorpayUnavailable,
     create_razorpay_order,
+    ensure_gateway_available,
     validate_created_razorpay_order,
     verify_razorpay_signature,
 )
 
 GatewayError = RazorpayServiceError
+GatewayUnavailable = RazorpayUnavailable
+
+
+def ensure_available() -> None:
+    """Raise ``GatewayUnavailable`` while the Razorpay circuit is open (fail-open)."""
+    ensure_gateway_available()
 
 # Callables ``handler(payload: dict, *, request=None) -> dict | None``. A handler
 # returns ``None`` for an event that is not its own; the first non-None result

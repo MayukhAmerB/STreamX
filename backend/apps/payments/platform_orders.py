@@ -29,6 +29,7 @@ from .plans import to_rupees
 from .services import (
     RazorpayServiceError,
     create_razorpay_order,
+    ensure_gateway_available,
     validate_created_razorpay_order,
     verify_razorpay_signature,
 )
@@ -71,6 +72,13 @@ def create_order(user, plan_key, *, request=None) -> Payment:
     if user_holds_plan(user, plan):
         raise PlatformOrderError("already_owned", "You already have this plan.", 409)
     amount = to_rupees(plan.price_inr)
+    if amount <= 0:
+        raise PlatformOrderError("plan_unavailable", "This plan does not have a valid price.", 403)
+    try:
+        # Circuit open: refuse before writing the Payment row.
+        ensure_gateway_available()
+    except RazorpayServiceError as exc:
+        raise PlatformOrderError("payment_gateway_unavailable", str(exc), 503) from exc
     with transaction.atomic():
         payment = Payment.objects.create(
             user=user,
@@ -100,7 +108,7 @@ def create_order(user, plan_key, *, request=None) -> Payment:
 
 
 def _grant_lifetime(user_id, course_id) -> bool:
-    from apps.realtime.domain import invalidate_course_join_access_cache
+    from apps.payments.access_cache import invalidate_course_join_access_cache
 
     enrollment, created = Enrollment.objects.select_for_update().get_or_create(
         user_id=user_id,
@@ -140,7 +148,7 @@ def grant_scope_lifetime(grant: PlatformGrant) -> int:
     ``expires_at``. OSINT plans need nothing here (the labs and recordings read
     the grant directly).
     """
-    from apps.realtime.domain import invalidate_course_join_access_cache
+    from apps.payments.access_cache import invalidate_course_join_access_cache
 
     if not grant.is_active or grant.plan.product not in PlatformPlan.PENTESTING_PRODUCTS:
         return 0
@@ -191,15 +199,31 @@ def grant_course_to_plan_holders(course) -> int:
 
 
 def _mark_paid(payment: Payment, *, payment_id: str, signature: str = "", event: str = "") -> bool:
-    """Mark the locked payment paid and grant access. False when already paid."""
-    if payment.status == Payment.STATUS_PAID:
+    """Mark the locked payment paid and grant access. False when already paid.
+
+    A refunded payment never becomes paid again (late capture/verify replays).
+    A second paid order for a plan the buyer already holds (two tabs, double
+    submit) still grants (harmless) but is flagged "duplicate - refund due"
+    for the admin, like duplicate guest course purchases.
+    """
+    if payment.status in (Payment.STATUS_PAID, Payment.STATUS_REFUNDED):
         return False
+    duplicate = (
+        PlatformGrant.objects.filter(user_id=payment.user_id, plan_id=payment.platform_plan_id, is_active=True)
+        .exclude(payment_id=payment.pk)
+        .exclude(payment__isnull=True)
+        .exists()
+    )
     payment.status = Payment.STATUS_PAID
     payment.razorpay_payment_id = payment_id
     if signature:
         payment.razorpay_signature = signature
     payment.paid_at = timezone.now()
-    payment.provisioning_status = Payment.PROVISION_CREDENTIALS_ISSUED
+    payment.provisioning_status = (
+        Payment.PROVISION_DUPLICATE if duplicate else Payment.PROVISION_CREDENTIALS_ISSUED
+    )
+    if duplicate:
+        log_security_event("platform_order.duplicate_purchase_refund_due", payment_id=payment.pk)
     if event:
         payment.last_webhook_event = event[:120]
     payment.save(
@@ -252,10 +276,23 @@ def handle_order_event(payment: Payment, payload: dict, *, request=None) -> dict
         payment = Payment.objects.select_for_update().get(pk=payment.pk)
         if event in {"refund.processed", "payment.refunded"}:
             refund = (body.get("refund") or {}).get("entity") or {}
-            try:
-                refunded = Decimal(int(refund.get("amount") or entity.get("amount_refunded") or 0)) / 100
-            except (TypeError, ValueError, ArithmeticError):
-                refunded = Decimal("0")
+            refund_payment_id = str(entity.get("id") or refund.get("payment_id") or "").strip()
+            if payment.razorpay_payment_id and refund_payment_id and refund_payment_id != payment.razorpay_payment_id:
+                # Razorpay auto-refunds a second/late payment on an already
+                # paid order; that refund must not touch this purchase.
+                log_security_event("platform_order.webhook_refund_payment_mismatch", request=request, payment_id=payment.pk)
+                return {"success": True, "status_code": 200, "message": "Webhook ignored.",
+                        "data": {"processed": False, "payment_id": payment.pk}}
+            # amount_refunded on the payment entity is cumulative; a single
+            # refund entity's amount is not (two partial refunds).
+            candidates = []
+            for value in (entity.get("amount_refunded"), refund.get("amount")):
+                if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                    candidates.append(value)
+            refunded = Decimal(max(candidates)) / 100 if candidates else Decimal("0")
+            if str(entity.get("refund_status") or "").lower() == "full":
+                refunded = max(refunded, payment.amount)
+            refunded = min(refunded, payment.amount)
             payment.amount_refunded = max(payment.amount_refunded or Decimal("0"), refunded)
             payment.refunded_at = payment.refunded_at or timezone.now()
             fields = ["amount_refunded", "refunded_at", "updated_at"]
@@ -272,6 +309,11 @@ def handle_order_event(payment: Payment, payload: dict, *, request=None) -> dict
         amount = entity.get("amount")
         currency = str(entity.get("currency") or "").upper()
         if event == "payment.captured" or str(entity.get("status") or "") == "captured":
+            if payment.status == Payment.STATUS_REFUNDED:
+                log_security_event("platform_order.webhook_capture_after_refund_ignored", request=request,
+                                   payment_id=payment.pk)
+                return {"success": True, "status_code": 200, "message": "Webhook ignored.",
+                        "data": {"processed": False, "payment_id": payment.pk}}
             if amount != int(payment.amount * 100) or currency != payment.currency:
                 log_security_event("platform_order.webhook_amount_mismatch", request=request, payment_id=payment.pk)
                 return {"success": False, "status_code": 400, "message": "Amount mismatch.",

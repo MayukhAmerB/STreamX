@@ -2,18 +2,40 @@ import hashlib
 import hmac
 import logging
 import re
+import time
 from urllib.parse import quote
 
 import requests
+from config.metrics import record_upstream_request
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
 RAZORPAY_API_BASE_URL = "https://api.razorpay.com/v1"
 RAZORPAY_ORDER_ID_PATTERN = re.compile(r"^order_[A-Za-z0-9_-]{1,120}$")
+RAZORPAY_BREAKER_NAME = "razorpay"
+GATEWAY_UNAVAILABLE_MESSAGE = "The payment gateway is temporarily unavailable. Please try again shortly."
+CIRCUIT_OPEN_MESSAGE = "Payments are temporarily unavailable. Please try again in a minute; you have not been charged."
 
 
 class RazorpayServiceError(Exception):
     pass
+
+
+class RazorpayUnavailable(RazorpayServiceError):
+    """Razorpay is down, slow, answering 5xx/429, or its circuit is open.
+
+    A subclass of ``RazorpayServiceError`` so every existing caller keeps
+    working; callers that care (verify, checkout) answer 503 + retry instead of
+    a client error. ``reason`` is one of circuit_open, timeout,
+    connection_error, upstream_5xx, rate_limited, invalid_response, error.
+    """
+
+    code = "payment_gateway_unavailable"
+
+    def __init__(self, message=GATEWAY_UNAVAILABLE_MESSAGE, *, reason="", retry_after=None):
+        super().__init__(message)
+        self.reason = reason
+        self.retry_after = retry_after
 
 
 class _TimeoutSession(requests.Session):
@@ -32,35 +54,164 @@ def _razorpay_credentials():
     return settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET
 
 
-def _razorpay_request(method, path, *, json_body=None):
-    key_id, key_secret = _razorpay_credentials()
-    session = _TimeoutSession(
-        timeout_seconds=getattr(settings, "RAZORPAY_HTTP_TIMEOUT_SECONDS", 12)
-    )
+def razorpay_breaker():
+    from apps.core.circuit import get_breaker
+
+    return get_breaker(RAZORPAY_BREAKER_NAME)
+
+
+def ensure_gateway_available():
+    """Raise ``RazorpayUnavailable`` while the Razorpay circuit is OPEN.
+
+    Checkout flows call this before writing any row, so an outage never leaves
+    half-created orders behind. Read-only (a half-open circuit lets the call
+    through as the probe) and fail-open: a cache/Redis error means "available".
+    """
+    from apps.core.circuit import STATE_OPEN
+
     try:
-        response = session.request(
-            method,
-            f"{RAZORPAY_API_BASE_URL}{path}",
-            auth=(key_id, key_secret),
-            headers={"Accept": "application/json"},
-            json=json_body,
+        breaker = razorpay_breaker()
+        state = breaker.state()
+        retry_after = breaker.config.open_seconds
+    except Exception:  # noqa: BLE001 - breaker trouble must never block payments
+        return
+    if state == STATE_OPEN:
+        record_upstream_request(upstream=RAZORPAY_BREAKER_NAME, method="PRECHECK", outcome="circuit_open")
+        raise RazorpayUnavailable(CIRCUIT_OPEN_MESSAGE, reason="circuit_open", retry_after=retry_after)
+
+
+def _retry_settings():
+    attempts = max(1, int(getattr(settings, "RAZORPAY_HTTP_MAX_ATTEMPTS", 2) or 1))
+    deadline = max(1.0, float(getattr(settings, "RAZORPAY_HTTP_RETRY_DEADLINE_SECONDS", 20) or 20))
+    base = max(0.0, float(getattr(settings, "RAZORPAY_HTTP_BACKOFF_BASE_SECONDS", 0.3) or 0.0))
+    cap = max(base, float(getattr(settings, "RAZORPAY_HTTP_BACKOFF_CAP_SECONDS", 2.0) or 0.0))
+    return attempts, deadline, base, cap
+
+
+def _classify_failure(exc):
+    """(reason, transient, request_never_sent) for an exception from one attempt."""
+    if isinstance(exc, requests.exceptions.ConnectTimeout):
+        return "timeout", True, True
+    if isinstance(exc, requests.exceptions.Timeout):
+        return "timeout", True, False
+    if isinstance(exc, requests.exceptions.ConnectionError):
+        return "connection_error", True, False
+    status_code = getattr(getattr(exc, "response", None), "status_code", None)
+    if isinstance(status_code, int):
+        if status_code >= 500:
+            return "upstream_5xx", True, False
+        if status_code == 429:
+            return "rate_limited", True, False
+        return "client_error", False, False
+    if isinstance(exc, ValueError):
+        return "invalid_response", True, False
+    return "error", True, False
+
+
+def _razorpay_request(method, path, *, json_body=None, retry_safe=None):
+    """One logical Razorpay API call: timeout, circuit breaker, bounded retries.
+
+    * Every attempt goes through the shared ``razorpay`` circuit breaker
+      (``apps.core.circuit``: state in Redis, shared by both payment-backend
+      replicas, fail-open). Network errors, timeouts and 5xx count as
+      failures; 4xx and 429 never trip it.
+    * Transient failures are retried (``RAZORPAY_HTTP_MAX_ATTEMPTS``,
+      full-jitter backoff) only while the retry can still finish inside
+      ``RAZORPAY_HTTP_RETRY_DEADLINE_SECONDS``: gunicorn kills a payment
+      worker at 30s, so a timed-out attempt is not retried.
+    * ``retry_safe`` defaults to GET. A POST is retried only when the request
+      was never sent (connect timeout), unless the caller marks it safe
+      (creating an order twice leaves only an orphan order nobody can pay).
+    """
+    from apps.core.circuit import CircuitOpenError
+    from apps.core.http import backoff_delay
+
+    key_id, key_secret = _razorpay_credentials()
+    method = str(method).upper()
+    retry_safe = (method == "GET") if retry_safe is None else bool(retry_safe)
+    max_attempts, deadline, backoff_base, backoff_cap = _retry_settings()
+    timeout_seconds = getattr(settings, "RAZORPAY_HTTP_TIMEOUT_SECONDS", 12)
+    session = _TimeoutSession(timeout_seconds=timeout_seconds)
+    breaker = razorpay_breaker()
+    started = time.monotonic()
+    last_exc = None
+    last_reason = ""
+    for attempt in range(max_attempts):
+        try:
+            permit = breaker.allow()
+        except CircuitOpenError as exc:
+            record_upstream_request(upstream=RAZORPAY_BREAKER_NAME, method=method, outcome="circuit_open")
+            logger.warning("Razorpay circuit open: method=%s path=%s", method, path)
+            raise RazorpayUnavailable(CIRCUIT_OPEN_MESSAGE, reason="circuit_open", retry_after=exc.retry_after) from exc
+        attempt_started = time.monotonic()
+        try:
+            response = session.request(
+                method,
+                f"{RAZORPAY_API_BASE_URL}{path}",
+                auth=(key_id, key_secret),
+                headers={"Accept": "application/json"},
+                json=json_body,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict):
+                raise ValueError("Razorpay returned a non-object response.")
+        except Exception as exc:  # noqa: BLE001 - classified below
+            reason, transient, never_sent = _classify_failure(exc)
+            if transient and reason != "rate_limited":
+                permit.failure()
+            else:
+                permit.release()
+            record_upstream_request(
+                upstream=RAZORPAY_BREAKER_NAME,
+                method=method,
+                outcome=reason,
+                elapsed_seconds=time.monotonic() - attempt_started,
+            )
+            status_code = getattr(getattr(exc, "response", None), "status_code", None)
+            logger.warning(
+                "Razorpay API request failed: method=%s path=%s status=%s reason=%s attempt=%s/%s",
+                method,
+                path,
+                status_code or "unavailable",
+                reason,
+                attempt + 1,
+                max_attempts,
+            )
+            last_exc, last_reason = exc, reason
+            if not transient or attempt + 1 >= max_attempts or not (retry_safe or never_sent):
+                break
+            delay = backoff_delay(attempt, base=backoff_base, cap=backoff_cap)
+            if time.monotonic() - started + delay + float(timeout_seconds) > deadline:
+                break
+            time.sleep(delay)
+            continue
+        permit.success()
+        record_upstream_request(
+            upstream=RAZORPAY_BREAKER_NAME,
+            method=method,
+            outcome="2xx",
+            elapsed_seconds=time.monotonic() - attempt_started,
         )
-        response.raise_for_status()
-        payload = response.json()
-        if not isinstance(payload, dict):
-            raise ValueError("Razorpay returned a non-object response.")
         return payload
-    except Exception as exc:
-        status_code = getattr(getattr(exc, "response", None), "status_code", None)
-        logger.exception(
-            "Razorpay API request failed: method=%s path=%s status=%s",
-            method,
-            path,
-            status_code or "unavailable",
-        )
-        raise RazorpayServiceError(
-            "The payment gateway is temporarily unavailable. Please try again shortly."
-        ) from exc
+
+    logger.error(
+        "Razorpay API request gave up: method=%s path=%s reason=%s",
+        method,
+        path,
+        last_reason or "unknown",
+        exc_info=last_exc,
+    )
+    if last_reason == "client_error":
+        raise RazorpayServiceError(GATEWAY_UNAVAILABLE_MESSAGE) from last_exc
+    raise RazorpayUnavailable(GATEWAY_UNAVAILABLE_MESSAGE, reason=last_reason) from last_exc
+
+
+def _rewrap(exc, message):
+    """The same failure with a caller-specific message, keeping the transient type."""
+    if isinstance(exc, RazorpayUnavailable):
+        return RazorpayUnavailable(message, reason=exc.reason, retry_after=exc.retry_after)
+    return RazorpayServiceError(message)
 
 
 def create_razorpay_order(*, amount_paise, currency="INR", receipt=""):
@@ -68,6 +219,7 @@ def create_razorpay_order(*, amount_paise, currency="INR", receipt=""):
         return _razorpay_request(
             "POST",
             "/orders",
+            retry_safe=True,
             json_body={
                 "amount": amount_paise,
                 "currency": currency,
@@ -156,9 +308,7 @@ def fetch_razorpay_payment(*, razorpay_payment_id):
     try:
         return _razorpay_request("GET", f"/payments/{payment_id}")
     except RazorpayServiceError as exc:
-        raise RazorpayServiceError(
-            "Failed to confirm payment status with Razorpay."
-        ) from exc
+        raise _rewrap(exc, "Failed to confirm payment status with Razorpay.") from exc
 
 
 def fetch_razorpay_order(*, razorpay_order_id):
@@ -168,9 +318,7 @@ def fetch_razorpay_order(*, razorpay_order_id):
     try:
         return _razorpay_request("GET", f"/orders/{order_id}")
     except RazorpayServiceError as exc:
-        raise RazorpayServiceError(
-            "Failed to confirm order status with Razorpay."
-        ) from exc
+        raise _rewrap(exc, "Failed to confirm order status with Razorpay.") from exc
 
 
 def fetch_razorpay_order_payments(*, razorpay_order_id):
@@ -180,9 +328,7 @@ def fetch_razorpay_order_payments(*, razorpay_order_id):
     try:
         return _razorpay_request("GET", f"/orders/{order_id}/payments")
     except RazorpayServiceError as exc:
-        raise RazorpayServiceError(
-            "Failed to confirm order payments with Razorpay."
-        ) from exc
+        raise _rewrap(exc, "Failed to confirm order payments with Razorpay.") from exc
 
 
 def validate_existing_razorpay_order(
@@ -310,6 +456,7 @@ def cancel_razorpay_subscription(*, subscription_id, at_cycle_end=True):
     return _razorpay_request(
         "POST",
         _subscription_path(subscription_id, "/cancel"),
+        retry_safe=True,
         json_body={"cancel_at_cycle_end": 1 if at_cycle_end else 0},
     )
 

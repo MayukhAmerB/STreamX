@@ -1,13 +1,13 @@
 from datetime import date, datetime, time, timedelta
 
+from config.audit import log_security_event
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
 from apps.courses.models import Enrollment
-from apps.realtime.domain import invalidate_course_join_access_cache
-from config.audit import log_security_event
+from apps.payments.access_cache import invalidate_course_join_access_cache
 
 from .batch_pass import activate_batch_pass
 from .entitlements import is_duplicate_guest_purchase

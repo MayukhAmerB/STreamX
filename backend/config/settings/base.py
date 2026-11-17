@@ -266,6 +266,13 @@ REST_FRAMEWORK = {
         "password_reset_confirm": "20/hour",
         "payment_create": "120/minute",
         "payment_verify": "240/minute",
+        # apps.payments.throttles: per-IP ceiling across accounts on checkout
+        # and verify, the Razorpay webhook's own per-IP budget, and billing.
+        "payment_ip": env("PAYMENT_IP_RATE", "300/minute"),
+        "payment_webhook": env("PAYMENT_WEBHOOK_RATE", "1200/minute"),
+        "plan_verify": env("PLAN_VERIFY_RATE", "120/hour"),
+        "billing_checkout": env("BILLING_CHECKOUT_RATE", "30/hour"),
+        "billing_verify": env("BILLING_VERIFY_RATE", "120/hour"),
         "course_enroll": "20/hour",
         "live_class_enroll": "20/hour",
         "lecture_playback": "120/minute",
@@ -473,6 +480,30 @@ PAYMENT_ORDER_RESUME_MAX_AGE_SECONDS = max(
     env_int("PAYMENT_ORDER_RESUME_MAX_AGE_SECONDS", 3600),
     60,
 )
+# Razorpay resilience (apps.payments.services._razorpay_request): attempts per
+# logical call (transient failures only), the total budget across attempts
+# (no retry is started that could not finish inside it; the payment workers'
+# gunicorn timeout is 30s) and the full-jitter backoff. Circuit breaker:
+# CIRCUIT_BREAKERS["razorpay"] below.
+RAZORPAY_HTTP_MAX_ATTEMPTS = max(1, env_int("RAZORPAY_HTTP_MAX_ATTEMPTS", 2))
+RAZORPAY_HTTP_RETRY_DEADLINE_SECONDS = max(1, env_int("RAZORPAY_HTTP_RETRY_DEADLINE_SECONDS", 20))
+RAZORPAY_HTTP_BACKOFF_BASE_SECONDS = 0.3
+RAZORPAY_HTTP_BACKOFF_CAP_SECONDS = 2.0
+# Webhook replay protection: a signed event whose own created_at is older than
+# this is recorded and ignored (Razorpay retries for 24h at most). 0 = off.
+PAYMENT_WEBHOOK_MAX_AGE_SECONDS = max(0, env_int("PAYMENT_WEBHOOK_MAX_AGE_SECONDS", 3 * 24 * 3600))
+# Stuck-payment reconciliation (apps.payments.reconciliation). Off by default;
+# `manage.py reconcile_payments` is a dry run unless --apply is given.
+PAYMENT_RECONCILE_ENABLED = env_bool("PAYMENT_RECONCILE_ENABLED", False)
+PAYMENT_RECONCILE_INTERVAL_SECONDS = max(60, env_int("PAYMENT_RECONCILE_INTERVAL_SECONDS", 900))
+PAYMENT_RECONCILE_MIN_AGE_MINUTES = max(5, env_int("PAYMENT_RECONCILE_MIN_AGE_MINUTES", 20))
+PAYMENT_RECONCILE_MAX_AGE_HOURS = max(1, env_int("PAYMENT_RECONCILE_MAX_AGE_HOURS", 72))
+PAYMENT_RECONCILE_BATCH_SIZE = max(1, env_int("PAYMENT_RECONCILE_BATCH_SIZE", 25))
+# Unpaid orders Razorpay reports as never attempted (or with only failed
+# attempts) older than this are closed ("superseded") by the job, so a buyer
+# who abandoned checkout can start a new one without contacting support.
+# 0 = never close them.
+PAYMENT_RECONCILE_SUPERSEDE_AFTER_HOURS = max(0, env_int("PAYMENT_RECONCILE_SUPERSEDE_AFTER_HOURS", 24))
 DIRECT_COURSE_PAYMENTS_ENABLED = env_bool("DIRECT_COURSE_PAYMENTS_ENABLED", False)
 PAYMENT_SUPPORT_WHATSAPP_NUMBER = env(
     "PAYMENT_SUPPORT_WHATSAPP_NUMBER",

@@ -7,7 +7,6 @@ from urllib.parse import urlencode
 
 from config.audit import log_security_event
 from config.response import api_response
-from config.throttling import ClientIpScopedRateThrottle
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
@@ -49,7 +48,9 @@ from .refunds import record_pending_refund, record_refund
 from .serializers import CreateOrderSerializer, VerifyPaymentSerializer
 from .services import (
     RazorpayServiceError,
+    RazorpayUnavailable,
     create_razorpay_order,
+    ensure_gateway_available,
     fetch_razorpay_order,
     fetch_razorpay_order_payments,
     fetch_razorpay_payment,
@@ -57,6 +58,7 @@ from .services import (
     verify_razorpay_signature,
     verify_razorpay_webhook_signature,
 )
+from .throttles import CHECKOUT_THROTTLES, PaymentWebhookThrottle
 
 
 def _grant_paid_course_access(payment):
@@ -475,6 +477,41 @@ def _create_order_replay_response(
         **replay.response_payload,
         status_code=replay.response_status or status.HTTP_200_OK,
     )
+
+
+def _idempotency_conflict_response(exc):
+    """409 with a stable code; a key reused for a different request tells the
+    client to rotate it (the server-side open-order check still prevents a
+    second payment for the same course)."""
+    code = getattr(exc, "code", "idempotency_conflict")
+    response = api_response(
+        success=False,
+        message="Payment request conflict.",
+        data={"rotate_checkout_key": True} if code == "idempotency_key_reused" else None,
+        errors={"detail": str(exc), "code": code},
+        status_code=status.HTTP_409_CONFLICT,
+    )
+    if code == "idempotency_in_progress":
+        response["Retry-After"] = "3"
+    return response
+
+
+def gateway_unavailable_response(exc, *, message="Payments are temporarily unavailable.", data=None):
+    """503 for a Razorpay outage or an open circuit: nothing was charged or created."""
+    retry_after = getattr(exc, "retry_after", None)
+    try:
+        retry_seconds = max(1, int(float(retry_after))) if retry_after is not None else 30
+    except (TypeError, ValueError):
+        retry_seconds = 30
+    response = api_response(
+        success=False,
+        message=message,
+        data={**(data or {}), "retry_after": retry_seconds},
+        errors={"detail": str(exc), "code": "payment_gateway_unavailable"},
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+    )
+    response["Retry-After"] = str(retry_seconds)
+    return response
 
 
 # Razorpay sends refund.processed once money has actually gone back to the
@@ -908,7 +945,7 @@ def process_payment_webhook_payload(
 class CreateOrderView(APIView):
     permission_classes = [permissions.AllowAny]
     parser_classes = [JSONParser]
-    throttle_classes = [ClientIpScopedRateThrottle]
+    throttle_classes = CHECKOUT_THROTTLES
     throttle_scope = "payment_create"
 
     def post(self, request):
@@ -1001,12 +1038,7 @@ class CreateOrderView(APIView):
                 request_payload=serializer.validated_data,
             )
         except IdempotencyConflict as exc:
-            return api_response(
-                success=False,
-                message="Payment request conflict.",
-                errors={"detail": str(exc)},
-                status_code=status.HTTP_409_CONFLICT,
-            )
+            return _idempotency_conflict_response(exc)
         if completed_replay:
             return _create_order_replay_response(
                 request=request,
@@ -1092,6 +1124,13 @@ class CreateOrderView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
         amount_paise = get_plan_amount_paise(course, plan)
+        # Razorpay circuit open: answer before any claim or row is written, so
+        # the retry starts clean (same key, nothing half-created).
+        try:
+            ensure_gateway_available()
+        except RazorpayUnavailable as exc:
+            log_security_event("payment.create_order_gateway_circuit_open", request=request, course_id=course.id)
+            return gateway_unavailable_response(exc)
         try:
             idempotency_claim = claim_create_order(
                 raw_key=request.headers.get("Idempotency-Key", ""),
@@ -1110,12 +1149,7 @@ class CreateOrderView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
         except IdempotencyConflict as exc:
-            return api_response(
-                success=False,
-                message="Payment request conflict.",
-                errors={"detail": str(exc)},
-                status_code=status.HTTP_409_CONFLICT,
-            )
+            return _idempotency_conflict_response(exc)
 
         if idempotency_claim and idempotency_claim.replay:
             return _create_order_replay_response(
@@ -1267,7 +1301,7 @@ class CreateOrderView(APIView):
 class VerifyPaymentView(APIView):
     permission_classes = [permissions.AllowAny]
     parser_classes = [JSONParser]
-    throttle_classes = [ClientIpScopedRateThrottle]
+    throttle_classes = CHECKOUT_THROTTLES
     throttle_scope = "payment_verify"
 
     def post(self, request):
@@ -1348,6 +1382,22 @@ class VerifyPaymentView(APIView):
             )
             gateway_payment = fetch_razorpay_payment(
                 razorpay_payment_id=data["razorpay_payment_id"],
+            )
+        except RazorpayUnavailable as exc:
+            # The signature was valid; only the status lookup failed. Nothing
+            # is recorded: the browser retries, and the webhook or the
+            # reconciliation job finalizes the capture if it never comes back.
+            log_security_event(
+                "payment.verify_gateway_unavailable",
+                request=request,
+                course_id=payment.course_id,
+                payment_id=payment.id,
+                reason=getattr(exc, "reason", ""),
+            )
+            return gateway_unavailable_response(
+                exc,
+                message="Payment confirmation is delayed.",
+                data={"retry_verify": True},
             )
         except RazorpayServiceError as exc:
             log_security_event("payment.verify_signature_failed", request=request, course_id=payment.course_id, payment_id=payment.id)
@@ -1450,8 +1500,22 @@ class VerifyPaymentView(APIView):
         )
 
 
+def _webhook_event_age_seconds(payload):
+    """Age of a signed event from its own ``created_at`` (None when absent)."""
+    try:
+        created = int(payload.get("created_at"))
+    except (TypeError, ValueError, AttributeError):
+        return None
+    if created <= 0:
+        return None
+    return timezone.now().timestamp() - created
+
+
 class PaymentWebhookView(APIView):
     permission_classes = [permissions.AllowAny]
+    # Razorpay is anonymous: its own generous per-IP budget instead of the
+    # global anon rate (50/minute), failing open if Redis is down.
+    throttle_classes = [PaymentWebhookThrottle]
 
     def post(self, request):
         signature = str(request.headers.get("X-Razorpay-Signature", "")).strip()
@@ -1481,11 +1545,67 @@ class PaymentWebhookView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
+        if not isinstance(payload, dict):
+            log_security_event("payment.webhook_invalid_payload", request=request)
+            return api_response(
+                success=False,
+                message="Webhook verification failed.",
+                errors={"detail": "Invalid webhook payload.", "code": "invalid_payload"},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
         event = str(payload.get("event") or "").strip().lower()
         payload_hash = hashlib.sha256(raw_body).hexdigest()
         event_id = str(request.headers.get("X-Razorpay-Event-Id", "")).strip()
         if not event_id:
             event_id = f"payload-{payload_hash}"
+        # Replay protection. The event-id header is not covered by the
+        # signature, so an identical signed body already handled under another
+        # id is a replay; so is a signed event older than Razorpay's retry window.
+        replayed = (
+            PaymentWebhookEvent.objects.filter(
+                payload_hash=payload_hash,
+                status__in=(
+                    PaymentWebhookEvent.STATUS_PROCESSED,
+                    PaymentWebhookEvent.STATUS_IGNORED,
+                    PaymentWebhookEvent.STATUS_REJECTED,
+                    PaymentWebhookEvent.STATUS_RETRY_QUEUED,
+                ),
+            )
+            .exclude(event_id=event_id[:255])
+            .only("event_id")
+            .first()
+        )
+        if replayed is not None:
+            log_security_event("payment.webhook_replay_ignored", request=request, webhook_event=event or None)
+            return api_response(
+                success=True,
+                message="Webhook already received.",
+                data={"processed": False, "duplicate": True, "event_id": replayed.event_id},
+            )
+        max_age = int(getattr(settings, "PAYMENT_WEBHOOK_MAX_AGE_SECONDS", 0) or 0)
+        event_age = _webhook_event_age_seconds(payload)
+        if max_age and event_age is not None and event_age > max_age:
+            log_security_event(
+                "payment.webhook_stale_ignored",
+                request=request,
+                webhook_event=event or None,
+                age_seconds=int(event_age),
+            )
+            PaymentWebhookEvent.objects.get_or_create(
+                event_id=event_id[:255],
+                defaults={
+                    "event_type": event[:120],
+                    "payload_hash": payload_hash,
+                    "status": PaymentWebhookEvent.STATUS_IGNORED,
+                    "processing_note": "Stale event outside the replay window.",
+                    "processed_at": timezone.now(),
+                },
+            )
+            return api_response(
+                success=True,
+                message="Webhook ignored.",
+                data={"processed": False, "reason": "stale_event", "event_id": event_id[:255]},
+            )
         webhook_event, created = PaymentWebhookEvent.objects.get_or_create(
             event_id=event_id[:255],
             defaults={

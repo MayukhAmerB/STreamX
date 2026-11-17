@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { siteBrand } from "../../config/siteBrand";
@@ -20,6 +20,7 @@ import "../../marketing/auth/auth.css";
 export default function PlatformPlanCheckout({ plan, gates = null, returnTo = "/pricing", onPaid, checkout = startPlatformCheckout, className = "" }) {
   const { isAuthenticated, user } = useAuth() || {};
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const [message, setMessage] = useState(null);
   const gate = platformPlanGate(plan, { gates });
   const label = plan?.cta_label || (plan?.billing_period ? "Subscribe" : "Buy");
@@ -35,6 +36,9 @@ export default function PlatformPlanCheckout({ plan, gates = null, returnTo = "/
   }
 
   const run = async () => {
+    // Synchronous guard: a double click never opens two orders.
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setMessage(null);
     try {
@@ -45,12 +49,15 @@ export default function PlatformPlanCheckout({ plan, gates = null, returnTo = "/
       if (result?.status === "paid") {
         setMessage({ tone: "success", text: "Payment verified. Your access is ready in the Console." });
         onPaid?.(result.data);
+      } else if (result?.status === "pending") {
+        setMessage({ tone: "info", text: result.error });
       } else if (result?.status === "failed") {
         setMessage({ tone: "error", text: result.error || "Payment was not completed." });
       }
     } catch (err) {
       setMessage({ tone: "error", text: platformCheckoutError(err) });
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   };

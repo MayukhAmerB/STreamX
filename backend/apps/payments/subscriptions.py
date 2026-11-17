@@ -41,6 +41,7 @@ from .services import (
     RazorpayServiceError,
     cancel_razorpay_subscription,
     create_razorpay_subscription,
+    ensure_gateway_available,
     fetch_razorpay_subscription,
     verify_razorpay_subscription_signature,
 )
@@ -149,7 +150,7 @@ def sync_subscription_enrollments(sub: PlatformSubscription) -> int:
     """Pentesting membership: extend time-limited Enrollments to ``access_until`` (never shortens)."""
     if sub.plan.product != PlatformPlan.PRODUCT_PT_MEMBERSHIP or not sub.has_access():
         return 0
-    from apps.realtime.domain import invalidate_course_join_access_cache
+    from apps.payments.access_cache import invalidate_course_join_access_cache
 
     touched = 0
     for course_id in plan_scope_course_ids(sub.plan):
@@ -327,6 +328,12 @@ def create_subscription(user, plan_key, *, request=None) -> PlatformSubscription
             return live  # resume the unfinished checkout
         if live.status != PlatformSubscription.STATUS_CREATED:
             raise SubscriptionError("already_subscribed", "You already have this membership.", 409)
+    try:
+        # Circuit open: refuse before changing any row.
+        ensure_gateway_available()
+    except RazorpayServiceError as exc:
+        raise SubscriptionError("payment_gateway_unavailable", str(exc), 503) from exc
+    if live is not None:
         # An unfinished checkout for an older Razorpay plan: retire it.
         live.status = PlatformSubscription.STATUS_EXPIRED
         live.ended_at = timezone.now()

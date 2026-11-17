@@ -51,7 +51,7 @@ def billing_course_entitlement(user_id, course):
 
 def apply_course_grant(user, course_id: int) -> None:
     from apps.billing.services import entitlement_window
-    from apps.realtime.domain import invalidate_course_join_access_cache
+    from apps.payments.access_cache import invalidate_course_join_access_cache
 
     from .models import Course, Enrollment
 

@@ -86,3 +86,30 @@ describe("payment checkout recovery", () => {
     expect(loadCourseApplicationReference(storage, 19)).toBe(applicationReference);
   });
 });
+
+describe("unfinished checkout after a page refresh", () => {
+  it("remembers when an order was opened and flags it for a day", async () => {
+    const { hasRecentUnfinishedCheckout, loadCheckoutRecovery, saveCheckoutRecovery } = await import(
+      "./paymentRecovery"
+    );
+    const storage = createMemoryStorage();
+    const startedAt = Date.UTC(2026, 10, 16, 10, 0, 0);
+    saveCheckoutRecovery(storage, 7, {
+      idempotencyKey: "checkout-refresh-mid-payment-0001",
+      plan: "full",
+      orderStartedAt: startedAt,
+    });
+    const recovered = loadCheckoutRecovery(storage, 7);
+    expect(recovered.orderStartedAt).toBe(startedAt);
+    expect(hasRecentUnfinishedCheckout(recovered, startedAt + 60 * 60 * 1000)).toBe(true);
+    expect(hasRecentUnfinishedCheckout(recovered, startedAt + 25 * 60 * 60 * 1000)).toBe(false);
+    expect(hasRecentUnfinishedCheckout({ idempotencyKey: "x" }, startedAt)).toBe(false);
+  });
+
+  it("drops a malformed timestamp", async () => {
+    const { loadCheckoutRecovery, saveCheckoutRecovery } = await import("./paymentRecovery");
+    const storage = createMemoryStorage();
+    saveCheckoutRecovery(storage, 8, { idempotencyKey: "checkout-bad-timestamp-0001", orderStartedAt: "soon" });
+    expect(loadCheckoutRecovery(storage, 8)).toEqual({ idempotencyKey: "checkout-bad-timestamp-0001", pendingVerification: null });
+  });
+});
