@@ -32,7 +32,7 @@ function CourseTrackCardContent({ track, selected, count, compactMobile = false 
 
   return (
     <>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_22%,rgba(255,255,255,0.09),transparent_38%)] opacity-80" />
+      {/* Absolute black card: matches the black inside the track artwork (owner request). */}
       <div className={bodyClassName}>
         <div className="flex items-center justify-between">
           <span className={`rounded-full border border-white/20 bg-black/60 font-semibold uppercase text-[#D6D6D6] ${
@@ -105,7 +105,7 @@ export function CourseTrackCards({
         const mobileWidthClass = compactMobile
           ? "min-w-[72%] rounded-[20px] last:mr-[28%] sm:last:mr-0"
           : "min-w-[82%] rounded-[24px]";
-        const className = `group relative ${mobileWidthClass} snap-start overflow-hidden border bg-[#090A0B] text-left transition duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white sm:min-w-0 sm:rounded-[24px] ${
+        const className = `group relative ${mobileWidthClass} snap-start overflow-hidden border bg-black text-left transition duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white sm:min-w-0 sm:rounded-[24px] ${
           selected
             ? "border-white/75 shadow-[0_22px_55px_rgba(0,0,0,0.55)]"
             : "border-white/20 hover:-translate-y-1 hover:border-white/45"

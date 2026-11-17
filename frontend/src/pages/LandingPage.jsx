@@ -823,7 +823,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="hero-program-panel reveal-up reveal-delay-1 relative bg-transparent p-0 sm:rounded-[22px] sm:border sm:border-white/12 sm:bg-white/[0.035] sm:p-4 sm:shadow-[0_30px_90px_rgba(0,0,0,0.38)] sm:backdrop-blur-sm">
+            <div className="hero-program-panel reveal-up reveal-delay-1 relative bg-transparent p-0 sm:rounded-[22px] sm:border sm:border-white/12 sm:bg-black sm:p-4 sm:shadow-[0_30px_90px_rgba(0,0,0,0.38)] sm:backdrop-blur-sm">
               {heroLiveBroadcast ? (
                 <Link
                   to={isAuthenticated ? heroLiveBroadcastJoinPath : "/login"}
