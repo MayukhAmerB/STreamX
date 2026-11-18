@@ -40,7 +40,12 @@ class CourseReview(models.Model):
 
 class PentestingApplication(models.Model):
     reference = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    course = models.ForeignKey("courses.Course", on_delete=models.PROTECT, related_name="applications")
+    # A deleted course keeps its applications (and their orders): the link is
+    # cleared and the title survives in course_title_snapshot.
+    course = models.ForeignKey(
+        "courses.Course", on_delete=models.SET_NULL, null=True, blank=True, related_name="applications"
+    )
+    course_title_snapshot = models.CharField(max_length=255, blank=True, default="")
     student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     full_name = models.CharField(max_length=120)
     email = models.EmailField()
@@ -73,6 +78,17 @@ class PentestingApplication(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+    def save(self, *args, **kwargs):
+        if self.course_id and not self.course_title_snapshot:
+            self.course_title_snapshot = self.course.title[:255]
+            if kwargs.get("update_fields") is not None:
+                kwargs["update_fields"] = {*kwargs["update_fields"], "course_title_snapshot"}
+        super().save(*args, **kwargs)
+
+    @property
+    def course_name(self):
+        return self.course.title if self.course_id else (self.course_title_snapshot or "Deleted course")
 
     @property
     def payment_status(self):

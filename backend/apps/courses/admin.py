@@ -77,10 +77,17 @@ class CourseReviewAdmin(admin.ModelAdmin):
 
 @admin.register(PentestingApplication)
 class PentestingApplicationAdmin(admin.ModelAdmin):
-    list_display = ("full_name", "course", "email", "is_student", "status", "payment_status", "created_at")
+    list_display = ("full_name", "course_name", "email", "is_student", "status", "payment_status", "created_at")
     list_filter = ("status", "is_student", "course")
-    search_fields = ("full_name", "email", "phone", "institution")
-    readonly_fields = ("reference", "student", "status", "payment_status", "consent_at", "created_at", "updated_at")
+    search_fields = ("full_name", "email", "phone", "institution", "course_title_snapshot")
+    readonly_fields = (
+        "reference", "student", "status", "payment_status", "course_title_snapshot",
+        "consent_at", "created_at", "updated_at",
+    )
+
+    @admin.display(description="Course", ordering="course_title_snapshot")
+    def course_name(self, obj):
+        return obj.course_name
 
     def has_add_permission(self, request):
         return False
