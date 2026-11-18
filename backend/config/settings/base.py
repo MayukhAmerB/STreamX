@@ -1242,6 +1242,15 @@ WHATSAPP_TEMPLATE_LETTER = env("WHATSAPP_TEMPLATE_LETTER", "").strip()
 WHATSAPP_TEMPLATE_LANGUAGE = env("WHATSAPP_TEMPLATE_LANGUAGE", "en").strip() or "en"
 WHATSAPP_DEFAULT_COUNTRY_CODE = env("WHATSAPP_DEFAULT_COUNTRY_CODE", "91").strip()
 WHATSAPP_HTTP_TIMEOUT_SECONDS = max(1, env_int("WHATSAPP_HTTP_TIMEOUT_SECONDS", 15))
+
+# Paid-buyer login delivery (apps.payments.credential_delivery). On payment the
+# generated login's password is created and sent to the buyer's registered email
+# and WhatsApp automatically; admins can also generate/resend from the admin.
+PAYMENT_AUTO_CREDENTIALS_ENABLED = env_bool("PAYMENT_AUTO_CREDENTIALS_ENABLED", True)
+CREDENTIALS_EMAIL_FROM = env("CREDENTIALS_EMAIL_FROM", "").strip()
+CREDENTIALS_EMAIL_TIMEOUT_SECONDS = max(3, env_int("CREDENTIALS_EMAIL_TIMEOUT_SECONDS", 15))
+# APPROVED WhatsApp template, body params: {{1}} name, {{2}} course, {{3}} login URL, {{4}} username, {{5}} password.
+WHATSAPP_TEMPLATE_CREDENTIALS = env("WHATSAPP_TEMPLATE_CREDENTIALS", "").strip()
 # --- end Certification ---
 
 # --- Billing (apps.billing): products, versioned prices, plans, entitlements ---

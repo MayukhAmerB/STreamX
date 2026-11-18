@@ -3,13 +3,16 @@ from django.contrib import admin, messages
 from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.http import Http404
+from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
-from django.utils.html import format_html
+from django.utils import timezone
+from django.utils.html import format_html, format_html_join
 
 from .batch_pass import activate_batch_pass, deactivate_batch_pass
+from . import credential_delivery
 from .credentials import issue_credentials_for_paid_user
-from .models import BatchPass, Payment, PaymentWebhookEvent, SuccessfulPaymentUser
+from .models import BatchPass, CredentialDelivery, Payment, PaymentWebhookEvent, SuccessfulPaymentUser
 from .refunds import record_refund
 
 
@@ -240,6 +243,39 @@ class PaymentAdmin(admin.ModelAdmin):
         )
 
 
+def _no_store(response):
+    """Pages that show a plaintext password must never be cached."""
+    response["Cache-Control"] = "no-store, private"
+    response["Pragma"] = "no-cache"
+    return response
+
+
+class CredentialStateFilter(admin.SimpleListFilter):
+    title = "credentials"
+    parameter_name = "credentials"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("awaiting", "Awaiting password"),
+            ("not_sent", "Password issued, not sent"),
+            ("sent", "Sent to buyer"),
+        )
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if not value:
+            return queryset
+        # Django marks unusable passwords with a leading "!".
+        unusable = Q(password__startswith="!") | Q(password="")
+        if value == "awaiting":
+            return queryset.filter(unusable)
+        sent_ids = CredentialDelivery.objects.filter(status=CredentialDelivery.STATUS_SENT).values("user_id")
+        issued = queryset.exclude(unusable)
+        if value == "sent":
+            return issued.filter(pk__in=sent_ids)
+        return issued.exclude(pk__in=sent_ids)
+
+
 @admin.register(SuccessfulPaymentUser)
 class SuccessfulPaymentUserAdmin(admin.ModelAdmin):
     list_display = (
@@ -253,6 +289,8 @@ class SuccessfulPaymentUserAdmin(admin.ModelAdmin):
         "credential_status",
         "credential_action",
     )
+    list_filter = (CredentialStateFilter,)
+    actions = ("generate_and_send_credentials",)
     list_display_links = ("generated_username",)
     search_fields = (
         "email",
@@ -279,6 +317,7 @@ class SuccessfulPaymentUserAdmin(admin.ModelAdmin):
         "paid_at_display",
         "credential_status",
         "credentials_issued_at_display",
+        "delivery_history",
         "credential_action",
     )
     readonly_fields = fields
@@ -308,7 +347,12 @@ class SuccessfulPaymentUserAdmin(admin.ModelAdmin):
                     "payments",
                     queryset=successful_payments,
                     to_attr="_successful_payment_records",
-                )
+                ),
+                Prefetch(
+                    "credential_deliveries",
+                    queryset=CredentialDelivery.objects.order_by("-created_at", "-id"),
+                    to_attr="_credential_delivery_records",
+                ),
             )
         )
 
@@ -372,9 +416,89 @@ class SuccessfulPaymentUserAdmin(admin.ModelAdmin):
         payment = self._latest_payment(obj)
         return payment.paid_at if payment else None
 
+    @staticmethod
+    def _deliveries(obj):
+        prefetched = getattr(obj, "_credential_delivery_records", None)
+        if prefetched is not None:
+            return prefetched
+        return list(obj.credential_deliveries.order_by("-created_at", "-id"))
+
+    def _sent_since_issue(self, obj):
+        payment = self._latest_payment(obj)
+        issued_at = payment.credentials_issued_at if payment else None
+        return [
+            item
+            for item in self._deliveries(obj)
+            if item.status == CredentialDelivery.STATUS_SENT and (issued_at is None or item.created_at >= issued_at)
+        ]
+
     @admin.display(description="Credential status")
     def credential_status(self, obj):
-        return "Password issued" if obj.has_usable_password() else "Awaiting password"
+        if not obj.has_usable_password():
+            latest = next(iter(self._deliveries(obj)), None)
+            if latest is not None and latest.status == CredentialDelivery.STATUS_FAILED:
+                return "Awaiting password - last send failed"
+            return "Awaiting password"
+        sent = self._sent_since_issue(obj)
+        if sent:
+            channels = sorted({item.get_channel_display() for item in sent})
+            return f"Sent ({' + '.join(channels)})"
+        latest = next(iter(self._deliveries(obj)), None)
+        if latest is not None and latest.status == CredentialDelivery.STATUS_FAILED:
+            return "Issued - send failed"
+        return "Issued - not sent"
+
+    @admin.display(description="Delivery history")
+    def delivery_history(self, obj):
+        rows = self._deliveries(obj)[:10]
+        if not rows:
+            return "-"
+        return format_html_join(
+            format_html("<br>"),
+            "{} - {} {}{}{}{}",
+            (
+                (
+                    f"{timezone.localtime(item.created_at):%d %b %Y %H:%M}",
+                    item.get_channel_display(),
+                    item.get_status_display().lower(),
+                    f" to {item.recipient}" if item.recipient else "",
+                    f" by {item.sent_by.email}" if item.sent_by_id else " (automatic)",
+                    f" - {item.error}" if item.error else "",
+                )
+                for item in rows
+            ),
+        )
+
+    @admin.action(description="Generate and send credentials (email + WhatsApp) to selected buyers")
+    def generate_and_send_credentials(self, request, queryset):
+        """Buyers still awaiting a password only; a reset (signs devices out) is done per buyer."""
+        users = list(queryset.order_by("email"))
+        pending = [user for user in users if not user.has_usable_password()]
+        skipped = [user for user in users if user.has_usable_password()]
+        results, errors = [], []
+        for user in pending:
+            try:
+                results.append(credential_delivery.issue_and_send(user=user, actor=request.user, request=request))
+            except ValueError as exc:
+                errors.append((user, str(exc)))
+                continue
+            self.log_change(request, user, "Generated login credentials and sent them to the buyer.")
+        info = self.model._meta.app_label, self.model._meta.model_name
+        context = {
+            **self.admin_site.each_context(request),
+            "opts": self.model._meta,
+            "title": "Credentials generated and sent",
+            "results": [
+                {"result": item, "mark_url": reverse(f"admin:{info[0]}_{info[1]}_mark_whatsapp", args=[item.user.pk])}
+                for item in results
+            ],
+            "skipped": skipped,
+            "errors": errors,
+            "changelist_url": reverse(f"admin:{info[0]}_{info[1]}_changelist"),
+        }
+        return _no_store(
+            TemplateResponse(request, "admin/payments/successfulpaymentuser/credentials_results.html", context)
+        )
 
     @admin.display(description="Credentials issued at")
     def credentials_issued_at_display(self, obj):
@@ -387,7 +511,7 @@ class SuccessfulPaymentUserAdmin(admin.ModelAdmin):
 
     @admin.display(description="Password")
     def credential_action(self, obj):
-        label = "Reset password" if obj.has_usable_password() else "Generate password"
+        label = "Reset and resend" if obj.has_usable_password() else "Generate and send"
         return format_html('<a class="button" href="{}">{}</a>', self._credential_url(obj), label)
 
     def get_urls(self):
@@ -397,7 +521,12 @@ class SuccessfulPaymentUserAdmin(admin.ModelAdmin):
                 "<path:object_id>/generate-credentials/",
                 self.admin_site.admin_view(self.generate_credentials_view),
                 name=f"{info[0]}_{info[1]}_generate_credentials",
-            )
+            ),
+            path(
+                "<path:object_id>/mark-whatsapp-sent/",
+                self.admin_site.admin_view(self.mark_whatsapp_sent_view),
+                name=f"{info[0]}_{info[1]}_mark_whatsapp",
+            ),
         ]
         return custom_urls + super().get_urls()
 
@@ -413,19 +542,20 @@ class SuccessfulPaymentUserAdmin(admin.ModelAdmin):
             raise Http404("No successful payment exists for this user.")
 
         generated_password = None
+        result = None
         if request.method == "POST":
-            payment, generated_password = issue_credentials_for_paid_user(user_id=target_user.pk)
-            target_user.refresh_from_db()
-            log_security_event(
-                "admin.payment_credentials_issued",
-                request=request,
-                target_user_id=target_user.id,
-                payment_id=payment.id,
+            send = request.POST.get("send", "1") not in ("0", "off", "false")
+            result = credential_delivery.issue_and_send(
+                user=target_user, actor=request.user, send_email=send, send_whatsapp=send, request=request
             )
+            payment, generated_password = result.payment, result.password
+            target_user.refresh_from_db()
             self.log_change(
                 request,
                 target_user,
-                f"Generated or reset login credentials from paid payment {payment.id}.",
+                f"Generated or reset login credentials from paid payment {payment.id}"
+                + (f"; email {result.email.status}" if result.email else "; not emailed")
+                + (f"; WhatsApp {result.whatsapp.status}." if result.whatsapp else "; WhatsApp manual."),
             )
 
         context = {
@@ -436,16 +566,35 @@ class SuccessfulPaymentUserAdmin(admin.ModelAdmin):
             "target_user": target_user,
             "payment": payment,
             "generated_password": generated_password,
+            "result": result,
+            "deliveries": self._deliveries(target_user)[:10],
+            "whatsapp_mark_url": reverse(
+                f"admin:{self.model._meta.app_label}_{self.model._meta.model_name}_mark_whatsapp",
+                args=[target_user.pk],
+            ),
             "credential_url": self._credential_url(target_user),
             "changelist_url": reverse(
                 f"admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist"
             ),
         }
-        return TemplateResponse(
-            request,
-            "admin/payments/successfulpaymentuser/generate_credentials.html",
-            context,
+        return _no_store(
+            TemplateResponse(
+                request,
+                "admin/payments/successfulpaymentuser/generate_credentials.html",
+                context,
+            )
         )
+
+    def mark_whatsapp_sent_view(self, request, object_id):
+        target_user = self.get_object(request, object_id)
+        if target_user is None or not self.has_change_permission(request, target_user):
+            raise Http404("Successful payment user does not exist.")
+        if request.method != "POST":
+            return redirect(self._credential_url(target_user))
+        credential_delivery.record_whatsapp_sent(user=target_user, actor=request.user, request=request)
+        self.log_change(request, target_user, "Marked login credentials as sent on WhatsApp.")
+        self.message_user(request, f"Recorded: login for {target_user.email} sent on WhatsApp.", messages.SUCCESS)
+        return redirect(reverse(f"admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist"))
 
 
 @admin.register(PaymentWebhookEvent)

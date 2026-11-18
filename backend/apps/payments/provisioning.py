@@ -10,6 +10,7 @@ from apps.courses.models import Enrollment
 from apps.payments.access_cache import invalidate_course_join_access_cache
 
 from .batch_pass import activate_batch_pass
+from .credential_delivery import queue_auto_send
 from .entitlements import is_duplicate_guest_purchase
 from .models import Payment, StudentAccountSequence
 from .plans import INSTALLMENT_PLANS, get_plan_terms
@@ -196,6 +197,31 @@ def provision_paid_payment(payment):
         ]
     )
     invalidate_course_join_access_cache(user_id=user.id, course_id=course.id)
+    if payment.provisioning_status == Payment.PROVISION_AWAITING_ADMIN:
+        # Generated login without a password: generate it and send it to the
+        # buyer's email and WhatsApp once this transaction commits.
+        queue_auto_send(payment)
     if payment.plan == Payment.PLAN_BATCH_PASS:
         activate_batch_pass(payment)
     return enrollment
+
+
+@transaction.atomic
+def withdraw_undelivered_credentials(*, user_id):
+    """An automatic send reached nobody: make the account "awaiting password" again.
+
+    The password just set was never delivered, so it is replaced by an
+    unusable one and the paid payments go back to awaiting credentials; the
+    next attempt (outbox retry or an admin) issues a fresh password.
+    """
+    User = get_user_model()
+    user = User.objects.select_for_update().get(pk=user_id)
+    user.set_unusable_password()
+    user.save(update_fields=["password", "updated_at"])
+    Payment.objects.filter(
+        user=user, status=Payment.STATUS_PAID, provisioning_status=Payment.PROVISION_CREDENTIALS_ISSUED
+    ).update(
+        provisioning_status=Payment.PROVISION_AWAITING_ADMIN,
+        credentials_issued_at=None,
+        updated_at=timezone.now(),
+    )

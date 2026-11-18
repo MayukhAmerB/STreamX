@@ -6,6 +6,7 @@ import logging
 
 from apps.core.outbox import outbox_handler
 
+from .credential_delivery import EVENT_AUTO_SEND, auto_send_for_payment
 from .reconciliation import EVENT_RECONCILE, enabled, reconcile_stuck_payments
 
 logger = logging.getLogger("apps.payments.reconciliation")
@@ -19,3 +20,11 @@ def handle_reconcile(event):
     report = reconcile_stuck_payments(apply=True)
     if report.captured or report.superseded or report.needs_review or report.errors:
         logger.warning("payments.reconcile_batch %s", {k: v for k, v in report.as_dict().items() if k != "rows"})
+
+
+@outbox_handler(EVENT_AUTO_SEND, max_attempts=6)
+def handle_credentials_auto_send(event):
+    """Generate a paid buyer's password and send it to their email + WhatsApp (retried with backoff)."""
+    outcome = auto_send_for_payment((event.payload or {}).get("payment_id"))
+    if outcome == "unreachable":
+        logger.warning("payments.credentials_auto_send_unreachable payment_id=%s", (event.payload or {}).get("payment_id"))

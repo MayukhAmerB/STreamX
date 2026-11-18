@@ -205,6 +205,29 @@ class WhatsAppCloudProvider:
         return message_id
 
 
+    def send_text_template(self, *, to: str, template: str, body_params) -> str:
+        """An approved template with text body parameters only (no header media)."""
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "type": "template",
+            "template": {
+                "name": template,
+                "language": {"code": self.config.language},
+                "components": [
+                    {"type": "body", "parameters": [{"type": "text", "text": str(value)[:1000]} for value in body_params]},
+                ],
+            },
+        }
+        result = self._call("messages", body=json.dumps(payload).encode("utf-8"), content_type="application/json")
+        messages = result.get("messages") if isinstance(result, dict) else None
+        message_id = str((messages or [{}])[0].get("id") or "") if isinstance(messages, list) else ""
+        if not message_id:
+            raise WhatsAppError("WhatsApp accepted the request but returned no message id.", retryable=False)
+        return message_id
+
+
 def provider_from_settings(transport=None) -> WhatsAppCloudProvider | None:
     config = config_from_settings()
     return WhatsAppCloudProvider(config, transport=transport) if config else None

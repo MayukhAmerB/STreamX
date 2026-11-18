@@ -72,7 +72,7 @@ class SuccessfulPaymentUserAdminTests(TestCase):
         self.assertContains(response, self.payment.whatsapp_number)
         self.assertContains(response, self.payment.razorpay_payment_id)
         self.assertContains(response, self.payment.invoice_number)
-        self.assertContains(response, "Generate password")
+        self.assertContains(response, "Generate and send")
 
     def test_user_without_successful_payment_is_not_listed(self):
         unpaid_user = User.objects.create_user(

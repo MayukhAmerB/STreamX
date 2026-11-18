@@ -180,6 +180,39 @@ class SuccessfulPaymentUser(User):
         verbose_name_plural = "Successful Payment Users"
 
 
+class CredentialDelivery(models.Model):
+    """One attempt to hand a paid buyer their login (never stores the password)."""
+
+    CHANNEL_EMAIL = "email"
+    CHANNEL_WHATSAPP = "whatsapp"
+    CHANNEL_CHOICES = [(CHANNEL_EMAIL, "Email"), (CHANNEL_WHATSAPP, "WhatsApp")]
+
+    STATUS_SENT = "sent"
+    STATUS_FAILED = "failed"
+    STATUS_SKIPPED = "skipped"
+    STATUS_CHOICES = [(STATUS_SENT, "Sent"), (STATUS_FAILED, "Failed"), (STATUS_SKIPPED, "Skipped")]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="credential_deliveries")
+    payment = models.ForeignKey(
+        Payment, on_delete=models.SET_NULL, null=True, blank=True, related_name="credential_deliveries"
+    )
+    channel = models.CharField(max_length=20, choices=CHANNEL_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
+    recipient = models.CharField(max_length=255, blank=True, default="")
+    error = models.TextField(blank=True, default="")
+    sent_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        indexes = [models.Index(fields=["user", "-created_at"], name="payments_cred_user_recent")]
+        verbose_name = "Credential delivery"
+        verbose_name_plural = "Credential deliveries"
+
+    def __str__(self):
+        return f"{self.get_channel_display()} {self.get_status_display().lower()} for {self.user_id}"
+
+
 class PaymentWebhookEvent(models.Model):
     STATUS_RECEIVED = "received"
     STATUS_PROCESSED = "processed"
