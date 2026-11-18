@@ -482,7 +482,7 @@ def set_feature(
 
     with transaction.atomic():
         _pending.dirty = True
-        row = FeatureFlag.objects.select_for_update().select_related("updated_by").filter(key=key).first()
+        row = FeatureFlag.objects.select_for_update(of=("self",)).select_related("updated_by").filter(key=key).first()
         current_version = int(row.version) if row else 0
         if expected_version is not None and int(expected_version) != current_version:
             who = _display_name(row.updated_by) if row and row.updated_by_id else "Someone"
