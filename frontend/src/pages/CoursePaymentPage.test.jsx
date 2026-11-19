@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  applicantCheckoutSteps,
   checkoutSteps,
   createCheckoutIdempotencyKey,
   hasPermanentCourseAccess,
@@ -16,10 +15,6 @@ describe("course checkout flow", () => {
       "email",
       "contact",
     ]);
-  });
-
-  it("asks a Pentesting applicant only for the plan, never their details again", () => {
-    expect(applicantCheckoutSteps.map((step) => step.id)).toEqual(["plan", "confirm"]);
   });
 
   it("creates unique backend-compatible idempotency keys", () => {

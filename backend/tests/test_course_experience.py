@@ -481,9 +481,10 @@ class CourseExperienceTests(APITestCase):
         )
 
     @patch("apps.payments.views.create_razorpay_order")
-    def test_payment_requires_matching_application_and_verified_payment_enrolls(self, gateway):
+    def test_pentesting_checks_out_like_osint_and_links_an_older_application(self, gateway):
+        order_ids = iter(["order_noapplication1", "order_otheremail1", "order_application123"])
         gateway.side_effect = lambda **kwargs: {
-            "id": "order_application123",
+            "id": next(order_ids),
             "entity": "order",
             "amount": kwargs["amount_paise"],
             "amount_paid": 0,
@@ -500,15 +501,20 @@ class CourseExperienceTests(APITestCase):
             "whatsapp_number": "+919876543210",
         }
         url = "/api/payment/create-order/"
-        self.assertEqual(self.client.post(url, payload, format="json").status_code, 403)
-        gateway.assert_not_called()
+        # No application: the order is created exactly as for an OSINT course.
+        response = self.client.post(url, {**payload, "buyer_email": "no.application@example.com"}, format="json",
+                                    HTTP_IDEMPOTENCY_KEY="checkout-no-application-0001")
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertIsNone(Payment.objects.get(razorpay_order_id="order_noapplication1").application_id)
         reference = self.client.post(f"/api/courses/{self.pentesting.pk}/applications/", self.application_data).data[
             "data"
         ]["reference"]
         payload["application_reference"] = reference
-        self.assertEqual(
-            self.client.post(url, {**payload, "buyer_email": "other@example.com"}, format="json").status_code, 403
-        )
+        # Another email never links someone else's application, but the order still goes through.
+        response = self.client.post(url, {**payload, "buyer_email": "other@example.com"}, format="json",
+                                    HTTP_IDEMPOTENCY_KEY="checkout-other-email-0001")
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertIsNone(Payment.objects.get(razorpay_order_id="order_otheremail1").application_id)
         response = self.client.post(
             url,
             payload,
@@ -516,7 +522,7 @@ class CourseExperienceTests(APITestCase):
             HTTP_IDEMPOTENCY_KEY="checkout-course-experience-0001",
         )
         self.assertEqual(response.status_code, 201, response.data)
-        payment = Payment.objects.get()
+        payment = Payment.objects.get(razorpay_order_id="order_application123")
         self.assertEqual(payment.amount, Decimal("5000"))
         self.assertIsNotNone(payment.application_id)
         self.assertIsNone(provision_paid_payment(payment))

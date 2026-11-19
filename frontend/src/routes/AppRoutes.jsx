@@ -42,7 +42,6 @@ const InstructorDashboardPage = lazy(() => import("../pages/InstructorDashboardP
 const JoinAlSyedPage = lazy(() => import("../pages/JoinAlSyedPage"));
 const JoinLivePage = lazy(() => import("../pages/JoinLivePage"));
 const LandingPage = lazy(() => import("../pages/LandingPage"));
-const PentestingRegistrationPage = lazy(() => import("../pages/PentestingRegistrationPage"));
 const LectureQuestionsPage = lazy(() => import("../pages/LectureQuestionsPage"));
 const LiveClassesPage = lazy(() => import("../pages/LiveClassesPage"));
 const LoginPage = lazy(() => import("../pages/LoginPage"));
@@ -91,6 +90,12 @@ const MonthlyCtfPlayPage = lazy(() => import("../features/monthly-ctf/MonthlyCtf
 export function SeasonCertificateRedirect() {
   const { slug = "" } = useParams();
   return <Navigate to={`/certificates/${encodeURIComponent(slug)}`} replace />;
+}
+
+/** Old /courses/<id>/register links (the retired Pentesting application). */
+export function RegisterRedirect() {
+  const { id = "" } = useParams();
+  return <Navigate to={`/courses/${encodeURIComponent(id)}/payment`} replace />;
 }
 
 /**
@@ -152,7 +157,8 @@ export default function AppRoutes() {
           <Route path="/courses/:id" element={siteBrand.id === "owlcognito" ? <LegacyCourseDetailPage /> : <CourseDetailPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/courses/:id/register" element={<PentestingRegistrationPage />} />
+          {/* Pentesting used to have an application step; old links go straight to payment like OSINT. */}
+          <Route path="/courses/:id/register" element={<RegisterRedirect />} />
           <Route path="/courses/:id/payment" element={<CoursePaymentPage />} />
           <Route path="/terms" element={<TermsPage />} />
           {siteBrand.youtube ? <Route path="/watch" element={<WatchPage />} /> : null}

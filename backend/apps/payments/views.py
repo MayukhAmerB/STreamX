@@ -979,28 +979,24 @@ class CreateOrderView(APIView):
             )
 
         plan = serializer.validated_data["plan"]
+        # Pentesting checks out exactly like OSINT: no application is needed.
+        # An older application sent along (same course and email, owned by
+        # nobody else) is still linked to the order for the admin's records.
         application = None
-        application_valid = True
-        if course.category == Course.CATEGORY_WEB_PENTESTING:
+        reference = serializer.validated_data.get("application_reference")
+        if reference and course.category == Course.CATEGORY_WEB_PENTESTING:
             from apps.courses.models import PentestingApplication
 
-            reference = serializer.validated_data.get("application_reference")
             application = PentestingApplication.objects.filter(
                 reference=reference,
                 course=course,
                 email__iexact=serializer.validated_data["buyer_email"],
                 status__in=["submitted", "enrolled"],
-            ).first() if reference else None
-            application_valid = bool(
-                application
-                and (
-                    not application.student_id
-                    or (
-                        request.user.is_authenticated
-                        and application.student_id == request.user.pk
-                    )
-                )
-            )
+            ).first()
+            if application is not None and application.student_id and not (
+                request.user.is_authenticated and application.student_id == request.user.pk
+            ):
+                application = None
 
         course_available = course_open_for_enrollment(course)
         instructor_self_purchase = bool(
@@ -1020,7 +1016,6 @@ class CreateOrderView(APIView):
             not pentesting_blocked
             and course_available
             and not instructor_self_purchase
-            and application_valid
             and plan_enabled
             and not already_enrolled
             and Decimal(amount) > 0
@@ -1083,13 +1078,6 @@ class CreateOrderView(APIView):
                 message="Invalid purchase request.",
                 errors={"detail": "Instructors cannot purchase their own courses."},
                 status_code=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not application_valid:
-            return api_response(
-                success=False,
-                message="Complete your Pentesting registration first.",
-                status_code=status.HTTP_403_FORBIDDEN,
             )
 
         if not plan_enabled:

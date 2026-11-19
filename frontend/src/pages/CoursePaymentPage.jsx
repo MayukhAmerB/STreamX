@@ -43,12 +43,6 @@ export const checkoutSteps = [
   { id: "contact", label: "WhatsApp", summaryKey: "whatsapp_number" },
 ];
 
-// Pentesting buyers already gave their name, email and WhatsApp on the
-// application form: checkout only picks the plan and confirms.
-export const applicantCheckoutSteps = [
-  { id: "plan", label: "Payment plan" },
-  { id: "confirm", label: "Confirm and pay" },
-];
 
 function usableApplicant(applicant) {
   if (!applicant || typeof applicant !== "object") return null;
@@ -282,10 +276,6 @@ export default function CoursePaymentPage() {
     paymentRecoveryStorage(),
     Number(id),
   ));
-  const [applicationReady, setApplicationReady] = useState(false);
-  // Details saved with the Pentesting application (from the server, so a
-  // reload or a return visit never asks for them again).
-  const [applicant, setApplicant] = useState(null);
   const [applicationReference] = useState(() => {
     try {
       return location.state?.applicationReference
@@ -372,16 +362,20 @@ export default function CoursePaymentPage() {
         if (!active) return;
         const loadedCourse = apiData(response);
         setCourse(loadedCourse);
-        if (loadedCourse?.category === "web_pentesting") {
-          const applicationResponse = await apiClient.post(`/courses/${id}/application-checkout/`, { reference: applicationReference });
-          if (!active) return;
-          const savedApplicant = usableApplicant(apiData(applicationResponse)?.applicant);
-          if (savedApplicant) {
-            setApplicant(savedApplicant);
-            setCheckoutProfile((current) => ({ ...current, ...savedApplicant }));
+        // Pentesting checks out like OSINT. Someone who applied under the old
+        // flow gets their saved details filled in (still editable).
+        if (loadedCourse?.category === "web_pentesting" && applicationReference) {
+          try {
+            const applicationResponse = await apiClient.post(`/courses/${id}/application-checkout/`, { reference: applicationReference });
+            const savedApplicant = usableApplicant(apiData(applicationResponse)?.applicant);
+            if (active && savedApplicant) {
+              setCheckoutProfile((current) => ({ ...current, ...savedApplicant }));
+            }
+          } catch {
+            // An old or cancelled application never blocks a normal checkout.
           }
+          if (!active) return;
         }
-        setApplicationReady(true);
         if (!initialCheckoutRecovery?.plan) {
           setPlan(defaultPaymentPlanId(loadedCourse));
         }
@@ -400,7 +394,7 @@ export default function CoursePaymentPage() {
   }, [id, applicationReference, initialCheckoutRecovery?.plan]);
 
   const launchStatus = useMemo(() => getCourseLaunchStatus(course), [course]);
-  const steps = applicant ? applicantCheckoutSteps : checkoutSteps;
+  const steps = checkoutSteps;
   const stepIndex = Math.min(currentStep, steps.length - 1);
   const activeStep = steps[stepIndex];
   const hasPermanentAccess = hasPermanentCourseAccess(course);
@@ -511,8 +505,7 @@ export default function CoursePaymentPage() {
       const validationError = validateStep(step.id);
       if (validationError) {
         setError(validationError);
-        // Saved applicant details have no edit step; the plan step is the only one to return to.
-        setCurrentStep(applicant ? (step.id === "plan" ? 0 : stepIndex) : index);
+        setCurrentStep(index);
         return;
       }
     }
@@ -532,7 +525,7 @@ export default function CoursePaymentPage() {
       const orderResponse = await createPaymentOrder(
         {
           course_id: Number(id),
-          ...(course.category === "web_pentesting" ? { application_reference: applicationReference } : {}),
+          ...(course.category === "web_pentesting" && applicationReference ? { application_reference: applicationReference } : {}),
           plan,
           buyer_name: checkoutProfile.buyer_name.trim(),
           buyer_email: checkoutProfile.buyer_email.trim(),
@@ -673,10 +666,6 @@ export default function CoursePaymentPage() {
         </div>
       </PageShell>
     );
-  }
-
-  if (course.category === "web_pentesting" && !applicationReady) {
-    return <PageShell title="Complete your registration"><div className="au-scope"><p role="alert" className="text-sm leading-6 text-[#a1a1a1]">{error || "Submit your Pentesting application before viewing the fee and payment plans."}</p><div className="au-actions"><Link className="au-btn au-btn--primary" to={`/courses/${id}/register`}>Register now</Link></div></div></PageShell>;
   }
 
   if (hasPermanentAccess) {
@@ -1042,33 +1031,6 @@ export default function CoursePaymentPage() {
                       />
                     </label>
                   </div>
-                </div>
-              ) : null}
-
-              {activeStep.id === "confirm" ? (
-                <div className="mt-5 max-w-2xl" data-testid="checkout-confirm">
-                  <h3 className="text-3xl font-semibold leading-tight text-white sm:text-4xl">
-                    Confirm and pay
-                  </h3>
-                  <p className="mt-3 text-sm leading-6 text-[#a1a1a1]">
-                    These are the details from your application. Your login is sent to this email and WhatsApp number after payment.
-                  </p>
-                  <dl className="mt-6 divide-y divide-white/10 rounded-[10px] border border-white/10">
-                    {[
-                      ["Plan", stepSummary(checkoutSteps[0], checkoutProfile, plan, course)],
-                      ["Name", checkoutProfile.buyer_name],
-                      ["Email", checkoutProfile.buyer_email],
-                      ["WhatsApp", checkoutProfile.whatsapp_number],
-                    ].map(([label, value]) => (
-                      <div key={label} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                        <dt className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#8a8a8a]">{label}</dt>
-                        <dd className="break-all text-sm font-semibold text-white sm:text-right">{value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                  <p className="mt-4 text-xs leading-5 text-[#8a8a8a]">
-                    Need to change these? <Link className="underline hover:text-white" to={`/courses/${id}/register`}>Submit a new application</Link>.
-                  </p>
                 </div>
               ) : null}
 

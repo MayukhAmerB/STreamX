@@ -334,16 +334,18 @@ describe("Pentesting: browsable, never purchasable while the switch is off", () 
     expect(markup).toContain('href="/pricing#pentesting"');
   });
 
-  it("disables Apply on a Pentesting course page and never links to register or payment", () => {
+  it("disables Enrol on a Pentesting course page and never links to register or payment", () => {
     const course = { category: "web_pentesting", launch_status: "live", registration_closed: false };
     const gate = coursePurchaseGate(course, CLOSED);
     const markup = html(<CourseActions course={course} id="41" gate={gate} />);
-    expect(markup).toContain("Apply (coming soon)");
+    expect(markup).toContain("Enrol (coming soon)");
     expect(markup).toContain('aria-disabled="true"');
     expect(markup).toContain(CLOSED.reason);
     expect(markup).not.toContain('href="/courses/41/register"');
-    const open = html(<CourseActions course={course} id="41" gate={coursePurchaseGate(course, { enabled: true })} />);
-    expect(open).toContain('href="/courses/41/register"');
+    const open = html(<CourseActions course={{ ...course, purchase_available: true }} id="41" gate={coursePurchaseGate(course, { enabled: true })} />);
+    // Switched on: the same Buy now -> payment as OSINT, no application step.
+    expect(open).toContain('href="/courses/41/payment"');
+    expect(open).not.toContain("/register");
   });
 
   it("keeps the enrolled student's Continue learning and installment links", () => {

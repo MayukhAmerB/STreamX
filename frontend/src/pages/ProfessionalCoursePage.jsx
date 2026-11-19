@@ -109,18 +109,19 @@ export function CourseActions({ course, id, gate }) {
   if (gate.disabled) {
     return (
       <div className="hp-actions" data-purchase-state={gate.state}>
-        <DisabledAction label={`${pentesting ? "Apply" : "Enrol"} (coming soon)`} reason={gate.reason || "Enrolment opens at launch."} size="lg" />
+        <DisabledAction label="Enrol (coming soon)" reason={gate.reason || "Enrolment opens at launch."} size="lg" />
         <ButtonLink to="#curriculum" variant="secondary" size="lg">
           Browse the outline
         </ButtonLink>
       </div>
     );
   }
-  if (open && (pentesting || course.purchase_available)) {
+  // Pentesting checks out exactly like OSINT: straight to plan and payment.
+  if (open && course.purchase_available) {
     return (
       <div className="hp-actions">
-        <ButtonLink to={`/courses/${id}/${pentesting ? "register" : "payment"}`} variant="primary" size="lg" arrow>
-          {pentesting ? "Apply now" : "Buy now"}
+        <ButtonLink to={`/courses/${id}/payment`} variant="primary" size="lg" arrow>
+          Buy now
         </ButtonLink>
         <ButtonLink to="#curriculum" variant="secondary" size="lg">
           See the curriculum
