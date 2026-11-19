@@ -43,6 +43,25 @@ export const checkoutSteps = [
   { id: "contact", label: "WhatsApp", summaryKey: "whatsapp_number" },
 ];
 
+// Pentesting buyers already gave their name, email and WhatsApp on the
+// application form: checkout only picks the plan and confirms.
+export const applicantCheckoutSteps = [
+  { id: "plan", label: "Payment plan" },
+  { id: "confirm", label: "Confirm and pay" },
+];
+
+function usableApplicant(applicant) {
+  if (!applicant || typeof applicant !== "object") return null;
+  const profile = {
+    buyer_name: String(applicant.buyer_name || "").trim(),
+    buyer_email: String(applicant.buyer_email || "").trim(),
+    whatsapp_number: String(applicant.whatsapp_number || "").trim(),
+  };
+  return isValidFullName(profile.buyer_name) && isValidEmail(profile.buyer_email) && isValidPhone(profile.whatsapp_number)
+    ? profile
+    : null;
+}
+
 const inputClassName =
   "mt-2 block h-11 w-full rounded-none border-0 border-b border-white/35 bg-transparent px-0 text-base text-white outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-[#737373] focus:border-[#F3E2B3] focus:shadow-[0_1px_0_0_#F3E2B3] sm:h-10 sm:text-sm";
 
@@ -264,6 +283,9 @@ export default function CoursePaymentPage() {
     Number(id),
   ));
   const [applicationReady, setApplicationReady] = useState(false);
+  // Details saved with the Pentesting application (from the server, so a
+  // reload or a return visit never asks for them again).
+  const [applicant, setApplicant] = useState(null);
   const [applicationReference] = useState(() => {
     try {
       return location.state?.applicationReference
@@ -351,8 +373,13 @@ export default function CoursePaymentPage() {
         const loadedCourse = apiData(response);
         setCourse(loadedCourse);
         if (loadedCourse?.category === "web_pentesting") {
-          await apiClient.post(`/courses/${id}/application-checkout/`, { reference: applicationReference });
+          const applicationResponse = await apiClient.post(`/courses/${id}/application-checkout/`, { reference: applicationReference });
           if (!active) return;
+          const savedApplicant = usableApplicant(apiData(applicationResponse)?.applicant);
+          if (savedApplicant) {
+            setApplicant(savedApplicant);
+            setCheckoutProfile((current) => ({ ...current, ...savedApplicant }));
+          }
         }
         setApplicationReady(true);
         if (!initialCheckoutRecovery?.plan) {
@@ -373,7 +400,9 @@ export default function CoursePaymentPage() {
   }, [id, applicationReference, initialCheckoutRecovery?.plan]);
 
   const launchStatus = useMemo(() => getCourseLaunchStatus(course), [course]);
-  const activeStep = checkoutSteps[currentStep];
+  const steps = applicant ? applicantCheckoutSteps : checkoutSteps;
+  const stepIndex = Math.min(currentStep, steps.length - 1);
+  const activeStep = steps[stepIndex];
   const hasPermanentAccess = hasPermanentCourseAccess(course);
 
   const handleProfileChange = (event) => {
@@ -424,7 +453,7 @@ export default function CoursePaymentPage() {
       return;
     }
     setError("");
-    setCurrentStep((step) => Math.min(step + 1, checkoutSteps.length - 1));
+    setCurrentStep((step) => Math.min(Math.min(step, steps.length - 1) + 1, steps.length - 1));
   };
 
   const continueWithPlan = (selectedPlan) => {
@@ -482,7 +511,8 @@ export default function CoursePaymentPage() {
       const validationError = validateStep(step.id);
       if (validationError) {
         setError(validationError);
-        setCurrentStep(index);
+        // Saved applicant details have no edit step; the plan step is the only one to return to.
+        setCurrentStep(applicant ? (step.id === "plan" ? 0 : stepIndex) : index);
         return;
       }
     }
@@ -821,7 +851,7 @@ export default function CoursePaymentPage() {
     );
   }
 
-  const isFinalStep = currentStep === checkoutSteps.length - 1;
+  const isFinalStep = stepIndex === steps.length - 1;
   const isPlanStep = activeStep.id === "plan";
   // Four admin-configured cards per row need the full content width.
   const widePlanGrid = isPlanStep
@@ -855,11 +885,11 @@ export default function CoursePaymentPage() {
               {course.title}
             </h2>
 
-            <ol className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-1">
-              {checkoutSteps.map((step, index) => {
-                const complete = index < currentStep;
-                const active = index === currentStep;
-                const canNavigate = index <= currentStep && !pendingVerification;
+            <ol className={`mt-6 grid grid-cols-2 gap-2 lg:grid-cols-1 ${steps.length > 2 ? "sm:grid-cols-4" : ""}`}>
+              {steps.map((step, index) => {
+                const complete = index < stepIndex;
+                const active = index === stepIndex;
+                const canNavigate = index <= stepIndex && !pendingVerification;
                 return (
                   <li key={step.id}>
                     <button
@@ -923,7 +953,7 @@ export default function CoursePaymentPage() {
             <div key={activeStep.id} className="motion-safe:animate-[checkoutStepIn_260ms_ease-out]">
               {!isPlanStep ? (
                 <p className="font-mono text-xs tabular-nums text-[#8a8a8a]">
-                  Step {currentStep + 1} of {checkoutSteps.length}
+                  Step {stepIndex + 1} of {steps.length}
                 </p>
               ) : null}
 
@@ -1012,6 +1042,33 @@ export default function CoursePaymentPage() {
                       />
                     </label>
                   </div>
+                </div>
+              ) : null}
+
+              {activeStep.id === "confirm" ? (
+                <div className="mt-5 max-w-2xl" data-testid="checkout-confirm">
+                  <h3 className="text-3xl font-semibold leading-tight text-white sm:text-4xl">
+                    Confirm and pay
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-[#a1a1a1]">
+                    These are the details from your application. Your login is sent to this email and WhatsApp number after payment.
+                  </p>
+                  <dl className="mt-6 divide-y divide-white/10 rounded-[10px] border border-white/10">
+                    {[
+                      ["Plan", stepSummary(checkoutSteps[0], checkoutProfile, plan, course)],
+                      ["Name", checkoutProfile.buyer_name],
+                      ["Email", checkoutProfile.buyer_email],
+                      ["WhatsApp", checkoutProfile.whatsapp_number],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <dt className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#8a8a8a]">{label}</dt>
+                        <dd className="break-all text-sm font-semibold text-white sm:text-right">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <p className="mt-4 text-xs leading-5 text-[#8a8a8a]">
+                    Need to change these? <Link className="underline hover:text-white" to={`/courses/${id}/register`}>Submit a new application</Link>.
+                  </p>
                 </div>
               ) : null}
 

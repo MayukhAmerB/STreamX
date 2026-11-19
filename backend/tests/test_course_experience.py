@@ -145,7 +145,10 @@ class CourseExperienceTests(APITestCase):
             f"/api/courses/{self.pentesting.pk}/application-checkout/", {"reference": reference}
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(set(response.data["data"]), {"status", "payment_status"})
+        # Only the applicant's own details come back, so checkout never asks for them twice.
+        self.assertEqual(set(response.data["data"]), {"status", "payment_status", "applicant"})
+        self.assertEqual(set(response.data["data"]["applicant"]), {"buyer_name", "buyer_email", "whatsapp_number"})
+        self.assertEqual(response.data["data"]["applicant"]["buyer_email"], self.application_data["email"].lower())
 
     def test_setup_is_idempotent_and_does_not_change_existing_courses(self):
         from io import StringIO

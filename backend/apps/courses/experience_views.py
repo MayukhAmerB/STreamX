@@ -216,6 +216,20 @@ class ApplicationInput(serializers.ModelSerializer):
             attrs["institution"] = ""
         if not 8 <= sum(char.isdigit() for char in attrs["phone"]) <= 15:
             raise serializers.ValidationError({"phone": "Enter 8 to 15 digits."})
+        # Checkout reuses these details, so the name follows the checkout rule
+        # (letters, spaces, ' - .): a buyer never has to type it a second time.
+        from apps.payments.serializers import NAME_PUNCTUATION, _validate_plain_text
+
+        try:
+            attrs["full_name"] = _validate_plain_text(
+                attrs["full_name"], "full_name", allowed_punctuation=NAME_PUNCTUATION, allow_numbers=False
+            )
+        except serializers.ValidationError:
+            raise serializers.ValidationError(
+                {"full_name": "Use letters, spaces, apostrophes, periods or hyphens only."}
+            ) from None
+        if len(attrs["full_name"]) < 2:
+            raise serializers.ValidationError({"full_name": "Enter your full name."})
         for value in attrs.values():
             if isinstance(value, str) and contains_active_content(value):
                 raise serializers.ValidationError("Use plain text in application fields.")
@@ -260,6 +274,16 @@ class ApplicationCheckoutView(APIView):
             raise ValidationError("Application cancelled. Contact support.")
         if application.student_id and (not request.user.is_authenticated or request.user.pk != application.student_id):
             raise PermissionDenied("Sign in with the applicant account.")
-        response = api_response(data={"status": application.status, "payment_status": application.payment_status})
+        response = api_response(data={
+            "status": application.status,
+            "payment_status": application.payment_status,
+            # The applicant's own details, so checkout never asks for them again
+            # (the reference is a secret only the applicant's browser holds).
+            "applicant": {
+                "buyer_name": application.full_name,
+                "buyer_email": application.email,
+                "whatsapp_number": application.phone,
+            },
+        })
         response["Cache-Control"] = "no-store"
         return response

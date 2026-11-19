@@ -134,3 +134,62 @@ describe("checkout with admin-configured plan cards", () => {
     await view.unmount();
   });
 });
+
+describe("pentesting checkout reuses the application details", () => {
+  const reference = "b1354157-05a8-4bc4-b907-d3af9d353ae8";
+  const pentesting = {
+    id: 49,
+    title: "Web Application Pentesting - Level 1",
+    category: "web_pentesting",
+    purchase_available: true,
+    launch_status: "live",
+    is_enrolled: false,
+    payment_plans: [
+      plan("monthly", { title: "Monthly", amount: "2000.00", price_label: "₹2,000 / month", order: 1, installments: 3, cta_label: "Start monthly" }),
+      plan("full", { title: "One-Time", amount: "3500.00", price_label: "₹3,500 one payment", order: 2, highlighted: true }),
+    ],
+  };
+
+  it("asks only for the plan, then confirms the saved details and pays", async () => {
+    getCourse.mockResolvedValue({ data: { data: pentesting } });
+    post.mockResolvedValue({ data: { data: { status: "submitted", payment_status: "pending", applicant: {
+      buyer_name: "Meera Iyer", buyer_email: "meera.iyer@example.com", whatsapp_number: "+91 91234 56789",
+    } } } });
+    createPaymentOrder.mockResolvedValue({ data: { data: {
+      amount: 200000, currency: "INR", plan: "monthly", key_id: "rzp_test_key",
+      razorpay_order_id: "order_2", checkout_reference: "chk_2",
+    } } });
+    const view = await renderTree(
+      <MemoryRouter
+        initialEntries={[{ pathname: "/courses/49/payment", state: { applicationReference: reference } }]}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <Routes>
+          <Route path="/courses/:id/payment" element={<CoursePaymentPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await settle();
+    expect(post).toHaveBeenCalledWith("/courses/49/application-checkout/", { reference });
+
+    await fire(view.find((node) => node.type === "button" && textOf(node) === "Start monthly"), "onClick");
+    expect(view.text()).toContain("Step 2 of 2");
+    expect(view.text()).toContain("Confirm and pay");
+    expect(view.text()).toContain("meera.iyer@example.com");
+    expect(view.find((node) => node.type === "input" && node.props.name === "buyer_name")).toBeFalsy();
+
+    await fire(view.find((node) => node.type === "form"), "onSubmit");
+    await settle();
+    expect(createPaymentOrder).toHaveBeenCalledTimes(1);
+    expect(createPaymentOrder.mock.calls[0][0]).toMatchObject({
+      course_id: 49,
+      plan: "monthly",
+      application_reference: reference,
+      buyer_name: "Meera Iyer",
+      buyer_email: "meera.iyer@example.com",
+      whatsapp_number: "+91 91234 56789",
+    });
+    expect(razorpayOptions).toMatchObject({ amount: 200000, order_id: "order_2" });
+    await view.unmount();
+  });
+});
