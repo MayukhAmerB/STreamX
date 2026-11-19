@@ -132,3 +132,13 @@ export function saveCourseApplicationReference(storage, courseId, value) {
     return false;
   }
 }
+
+export function clearCourseApplicationReference(storage, courseId) {
+  const key = applicationStorageKey(courseId);
+  if (!storage || !key) return;
+  try {
+    storage.removeItem(key);
+  } catch {
+    // Storage unavailable; nothing to clear.
+  }
+}
