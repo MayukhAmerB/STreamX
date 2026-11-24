@@ -2,6 +2,7 @@ import { useState } from "react";
 import { sendContactMessage } from "../api/auth";
 import Button from "../components/Button";
 import FormInput from "../components/FormInput";
+import IndiaOnlyNote from "../components/IndiaOnlyNote";
 import PageShell from "../components/PageShell";
 import TurnstileWidget from "../components/TurnstileWidget";
 import { useTurnstileChallenge } from "../hooks/useTurnstileChallenge";
@@ -148,6 +149,7 @@ export default function ContactPage() {
               Message us on WhatsApp, Instagram or X, e-mail the team, or use the form below. We
               usually reply within one working day.
             </p>
+            <IndiaOnlyNote variant="note" className="mt-4 max-w-3xl" />
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">

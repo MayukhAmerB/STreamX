@@ -4,6 +4,7 @@ import certificateExcellenceImage from "../assets/certificate-excellence.webp";
 import { listCourses, listLiveClasses } from "../api/courses";
 import { listRealtimeSessions } from "../api/realtime";
 import Button from "../components/Button";
+import IndiaOnlyNote from "../components/IndiaOnlyNote";
 import { CourseTrackCards } from "../components/CourseCategorySelector";
 import CourseCardRail from "../components/CourseCardRail";
 import HeroCountdown from "../components/HeroCountdown";
@@ -787,6 +788,8 @@ export default function LandingPage() {
                 ))}
               </ul>
 
+              <IndiaOnlyNote className="mt-5" />
+
               {heroLiveBroadcast ? (
                 <Link
                   to={isAuthenticated ? heroLiveBroadcastJoinPath : "/login"}
@@ -1125,6 +1128,7 @@ export default function LandingPage() {
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-[#A8A8A8]">
                     Join our flagship course and learn OSINT plus web application pentesting with a structured workflow.
                   </p>
+                  <IndiaOnlyNote variant="note" className="mt-4 max-w-2xl" />
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                   <Link

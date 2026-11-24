@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { siteBrand } from "../config/siteBrand";
 import { useYouTubeChannel } from "../features/youtube/youTubeStore";
 import BrandLogo from "./BrandLogo";
+import IndiaOnlyNote from "./IndiaOnlyNote";
 
 const baseQuickLinks = [
   { label: "Home", to: "/" },
@@ -183,6 +184,7 @@ export default function AppFooter() {
             <div>
               <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white">Connect</h2>
               <p className="mt-2 text-xs text-[#8F8F8F]">Official channels for support and platform updates.</p>
+              <IndiaOnlyNote variant="note" className="mt-3 max-w-md !text-xs !leading-5" />
             </div>
             <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:justify-end">
             {socialLinks.map((item) => (
