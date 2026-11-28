@@ -122,7 +122,10 @@ $stage-text-secondary: var(--uc-text-2);
 }
 
 .cds-app .cp-page[data-layout='desktop'] .cp-stage__frame {
-  max-inline-size: min(100%, calc((100dvh - var(--cds-app-header-height) - 13rem) * 16 / 9));
+  // Fill the column: the video only shrinks when the whole 16:9 player would
+  // no longer fit the screen below the header (the title follows on scroll).
+  // Was 13rem of headroom, which pillarboxed recordings on laptop screens.
+  max-inline-size: min(100%, calc((100dvh - var(--cds-app-header-height) - 3rem) * 16 / 9));
 }
 
 .cds-app .cp-video {
