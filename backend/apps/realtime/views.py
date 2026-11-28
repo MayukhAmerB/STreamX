@@ -609,6 +609,16 @@ def _sync_owncast_chat_settings_non_blocking(*, session):
         )
 
 
+def _superseded_note(session):
+    """A note naming the classes this start ended (one class on air)."""
+    titles = [str(getattr(other, "title", "") or "").strip() for other in getattr(session, "superseded_sessions", None) or []]
+    titles = [title for title in titles if title]
+    if not titles:
+        return ""
+    quoted = ", ".join(f"'{title}'" for title in titles)
+    return f" Ended {quoted} so only this class is on air."
+
+
 def _rotate_obs_stream_key_if_enabled(*, session, force=False):
     if (
         session.session_type != RealtimeSession.TYPE_BROADCASTING
@@ -2139,7 +2149,8 @@ class RealtimeOwncastStreamAccessView(APIView):
             return HttpResponse(status=401)
 
         cache_key = _owncast_stream_auth_cache_key(cookie_value)
-        if cache.get(cache_key) == f"{session_id}:{user_id}":
+        # An ended class skips the cache so its viewers are cut off at once.
+        if cache.get(cache_key) == f"{session_id}:{user_id}" and not live_lifecycle.stream_closed(session_id):
             response = HttpResponse(status=204)
             response["Cache-Control"] = "no-store, max-age=0"
             return response
@@ -2153,6 +2164,10 @@ class RealtimeOwncastStreamAccessView(APIView):
 
         access_decision = get_access_decision(session, user)
         if not access_decision.allowed:
+            return HttpResponse(status=403)
+        # One feed, one class on air: if a later class (another batch) is live,
+        # this older class's viewers must not see it.
+        if session.session_type == RealtimeSession.TYPE_BROADCASTING and live_lifecycle.newer_broadcast_on_air(session):
             return HttpResponse(status=403)
 
         cache.set(
@@ -2720,6 +2735,7 @@ class RealtimeSessionStreamStartView(APIView):
                 "OBS stream re-prepared. If OBS showed a disconnect warning, "
                 "resume publishing with the same server URL and key now."
             )
+        message += _superseded_note(session)
         return api_response(success=True, message=message, data=data)
 
     def _start_host_studio_stream(self, request, session, rtmp_target_url):

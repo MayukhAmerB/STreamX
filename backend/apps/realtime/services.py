@@ -1168,6 +1168,39 @@ def owncast_set_chat_message_visibility(*, message_ids, visible, timeout=10):
     )
 
 
+def hide_owncast_chat_messages_between(*, start, end, timeout=8, chunk_size=200):
+    """Hide every visible Owncast chat message sent in [start, end].
+
+    Used when the next class starts, so one batch's chat never shows in the
+    following batch's class. Hidden messages stay in Owncast (moderation can
+    still see or restore them). Returns how many were hidden.
+    """
+    from django.utils.dateparse import parse_datetime
+
+    base_url, headers = _resolve_owncast_admin_request_context()
+    ids = []
+    for message in fetch_owncast_chat_messages_admin(limit=0, timeout=timeout):
+        message_id = str(message.get("id") or "").strip()
+        if not message_id or not message.get("visible"):
+            continue
+        try:
+            sent_at = parse_datetime(str(message.get("timestamp") or ""))
+        except ValueError:
+            sent_at = None
+        if sent_at is None or sent_at < start or sent_at > end:
+            continue
+        ids.append(message_id)
+    for index in range(0, len(ids), chunk_size):
+        _owncast_admin_post_json(
+            base_url=base_url,
+            endpoint_path="/api/admin/chat/messagevisibility",
+            payload={"idArray": ids[index:index + chunk_size], "visible": False},
+            headers=headers,
+            timeout=timeout,
+        )
+    return len(ids)
+
+
 def owncast_ban_ip_address(*, ip_address, timeout=10):
     ip_value = str(ip_address or "").strip()
     if not ip_value:

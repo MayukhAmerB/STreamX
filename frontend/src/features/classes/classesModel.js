@@ -80,6 +80,16 @@ export function getStreamServiceLabel(session) {
 }
 
 /** One short, sentence-case line: how this class is delivered. */
+/**
+ * Who can watch a broadcast: the batch (live class, else course) it is linked
+ * to. Every broadcast shares one stream, so the studio names the batch the
+ * host is about to put on air. Empty when the class is open to everyone.
+ */
+export function sessionAudienceLabel(session) {
+  if (isMeetingSession(session)) return "";
+  return String(session?.linked_live_class?.title || session?.linked_course?.title || "").trim();
+}
+
 export function sessionModeLabel(session) {
   if (isMeetingSession(session)) return "Interactive meeting";
   return isObsStreamMode(session) ? "Broadcast from OBS" : "Broadcast from the browser";

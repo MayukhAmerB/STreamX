@@ -588,6 +588,18 @@ $cls-desktop: 66rem; // 1056 px
   }
 }
 
+.cls-studio__audience {
+  margin: 0.5rem 0 0;
+  color: var(--sc-text-secondary, #c6c6c6);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+
+  strong {
+    color: var(--sc-text-primary, #f4f4f4);
+    font-weight: 600;
+  }
+}
+
 .cls-studio__header-actions {
   display: flex;
   flex-wrap: wrap;

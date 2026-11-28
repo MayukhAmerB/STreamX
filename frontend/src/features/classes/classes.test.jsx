@@ -13,6 +13,7 @@ import {
   inferObsServerUrl,
   maskSecretValue,
   normalizeBroadcastProfile,
+  sessionAudienceLabel,
   sessionModeLabel,
   sessionRowActions,
   sessionStatus,
@@ -125,6 +126,16 @@ describe("classes model", () => {
     expect(sessionStatus({ ...meeting, status: "live" }).key).toBe("live");
     expect(sessionModeLabel(meeting)).toBe("Interactive meeting");
     expect(sessionModeLabel(studio)).toBe("Broadcast from the browser");
+  });
+
+  it("names the batch a broadcast is for (one stream, one batch on air)", () => {
+    const batch4 = { ...obs, linked_live_class: { title: "OSINT Batch IV" }, linked_course: { title: "OSINT IV course" } };
+    expect(sessionAudienceLabel(batch4)).toBe("OSINT Batch IV");
+    expect(sessionAudienceLabel({ ...obs, linked_live_class: null, linked_course: { title: "OSINT IV course" } })).toBe(
+      "OSINT IV course"
+    );
+    expect(sessionAudienceLabel({ ...obs, linked_live_class: null, linked_course: null })).toBe("");
+    expect(sessionAudienceLabel({ ...meeting, linked_course: { title: "x" } })).toBe("");
   });
 
   it("lists live first, then newest, and only meetings and broadcasts that have not ended", () => {

@@ -27,6 +27,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
+from datetime import timedelta
 
 from django.conf import settings
 from django.core.cache import cache
@@ -52,6 +53,8 @@ END_REASON_HOST = "host"
 END_REASON_ADMIN = "admin"
 END_REASON_ABANDONED = "abandoned"
 END_REASON_NEVER_STARTED = "never_started"
+# Another broadcast class started: Owncast carries one feed, so this one ended.
+END_REASON_SUPERSEDED = "superseded"
 
 KIND_OBS = "obs"
 KIND_STUDIO = "studio"
@@ -59,6 +62,11 @@ KIND_MEETING = "meeting"
 
 EVENT_LIVE_ENDED = "live.ended"
 EVENT_GO_LIVE = "realtime.go_live"
+EVENT_CHAT_RESET = "realtime.owncast_chat_reset"
+
+# How far back a new class's chat reset reaches. Owncast replays only recent
+# history to viewers, so older messages never reach the next batch anyway.
+CHAT_RESET_LOOKBACK_HOURS = 12
 
 EGRESS_RESTART_WINDOW_SECONDS = 600
 EGRESS_RESTART_BACKOFF_CAP_SECONDS = 60
@@ -562,6 +570,7 @@ def end_session(
             applied=True,
         )
         mark_live_activity(now)
+    mark_stream_closed(row.pk)
     _after_end(row, request=request, stream_was=stream_was, transitioned=transitioned)
     clear_live_keys(row.pk)
     return EndResult(session=row, transitioned=transitioned, stopped_egress_id=egress_id, event_id=getattr(event, "pk", None))
@@ -640,6 +649,145 @@ def handle_live_ended(event):
     return {"session_id": session_id, "egress_id": egress_id, "room_name": room_name}
 
 
+# --- one broadcast class on air -----------------------------------------------
+#
+# Every broadcast class (OBS or Host Studio) plays through the one Owncast feed
+# with the one fixed stream key. What separates Batch III from Batch IV is which
+# class is live: the stream gate lets a viewer through only for the class on
+# air, and only if they belong to its batch. So starting a class ends any other
+# broadcast class still live (its viewers are cut off, its recording finalized)
+# and gives the new class a fresh chat.
+
+
+def _stream_closed_key(session_id) -> str:
+    return f"realtime:owncast:stream-closed:{session_id}"
+
+
+def mark_stream_closed(session_id) -> None:
+    """Tell the stream gate this class is over, bypassing its auth cache."""
+    try:
+        ttl = int(getattr(settings, "OWNCAST_STREAM_ACCESS_TTL_SECONDS", 10800) or 10800)
+        cache.set(_stream_closed_key(session_id), 1, timeout=max(ttl, 3600) + 600)
+    except Exception:  # noqa: BLE001 - cache is an accelerator; the DB check still holds
+        logger.debug("stream-closed flag not cached for session %s", session_id, exc_info=True)
+
+
+def stream_closed(session_id) -> bool:
+    try:
+        return bool(cache.get(_stream_closed_key(session_id)))
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def other_live_broadcasts(session):
+    from .models import RealtimeSession
+
+    return RealtimeSession.objects.filter(
+        session_type=RealtimeSession.TYPE_BROADCASTING,
+        status=RealtimeSession.STATUS_LIVE,
+    ).exclude(pk=session.pk)
+
+
+def newer_broadcast_on_air(session) -> bool:
+    """Is another broadcast class on air that started after this one?
+
+    The feed belongs to the class started last; viewers of any older class
+    still marked live must not see it.
+    """
+    others = other_live_broadcasts(session)
+    if session.started_at is not None:
+        others = others.filter(started_at__gt=session.started_at)
+    return others.exists()
+
+
+def supersede_other_broadcasts(session, *, request=None) -> list:
+    """End every other live broadcast class; returns the ended sessions.
+
+    Never raises: a failure to end one class must not stop the new one.
+    """
+    from .models import RealtimeSession
+
+    if getattr(session, "session_type", "") != RealtimeSession.TYPE_BROADCASTING:
+        return []
+    ended = []
+    for other in other_live_broadcasts(session).only("pk", "title"):
+        try:
+            result = end_session(other.pk, reason=END_REASON_SUPERSEDED, request=request)
+        except Exception:  # noqa: BLE001
+            ops_logger.exception(
+                "CLASS_SUPERSEDE_FAILED session_id=%s superseded_by=%s", other.pk, session.pk
+            )
+            continue
+        if result.transitioned:
+            ended.append(result.session)
+            ops_logger.info(
+                "CLASS_SUPERSEDED session_id=%s title=%r superseded_by=%s",
+                other.pk,
+                other.title,
+                session.pk,
+            )
+    return ended
+
+
+def queue_chat_reset(session, now=None) -> None:
+    """Hide the previous class's chat so the next batch starts with a clean one.
+
+    Cut-off: the moment the most recent other broadcast class ended. Chat sent
+    after that (students of this class waiting for it to start) stays.
+    """
+    from .models import RealtimeSession
+
+    if getattr(session, "session_type", "") != RealtimeSession.TYPE_BROADCASTING:
+        return
+    if not str(getattr(settings, "OWNCAST_ADMIN_PASSWORD", "") or "").strip():
+        return
+    moment = now or timezone.now()
+    cutoff = (
+        RealtimeSession.objects.filter(
+            session_type=RealtimeSession.TYPE_BROADCASTING,
+            status=RealtimeSession.STATUS_ENDED,
+            ended_at__isnull=False,
+            ended_at__lte=moment,
+            ended_at__gte=moment - timedelta(hours=CHAT_RESET_LOOKBACK_HOURS),
+        )
+        .exclude(pk=session.pk)
+        .order_by("-ended_at")
+        .values_list("ended_at", flat=True)
+        .first()
+    )
+    if cutoff is None:
+        return
+    try:
+        publish(
+            EVENT_CHAT_RESET,
+            {"session_id": session.pk, "cutoff": cutoff.isoformat()},
+            dedupe_key=f"chat-reset:{session.pk}:{int(cutoff.timestamp())}",
+        )
+    except Exception:  # noqa: BLE001 - a stale chat must never block going live
+        ops_logger.exception("Chat reset not queued. session_id=%s", session.pk)
+
+
+@outbox_handler(EVENT_CHAT_RESET, max_attempts=3)
+def handle_chat_reset(event):
+    from django.utils.dateparse import parse_datetime
+
+    from . import services
+
+    payload = event.payload or {}
+    cutoff = parse_datetime(str(payload.get("cutoff") or ""))
+    if cutoff is None:
+        return {"hidden": 0}
+    try:
+        hidden = services.hide_owncast_chat_messages_between(
+            start=cutoff - timedelta(hours=CHAT_RESET_LOOKBACK_HOURS),
+            end=cutoff,
+        )
+    except services.OwncastConfigError:
+        return {"hidden": 0, "skipped": "owncast_not_configured"}
+    ops_logger.info("CLASS_CHAT_RESET session_id=%s cutoff=%s hidden=%s", payload.get("session_id"), cutoff, hidden)
+    return {"hidden": hidden}
+
+
 # --- async Go Live ------------------------------------------------------------
 
 
@@ -713,6 +861,10 @@ def open_session_for_start(session, now=None) -> bool:
     if opened:
         session.refresh_from_db(fields=["status", "started_at", "ended_at", "updated_at"])
         mark_live_activity()
+        # One class on air: the batch that was live before this one is closed
+        # now, so its students never see this class (and vice versa).
+        session.superseded_sessions = supersede_other_broadcasts(session)
+        queue_chat_reset(session)
     return opened
 
 

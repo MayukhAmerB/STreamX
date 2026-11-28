@@ -16,6 +16,7 @@ import {
   canManageSession,
   classesPath,
   isMeetingSession,
+  sessionAudienceLabel,
   sessionModeLabel,
   sessionStatus,
   workspaceRootFor,
@@ -28,6 +29,7 @@ function StudioHeader({ session, root, studio }) {
   const copy = useCopyToast();
   const status = sessionStatus(session);
   const course = session?.linked_course?.title || session?.linked_live_class?.linked_course_title || "";
+  const audience = sessionAudienceLabel(session);
   return (
     <header className="cls-studio__header">
       <Link className="cls-back" to={classesPath(root)}>
@@ -41,6 +43,12 @@ function StudioHeader({ session, root, studio }) {
             <StatusTag status={status.key}>{status.label}</StatusTag>
             <span>{[sessionModeLabel(session), course].filter(Boolean).join(" · ")}</span>
           </p>
+          {audience ? (
+            <p className="cls-studio__audience" data-testid="studio-audience">
+              Only <strong>{audience}</strong> students can watch. Going live ends any other class that is
+              still live.
+            </p>
+          ) : null}
         </div>
         <div className="cls-studio__header-actions">
           {studio && !studio.obsMode ? (
