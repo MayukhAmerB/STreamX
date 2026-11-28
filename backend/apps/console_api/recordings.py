@@ -171,6 +171,10 @@ def _class_item(recording) -> dict:
         "links": {
             "back_office": _admin_url("realtime_classrecording_change", recording.pk),
             "course": f"/console/admin/courses/{course.pk}" if course else "",
+            # Topic, module and description of the class (renames this lecture).
+            "class_details": (
+                f"/console/admin/classes/{recording.session_id}/studio?panel=setup" if recording.session_id else ""
+            ),
         },
         "media_url": "",
     }

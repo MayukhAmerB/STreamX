@@ -36,6 +36,9 @@ export const getRealtimeOwncastChatModeration = (id) =>
 export const applyRealtimeOwncastChatModeration = (id, payload) =>
   apiClient.post(`/realtime/sessions/${id}/broadcast-chat/moderation/`, payload);
 export const endRealtimeSession = (id) => apiClient.post(`/realtime/sessions/${id}/end/`);
+// Topic, description and module the class's recording is published with.
+export const saveRealtimeClassDetails = (id, payload) =>
+  apiClient.post(`/realtime/sessions/${id}/class-details/`, payload);
 export const getRealtimeHostToken = (id) => apiClient.post(`/realtime/sessions/${id}/host-token/`);
 export const startRealtimeStream = (id) => apiClient.post(`/realtime/sessions/${id}/stream/start/`);
 export const stopRealtimeStream = (id) => apiClient.post(`/realtime/sessions/${id}/stream/stop/`);

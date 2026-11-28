@@ -58,6 +58,16 @@ class RealtimeSession(models.Model):
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True, blank=True)
     description = models.TextField(blank=True, default="")
+    # The class's topic ("Google dorking: advanced operators"). Names the
+    # lecture its recording becomes; the title (e.g. "OSINT Batch IV · Friday
+    # 27 Nov") stays the calendar/live-list name.
+    lecture_title = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        verbose_name="Recording title (topic)",
+        help_text="Topic of this class. Used as the title of its recorded lecture.",
+    )
     session_type = models.CharField(
         max_length=20,
         choices=SESSION_TYPE_CHOICES,

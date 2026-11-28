@@ -93,6 +93,11 @@ export function RecordingPanelBody({ item, loading, error }) {
       {!Object.values(item.actions || {}).some(Boolean) ? (
         <p className="adm-quiet">Nothing to do here in the Console. The back office has every detail.</p>
       ) : null}
+      {item.links?.class_details ? (
+        <SmartLink href={item.links.class_details} className="adm-link adm-link--arrow">
+          Edit topic, module and description
+        </SmartLink>
+      ) : null}
       {item.links?.back_office ? (
         <SmartLink href={item.links.back_office} className="adm-link adm-link--arrow">
           Open in the back office <Launch size={16} aria-hidden="true" />

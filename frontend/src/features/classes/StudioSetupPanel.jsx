@@ -7,6 +7,7 @@ import { rotateRealtimeStreamKey } from "../../api/realtime";
 import { resolveBroadcastEmbedUrls } from "../../utils/broadcastUrls";
 import { apiData, apiMessage } from "../../utils/api";
 import { useToast } from "../app-shell/ui";
+import ClassDetailsCard from "./ClassDetailsCard";
 import SecretField from "./SecretField";
 import { buildJoinLink, confirmCopy, isObsStreamMode } from "./classesModel";
 import useCopyToast from "./useCopyToast";
@@ -34,7 +35,7 @@ function openInNewTab(url, showToast) {
   }
 }
 
-export default function StudioSetupPanel({ session, viewerPayload, onSession, confirm }) {
+export default function StudioSetupPanel({ session, viewerPayload, onSession, confirm, moduleOptions = [] }) {
   const { showToast } = useToast();
   const copy = useCopyToast();
   const [resyncing, setResyncing] = useState(false);
@@ -59,6 +60,7 @@ export default function StudioSetupPanel({ session, viewerPayload, onSession, co
 
   return (
     <div className="cls-panel-stack">
+      <ClassDetailsCard session={session} moduleOptions={moduleOptions} onSaved={onSession} />
       {obs ? (
         <section className="cls-section" aria-labelledby="cls-obs-title">
           <h2 id="cls-obs-title" className="cls-section__title">

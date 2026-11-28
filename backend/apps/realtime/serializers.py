@@ -45,6 +45,7 @@ class RealtimeSessionListSerializer(serializers.ModelSerializer):
             "title",
             "slug",
             "description",
+            "lecture_title",
             "session_type",
             "status",
             "host",

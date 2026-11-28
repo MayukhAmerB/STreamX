@@ -487,7 +487,10 @@ class StreamRecorder:
                 session_type=RealtimeSession.TYPE_BROADCASTING,
                 stream_status=RealtimeSession.STREAM_LIVE,
             )
-            .exclude(status=RealtimeSession.STATUS_ENDED)
+            # Only a class the host has opened. An upcoming (scheduled) OBS class
+            # also reads "stream live" while OBS is on, and must never take over
+            # the recording of the class actually on air.
+            .filter(status=RealtimeSession.STATUS_LIVE)
             .select_related("target_module", "linked_live_class")
             .order_by("-updated_at", "-pk")[:5]
             if recording_services.is_recordable_broadcast(session) and _feeds_owncast(session)

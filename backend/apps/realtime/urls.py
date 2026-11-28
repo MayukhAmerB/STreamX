@@ -4,6 +4,7 @@ from .recording.views import (
     ClassRecordingObsUploadView,
     ClassRecordingRetryView,
     ModuleOptionsView,
+    SessionClassDetailsView,
     SessionClassRecordingListView,
     SessionObsUploadView,
 )
@@ -162,6 +163,11 @@ urlpatterns = [
     path("sessions/<int:pk>/go-live/", RealtimeSessionGoLiveView.as_view(), name="realtime-session-go-live"),
     path("preflight/", RealtimePreflightView.as_view(), name="realtime-preflight"),
     # --- Phase 2: no-click recordings (module override, admin re-run finalize) ---
+    path(
+        "sessions/<int:pk>/class-details/",
+        SessionClassDetailsView.as_view(),
+        name="realtime-session-class-details",
+    ),
     path(
         "class-recordings/<int:recording_id>/module/",
         ClassRecordingModuleView.as_view(),

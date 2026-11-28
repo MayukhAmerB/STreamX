@@ -90,7 +90,15 @@ export default function BroadcastStudio({ session, onSession, confirm, header, u
             tabs={STUDIO_PANELS.map((item) => ({ ...item, href: panelHref(location.pathname, location.search, item.key) }))}
           />
           <div className="cls-studio__panel">
-            {panel === "setup" ? <StudioSetupPanel session={session} viewerPayload={viewer.activeBroadcast} onSession={syncSession} confirm={confirm} /> : null}
+            {panel === "setup" ? (
+              <StudioSetupPanel
+                session={session}
+                viewerPayload={viewer.activeBroadcast}
+                onSession={syncSession}
+                confirm={confirm}
+                moduleOptions={recordings.moduleOptions}
+              />
+            ) : null}
             {panel === "chat" ? <ChatModerationPanel chat={chat} confirm={confirm} /> : null}
             {panel === "recordings" ? (
               <StudioRecordingsPanel

@@ -1,7 +1,7 @@
 """HTTP mapping for class recordings and the module picker."""
 
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db.models import Count, Q
+from django.db.models import Count, Max, Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import permissions, status
@@ -24,6 +24,7 @@ from .serializers import (
     ModuleOptionsResponseSerializer,
     ObsUploadSerializer,
 )
+from .serializers import ClassDetailsSerializer
 
 TAGS = ("Class recordings",)
 
@@ -39,6 +40,65 @@ def _denied(detail):
 
 def _bad_request(message, errors):
     return api_response(success=False, message=message, errors=errors, status_code=status.HTTP_400_BAD_REQUEST)
+
+
+class SessionClassDetailsView(APIView):
+    """The class's topic, description and module: they name its recorded lecture."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        operation_id="realtime_session_class_details",
+        tags=TAGS,
+        request=ClassDetailsSerializer,
+        responses={200: ClassRecordingResponseSerializer, 400: ClassRecordingResponseSerializer, 403: ClassRecordingResponseSerializer},
+        description=(
+            "Set the class topic (the recorded lecture's title), its description and its module (an existing "
+            "module of the class's course, or a new one by name). Saved for the recording that is published when "
+            "the class ends; lectures already published from this class are renamed and moved at once."
+        ),
+    )
+    def post(self, request, pk):
+        from ..serializers import RealtimeSessionListSerializer
+        from . import modules
+
+        session = get_object_or_404(RealtimeSession.objects.with_related(), pk=pk)
+        if not session.is_moderator_allowed(request.user):
+            return _denied("Only host, assigned instructor, or admin can edit this class's details.")
+        serializer = ClassDetailsSerializer(data=request.data)
+        if not serializer.is_valid():
+            return _bad_request("Class details not saved.", serializer.errors)
+        data = serializer.validated_data
+        course_id = modules.session_course_id(session)
+        module = None
+        if data.get("module_id"):
+            module = Section.objects.filter(pk=data["module_id"]).first()
+            if module is None or (course_id and module.course_id != course_id):
+                return _bad_request("Class details not saved.", {"module_id": ["Pick a module of this class's course."]})
+        elif data.get("new_module_title"):
+            if not course_id:
+                return _bad_request("Class details not saved.", {"new_module_title": ["This class is not linked to a course."]})
+            module = Section.objects.filter(course_id=course_id, title__iexact=data["new_module_title"]).order_by("id").first()
+            if module is None:
+                top = Section.objects.filter(course_id=course_id).aggregate(top=Max("order"))["top"] or 0
+                module = Section.objects.create(course_id=course_id, title=data["new_module_title"], order=int(top) + 1)
+        try:
+            updated = services.apply_class_details(
+                session, topic=data["topic"], description=data["description"], module=module, request=request
+            )
+        except DjangoValidationError as exc:
+            return _bad_request("Class details not saved.", {"detail": exc.messages})
+        session = RealtimeSession.objects.with_related().get(pk=session.pk)
+        message = "Class details saved."
+        if updated:
+            message = f"Class details saved and applied to {updated} recorded lecture{'s' if updated != 1 else ''}."
+        return api_response(
+            message=message,
+            data={
+                "session": RealtimeSessionListSerializer(session, context={"request": request}).data,
+                "lectures_updated": updated,
+            },
+        )
 
 
 def _recordings_queryset():

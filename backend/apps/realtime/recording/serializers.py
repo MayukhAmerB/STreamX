@@ -3,6 +3,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.courses.models import Section
+from config.request_security import contains_active_content
 from config.upload_validators import validate_obs_recording_upload
 
 from . import services
@@ -172,3 +173,22 @@ ModuleOptionsResponseSerializer = _envelope("ModuleOptionsResponse", ModuleOptio
 ClassRecordingActionResponseSerializer = _envelope(
     "ClassRecordingActionResponse", ClassRecordingActionResultSerializer(allow_null=True)
 )
+
+
+class ClassDetailsSerializer(serializers.Serializer):
+    """A class's topic, description and module (the recorded lecture's details)."""
+
+    topic = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
+    description = serializers.CharField(max_length=5000, required=False, allow_blank=True, default="")
+    module_id = serializers.IntegerField(required=False, allow_null=True, default=None)
+    new_module_title = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
+
+    def validate(self, attrs):
+        for name in ("topic", "description", "new_module_title"):
+            value = str(attrs.get(name) or "").strip()
+            if value and contains_active_content(value):
+                raise serializers.ValidationError({name: "Suspicious script or active-content payload detected."})
+            attrs[name] = value
+        if attrs.get("module_id") and attrs.get("new_module_title"):
+            raise serializers.ValidationError({"module_id": "Choose a module or name a new one, not both."})
+        return attrs

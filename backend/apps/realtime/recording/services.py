@@ -303,6 +303,73 @@ def set_module(recording, module, *, request=None):
     return recording
 
 
+def apply_class_details(session, *, topic, description, module=None, request=None):
+    """Save a class's details and apply them to its recorded lectures.
+
+    ``topic`` names the lecture, ``description`` describes it and ``module``
+    (optional) is where it lives. Works before the class (used when the
+    recording is published), during it, and after it: lectures already
+    published are renamed and moved at once. Returns how many lectures changed.
+    """
+    from .publisher import lecture_description_for, lecture_title_for
+
+    topic = str(topic or "").strip()[:255]
+    description = str(description or "").strip()
+    fields = []
+    if session.lecture_title != topic:
+        session.lecture_title = topic
+        fields.append("lecture_title")
+    if session.description != description:
+        session.description = description
+        fields.append("description")
+    if module is not None and session.target_module_id != module.pk:
+        session.target_module = module
+        fields.append("target_module")
+    if fields:
+        session.save(update_fields=[*fields, "updated_at"])
+
+    recordings = list(R.objects.filter(session=session).select_related("lecture").order_by("started_at", "pk"))
+    if module is not None:
+        for recording in recordings:
+            if recording.module_id == module.pk and (not recording.lecture_id or recording.lecture.section_id == module.pk):
+                continue
+            try:
+                move_to_module(recording, module, request=request)
+            except ValidationError:
+                # Finalizing right now: the finalize reads the session's module.
+                logger.info("Class details: recording %s not moved (finalizing).", recording.pk)
+    lecture_ids = list(dict.fromkeys(recording.lecture_id for recording in recordings if recording.lecture_id))
+    first_take = {}
+    for recording in recordings:
+        if recording.lecture_id and recording.lecture_id not in first_take:
+            first_take[recording.lecture_id] = recording
+    changed = 0
+    for index, lecture_id in enumerate(lecture_ids):
+        lecture = Lecture.objects.select_related("section").filter(pk=lecture_id).first()
+        if lecture is None:
+            continue
+        recording = first_take[lecture_id]
+        title = lecture_title_for(session, recording.started_at)
+        if len(lecture_ids) > 1 and index:
+            title = f"{title} (part {index + 1})"[:255]
+        lecture_description = lecture_description_for(recording, lecture.section)
+        if lecture.title != title or lecture.description != lecture_description:
+            Lecture.objects.filter(pk=lecture.pk).update(
+                title=title, description=lecture_description, updated_at=timezone.now()
+            )
+            changed += 1
+    if changed or fields:
+        bump_course_list_cache_version()
+    log_security_event(
+        "realtime.class_details_updated",
+        request=request,
+        session_id=session.pk,
+        target_module_id=session.target_module_id,
+        lectures_updated=changed,
+    )
+    return changed
+
+
 def mark_reviewed(recording, *, request=None):
     changed = R.objects.filter(pk=recording.pk, needs_review=True).update(needs_review=False)
     if changed:

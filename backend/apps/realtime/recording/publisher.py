@@ -32,6 +32,10 @@ CLASS_RECORDING_STREAM_PRIORITY = 10
 
 
 def lecture_title_for(session, when=None):
+    """The class's topic when the host gave one, else "<class title> - <date>"."""
+    topic = str(getattr(session, "lecture_title", "") or "").strip()
+    if topic:
+        return topic[:255]
     when = timezone.localtime(when or getattr(session, "started_at", None) or timezone.now())
     base = (getattr(session, "title", "") or "Live class").strip()
     return f"{base} - {when:%d %b %Y}"[:255]
