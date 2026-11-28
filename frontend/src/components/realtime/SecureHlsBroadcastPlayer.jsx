@@ -1,7 +1,9 @@
 import Hls from "hls.js";
 import { useEffect, useRef, useState } from "react";
 import { reportRealtimeBroadcastPlaybackIssue } from "../../api/realtime";
+import { useAuth } from "../../hooks/useAuth";
 import ProtectedPlaybackSurface from "../ProtectedPlaybackSurface";
+import { owncastPingUrl, owncastViewerTag, startOwncastViewerPing } from "./owncastViewerPing";
 import {
   NATIVE_STALL_PROBE_MS,
   PROBE_RESULTS,
@@ -200,6 +202,8 @@ export default function SecureHlsBroadcastPlayer({
   onPlaybackStalledChange = null,
 }) {
   const videoRef = useRef(null);
+  const { user } = useAuth() || {};
+  const viewerTagRef = useRef("");
   const playerRetryTimerRef = useRef(null);
   const recoveryAttemptRef = useRef(0);
   const lastReportedIssueRef = useRef({ key: "", reportedAt: 0 });
@@ -1118,6 +1122,20 @@ export default function SecureHlsBroadcastPlayer({
       video.load();
     };
   }, [bootstrapReady, hlsUrl, playerGeneration, refreshKey, sessionId, unsupportedBrowser]);
+
+  // Live viewer count: ping Owncast while this player is playing (see
+  // owncastViewerPing.js). One tag per student, kept for this player.
+  const userId = user?.id ?? null;
+  useEffect(() => {
+    if (!bootstrapReady || unsupportedBrowser || !hlsUrl) return undefined;
+    if (!viewerTagRef.current || (userId && viewerTagRef.current !== owncastViewerTag(userId))) {
+      viewerTagRef.current = owncastViewerTag(userId);
+    }
+    return startOwncastViewerPing({
+      url: owncastPingUrl(hlsUrl, viewerTagRef.current),
+      getVideo: () => videoRef.current,
+    });
+  }, [bootstrapReady, hlsUrl, playerGeneration, unsupportedBrowser, userId]);
 
   if (unsupportedBrowser && fallbackEmbedUrl) {
     return (
